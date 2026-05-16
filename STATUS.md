@@ -8,6 +8,7 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
+- `6b4ff19` - `feat(m1): settings store on disk + Settings dialog (theme persistence)`
 - `e2837c1` - `feat(m1): per-session Channel + Pinia stores + typed IPC wrapper`
 - `1b8f7de` - `refactor(backend): split lib.rs into app/ + ipc/commands/ with AppError`
 - `b073ead` - `docs: adopt AGENTS.md standard at repo root (agents.md spec)`
