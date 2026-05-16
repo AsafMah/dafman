@@ -39,10 +39,13 @@ pub async fn create_session(
         loop {
             match subscription.recv().await {
                 Ok(event) => {
-                    // Log every event we forward. Event type at debug so
-                    // a stuck reasoning panel / silent UI can be traced
-                    // back to the wire without devtools open; full data
-                    // at trace because most payloads are big.
+                    // M1-TODO(observability): right now we log EVERY event
+                    // at debug (and reasoning/error data at debug too).
+                    // Once the chat UI is feature-complete and we've
+                    // shipped a Settings -> Diagnostics log level toggle
+                    // (see plans/plan-observability.prompt.md), demote
+                    // the per-event line to trace and keep only
+                    // counters/aggregates at debug to avoid log bloat.
                     tracing::debug!(
                         target: "dafman_lib::session_events",
                         session_id = %session_id,

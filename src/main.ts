@@ -26,17 +26,29 @@ const GreenAura = definePreset(Aura, {
   },
 });
 
-const app = createApp(App);
-
-app.use(createPinia());
-app.use(PrimeVue, {
-  theme: {
-    preset: GreenAura,
-    options: {
-      darkModeSelector: ".app-dark",
+// Dev-only playground: open with `?dev` during `npm run tauri dev`. The
+// dynamic import + DEV guard keeps Playground.vue out of production
+// bundles via tree-shaking.
+function mountWith(Root: typeof App) {
+  const app = createApp(Root);
+  app.use(createPinia());
+  app.use(PrimeVue, {
+    theme: {
+      preset: GreenAura,
+      options: {
+        darkModeSelector: ".app-dark",
+      },
     },
-  },
-});
-app.use(ToastService);
+  });
+  app.use(ToastService);
+  app.mount("#app");
+}
 
-app.mount("#app");
+if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("dev")
+) {
+  void import("./dev/Playground.vue").then((mod) => mountWith(mod.default));
+} else {
+  mountWith(App);
+}

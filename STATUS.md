@@ -8,23 +8,25 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
+- `d205151` - `feat(chat): render high-value session events (title, intent, usage, system callouts, model change, turn boundaries)`
+- `72c6994` - `feat(diagnostics): log reasoning/error event data + Open log folder button`
+- `66a5076` - `fix(chat): drop OpenAI's opaque reasoning blob events (empty content)`
+- `899c71b` - `fix(chat): drop alias, suppress empty reasoning cards, add ChatWindow component tests`
+- `d971488` - `feat(app): auto-create client on mount + per-event session logging + mockIPC E2E tests`
 - `1f737ba` - `feat(chat): per-session model + reasoning effort selectors in chat header`
-- `83af904` - `fix(chat): readable reasoning in dark mode, labeled selects, friendly session aliases`
+- `83af904` - `fix(chat): readable reasoning in dark mode, labeled selects`
 - `ebf636e` - `feat(chat): reasoning visibility + full-width chat redesign`
 - `6b4ff19` - `feat(m1): settings store on disk + Settings dialog (theme persistence)`
 - `e2837c1` - `feat(m1): per-session Channel + Pinia stores + typed IPC wrapper`
 - `1b8f7de` - `refactor(backend): split lib.rs into app/ + ipc/commands/ with AppError`
-- `b073ead` - `docs: adopt AGENTS.md standard at repo root (agents.md spec)`
-- `0e1587d` - `chore: centralize dev commands in package.json + add STATUS.md + copilot-instructions`
-- `7d26d5d` - `test(m1): testing baseline (vitest + cargo test + insta + CI)`
-- `5e05456` - `feat(m1): swap to Supercharged SDK pin + add tracing observability baseline`
 ## Next concrete step
-Pick a real-caller-grounded next step. **Markdown + code-block rendering** for assistant/reasoning content is a strong candidate — it directly improves what just landed (reasoning blocks would be far more readable with code highlight). After that, real permission UX / URL elicitation will land once we have a tool surface or MCP that actually elicits.
+**Markdown + code-block rendering** for assistant/reasoning content. Reasoning blocks especially are unreadable without code highlight today; the SDK already streams markdown-formatted text, we just render it as `pre-wrap`. Candidates: `marked` + `highlight.js`, or `markdown-it`. Sanitization mandatory (assistant output is untrusted).
 Other M1 items still open:
-1. **Real permission UX** — blocked on having any tools to permission.
-2. **URL elicitation card + `UrlOpener`** — blocked on a real caller (SDK auth flow, MCP OAuth, or clickable links once markdown lands).
-3. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
+1. **Real permission UX** - blocked on having any tools to permission.
+2. **URL elicitation card + `UrlOpener`** - blocked on a real caller (SDK auth flow, MCP OAuth, or clickable links once markdown lands).
+3. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle. Also: tone down per-event session logging (currently every event hits debug; see `M1-TODO(observability)` comment in `src-tauri/src/ipc/commands/session.rs`).
 4. **Real binary E2E via `tauri-driver`** (Linux CI).
+5. **Reasoning visible in CLI but missing in our UI for GPT-5.5** - investigate how the upstream CLI decrypts/displays `reasoning_opaque`. Worth a separate session.
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold.
 - [x] Single SDK Client lifecycle.
@@ -38,12 +40,19 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 - [x] **Testing baseline** - Vitest + `@vue/test-utils` + `happy-dom`; `cargo test` + `insta` + `tempfile`; first lib unit test (`logging::init`), first IPC contract snapshot (`SessionEventPayload`); CI runs both.
 - [x] **Centralized scripts** in `package.json` (`npm run test`, `npm run lint`, `npm run check`).
 - [x] **AGENTS.md** at repo root per the agents.md standard.
-- [x] **Backend module refactor** to the architecture-plan layout (`app/{error,events,state}.rs`, `ipc/commands/{client,session}.rs`). `AppError` (`thiserror`) replaces `String` returns; `tests/ipc_contract.rs` imports the real `SessionEventPayload`.
+- [x] **Backend module refactor** to the architecture-plan layout (`app/{error,events,state,settings,models}.rs`, `ipc/commands/{client,session,settings,models,diagnostics}.rs`). `AppError` (`thiserror`) replaces `String` returns; `tests/ipc_contract.rs` imports the real `SessionEventPayload`.
 - [x] **Per-session Tauri channel** (`tauri::ipc::Channel`) returned from `create_session`; dropped the global `session-event` filter on the frontend. `SessionEventPayload` no longer carries `sessionId` (channel identity scopes events). Added `src/ipc/types.ts` as the TS mirror surface.
 - [x] **Pinia stores** (`clientStore`, `sessionsStore`, `toastStore`, `permissionsStore` stub); centralized IPC behind `src/ipc/invoke.ts` (typed via `CommandMap`). PrimeVue `Toast` mounted at the app root; stores push toasts without needing a component context.
 - [x] **Typed IPC** - hand-mirror in `src/ipc/types.ts` (`SessionEventPayload`, `Settings`, `AppErrorPayload`, `CommandMap`); evaluate `tauri-specta` for M2.
 - [x] **Settings store** on disk (versioned JSON in `app_config_dir()/settings.json`) + minimal Settings dialog (General, Appearance) with three-state theme (system/light/dark). Backend `SettingsService` reads sync at startup, writes via `spawn_blocking`; falls back to defaults on missing/malformed files; future schema bumps go through `Settings::migrate`.
 - [x] **Dark mode** persisted via settings store; resolved through `resolveIsDark(theme, prefersDark)`, follows `prefers-color-scheme` when theme = `system`.
+- [x] **Auto-create client on mount** - no "Create Client" button; `App.vue` calls `clientStore.createClient()` after settings load.
+- [x] **Reasoning visibility** (Settings v2: `Appearance.reasoningVisibility` hidden/compact/expanded, default compact) + per-session header override + `ReasoningBlock.vue`. Tolerates `delta`/`deltaContent`/`text` field-name drift; drops OpenAI's opaque `reasoning_opaque` events.
+- [x] **Per-session model + reasoning effort selectors** in chat header (`list_models` / `set_session_model` IPC; `modelsStore` lazy load + dedupe; effort Select only renders when `supports.reasoningEffort`).
+- [x] **High-value event types rendered**: `session.title_changed` (header), `session.model_change` (badge + toast), `session.usage_info` / `assistant.usage` (token pill), `assistant.turn_start/end` (real "thinking" boundary), `assistant.intent` (intent pill), `session.info/warning`, `system.notification`, `model.call_failure`, `session.truncation`, `session.compaction_start/complete` - all severity-tinted system cards or ambient surfaces. Explicit no-op cases for `assistant.streaming_delta` (dup), raw `system.message`, `tools_updated`, etc.
+- [x] **Session event logging**: forwarder logs `event_type` + `session_id` at debug (default-on via `dafman_lib=debug`); reasoning/error/warning data at debug; everything else's data at trace. `M1-TODO(observability)`: demote per-event log to trace once chat is feature-complete and Settings → Diagnostics log toggle ships.
+- [x] **Open log folder** button in Settings → General (`get_log_dir` IPC + `revealItemInDir` from `tauri-plugin-opener`).
+- [x] **Dev playground** at `?dev` (DEV-only, tree-shaken from prod): scripted event sequences, custom event JSON pusher, toast firing, and a live `ChatWindow` preview.
 - [ ] **Real permission UX** - `PermissionService` replaces `ApproveAllHandler`; modal prompt.
 - [ ] **URL elicitation card + `UrlOpener`** with defaults (`https://github.com/login/*` allow-always; `localhost:*` allow-always; everything else ask).
 - [ ] **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
@@ -53,7 +62,7 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 ## Tests at a glance
 | Surface | Runner | Status |
 |---|---|---|
-| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`, `src/components/__tests__/`, `src/ipc/__tests__/`) | Vitest + happy-dom | 65 tests passing |
+| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`, `src/components/__tests__/`, `src/ipc/__tests__/`) | Vitest + happy-dom | 78 tests passing |
 | Frontend E2E via `mockIPC` (`src/__tests__/App.e2e.test.ts`) | Vitest + happy-dom + `@tauri-apps/api/mocks` | 4 tests passing |
 | Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 10 tests passing (`logging`, `app::settings`, `app::models`) |
 | Backend integration (`src-tauri/tests/`) | `cargo test` | 7 snapshots passing (`SessionEventPayload`, `Settings`, `ModelSummary`, 4 × `AppError` variants) |
