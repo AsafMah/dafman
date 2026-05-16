@@ -33,20 +33,57 @@ pub async fn create_session(
     let session_id = session.id().to_string();
     let session = Arc::new(session);
     let mut subscription = session.subscribe();
+    let session_id_for_log = session_id.clone();
     let event_task = spawn(async move {
+        let session_id = session_id_for_log;
         loop {
             match subscription.recv().await {
                 Ok(event) => {
+                    // Log every event we forward. Event type at debug so
+                    // a stuck reasoning panel / silent UI can be traced
+                    // back to the wire without devtools open; full data
+                    // at trace because some payloads are big.
+                    tracing::debug!(
+                        target: "dafman_lib::session_events",
+                        session_id = %session_id,
+                        event_type = %event.event_type,
+                        "session event"
+                    );
+                    tracing::trace!(
+                        target: "dafman_lib::session_events",
+                        session_id = %session_id,
+                        event_type = %event.event_type,
+                        data = ?event.data,
+                        "session event data"
+                    );
                     let payload = SessionEventPayload {
                         event_type: event.event_type.clone(),
                         data: event.data.clone(),
                     };
                     if on_event.send(payload).is_err() {
+                        tracing::debug!(
+                            session_id = %session_id,
+                            "session event channel closed, stopping forwarder"
+                        );
                         break;
                     }
                 }
-                Err(RecvError::Lagged(_)) => continue,
-                Err(_) => break,
+                Err(RecvError::Lagged(n)) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        skipped = ?n,
+                        "session subscription lagged, events dropped"
+                    );
+                    continue;
+                }
+                Err(err) => {
+                    tracing::debug!(
+                        session_id = %session_id,
+                        error = ?err,
+                        "session subscription ended"
+                    );
+                    break;
+                }
             }
         }
     });

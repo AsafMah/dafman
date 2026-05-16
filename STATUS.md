@@ -24,7 +24,7 @@ Other M1 items still open:
 1. **Real permission UX** — blocked on having any tools to permission.
 2. **URL elicitation card + `UrlOpener`** — blocked on a real caller (SDK auth flow, MCP OAuth, or clickable links once markdown lands).
 3. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
-4. **One Playwright smoke test** (first-run → create client → create session → send → see streaming reply).
+4. **Real binary E2E via `tauri-driver`** (Linux CI).
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold.
 - [x] Single SDK Client lifecycle.
@@ -48,14 +48,16 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 - [ ] **URL elicitation card + `UrlOpener`** with defaults (`https://github.com/login/*` allow-always; `localhost:*` allow-always; everything else ask).
 - [ ] **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
 - [x] **Frontend store + component tests** to follow the refactor (sessionsStore optimistic flow, ChatPane render).
-- [ ] **One Playwright smoke test** (first-run -> create client -> create session -> send -> see streaming reply).
+- [x] **mockIPC E2E** (`src/__tests__/App.e2e.test.ts`) - covers auto-create-client → new-session → stream events → send message without launching the Tauri binary.
+- [ ] **Real binary E2E via `tauri-driver` + Playwright** (Linux runner; macOS unsupported as of 2025). One smoke test: launch → new session → send → assert streamed reply.
 ## Tests at a glance
 | Surface | Runner | Status |
 |---|---|---|
 | Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`, `src/components/__tests__/`, `src/ipc/__tests__/`) | Vitest + happy-dom | 65 tests passing |
+| Frontend E2E via `mockIPC` (`src/__tests__/App.e2e.test.ts`) | Vitest + happy-dom + `@tauri-apps/api/mocks` | 4 tests passing |
 | Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 10 tests passing (`logging`, `app::settings`, `app::models`) |
 | Backend integration (`src-tauri/tests/`) | `cargo test` | 7 snapshots passing (`SessionEventPayload`, `Settings`, `ModelSummary`, 4 × `AppError` variants) |
-| E2E (Playwright) | _not yet wired_ | - |
+| E2E (Playwright via `tauri-driver`) | _not yet wired_ | - |
 ## Conventions for agents
 Agent contract lives in [`AGENTS.md`](AGENTS.md) at the repo root (per the [agents.md](https://agents.md/) standard). Highlights:
 - Read `plans/plan-overview.prompt.md` first; it indexes everything else.

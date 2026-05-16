@@ -45,6 +45,15 @@ onMounted(async () => {
   } catch {
     /* toast already shown */
   }
+  // Auto-start the SDK client so the user is one click away from
+  // creating a session. Errors are surfaced via the toast store; the
+  // user can retry via the Create Session button (which stays disabled
+  // until the client is ready).
+  try {
+    await clientStore.createClient();
+  } catch {
+    /* toast already shown */
+  }
 });
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
@@ -66,14 +75,6 @@ watch(
   },
 );
 
-async function onCreateClient() {
-  try {
-    await clientStore.createClient();
-  } catch {
-    /* toast already shown */
-  }
-}
-
 async function onCreateSession() {
   try {
     await sessionsStore.createSession();
@@ -93,17 +94,9 @@ async function onCreateSession() {
     <div class="topbar">
       <div class="topbar-actions">
         <Button
-          label="Create Client"
-          icon="pi pi-play"
-          :loading="isCreatingClient"
-          :disabled="clientReady"
-          @click="onCreateClient"
-        />
-        <Button
-          label="Create Session"
+          label="New Session"
           icon="pi pi-plus"
-          severity="secondary"
-          :loading="isCreatingSession"
+          :loading="isCreatingSession || (isCreatingClient && !clientReady)"
           :disabled="!clientReady"
           @click="onCreateSession"
         />
@@ -133,7 +126,8 @@ async function onCreateSession() {
       />
     </div>
     <div v-else class="placeholder">
-      Create a client, then create a session to start chatting.
+      <template v-if="!clientReady">Starting Copilot client...</template>
+      <template v-else>Click <strong>New Session</strong> to start chatting.</template>
     </div>
   </main>
 </template>
