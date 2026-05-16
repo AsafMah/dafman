@@ -56,7 +56,7 @@ function close() {
         <TabPanel value="general">
           <p class="muted">
             Schema version
-            <strong>{{ settings.version }}</strong> â€¢ stored under
+            <strong>{{ settings.version }}</strong> - stored under
             <code>app_config_dir()/settings.json</code>.
           </p>
         </TabPanel>
@@ -76,7 +76,7 @@ function close() {
     </Tabs>
 
     <template #footer>
-      <span v-if="isSaving" class="muted">Savingâ€¦</span>
+      <span v-if="isSaving" class="muted">Saving...</span>
       <Button label="Close" icon="pi pi-times" @click="close" />
     </template>
   </Dialog>

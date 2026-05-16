@@ -209,7 +209,7 @@ async function sendMessage() {
           shape="circle"
           size="small"
         />
-        <div class="message-bubble">{{ message.text || "â€¦" }}</div>
+        <div class="message-bubble">{{ message.text || "..." }}</div>
       </div>
 
       <div
