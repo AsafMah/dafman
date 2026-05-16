@@ -9,7 +9,9 @@ import Tag from "primevue/tag";
 import {
   appendSystemMessage,
   appendUserMessage,
+  defaultAmbient,
   processEvents,
+  type ChatAmbient,
   type ChatItem,
   type IdCounter,
 } from "../lib/chatEvents";
@@ -51,10 +53,17 @@ onMounted(() => {
 
 const draft = ref("");
 const items = ref<ChatItem[]>([]);
+const ambient = ref<ChatAmbient>(defaultAmbient());
 const messagesEl = ref<HTMLElement | null>(null);
-const isSending = ref(false);
+/// Fallback "thinking" flag used until we observe a turn boundary; after
+/// the first `assistant.turn_start` we trust `ambient.turnActive` exclusively.
+const isSendingFallback = ref(false);
 const idCounter: IdCounter = { next: 1 };
 let processedEvents = 0;
+
+const isSending = computed(() =>
+  ambient.value.sawTurnBoundary ? ambient.value.turnActive : isSendingFallback.value,
+);
 
 const sessionOverride = ref<ReasoningVisibility | "default">("default");
 
@@ -124,15 +133,29 @@ watch(
     if (processedEvents >= len) return;
     const fresh = props.events.slice(processedEvents);
     processedEvents = len;
-    const { items: next, idle, error } = processEvents(
-      items.value,
-      fresh,
-      idCounter,
-    );
-    items.value = next;
-    if (idle || error) isSending.value = false;
-    if (error) {
-      const lastSystem = [...next].reverse().find((i) => i.kind === "system");
+    const result = processEvents(items.value, ambient.value, fresh, idCounter);
+    items.value = result.items;
+    ambient.value = result.ambient;
+    if (result.idle || result.error) isSendingFallback.value = false;
+    for (const t of result.toasts) {
+      switch (t.severity) {
+        case "success":
+          toasts.success(t.summary, t.detail);
+          break;
+        case "warn":
+          toasts.warn(t.summary, t.detail);
+          break;
+        case "error":
+          toasts.error(t.summary, t.detail);
+          break;
+        default:
+          toasts.info(t.summary, t.detail);
+      }
+    }
+    if (result.error) {
+      const lastSystem = [...result.items]
+        .reverse()
+        .find((i) => i.kind === "system" && i.severity === "error");
       if (lastSystem) toasts.error("Session error", lastSystem.text);
     }
     scrollToBottom();
@@ -144,7 +167,8 @@ watch(
   () => props.sessionId,
   () => {
     items.value = [];
-    isSending.value = false;
+    ambient.value = defaultAmbient();
+    isSendingFallback.value = false;
     draft.value = "";
     sessionOverride.value = "default";
     processedEvents = props.events.length;
@@ -157,7 +181,7 @@ async function sendMessage() {
 
   items.value = appendUserMessage(items.value, text, idCounter);
   draft.value = "";
-  isSending.value = true;
+  isSendingFallback.value = true;
   await scrollToBottom();
 
   try {
@@ -170,7 +194,7 @@ async function sendMessage() {
       idCounter,
     );
     toasts.error("Failed to send message", message);
-    isSending.value = false;
+    isSendingFallback.value = false;
     await scrollToBottom();
   }
 }
@@ -180,7 +204,10 @@ async function sendMessage() {
   <section class="chat-tile" :style="{ '--accent': accentColor }">
     <header class="chat-header">
       <div class="chat-title">
-        <Tag :value="props.sessionId" severity="secondary" />
+        <Tag :value="ambient.title || props.sessionId" severity="secondary" />
+        <span v-if="ambient.model" class="model-badge" :title="ambient.model">
+          {{ ambient.model }}
+        </span>
       </div>
       <div class="chat-header-actions">
         <label class="control" :for="`model-${props.sessionId}`">
@@ -247,9 +274,26 @@ async function sendMessage() {
           :text="item.text"
           :visibility="reasoningVisibility"
         />
-        <article v-else class="message-card" :class="item.kind">
+        <article
+          v-else
+          class="message-card"
+          :class="[
+            item.kind,
+            item.kind === 'system' ? `severity-${item.severity}` : '',
+          ]"
+        >
           <header class="role-label">
-            {{ item.kind === "user" ? "You" : item.kind === "assistant" ? "Assistant" : "System" }}
+            {{
+              item.kind === "user"
+                ? "You"
+                : item.kind === "assistant"
+                  ? "Assistant"
+                  : item.kind === "system" && item.severity === "warn"
+                    ? "Warning"
+                    : item.kind === "system" && item.severity === "error"
+                      ? "Error"
+                      : "Info"
+            }}
           </header>
           <p class="message-body">{{ item.text || "..." }}</p>
         </article>
@@ -261,10 +305,18 @@ async function sendMessage() {
       >
         <header class="role-label">Assistant</header>
         <p class="message-body">
-          <i class="pi pi-spin pi-spinner" /> Thinking...
+          <i class="pi pi-spin pi-spinner" />
+          {{ ambient.intent || "Thinking..." }}
         </p>
       </article>
     </div>
+
+    <footer v-if="ambient.usage" class="chat-usage">
+      <span class="usage-pill" :title="`${ambient.usage.currentTokens} / ${ambient.usage.tokenLimit} tokens`">
+        {{ ambient.usage.currentTokens.toLocaleString() }} /
+        {{ ambient.usage.tokenLimit.toLocaleString() }} tokens
+      </span>
+    </footer>
 
     <form class="chat-composer" @submit.prevent="sendMessage">
       <InputGroup>
@@ -375,6 +427,47 @@ async function sendMessage() {
 .message-card.system {
   background: color-mix(in srgb, var(--p-red-500, #ef4444) 12%, var(--p-content-background));
   border-left-color: var(--p-red-500, #ef4444);
+}
+
+.message-card.system.severity-info {
+  background: color-mix(in srgb, var(--p-blue-500, #3b82f6) 10%, var(--p-content-background));
+  border-left-color: var(--p-blue-500, #3b82f6);
+}
+
+.message-card.system.severity-warn {
+  background: color-mix(in srgb, var(--p-amber-500, #f59e0b) 12%, var(--p-content-background));
+  border-left-color: var(--p-amber-500, #f59e0b);
+}
+
+.message-card.system.severity-error {
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 12%, var(--p-content-background));
+  border-left-color: var(--p-red-500, #ef4444);
+}
+
+.model-badge {
+  font-family: var(--p-font-family-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-sm);
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-usage {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem 0.75rem 0;
+}
+
+.usage-pill {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  font-variant-numeric: tabular-nums;
 }
 
 .role-label {
