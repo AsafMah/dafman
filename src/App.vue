@@ -1,66 +1,136 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import Button from "primevue/button";
-import Card from "primevue/card";
-import Message from "primevue/message";
+import Tag from "primevue/tag";
+import ToggleSwitch from "primevue/toggleswitch";
+import ChatWindow from "./components/ChatWindow.vue";
 
-const result = ref("");
-const isLoading = ref(false);
-const isError = ref(false);
+const isDarkMode = ref(false);
+const sessionId = ref<string | null>(null);
+const clientReady = ref(false);
+const statusMessage = ref<string>("");
+const isCreatingClient = ref(false);
+const isCreatingSession = ref(false);
+
+function applyThemeClass(isDark: boolean) {
+  document.documentElement.classList.toggle("app-dark", isDark);
+}
+
+onMounted(() => {
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  isDarkMode.value = prefersDark;
+  applyThemeClass(prefersDark);
+});
+
+watch(isDarkMode, (nextValue) => {
+  applyThemeClass(nextValue);
+});
 
 async function createClient() {
-  isLoading.value = true;
-  isError.value = false;
-
+  isCreatingClient.value = true;
   try {
-    result.value = await invoke<string>("create_client");
+    statusMessage.value = await invoke<string>("create_client");
+    clientReady.value = true;
   } catch (error) {
-    isError.value = true;
-    result.value = `Error: ${String(error)}`;
+    statusMessage.value = `Error: ${String(error)}`;
   } finally {
-    isLoading.value = false;
+    isCreatingClient.value = false;
+  }
+}
+
+async function createSession() {
+  isCreatingSession.value = true;
+  try {
+    const id = await invoke<string>("create_session");
+    sessionId.value = id;
+    statusMessage.value = `Session created`;
+  } catch (error) {
+    statusMessage.value = `Error: ${String(error)}`;
+  } finally {
+    isCreatingSession.value = false;
   }
 }
 </script>
 
 <template>
-  <main class="container">
-    <Card class="panel">
-      <template #title>Copilot Client</template>
-      <template #content>
-        <div class="content">
-          <Button
-            type="button"
-            :loading="isLoading"
-            :label="isLoading ? 'Creating client...' : 'Create Copilot Client'"
-            icon="pi pi-play"
-            @click="createClient"
-          />
-          <Message v-if="result" :severity="isError ? 'error' : 'success'">
-            {{ result }}
-          </Message>
-        </div>
-      </template>
-    </Card>
+  <main class="app-root" :class="{ 'app-dark': isDarkMode }">
+    <div class="topbar">
+      <div class="topbar-actions">
+        <Button
+          label="Create Client"
+          icon="pi pi-play"
+          :loading="isCreatingClient"
+          :disabled="clientReady"
+          @click="createClient"
+        />
+        <Button
+          label="Create Session"
+          icon="pi pi-plus"
+          severity="secondary"
+          :loading="isCreatingSession"
+          :disabled="!clientReady"
+          @click="createSession"
+        />
+        <Tag v-if="statusMessage" :value="statusMessage" severity="info" />
+      </div>
+      <div class="mode-toggle">
+        <span>Dark mode</span>
+        <ToggleSwitch v-model="isDarkMode" />
+      </div>
+    </div>
+
+    <ChatWindow v-if="sessionId" :session-id="sessionId" />
+    <div v-else class="placeholder">
+      Create a client, then create a session to start chatting.
+    </div>
   </main>
 </template>
 
 <style scoped>
-.container {
-  min-height: 100vh;
-  display: grid;
-  place-content: center;
+.app-root {
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.app-root.app-dark {
+  background: var(--p-surface-950);
+}
+
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.placeholder {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--p-text-muted-color);
   padding: 1rem;
 }
-
-.panel {
-  width: min(500px, 92vw);
-}
-
-.content {
-  display: grid;
-  gap: 1rem;
-}
-
 </style>
