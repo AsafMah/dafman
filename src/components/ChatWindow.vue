@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import InputGroup from "primevue/inputgroup";
@@ -14,7 +14,12 @@ import {
   type ChatItem,
   type IdCounter,
 } from "../lib/chatEvents";
-import type { ReasoningVisibility, SessionEventPayload } from "../ipc/types";
+import type {
+  ModelSummary,
+  ReasoningVisibility,
+  SessionEventPayload,
+} from "../ipc/types";
+import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
@@ -24,6 +29,8 @@ const props = defineProps<{
   sessionId: string;
   alias: string;
   events: SessionEventPayload[];
+  model: string | null;
+  reasoningEffort: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -32,8 +39,16 @@ const emit = defineEmits<{
 
 const sessionsStore = useSessionsStore();
 const settingsStore = useSettingsStore();
+const modelsStore = useModelsStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
+const { models } = storeToRefs(modelsStore);
+
+onMounted(() => {
+  modelsStore.load().catch(() => {
+    /* toast already shown */
+  });
+});
 
 const draft = ref("");
 const items = ref<ChatItem[]>([]);
@@ -56,6 +71,41 @@ const reasoningOptions: { label: string; value: ReasoningVisibility | "default" 
   { label: "Compact", value: "compact" },
   { label: "Expanded", value: "expanded" },
 ];
+
+const selectedModel = computed<ModelSummary | undefined>(() =>
+  props.model ? models.value.find((m) => m.id === props.model) : undefined,
+);
+
+const modelOptions = computed(() =>
+  models.value.map((m) => ({ label: m.name, value: m.id })),
+);
+
+const effortOptions = computed(() =>
+  (selectedModel.value?.supportedReasoningEfforts ?? []).map((effort) => ({
+    label: effort,
+    value: effort,
+  })),
+);
+
+const modelChoice = computed<string | null>({
+  get: () => props.model,
+  set: (value) => {
+    if (!value) return;
+    const fresh = models.value.find((m) => m.id === value);
+    const effort = fresh?.supportsReasoningEffort
+      ? props.reasoningEffort ?? fresh.defaultReasoningEffort ?? null
+      : null;
+    void sessionsStore.setSessionModel(props.sessionId, value, effort);
+  },
+});
+
+const effortChoice = computed<string | null>({
+  get: () => props.reasoningEffort,
+  set: (value) => {
+    if (!props.model || !value) return;
+    void sessionsStore.setSessionModel(props.sessionId, props.model, value);
+  },
+});
 
 const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
@@ -135,6 +185,37 @@ async function sendMessage() {
         <span class="session-id" :title="props.sessionId">{{ props.sessionId }}</span>
       </div>
       <div class="chat-header-actions">
+        <label class="control" :for="`model-${props.sessionId}`">
+          <span class="control-label">Model</span>
+          <Select
+            :input-id="`model-${props.sessionId}`"
+            v-model="modelChoice"
+            :options="modelOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            placeholder="Default"
+            :disabled="models.length === 0"
+            aria-label="Model for this session"
+          />
+        </label>
+        <label
+          v-if="selectedModel?.supportsReasoningEffort"
+          class="control"
+          :for="`effort-${props.sessionId}`"
+        >
+          <span class="control-label">Effort</span>
+          <Select
+            :input-id="`effort-${props.sessionId}`"
+            v-model="effortChoice"
+            :options="effortOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            placeholder="Default"
+            aria-label="Reasoning effort for this session"
+          />
+        </label>
         <label class="control" :for="`reasoning-${props.sessionId}`">
           <span class="control-label">Reasoning</span>
           <Select

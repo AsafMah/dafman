@@ -7,11 +7,13 @@ mod app;
 mod ipc;
 mod logging;
 pub use app::events::SessionEventPayload;
+pub use app::models::ModelSummary;
 use app::settings::SettingsService;
 pub use app::settings::{Appearance, ReasoningVisibility, Settings, ThemeChoice, SETTINGS_VERSION};
 use app::state::AppState;
 use app::LogGuard;
 use ipc::commands::client::create_client;
+use ipc::commands::models::{list_models, set_session_model};
 use ipc::commands::session::{create_session, disconnect_session, send_message};
 use ipc::commands::settings::{get_settings, update_settings};
 use std::sync::Arc;
@@ -53,7 +55,9 @@ pub fn run() {
             disconnect_session,
             send_message,
             get_settings,
-            update_settings
+            update_settings,
+            list_models,
+            set_session_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

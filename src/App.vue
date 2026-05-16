@@ -127,6 +127,8 @@ async function onCreateSession() {
         :session-id="session.id"
         :alias="session.alias"
         :events="session.events"
+        :model="session.model"
+        :reasoning-effort="session.reasoningEffort"
         @close="sessionsStore.closeSession(session.id)"
       />
     </div>

@@ -27,6 +27,8 @@ describe("sessionsStore", () => {
     const record = await store.createSession();
     expect(record?.id).toBe("sess-1");
     expect(record?.alias).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(record?.model).toBeNull();
+    expect(record?.reasoningEffort).toBeNull();
     expect(store.sessions).toHaveLength(1);
     expect(store.isCreating).toBe(false);
   });
@@ -64,5 +66,26 @@ describe("sessionsStore", () => {
     invokeMock.mockRejectedValueOnce(new Error("disconnect failed"));
     await store.closeSession("sess-3");
     expect(store.sessions).toHaveLength(0);
+  });
+
+  it("setSessionModel updates the record on success and surfaces toast on error", async () => {
+    invokeMock.mockResolvedValueOnce("sess-4");
+    const store = useSessionsStore();
+    await store.createSession();
+    invokeMock.mockResolvedValueOnce("claude-sonnet-4.5");
+    await store.setSessionModel("sess-4", "claude-sonnet-4.5", "high");
+    const record = store.sessions.find((s) => s.id === "sess-4");
+    expect(record?.model).toBe("claude-sonnet-4.5");
+    expect(record?.reasoningEffort).toBe("high");
+
+    invokeMock.mockRejectedValueOnce(new Error("backend rejected"));
+    const toasts = useToastStore();
+    toasts.consume();
+    await expect(
+      store.setSessionModel("sess-4", "other-model", null),
+    ).rejects.toThrow("backend rejected");
+    expect(toasts.pending.some((t) => t.severity === "error")).toBe(true);
+    // Failed switch leaves the record's previous model in place.
+    expect(record?.model).toBe("claude-sonnet-4.5");
   });
 });

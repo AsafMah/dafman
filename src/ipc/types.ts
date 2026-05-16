@@ -34,6 +34,14 @@ export type Settings = {
   appearance: Appearance;
 };
 
+export type ModelSummary = {
+  id: string;
+  name: string;
+  supportsReasoningEffort: boolean;
+  supportedReasoningEfforts: string[];
+  defaultReasoningEffort: string | null;
+};
+
 export type CommandMap = {
   create_client: { args: Record<string, never>; result: string };
   create_session: {
@@ -44,6 +52,15 @@ export type CommandMap = {
   send_message: { args: { sessionId: string; text: string }; result: string };
   get_settings: { args: Record<string, never>; result: Settings };
   update_settings: { args: { next: Settings }; result: Settings };
+  list_models: { args: Record<string, never>; result: ModelSummary[] };
+  set_session_model: {
+    args: {
+      sessionId: string;
+      model: string;
+      reasoningEffort: string | null;
+    };
+    result: string;
+  };
 };
 
 export type CommandName = keyof CommandMap;

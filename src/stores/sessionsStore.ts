@@ -19,6 +19,11 @@ export type SessionRecord = {
   alias: string;
   channel: Channel<SessionEventPayload>;
   events: SessionEventPayload[];
+  /// Currently-selected model id; `null` until the user picks one or a
+  /// `session.model_change` event arrives.
+  model: string | null;
+  /// Currently-selected reasoning effort, when the model supports it.
+  reasoningEffort: string | null;
 };
 
 export const useSessionsStore = defineStore("sessions", () => {
@@ -33,11 +38,36 @@ export const useSessionsStore = defineStore("sessions", () => {
     const events = reactive<SessionEventPayload[]>([]);
     channel.onmessage = (payload) => {
       events.push(payload);
+      // Keep model + reasoning effort in sync with backend-initiated changes
+      // (rate-limit auto-switch, /model commands, etc.). The session.model_change
+      // event ships both fields when applicable.
+      if (payload.eventType === "session.model_change") {
+        const data = payload.data as {
+          newModel?: unknown;
+          reasoningEffort?: unknown;
+        };
+        const record = sessions.value.find((s) => s.id === pendingId);
+        if (record && typeof data.newModel === "string") {
+          record.model = data.newModel;
+        }
+        if (record && typeof data.reasoningEffort === "string") {
+          record.reasoningEffort = data.reasoningEffort;
+        }
+      }
     };
+    let pendingId: string | null = null;
     try {
       const id = await invokeCommand("create_session", { onEvent: channel });
+      pendingId = id;
       const alias = generateSessionAlias();
-      const record: SessionRecord = { id, alias, channel, events };
+      const record: SessionRecord = {
+        id,
+        alias,
+        channel,
+        events,
+        model: null,
+        reasoningEffort: null,
+      };
       sessions.value.push(record);
       toasts.success("Session created", alias);
       return record;
@@ -66,5 +96,36 @@ export const useSessionsStore = defineStore("sessions", () => {
     await invokeCommand("send_message", { sessionId, text });
   }
 
-  return { sessions, isCreating, createSession, closeSession, sendMessage };
+  async function setSessionModel(
+    sessionId: string,
+    model: string,
+    reasoningEffort: string | null,
+  ): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("set_session_model", {
+        sessionId,
+        model,
+        reasoningEffort,
+      });
+      const record = sessions.value.find((s) => s.id === sessionId);
+      if (record) {
+        record.model = model;
+        record.reasoningEffort = reasoningEffort;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to switch model", message);
+      throw err;
+    }
+  }
+
+  return {
+    sessions,
+    isCreating,
+    createSession,
+    closeSession,
+    sendMessage,
+    setSessionModel,
+  };
 });
