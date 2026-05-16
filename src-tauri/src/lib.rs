@@ -1,8 +1,11 @@
-use std::collections::HashMap;
+﻿use std::collections::HashMap;
 use std::sync::Arc;
 use github_copilot_sdk::{Client, ClientOptions, SessionConfig};
 use github_copilot_sdk::handler::ApproveAllHandler;
 use github_copilot_sdk::session::Session;
+use tracing::info;
+
+mod logging;
 use github_copilot_sdk::subscription::RecvError;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -29,6 +32,7 @@ struct SessionEventPayload {
 }
 
 #[tauri::command]
+#[tracing::instrument(skip(state))]
 async fn create_client(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let mut client_slot = state.client.lock().await;
 
@@ -45,6 +49,7 @@ async fn create_client(state: tauri::State<'_, AppState>) -> Result<String, Stri
 }
 
 #[tauri::command]
+#[tracing::instrument(skip(app, state))]
 async fn create_session(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
@@ -104,6 +109,7 @@ async fn create_session(
 }
 
 #[tauri::command]
+#[tracing::instrument(skip(state))]
 async fn disconnect_session(
     session_id: String,
     state: tauri::State<'_, AppState>,
@@ -128,6 +134,7 @@ async fn disconnect_session(
 }
 
 #[tauri::command]
+#[tracing::instrument(skip(state, text), fields(text_len = text.len()))]
 async fn send_message(
     session_id: String,
     text: String,
@@ -153,7 +160,18 @@ async fn send_message(
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // Resolve the per-app log directory under the OS app-data dir and
+            // start the tracing subscriber. Keep the guard inside AppState so
+            // it flushes on shutdown.
+            let log_dir = app
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("logs"));
+            std::fs::create_dir_all(&log_dir).ok();
+            let guard = logging::init(log_dir);
+            app.manage(LogGuard(guard));
             app.manage(AppState::default());
+            info!(version = env!("CARGO_PKG_VERSION"), "dafman started");
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -166,3 +184,12 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+/// Newtype so the tracing-appender `WorkerGuard` can live in `tauri::State`
+/// without colliding with other types.
+#[allow(dead_code)]
+struct LogGuard(tracing_appender::non_blocking::WorkerGuard);
+
+
+
+
+
