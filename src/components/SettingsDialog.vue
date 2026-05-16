@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import SelectButton from "primevue/selectbutton";
@@ -10,6 +11,8 @@ import Tab from "primevue/tab";
 import TabPanels from "primevue/tabpanels";
 import TabPanel from "primevue/tabpanel";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useToastStore } from "../stores/toastStore";
+import { invokeCommand } from "../ipc/invoke";
 import type { ReasoningVisibility, ThemeChoice } from "../ipc/types";
 
 const props = defineProps<{ visible: boolean }>();
@@ -49,6 +52,17 @@ const reasoningVisibility = computed<ReasoningVisibility>({
 function close() {
   emit("update:visible", false);
 }
+
+async function openLogFolder() {
+  const toasts = useToastStore();
+  try {
+    const dir = await invokeCommand("get_log_dir", {});
+    await revealItemInDir(dir);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    toasts.error("Couldn't open log folder", message);
+  }
+}
 </script>
 
 <template>
@@ -72,6 +86,21 @@ function close() {
             <strong>{{ settings.version }}</strong> - stored under
             <code>app_config_dir()/settings.json</code>.
           </p>
+          <div class="row">
+            <label>Diagnostics</label>
+            <Button
+              label="Open log folder"
+              icon="pi pi-folder-open"
+              severity="secondary"
+              size="small"
+              @click="openLogFolder"
+            />
+            <p class="muted hint">
+              Opens the daily JSON log file in your file manager. Set
+              <code>DAFMAN_LOG=dafman_lib::session_events=trace</code> for the
+              full event payload.
+            </p>
+          </div>
         </TabPanel>
         <TabPanel value="appearance">
           <div class="row">

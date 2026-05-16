@@ -13,6 +13,7 @@ pub use app::settings::{Appearance, ReasoningVisibility, Settings, ThemeChoice, 
 use app::state::AppState;
 use app::LogGuard;
 use ipc::commands::client::create_client;
+use ipc::commands::diagnostics::get_log_dir;
 use ipc::commands::models::{list_models, set_session_model};
 use ipc::commands::session::{create_session, disconnect_session, send_message};
 use ipc::commands::settings::{get_settings, update_settings};
@@ -57,7 +58,8 @@ pub fn run() {
             get_settings,
             update_settings,
             list_models,
-            set_session_model
+            set_session_model,
+            get_log_dir
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

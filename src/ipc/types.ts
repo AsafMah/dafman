@@ -61,6 +61,7 @@ export type CommandMap = {
     };
     result: string;
   };
+  get_log_dir: { args: Record<string, never>; result: string };
 };
 
 export type CommandName = keyof CommandMap;

@@ -42,20 +42,43 @@ pub async fn create_session(
                     // Log every event we forward. Event type at debug so
                     // a stuck reasoning panel / silent UI can be traced
                     // back to the wire without devtools open; full data
-                    // at trace because some payloads are big.
+                    // at trace because most payloads are big.
                     tracing::debug!(
                         target: "dafman_lib::session_events",
                         session_id = %session_id,
                         event_type = %event.event_type,
                         "session event"
                     );
-                    tracing::trace!(
-                        target: "dafman_lib::session_events",
-                        session_id = %session_id,
-                        event_type = %event.event_type,
-                        data = ?event.data,
-                        "session event data"
+                    // Reasoning + error events are rare and the *contents*
+                    // are exactly what we need to diagnose a stuck UI, so
+                    // log their full data at debug regardless of the trace
+                    // toggle. Other events stay behind trace to avoid log
+                    // bloat from delta floods.
+                    let is_diagnostic = matches!(
+                        event.event_type.as_str(),
+                        "assistant.reasoning"
+                            | "assistant.reasoning_delta"
+                            | "session.error"
+                            | "session.warning"
+                            | "model.call_failure"
                     );
+                    if is_diagnostic {
+                        tracing::debug!(
+                            target: "dafman_lib::session_events",
+                            session_id = %session_id,
+                            event_type = %event.event_type,
+                            data = %event.data,
+                            "session event (full data)"
+                        );
+                    } else {
+                        tracing::trace!(
+                            target: "dafman_lib::session_events",
+                            session_id = %session_id,
+                            event_type = %event.event_type,
+                            data = %event.data,
+                            "session event data"
+                        );
+                    }
                     let payload = SessionEventPayload {
                         event_type: event.event_type.clone(),
                         data: event.data.clone(),
