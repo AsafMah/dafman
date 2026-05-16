@@ -22,3 +22,27 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Rust / Tauri build artifacts
+src-tauri/target/
+target/
+# Build output
+dist/
+dist-ssr/
+# OS metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+# IDE / Editor
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+# Logs
+*.log
+# Local environment
+.env
+.env.*
+!.env.example
+# Dafman app data (local-only)
+.dafman/

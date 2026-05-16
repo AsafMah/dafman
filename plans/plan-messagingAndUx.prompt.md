@@ -1,111 +1,109 @@
-# Dafman — Messaging & UX
-
+﻿# Dafman — Messaging & UX
 ## Chat surface
-
 ### Layout (per pane)
-
-- **Header**: accent stripe, session label, model badge, "thinking" indicator, kebab menu (export, settings, close).
-- **Quick controls row** (collapsible): model picker, mode (chat / autopilot), tools allow-list quick toggle.
-- **Message list** (scrollable): mixed stream of user, assistant, reasoning, tool call, system events.
-- **Composer**: text area with auto-grow, attachment chips, mode hint, send / abort button, slash-command hint.
-
+- **Header**: accent stripe, session label, model badge, account badge, "thinking" indicator, kebab menu (export, settings, close).
+- **Quick controls row** (collapsible): model picker (with capability overrides), mode (chat / autopilot), tools allow-list quick toggle, response format (text / image / mixed).
+- **Message list** (scrollable): mixed stream of user, assistant, reasoning, tool call, system, elicitation, image events.
+- **Composer**: text area with auto-grow, attachment chips, mode hint, send / abort button, slash-command hint, "Advanced" panel for headers / response format.
 ### Message types & rendering
-
 | Type | Role | Default display | Toggle states |
 |---|---|---|---|
-| `user` | left/right per layout choice | plain markdown bubble | n/a |
-| `assistant` | accent bubble | markdown with code blocks | n/a |
+| `user` | left | plain markdown bubble | n/a |
+| `assistant` | right | markdown with code blocks; accent bubble | n/a |
 | `reasoning` | secondary bubble with `pi-bolt` icon | collapsed summary line | hidden / collapsed / expanded |
 | `tool_call` | dedicated card | "Ran tool X — succeeded" with chevron | hidden / collapsed / expanded |
+| `image` (assistant-generated) | embedded image | full image with zoom; click to open | n/a |
+| `inline_confirm` (`session.ui.confirm`) | inline card | message + Yes/No/Cancel | n/a (one-shot) |
+| `inline_select` (`session.ui.select`) | inline card | message + radio/checkbox list + Submit | n/a |
+| `inline_input` (`session.ui.input`) | inline card | message + typed input with format hint + Submit | n/a |
+| `url_elicitation` (URL-mode) | inline card | URL preview + Open / Copy / Cancel | n/a |
 | `system` | callout | one-liner, dismissable | n/a |
 | `error` | red callout | message + details on expand | n/a |
 | `usage_info` | tiny footer pill | token totals | always shown / hidden |
-
 ### Reasoning visibility
-
 - Per-message: chevron to expand/collapse.
 - Per-session: header dropdown — "Reasoning: hidden / compact / full".
-- Global default in Settings → Appearance → "Default reasoning visibility".
-
+- Global default in Settings → Appearance.
 ### Tool call rendering
-
-- A tool call is one card with three lifecycle states:
-    - **Pending** — spinner + name + arguments preview.
-    - **Permission requested** — prompt embedded inline or surfaced as modal (see Permissions).
-    - **Complete** — status icon + result preview (truncated with "Show all").
+- Lifecycle states: Pending → Permission requested → Running → Complete.
 - Special renderers per tool:
-    - `fs.read` → file path + first N lines.
-    - `fs.write` / `fs.edit` → diff viewer (Monaco) with accept/reject buttons (when in dry-run mode).
-    - `shell` → command, exit code, stdout/stderr split panels.
-    - `http` → method + URL + status + body (formatted JSON if applicable).
-    - `search` → matches grouped by file.
-
+  - `fs.read` → file path + first N lines.
+  - `fs.write` / `fs.edit` → diff viewer (Monaco) with accept/reject when in dry-run.
+  - `shell` → command, exit code, stdout/stderr split panels.
+  - `http` → method + URL + status + body (formatted JSON if applicable).
+  - `search` → matches grouped by file.
+### Inline session.ui rendering
+- `confirm` — card with message + Yes (primary) / No / Cancel. Submitting calls `session.ui_respond`.
+- `select` — card with message + `SelectButton`/`Listbox` for single, `MultiSelect` for multi.
+- `input` — card with `InputText`/`InputMask`/`Password` depending on `InputFormat`. Validates per `min_length`/`max_length`.
+### URL elicitation rendering
+- Inline card with:
+  - Title "Open a link in your browser?"
+  - Source label (which agent / MCP server) and reason (if provided).
+  - Visible URL (monospace) and host badge with risk indicator (Allow / Ask / Deny per current policy).
+  - Actions: Open · Open and don''t ask again for this host · Copy URL · Cancel.
+- Opening goes through `external.open_url`; result event marks the card resolved.
+### Image messages
+- Detected via response format / content type.
+- Rendered with PrimeVue `Image` for zoom; right-click → Save As.
+- Multi-image responses become a row of thumbnails; click to enlarge.
 ### Streaming behavior
-
 - Assistant deltas append into the active bubble identified by `messageId`.
-- `assistant.message` event replaces text with canonical content (no more flicker).
+- `assistant.message` event replaces text with canonical content (no flicker).
 - `session.idle` ends the "thinking" indicator.
 - `session.error` shows an inline error card.
-- Auto-scroll only if the user is already pinned to the bottom (don't yank them away).
-
+- Auto-scroll only if the user is already pinned to the bottom.
 ## Composer
-
 - Multi-line, auto-grow up to ~10 lines, scroll after.
-- Slash commands suggest as the user types `/`.
+- Slash commands suggest as the user types `/` (uses registered SDK `CommandDefinition`s plus skills).
 - Drag-and-drop files to attach.
 - Send on `Cmd/Ctrl+Enter`. `Shift+Enter` inserts a newline.
 - "Abort" replaces "Send" while a turn is in flight.
-- Mode chip (chat / autopilot / immediate) — affects `MessageOptions.mode`.
-
+- Mode chip (chat / autopilot / immediate) affects `MessageOptions.mode`.
+- Advanced panel (chevron): custom request headers, response format, attachments preview.
 ## Message actions
-
 Hover/keyboard-revealed actions on each bubble:
-
 - Copy text (markdown source).
 - Copy as plain text.
 - Retry (replays the same user message).
 - Edit & resend (user messages only).
-- Delete locally (UI only; doesn't rewrite session state).
+- Delete locally (UI only; doesn''t rewrite session state).
 - Pin to "Notes" sidebar (M2.1+).
-
+- For images: Save As, Copy image.
 ## Niceties
-
-- **Export**: whole conversation → Markdown / JSON / printable HTML.
-- **Share**: copy permalink (when persistence exists).
+- **Export**: whole conversation → Markdown / JSON / printable HTML; image assets included.
 - **Snapshots**: save the current session as a Skill template.
 - **Time travel** (M4+): rewind to an earlier event using SDK `session.snapshot_rewind`.
-
 ## Per-session settings panel
-
 Reachable via header kebab → "Session settings".
-
-- Model.
-- System prompt (multi-line, save-as-skill button).
+- Model + capability overrides (deep-merged).
+- System prompt mode + content (`append` / `replace` / `customize` ten sections).
 - Tools allow-list (toggle list, group by source: built-in / MCP / skill).
+- `excludedTools` overlay for this session.
 - Mode (chat / autopilot).
 - Streaming on/off.
 - Elicitation on/off.
 - Reasoning visibility default.
 - Session-level permission policy override.
-
+- Account pin (which GitHub account to use).
+- Idle timeout override.
 ## Global settings UI
-
-Settings dialog with left-nav sections (see architecture):
-
+Settings dialog with left-nav sections:
 - **General** — startup behavior, restore on launch, default project.
 - **Appearance** — theme, accent strategy, density, font, reasoning visibility, message density.
-- **Models** — provider config, BYOK (per `ProviderConfig`), default model.
+- **Models** — provider config, BYOK (per `ProviderConfig`), default model, capability overrides per model.
 - **Tools** — toggle built-ins, configure timeouts, default policies per tool.
 - **Permissions** — policy editor (rules, presets, scope).
-- **MCP** — list, install, configure, status, logs.
+- **URL Policy** — host/scheme rule editor for URL opens.
+- **System Prompt** — defaults + per-section presets editor.
+- **Accounts** — list GitHub accounts; add via OAuth (uses URL elicitation flow); set default.
+- **MCP** — list, install, configure (stdio/HTTP), status, logs.
 - **Skills** — manage library.
 - **Automations** — list, enable/disable, schedule editor.
 - **Notifications** — quiet hours, channels.
 - **Privacy & Telemetry** — OTel opt-in, log redaction.
-- **Advanced** — paths, override CLI path, embedded CLI info.
-
-## Keyboard shortcuts (initial)
-
+- **Advanced** — paths, override CLI path, embedded CLI info, idle timeout default.
+## Keyboard shortcuts
 | Combo | Action |
 |---|---|
 | `Cmd/Ctrl+Enter` | Send |
@@ -117,17 +115,14 @@ Settings dialog with left-nav sections (see architecture):
 | `Cmd/Ctrl+Shift+P` | Open project |
 | `Cmd/Ctrl+/` | Toggle reasoning visibility |
 | `Cmd/Ctrl+]` / `[` | Next / previous pane |
-
 ## Accessibility
-
 - Every interactive element has an `aria-label`.
-- Focus rings visible.
+- Focus rings visible; URL elicitation cards announce host + risk to screen readers.
 - Color is never the only signal (icons + text for status).
-- Min contrast 4.5:1 for text; tested via Playwright + axe.
-
+- Min contrast 4.5:1; tested via Playwright + axe.
 ## Empty & error states
-
 - No client: card with "Start client" CTA and explanation.
 - No sessions: card with "Open project" / "New session".
 - Permission denied: explanatory toast with "Change policy…" link.
+- URL blocked: toast with "Open URL Policy…" link.
 - Network/SDK transport failure: banner with "Reconnect" action.

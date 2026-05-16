@@ -1,88 +1,91 @@
-# Dafman — Architecture
-
+﻿# Dafman — Architecture
 ## Goals
-
-- Replace today's single-file `src-tauri/src/lib.rs` with a layered, module-per-concern backend.
-- Replace today's flat `src/` with a feature-oriented frontend.
+- Replace today''s single-file `src-tauri/src/lib.rs` with a layered, module-per-concern backend.
+- Replace today''s flat `src/` with a feature-oriented frontend.
 - Make a typed, versioned IPC contract that both sides import from one source of truth.
 - Keep concurrency obvious: one CLI client, one event task per session, one Tauri channel per session for streaming.
 - Make every layer testable without spawning the CLI.
-
 ## Backend module layout (`src-tauri/src/`)
-
 ```
 src/
   main.rs                    # binary entry (calls lib::run)
   lib.rs                     # tauri::Builder setup, registers commands, manages state
   app/
     mod.rs
-    state.rs                 # AppState aggregate; uses thin sub-states from each domain
+    state.rs                 # AppState aggregate
     error.rs                 # AppError enum, IntoTauriError impl
     events.rs                # canonical event payload types emitted to the frontend
     config.rs                # app-level config loader/saver (paths, defaults)
   ipc/
-    mod.rs                   # re-exports
+    mod.rs
     commands/
       client.rs              # create_client, stop_client, client_status
       session.rs             # create_session, disconnect_session, send_message, abort
       project.rs             # open_project, close_project, list_projects
       permission.rs          # respond_to_permission_request
+      external.rs            # open_url, url_policy_get/set
+      ui.rs                  # session_ui_respond (confirm/select/input)
       settings.rs            # get_settings, update_settings
       skills.rs              # list_skills, create_skill, run_skill
       automation.rs          # list_automations, create_automation, ...
-      mcp.rs                 # list_mcp_servers, install_mcp_server, ...
+      mcp.rs                 # list_mcp_servers, install_mcp_server, oauth_complete, ...
+      auth.rs                # list_accounts, add_account, remove_account, pin_account
     types.rs                 # public IPC types (serde + ts-rs / specta)
   sessions/
     mod.rs
     manager.rs               # SessionManager trait + Tokio impl
-    entry.rs                 # SessionEntry { session, event_task, project_id, ... }
-    stream.rs                # background subscription -> AppHandle.emit per session
-    handler.rs               # DafmanSessionHandler: SessionHandler impl, routes to PermissionService
+    entry.rs                 # SessionEntry { session, event_task, project_id, account_id, ... }
+    stream.rs                # background subscription -> per-session Tauri channel
+    handler.rs               # DafmanSessionHandler: SessionHandler impl; routes permission/elicitation
+    fs.rs                    # SessionFsProvider impl writing under <app-data>/sessions/<id>/
   client/
     mod.rs
     manager.rs               # ClientManager trait + Tokio impl, holds Arc<Client>
+  external/
+    mod.rs                   # UrlOpener trait + tauri-plugin-opener impl
+    policy.rs                # UrlPolicy, UrlRule, evaluator
   projects/
     mod.rs
-    project.rs               # Project struct (id, root_path, settings_overlay)
+    project.rs               # Project struct (id, root_path, settings_overlay, mcp_overlay)
     registry.rs              # ProjectRegistry trait + on-disk impl
   permissions/
     mod.rs
-    policy.rs                # PermissionPolicy enum: AlwaysAsk | ApproveAll | DenyAll | Rules
-    rules.rs                 # rule engine (glob/regex over tool name + arguments)
-    service.rs               # PermissionService trait + impl, pairs SDK requests with UI prompts
+    policy.rs                # PermissionPolicy: AlwaysAsk | ApproveAll | DenyAll | Rules
+    rules.rs                 # rule engine
+    service.rs               # PermissionService: pairs SDK requests with UI prompts
   tools/
     mod.rs
-    registry.rs              # ToolHandlerRouter wiring
-    fs.rs                    # read_file, write_file, edit_file
+    registry.rs              # ToolHandlerRouter wiring + excludedTools overlay
+    fs.rs                    # read, write, edit
     search.rs                # ripgrep-backed search
     shell.rs                 # bounded, permissioned shell exec
     http.rs                  # bounded, permissioned HTTP
-    web_browser.rs           # M5 — headless browser tool
+    web_browser.rs           # M6 — headless browser tool (separate from URL-opener)
   mcp/
-    mod.rs                   # MCP client wrappers, registry, lifecycle
+    mod.rs                   # MCP registry, lifecycle, OAuth coordination
+    config.rs                # discriminated stdio/HTTP config types
   skills/
-    mod.rs                   # skill model, loader, runtime
+    mod.rs
   automation/
-    mod.rs                   # scheduler, triggers
-    notify.rs                # desktop notifications (tauri plugin)
+    mod.rs
+    notify.rs
+  auth/
+    mod.rs                   # Accounts, token storage (OS keyring), per-session pinning
+    keyring.rs
   settings/
-    mod.rs                   # global + per-project settings
+    mod.rs
     schema.rs                # versioned settings schema
-    store.rs                 # on-disk persistence (JSON / TOML)
-  logging.rs                 # tracing subscriber setup, file rotation
-  prelude.rs                 # internal: common imports
+    store.rs
+  logging.rs
+  prelude.rs
 ```
-
 ### Key rules
-
-- **No global state, no `static` mutables.** Each domain exposes a trait + an impl behind `Arc<dyn Trait>`. They go into a single `AppState` (Tauri managed).
-- **Domain modules don't depend on Tauri.** Only `ipc/` and `app/` know about `tauri::*`. Domain types are testable in isolation.
-- **Async-correct.** `tokio::sync::Mutex` for state shared across await boundaries; everything time-sensitive is non-blocking. No `std::sync::Mutex` across `.await`.
-- **Cancellation-safe.** Background tasks store `JoinHandle`s; teardown aborts them and the SDK calls.
-- **Errors are values.** A single `AppError` (with `thiserror`), converted to a structured payload at the IPC boundary.
-
+- **No global state.** Each domain exposes a trait + an impl behind `Arc<dyn Trait>` in `AppState`.
+- **Domain modules don''t depend on Tauri.** Only `ipc/` and `app/` know about `tauri::*`.
+- **Async-correct.** `tokio::sync::Mutex` for shared state across await; no `std::sync::Mutex` across `.await`.
+- **Cancellation-safe.** Background tasks store `JoinHandle`s; teardown aborts them.
+- **Errors are values.** Single `AppError` (with `thiserror`); structured payload at IPC boundary.
 ### Trait sketches
-
 ```rust
 #[async_trait::async_trait]
 pub trait ClientManager: Send + Sync {
@@ -91,7 +94,6 @@ pub trait ClientManager: Send + Sync {
     fn handle(&self) -> Option<Arc<Client>>;
     fn status(&self) -> ClientStatus;
 }
-
 #[async_trait::async_trait]
 pub trait SessionManager: Send + Sync {
     async fn create(&self, opts: CreateSessionOpts) -> Result<SessionId, AppError>;
@@ -100,7 +102,6 @@ pub trait SessionManager: Send + Sync {
     async fn disconnect(&self, sid: &SessionId) -> Result<(), AppError>;
     fn snapshot(&self, sid: &SessionId) -> Option<SessionSnapshot>;
 }
-
 #[async_trait::async_trait]
 pub trait PermissionService: Send + Sync {
     async fn request(&self, req: PermissionRequest) -> PermissionResult;
@@ -108,42 +109,51 @@ pub trait PermissionService: Send + Sync {
     fn policy(&self) -> PermissionPolicy;
     fn set_policy(&self, policy: PermissionPolicy);
 }
+#[async_trait::async_trait]
+pub trait UrlOpener: Send + Sync {
+    async fn open(&self, url: &Url, ctx: OpenUrlContext) -> Result<(), AppError>;
+}
 ```
-
 ### Event channel
-
-- One global Tauri event named `session-event` carrying `{ sessionId, eventType, data }` works today but doesn't scale. M1 introduces per-session Tauri channels (`tauri::ipc::Channel<T>`) returned from `create_session` so each pane only receives events for its own session.
-
+- Per-session Tauri channel (`tauri::ipc::Channel<T>`) returned from `create_session` so each pane only receives events for its own session. Removes filtering on the frontend.
+- App-level events (client status, permission queue, MCP/OAuth, automations) use named global events.
 ## Frontend module layout (`src/`)
-
 ```
 src/
-  main.ts                    # PrimeVue init, theme, mounts <App/>
-  style.css                  # token-anchored globals only (font, body, scroll lock)
+  main.ts
+  style.css                  # token-anchored globals only
   app/
     App.vue                  # shell: top bar + main view
-    routes.ts                # if/when we add multiple top-level views
+    routes.ts
     composables/
-      useTheme.ts            # dark-mode toggle bound to PrimeVue darkModeSelector
-      useKeybindings.ts      # registers and dispatches shortcuts
-      useToast.ts            # wrapper around PrimeVue toast
+      useTheme.ts
+      useKeybindings.ts
+      useToast.ts
   features/
     chat/
-      ChatGrid.vue           # grid container for ChatPane
+      ChatGrid.vue           # responsive grid of ChatPane
       ChatPane.vue           # one session pane (replaces ChatWindow.vue)
       MessageList.vue
       MessageBubble.vue
       ReasoningBlock.vue
       ToolCallBlock.vue
+      ImageBlock.vue         # generated image rendering
+      InlineConfirm.vue      # session.ui.confirm
+      InlineSelect.vue       # session.ui.select
+      InlineInput.vue        # session.ui.input
+      UrlElicitationCard.vue # URL-mode elicitation
       Composer.vue
-      useChatSession.ts      # composable: events listener + send + abort
+      useChatSession.ts      # per-pane composable: channel listener + send + abort
     projects/
       ProjectPicker.vue
       ProjectSettings.vue
       useProjects.ts
     permissions/
-      PermissionPrompt.vue   # modal that surfaces SDK permission requests
+      PermissionPrompt.vue
       usePermissionQueue.ts
+    elicitation/
+      ElicitationQueue.vue   # central queue (form mode)
+      OAuthToast.vue         # MCP OAuth toast
     settings/
       SettingsDialog.vue
       sections/
@@ -153,6 +163,9 @@ src/
         Mcp.vue
         Permissions.vue
         Appearance.vue
+        Accounts.vue         # multi-account
+        UrlPolicy.vue        # URL/browser policy editor
+        SystemPrompt.vue     # append/replace/customize section editor
       useSettings.ts
     skills/
       SkillLibrary.vue
@@ -161,101 +174,76 @@ src/
       AutomationList.vue
       AutomationEditor.vue
     editor/
-      MonacoEditor.vue       # thin wrapper
+      MonacoEditor.vue
       DiffViewer.vue
     sessions/
-      SessionList.vue        # global session manager (resume, search)
+      SessionList.vue
   stores/                    # Pinia
-    clientStore.ts           # client status, model list
-    sessionsStore.ts         # session entities, per-session message log
+    clientStore.ts
+    sessionsStore.ts
     projectsStore.ts
     settingsStore.ts
     permissionsStore.ts
+    elicitationStore.ts
+    accountsStore.ts
     toastStore.ts
   ipc/
-    invoke.ts                # typed wrappers around invoke() per command (or generated by specta)
-    events.ts                # typed listeners for app-emitted events
-    types.ts                 # shared with backend (specta-generated or hand-mirrored)
+    invoke.ts                # typed wrappers around invoke()
+    events.ts                # typed listeners
+    types.ts                 # shared/generated types
   lib/
     color.ts                 # session-id -> accent (hsl)
-    markdown.ts              # markdown-it config + shiki highlighter
-    keyboard.ts              # key combo helpers
+    markdown.ts
+    keyboard.ts
 ```
-
 ### Key rules
-
-- **Components are dumb.** Data + actions come from composables / stores. Components only render.
-- **No raw `invoke()` in components.** Always go through `ipc/invoke.ts`.
+- **Components are dumb.** Data + actions come from composables / stores.
+- **No raw `invoke()` in components.** Always via `ipc/invoke.ts`.
 - **Strict TypeScript.** `strict: true`, `noUncheckedIndexedAccess: true`.
-- **No hardcoded hex colors except token fallbacks.** Use `var(--p-*)` for everything that should adapt to theme.
-
+- **No hardcoded hex colors** — `var(--p-*)` tokens only (unless a per-session accent color).
 ## IPC contract
-
-Every command and event is defined once and shared across Rust ↔ TS:
-
-- Hand-mirror in M1: `ipc/types.ts` matches `src-tauri/src/ipc/types.rs` (small surface; easy to maintain).
-- Promote to `tauri-specta` in M2 once the surface stabilizes — it generates TS definitions from Rust types/commands so they can't drift.
-
+Defined once, shared. M1: hand-mirrored. M2: promote to `tauri-specta`.
 ### Commands (initial set)
-
 ```
-client.start  () -> ClientStatus
-client.stop   () -> ()
-client.status () -> ClientStatus
-
-session.create   (opts: CreateSessionOpts) -> { sessionId, channel }
-session.send     (sessionId, text, attachments?) -> MessageId
-session.abort    (sessionId) -> ()
-session.disconnect (sessionId) -> ()
-session.snapshot (sessionId) -> SessionSnapshot
-
-permissions.respond (ticket, decision) -> ()
-permissions.set_policy (policy) -> ()
-
-projects.list   () -> Project[]
-projects.open   (path) -> Project
-projects.close  (id) -> ()
-
-settings.get    () -> Settings
-settings.update (patch) -> Settings
-
-skills.list/create/update/delete/run
-automations.list/create/update/delete/run_now
-mcp.list/install/remove/start/stop
+client.start | stop | status
+session.create   (opts) -> { sessionId, channel }
+session.send     (sessionId, text, attachments?, mode?, headers?, response_format?) -> MessageId
+session.abort | disconnect | snapshot
+session.ui_respond  (sessionId, requestId, response)
+session.set_model    (sessionId, modelId, capabilityOverrides?)
+session.set_system_prompt (sessionId, config)
+permissions.respond | set_policy
+external.open_url  (url, origin, sessionId?, mcpServerId?, reason?) -> ()
+external.url_policy.get | set
+projects.list | open | close
+settings.get | update
+skills.list | create | update | delete | run
+automations.list | create | update | delete | run_now
+mcp.list | install | remove | start | stop | oauth_completed (manual fallback)
+auth.list | add | remove | pin_to_session
 ```
-
 ### Events
-
-- Per-session channel events (preferred): `assistant_message_start/delta/message`, `reasoning_start/delta`, `tool_call_start/progress/complete`, `permission_request`, `session_idle`, `session_error`, `model_change`, `usage_info`.
-- App-level events: `client_status_changed`, `permission_requested`, `notification`, `automation_fired`, `mcp_status_changed`.
-
+- Per-session channel: `assistant_message_start/delta/message`, `assistant_reasoning_start/delta`, `tool_call_start/progress/complete`, `permission_request`, `elicitation_request`, `url_open_requested`, `session_ui_request`, `session_idle`, `session_error`, `model_change`, `usage_info`.
+- App-level: `client_status_changed`, `mcp_status_changed`, `mcp_oauth_required`, `notification`, `automation_fired`.
 ## State model
-
 ### Backend
-
-`AppState` is small and aggregates managers:
-
 ```rust
 pub struct AppState {
     pub client: Arc<dyn ClientManager>,
     pub sessions: Arc<dyn SessionManager>,
     pub projects: Arc<dyn ProjectRegistry>,
     pub permissions: Arc<dyn PermissionService>,
+    pub url_opener: Arc<dyn UrlOpener>,
     pub settings: Arc<dyn SettingsStore>,
     pub mcp: Arc<dyn McpRegistry>,
     pub skills: Arc<dyn SkillRegistry>,
     pub automations: Arc<dyn AutomationScheduler>,
+    pub accounts: Arc<dyn AccountStore>,
 }
 ```
-
-Each manager owns its own internal mutability. Commands take `tauri::State<'_, AppState>` and call domain methods.
-
 ### Frontend (Pinia)
-
-Stores mirror backend domains. Each store handles its own `listen()` subscriptions and exposes computed views to components. Only stores call IPC; components are read-only consumers + action dispatchers.
-
+Stores mirror backend domains; only stores call IPC; components are read-only consumers + action dispatchers.
 ## Error model
-
 ```rust
 #[derive(thiserror::Error, Debug, serde::Serialize)]
 #[serde(tag = "kind", content = "data")]
@@ -263,40 +251,39 @@ pub enum AppError {
     #[error("client not started")] ClientNotStarted,
     #[error("session {0} not found")] SessionNotFound(String),
     #[error("permission denied: {0}")] PermissionDenied(String),
+    #[error("url blocked: {0}")] UrlBlocked(String),
     #[error("sdk: {0}")] Sdk(String),
     #[error("io: {0}")] Io(String),
     #[error("invalid argument: {0}")] InvalidArgument(String),
     #[error("internal: {0}")] Internal(String),
 }
 ```
-
-- Implement `From<github_copilot_sdk::Error> for AppError` so SDK transport failures are typed.
-- Tauri commands return `Result<T, AppError>`; frontend gets a discriminated union it can pattern-match.
-
 ## Threading & concurrency
-
-- One tokio runtime (Tauri's).
+- One tokio runtime (Tauri''s).
 - One `Client` (background CLI process).
 - Per session: one `Arc<Session>`, one event-forwarding task, one cancel token.
-- Permission flow uses an `oneshot` channel: SDK request → frontend prompt → user answer → channel → SDK reply.
-- Tools that block (shell, fs, http) spawn on tokio's blocking pool or use native async clients (reqwest, tokio::fs).
-- All cleanup on app exit: stop scheduler → abort session tasks → `session.disconnect()` for each → `client.stop()`.
-
+- Permission and elicitation flows use `oneshot` channels: SDK request → frontend prompt → user answer → channel → SDK reply.
+- All blocking I/O (shell, fs) on tokio''s blocking pool; async clients (reqwest, tokio::fs) elsewhere.
+- Cleanup on exit: stop scheduler → abort tasks → disconnect sessions → stop client → flush logs.
 ## Configuration & paths
-
-- App data root: `dirs::data_dir() / "dafman"`.
-- Sub-paths:
-    - `settings.json` — global settings (schema-versioned).
-    - `projects/` — per-project overlays.
-    - `sessions/` — resumable session metadata (separate from SDK's own session-state dir).
-    - `skills/` — user-defined skills.
-    - `automations/` — schedules.
-    - `mcp/` — installed MCP server configs.
-    - `logs/` — rotating log files.
-
+App data root: `dirs::data_dir() / "dafman"`.
+```
+dafman/
+  settings.json
+  projects/<id>.json
+  sessions/<id>/             # SessionFsProvider target
+    meta.json
+    events.log
+  skills/<id>.json
+  automations/<id>.json
+  mcp/<id>.json
+  accounts.json              # public profile; tokens in OS keyring
+  logs/
+  audit/                     # url + permission audit logs
+```
 ## Build & release
-
-- `cargo` workspace stays single-crate for now; if `tools`, `mcp`, `skills` grow, split into a workspace with `dafman-core`, `dafman-tools`, `dafman-mcp`, `dafman-app` (binary).
-- Frontend bundled by Vite; Tauri bundles for win/mac/linux.
-- CI matrix runs `cargo test`, `cargo clippy`, frontend `vitest`, frontend `vue-tsc`, Playwright e2e against `tauri build`.
-- Versioning: semver; pinned `github-copilot-sdk` version per release.
+- Single crate today; if `tools`, `mcp`, `skills` grow, split into workspace: `dafman-core`, `dafman-tools`, `dafman-mcp`, `dafman-app` (binary).
+- Frontend bundled by Vite; Tauri bundles per OS.
+- CI matrix: `cargo test`, `cargo clippy`, `vue-tsc`, `vitest`, Playwright e2e against `tauri build`.
+- Pinned `github-copilot-sdk` (Supercharged) SHA per release; CI verifies the lockfile.
+- Release builds use SDK `embedded-cli` feature for self-contained binaries.
