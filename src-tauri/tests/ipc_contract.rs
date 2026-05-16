@@ -32,9 +32,10 @@ fn settings_wire_shape() {
     insta::assert_json_snapshot!(json, @r###"
     {
       "appearance": {
+        "reasoningVisibility": "compact",
         "theme": "system"
       },
-      "version": 1
+      "version": 2
     }
     "###);
     assert_eq!(settings.version, SETTINGS_VERSION);

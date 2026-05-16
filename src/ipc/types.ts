@@ -22,8 +22,11 @@ export type AppErrorPayload =
 
 export type ThemeChoice = "system" | "light" | "dark";
 
+export type ReasoningVisibility = "hidden" | "compact" | "expanded";
+
 export type Appearance = {
   theme: ThemeChoice;
+  reasoningVisibility: ReasoningVisibility;
 };
 
 export type Settings = {

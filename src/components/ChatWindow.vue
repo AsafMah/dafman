@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { accentForSession } from "../lib/color";
-import type { SessionEventPayload } from "../ipc/types";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useToastStore } from "../stores/toastStore";
-import Avatar from "primevue/avatar";
+import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
+import Select from "primevue/select";
 import Tag from "primevue/tag";
-
-type ChatMessage = {
-  id: number;
-  role: "user" | "assistant" | "system";
-  text: string;
-  messageId?: string;
-};
+import { accentForSession } from "../lib/color";
+import {
+  appendSystemMessage,
+  appendUserMessage,
+  processEvents,
+  type ChatItem,
+  type IdCounter,
+} from "../lib/chatEvents";
+import type { ReasoningVisibility, SessionEventPayload } from "../ipc/types";
+import { useSessionsStore } from "../stores/sessionsStore";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useToastStore } from "../stores/toastStore";
+import ReasoningBlock from "./ReasoningBlock.vue";
 
 const props = defineProps<{
   sessionId: string;
@@ -26,12 +29,30 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
+const sessionsStore = useSessionsStore();
+const settingsStore = useSettingsStore();
+const toasts = useToastStore();
+const { settings } = storeToRefs(settingsStore);
+
 const draft = ref("");
-const messages = ref<ChatMessage[]>([]);
+const items = ref<ChatItem[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
 const isSending = ref(false);
-let nextId = 1;
+const idCounter: IdCounter = { next: 1 };
 let processedEvents = 0;
+
+const sessionOverride = ref<ReasoningVisibility | null>(null);
+
+const reasoningVisibility = computed<ReasoningVisibility>(
+  () => sessionOverride.value ?? settings.value.appearance.reasoningVisibility,
+);
+
+const reasoningOptions: { label: string; value: ReasoningVisibility | null }[] = [
+  { label: "Default", value: null },
+  { label: "Hidden", value: "hidden" },
+  { label: "Compact", value: "compact" },
+  { label: "Expanded", value: "expanded" },
+];
 
 const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
@@ -42,89 +63,27 @@ const accentColor = computed(() => accentForSession(props.sessionId));
 async function scrollToBottom() {
   await nextTick();
   const el = messagesEl.value;
-  if (el) {
-    el.scrollTop = el.scrollHeight;
-  }
-}
-
-function findOrCreateAssistantMessage(messageId: string): ChatMessage {
-  let msg = messages.value.find(
-    (m) => m.role === "assistant" && m.messageId === messageId,
-  );
-  if (!msg) {
-    msg = {
-      id: nextId++,
-      role: "assistant",
-      text: "",
-      messageId,
-    };
-    messages.value.push(msg);
-  }
-  return msg;
-}
-
-function handleEvent(payload: SessionEventPayload) {
-  const { eventType, data } = payload;
-
-  switch (eventType) {
-    case "assistant.message_start": {
-      const messageId = String(data.messageId ?? "");
-      if (messageId) {
-        findOrCreateAssistantMessage(messageId);
-        scrollToBottom();
-      }
-      break;
-    }
-    case "assistant.message_delta": {
-      const messageId = String(data.messageId ?? "");
-      const delta = String(data.deltaContent ?? "");
-      if (messageId) {
-        const msg = findOrCreateAssistantMessage(messageId);
-        msg.text += delta;
-        scrollToBottom();
-      }
-      break;
-    }
-    case "assistant.message": {
-      const messageId = String(data.messageId ?? "");
-      const content = String(data.content ?? "");
-      if (messageId) {
-        const msg = findOrCreateAssistantMessage(messageId);
-        msg.text = content;
-        scrollToBottom();
-      }
-      break;
-    }
-    case "session.idle": {
-      isSending.value = false;
-      break;
-    }
-    case "session.error": {
-      const message = String(data.message ?? "Unknown session error");
-      messages.value.push({
-        id: nextId++,
-        role: "system",
-        text: `Session error: ${message}`,
-      });
-      isSending.value = false;
-      scrollToBottom();
-      break;
-    }
-    default:
-      break;
-  }
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
 watch(
   () => props.events.length,
   (len) => {
-    while (processedEvents < len) {
-      const payload = props.events[processedEvents];
-      processedEvents++;
-      if (payload) {
-        handleEvent(payload);
-      }
+    if (processedEvents >= len) return;
+    const fresh = props.events.slice(processedEvents);
+    processedEvents = len;
+    const { items: next, idle, error } = processEvents(
+      items.value,
+      fresh,
+      idCounter,
+    );
+    items.value = next;
+    if (idle || error) isSending.value = false;
+    if (error) {
+      const lastSystem = [...next].reverse().find((i) => i.kind === "system");
+      if (lastSystem) toasts.error("Session error", lastSystem.text);
     }
+    scrollToBottom();
   },
   { immediate: true },
 );
@@ -132,23 +91,19 @@ watch(
 watch(
   () => props.sessionId,
   () => {
-    messages.value = [];
+    items.value = [];
     isSending.value = false;
     draft.value = "";
+    sessionOverride.value = null;
     processedEvents = props.events.length;
   },
 );
 
-const sessionsStore = useSessionsStore();
-const toasts = useToastStore();
-
 async function sendMessage() {
   const text = draft.value.trim();
-  if (!text || isSending.value) {
-    return;
-  }
+  if (!text || isSending.value) return;
 
-  messages.value.push({ id: nextId++, role: "user", text });
+  items.value = appendUserMessage(items.value, text, idCounter);
   draft.value = "";
   isSending.value = true;
   await scrollToBottom();
@@ -157,11 +112,11 @@ async function sendMessage() {
     await sessionsStore.sendMessage(props.sessionId, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    messages.value.push({
-      id: nextId++,
-      role: "system",
-      text: `Error: ${message}`,
-    });
+    items.value = appendSystemMessage(
+      items.value,
+      `Error: ${message}`,
+      idCounter,
+    );
     toasts.error("Failed to send message", message);
     isSending.value = false;
     await scrollToBottom();
@@ -170,57 +125,58 @@ async function sendMessage() {
 </script>
 
 <template>
-  <section
-    class="chat-tile"
-    :style="{ '--accent': accentColor }"
-  >
+  <section class="chat-tile" :style="{ '--accent': accentColor }">
     <header class="chat-header">
       <div class="chat-title">
-        <Avatar
-          label="AI"
-          shape="circle"
-          size="small"
-          :style="{ background: accentColor, color: 'white' }"
-        />
         <Tag :value="props.sessionId" severity="secondary" />
       </div>
-      <Button
-        icon="pi pi-times"
-        text
-        rounded
-        aria-label="Close session"
-        @click="emit('close')"
-      />
+      <div class="chat-header-actions">
+        <Select
+          v-model="sessionOverride"
+          :options="reasoningOptions"
+          option-label="label"
+          option-value="value"
+          size="small"
+          aria-label="Reasoning visibility for this session"
+        />
+        <Button
+          icon="pi pi-times"
+          text
+          rounded
+          aria-label="Close session"
+          @click="emit('close')"
+        />
+      </div>
     </header>
 
     <div ref="messagesEl" class="chat-messages">
-      <p v-if="messages.length === 0" class="empty-message">
+      <p v-if="items.length === 0" class="empty-message">
         Start typing below to send a message.
       </p>
 
-      <div
-        v-for="message in messages"
-        :key="message.id"
-        class="message-row"
-        :class="message.role"
-      >
-        <Avatar
-          :label="message.role === 'user' ? 'U' : message.role === 'assistant' ? 'A' : '!'"
-          shape="circle"
-          size="small"
+      <template v-for="item in items" :key="item.id">
+        <ReasoningBlock
+          v-if="item.kind === 'reasoning'"
+          :text="item.text"
+          :visibility="reasoningVisibility"
         />
-        <div class="message-bubble">{{ message.text || "..." }}</div>
-      </div>
+        <article v-else class="message-card" :class="item.kind">
+          <header class="role-label">
+            {{ item.kind === "user" ? "You" : item.kind === "assistant" ? "Assistant" : "System" }}
+          </header>
+          <p class="message-body">{{ item.text || "..." }}</p>
+        </article>
+      </template>
 
-      <div
-        v-if="isSending && !messages.some((m) => m.role === 'assistant' && m.text === '')"
-        class="message-row assistant"
+      <article
+        v-if="isSending && !items.some((m) => m.kind === 'assistant' && m.text === '')"
+        class="message-card assistant pending"
       >
-        <Avatar label="A" shape="circle" size="small" />
-        <div class="message-bubble typing">
+        <header class="role-label">Assistant</header>
+        <p class="message-body">
           <i class="pi pi-spin pi-spinner" /> Thinking...
-        </div>
-      </div>
+        </p>
+      </article>
     </div>
 
     <form class="chat-composer" @submit.prevent="sendMessage">
@@ -265,13 +221,19 @@ async function sendMessage() {
   min-width: 0;
 }
 
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .chat-messages {
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 0.75rem;
 }
 
@@ -280,37 +242,48 @@ async function sendMessage() {
   color: var(--p-text-muted-color);
 }
 
-.message-row {
+.message-card {
   display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--p-border-radius-md);
+  background: var(--p-surface-100, var(--p-content-background));
+  border-left: 3px solid transparent;
 }
 
-.message-row.assistant {
-  flex-direction: row-reverse;
+:global(.app-dark) .message-card {
+  background: var(--p-surface-800, var(--p-content-background));
 }
 
-.message-bubble {
-  max-width: min(80%, 28rem);
-  padding: 0.5rem 0.65rem;
-  border-radius: var(--p-border-radius-lg);
-  color: var(--p-text-color);
-  background: var(--p-content-hover-background, var(--p-content-background));
-  border: 1px solid var(--p-content-border-color);
+.message-card.user {
+  background: var(--p-content-background);
+  border-left-color: var(--p-surface-400, #cbd5e1);
+}
+
+.message-card.assistant {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-left-color: var(--accent);
+}
+
+.message-card.system {
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent);
+  border-left-color: var(--p-red-500, #ef4444);
+}
+
+.role-label {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+}
+
+.message-body {
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.message-row.assistant .message-bubble {
-  color: white;
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.message-row.system .message-bubble {
   color: var(--p-text-color);
-  background: var(--p-content-background);
-  border-color: var(--p-red-500, #ef4444);
 }
 
 .chat-composer {
@@ -319,4 +292,3 @@ async function sendMessage() {
   border-top: 1px solid var(--p-content-border-color);
 }
 </style>
-

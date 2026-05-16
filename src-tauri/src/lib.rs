@@ -8,7 +8,7 @@ mod ipc;
 mod logging;
 pub use app::events::SessionEventPayload;
 use app::settings::SettingsService;
-pub use app::settings::{Appearance, Settings, ThemeChoice, SETTINGS_VERSION};
+pub use app::settings::{Appearance, ReasoningVisibility, Settings, ThemeChoice, SETTINGS_VERSION};
 use app::state::AppState;
 use app::LogGuard;
 use ipc::commands::client::create_client;

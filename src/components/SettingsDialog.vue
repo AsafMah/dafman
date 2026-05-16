@@ -10,7 +10,7 @@ import Tab from "primevue/tab";
 import TabPanels from "primevue/tabpanels";
 import TabPanel from "primevue/tabpanel";
 import { useSettingsStore } from "../stores/settingsStore";
-import type { ThemeChoice } from "../ipc/types";
+import type { ReasoningVisibility, ThemeChoice } from "../ipc/types";
 
 const props = defineProps<{ visible: boolean }>();
 const emit = defineEmits<{
@@ -26,10 +26,23 @@ const themeOptions: { label: string; value: ThemeChoice }[] = [
   { label: "Dark", value: "dark" },
 ];
 
+const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
+  { label: "Hidden", value: "hidden" },
+  { label: "Compact", value: "compact" },
+  { label: "Expanded", value: "expanded" },
+];
+
 const theme = computed<ThemeChoice>({
   get: () => settings.value.appearance.theme,
   set: (value) => {
     void settingsStore.setTheme(value);
+  },
+});
+
+const reasoningVisibility = computed<ReasoningVisibility>({
+  get: () => settings.value.appearance.reasoningVisibility,
+  set: (value) => {
+    void settingsStore.setReasoningVisibility(value);
   },
 });
 
@@ -71,6 +84,19 @@ function close() {
               :allow-empty="false"
             />
           </div>
+          <div class="row">
+            <label>Reasoning visibility</label>
+            <SelectButton
+              v-model="reasoningVisibility"
+              :options="reasoningOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+            />
+            <p class="muted hint">
+              Default for new chats. Each session can override this from its header.
+            </p>
+          </div>
         </TabPanel>
       </TabPanels>
     </Tabs>
@@ -93,5 +119,9 @@ function close() {
 .muted {
   color: var(--p-text-muted-color);
   margin: 0;
+}
+
+.hint {
+  font-size: 0.85rem;
 }
 </style>

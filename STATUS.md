@@ -16,11 +16,12 @@
 - `7d26d5d` - `test(m1): testing baseline (vitest + cargo test + insta + CI)`
 - `5e05456` - `feat(m1): swap to Supercharged SDK pin + add tracing observability baseline`
 ## Next concrete step
-**Real permission UX** — replace `ApproveAllHandler` with a real `PermissionService` in the backend that surfaces requests to the frontend (per-session channel or a new global elicitation channel), and wire the existing `permissionsStore` scaffold to a modal prompt component. See `plans/plan-toolsAndPermissions.prompt.md`.
-After that, in order:
-1. **URL elicitation card + `UrlOpener`** with policy defaults (`https://github.com/login/*` allow-always; `localhost:*` allow-always; everything else ask).
-2. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
-3. **One Playwright smoke test** (first-run → create client → create session → send → see streaming reply).
+Pick a real-caller-grounded next step. **Markdown + code-block rendering** for assistant/reasoning content is a strong candidate — it directly improves what just landed (reasoning blocks would be far more readable with code highlight). After that, real permission UX / URL elicitation will land once we have a tool surface or MCP that actually elicits.
+Other M1 items still open:
+1. **Real permission UX** — blocked on having any tools to permission.
+2. **URL elicitation card + `UrlOpener`** — blocked on a real caller (SDK auth flow, MCP OAuth, or clickable links once markdown lands).
+3. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
+4. **One Playwright smoke test** (first-run → create client → create session → send → see streaming reply).
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold.
 - [x] Single SDK Client lifecycle.
@@ -48,8 +49,8 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 ## Tests at a glance
 | Surface | Runner | Status |
 |---|---|---|
-| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 18 tests passing |
-| Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 5 tests passing (`logging`, `app::settings`) |
+| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 28 tests passing |
+| Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 6 tests passing (`logging`, `app::settings`) |
 | Backend integration (`src-tauri/tests/`) | `cargo test` | 2 snapshots passing (`SessionEventPayload`, `Settings`) |
 | E2E (Playwright) | _not yet wired_ | - |
 ## Conventions for agents

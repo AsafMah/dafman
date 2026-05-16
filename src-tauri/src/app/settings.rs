@@ -15,7 +15,7 @@ use tauri::async_runtime::{spawn_blocking, Mutex};
 
 /// Current settings schema version. Bump when adding/removing top-level
 /// fields and add a migration in [`Settings::migrate`].
-pub const SETTINGS_VERSION: u32 = 1;
+pub const SETTINGS_VERSION: u32 = 2;
 
 /// User-facing theme choice. `System` follows `prefers-color-scheme`.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -27,10 +27,26 @@ pub enum ThemeChoice {
     Dark,
 }
 
+/// How much of the model's reasoning content to show in the chat surface.
+/// Mirrored on the frontend as `ReasoningVisibility`.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningVisibility {
+    /// Don't render reasoning blocks.
+    Hidden,
+    /// Render a collapsed bubble with a preview line; expand on click.
+    #[default]
+    Compact,
+    /// Render every reasoning block in full.
+    Expanded,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Appearance {
     pub theme: ThemeChoice,
+    #[serde(default)]
+    pub reasoning_visibility: ReasoningVisibility,
 }
 
 /// Root settings document persisted to disk.
@@ -52,10 +68,12 @@ impl Default for Settings {
 
 impl Settings {
     /// Apply forward migrations in place, stamping the current version.
-    /// Today this is a stamp-only operation since the schema has one
-    /// version; the match arm exists so adding a v2 is a localized change.
+    ///
+    /// `Appearance.reasoning_visibility` was added in v2 with a serde
+    /// default, so v1 documents deserialize cleanly into the v2 struct;
+    /// migration is just a version stamp. Future schema changes that drop
+    /// or rename fields should `match self.version` here.
     fn migrate(mut self) -> Self {
-        // No-op migrations for now; future versions match on `self.version`.
         self.version = SETTINGS_VERSION;
         self
     }
@@ -177,6 +195,7 @@ mod tests {
             version: SETTINGS_VERSION,
             appearance: Appearance {
                 theme: ThemeChoice::Dark,
+                reasoning_visibility: ReasoningVisibility::Compact,
             },
         };
         let written = futures_block_on(svc.update(next.clone())).unwrap();
@@ -200,6 +219,23 @@ mod tests {
         let settings = futures_block_on(svc.get());
         assert_eq!(settings.version, SETTINGS_VERSION);
         assert_eq!(settings.appearance.theme, ThemeChoice::Light);
+    }
+
+    #[test]
+    fn v1_document_migrates_to_v2_with_default_reasoning_visibility() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        // A v1 document predates `reasoningVisibility`; it should round-trip
+        // through the v2 struct via serde's default and get stamped.
+        std::fs::write(&path, r#"{"version": 1, "appearance": {"theme": "dark"}}"#).unwrap();
+        let svc = SettingsService::load_or_default(path);
+        let settings = futures_block_on(svc.get());
+        assert_eq!(settings.version, SETTINGS_VERSION);
+        assert_eq!(settings.appearance.theme, ThemeChoice::Dark);
+        assert_eq!(
+            settings.appearance.reasoning_visibility,
+            ReasoningVisibility::Compact
+        );
     }
 
     /// Minimal blocker so the unit tests don't need a tokio attribute.

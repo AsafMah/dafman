@@ -19,8 +19,8 @@ describe("settingsStore", () => {
 
   it("load() pulls settings from the backend and flips loaded", async () => {
     invokeMock.mockResolvedValueOnce({
-      version: 1,
-      appearance: { theme: "dark" },
+      version: 2,
+      appearance: { theme: "dark", reasoningVisibility: "compact" },
     });
     const store = useSettingsStore();
     const result = await store.load();
@@ -40,13 +40,16 @@ describe("settingsStore", () => {
 
   it("setTheme() forwards a full-replace update_settings with the new theme", async () => {
     invokeMock.mockResolvedValueOnce({
-      version: 1,
-      appearance: { theme: "light" },
+      version: 2,
+      appearance: { theme: "light", reasoningVisibility: "compact" },
     });
     const store = useSettingsStore();
     await store.setTheme("light");
     expect(invokeMock).toHaveBeenCalledWith("update_settings", {
-      next: { version: 1, appearance: { theme: "light" } },
+      next: {
+        version: 2,
+        appearance: { theme: "light", reasoningVisibility: "compact" },
+      },
     });
     expect(store.settings.appearance.theme).toBe("light");
     expect(store.isSaving).toBe(false);
@@ -54,15 +57,31 @@ describe("settingsStore", () => {
 
   it("update() rolls forward when the backend stamps a new version", async () => {
     invokeMock.mockResolvedValueOnce({
-      version: 2,
-      appearance: { theme: "dark" },
+      version: 3,
+      appearance: { theme: "dark", reasoningVisibility: "expanded" },
     });
     const store = useSettingsStore();
     const written = await store.update({
-      version: 1,
-      appearance: { theme: "dark" },
+      version: 2,
+      appearance: { theme: "dark", reasoningVisibility: "expanded" },
     });
-    expect(written.version).toBe(2);
-    expect(store.settings.version).toBe(2);
+    expect(written.version).toBe(3);
+    expect(store.settings.version).toBe(3);
+  });
+
+  it("setReasoningVisibility() updates only the reasoning visibility", async () => {
+    invokeMock.mockResolvedValueOnce({
+      version: 2,
+      appearance: { theme: "system", reasoningVisibility: "hidden" },
+    });
+    const store = useSettingsStore();
+    await store.setReasoningVisibility("hidden");
+    expect(invokeMock).toHaveBeenCalledWith("update_settings", {
+      next: {
+        version: 2,
+        appearance: { theme: "system", reasoningVisibility: "hidden" },
+      },
+    });
+    expect(store.settings.appearance.reasoningVisibility).toBe("hidden");
   });
 });

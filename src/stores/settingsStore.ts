@@ -6,11 +6,14 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
-import type { Settings, ThemeChoice } from "../ipc/types";
+import type { ReasoningVisibility, Settings, ThemeChoice } from "../ipc/types";
 import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
-  return { version: 1, appearance: { theme: "system" } };
+  return {
+    version: 2,
+    appearance: { theme: "system", reasoningVisibility: "compact" },
+  };
 }
 
 export const useSettingsStore = defineStore("settings", () => {
@@ -53,5 +56,22 @@ export const useSettingsStore = defineStore("settings", () => {
     });
   }
 
-  return { settings, loaded, isSaving, load, update, setTheme };
+  async function setReasoningVisibility(
+    reasoningVisibility: ReasoningVisibility,
+  ): Promise<Settings> {
+    return update({
+      ...settings.value,
+      appearance: { ...settings.value.appearance, reasoningVisibility },
+    });
+  }
+
+  return {
+    settings,
+    loaded,
+    isSaving,
+    load,
+    update,
+    setTheme,
+    setReasoningVisibility,
+  };
 });
