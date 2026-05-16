@@ -10,7 +10,14 @@
         "tauri": "tauri",
         "test": "vitest run",
         "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+        "test:all": "npm test && npm run test:rust",
+        "lint:frontend": "vue-tsc --noEmit",
+        "lint:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+        "lint": "npm run lint:frontend && npm run lint:rust",
+        "fmt:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
+        "check": "npm run lint && npm run test:all && npm run build"
     },
     "dependencies": {
         "@primeuix/themes": "^2.0.3",

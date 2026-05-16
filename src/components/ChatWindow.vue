@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -41,16 +41,7 @@ const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
 );
 
-const accentColor = computed(() => {
-  // Deterministic hue from session id (FNV-1a-ish hash).
-  let h = 2166136261;
-  for (let i = 0; i < sessionId.length; i++) {
-    h ^= sessionId.charCodeAt(i);
-    h = (h * 16777619) >>> 0;
-  }
-  const hue = h % 360;
-  return `hsl(${hue}, 70%, 55%)`;
-});
+const accentColor = computed(() => accentForSession(sessionId));
 
 async function scrollToBottom() {
   await nextTick();

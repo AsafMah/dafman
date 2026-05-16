@@ -1,15 +1,15 @@
-﻿use std::collections::HashMap;
-use std::sync::Arc;
-use github_copilot_sdk::{Client, ClientOptions, SessionConfig};
 use github_copilot_sdk::handler::ApproveAllHandler;
 use github_copilot_sdk::session::Session;
+use github_copilot_sdk::{Client, ClientOptions, SessionConfig};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::info;
 
 mod logging;
 use github_copilot_sdk::subscription::RecvError;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
 use tauri::async_runtime::{spawn, JoinHandle, Mutex};
+use tauri::{AppHandle, Emitter, Manager};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 struct SessionEntry {
@@ -188,8 +188,3 @@ pub fn run() {
 /// without colliding with other types.
 #[allow(dead_code)]
 struct LogGuard(tracing_appender::non_blocking::WorkerGuard);
-
-
-
-
-

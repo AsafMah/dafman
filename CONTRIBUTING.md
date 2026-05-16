@@ -1,5 +1,5 @@
 # Contributing to Dafman
-Thanks for considering a contribution! Dafman is still early — there is a lot of room to shape the architecture and product. This guide tells you how to file issues, propose changes, and ship a PR.
+Thanks for considering a contribution! Dafman is still early â€” there is a lot of room to shape the architecture and product. This guide tells you how to file issues, propose changes, and ship a PR.
 ## Code of Conduct
 Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold it.
 ## Where to start
@@ -9,7 +9,7 @@ Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDU
 ## Filing issues
 - Use the appropriate issue template (bug or feature).
 - Be specific about reproduction steps, the OS, the Rust + Node versions, and what you expected vs. what happened.
-- For security issues, follow [`SECURITY.md`](SECURITY.md) — do not open a public issue.
+- For security issues, follow [`SECURITY.md`](SECURITY.md) â€” do not open a public issue.
 ## Development setup
 ```bash
 git clone https://github.com/<owner>/dafman.git
@@ -17,16 +17,14 @@ cd dafman
 npm install
 npm run tauri dev
 ```
-Run the test suites:
+Run the test suites and quality gates via npm scripts (the same ones CI uses):
 ```bash
-# frontend
-npm run build      # vue-tsc type-check + vite build
-npm test           # vitest unit + component tests
-# backend
-cd src-tauri
-cargo test
-cargo clippy -- -D warnings
-cargo fmt --check
+npm run check       # lint (vue-tsc + clippy + fmt) + all tests + build
+npm test            # frontend unit tests (vitest)
+npm run test:rust   # backend tests (cargo test)
+npm run test:all    # both
+npm run lint        # vue-tsc + cargo fmt --check + cargo clippy -D warnings
+npm run fmt:rust    # auto-format Rust
 ```
 ## Branching & commits
 - Branch from `main`.
@@ -42,7 +40,7 @@ cargo fmt --check
 - Include screenshots / GIFs for UI changes.
 - Make sure CI is green.
 - Update relevant files in `plans/` if you''re changing direction.
-- Add or update tests for new behavior — see [`plans/plan-testingStrategy.prompt.md`](plans/plan-testingStrategy.prompt.md).
+- Add or update tests for new behavior â€” see [`plans/plan-testingStrategy.prompt.md`](plans/plan-testingStrategy.prompt.md).
 ## Code style
 - **Rust:** `cargo fmt`, `cargo clippy -- -D warnings`. No `unwrap` in command paths.
 - **TypeScript:** strict mode. `vue-tsc --noEmit` must pass.

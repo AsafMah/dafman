@@ -6,10 +6,10 @@
 use std::path::PathBuf;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling;
-use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
 /// Default level filter applied when neither `DAFMAN_LOG` nor `RUST_LOG` is set.
 const DEFAULT_FILTER: &str = "info,dafman=debug,dafman_lib=debug,github_copilot_sdk=info";
 /// Initializes the global `tracing` subscriber.
@@ -50,7 +50,8 @@ pub fn init(log_dir: PathBuf) -> WorkerGuard {
         "tracing subscriber initialized",
     );
     guard
-}#[cfg(test)]
+}
+#[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
@@ -65,17 +66,15 @@ mod tests {
             let _guard = init(path.clone());
             tracing::info!(target: "dafman_lib::logging::tests", "smoke test event");
         } // guard dropped here flushes
-        // The daily appender creates a file named `dafman.log.YYYY-MM-DD`.
+          // The daily appender creates a file named `dafman.log.YYYY-MM-DD`.
         let entries: Vec<_> = std::fs::read_dir(&path)
             .expect("read dir")
             .filter_map(Result::ok)
             .collect();
         assert!(
-            entries.iter().any(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    .starts_with("dafman.log")
-            }),
+            entries
+                .iter()
+                .any(|e| { e.file_name().to_string_lossy().starts_with("dafman.log") }),
             "expected a dafman.log* file in the log dir, got: {:?}",
             entries.iter().map(|e| e.file_name()).collect::<Vec<_>>()
         );

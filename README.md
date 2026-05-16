@@ -1,4 +1,4 @@
-﻿# Dafman
+# Dafman
 > A desktop replacement for the GitHub Copilot CLI built on Tauri (Rust + Vue 3).
 Dafman keeps the speed and resource profile of a native Rust process while giving humans a real UI: multiple panes, simultaneous projects, visible reasoning and tool calls, settings, automations, MCP integrations, and an editor for diffs and files. Conversations and configuration persist across restarts.
 > Status: **early development**. M0 (multi-pane streaming chat) is live. The roadmap toward a CLI-replacement is tracked in [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md).
@@ -17,6 +17,10 @@ See [`plans/`](plans/) for the full design system:
 - `plan-platformFeatures.prompt.md` — projects, accounts, skills, agents, automations.
 - `plan-sdkAndExternalSurfaces.prompt.md` — Supercharged SDK pinning, URL/browser surface, MCP OAuth.
 - `plan-testingStrategy.prompt.md` — test pyramid, E2E, CI matrix.
+## Status & progress
+
+Live progress board: [STATUS.md](STATUS.md). Plans live in [plans/](plans/).
+
 ## Stack
 - **Shell:** Tauri 2 (Windows / macOS / Linux)
 - **Backend:** Rust + tokio + [`github-copilot-sdk`](https://github.com/github/copilot-sdk) (Supercharged distribution)
@@ -33,6 +37,19 @@ See [`plans/`](plans/) for the full design system:
 ```bash
 npm install
 ```
+### Common commands
+
+| Want to… | Run |
+|---|---|
+| run everything (lint + tests + build) | `npm run check` |
+| run frontend tests (vitest) | `npm test` |
+| run backend tests (cargo) | `npm run test:rust` |
+| run both test suites | `npm run test:all` |
+| lint everything | `npm run lint` |
+| auto-format Rust | `npm run fmt:rust` |
+| start the app in dev | `npm run tauri dev` |
+| build a release bundle | `npm run tauri build` |
+
 ### Run in development
 ```bash
 npm run tauri dev
