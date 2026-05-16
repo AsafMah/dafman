@@ -1,168 +1,24 @@
-use github_copilot_sdk::handler::ApproveAllHandler;
-use github_copilot_sdk::session::Session;
-use github_copilot_sdk::{Client, ClientOptions, SessionConfig};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tracing::info;
-
+//! Dafman backend entry point.
+//!
+//! Module layout follows `plans/plan-architecture.prompt.md`. Per the
+//! agent contract in `AGENTS.md`, only this module + `ipc/` + `app/` may
+//! touch `tauri::*`; domain modules stay platform-agnostic.
+mod app;
+mod ipc;
 mod logging;
-use github_copilot_sdk::subscription::RecvError;
-use serde::Serialize;
-use tauri::async_runtime::{spawn, JoinHandle, Mutex};
-use tauri::{AppHandle, Emitter, Manager};
-
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-struct SessionEntry {
-    session: Arc<Session>,
-    event_task: JoinHandle<()>,
-}
-
-#[derive(Default)]
-struct AppState {
-    client: Mutex<Option<Arc<Client>>>,
-    sessions: Mutex<HashMap<String, SessionEntry>>,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SessionEventPayload {
-    session_id: String,
-    event_type: String,
-    data: serde_json::Value,
-}
-
-#[tauri::command]
-#[tracing::instrument(skip(state))]
-async fn create_client(state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let mut client_slot = state.client.lock().await;
-
-    if client_slot.is_some() {
-        return Ok("Copilot client already created".to_string());
-    }
-
-    let client = Client::start(ClientOptions::default())
-        .await
-        .map_err(|err| err.to_string())?;
-    *client_slot = Some(Arc::new(client));
-
-    Ok("Copilot client created".to_string())
-}
-
-#[tauri::command]
-#[tracing::instrument(skip(app, state))]
-async fn create_session(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
-    let client = {
-        let client_slot = state.client.lock().await;
-        client_slot
-            .as_ref()
-            .ok_or_else(|| "Copilot client not initialized. Call create_client first.".to_string())?
-            .clone()
-    };
-
-    let session = client
-        .create_session(
-            SessionConfig::default()
-                .with_handler(Arc::new(ApproveAllHandler))
-                .with_streaming(true),
-        )
-        .await
-        .map_err(|err| err.to_string())?;
-
-    let session_id = session.id().to_string();
-    let session = Arc::new(session);
-
-    // Spawn an event-forwarding task that streams session events to the frontend.
-    let mut subscription = session.subscribe();
-    let app_handle = app.clone();
-    let session_id_for_task = session_id.clone();
-    let event_task = spawn(async move {
-        loop {
-            match subscription.recv().await {
-                Ok(event) => {
-                    let payload = SessionEventPayload {
-                        session_id: session_id_for_task.clone(),
-                        event_type: event.event_type.clone(),
-                        data: event.data.clone(),
-                    };
-                    let _ = app_handle.emit("session-event", payload);
-                }
-                Err(RecvError::Lagged(_)) => continue,
-                Err(RecvError::Closed) => break,
-                Err(_) => break,
-            }
-        }
-    });
-
-    let mut sessions = state.sessions.lock().await;
-    sessions.insert(
-        session_id.clone(),
-        SessionEntry {
-            session,
-            event_task,
-        },
-    );
-
-    Ok(session_id)
-}
-
-#[tauri::command]
-#[tracing::instrument(skip(state))]
-async fn disconnect_session(
-    session_id: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
-    let entry = {
-        let mut sessions = state.sessions.lock().await;
-        sessions.remove(&session_id)
-    };
-
-    let Some(entry) = entry else {
-        return Err("Session not found".to_string());
-    };
-
-    entry.event_task.abort();
-    entry
-        .session
-        .disconnect()
-        .await
-        .map_err(|err| err.to_string())?;
-
-    Ok("Session closed successfully".to_string())
-}
-
-#[tauri::command]
-#[tracing::instrument(skip(state, text), fields(text_len = text.len()))]
-async fn send_message(
-    session_id: String,
-    text: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
-    let session = {
-        let sessions = state.sessions.lock().await;
-        sessions
-            .get(&session_id)
-            .map(|entry| entry.session.clone())
-            .ok_or_else(|| "Session not found".to_string())?
-    };
-
-    let message_id = session
-        .send(text.as_str())
-        .await
-        .map_err(|err| err.to_string())?;
-
-    Ok(message_id)
-}
-
+pub use app::events::SessionEventPayload;
+use app::state::AppState;
+use app::LogGuard;
+use ipc::commands::client::create_client;
+use ipc::commands::session::{create_session, disconnect_session, send_message};
+use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            // Resolve the per-app log directory under the OS app-data dir and
-            // start the tracing subscriber. Keep the guard inside AppState so
-            // it flushes on shutdown.
+            // Resolve the per-app log directory under the OS app-data dir
+            // and start the tracing subscriber. Keep the guard inside
+            // managed state so it flushes on shutdown.
             let log_dir = app
                 .path()
                 .app_log_dir()
@@ -171,7 +27,7 @@ pub fn run() {
             let guard = logging::init(log_dir);
             app.manage(LogGuard(guard));
             app.manage(AppState::default());
-            info!(version = env!("CARGO_PKG_VERSION"), "dafman started");
+            tracing::info!(version = env!("CARGO_PKG_VERSION"), "dafman started");
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -184,7 +40,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-/// Newtype so the tracing-appender `WorkerGuard` can live in `tauri::State`
-/// without colliding with other types.
-#[allow(dead_code)]
-struct LogGuard(tracing_appender::non_blocking::WorkerGuard);
