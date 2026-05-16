@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputGroup from "primevue/inputgroup";
@@ -11,6 +12,14 @@ type ChatMessage = {
   id: number;
   role: "user" | "assistant" | "system";
   text: string;
+  /** Backend message id for assistant messages, used to correlate streaming events */
+  messageId?: string;
+};
+
+type SessionEventPayload = {
+  sessionId: string;
+  eventType: string;
+  data: Record<string, unknown>;
 };
 
 const { sessionId } = defineProps<{
@@ -22,6 +31,7 @@ const messages = ref<ChatMessage[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
 const isSending = ref(false);
 let nextId = 1;
+let unlisten: UnlistenFn | null = null;
 
 const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
@@ -35,6 +45,101 @@ async function scrollToBottom() {
   }
 }
 
+function findOrCreateAssistantMessage(messageId: string): ChatMessage {
+  let msg = messages.value.find(
+    (m) => m.role === "assistant" && m.messageId === messageId,
+  );
+  if (!msg) {
+    msg = {
+      id: nextId++,
+      role: "assistant",
+      text: "",
+      messageId,
+    };
+    messages.value.push(msg);
+  }
+  return msg;
+}
+
+function handleEvent(payload: SessionEventPayload) {
+  if (payload.sessionId !== sessionId) {
+    return;
+  }
+
+  const { eventType, data } = payload;
+
+  switch (eventType) {
+    case "assistant.message_start": {
+      const messageId = String(data.messageId ?? "");
+      if (messageId) {
+        findOrCreateAssistantMessage(messageId);
+        scrollToBottom();
+      }
+      break;
+    }
+    case "assistant.message_delta": {
+      const messageId = String(data.messageId ?? "");
+      const delta = String(data.deltaContent ?? "");
+      if (messageId) {
+        const msg = findOrCreateAssistantMessage(messageId);
+        msg.text += delta;
+        scrollToBottom();
+      }
+      break;
+    }
+    case "assistant.message": {
+      const messageId = String(data.messageId ?? "");
+      const content = String(data.content ?? "");
+      if (messageId) {
+        const msg = findOrCreateAssistantMessage(messageId);
+        msg.text = content;
+        scrollToBottom();
+      }
+      break;
+    }
+    case "session.idle": {
+      isSending.value = false;
+      break;
+    }
+    case "session.error": {
+      const message = String(data.message ?? "Unknown session error");
+      messages.value.push({
+        id: nextId++,
+        role: "system",
+        text: `Session error: ${message}`,
+      });
+      isSending.value = false;
+      scrollToBottom();
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+onMounted(async () => {
+  unlisten = await listen<SessionEventPayload>("session-event", (event) => {
+    handleEvent(event.payload);
+  });
+});
+
+onUnmounted(() => {
+  if (unlisten) {
+    unlisten();
+    unlisten = null;
+  }
+});
+
+// Reset chat state if the bound session changes.
+watch(
+  () => sessionId,
+  () => {
+    messages.value = [];
+    isSending.value = false;
+    draft.value = "";
+  },
+);
+
 async function sendMessage() {
   const text = draft.value.trim();
   if (!text || isSending.value) {
@@ -47,22 +152,14 @@ async function sendMessage() {
   await scrollToBottom();
 
   try {
-    const reply = await invoke<string>("send_message", {
-      sessionId,
-      text,
-    });
-    messages.value.push({
-      id: nextId++,
-      role: "assistant",
-      text: reply || "(no response)",
-    });
+    await invoke<string>("send_message", { sessionId, text });
+    // Response now streams in via "session-event"; idle will clear isSending.
   } catch (error) {
     messages.value.push({
       id: nextId++,
       role: "system",
       text: `Error: ${String(error)}`,
     });
-  } finally {
     isSending.value = false;
     await scrollToBottom();
   }
@@ -95,10 +192,13 @@ async function sendMessage() {
           shape="circle"
           size="small"
         />
-        <div class="message-bubble">{{ message.text }}</div>
+        <div class="message-bubble">{{ message.text || "…" }}</div>
       </div>
 
-      <div v-if="isSending" class="message-row assistant">
+      <div
+        v-if="isSending && !messages.some((m) => m.role === 'assistant' && m.text === '')"
+        class="message-row assistant"
+      >
         <Avatar label="A" shape="circle" size="small" />
         <div class="message-bubble typing">
           <i class="pi pi-spin pi-spinner" /> Thinking...
