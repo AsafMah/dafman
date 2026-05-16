@@ -8,8 +8,7 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
-- `WIP` - `feat(m1): pinia stores (client, sessions, toast, permissions stub) + central src/ipc/invoke.ts + PrimeVue Toast UI`
-- `WIP` - `feat(m1): per-session Tauri Channel returned from create_session; drop global session-event`
+- `e2837c1` - `feat(m1): per-session Channel + Pinia stores + typed IPC wrapper`
 - `1b8f7de` - `refactor(backend): split lib.rs into app/ + ipc/commands/ with AppError`
 - `b073ead` - `docs: adopt AGENTS.md standard at repo root (agents.md spec)`
 - `0e1587d` - `chore: centralize dev commands in package.json + add STATUS.md + copilot-instructions`
