@@ -22,6 +22,7 @@ import ReasoningBlock from "./ReasoningBlock.vue";
 
 const props = defineProps<{
   sessionId: string;
+  alias: string;
   events: SessionEventPayload[];
 }>();
 
@@ -41,14 +42,16 @@ const isSending = ref(false);
 const idCounter: IdCounter = { next: 1 };
 let processedEvents = 0;
 
-const sessionOverride = ref<ReasoningVisibility | null>(null);
+const sessionOverride = ref<ReasoningVisibility | "default">("default");
 
-const reasoningVisibility = computed<ReasoningVisibility>(
-  () => sessionOverride.value ?? settings.value.appearance.reasoningVisibility,
+const reasoningVisibility = computed<ReasoningVisibility>(() =>
+  sessionOverride.value === "default"
+    ? settings.value.appearance.reasoningVisibility
+    : sessionOverride.value,
 );
 
-const reasoningOptions: { label: string; value: ReasoningVisibility | null }[] = [
-  { label: "Default", value: null },
+const reasoningOptions: { label: string; value: ReasoningVisibility | "default" }[] = [
+  { label: "Default", value: "default" },
   { label: "Hidden", value: "hidden" },
   { label: "Compact", value: "compact" },
   { label: "Expanded", value: "expanded" },
@@ -94,7 +97,7 @@ watch(
     items.value = [];
     isSending.value = false;
     draft.value = "";
-    sessionOverride.value = null;
+    sessionOverride.value = "default";
     processedEvents = props.events.length;
   },
 );
@@ -128,17 +131,22 @@ async function sendMessage() {
   <section class="chat-tile" :style="{ '--accent': accentColor }">
     <header class="chat-header">
       <div class="chat-title">
-        <Tag :value="props.sessionId" severity="secondary" />
+        <Tag :value="props.alias" severity="secondary" />
+        <span class="session-id" :title="props.sessionId">{{ props.sessionId }}</span>
       </div>
       <div class="chat-header-actions">
-        <Select
-          v-model="sessionOverride"
-          :options="reasoningOptions"
-          option-label="label"
-          option-value="value"
-          size="small"
-          aria-label="Reasoning visibility for this session"
-        />
+        <label class="control" :for="`reasoning-${props.sessionId}`">
+          <span class="control-label">Reasoning</span>
+          <Select
+            :input-id="`reasoning-${props.sessionId}`"
+            v-model="sessionOverride"
+            :options="reasoningOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            aria-label="Reasoning visibility for this session"
+          />
+        </label>
         <Button
           icon="pi pi-times"
           text
@@ -224,7 +232,30 @@ async function sendMessage() {
 .chat-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.control-label {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.session-id {
+  font-family: var(--p-font-family-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12ch;
 }
 
 .chat-messages {
@@ -253,7 +284,7 @@ async function sendMessage() {
 }
 
 :global(.app-dark) .message-card {
-  background: var(--p-surface-800, var(--p-content-background));
+  background: var(--p-surface-700, var(--p-content-background));
 }
 
 .message-card.user {

@@ -75,23 +75,25 @@ function close() {
         </TabPanel>
         <TabPanel value="appearance">
           <div class="row">
-            <label>Theme</label>
+            <label id="theme-label">Theme</label>
             <SelectButton
               v-model="theme"
               :options="themeOptions"
               option-label="label"
               option-value="value"
               :allow-empty="false"
+              aria-labelledby="theme-label"
             />
           </div>
           <div class="row">
-            <label>Reasoning visibility</label>
+            <label id="reasoning-label">Reasoning visibility</label>
             <SelectButton
               v-model="reasoningVisibility"
               :options="reasoningOptions"
               option-label="label"
               option-value="value"
               :allow-empty="false"
+              aria-labelledby="reasoning-label"
             />
             <p class="muted hint">
               Default for new chats. Each session can override this from its header.

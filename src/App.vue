@@ -125,6 +125,7 @@ async function onCreateSession() {
         v-for="session in sessions"
         :key="session.id"
         :session-id="session.id"
+        :alias="session.alias"
         :events="session.events"
         @close="sessionsStore.closeSession(session.id)"
       />

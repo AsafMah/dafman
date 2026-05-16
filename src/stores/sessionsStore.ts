@@ -10,10 +10,13 @@ import { reactive, ref } from "vue";
 import { Channel } from "@tauri-apps/api/core";
 import type { SessionEventPayload } from "../ipc/types";
 import { invokeCommand } from "../ipc/invoke";
+import { generateSessionAlias } from "../lib/sessionAlias";
 import { useToastStore } from "./toastStore";
 
 export type SessionRecord = {
   id: string;
+  /// Friendly two-word display name. Cosmetic only -- IPC uses `id`.
+  alias: string;
   channel: Channel<SessionEventPayload>;
   events: SessionEventPayload[];
 };
@@ -33,9 +36,10 @@ export const useSessionsStore = defineStore("sessions", () => {
     };
     try {
       const id = await invokeCommand("create_session", { onEvent: channel });
-      const record: SessionRecord = { id, channel, events };
+      const alias = generateSessionAlias();
+      const record: SessionRecord = { id, alias, channel, events };
       sessions.value.push(record);
-      toasts.success("Session created", id);
+      toasts.success("Session created", alias);
       return record;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

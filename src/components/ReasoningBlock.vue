@@ -43,14 +43,14 @@ const showFull = computed(
 .reasoning-card {
   padding: 0.5rem 0.75rem;
   background: var(--p-surface-100, var(--p-content-background));
-  border-left: 3px solid var(--p-text-muted-color);
+  border-left: 3px solid var(--p-primary-color, var(--p-text-muted-color));
   border-radius: var(--p-border-radius-md);
-  color: var(--p-text-muted-color);
+  color: var(--p-text-color);
   font-size: 0.875rem;
 }
 
 :global(.app-dark) .reasoning-card {
-  background: var(--p-surface-800, var(--p-content-background));
+  background: var(--p-surface-700, var(--p-content-background));
 }
 
 .reasoning-header {
@@ -65,6 +65,7 @@ const showFull = computed(
   font-size: 0.7rem;
   letter-spacing: 0.05em;
   font-weight: 600;
+  color: var(--p-text-muted-color);
 }
 
 .reasoning-body,

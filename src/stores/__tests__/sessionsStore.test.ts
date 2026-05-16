@@ -26,6 +26,7 @@ describe("sessionsStore", () => {
     const store = useSessionsStore();
     const record = await store.createSession();
     expect(record?.id).toBe("sess-1");
+    expect(record?.alias).toMatch(/^[a-z]+-[a-z]+$/);
     expect(store.sessions).toHaveLength(1);
     expect(store.isCreating).toBe(false);
   });
