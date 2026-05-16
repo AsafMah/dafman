@@ -1,7 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { accentForSession } from "../lib/color";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputGroup from "primevue/inputgroup";
@@ -218,7 +219,7 @@ async function sendMessage() {
           shape="circle"
           size="small"
         />
-        <div class="message-bubble">{{ message.text || "…" }}</div>
+        <div class="message-bubble">{{ message.text || "â€¦" }}</div>
       </div>
 
       <div
@@ -328,3 +329,4 @@ async function sendMessage() {
   border-top: 1px solid var(--p-content-border-color);
 }
 </style>
+

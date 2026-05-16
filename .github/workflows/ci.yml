@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 on:
   push:
     branches: [main]
@@ -21,6 +21,8 @@ jobs:
         run: npm ci
       - name: Type-check & build
         run: npm run build
+      - name: Run frontend tests
+        run: npm test
   backend:
     name: Backend (${{ matrix.os }})
     strategy:

@@ -1,4 +1,4 @@
-﻿# Contributing to Dafman
+# Contributing to Dafman
 Thanks for considering a contribution! Dafman is still early — there is a lot of room to shape the architecture and product. This guide tells you how to file issues, propose changes, and ship a PR.
 ## Code of Conduct
 Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold it.
@@ -21,7 +21,7 @@ Run the test suites:
 ```bash
 # frontend
 npm run build      # vue-tsc type-check + vite build
-# (Vitest test runner added in M1)
+npm test           # vitest unit + component tests
 # backend
 cd src-tauri
 cargo test

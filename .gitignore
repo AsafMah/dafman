@@ -46,3 +46,9 @@ ehthumbs.db
 !.env.example
 # Dafman app data (local-only)
 .dafman/
+
+# Test coverage
+coverage/
+
+# insta pending snapshots
+*.snap.new

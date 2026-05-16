@@ -1,4 +1,4 @@
-﻿//! Observability — `tracing` subscriber setup.
+//! Observability — `tracing` subscriber setup.
 //!
 //! See `plans/plan-observability.prompt.md` for the full design. This is the
 //! M1 baseline: file appender (daily, JSON), dev-stderr layer, env-filter.
@@ -50,4 +50,34 @@ pub fn init(log_dir: PathBuf) -> WorkerGuard {
         "tracing subscriber initialized",
     );
     guard
+}#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    /// `init` returns a guard that — when dropped — flushes the appender. We
+    /// verify that the log directory + file are created and that at least the
+    /// "tracing subscriber initialized" record lands on disk.
+    #[test]
+    fn init_creates_log_dir_and_writes_file() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().to_path_buf();
+        {
+            let _guard = init(path.clone());
+            tracing::info!(target: "dafman_lib::logging::tests", "smoke test event");
+        } // guard dropped here flushes
+        // The daily appender creates a file named `dafman.log.YYYY-MM-DD`.
+        let entries: Vec<_> = std::fs::read_dir(&path)
+            .expect("read dir")
+            .filter_map(Result::ok)
+            .collect();
+        assert!(
+            entries.iter().any(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("dafman.log")
+            }),
+            "expected a dafman.log* file in the log dir, got: {:?}",
+            entries.iter().map(|e| e.file_name()).collect::<Vec<_>>()
+        );
+    }
 }
