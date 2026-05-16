@@ -152,14 +152,29 @@ export function processEvents(
           "reasoningText",
           "reasoning_text",
         ]);
-        if (!reasoningId && !content) {
-          if (typeof console !== "undefined") {
-            console.warn(
-              "[chatEvents] assistant.reasoning with no id or content",
-              data,
+        // Skip pure-noise events. Two cases:
+        //   - Empty everywhere: nothing to render.
+        //   - OpenAI's opaque reasoning blob: emitted as a final event
+        //     with `content: ""` and a ~500-char base64 `reasoningId`
+        //     that the SDK uses internally to re-submit reasoning context
+        //     on follow-up turns. It's not displayable, and creating a
+        //     card from it leaves a perpetual "Thinking..." placeholder
+        //     after the assistant has already replied.
+        if (!content) {
+          const hasExistingItem =
+            reasoningId &&
+            items.some(
+              (i) => i.kind === "reasoning" && i.reasoningId === reasoningId,
             );
+          if (!hasExistingItem) {
+            if (typeof console !== "undefined") {
+              console.warn(
+                "[chatEvents] dropping assistant.reasoning with no displayable content",
+                { reasoningIdLen: reasoningId.length },
+              );
+            }
+            break;
           }
-          break;
         }
         const key = reasoningId || "_reasoning_singleton";
         const msg = upsertReasoning(key);

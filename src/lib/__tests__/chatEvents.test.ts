@@ -141,6 +141,47 @@ describe("processEvents", () => {
     expect(items).toHaveLength(0);
   });
 
+  it("does NOT create a card for OpenAI's opaque reasoning blob (empty content, base64 id)", () => {
+    // GPT-5.5 emits this AFTER the canonical reasoning event. The id is
+    // the encrypted blob the SDK uses to re-submit reasoning context on
+    // follow-up turns; it must not produce a UI card.
+    const counter = mkCounter();
+    const opaqueId =
+      "j8NsbxF6k3hyOuiAkHx+3cwEFYP0xgsUDtQmGAXgxTdIkzJDVk6WpdL8d8s0RKeM" +
+      "atF+ciUoX4pKPKXubbVMNArkSXfdlQzDDpt8I+hTJCWZw+Raxps9bpheFx7AFLC8";
+    const { items } = processEvents(
+      [],
+      [ev("assistant.reasoning", { content: "", reasoningId: opaqueId })],
+      counter,
+    );
+    expect(items).toHaveLength(0);
+  });
+
+  it("updates an existing reasoning card when assistant.reasoning carries content for a known id", () => {
+    // The canonical OpenAI/Claude flow: deltas stream first, then a
+    // final assistant.reasoning event arrives with the full content for
+    // the same reasoningId. Updating MUST work even though we now skip
+    // empty-content events.
+    const counter = mkCounter();
+    const seeded = processEvents(
+      [],
+      [
+        ev("assistant.reasoning_delta", { reasoningId: "r1", deltaContent: "draft" }),
+      ],
+      counter,
+    );
+    const final = processEvents(
+      seeded.items,
+      [ev("assistant.reasoning", { reasoningId: "r1", content: "final text" })],
+      counter,
+    );
+    const reasoning = final.items.find((i) => i.kind === "reasoning");
+    expect(reasoning && "text" in reasoning && reasoning.text).toBe(
+      "final text",
+    );
+    expect(final.items.filter((i) => i.kind === "reasoning")).toHaveLength(1);
+  });
+
   it("accepts reasoning delta under alternate field name 'delta'", () => {
     const counter = mkCounter();
     const { items } = processEvents(
