@@ -6,17 +6,18 @@ use github_copilot_sdk::subscription::RecvError;
 use github_copilot_sdk::SessionConfig;
 use std::sync::Arc;
 use tauri::async_runtime::spawn;
-use tauri::{AppHandle, Emitter};
+use tauri::ipc::Channel;
 /// Creates a streaming session using the running CLI client.
 ///
-/// Spawns a background task that forwards every `SessionEvent` to the
-/// frontend via the global ``session-event`` channel. The task is aborted
-/// when the session is disconnected.
+/// The frontend passes a `Channel<SessionEventPayload>` that scopes events
+/// to a single pane; this command spawns a background task that forwards
+/// every `SessionEvent` over that channel. The task is aborted when the
+/// session is disconnected.
 #[tauri::command]
-#[tracing::instrument(skip(app, state))]
+#[tracing::instrument(skip(state, on_event))]
 pub async fn create_session(
-    app: AppHandle,
     state: tauri::State<'_, AppState>,
+    on_event: Channel<SessionEventPayload>,
 ) -> AppResult<String> {
     let client = {
         let slot = state.client.lock().await;
@@ -32,18 +33,17 @@ pub async fn create_session(
     let session_id = session.id().to_string();
     let session = Arc::new(session);
     let mut subscription = session.subscribe();
-    let app_handle = app.clone();
-    let session_id_for_task = session_id.clone();
     let event_task = spawn(async move {
         loop {
             match subscription.recv().await {
                 Ok(event) => {
                     let payload = SessionEventPayload {
-                        session_id: session_id_for_task.clone(),
                         event_type: event.event_type.clone(),
                         data: event.data.clone(),
                     };
-                    let _ = app_handle.emit("session-event", payload);
+                    if on_event.send(payload).is_err() {
+                        break;
+                    }
                 }
                 Err(RecvError::Lagged(_)) => continue,
                 Err(_) => break,
@@ -79,7 +79,7 @@ pub async fn disconnect_session(
     Ok("Session closed successfully".to_string())
 }
 /// Fire-and-forget: queues a user message; the agent reply streams back via
-/// `session-event`.
+/// the per-session channel handed to `create_session`.
 ///
 /// `text` is deliberately skipped from the span; only its `len` is recorded
 /// (privacy-first per `plans/plan-observability.prompt.md`).

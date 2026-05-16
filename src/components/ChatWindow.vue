@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { computed, nextTick, ref, watch } from "vue";
 import { accentForSession } from "../lib/color";
+import type { SessionEventPayload } from "../ipc/types";
+import { useSessionsStore } from "../stores/sessionsStore";
+import { useToastStore } from "../stores/toastStore";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputGroup from "primevue/inputgroup";
@@ -16,14 +17,9 @@ type ChatMessage = {
   messageId?: string;
 };
 
-type SessionEventPayload = {
+const props = defineProps<{
   sessionId: string;
-  eventType: string;
-  data: Record<string, unknown>;
-};
-
-const { sessionId } = defineProps<{
-  sessionId: string;
+  events: SessionEventPayload[];
 }>();
 
 const emit = defineEmits<{
@@ -35,13 +31,13 @@ const messages = ref<ChatMessage[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
 const isSending = ref(false);
 let nextId = 1;
-let unlisten: UnlistenFn | null = null;
+let processedEvents = 0;
 
 const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
 );
 
-const accentColor = computed(() => accentForSession(sessionId));
+const accentColor = computed(() => accentForSession(props.sessionId));
 
 async function scrollToBottom() {
   await nextTick();
@@ -68,10 +64,6 @@ function findOrCreateAssistantMessage(messageId: string): ChatMessage {
 }
 
 function handleEvent(payload: SessionEventPayload) {
-  if (payload.sessionId !== sessionId) {
-    return;
-  }
-
   const { eventType, data } = payload;
 
   switch (eventType) {
@@ -123,27 +115,32 @@ function handleEvent(payload: SessionEventPayload) {
   }
 }
 
-onMounted(async () => {
-  unlisten = await listen<SessionEventPayload>("session-event", (event) => {
-    handleEvent(event.payload);
-  });
-});
-
-onUnmounted(() => {
-  if (unlisten) {
-    unlisten();
-    unlisten = null;
-  }
-});
+watch(
+  () => props.events.length,
+  (len) => {
+    while (processedEvents < len) {
+      const payload = props.events[processedEvents];
+      processedEvents++;
+      if (payload) {
+        handleEvent(payload);
+      }
+    }
+  },
+  { immediate: true },
+);
 
 watch(
-  () => sessionId,
+  () => props.sessionId,
   () => {
     messages.value = [];
     isSending.value = false;
     draft.value = "";
+    processedEvents = props.events.length;
   },
 );
+
+const sessionsStore = useSessionsStore();
+const toasts = useToastStore();
 
 async function sendMessage() {
   const text = draft.value.trim();
@@ -157,13 +154,15 @@ async function sendMessage() {
   await scrollToBottom();
 
   try {
-    await invoke<string>("send_message", { sessionId, text });
+    await sessionsStore.sendMessage(props.sessionId, text);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     messages.value.push({
       id: nextId++,
       role: "system",
-      text: `Error: ${String(error)}`,
+      text: `Error: ${message}`,
     });
+    toasts.error("Failed to send message", message);
     isSending.value = false;
     await scrollToBottom();
   }
@@ -183,7 +182,7 @@ async function sendMessage() {
           size="small"
           :style="{ background: accentColor, color: 'white' }"
         />
-        <Tag :value="sessionId" severity="secondary" />
+        <Tag :value="props.sessionId" severity="secondary" />
       </div>
       <Button
         icon="pi pi-times"

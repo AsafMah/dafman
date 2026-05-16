@@ -7,7 +7,6 @@ use dafman_lib::SessionEventPayload;
 #[test]
 fn session_event_payload_wire_shape() {
     let payload = SessionEventPayload {
-        session_id: "sess-1".into(),
         event_type: "assistant.message_delta".into(),
         data: serde_json::json!({
             "messageId": "m-1",
@@ -21,8 +20,7 @@ fn session_event_payload_wire_shape() {
         "deltaContent": "Hello",
         "messageId": "m-1"
       },
-      "eventType": "assistant.message_delta",
-      "sessionId": "sess-1"
+      "eventType": "assistant.message_delta"
     }
     "###);
 }

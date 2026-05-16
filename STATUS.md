@@ -8,18 +8,18 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
+- `WIP` - `feat(m1): pinia stores (client, sessions, toast, permissions stub) + central src/ipc/invoke.ts + PrimeVue Toast UI`
+- `WIP` - `feat(m1): per-session Tauri Channel returned from create_session; drop global session-event`
 - `1b8f7de` - `refactor(backend): split lib.rs into app/ + ipc/commands/ with AppError`
 - `b073ead` - `docs: adopt AGENTS.md standard at repo root (agents.md spec)`
 - `0e1587d` - `chore: centralize dev commands in package.json + add STATUS.md + copilot-instructions`
 - `7d26d5d` - `test(m1): testing baseline (vitest + cargo test + insta + CI)`
 - `5e05456` - `feat(m1): swap to Supercharged SDK pin + add tracing observability baseline`
 ## Next concrete step
-**Per-session Tauri channel** (`tauri::ipc::Channel<T>`). Replace the global `session-event` with a channel handle returned from `create_session`; the frontend subscribes directly per pane and drops the `payload.sessionId === sessionId` filter in `ChatWindow.vue`. `src-tauri/tests/ipc_contract.rs` already imports the real `SessionEventPayload`, so renaming/moving fields will fail loudly.
+**Settings store on disk** (versioned JSON in `app_config_dir()`) + a minimal Settings dialog (General, Appearance) that persists dark mode through the new store. Wire dark-mode reads/writes through the store instead of the `App.vue` local ref + `matchMedia` fallback.
 After that, in order:
-1. **Pinia stores** (`clientStore`, `sessionsStore`, `permissionsStore`, `toastStore`) + central `src/ipc/invoke.ts` wrapper.
-2. **Settings store on disk** (versioned JSON) + minimal Settings dialog persisting dark mode.
-3. **Real permission UX** (`PermissionService` -> modal prompt).
-4. **URL elicitation card + `UrlOpener`** with policy defaults.
+1. **Real permission UX** (`PermissionService` -> modal prompt; `permissionsStore` is already scaffolded).
+2. **URL elicitation card + `UrlOpener`** with policy defaults.
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold.
 - [x] Single SDK Client lifecycle.
@@ -34,20 +34,20 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 - [x] **Centralized scripts** in `package.json` (`npm run test`, `npm run lint`, `npm run check`).
 - [x] **AGENTS.md** at repo root per the agents.md standard.
 - [x] **Backend module refactor** to the architecture-plan layout (`app/{error,events,state}.rs`, `ipc/commands/{client,session}.rs`). `AppError` (`thiserror`) replaces `String` returns; `tests/ipc_contract.rs` imports the real `SessionEventPayload`.
-- [ ] **Per-session Tauri channel** (`tauri::ipc::Channel`) returned from `create_session`; drop the global `session-event` filter on the frontend.
-- [ ] **Pinia stores** (`clientStore`, `sessionsStore`, `permissionsStore`, `toastStore`); centralize IPC wrappers in `src/ipc/`.
+- [x] **Per-session Tauri channel** (`tauri::ipc::Channel`) returned from `create_session`; dropped the global `session-event` filter on the frontend. `SessionEventPayload` no longer carries `sessionId` (channel identity scopes events). Added `src/ipc/types.ts` as the TS mirror surface.
+- [x] **Pinia stores** (`clientStore`, `sessionsStore`, `toastStore`, `permissionsStore` stub); centralized IPC behind `src/ipc/invoke.ts` (typed via `CommandMap`). PrimeVue `Toast` mounted at the app root; stores push toasts without needing a component context.
 - [ ] **Typed IPC** - hand-mirror in `src/ipc/types.ts`; evaluate `tauri-specta` for M2.
 - [ ] **Settings store** on disk (versioned JSON) + minimal Settings dialog (General, Appearance).
 - [ ] **Dark mode** persisted via settings store; token-driven.
 - [ ] **Real permission UX** - `PermissionService` replaces `ApproveAllHandler`; modal prompt.
 - [ ] **URL elicitation card + `UrlOpener`** with defaults (`https://github.com/login/*` allow-always; `localhost:*` allow-always; everything else ask).
 - [ ] **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
-- [ ] **Frontend store + component tests** to follow the refactor (sessionsStore optimistic flow, ChatPane render).
+- [x] **Frontend store + component tests** to follow the refactor (sessionsStore optimistic flow, ChatPane render).
 - [ ] **One Playwright smoke test** (first-run -> create client -> create session -> send -> see streaming reply).
 ## Tests at a glance
 | Surface | Runner | Status |
 |---|---|---|
-| Frontend unit (`src/lib/__tests__/`) | Vitest + happy-dom | 8 tests passing |
+| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 12 tests passing |
 | Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 1 test passing (`logging`) |
 | Backend integration (`src-tauri/tests/`) | `cargo test` | 1 snapshot passing |
 | E2E (Playwright) | _not yet wired_ | - |

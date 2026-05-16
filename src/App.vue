@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { storeToRefs } from "pinia";
 import Button from "primevue/button";
-import Tag from "primevue/tag";
+import Toast from "primevue/toast";
+import { useToast } from "primevue/usetoast";
 import ToggleSwitch from "primevue/toggleswitch";
 import ChatWindow from "./components/ChatWindow.vue";
+import { useClientStore } from "./stores/clientStore";
+import { useSessionsStore } from "./stores/sessionsStore";
+import { useToastStore } from "./stores/toastStore";
 
 const isDarkMode = ref(false);
-const sessionIds = ref<string[]>([]);
-const clientReady = ref(false);
-const statusMessage = ref<string>("");
-const isCreatingClient = ref(false);
-const isCreatingSession = ref(false);
+
+const clientStore = useClientStore();
+const sessionsStore = useSessionsStore();
+const toastStore = useToastStore();
+const primeToast = useToast();
+
+const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
+const { sessions, isCreating: isCreatingSession } = storeToRefs(sessionsStore);
 
 function applyThemeClass(isDark: boolean) {
   document.documentElement.classList.toggle("app-dark", isDark);
@@ -27,44 +34,43 @@ watch(isDarkMode, (nextValue) => {
   applyThemeClass(nextValue);
 });
 
-async function createClient() {
-  isCreatingClient.value = true;
+// Drain queued toasts into PrimeVue's service. Stores can `push` without a
+// component context; this watcher is the only place that talks to PrimeVue.
+watch(
+  () => toastStore.pending.length,
+  (len) => {
+    if (len === 0) return;
+    for (const msg of toastStore.consume()) {
+      primeToast.add({
+        severity: msg.severity,
+        summary: msg.summary,
+        detail: msg.detail,
+        life: msg.life,
+      });
+    }
+  },
+);
+
+async function onCreateClient() {
   try {
-    statusMessage.value = await invoke<string>("create_client");
-    clientReady.value = true;
-  } catch (error) {
-    statusMessage.value = `Error: ${String(error)}`;
-  } finally {
-    isCreatingClient.value = false;
+    await clientStore.createClient();
+  } catch {
+    /* toast already shown */
   }
 }
 
-async function createSession() {
-  isCreatingSession.value = true;
+async function onCreateSession() {
   try {
-    const id = await invoke<string>("create_session");
-    sessionIds.value.push(id);
-    statusMessage.value = `Session created`;
-  } catch (error) {
-    statusMessage.value = `Error: ${String(error)}`;
-  } finally {
-    isCreatingSession.value = false;
-  }
-}
-
-async function closeSession(id: string) {
-  try {
-    await invoke<string>("disconnect_session", { sessionId: id });
-  } catch (error) {
-    statusMessage.value = `Error closing session: ${String(error)}`;
-  } finally {
-    sessionIds.value = sessionIds.value.filter((s) => s !== id);
+    await sessionsStore.createSession();
+  } catch {
+    /* toast already shown */
   }
 }
 </script>
 
 <template>
   <main class="app-root" :class="{ 'app-dark': isDarkMode }">
+    <Toast />
     <div class="topbar">
       <div class="topbar-actions">
         <Button
@@ -72,7 +78,7 @@ async function closeSession(id: string) {
           icon="pi pi-play"
           :loading="isCreatingClient"
           :disabled="clientReady"
-          @click="createClient"
+          @click="onCreateClient"
         />
         <Button
           label="Create Session"
@@ -80,9 +86,8 @@ async function closeSession(id: string) {
           severity="secondary"
           :loading="isCreatingSession"
           :disabled="!clientReady"
-          @click="createSession"
+          @click="onCreateSession"
         />
-        <Tag v-if="statusMessage" :value="statusMessage" severity="info" />
       </div>
       <div class="mode-toggle">
         <span>Dark mode</span>
@@ -90,12 +95,13 @@ async function closeSession(id: string) {
       </div>
     </div>
 
-    <div v-if="sessionIds.length > 0" class="session-grid">
+    <div v-if="sessions.length > 0" class="session-grid">
       <ChatWindow
-        v-for="id in sessionIds"
-        :key="id"
-        :session-id="id"
-        @close="closeSession(id)"
+        v-for="session in sessions"
+        :key="session.id"
+        :session-id="session.id"
+        :events="session.events"
+        @close="sessionsStore.closeSession(session.id)"
       />
     </div>
     <div v-else class="placeholder">

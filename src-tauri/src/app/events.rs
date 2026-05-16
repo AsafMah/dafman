@@ -3,19 +3,17 @@
 //! Every type here is part of the IPC wire contract — adding or renaming a
 //! field must update `src-tauri/tests/ipc_contract.rs` and the TS mirror.
 use serde::Serialize;
-/// Payload for the `session-event` Tauri event.
+/// Payload sent over a per-session `tauri::ipc::Channel<SessionEventPayload>`.
 ///
-/// Per-session Tauri channels are planned for the next M1 step (see
-/// `plans/plan-architecture.prompt.md`); the global event stays in place
-/// until that refactor.
+/// The channel handle is returned from `create_session`; the frontend
+/// subscribes per-pane, so there is no `session_id` field — the channel
+/// identity already scopes the events.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionEventPayload {
-    /// Session that produced the event.
-    pub session_id: String,
     /// Event type string from the SDK (e.g. ``"assistant.message_delta"``).
     pub event_type: String,
     /// Event-specific data (untyped JSON for now; typed wrappers will land
-    /// alongside the per-session channel in M1).
+    /// as the surface grows).
     pub data: serde_json::Value,
 }
