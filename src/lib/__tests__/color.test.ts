@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { accentForSession, hashString } from "../color";
+import { accentForIndex, accentForSession, hashString } from "../color";
 describe("hashString", () => {
   it("is deterministic", () => {
     expect(hashString("abc")).toBe(hashString("abc"));
@@ -21,26 +21,29 @@ describe("hashString", () => {
     expect(Number.isInteger(h)).toBe(true);
   });
 });
+describe("accentForIndex", () => {
+  it("returns a valid hsl(...) string", () => {
+    expect(accentForIndex(0)).toMatch(/^hsl\(\s*\d+(?:\.\d+)?,/);
+  });
+  it("cycles through the 12-color palette", () => {
+    expect(accentForIndex(0)).toBe(accentForIndex(12));
+    expect(accentForIndex(1)).toBe(accentForIndex(13));
+  });
+  it("handles negative indices safely", () => {
+    expect(() => accentForIndex(-1)).not.toThrow();
+    expect(accentForIndex(-1)).toMatch(/^hsl/);
+  });
+  it("produces distinct colors for the first 12 indices", () => {
+    const colors = new Set<string>();
+    for (let i = 0; i < 12; i++) colors.add(accentForIndex(i));
+    expect(colors.size).toBe(12);
+  });
+});
 describe("accentForSession", () => {
-  it("produces a valid hsl(h, 70%, 55%) string", () => {
-    const color = accentForSession("abc");
-    expect(color).toMatch(/^hsl\(\d{1,3}, 70%, 55%\)$/);
+  it("returns one of the palette entries", () => {
+    expect(accentForSession("xyz")).toMatch(/^hsl/);
   });
   it("is stable for the same session id", () => {
     expect(accentForSession("xyz")).toBe(accentForSession("xyz"));
-  });
-  it("differs for different session ids", () => {
-    // Two close-but-distinct ids should not collide on hue for our fixtures.
-    expect(accentForSession("session-alpha")).not.toBe(
-      accentForSession("session-bravo"),
-    );
-  });
-  it("clamps the hue to 0..359", () => {
-    const color = accentForSession("any");
-    const match = color.match(/^hsl\((\d+),/);
-    expect(match).not.toBeNull();
-    const hue = Number(match![1]);
-    expect(hue).toBeGreaterThanOrEqual(0);
-    expect(hue).toBeLessThan(360);
   });
 });

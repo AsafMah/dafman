@@ -42,15 +42,15 @@ const showFull = computed(
 <style scoped>
 .reasoning-card {
   padding: 0.5rem 0.75rem;
-  background: var(--p-surface-100, var(--p-content-background));
+  /* Theme-aware token so dark mode keeps text-on-bg contrast; the previous
+     `:global(.app-dark)` override didn't compose reliably with scoped style
+     hashing, which left the body white-on-light in dark mode. */
+  background: color-mix(in srgb, var(--p-primary-color) 8%, var(--p-content-background));
+  color: var(--p-text-color);
+  border: 1px solid var(--p-content-border-color);
   border-left: 3px solid var(--p-primary-color, var(--p-text-muted-color));
   border-radius: var(--p-border-radius-md);
-  color: var(--p-text-color);
   font-size: 0.875rem;
-}
-
-:global(.app-dark) .reasoning-card {
-  background: var(--p-surface-700, var(--p-content-background));
 }
 
 .reasoning-header {

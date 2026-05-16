@@ -39,6 +39,19 @@ export type ProcessResult = {
 
 export type IdCounter = { next: number };
 
+/// Extracts the first present string field, in order. Used to paper over
+/// minor wire-shape drift across SDK versions (e.g. some events use
+/// `delta` while the generated structs say `deltaContent`).
+function pickString(data: unknown, keys: readonly string[]): string {
+  if (!data || typeof data !== "object") return "";
+  const obj = data as Record<string, unknown>;
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === "string") return v;
+  }
+  return "";
+}
+
 export function processEvents(
   current: ChatItem[],
   newPayloads: SessionEventPayload[],
@@ -84,13 +97,13 @@ export function processEvents(
     const data = payload.data ?? {};
     switch (payload.eventType) {
       case "assistant.message_start": {
-        const messageId = String((data as { messageId?: unknown }).messageId ?? "");
+        const messageId = pickString(data, ["messageId"]);
         if (messageId) upsertAssistant(messageId);
         break;
       }
       case "assistant.message_delta": {
-        const messageId = String((data as { messageId?: unknown }).messageId ?? "");
-        const delta = String((data as { deltaContent?: unknown }).deltaContent ?? "");
+        const messageId = pickString(data, ["messageId"]);
+        const delta = pickString(data, ["deltaContent", "delta", "text"]);
         if (messageId) {
           const msg = upsertAssistant(messageId);
           if (msg.kind === "assistant") msg.text += delta;
@@ -98,8 +111,8 @@ export function processEvents(
         break;
       }
       case "assistant.message": {
-        const messageId = String((data as { messageId?: unknown }).messageId ?? "");
-        const content = String((data as { content?: unknown }).content ?? "");
+        const messageId = pickString(data, ["messageId"]);
+        const content = pickString(data, ["content", "text", "message"]);
         if (messageId) {
           const msg = upsertAssistant(messageId);
           if (msg.kind === "assistant") msg.text = content;
@@ -107,27 +120,30 @@ export function processEvents(
         break;
       }
       case "assistant.reasoning_delta": {
-        const reasoningId = String(
-          (data as { reasoningId?: unknown }).reasoningId ?? "",
-        );
-        const delta = String(
-          (data as { deltaContent?: unknown }).deltaContent ?? "",
-        );
-        if (reasoningId) {
-          const msg = upsertReasoning(reasoningId);
-          if (msg.kind === "reasoning") msg.text += delta;
-        }
+        const reasoningId =
+          pickString(data, ["reasoningId"]) || "_reasoning_singleton";
+        const delta = pickString(data, [
+          "deltaContent",
+          "delta",
+          "text",
+          "reasoningText",
+          "reasoning_text",
+        ]);
+        const msg = upsertReasoning(reasoningId);
+        if (msg.kind === "reasoning") msg.text += delta;
         break;
       }
       case "assistant.reasoning": {
-        const reasoningId = String(
-          (data as { reasoningId?: unknown }).reasoningId ?? "",
-        );
-        const content = String((data as { content?: unknown }).content ?? "");
-        if (reasoningId) {
-          const msg = upsertReasoning(reasoningId);
-          if (msg.kind === "reasoning") msg.text = content;
-        }
+        const reasoningId =
+          pickString(data, ["reasoningId"]) || "_reasoning_singleton";
+        const content = pickString(data, [
+          "content",
+          "text",
+          "reasoningText",
+          "reasoning_text",
+        ]);
+        const msg = upsertReasoning(reasoningId);
+        if (msg.kind === "reasoning") msg.text = content || msg.text;
         break;
       }
       case "session.idle": {
@@ -135,9 +151,7 @@ export function processEvents(
         break;
       }
       case "session.error": {
-        const message = String(
-          (data as { message?: unknown }).message ?? "Unknown session error",
-        );
+        const message = pickString(data, ["message"]) || "Unknown session error";
         items.push({
           id: counter.next++,
           kind: "system",

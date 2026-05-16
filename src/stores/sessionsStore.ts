@@ -10,6 +10,7 @@ import { reactive, ref } from "vue";
 import { Channel } from "@tauri-apps/api/core";
 import type { SessionEventPayload } from "../ipc/types";
 import { invokeCommand } from "../ipc/invoke";
+import { accentForIndex } from "../lib/color";
 import { generateSessionAlias } from "../lib/sessionAlias";
 import { useToastStore } from "./toastStore";
 
@@ -17,6 +18,9 @@ export type SessionRecord = {
   id: string;
   /// Friendly two-word display name. Cosmetic only -- IPC uses `id`.
   alias: string;
+  /// CSS color picked from a curated palette so the first N sessions are
+  /// visually distinct.
+  accent: string;
   channel: Channel<SessionEventPayload>;
   events: SessionEventPayload[];
   /// Currently-selected model id; `null` until the user picks one or a
@@ -29,6 +33,7 @@ export type SessionRecord = {
 export const useSessionsStore = defineStore("sessions", () => {
   const sessions = ref<SessionRecord[]>([]);
   const isCreating = ref(false);
+  let creationCount = 0;
 
   async function createSession(): Promise<SessionRecord | null> {
     if (isCreating.value) return null;
@@ -38,6 +43,12 @@ export const useSessionsStore = defineStore("sessions", () => {
     const events = reactive<SessionEventPayload[]>([]);
     channel.onmessage = (payload) => {
       events.push(payload);
+      // Dev-time visibility into the raw wire shape -- helps debug when a
+      // new SDK version drifts field names. Visible in the browser
+      // devtools when "Verbose" logging is enabled.
+      if (import.meta.env.DEV) {
+        console.debug("[session-event]", payload.eventType, payload.data);
+      }
       // Keep model + reasoning effort in sync with backend-initiated changes
       // (rate-limit auto-switch, /model commands, etc.). The session.model_change
       // event ships both fields when applicable.
@@ -60,9 +71,11 @@ export const useSessionsStore = defineStore("sessions", () => {
       const id = await invokeCommand("create_session", { onEvent: channel });
       pendingId = id;
       const alias = generateSessionAlias();
+      const accent = accentForIndex(creationCount++);
       const record: SessionRecord = {
         id,
         alias,
+        accent,
         channel,
         events,
         model: null,

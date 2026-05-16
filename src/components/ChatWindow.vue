@@ -6,7 +6,6 @@ import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
-import { accentForSession } from "../lib/color";
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -28,6 +27,7 @@ import ReasoningBlock from "./ReasoningBlock.vue";
 const props = defineProps<{
   sessionId: string;
   alias: string;
+  accent: string;
   events: SessionEventPayload[];
   model: string | null;
   reasoningEffort: string | null;
@@ -111,7 +111,7 @@ const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
 );
 
-const accentColor = computed(() => accentForSession(props.sessionId));
+const accentColor = computed(() => props.accent);
 
 async function scrollToBottom() {
   await nextTick();
@@ -182,7 +182,6 @@ async function sendMessage() {
     <header class="chat-header">
       <div class="chat-title">
         <Tag :value="props.alias" severity="secondary" />
-        <span class="session-id" :title="props.sessionId">{{ props.sessionId }}</span>
       </div>
       <div class="chat-header-actions">
         <label class="control" :for="`model-${props.sessionId}`">
@@ -330,13 +329,8 @@ async function sendMessage() {
 }
 
 .session-id {
-  font-family: var(--p-font-family-mono, monospace);
-  font-size: 0.7rem;
-  color: var(--p-text-muted-color);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 12ch;
+  /* unused since we hid the raw id; kept commented for quick reinstatement */
+  display: none;
 }
 
 .chat-messages {
@@ -360,26 +354,27 @@ async function sendMessage() {
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--p-border-radius-md);
-  background: var(--p-surface-100, var(--p-content-background));
+  /* Default to content background so text-color contrast is always right;
+     :global(.app-dark) selectors don't compose reliably with Vue's scoped
+     style hashing, so we lean on the auto-switching content tokens
+     instead. Per-role variants below add a subtle accent tint. */
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+  border: 1px solid var(--p-content-border-color);
   border-left: 3px solid transparent;
 }
 
-:global(.app-dark) .message-card {
-  background: var(--p-surface-700, var(--p-content-background));
-}
-
 .message-card.user {
-  background: var(--p-content-background);
-  border-left-color: var(--p-surface-400, #cbd5e1);
+  border-left-color: var(--p-surface-400, var(--p-text-muted-color));
 }
 
 .message-card.assistant {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--p-content-background));
   border-left-color: var(--accent);
 }
 
 .message-card.system {
-  background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent);
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 12%, var(--p-content-background));
   border-left-color: var(--p-red-500, #ef4444);
 }
 
