@@ -8,6 +8,8 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
+- `1f737ba` - `feat(chat): per-session model + reasoning effort selectors in chat header`
+- `83af904` - `fix(chat): readable reasoning in dark mode, labeled selects, friendly session aliases`
 - `ebf636e` - `feat(chat): reasoning visibility + full-width chat redesign`
 - `6b4ff19` - `feat(m1): settings store on disk + Settings dialog (theme persistence)`
 - `e2837c1` - `feat(m1): per-session Channel + Pinia stores + typed IPC wrapper`
@@ -50,9 +52,9 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 ## Tests at a glance
 | Surface | Runner | Status |
 |---|---|---|
-| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 28 tests passing |
+| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 32 tests passing |
 | Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 6 tests passing (`logging`, `app::settings`) |
-| Backend integration (`src-tauri/tests/`) | `cargo test` | 2 snapshots passing (`SessionEventPayload`, `Settings`) |
+| Backend integration (`src-tauri/tests/`) | `cargo test` | 3 snapshots passing (`SessionEventPayload`, `Settings`, `ModelSummary`) |
 | E2E (Playwright) | _not yet wired_ | - |
 ## Conventions for agents
 Agent contract lives in [`AGENTS.md`](AGENTS.md) at the repo root (per the [agents.md](https://agents.md/) standard). Highlights:
