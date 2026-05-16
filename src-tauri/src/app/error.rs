@@ -17,6 +17,9 @@ pub enum AppError {
     /// A session id was supplied that the manager does not know about.
     #[error("session {0} not found")]
     SessionNotFound(String),
+    /// Settings load/save failed.
+    #[error("settings: {0}")]
+    Settings(String),
     /// Anything coming out of the upstream SDK that we do not have a
     /// finer-grained category for yet.
     #[error("sdk: {0}")]
@@ -25,6 +28,11 @@ pub enum AppError {
 impl From<github_copilot_sdk::Error> for AppError {
     fn from(err: github_copilot_sdk::Error) -> Self {
         Self::Sdk(err.to_string())
+    }
+}
+impl From<crate::app::settings::SettingsError> for AppError {
+    fn from(err: crate::app::settings::SettingsError) -> Self {
+        Self::Settings(err.to_string())
     }
 }
 /// `Result` alias used throughout `ipc::commands::*`.

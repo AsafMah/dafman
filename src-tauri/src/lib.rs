@@ -7,10 +7,14 @@ mod app;
 mod ipc;
 mod logging;
 pub use app::events::SessionEventPayload;
+use app::settings::SettingsService;
+pub use app::settings::{Appearance, Settings, ThemeChoice, SETTINGS_VERSION};
 use app::state::AppState;
 use app::LogGuard;
 use ipc::commands::client::create_client;
 use ipc::commands::session::{create_session, disconnect_session, send_message};
+use ipc::commands::settings::{get_settings, update_settings};
+use std::sync::Arc;
 use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,6 +31,18 @@ pub fn run() {
             let guard = logging::init(log_dir);
             app.manage(LogGuard(guard));
             app.manage(AppState::default());
+
+            // Resolve `app_config_dir()/settings.json` and prime the cache.
+            // Load is sync (one tiny file) and runs before commands are
+            // dispatched, so the frontend's first `get_settings` is hot.
+            let config_dir = app
+                .path()
+                .app_config_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let settings_path = config_dir.join("settings.json");
+            let settings = SettingsService::load_or_default(settings_path);
+            app.manage(Arc::new(settings));
+
             tracing::info!(version = env!("CARGO_PKG_VERSION"), "dafman started");
             Ok(())
         })
@@ -35,7 +51,9 @@ pub fn run() {
             create_client,
             create_session,
             disconnect_session,
-            send_message
+            send_message,
+            get_settings,
+            update_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

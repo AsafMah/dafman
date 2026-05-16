@@ -30,6 +30,8 @@ function formatAppError(payload: AppErrorPayload): string {
       return "Copilot client not started";
     case "SessionNotFound":
       return `Session ${payload.data} not found`;
+    case "Settings":
+      return `Settings error: ${payload.data}`;
     case "Sdk":
       return `SDK error: ${payload.data}`;
   }
@@ -39,7 +41,10 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
   if (!value || typeof value !== "object") return false;
   const kind = (value as { kind?: unknown }).kind;
   return (
-    kind === "ClientNotStarted" || kind === "SessionNotFound" || kind === "Sdk"
+    kind === "ClientNotStarted" ||
+    kind === "SessionNotFound" ||
+    kind === "Settings" ||
+    kind === "Sdk"
   );
 }
 

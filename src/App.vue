@@ -1,38 +1,53 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
-import ToggleSwitch from "primevue/toggleswitch";
 import ChatWindow from "./components/ChatWindow.vue";
+import SettingsDialog from "./components/SettingsDialog.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
+import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
-
-const isDarkMode = ref(false);
+import { resolveIsDark } from "./lib/theme";
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
+const settingsStore = useSettingsStore();
 const toastStore = useToastStore();
 const primeToast = useToast();
 
 const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
 const { sessions, isCreating: isCreatingSession } = storeToRefs(sessionsStore);
+const { settings } = storeToRefs(settingsStore);
+
+const prefersDark = ref(false);
+const settingsOpen = ref(false);
+
+const isDarkMode = computed(() =>
+  resolveIsDark(settings.value.appearance.theme, prefersDark.value),
+);
 
 function applyThemeClass(isDark: boolean) {
   document.documentElement.classList.toggle("app-dark", isDark);
 }
 
-onMounted(() => {
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  isDarkMode.value = prefersDark;
-  applyThemeClass(prefersDark);
+onMounted(async () => {
+  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+  prefersDark.value = mql.matches;
+  mql.addEventListener("change", (e) => {
+    prefersDark.value = e.matches;
+  });
+  applyThemeClass(isDarkMode.value);
+  try {
+    await settingsStore.load();
+  } catch {
+    /* toast already shown */
+  }
 });
 
-watch(isDarkMode, (nextValue) => {
-  applyThemeClass(nextValue);
-});
+watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
 
 // Drain queued toasts into PrimeVue's service. Stores can `push` without a
 // component context; this watcher is the only place that talks to PrimeVue.
@@ -71,6 +86,10 @@ async function onCreateSession() {
 <template>
   <main class="app-root" :class="{ 'app-dark': isDarkMode }">
     <Toast />
+    <SettingsDialog
+      :visible="settingsOpen"
+      @update:visible="(v) => (settingsOpen = v)"
+    />
     <div class="topbar">
       <div class="topbar-actions">
         <Button
@@ -89,9 +108,15 @@ async function onCreateSession() {
           @click="onCreateSession"
         />
       </div>
-      <div class="mode-toggle">
-        <span>Dark mode</span>
-        <ToggleSwitch v-model="isDarkMode" />
+      <div class="topbar-right">
+        <Button
+          icon="pi pi-cog"
+          severity="secondary"
+          text
+          rounded
+          aria-label="Open settings"
+          @click="settingsOpen = true"
+        />
       </div>
     </div>
 
@@ -141,7 +166,7 @@ async function onCreateSession() {
   flex-wrap: wrap;
 }
 
-.mode-toggle {
+.topbar-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;

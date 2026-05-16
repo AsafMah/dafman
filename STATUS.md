@@ -15,10 +15,11 @@
 - `7d26d5d` - `test(m1): testing baseline (vitest + cargo test + insta + CI)`
 - `5e05456` - `feat(m1): swap to Supercharged SDK pin + add tracing observability baseline`
 ## Next concrete step
-**Settings store on disk** (versioned JSON in `app_config_dir()`) + a minimal Settings dialog (General, Appearance) that persists dark mode through the new store. Wire dark-mode reads/writes through the store instead of the `App.vue` local ref + `matchMedia` fallback.
+**Real permission UX** — replace `ApproveAllHandler` with a real `PermissionService` in the backend that surfaces requests to the frontend (per-session channel or a new global elicitation channel), and wire the existing `permissionsStore` scaffold to a modal prompt component. See `plans/plan-toolsAndPermissions.prompt.md`.
 After that, in order:
-1. **Real permission UX** (`PermissionService` -> modal prompt; `permissionsStore` is already scaffolded).
-2. **URL elicitation card + `UrlOpener`** with policy defaults.
+1. **URL elicitation card + `UrlOpener`** with policy defaults (`https://github.com/login/*` allow-always; `localhost:*` allow-always; everything else ask).
+2. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
+3. **One Playwright smoke test** (first-run → create client → create session → send → see streaming reply).
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold.
 - [x] Single SDK Client lifecycle.
@@ -35,9 +36,9 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 - [x] **Backend module refactor** to the architecture-plan layout (`app/{error,events,state}.rs`, `ipc/commands/{client,session}.rs`). `AppError` (`thiserror`) replaces `String` returns; `tests/ipc_contract.rs` imports the real `SessionEventPayload`.
 - [x] **Per-session Tauri channel** (`tauri::ipc::Channel`) returned from `create_session`; dropped the global `session-event` filter on the frontend. `SessionEventPayload` no longer carries `sessionId` (channel identity scopes events). Added `src/ipc/types.ts` as the TS mirror surface.
 - [x] **Pinia stores** (`clientStore`, `sessionsStore`, `toastStore`, `permissionsStore` stub); centralized IPC behind `src/ipc/invoke.ts` (typed via `CommandMap`). PrimeVue `Toast` mounted at the app root; stores push toasts without needing a component context.
-- [ ] **Typed IPC** - hand-mirror in `src/ipc/types.ts`; evaluate `tauri-specta` for M2.
-- [ ] **Settings store** on disk (versioned JSON) + minimal Settings dialog (General, Appearance).
-- [ ] **Dark mode** persisted via settings store; token-driven.
+- [x] **Typed IPC** - hand-mirror in `src/ipc/types.ts` (`SessionEventPayload`, `Settings`, `AppErrorPayload`, `CommandMap`); evaluate `tauri-specta` for M2.
+- [x] **Settings store** on disk (versioned JSON in `app_config_dir()/settings.json`) + minimal Settings dialog (General, Appearance) with three-state theme (system/light/dark). Backend `SettingsService` reads sync at startup, writes via `spawn_blocking`; falls back to defaults on missing/malformed files; future schema bumps go through `Settings::migrate`.
+- [x] **Dark mode** persisted via settings store; resolved through `resolveIsDark(theme, prefersDark)`, follows `prefers-color-scheme` when theme = `system`.
 - [ ] **Real permission UX** - `PermissionService` replaces `ApproveAllHandler`; modal prompt.
 - [ ] **URL elicitation card + `UrlOpener`** with defaults (`https://github.com/login/*` allow-always; `localhost:*` allow-always; everything else ask).
 - [ ] **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle.
@@ -46,9 +47,9 @@ Definition of done lives in `plans/plan-roadmap.prompt.md`.
 ## Tests at a glance
 | Surface | Runner | Status |
 |---|---|---|
-| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 12 tests passing |
-| Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 1 test passing (`logging`) |
-| Backend integration (`src-tauri/tests/`) | `cargo test` | 1 snapshot passing |
+| Frontend unit (`src/lib/__tests__/`, `src/stores/__tests__/`) | Vitest + happy-dom | 18 tests passing |
+| Backend lib (`src-tauri/src/*.rs`) | `cargo test --lib` | 5 tests passing (`logging`, `app::settings`) |
+| Backend integration (`src-tauri/tests/`) | `cargo test` | 2 snapshots passing (`SessionEventPayload`, `Settings`) |
 | E2E (Playwright) | _not yet wired_ | - |
 ## Conventions for agents
 Agent contract lives in [`AGENTS.md`](AGENTS.md) at the repo root (per the [agents.md](https://agents.md/) standard). Highlights:
