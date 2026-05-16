@@ -127,7 +127,9 @@ async function onCreateSession() {
     </div>
     <div v-else class="placeholder">
       <template v-if="!clientReady">Starting Copilot client...</template>
-      <template v-else>Click <strong>New Session</strong> to start chatting.</template>
+      <template v-else>
+        Click <strong>&nbsp;New Session&nbsp;</strong> to start chatting.
+      </template>
     </div>
   </main>
 </template>

@@ -61,6 +61,20 @@
 - "Abort" replaces "Send" while a turn is in flight.
 - Mode chip (chat / autopilot / immediate) affects `MessageOptions.mode`.
 - Advanced panel (chevron): custom request headers, response format, attachments preview.
+
+### Message queue & steering (backlog)
+- While a turn is in flight, additional sends are queued (not blocked). Queued messages display as a stack above the composer with per-item status (`pending` / `sending` / `delivered`).
+- Users can reorder (drag), edit, or cancel any `pending` item before it leaves the queue.
+- "Steer" affordance: inject a short context note into the live turn without ending it (maps to whatever the SDK exposes for mid-turn input; alternative: cancel-and-resend with prepended context).
+- Backend pipeline mirrors SDK `pending_messages.modified` so the queue UI stays in sync if the SDK reorders or coalesces messages.
+- Surface design open: drawer below composer vs. inline chips. Needs UX sketch before implementation.
+
+### Attachments (backlog)
+- Drag-and-drop and paste-from-clipboard for files (any) and images (rendered as previews).
+- Per-attachment chip with filename, size, remove button; click to open.
+- Backend `attachments` module hands paths/bytes to the SDK''s message-options surface.
+- Image attachments included in the next user message; non-image files referenced by path (for tool consumption).
+- Per-format previews: image thumbnail, code snippet for text files, generic file icon otherwise.
 ## Message actions
 Hover/keyboard-revealed actions on each bubble:
 - Copy text (markdown source).
@@ -70,6 +84,13 @@ Hover/keyboard-revealed actions on each bubble:
 - Delete locally (UI only; doesn''t rewrite session state).
 - Pin to "Notes" sidebar (M2.1+).
 - For images: Save As, Copy image.
+
+## Markdown rendering (backlog)
+- Assistant + reasoning content rendered as markdown (currently `pre-wrap` plain text).
+- Code fences with syntax highlight; copy-code button per block.
+- Sanitization mandatory — assistant output is untrusted (no raw HTML, no inline scripts).
+- Library candidates: `marked` + `highlight.js`, or `markdown-it` + `shiki`. Bundle-size and CSP implications need a measurement pass.
+- Links route through the URL policy (see `plan-sdkAndExternalSurfaces.prompt.md` "Browser & external URLs").
 ## Niceties
 - **Export**: whole conversation → Markdown / JSON / printable HTML; image assets included.
 - **Snapshots**: save the current session as a Skill template.

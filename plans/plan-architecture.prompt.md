@@ -195,6 +195,8 @@ src/
     color.ts                 # session-id -> accent (hsl)
     markdown.ts
     keyboard.ts
+  dev/                       # DEV-only surfaces, dynamically imported in main.ts
+    Playground.vue           # exercise chat components without a real SDK turn
 ```
 ### Key rules
 - **Components are dumb.** Data + actions come from composables / stores.

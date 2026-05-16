@@ -20,13 +20,21 @@
 - `e2837c1` - `feat(m1): per-session Channel + Pinia stores + typed IPC wrapper`
 - `1b8f7de` - `refactor(backend): split lib.rs into app/ + ipc/commands/ with AppError`
 ## Next concrete step
-**Markdown + code-block rendering** for assistant/reasoning content. Reasoning blocks especially are unreadable without code highlight today; the SDK already streams markdown-formatted text, we just render it as `pre-wrap`. Candidates: `marked` + `highlight.js`, or `markdown-it`. Sanitization mandatory (assistant output is untrusted).
+**Markdown + code-block rendering** for assistant/reasoning content. Reasoning blocks especially are unreadable without code highlight today; the SDK already streams markdown-formatted text, we just render it as `pre-wrap`. Candidates: `marked` + `highlight.js`, or `markdown-it`. Sanitization mandatory (assistant output is untrusted). See `plans/plan-messagingAndUx.prompt.md` → "Markdown rendering".
+
+User-flagged backlog (from session 2026-05-16, full detail in `plans/plan-roadmap.prompt.md` → "Backlog"):
+1. Steering & message queueing.
+2. File / image attachments.
+3. More session settings exposed (compaction, reasoning summary, system prompt modes, etc).
+4. Make the dev playground a discoverable button (currently `?dev`).
+5. Markdown + message QoL (copy/retry/edit-and-resend).
+6. GPT-5.5 `reasoning_opaque` mystery — CLI shows it, our UI gets `content: ""`.
+
 Other M1 items still open:
 1. **Real permission UX** - blocked on having any tools to permission.
 2. **URL elicitation card + `UrlOpener`** - blocked on a real caller (SDK auth flow, MCP OAuth, or clickable links once markdown lands).
 3. **Tracing redaction** snapshot tests; runtime `EnvFilter` reload handle. Also: tone down per-event session logging (currently every event hits debug; see `M1-TODO(observability)` comment in `src-tauri/src/ipc/commands/session.rs`).
 4. **Real binary E2E via `tauri-driver`** (Linux CI).
-5. **Reasoning visible in CLI but missing in our UI for GPT-5.5** - investigate how the upstream CLI decrypts/displays `reasoning_opaque`. Worth a separate session.
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold.
 - [x] Single SDK Client lifecycle.
