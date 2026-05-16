@@ -1,5 +1,9 @@
 # Contributing to Dafman
-Thanks for considering a contribution! Dafman is still early â€” there is a lot of room to shape the architecture and product. This guide tells you how to file issues, propose changes, and ship a PR.
+Thanks for considering a contribution! Dafman is still early Ã¢â‚¬â€ there is a lot of room to shape the architecture and product. This guide tells you how to file issues, propose changes, and ship a PR.
+## For AI coding agents
+
+If you''re an AI coding agent (Codex, Copilot, Cursor, Aider, Gemini CLI, Claude, etc.) working on this repo, read [AGENTS.md](AGENTS.md) first — it is the canonical, agent-focused contract per the [agents.md](https://agents.md/) standard.
+
 ## Code of Conduct
 Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold it.
 ## Where to start
@@ -9,7 +13,7 @@ Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDU
 ## Filing issues
 - Use the appropriate issue template (bug or feature).
 - Be specific about reproduction steps, the OS, the Rust + Node versions, and what you expected vs. what happened.
-- For security issues, follow [`SECURITY.md`](SECURITY.md) â€” do not open a public issue.
+- For security issues, follow [`SECURITY.md`](SECURITY.md) Ã¢â‚¬â€ do not open a public issue.
 ## Development setup
 ```bash
 git clone https://github.com/<owner>/dafman.git
@@ -40,7 +44,7 @@ npm run fmt:rust    # auto-format Rust
 - Include screenshots / GIFs for UI changes.
 - Make sure CI is green.
 - Update relevant files in `plans/` if you''re changing direction.
-- Add or update tests for new behavior â€” see [`plans/plan-testingStrategy.prompt.md`](plans/plan-testingStrategy.prompt.md).
+- Add or update tests for new behavior Ã¢â‚¬â€ see [`plans/plan-testingStrategy.prompt.md`](plans/plan-testingStrategy.prompt.md).
 ## Code style
 - **Rust:** `cargo fmt`, `cargo clippy -- -D warnings`. No `unwrap` in command paths.
 - **TypeScript:** strict mode. `vue-tsc --noEmit` must pass.

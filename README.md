@@ -7,16 +7,16 @@ Dafman keeps the speed and resource profile of a native Rust process while givin
 - Streaming token deltas via the GitHub Copilot SDK (Supercharged distribution).
 - Per-session accent color derived from the session id.
 - Light & dark mode via PrimeVue theme tokens.
-## Planned (M1–M7)
+## Planned (M1â€“M7)
 See [`plans/`](plans/) for the full design system:
-- `plan-overview.prompt.md` — vision, principles, decisions register.
-- `plan-architecture.prompt.md` — backend & frontend module layout, IPC contract.
-- `plan-roadmap.prompt.md` — milestones M0–M7.
-- `plan-messagingAndUx.prompt.md` — chat UX, reasoning, tools, inline elicitation.
-- `plan-toolsAndPermissions.prompt.md` — built-in tools, permission model, MCP.
-- `plan-platformFeatures.prompt.md` — projects, accounts, skills, agents, automations.
-- `plan-sdkAndExternalSurfaces.prompt.md` — Supercharged SDK pinning, URL/browser surface, MCP OAuth.
-- `plan-testingStrategy.prompt.md` — test pyramid, E2E, CI matrix.
+- `plan-overview.prompt.md` â€” vision, principles, decisions register.
+- `plan-architecture.prompt.md` â€” backend & frontend module layout, IPC contract.
+- `plan-roadmap.prompt.md` â€” milestones M0â€“M7.
+- `plan-messagingAndUx.prompt.md` â€” chat UX, reasoning, tools, inline elicitation.
+- `plan-toolsAndPermissions.prompt.md` â€” built-in tools, permission model, MCP.
+- `plan-platformFeatures.prompt.md` â€” projects, accounts, skills, agents, automations.
+- `plan-sdkAndExternalSurfaces.prompt.md` â€” Supercharged SDK pinning, URL/browser surface, MCP OAuth.
+- `plan-testingStrategy.prompt.md` â€” test pyramid, E2E, CI matrix.
 ## Status & progress
 
 Live progress board: [STATUS.md](STATUS.md). Plans live in [plans/](plans/).
@@ -29,7 +29,7 @@ Live progress board: [STATUS.md](STATUS.md). Plans live in [plans/](plans/).
 - **Tests:** `cargo test`, Vitest, Playwright
 ## Getting started
 ### Prerequisites
-- Rust (stable) — install via [rustup](https://rustup.rs).
+- Rust (stable) â€” install via [rustup](https://rustup.rs).
 - Node.js 20+ and npm (or pnpm/bun).
 - The Copilot CLI on your PATH (or set `COPILOT_CLI_PATH`). See the [SDK README](https://github.com/github/copilot-sdk/tree/main/rust) for binary install. Future releases will embed the CLI.
 - A GitHub Copilot subscription (or BYOK credentials for a supported provider).
@@ -39,7 +39,7 @@ npm install
 ```
 ### Common commands
 
-| Want to… | Run |
+| Want toâ€¦ | Run |
 |---|---|
 | run everything (lint + tests + build) | `npm run check` |
 | run frontend tests (vitest) | `npm test` |
@@ -70,4 +70,4 @@ Contributions are very welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) 
 ## Security
 To report a vulnerability, follow [`SECURITY.md`](SECURITY.md). Do not open public issues for security problems.
 ## License
-[MIT](LICENSE) © 2026 Dafman contributors.
+[MIT](LICENSE) Â© 2026 Dafman contributors.
