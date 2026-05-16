@@ -52,3 +52,4 @@ coverage/
 
 # insta pending snapshots
 *.snap.new
+*.pending-snap

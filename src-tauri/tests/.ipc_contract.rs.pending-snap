@@ -1,3 +1,0 @@
-{"run_id":"1778954383-63555800","line":30,"new":{"module_name":"ipc_contract","snapshot_name":"session_event_payload_wire_shape","metadata":{"source":"tests/ipc_contract.rs","assertion_line":30,"expression":"json"},"snapshot":"{\n  \"data\": {\n    \"deltaContent\": \"Hello\",\n    \"messageId\": \"m-1\"\n  },\n  \"eventType\": \"assistant.message_delta\",\n  \"sessionId\": \"sess-1\"\n}"},"old":{"module_name":"ipc_contract","metadata":{},"snapshot":"{\n  \"sessionId\": \"sess-1\",\n  \"eventType\": \"assistant.message_delta\",\n  \"data\": {\n    \"deltaContent\": \"Hello\",\n    \"messageId\": \"m-1\"\n  }\n}"}}
-{"run_id":"1778954396-112362400","line":30,"new":null,"old":null}
-{"run_id":"1778954408-931192700","line":30,"new":null,"old":null}
