@@ -12,7 +12,6 @@ type ChatMessage = {
   id: number;
   role: "user" | "assistant" | "system";
   text: string;
-  /** Backend message id for assistant messages, used to correlate streaming events */
   messageId?: string;
 };
 
@@ -26,6 +25,10 @@ const { sessionId } = defineProps<{
   sessionId: string;
 }>();
 
+const emit = defineEmits<{
+  (e: "close"): void;
+}>();
+
 const draft = ref("");
 const messages = ref<ChatMessage[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
@@ -36,6 +39,17 @@ let unlisten: UnlistenFn | null = null;
 const canSend = computed(
   () => draft.value.trim().length > 0 && !isSending.value,
 );
+
+const accentColor = computed(() => {
+  // Deterministic hue from session id (FNV-1a-ish hash).
+  let h = 2166136261;
+  for (let i = 0; i < sessionId.length; i++) {
+    h ^= sessionId.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  const hue = h % 360;
+  return `hsl(${hue}, 70%, 55%)`;
+});
 
 async function scrollToBottom() {
   await nextTick();
@@ -130,7 +144,6 @@ onUnmounted(() => {
   }
 });
 
-// Reset chat state if the bound session changes.
 watch(
   () => sessionId,
   () => {
@@ -153,7 +166,6 @@ async function sendMessage() {
 
   try {
     await invoke<string>("send_message", { sessionId, text });
-    // Response now streams in via "session-event"; idle will clear isSending.
   } catch (error) {
     messages.value.push({
       id: nextId++,
@@ -167,13 +179,27 @@ async function sendMessage() {
 </script>
 
 <template>
-  <section class="chat-tile">
+  <section
+    class="chat-tile"
+    :style="{ '--accent': accentColor }"
+  >
     <header class="chat-header">
       <div class="chat-title">
-        <Avatar label="AI" shape="circle" size="small" />
-        <span>Assistant Chat</span>
+        <Avatar
+          label="AI"
+          shape="circle"
+          size="small"
+          :style="{ background: accentColor, color: 'white' }"
+        />
+        <Tag :value="sessionId" severity="secondary" />
       </div>
-      <Tag :value="sessionId" severity="secondary" />
+      <Button
+        icon="pi pi-times"
+        text
+        rounded
+        aria-label="Close session"
+        @click="emit('close')"
+      />
     </header>
 
     <div ref="messagesEl" class="chat-messages">
@@ -221,14 +247,13 @@ async function sendMessage() {
 
 <style scoped>
 .chat-tile {
-  flex: 1 1 0;
   min-height: 0;
-  margin: 1rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--p-content-background);
   border: 1px solid var(--p-content-border-color);
+  border-top: 3px solid var(--accent);
   border-radius: var(--p-border-radius-xl);
 }
 
@@ -238,14 +263,15 @@ async function sendMessage() {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--p-content-border-color);
 }
 
 .chat-title {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .chat-messages {
@@ -254,8 +280,8 @@ async function sendMessage() {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  padding: 0.75rem;
 }
 
 .empty-message {
@@ -266,7 +292,7 @@ async function sendMessage() {
 .message-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .message-row.assistant {
@@ -274,19 +300,20 @@ async function sendMessage() {
 }
 
 .message-bubble {
-  max-width: min(72%, 40rem);
-  padding: 0.625rem 0.75rem;
+  max-width: min(80%, 28rem);
+  padding: 0.5rem 0.65rem;
   border-radius: var(--p-border-radius-lg);
   color: var(--p-text-color);
   background: var(--p-content-hover-background, var(--p-content-background));
   border: 1px solid var(--p-content-border-color);
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .message-row.assistant .message-bubble {
-  color: var(--p-primary-contrast-color);
-  background: var(--p-primary-color);
-  border-color: var(--p-primary-color);
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .message-row.system .message-bubble {
@@ -297,7 +324,7 @@ async function sendMessage() {
 
 .chat-composer {
   flex: 0 0 auto;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border-top: 1px solid var(--p-content-border-color);
 }
 </style>
