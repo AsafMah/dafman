@@ -120,8 +120,7 @@ export function processEvents(
         break;
       }
       case "assistant.reasoning_delta": {
-        const reasoningId =
-          pickString(data, ["reasoningId"]) || "_reasoning_singleton";
+        const reasoningId = pickString(data, ["reasoningId"]);
         const delta = pickString(data, [
           "deltaContent",
           "delta",
@@ -129,21 +128,44 @@ export function processEvents(
           "reasoningText",
           "reasoning_text",
         ]);
-        const msg = upsertReasoning(reasoningId);
+        // Drop events that have neither an id nor any text -- otherwise
+        // we render an empty "Thinking..." card after the assistant turn.
+        if (!reasoningId && !delta) {
+          if (typeof console !== "undefined") {
+            console.warn(
+              "[chatEvents] assistant.reasoning_delta with no id or text",
+              data,
+            );
+          }
+          break;
+        }
+        const key = reasoningId || "_reasoning_singleton";
+        const msg = upsertReasoning(key);
         if (msg.kind === "reasoning") msg.text += delta;
         break;
       }
       case "assistant.reasoning": {
-        const reasoningId =
-          pickString(data, ["reasoningId"]) || "_reasoning_singleton";
+        const reasoningId = pickString(data, ["reasoningId"]);
         const content = pickString(data, [
           "content",
           "text",
           "reasoningText",
           "reasoning_text",
         ]);
-        const msg = upsertReasoning(reasoningId);
-        if (msg.kind === "reasoning") msg.text = content || msg.text;
+        if (!reasoningId && !content) {
+          if (typeof console !== "undefined") {
+            console.warn(
+              "[chatEvents] assistant.reasoning with no id or content",
+              data,
+            );
+          }
+          break;
+        }
+        const key = reasoningId || "_reasoning_singleton";
+        const msg = upsertReasoning(key);
+        if (msg.kind === "reasoning") {
+          msg.text = content || msg.text;
+        }
         break;
       }
       case "session.idle": {

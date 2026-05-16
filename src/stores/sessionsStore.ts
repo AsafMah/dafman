@@ -11,13 +11,10 @@ import { Channel } from "@tauri-apps/api/core";
 import type { SessionEventPayload } from "../ipc/types";
 import { invokeCommand } from "../ipc/invoke";
 import { accentForIndex } from "../lib/color";
-import { generateSessionAlias } from "../lib/sessionAlias";
 import { useToastStore } from "./toastStore";
 
 export type SessionRecord = {
   id: string;
-  /// Friendly two-word display name. Cosmetic only -- IPC uses `id`.
-  alias: string;
   /// CSS color picked from a curated palette so the first N sessions are
   /// visually distinct.
   accent: string;
@@ -70,11 +67,9 @@ export const useSessionsStore = defineStore("sessions", () => {
     try {
       const id = await invokeCommand("create_session", { onEvent: channel });
       pendingId = id;
-      const alias = generateSessionAlias();
       const accent = accentForIndex(creationCount++);
       const record: SessionRecord = {
         id,
-        alias,
         accent,
         channel,
         events,
@@ -82,7 +77,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningEffort: null,
       };
       sessions.value.push(record);
-      toasts.success("Session created", alias);
+      toasts.success("Session created", id);
       return record;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

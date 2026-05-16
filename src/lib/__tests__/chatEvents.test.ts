@@ -120,6 +120,50 @@ describe("processEvents", () => {
     );
     expect(items).toHaveLength(0);
   });
+
+  it("does NOT create an empty reasoning card when delta has no id and no text", () => {
+    const counter = mkCounter();
+    const { items } = processEvents(
+      [],
+      [ev("assistant.reasoning_delta", {})],
+      counter,
+    );
+    expect(items).toHaveLength(0);
+  });
+
+  it("does NOT create an empty reasoning card when assistant.reasoning has no id and no content", () => {
+    const counter = mkCounter();
+    const { items } = processEvents(
+      [],
+      [ev("assistant.reasoning", {})],
+      counter,
+    );
+    expect(items).toHaveLength(0);
+  });
+
+  it("accepts reasoning delta under alternate field name 'delta'", () => {
+    const counter = mkCounter();
+    const { items } = processEvents(
+      [],
+      [
+        ev("assistant.reasoning_delta", { reasoningId: "r1", delta: "Hmm" }),
+      ],
+      counter,
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: "reasoning", text: "Hmm" });
+  });
+
+  it("accepts assistant.reasoning content under alternate field name 'text'", () => {
+    const counter = mkCounter();
+    const { items } = processEvents(
+      [],
+      [ev("assistant.reasoning", { reasoningId: "r1", text: "Done" })],
+      counter,
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: "reasoning", text: "Done" });
+  });
 });
 
 describe("appendUserMessage / appendSystemMessage", () => {

@@ -26,7 +26,6 @@ import ReasoningBlock from "./ReasoningBlock.vue";
 
 const props = defineProps<{
   sessionId: string;
-  alias: string;
   accent: string;
   events: SessionEventPayload[];
   model: string | null;
@@ -181,7 +180,7 @@ async function sendMessage() {
   <section class="chat-tile" :style="{ '--accent': accentColor }">
     <header class="chat-header">
       <div class="chat-title">
-        <Tag :value="props.alias" severity="secondary" />
+        <Tag :value="props.sessionId" severity="secondary" />
       </div>
       <div class="chat-header-actions">
         <label class="control" :for="`model-${props.sessionId}`">
