@@ -107,6 +107,15 @@ Critical user journeys:
   - `e2e` — only on `main` PRs; Playwright against `tauri build`.
 - Cache cargo + node_modules per OS.
 - Verify lockfile pins the Supercharged SDK SHA.
+## Observability integration
+
+Logging, tracing, metrics, and perf budgets are owned by plan-observability.prompt.md. Highlights enforced via tests:
+
+- Snapshot assertions that `#[instrument]` spans on chat/permission/url paths never log secret fields (`insta` redaction).
+- Property tests for the redaction helper.
+- E2E asserts the Log Viewer can tail and filter live entries.
+- `criterion` bench harness (ench_event_dispatch, ench_permission_eval, ench_url_policy_eval, ench_markdown_render) runs as an optional CI job; PRs show the diff.
+
 ## Performance & regression budgets
 - **Cold start** (window visible): < 1.5 s on a midrange laptop.
 - **Send → first delta**: dominated by SDK; track our own overhead — target < 50 ms added.
@@ -129,3 +138,4 @@ Tracked via:
 - One assertion concept per test; names describe behavior.
 - No flaky test ships; quarantined tests are deleted within a week.
 - Snapshots reviewed in PRs; updated via explicit script, never auto.
+

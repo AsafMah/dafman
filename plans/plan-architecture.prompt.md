@@ -281,9 +281,26 @@ dafman/
   logs/
   audit/                     # url + permission audit logs
 ```
+## Observability modules
+Lives across these backend modules (see `plan-observability.prompt.md` for the full design):
+- `logging.rs` — `tracing` subscriber, file appender (daily JSON), dev-stderr layer, runtime `EnvFilter` handle, redaction helpers, OTLP layer toggle.
+- `metrics/` — counters/histograms behind an `Arc<dyn MetricsRecorder>` so it''s easy to swap implementations and to no-op in tests.
+- `audit/` — append-only writers for `permissions.log`, `urls.log`, `accounts.log` (separate from diagnostic logs).
+- `ipc/commands/diagnostics.rs` — IPC for the in-app Log Viewer:
+  - `diagnostics.tail` (subscribe to live log lines via a Tauri channel),
+  - `diagnostics.set_level`, `diagnostics.snapshot_metrics`,
+  - `diagnostics.export_bundle` (zip logs + redacted settings + recent events).
+Frontend mirror:
+- `src/lib/logger.ts` — typed logger; high-severity entries forwarded to the backend.
+- `src/features/settings/sections/Diagnostics.vue` — log tail, level controls, metrics dashboard, "Export diagnostics bundle" button.
+- `src/features/settings/sections/Privacy.vue` — toggles for OTLP exporter and crash reports.
+
 ## Build & release
 - Single crate today; if `tools`, `mcp`, `skills` grow, split into workspace: `dafman-core`, `dafman-tools`, `dafman-mcp`, `dafman-app` (binary).
 - Frontend bundled by Vite; Tauri bundles per OS.
 - CI matrix: `cargo test`, `cargo clippy`, `vue-tsc`, `vitest`, Playwright e2e against `tauri build`.
 - Pinned `github-copilot-sdk` (Supercharged) SHA per release; CI verifies the lockfile.
 - Release builds use SDK `embedded-cli` feature for self-contained binaries.
+
+
+

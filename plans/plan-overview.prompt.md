@@ -35,6 +35,7 @@ Dafman is a desktop replacement for the GitHub Copilot CLI built on Tauri (Rust 
 | `plan-toolsAndPermissions.prompt.md` | Built-in tools, permission system, URL policy, MCP. |
 | `plan-platformFeatures.prompt.md` | Skills, agents, automations, projects, persistence, multi-account auth. |
 | `plan-sdkAndExternalSurfaces.prompt.md` | Supercharged SDK pinning, URL/browser surface, session.ui, image generation, MCP OAuth. |
+| `plan-observability.prompt.md` | Logging, tracing, metrics, audit, perf budgets, in-app Log Viewer, privacy controls. |
 | `plan-testingStrategy.prompt.md` | Test pyramid, fakes, snapshot tests, e2e, CI. |
 ## Decisions register
 - `[2026-05-16]` Tauri 2 — cross-platform and lightweight.
@@ -44,6 +45,7 @@ Dafman is a desktop replacement for the GitHub Copilot CLI built on Tauri (Rust 
 - `[2026-05-16]` Streaming is on by default.
 - `[2026-05-16]` Permissions default to "ask the user" (no `ApproveAllHandler` in production). Browser/URL opens go through the URL policy.
 - `[2026-05-16]` Tokens stored in OS keyring; multi-account supported from M4.
+- `[2026-05-16]` Adopt `tracing` + `tracing-subscriber` with JSON file appender + dev-stderr; OTLP export is opt-in. Audit logs are separate from diagnostic logs and never auto-deleted. See `plan-observability.prompt.md`.
 - **Open:** product name, MCP scope per release, Monaco vs CodeMirror 6.
 ## Glossary
 - **Client** — one `github_copilot_sdk::Client` (one CLI process).
@@ -54,3 +56,5 @@ Dafman is a desktop replacement for the GitHub Copilot CLI built on Tauri (Rust 
 - **Agent / Fleet** — sub-agent setup via SDK''s fleet API.
 - **Automation** — schedule/trigger that runs a session prompt unattended.
 - **URL elicitation** — runtime asks the host to open a URL in the user''s default browser (OAuth, consent, docs).
+
+

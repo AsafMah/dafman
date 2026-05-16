@@ -7,7 +7,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - Per-session accent color derived from the session id.
 - Light & dark mode via PrimeVue tokens (Aura preset, green primary).
 - Initial design documents in `plans/` covering vision, architecture, roadmap, messaging UX, tools & permissions, platform features, SDK & external surfaces, and testing strategy.
+- plans/plan-observability.prompt.md — logging, tracing, metrics, audit, performance budgets, in-app Log Viewer, privacy controls. Cross-referenced from the overview, architecture, roadmap (M1–M7 observability bullets), and testing strategy.
 ### Changed
 - N/A — initial release.
 ### Fixed
 - N/A — initial release.
+

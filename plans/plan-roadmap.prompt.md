@@ -17,7 +17,7 @@ Goal: take the prototype and make it a base we can grow on.
 - **Real permission UX** replacing `ApproveAllHandler`: SDK request → UI modal → answer.
 - **URL elicitation** card + opener policy (defaults only; full editor in M3).
 - **Dark mode** fully token-driven; switch persisted.
-- **Tracing logs** to file with rotation; log viewer in settings.
+- **Tracing logs** to file with rotation; in-app Log Viewer (basic tail + level filter); first `criterion` bench (`bench_event_dispatch`). See `plan-observability.prompt.md`.
 - **Tests**: backend unit tests for managers (with SDK trait fakes), frontend Vitest for stores, one Playwright smoke test.
 **Definition of done:** All current features work, every domain is testable in isolation, no `unwrap` in command paths, settings persist, dark mode is consistent, URL opens go through policy.
 ## M2 — Messaging power-ups
@@ -31,6 +31,7 @@ Goal: take the prototype and make it a base we can grow on.
 - Export conversation (Markdown, JSON).
 - Abort in-flight turn.
 - Keyboard shortcuts (`Cmd/Ctrl+Enter` send, `Esc` abort, `Cmd+K` command palette).
+- **Observability:** `#[instrument]` on chat/send/permission paths; metrics counters + histograms exposed in Settings → Diagnostics; Playwright perf snapshot.
 **Definition of done:** Chat experience is at parity (or better) with CLI; tools/reasoning/elicitation/images are first-class UI.
 ## M3 — Tools & permissions
 - Built-in tool registry (fs read, fs write, edit, search via `grep`, shell with timeout, http).
@@ -40,6 +41,7 @@ Goal: take the prototype and make it a base we can grow on.
 - URL policy editor (Settings → URL Policy).
 - Tool call visualization (diffs for fs.edit; output preview for shell/http).
 - `excludedTools` overlay surfaces per skill / per agent.
+- **Observability:** permission + URL audit logs wired; `bench_permission_eval` and `bench_url_policy_eval` benches.
 **Definition of done:** Sessions can read/write project files, search, shell out, hit the web, with full visibility and control.
 ## M4 — Projects, accounts & resumability
 - Project picker (open folder → becomes a project).
@@ -51,6 +53,7 @@ Goal: take the prototype and make it a base we can grow on.
 - `SessionFsProvider` writes session state under `<app-data>/sessions/<id>/`.
 - Recent projects + recent sessions in a sidebar.
 - Crash recovery: restart picks up open panes (best-effort).
+- **Observability:** OTLP exporter (opt-in) wired through Settings → Privacy; multi-account redaction snapshot tests.
 **Definition of done:** Close mid-conversation, reopen, conversations are back. Multiple projects + multiple accounts in parallel.
 ## M5 — Integrations: skills, MCP, agents
 - **Skills**: named bundle (instructions + tools subset + model + starter prompt + variables). Library UI + editor.
@@ -58,12 +61,14 @@ Goal: take the prototype and make it a base we can grow on.
 - **Agents / Fleets**: leverage SDK `fleet.start`, render sub-agent activity in a child pane (forwarding configurable).
 - Slash commands UI (registered via SDK `CommandDefinition`).
 - Custom system message transforms via UI.
+- **Observability:** sub-agent + MCP span propagation; per-MCP-server metrics.
 **Definition of done:** User can install an MCP server (with OAuth via the URL flow), build a skill, then invoke it from chat.
 ## M6 — Automations & notifications
 - Scheduled prompts (cron-style).
 - Triggers: file changed, time, manual, webhook (M6.1).
 - Background runs surface as desktop notifications + an Activity feed.
 - Quiet hours, batching, summary digest.
+- **Observability:** automations emit audit + metric events; quiet hours respect.
 **Definition of done:** "Every morning, run X in project Y and notify me" works end-to-end.
 ## M7 — Editor & power UX
 - Monaco-based file viewer/editor for tool-touched files.
@@ -73,6 +78,7 @@ Goal: take the prototype and make it a base we can grow on.
 - Command palette (`Cmd+K`).
 - Headless `browser.*` tool (separate from URL opener), with screenshot/snapshot capabilities.
 - Plugin/theme system (later).
+- **Observability:** diagnostics bundle export; `tokio-console` feature flag; full perf dashboard.
 **Definition of done:** Dafman feels like an IDE-companion for prompt-driven editing.
 ## Cross-cutting / continuous
 - A11y review at every milestone.
@@ -89,3 +95,8 @@ Goal: take the prototype and make it a base we can grow on.
 | P4 (M5) | Skills, MCP (stdio+HTTP+OAuth), sub-agents, slash commands. |
 | P5 (M6) | Automations, notifications. |
 | P6 (M7) | Monaco editor, diffs, command palette, headless browser tool. |
+
+## Observability per milestone
+
+See detailed list in `plan-observability.prompt.md` (`Definition of done per milestone`). Each milestone explicitly ships its observability deliverables alongside features.
+
