@@ -39,3 +39,63 @@ impl From<github_copilot_sdk::Model> for ModelSummary {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use github_copilot_sdk::{Model, ModelCapabilities, ModelCapabilitiesSupports};
+
+    fn base_model() -> Model {
+        Model {
+            id: "test-model".into(),
+            name: "Test Model".into(),
+            capabilities: ModelCapabilities::default(),
+            supported_reasoning_efforts: vec![],
+            default_reasoning_effort: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn supports_reasoning_effort_defaults_to_false_when_supports_field_is_none() {
+        let m = base_model();
+        let s = ModelSummary::from(m);
+        assert!(!s.supports_reasoning_effort);
+    }
+
+    #[test]
+    fn supports_reasoning_effort_defaults_to_false_when_inner_flag_is_none() {
+        let mut m = base_model();
+        m.capabilities.supports = Some(ModelCapabilitiesSupports {
+            reasoning_effort: None,
+            ..Default::default()
+        });
+        let s = ModelSummary::from(m);
+        assert!(!s.supports_reasoning_effort);
+    }
+
+    #[test]
+    fn supports_reasoning_effort_reflects_inner_flag_when_present() {
+        let mut m = base_model();
+        m.capabilities.supports = Some(ModelCapabilitiesSupports {
+            reasoning_effort: Some(true),
+            ..Default::default()
+        });
+        let s = ModelSummary::from(m);
+        assert!(s.supports_reasoning_effort);
+    }
+
+    #[test]
+    fn carries_id_name_efforts_and_default_verbatim() {
+        let mut m = base_model();
+        m.id = "claude-sonnet-4.5".into();
+        m.name = "Claude Sonnet 4.5".into();
+        m.supported_reasoning_efforts = vec!["low".into(), "high".into()];
+        m.default_reasoning_effort = Some("low".into());
+        let s = ModelSummary::from(m);
+        assert_eq!(s.id, "claude-sonnet-4.5");
+        assert_eq!(s.name, "Claude Sonnet 4.5");
+        assert_eq!(s.supported_reasoning_efforts, vec!["low", "high"]);
+        assert_eq!(s.default_reasoning_effort.as_deref(), Some("low"));
+    }
+}
