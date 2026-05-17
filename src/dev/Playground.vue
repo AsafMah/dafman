@@ -400,6 +400,8 @@ function exitPlayground() {
           :events="events"
           :model="null"
           :reasoning-effort="null"
+          :mode="null"
+          :approve-all="true"
           :send-handler="echoSend"
           @close="clearChat"
         />

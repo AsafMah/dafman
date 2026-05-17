@@ -10,7 +10,7 @@
 import { defineStore } from "pinia";
 import { reactive, ref } from "vue";
 import { invokeCommand, onSessionEvent } from "../ipc/invoke";
-import type { SessionEventPayload } from "../ipc/types";
+import type { SessionEventPayload, SessionMode } from "../ipc/types";
 import { accentForIndex } from "../lib/color";
 import { useToastStore } from "./toastStore";
 
@@ -25,6 +25,11 @@ export type SessionRecord = {
   model: string | null;
   /// Currently-selected reasoning effort, when the model supports it.
   reasoningEffort: string | null;
+  /// Agent run mode. `null` until we fetch / observe a change.
+  mode: SessionMode | null;
+  /// Whether the SDK is auto-approving every permission request for this
+  /// session. Tracked locally because the SDK doesn't emit an event for it.
+  approveAll: boolean;
   /// Tab/pane title, derived from the SDK's `session.title_changed`
   /// event (which fires once the model auto-summarises the chat).
   /// `null` until that event arrives — callers fall back to a short
@@ -64,6 +69,18 @@ export const useSessionsStore = defineStore("sessions", () => {
       }
     }
 
+    // Backend may auto-switch the agent run mode (e.g. /plan command).
+    if (payload.eventType === "session.mode_changed") {
+      const data = payload.data as { newMode?: unknown };
+      if (
+        data.newMode === "interactive" ||
+        data.newMode === "plan" ||
+        data.newMode === "autopilot"
+      ) {
+        record.mode = data.newMode;
+      }
+    }
+
     // Track the SDK's auto-summarised title so the dockview tab can
     // show something meaningful instead of the raw uuid.
     if (payload.eventType === "session.title_changed") {
@@ -94,9 +111,23 @@ export const useSessionsStore = defineStore("sessions", () => {
         model: null,
         reasoningEffort: null,
         title: null,
+        mode: null,
+        approveAll: true, // current backend default (`approveAll` permission handler)
       });
       sessions.value.push(record);
       toasts.success("Session created", id);
+      // Fire-and-forget: get the current run mode so the UI shows it.
+      // Re-look up the record by id when the RPC resolves — if the
+      // session was closed in the meantime it's no longer in
+      // `sessions.value` and we must not mutate a stale closure capture.
+      void invokeCommand("getSessionMode", { sessionId: id })
+        .then((mode) => {
+          const current = sessions.value.find((s) => s.id === id);
+          if (current) current.mode = mode;
+        })
+        .catch(() => {
+          /* mode RPC may be unavailable on older CLI hosts; ignore */
+        });
       return record;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -136,8 +167,20 @@ export const useSessionsStore = defineStore("sessions", () => {
         model: null,
         reasoningEffort: null,
         title: null,
+        mode: null,
+        approveAll: true,
       });
       sessions.value.push(record);
+      // Pick up the run mode the SDK is currently using for the
+      // restored session — same fire-and-forget shape as createSession.
+      void invokeCommand("getSessionMode", { sessionId: actualId })
+        .then((mode) => {
+          const current = sessions.value.find((s) => s.id === actualId);
+          if (current) current.mode = mode;
+        })
+        .catch(() => {
+          /* mode RPC may be unavailable on older CLI hosts; ignore */
+        });
       return record;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -189,6 +232,92 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
   }
 
+  async function setSessionMode(
+    sessionId: string,
+    mode: SessionMode,
+  ): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("setSessionMode", { sessionId, mode });
+      const record = sessions.value.find((s) => s.id === sessionId);
+      if (record) record.mode = mode;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to change run mode", message);
+      throw err;
+    }
+  }
+
+  async function setSessionApproveAll(
+    sessionId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("setSessionApproveAll", { sessionId, enabled });
+      const record = sessions.value.find((s) => s.id === sessionId);
+      if (record) record.approveAll = enabled;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to update auto-approval", message);
+      throw err;
+    }
+  }
+
+  async function resetSessionApprovals(sessionId: string): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("resetSessionApprovals", { sessionId });
+      toasts.success("Session approvals cleared", sessionId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to reset approvals", message);
+      throw err;
+    }
+  }
+
+  async function compactSessionHistory(sessionId: string): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      const result = await invokeCommand("compactSessionHistory", {
+        sessionId,
+      });
+      if (result.success) {
+        const parts: string[] = [];
+        if (result.tokensFreed !== null) {
+          parts.push(`${result.tokensFreed.toLocaleString()} tokens freed`);
+        }
+        if (result.messagesRemoved !== null) {
+          parts.push(`${result.messagesRemoved} messages removed`);
+        }
+        toasts.success(
+          "History compacted",
+          parts.length > 0 ? parts.join(", ") : undefined,
+        );
+      } else {
+        toasts.warn("Compaction did not complete", sessionId);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to compact history", message);
+      throw err;
+    }
+  }
+
+  async function setSessionName(
+    sessionId: string,
+    name: string,
+  ): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("setSessionName", { sessionId, name });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to rename session", message);
+      throw err;
+    }
+  }
+
   return {
     sessions,
     isCreating,
@@ -197,5 +326,10 @@ export const useSessionsStore = defineStore("sessions", () => {
     closeSession,
     sendMessage,
     setSessionModel,
+    setSessionMode,
+    setSessionApproveAll,
+    resetSessionApprovals,
+    compactSessionHistory,
+    setSessionName,
   };
 });

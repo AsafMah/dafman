@@ -91,6 +91,10 @@ onMounted(async () => {
     await restoreFromLayout();
   }
 
+  // Dev-only: auto-create a session when none exist and the URL carries
+  // `?autosession=1`. Used by the typing diagnostic flow so we can see
+  // the composer mount without manually clicking "New Session". One-shot
+  // per page load; will not loop on HMR refreshes.
   if (
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("autosession")
@@ -295,6 +299,8 @@ async function onCreateSession() {
             :events="paneRecord(params)!.events"
             :model="paneRecord(params)!.model"
             :reasoning-effort="paneRecord(params)!.reasoningEffort"
+            :mode="paneRecord(params)!.mode"
+            :approve-all="paneRecord(params)!.approveAll"
             :hide-close="true"
           />
           <p v-else class="missing-pane">
