@@ -289,7 +289,11 @@ async function onCreateSession() {
       class="dock-wrapper"
       :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
     >
-      <DockviewVue class="dock" @ready="onDockReady">
+      <DockviewVue
+        class="dock"
+        watermark-component="watermark"
+        @ready="onDockReady"
+      >
         <template #chat="{ params }">
           <ChatWindow
             v-if="paneRecord(params)"
