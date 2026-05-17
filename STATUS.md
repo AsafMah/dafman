@@ -15,7 +15,6 @@
 - **Composer auto-grow.** A `ResizeObserver` on `.chat-tile` publishes `--tile-height`; the composer input caps at `calc(var(--tile-height) * 0.6)` so it grows up to ~60 % of the tile before scrolling.
 - **Toast UX.** Click anywhere on a toast to dismiss; non-error toasts auto-dismiss at 2.5s, errors at 5s. Model-change toasts are deduped and include the reasoning effort transition.
 - Branch port: Tauri (Rust + Vue) → Electrobun (Bun + Vue). `src-tauri/` removed. New `src-bun/` main process + `tools/bun-vue-loader.ts` Bun plugin for Vue SFC tests. One test runner (`bun test`). See `CHANGELOG.md` → Unreleased → "Port from Tauri → Electrobun".
-- **Per-session options popover** (M1 "More session settings"). Chat header now has a gear button that opens a `Popover` with run mode, reasoning view, auto-approve permissions toggle, rename, compact-history, reset-approvals. Backend RPCs `getSessionMode`/`setSessionMode`/`getSessionName`/`setSessionName`/`compactSessionHistory`/`setSessionApproveAll`/`resetSessionApprovals` wrap `session.rpc.{mode,name,history,permissions}.*`; store reacts to `session.mode_changed`.
 
 ## Next concrete step
 **End-to-end smoke run.** Launch `bun run dev`, verify a real `copilot` CLI session streams replies through the new `sessionEvent` RPC fan-out, that Settings + Open log folder still work, and that the dev playground (`?dev`) still renders, and that the new Lexical composer/display behave under real traffic (markdown shortcuts, streamed code blocks, very long messages). Then resume the M1 backlog below.
@@ -26,7 +25,7 @@ Carried-over M1 backlog (full detail in `plans/plan-roadmap.prompt.md` → "Back
 3. **URL elicitation card + URL opener** (use Electrobun `Utils.openExternal` once the elicitation flow lands).
 4. Steering & message queueing.
 5. File / image attachments.
-6. More session settings exposed (compaction, reasoning summary, system prompt modes). *Partially done in this PR — gear-menu popover exposes run mode, reasoning view, auto-approve, reset approvals, compact-history, rename. System-prompt-mode override still pending.*
+6. More session settings exposed (compaction, reasoning summary, system prompt modes).
 7. **Make the dev playground a discoverable button (currently `?dev`).** Done — wrench button in topbar (dev builds only) + "Back to app" in the playground.
 8. Markdown + message QoL (copy/retry/edit-and-resend).
 9. GPT-5.5 `reasoning_opaque` mystery — CLI shows it, our UI gets `content: ""`.
