@@ -1,35 +1,32 @@
 <script setup lang="ts">
 // Lexical-backed chat composer.
 //
-// Replaces the previous PrimeVue `InputGroup` + `InputText` setup. Plain
-// text only for now; the EditorState model leaves room for custom nodes
-// (slash commands, @mentions, #hashtags, inline images) without changing
-// the parent contract.
+// Plain-text input today; the EditorState model leaves room for future
+// custom nodes (slash commands, @mentions, #hashtags, inline images)
+// without changing the parent contract. Markdown keystroke shortcuts
+// (`# heading`, `**bold**`, fenced code, lists, links, hr) were tried
+// in an earlier revision but interfered with typing under Electrobun's
+// WebView2 surface; deferred until we can run that combo against real
+// devtools. The assistant/reasoning *display* side still renders the
+// full markdown bundle — see `MessageContent.vue`.
 //
-// Wire contract: emits `submit` with the trimmed plain-text content when
-// Enter is pressed or the send button is clicked. Shift+Enter inserts a
-// newline. Disabled state flows through `EditableSync` since
+// Wire contract: emits `submit` with the trimmed plain-text content
+// when Enter is pressed or the send button is clicked. Shift+Enter
+// inserts a newline. Disabled state flows through `EditableSync` since
 // `lexical-vue`'s composer only reads `editable` once on mount.
 
 import { computed, defineComponent, h } from "vue";
 import Button from "primevue/button";
 import { LexicalComposer, useLexicalComposer } from "lexical-vue/LexicalComposer";
 import { ContentEditable } from "lexical-vue/LexicalContentEditable";
-import { RichTextPlugin } from "lexical-vue/LexicalRichTextPlugin";
+import { PlainTextPlugin } from "lexical-vue/LexicalPlainTextPlugin";
 import { HistoryPlugin } from "lexical-vue/LexicalHistoryPlugin";
 import { AutoFocusPlugin } from "lexical-vue/LexicalAutoFocusPlugin";
-import { ListPlugin } from "lexical-vue/LexicalListPlugin";
-import { CheckListPlugin } from "lexical-vue/LexicalCheckListPlugin";
-import { LinkPlugin } from "lexical-vue/LexicalLinkPlugin";
-import { TabIndentationPlugin } from "lexical-vue/LexicalTabIndentationPlugin";
-import { HorizontalRulePlugin } from "lexical-vue/LexicalHorizontalRulePlugin";
 import {
   EditableSync,
-  RegisterMarkdownShortcuts,
   SubmitOnEnter,
   consumeComposerText,
 } from "../lexical/plugins";
-import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 
 const props = withDefaults(
@@ -47,7 +44,6 @@ const editable = computed(() => !props.disabled);
 const initialConfig = {
   namespace: "DafmanComposer",
   editable: true,
-  nodes: markdownNodes,
   theme: lexicalTheme,
   onError(error: Error) {
     console.error("[lexical composer]", error);
@@ -93,7 +89,7 @@ const SubmitButton = defineComponent({
       <EditableSync :editable="editable" />
       <SubmitOnEnter @submit="onSubmit" />
       <div class="lex-composer-shell">
-        <RichTextPlugin>
+        <PlainTextPlugin>
           <template #contentEditable>
             <ContentEditable
               class="lex-content lex-composer-input"
@@ -106,15 +102,9 @@ const SubmitButton = defineComponent({
           <template #placeholder>
             <div class="lex-composer-placeholder">{{ placeholder }}</div>
           </template>
-        </RichTextPlugin>
+        </PlainTextPlugin>
         <HistoryPlugin />
         <AutoFocusPlugin />
-        <ListPlugin />
-        <CheckListPlugin />
-        <LinkPlugin />
-        <HorizontalRulePlugin />
-        <TabIndentationPlugin />
-        <RegisterMarkdownShortcuts />
       </div>
       <SubmitButton :disabled="props.disabled" @submit="onSubmit" />
     </LexicalComposer>

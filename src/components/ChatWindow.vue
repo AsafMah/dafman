@@ -345,6 +345,11 @@ async function sendMessage(text: string) {
 <style scoped>
 .chat-tile {
   width: 100%;
+  /* `height: 100%` so the tile fills its container in any layout: it
+   * still works as a grid item (`.session-grid` stretches grid items by
+   * default) and now also works when mounted inside a plain block
+   * container like the dev playground's `.chat-frame`. */
+  height: 100%;
   min-height: 0;
   min-width: 0;
   display: flex;
