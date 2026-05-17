@@ -117,6 +117,18 @@ export type DafmanRPC = {
 				params: Record<string, never>;
 				response: boolean;
 			};
+			// Lets the webview pipe console messages + uncaught errors back
+			// through the existing RPC channel so they show up in bun's
+			// JSON log even when WebView2 devtools is closed. Pure
+			// diagnostic — not part of any product surface.
+			rendererLog: {
+				params: {
+					level: "debug" | "info" | "warn" | "error";
+					message: string;
+					extra?: Record<string, unknown>;
+				};
+				response: void;
+			};
 		};
 		messages: Record<string, never>;
 	}>;

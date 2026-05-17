@@ -10,6 +10,7 @@ import "./lexical/lexical.css";
 import App from "./App.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
+import { installRendererLogBridge } from "./ipc/rendererLog";
 
 const GreenAura = definePreset(Aura, {
   semantic: {
@@ -33,6 +34,10 @@ const GreenAura = definePreset(Aura, {
 // IPC. Tests inject their own bridge via `setRpcBridge` before mount.
 const { bridge } = createElectrobunBridge();
 setRpcBridge(bridge);
+
+// Install the renderer→bun log bridge so console.error and uncaught
+// exceptions surface in the bun JSON log, not just WebView2 devtools.
+installRendererLogBridge();
 
 // Dev-only playground: open with `?dev` during `bun run dev:hmr`. The
 // dynamic import + DEV guard keeps Playground.vue out of production

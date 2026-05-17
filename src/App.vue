@@ -63,6 +63,21 @@ onMounted(async () => {
   } catch {
     /* toast already shown */
   }
+
+  // Dev-only: auto-create a session when none exist and the URL carries
+  // `?autosession=1`. Used by the typing diagnostic flow so we can see
+  // the composer mount without manually clicking "New Session". One-shot
+  // per page load; will not loop on HMR refreshes.
+  if (
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).has("autosession")
+  ) {
+    setTimeout(() => {
+      if (sessionsStore.sessions.length === 0) {
+        void sessionsStore.createSession();
+      }
+    }, 500);
+  }
 });
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
