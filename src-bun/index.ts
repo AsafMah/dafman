@@ -75,6 +75,28 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				Utils.showItemInFolder(dir);
 				return true;
 			}),
+			rendererLog: rpcGuard(async ({ level, message, extra }) => {
+				// Mirror the renderer's structured log into the bun-side
+				// JSON log so a developer can `tail` it instead of needing
+				// WebView2 devtools open. Prefix lets us distinguish from
+				// bun-originated entries.
+				const tagged = `[renderer] ${message}`;
+				const data = extra ?? {};
+				switch (level) {
+					case "debug":
+						log.debug(tagged, data);
+						break;
+					case "info":
+						log.info(tagged, data);
+						break;
+					case "warn":
+						log.warn(tagged, data);
+						break;
+					case "error":
+						log.error(tagged, data);
+						break;
+				}
+			}),
 		},
 		messages: {},
 	},
@@ -82,18 +104,27 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 
 async function getMainViewUrl(): Promise<string> {
 	const channel = await Updater.localInfo.channel();
+	// Allow `DAFMAN_PLAYGROUND=1` (dev only) to land directly on the
+	// playground without manual URL editing. Handy when iterating on the
+	// composer / Lexical bits without a real Copilot session.
+	const playground = channel === "dev" && process.env.DAFMAN_PLAYGROUND === "1";
+	// Allow `DAFMAN_AUTO_SESSION=1` (dev only) to land on the main app
+	// with a session auto-created on mount. Useful for the typing
+	// diagnostic, which needs a mounted MessageComposer to fire.
+	const autosession = channel === "dev" && process.env.DAFMAN_AUTO_SESSION === "1";
+	const suffix = playground ? "?dev" : autosession ? "?autosession=1" : "";
 	if (channel === "dev") {
 		try {
 			await fetch(DEV_SERVER_URL, { method: "HEAD" });
 			log.info(`HMR enabled: using Vite dev server at ${DEV_SERVER_URL}`);
-			return DEV_SERVER_URL;
+			return `${DEV_SERVER_URL}/${suffix}`;
 		} catch {
 			log.info(
 				"Vite dev server not running. Run `bun run dev:hmr` for HMR.",
 			);
 		}
 	}
-	return "views://mainview/index.html";
+	return `views://mainview/index.html${suffix}`;
 }
 
 const url = await getMainViewUrl();

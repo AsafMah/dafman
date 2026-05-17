@@ -60,6 +60,14 @@ export type CommandMap = {
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };
   openLogFolder: { args: Record<string, never>; result: boolean };
+  rendererLog: {
+    args: {
+      level: "debug" | "info" | "warn" | "error";
+      message: string;
+      extra?: Record<string, unknown>;
+    };
+    result: void;
+  };
 };
 
 export type CommandName = keyof CommandMap;

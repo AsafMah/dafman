@@ -113,8 +113,12 @@
   border: 1px solid var(--p-content-border-color);
   border-radius: var(--p-border-radius-md);
   background: var(--p-content-background);
-  display: flex;
-  align-items: stretch;
+  /* Block (not flex) — Lexical warns that `display: flex` on the
+   * contenteditable's parent causes unwanted focusing behaviour in
+   * Chrome/WebView2 when clicking outside the editable region. The shell
+   * only has one visible child (the contenteditable) plus an absolutely
+   * positioned placeholder, so block layout is sufficient. */
+  display: block;
 }
 
 .lex-composer-shell:focus-within {
@@ -123,7 +127,8 @@
 }
 
 .lex-composer-input {
-  flex: 1 1 auto;
+  display: block;
+  width: 100%;
   min-width: 0;
   padding: 0.5rem 0.75rem;
   min-height: 1.5rem;
