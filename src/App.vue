@@ -4,6 +4,7 @@ import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
+import type { ToastMessageOptions } from "primevue/toast";
 import ChatWindow from "./components/ChatWindow.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import { useClientStore } from "./stores/clientStore";
@@ -24,6 +25,14 @@ const { settings } = storeToRefs(settingsStore);
 
 const prefersDark = ref(false);
 const settingsOpen = ref(false);
+
+// Dev playground is only built in dev mode; the button is tree-shaken in prod.
+const isDev = import.meta.env.DEV;
+function openPlayground() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("dev", "1");
+  window.location.href = url.toString();
+}
 
 const isDarkMode = computed(() =>
   resolveIsDark(settings.value.appearance.theme, prefersDark.value),
@@ -75,6 +84,10 @@ watch(
   },
 );
 
+function closeToast({ message }: { message: ToastMessageOptions }) {
+  primeToast.remove(message);
+}
+
 async function onCreateSession() {
   try {
     await sessionsStore.createSession();
@@ -86,7 +99,7 @@ async function onCreateSession() {
 
 <template>
   <main class="app-root" :class="{ 'app-dark': isDarkMode }">
-    <Toast />
+    <Toast :on-click="closeToast" />
     <SettingsDialog
       :visible="settingsOpen"
       @update:visible="(v) => (settingsOpen = v)"
@@ -102,6 +115,16 @@ async function onCreateSession() {
         />
       </div>
       <div class="topbar-right">
+        <Button
+          v-if="isDev"
+          icon="pi pi-wrench"
+          severity="secondary"
+          text
+          rounded
+          aria-label="Open dev playground"
+          title="Open dev playground"
+          @click="openPlayground"
+        />
         <Button
           icon="pi pi-cog"
           severity="secondary"
@@ -175,11 +198,12 @@ async function onCreateSession() {
   flex: 1 1 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   grid-auto-rows: 1fr;
   gap: 0.75rem;
   padding: 0.75rem 1rem 1rem;
   overflow: auto;
+  min-width: 0;
 }
 
 .placeholder {

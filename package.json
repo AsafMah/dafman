@@ -17,9 +17,17 @@
     "check": "bun run lint && bun run test && bun run build"
   },
   "dependencies": {
+    "@lexical/code": "0.38.1",
+    "@lexical/link": "0.38.1",
+    "@lexical/list": "0.38.1",
+    "@lexical/markdown": "0.38.1",
+    "@lexical/rich-text": "0.38.1",
+    "@lexical/utils": "0.38.1",
     "@primeuix/themes": "^2.0.3",
     "copilot-sdk-supercharged": "^2.1.2",
     "electrobun": "1.18.1",
+    "lexical": "0.38.1",
+    "lexical-vue": "^0.14.1",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",

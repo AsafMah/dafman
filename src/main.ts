@@ -6,6 +6,7 @@ import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import "primeicons/primeicons.css";
 import "./style.css";
+import "./lexical/lexical.css";
 import App from "./App.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";

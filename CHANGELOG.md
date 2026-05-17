@@ -3,7 +3,26 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **Lexical-backed chat composer + message display.** Replaces the PrimeVue `InputText` composer and the plain-`<p>` assistant/reasoning body with two new components, `MessageComposer.vue` and `MessageContent.vue`, both backed by [Lexical](https://lexical.dev) via the `lexical-vue` Vue 3 binding (`lexical-vue@0.14.1` + `lexical@0.38.1` + matching `@lexical/*` packages, all version-pinned to avoid duplicate-version drift). The composer enables markdown keystroke shortcuts (`# heading`, `**bold**`, ` ``` `, `- list`, `> quote`, `---`, links, checkboxes, tab-indent) and serializes sends through `$convertToMarkdownString(TRANSFORMERS)`; the display renders the same markdown back via `$convertFromMarkdownString`. Streaming assistant deltas are coalesced via `requestAnimationFrame` so a burst of 5–30 deltas/sec triggers at most one Lexical reconcile per frame. New `src/lexical/{theme,plugins,nodes}.ts` keep Lexical wiring out of SFCs; global `src/lexical/lexical.css` styles the theme classes Lexical injects into the DOM (scoped CSS can't reach those nodes). Composer height auto-grows up to 60 % of the chat tile via a `ResizeObserver`-published `--tile-height` custom property.
+
+### Fixed
+
+- **Initial window clipping (Windows).** The WebView2 surface attaches at the outer window size, so the renderer reported a viewport ~16 px wider/taller than the visible client area until the first WM_SIZE — anything past that boundary was clipped. We now schedule a ±1 px frame nudge from the Bun main process on a staggered timeline (0/150/400/900 ms after `dom-ready`, plus 200/600/1500 ms fallbacks) so a single resize event always lands after the renderer has finished its first layout, regardless of how slow the renderer mount is (a few hundred ms with Lexical).
+- **Model-change toast was emitted twice and lost the reasoning effort.** The SDK fires `session.model_change` for both the user-requested switch and the backend's auto-switch echo. The reducer now dedupes by `(previousModel, newModel, previousReasoningEffort, reasoningEffort)` and folds the effort delta into the toast detail (`claude-sonnet-4.5 → gpt-5.5 (medium → high effort)`).
+- **Bun SFC loader emitted duplicate `_hoisted_*` constants** for any SFC whose template had static class attributes on multiple elements. The loader gated the standalone-template-compile pass on `scriptBlock.scriptSetup` — which is `undefined` on the `SFCScriptBlock` returned by `compileScript({inlineTemplate: true})` — so it ran a redundant `compileTemplate` whose hoisted vnode constants collided with the inlined ones. Now gated on `descriptor.scriptSetup` (the source descriptor) instead.
+
 ### Changed
+
+- **Toasts.** Click anywhere on a toast to dismiss it. Default auto-dismiss shortened from 4 s → 2.5 s (errors from 6 s → 5 s) to make the stream less noisy during a session.
+- **Chat tile + composer layout.** `.session-grid` now uses `minmax(min(360px, 100%), 1fr)` and the chat header wraps; selectors don't push the tile past the viewport.
+
+### Known gaps
+
+- SFC tests for `MessageComposer` / `MessageContent` were prototyped but removed: Bun's ESM loader trips a TDZ inside `@lexical/{history,rich-text,link}` (`Cannot access 'X' before initialization`) that Vite's bundler handles transparently. The components are exercised end-to-end via the Vite production build and the dev playground; deep rendering coverage moves to e2e (see roadmap).
+
+## [Earlier unreleased entries]
 
 - **Port from Tauri → Electrobun.** The Rust backend (`src-tauri/`) is gone; main process is now TypeScript under `src-bun/`, driven by [Electrobun](https://docs.electrobunny.ai/electrobun/) on Bun. The SDK swap is `github-copilot-sdk` (Rust crate) → `copilot-sdk-supercharged` (npm), same JSON-RPC engine. Tauri's per-session `Channel<SessionEventPayload>` is replaced with a single bun→webview `sessionEvent` RPC message that carries `sessionId`. Settings live at `Utils.paths.userData/settings.json`; logs at `Utils.paths.userLogs/dafman-YYYY-MM-DD.log` (JSON lines). "Open log folder" uses Electrobun's `Utils.showItemInFolder`. Per-session permission UX still defers to `approveAll` until M1's PermissionService lands.
 - **One runner, one language.** Vitest, `@vue/test-utils`, `happy-dom`, `cargo test`, and `insta` are all gone. `bun test` runs everything; Vue SFC tests work via `tools/bun-vue-loader.ts` (Bun plugin patterned on the [Svelte test guide](https://bun.com/docs/guides/test/svelte-test) using `@vue/compiler-sfc` + `@happy-dom/global-registrator` + `@testing-library/vue`). IPC wire-shape snapshots moved from `insta` inline snapshots to `expect(...).toMatchSnapshot()` in `src-bun/__tests__/wire-contract.test.ts`.

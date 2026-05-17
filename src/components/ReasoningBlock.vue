@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import Button from "primevue/button";
 import type { ReasoningVisibility } from "../ipc/types";
+import MessageContent from "./MessageContent.vue";
 
 const props = defineProps<{
   text: string;
@@ -34,7 +35,12 @@ const showFull = computed(
         @click="expanded = !expanded"
       />
     </div>
-    <p v-if="showFull" class="reasoning-body">{{ props.text || "Thinking..." }}</p>
+    <MessageContent
+      v-if="showFull"
+      class="reasoning-body"
+      :text="props.text || 'Thinking...'"
+      label="Reasoning content"
+    />
     <p v-else class="reasoning-preview">{{ preview || "Thinking..." }}</p>
   </div>
 </template>

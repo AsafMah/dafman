@@ -1,0 +1,159 @@
+/* Global Lexical theme styles.
+ *
+ * Lexical adds these class names to the DOM it builds inside any
+ * contenteditable root. Vue scoped styles can't reach them (the
+ * dynamically-created nodes don't carry the scope-id attribute), so this
+ * file lives outside any SFC and is imported once from `src/main.ts`.
+ *
+ * Token usage follows the repo rule: only `var(--p-*)` PrimeVue tokens
+ * — no raw hex.
+ */
+
+.lex-content {
+  outline: none;
+  word-break: break-word;
+}
+
+.lex-content:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
+  border-radius: var(--p-border-radius-sm);
+}
+
+.lex-paragraph {
+  margin: 0 0 0.5rem;
+}
+
+.lex-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.lex-h1,
+.lex-h2,
+.lex-h3,
+.lex-h4,
+.lex-h5,
+.lex-h6 {
+  margin: 0.5rem 0 0.25rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.lex-h1 { font-size: 1.4rem; }
+.lex-h2 { font-size: 1.25rem; }
+.lex-h3 { font-size: 1.1rem; }
+.lex-h4 { font-size: 1rem; }
+.lex-h5 { font-size: 0.95rem; }
+.lex-h6 { font-size: 0.9rem; color: var(--p-text-muted-color); }
+
+.lex-quote {
+  margin: 0 0 0.5rem;
+  padding: 0.25rem 0.75rem;
+  color: var(--p-text-muted-color);
+  border-left: 3px solid var(--p-content-border-color);
+}
+
+.lex-ol,
+.lex-ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.lex-li { margin: 0.1rem 0; }
+.lex-li-nested { list-style-type: none; }
+
+.lex-link {
+  color: var(--p-primary-color);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lex-text-bold { font-weight: 700; }
+.lex-text-italic { font-style: italic; }
+.lex-text-underline { text-decoration: underline; }
+.lex-text-strike { text-decoration: line-through; }
+
+.lex-text-code {
+  font-family: var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9em;
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--p-border-radius-sm);
+  background: color-mix(in srgb, var(--p-text-color) 10%, transparent);
+}
+
+.lex-code {
+  display: block;
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--p-text-color) 8%, var(--p-content-background));
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-md);
+  font-family: var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+/* Composer-specific layout. The composer's contenteditable sits inside
+ * an `InputGroup`-like flex row alongside the submit button. */
+.lex-composer {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.lex-composer-shell {
+  flex: 1 1 auto;
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-md);
+  background: var(--p-content-background);
+  display: flex;
+  align-items: stretch;
+}
+
+.lex-composer-shell:focus-within {
+  border-color: var(--p-primary-color);
+  box-shadow: 0 0 0 1px var(--p-primary-color);
+}
+
+.lex-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  min-height: 1.5rem;
+  /* Cap at 60% of the chat tile's height. `--tile-height` is published by
+   * a `ResizeObserver` on `.chat-tile` (`src/components/ChatWindow.vue`).
+   * When the var is missing — e.g. when the composer is mounted outside a
+   * chat tile (dev playground, tests) — fall back to a generous viewport
+   * cap so the textarea never runs away. */
+  max-height: calc(var(--tile-height, 100dvh) * 0.6);
+  overflow-y: auto;
+  color: var(--p-text-color);
+}
+
+.lex-composer-input[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lex-composer-placeholder {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.75rem;
+  color: var(--p-text-muted-color);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Message display: editor root is non-interactive but still receives
+ * focus when clicked (e.g. for accessibility). Suppress the focus ring
+ * because we render it as static content. */
+.lex-display .lex-content:focus-visible {
+  outline: none;
+}

@@ -83,7 +83,13 @@ plugin({
 				parserPlugins,
 			);
 
-			if (!scriptBlock.scriptSetup && descriptor.template) {
+			// When the SFC uses `<script setup>` we already get an inlined
+			// render via `inlineTemplate: true`, so a separate `compileTemplate`
+			// pass would just produce duplicate hoisted-vnode constants
+			// (`_hoisted_1` declared twice → parse error). Gate the fallback on
+			// the source descriptor rather than `scriptBlock.scriptSetup`, which
+			// is `undefined` on the returned `SFCScriptBlock` regardless.
+			if (!descriptor.scriptSetup && descriptor.template) {
 				const tpl = compileTemplate({
 					id,
 					filename: real,

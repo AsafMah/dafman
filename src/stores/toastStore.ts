@@ -26,14 +26,14 @@ export const useToastStore = defineStore("toast", () => {
     severity: ToastSeverity,
     summary: string,
     detail?: string,
-    life = 4000,
+    life = 2500,
   ): ToastMessage {
     const msg: ToastMessage = {
       id: nextToastId++,
       severity,
       summary,
       detail,
-      life,
+      life: Math.max(1, life),
     };
     pending.value.push(msg);
     return msg;
@@ -53,7 +53,7 @@ export const useToastStore = defineStore("toast", () => {
       push("success", summary, detail),
     warn: (summary: string, detail?: string) => push("warn", summary, detail),
     error: (summary: string, detail?: string) =>
-      push("error", summary, detail, 6000),
+      push("error", summary, detail, 5000),
     consume,
   };
 });

@@ -41,6 +41,11 @@ export type ChatAmbient = {
   title: string | null;
   /// Current model id from `session.model_change`, if any.
   model: string | null;
+  /// Current reasoning effort from `session.model_change`, if any.
+  reasoningEffort: string | null;
+  /// Last model-change notification signature, used to suppress duplicate
+  /// SDK events without hiding later distinct model changes.
+  lastModelChangeToastKey: string | null;
   /// Latest `assistant.intent.intent`. Cleared on `assistant.turn_end`.
   intent: string | null;
   /// Latest `session.usage_info` snapshot. Updated in place.
@@ -58,6 +63,8 @@ export function defaultAmbient(): ChatAmbient {
   return {
     title: null,
     model: null,
+    reasoningEffort: null,
+    lastModelChangeToastKey: null,
     intent: null,
     usage: null,
     turnActive: false,
@@ -262,13 +269,26 @@ export function processEvents(
       case "session.model_change": {
         const newModel = pickString(data, ["newModel"]);
         const prev = pickString(data, ["previousModel"]);
+        const effort = pickString(data, ["reasoningEffort"]);
+        const prevEffort = pickString(data, ["previousReasoningEffort"]);
         if (newModel) {
           next.model = newModel;
-          toasts.push({
-            severity: "info",
-            summary: "Model changed",
-            detail: prev ? `${prev} → ${newModel}` : newModel,
-          });
+          if (effort) next.reasoningEffort = effort;
+          const key = [prev, newModel, prevEffort, effort].join("\0");
+          const modelDetail = prev ? `${prev} → ${newModel}` : newModel;
+          const detail = effort
+            ? prevEffort && prevEffort !== effort
+              ? `${modelDetail} (${prevEffort} → ${effort} effort)`
+              : `${modelDetail} (${effort} effort)`
+            : modelDetail;
+          if (next.lastModelChangeToastKey !== key) {
+            toasts.push({
+              severity: "info",
+              summary: "Model changed",
+              detail,
+            });
+            next.lastModelChangeToastKey = key;
+          }
         }
         break;
       }

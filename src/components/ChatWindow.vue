@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
-import InputGroup from "primevue/inputgroup";
-import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
+import MessageComposer from "./MessageComposer.vue";
+import MessageContent from "./MessageContent.vue";
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -51,10 +51,30 @@ onMounted(() => {
   });
 });
 
-const draft = ref("");
 const items = ref<ChatItem[]>([]);
 const ambient = ref<ChatAmbient>(defaultAmbient());
 const messagesEl = ref<HTMLElement | null>(null);
+const tileEl = ref<HTMLElement | null>(null);
+/// Live `--tile-height` so the composer can cap itself at a percentage of
+/// the chat tile's height even though the tile lives inside a flex/grid
+/// layout with no fixed height.
+let tileResizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  if (typeof ResizeObserver === "undefined" || !tileEl.value) return;
+  const el = tileEl.value;
+  const update = () => {
+    el.style.setProperty("--tile-height", `${el.clientHeight}px`);
+  };
+  update();
+  tileResizeObserver = new ResizeObserver(update);
+  tileResizeObserver.observe(el);
+});
+
+onBeforeUnmount(() => {
+  tileResizeObserver?.disconnect();
+  tileResizeObserver = null;
+});
 /// Fallback "thinking" flag used until we observe a turn boundary; after
 /// the first `assistant.turn_start` we trust `ambient.turnActive` exclusively.
 const isSendingFallback = ref(false);
@@ -115,10 +135,6 @@ const effortChoice = computed<string | null>({
   },
 });
 
-const canSend = computed(
-  () => draft.value.trim().length > 0 && !isSending.value,
-);
-
 const accentColor = computed(() => props.accent);
 
 async function scrollToBottom() {
@@ -169,18 +185,15 @@ watch(
     items.value = [];
     ambient.value = defaultAmbient();
     isSendingFallback.value = false;
-    draft.value = "";
     sessionOverride.value = "default";
     processedEvents = props.events.length;
   },
 );
 
-async function sendMessage() {
-  const text = draft.value.trim();
+async function sendMessage(text: string) {
   if (!text || isSending.value) return;
 
   items.value = appendUserMessage(items.value, text, idCounter);
-  draft.value = "";
   isSendingFallback.value = true;
   await scrollToBottom();
 
@@ -201,7 +214,7 @@ async function sendMessage() {
 </script>
 
 <template>
-  <section class="chat-tile" :style="{ '--accent': accentColor }">
+  <section ref="tileEl" class="chat-tile" :style="{ '--accent': accentColor }">
     <header class="chat-header">
       <div class="chat-title">
         <Tag :value="ambient.title || props.sessionId" severity="secondary" />
@@ -295,7 +308,12 @@ async function sendMessage() {
                       : "Info"
             }}
           </header>
-          <p class="message-body">{{ item.text || "..." }}</p>
+          <MessageContent
+            v-if="item.kind === 'assistant' || item.kind === 'user'"
+            :text="item.text || '...'"
+            :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
+          />
+          <p v-else class="message-body">{{ item.text || "..." }}</p>
         </article>
       </template>
 
@@ -318,22 +336,17 @@ async function sendMessage() {
       </span>
     </footer>
 
-    <form class="chat-composer" @submit.prevent="sendMessage">
-      <InputGroup>
-        <InputText
-          v-model="draft"
-          placeholder="Write your message..."
-          :disabled="isSending"
-        />
-        <Button type="submit" icon="pi pi-send" :disabled="!canSend" />
-      </InputGroup>
+    <form class="chat-composer" @submit.prevent>
+      <MessageComposer :disabled="isSending" @submit="sendMessage" />
     </form>
   </section>
 </template>
 
 <style scoped>
 .chat-tile {
+  width: 100%;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -348,6 +361,7 @@ async function sendMessage() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--p-content-border-color);
@@ -358,18 +372,28 @@ async function sendMessage() {
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  flex: 1 1 14rem;
 }
 
 .chat-header-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .control {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  min-width: 0;
+}
+
+.control :deep(.p-select) {
+  max-width: 14rem;
 }
 
 .control-label {
@@ -487,7 +511,9 @@ async function sendMessage() {
 
 .chat-composer {
   flex: 0 0 auto;
-  padding: 0.5rem;
-  border-top: 1px solid var(--p-content-border-color);
 }
+
+/* MessageComposer brings its own border-top + padding via the global
+ * `.lex-composer` styles in `src/lexical/lexical.css`; the form wrapper
+ * just contributes layout placement here. */
 </style>

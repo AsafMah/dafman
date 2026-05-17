@@ -8,19 +8,23 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
+- **Lexical-backed chat surface** (M1 markdown rendering). Composer and assistant/reasoning/user message display both run through Lexical. Markdown shortcuts (`# heading`, `**bold**`, fenced code, lists, links, hr, blockquote) auto-format as the user types; sends are serialized as markdown and re-rendered the same way for both peers. New `src/lexical/{theme,plugins,nodes}.ts` + `lexical.css`; new components `src/components/{MessageComposer,MessageContent}.vue`; `ChatWindow.vue` and `ReasoningBlock.vue` now delegate body rendering. Pinned `lexical@0.38.1` and matching `@lexical/*` packages to align with `lexical-vue@0.14.1`. Streaming deltas reparse via rAF throttle to keep the reconciler smooth.
+- **Initial-window clipping fix** (Windows). The WebView2 surface is created at the outer window size, so the renderer ships ~16px clipped until the first WM_SIZE. We now nudge the frame ±1px on a staggered schedule (0/150/400/900ms after dom-ready plus belt-and-suspenders fallbacks) so a single resize event always lands after the renderer has painted.
+- **Composer auto-grow.** A `ResizeObserver` on `.chat-tile` publishes `--tile-height`; the composer input caps at `calc(var(--tile-height) * 0.6)` so it grows up to ~60 % of the tile before scrolling.
+- **Toast UX.** Click anywhere on a toast to dismiss; non-error toasts auto-dismiss at 2.5s, errors at 5s. Model-change toasts are deduped and include the reasoning effort transition.
 - Branch port: Tauri (Rust + Vue) → Electrobun (Bun + Vue). `src-tauri/` removed. New `src-bun/` main process + `tools/bun-vue-loader.ts` Bun plugin for Vue SFC tests. One test runner (`bun test`). See `CHANGELOG.md` → Unreleased → "Port from Tauri → Electrobun".
 
 ## Next concrete step
-**End-to-end smoke run.** Launch `bun run dev`, verify a real `copilot` CLI session streams replies through the new `sessionEvent` RPC fan-out, that Settings + Open log folder still work, and that the dev playground (`?dev`) still renders. The full backlog from the pre-port M1 list (markdown rendering, real permission UX, URL elicitation card) is preserved below; resume work from there once the smoke is clean.
+**End-to-end smoke run.** Launch `bun run dev`, verify a real `copilot` CLI session streams replies through the new `sessionEvent` RPC fan-out, that Settings + Open log folder still work, and that the dev playground (`?dev`) still renders, and that the new Lexical composer/display behave under real traffic (markdown shortcuts, streamed code blocks, very long messages). Then resume the M1 backlog below.
 
 Carried-over M1 backlog (full detail in `plans/plan-roadmap.prompt.md` → "Backlog"):
-1. **Markdown + code-block rendering** for assistant/reasoning content (was the pre-port "next" item).
+1. ~~**Markdown + code-block rendering** for assistant/reasoning content.~~ Done via Lexical.
 2. **Real permission UX** - replace `approveAll` with a webview-side modal driven through the RPC bridge.
 3. **URL elicitation card + URL opener** (use Electrobun `Utils.openExternal` once the elicitation flow lands).
 4. Steering & message queueing.
 5. File / image attachments.
 6. More session settings exposed (compaction, reasoning summary, system prompt modes).
-7. Make the dev playground a discoverable button (currently `?dev`).
+7. **Make the dev playground a discoverable button (currently `?dev`).** Done — wrench button in topbar (dev builds only) + "Back to app" in the playground.
 8. Markdown + message QoL (copy/retry/edit-and-resend).
 9. GPT-5.5 `reasoning_opaque` mystery — CLI shows it, our UI gets `content: ""`.
 10. **Real binary E2E**: Electrobun doesn't have a `tauri-driver` equivalent yet; investigate spawning the dev binary + driving the webview through the existing RPC bridge.

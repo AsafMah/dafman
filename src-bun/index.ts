@@ -105,6 +105,38 @@ const mainWindow = new BrowserWindow({
 	frame: { width: 1200, height: 800, x: 100, y: 100 },
 });
 
+/// Initial-paint clipping workaround for the Electrobun BrowserWindow on
+/// Windows: the WebView2 surface is created at the *outer* window size,
+/// so the renderer reports a viewport ~16px wider/taller than the visible
+/// client area until the OS sends its first WM_SIZE. Any manual resize
+/// fixes it permanently. We force one by nudging the frame by 1px and
+/// snapping it back.
+///
+/// We schedule the nudge multiple times because heavier renderer init
+/// (e.g. Lexical mounting many editors) can delay the renderer's first
+/// real layout past a single 100ms tick. Each nudge is a cheap pair of
+/// `setFrame` calls; once one of them lands after the renderer has
+/// painted, the clip is gone.
+function nudgeWindow(): void {
+	const { x, y, width, height } = mainWindow.getFrame();
+	mainWindow.setFrame(x, y, width + 1, height + 1);
+	setTimeout(() => {
+		mainWindow.setFrame(x, y, width, height);
+	}, 16);
+}
+
+mainWindow.webview.on("dom-ready", () => {
+	for (const delay of [0, 150, 400, 900]) {
+		setTimeout(nudgeWindow, delay);
+	}
+});
+// Belt-and-suspenders fallback in case `dom-ready` is missed (HMR reloads,
+// dev-server reconnects, etc.). Cheap no-ops if the renderer is already
+// laid out.
+for (const delay of [200, 600, 1500]) {
+	setTimeout(nudgeWindow, delay);
+}
+
 emitEvent = (payload) => {
 	(mainWindow.webview.rpc as unknown as {
 		send: { sessionEvent: (p: SessionEventPayload) => void };

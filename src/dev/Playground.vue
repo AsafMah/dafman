@@ -10,6 +10,7 @@ import { computed, reactive, ref, watch } from "vue";
 import Button from "primevue/button";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
+import type { ToastMessageOptions } from "primevue/toast";
 import ChatWindow from "../components/ChatWindow.vue";
 import type { SessionEventPayload } from "../ipc/types";
 import { useToastStore } from "../stores/toastStore";
@@ -32,6 +33,10 @@ watch(
   },
 );
 
+function closeToast({ message }: { message: ToastMessageOptions }) {
+  primeToast.remove(message);
+}
+
 type ScriptEvent = Omit<SessionEventPayload, "sessionId">;
 type Script = { label: string; events: ScriptEvent[] };
 
@@ -45,7 +50,12 @@ const SCRIPTS: Script[] = [
     events: [
       {
         eventType: "session.model_change",
-        data: { previousModel: "claude-sonnet-4.5", newModel: "gpt-5.5" },
+        data: {
+          previousModel: "claude-sonnet-4.5",
+          newModel: "gpt-5.5",
+          previousReasoningEffort: "medium",
+          reasoningEffort: "high",
+        },
       },
     ],
   },
@@ -193,13 +203,28 @@ function fireToast(severity: (typeof toastSeverities)[number]) {
 }
 
 const eventCount = computed(() => events.length);
+
+function exitPlayground() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("dev");
+  window.location.href = url.toString();
+}
 </script>
 
 <template>
   <main class="playground">
-    <Toast />
+    <Toast :on-click="closeToast" />
     <header class="playground-header">
-      <h1>Dev Playground</h1>
+      <div class="playground-title">
+        <h1>Dev Playground</h1>
+        <Button
+          label="Back to app"
+          icon="pi pi-arrow-left"
+          size="small"
+          severity="secondary"
+          @click="exitPlayground"
+        />
+      </div>
       <p class="muted">
         Dev-only surface for exercising chat components in isolation. Reload to reset.
       </p>
@@ -277,6 +302,13 @@ const eventCount = computed(() => events.length);
   font-size: 1.5rem;
 }
 
+.playground-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .muted {
   color: var(--p-text-muted-color);
   margin: 0.25rem 0 0;
@@ -325,6 +357,8 @@ const eventCount = computed(() => events.length);
 }
 
 .chat-wrapper .chat-frame {
-  height: 500px;
+  /* Big enough to feel like a real chat surface in dev. The page itself
+   * scrolls, so we can be generous. Falls back to 600px on tiny windows. */
+  height: max(600px, 75dvh);
 }
 </style>
