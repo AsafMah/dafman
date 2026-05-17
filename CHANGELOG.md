@@ -1,6 +1,21 @@
 # Changelog
 All notable changes to Dafman are documented here. Format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org).
+
 ## [Unreleased]
+
+### Changed
+
+- **Port from Tauri → Electrobun.** The Rust backend (`src-tauri/`) is gone; main process is now TypeScript under `src-bun/`, driven by [Electrobun](https://docs.electrobunny.ai/electrobun/) on Bun. The SDK swap is `github-copilot-sdk` (Rust crate) → `copilot-sdk-supercharged` (npm), same JSON-RPC engine. Tauri's per-session `Channel<SessionEventPayload>` is replaced with a single bun→webview `sessionEvent` RPC message that carries `sessionId`. Settings live at `Utils.paths.userData/settings.json`; logs at `Utils.paths.userLogs/dafman-YYYY-MM-DD.log` (JSON lines). "Open log folder" uses Electrobun's `Utils.showItemInFolder`. Per-session permission UX still defers to `approveAll` until M1's PermissionService lands.
+- **One runner, one language.** Vitest, `@vue/test-utils`, `happy-dom`, `cargo test`, and `insta` are all gone. `bun test` runs everything; Vue SFC tests work via `tools/bun-vue-loader.ts` (Bun plugin patterned on the [Svelte test guide](https://bun.com/docs/guides/test/svelte-test) using `@vue/compiler-sfc` + `@happy-dom/global-registrator` + `@testing-library/vue`). IPC wire-shape snapshots moved from `insta` inline snapshots to `expect(...).toMatchSnapshot()` in `src-bun/__tests__/wire-contract.test.ts`.
+- **package.json scripts**: `dev` / `dev:hmr` / `build` / `test` / `lint` / `check` all run through Bun. Dropped `tauri`, `test:rust`, `test:all`, `lint:rust`, `fmt:rust`.
+- **CI**: `.github/workflows/ci.yml` simplifies to a single Linux job (`bun install` → `bun run lint` → `bun test` → `bunx vite build`). Cross-platform `electrobun build` matrix is a follow-up.
+
+### Removed
+
+- `src-tauri/` crate (Rust backend + cargo toolchain + tauri-driver plan).
+- `@tauri-apps/api`, `@tauri-apps/cli`, `@tauri-apps/plugin-opener` deps.
+- `vitest.config.ts`, `vitest`, `@vitest/coverage-v8`, `@vue/test-utils`, `happy-dom` dev-deps.
+- The `insta` integration-test crate (`src-tauri/tests/ipc_contract.rs`).
 
 ### Fixed
 

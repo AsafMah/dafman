@@ -1,4 +1,5 @@
-﻿# Dafman — Platform Features
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — Platform Features
 Projects, accounts, persistence, skills, agents, automations, memory, slash commands, plans, transforms, multi-project workflow, self-control surface.
 ## Projects
 A Project is the unit of work context.
@@ -131,3 +132,4 @@ Carefully designed actions the agent can take **inside the app**:
 - Show a toast / dialog.
 - Create / update a note.
 All `self.*` calls go through the permission system.
+

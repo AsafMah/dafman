@@ -1,32 +1,20 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
-
-// https://vite.dev/config/
-export default defineConfig(async () => ({
+// Vite builds the Vue app into ./dist; Electrobun's `copy` directives in
+// `electrobun.config.ts` then place dist/index.html + dist/assets under
+// `views/mainview/` inside the bundle. Dev HMR is served from port 5173,
+// which `src-bun/index.ts` probes on startup.
+export default defineConfig({
   plugins: [vue()],
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 1420,
+    port: 5173,
     strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
-      : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
   },
-}));
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+  },
+});
+

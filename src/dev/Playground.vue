@@ -4,7 +4,7 @@
 // synthetic session events without a real SDK turn. Tree-shaken out of
 // production builds.
 //
-// Open with `?dev` in the URL during `npm run tauri dev`.
+// Open with `?dev` in the URL during `bun run dev:hmr`.
 
 import { computed, reactive, ref, watch } from "vue";
 import Button from "primevue/button";
@@ -32,7 +32,8 @@ watch(
   },
 );
 
-type Script = { label: string; events: SessionEventPayload[] };
+type ScriptEvent = Omit<SessionEventPayload, "sessionId">;
+type Script = { label: string; events: ScriptEvent[] };
 
 const SCRIPTS: Script[] = [
   {
@@ -153,10 +154,12 @@ const SCRIPTS: Script[] = [
   },
 ];
 
+const PLAYGROUND_SESSION_ID = "playground";
 const events = reactive<SessionEventPayload[]>([]);
 
 function run(script: Script) {
-  for (const e of script.events) events.push(e);
+  for (const e of script.events)
+    events.push({ ...e, sessionId: PLAYGROUND_SESSION_ID });
 }
 
 function clearChat() {
@@ -169,9 +172,13 @@ const customError = ref<string | null>(null);
 function pushCustom() {
   customError.value = null;
   try {
-    const parsed = JSON.parse(customEventJson.value) as SessionEventPayload;
+    const parsed = JSON.parse(customEventJson.value) as Partial<SessionEventPayload>;
     if (!parsed.eventType) throw new Error("missing eventType");
-    events.push(parsed);
+    events.push({
+      sessionId: PLAYGROUND_SESSION_ID,
+      eventType: parsed.eventType,
+      data: parsed.data ?? {},
+    });
   } catch (err) {
     customError.value = err instanceof Error ? err.message : String(err);
   }

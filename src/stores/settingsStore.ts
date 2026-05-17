@@ -23,7 +23,7 @@ export const useSettingsStore = defineStore("settings", () => {
 
   async function load(): Promise<Settings> {
     try {
-      const next = await invokeCommand("get_settings", {});
+      const next = await invokeCommand("getSettings", {});
       settings.value = next;
       loaded.value = true;
       return next;
@@ -37,7 +37,7 @@ export const useSettingsStore = defineStore("settings", () => {
   async function update(next: Settings): Promise<Settings> {
     isSaving.value = true;
     try {
-      const written = await invokeCommand("update_settings", { next });
+      const written = await invokeCommand("updateSettings", { next });
       settings.value = written;
       return written;
     } catch (err) {

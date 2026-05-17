@@ -1,73 +1,75 @@
 # Dafman
-> A desktop replacement for the GitHub Copilot CLI built on Tauri (Rust + Vue 3).
-Dafman keeps the speed and resource profile of a native Rust process while giving humans a real UI: multiple panes, simultaneous projects, visible reasoning and tool calls, settings, automations, MCP integrations, and an editor for diffs and files. Conversations and configuration persist across restarts.
+> A desktop replacement for the GitHub Copilot CLI built on [Electrobun](https://docs.electrobunny.ai/electrobun/) (Bun + native webview) with a Vue 3 renderer.
+
+Dafman gives humans a real UI on top of the same engine the Copilot CLI uses: multiple panes, simultaneous projects, visible reasoning and tool calls, settings, automations, MCP integrations, and an editor for diffs and files. Conversations and configuration persist across restarts.
+
 > Status: **early development**. M0 (multi-pane streaming chat) is live. The roadmap toward a CLI-replacement is tracked in [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md).
+
 ## Features (today)
 - Multi-session chat panes in a responsive grid.
-- Streaming token deltas via the GitHub Copilot SDK (Supercharged distribution).
-- Per-session accent color derived from the session id.
+- Streaming token deltas via the GitHub Copilot SDK (`copilot-sdk-supercharged`).
+- Per-session accent color derived from creation order.
 - Light & dark mode via PrimeVue theme tokens.
-## Planned (M1â€“M7)
-See [`plans/`](plans/) for the full design system:
-- `plan-overview.prompt.md` â€” vision, principles, decisions register.
-- `plan-architecture.prompt.md` â€” backend & frontend module layout, IPC contract.
-- `plan-roadmap.prompt.md` â€” milestones M0â€“M7.
-- `plan-messagingAndUx.prompt.md` â€” chat UX, reasoning, tools, inline elicitation.
-- `plan-toolsAndPermissions.prompt.md` â€” built-in tools, permission model, MCP.
-- `plan-platformFeatures.prompt.md` â€” projects, accounts, skills, agents, automations.
-- `plan-sdkAndExternalSurfaces.prompt.md` â€” Supercharged SDK pinning, URL/browser surface, MCP OAuth.
-- `plan-testingStrategy.prompt.md` â€” test pyramid, E2E, CI matrix.
-## Status & progress
 
+## Planned (M1–M7)
+See [`plans/`](plans/) for the full design system.
+
+## Status & progress
 Live progress board: [STATUS.md](STATUS.md). Plans live in [plans/](plans/).
 
 ## Stack
-- **Shell:** Tauri 2 (Windows / macOS / Linux)
-- **Backend:** Rust + tokio + [`github-copilot-sdk`](https://github.com/github/copilot-sdk) (Supercharged distribution)
-- **Frontend:** Vue 3 + Vite + TypeScript + [PrimeVue](https://primevue.org) (Aura)
-- **State:** Pinia (from M1)
-- **Tests:** `cargo test`, Vitest, Playwright
+- **Shell:** Electrobun 1.18 (Windows / macOS / Linux), native webview, system Bun runtime.
+- **Main process:** TypeScript + [`copilot-sdk-supercharged`](https://github.com/jeremiahjordanisaacson/copilot-sdk-supercharged).
+- **Renderer:** Vue 3 + Vite + TypeScript + [PrimeVue](https://primevue.org) (Aura).
+- **State:** Pinia.
+- **Tests:** `bun test` (one runner for backend + frontend; Vue SFCs via `tools/bun-vue-loader.ts`).
+
 ## Getting started
+
 ### Prerequisites
-- Rust (stable) â€” install via [rustup](https://rustup.rs).
-- Node.js 20+ and npm (or pnpm/bun).
-- The Copilot CLI on your PATH (or set `COPILOT_CLI_PATH`). See the [SDK README](https://github.com/github/copilot-sdk/tree/main/rust) for binary install. Future releases will embed the CLI.
-- A GitHub Copilot subscription (or BYOK credentials for a supported provider).
+- [Bun](https://bun.sh) 1.3+ (handles the package manager, runtime, and test runner).
+- A GitHub Copilot subscription, or BYOK credentials for a supported provider. The Copilot CLI is bundled by the Node.js SDK — no separate install required.
+
 ### Install dependencies
 ```bash
-npm install
+bun install
 ```
-### Common commands
 
-| Want toâ€¦ | Run |
+### Common commands
+| Want to… | Run |
 |---|---|
-| run everything (lint + tests + build) | `npm run check` |
-| run frontend tests (vitest) | `npm test` |
-| run backend tests (cargo) | `npm run test:rust` |
-| run both test suites | `npm run test:all` |
-| lint everything | `npm run lint` |
-| auto-format Rust | `npm run fmt:rust` |
-| start the app in dev | `npm run tauri dev` |
-| build a release bundle | `npm run tauri build` |
+| run everything (lint + tests + build) | `bun run check` |
+| run all tests | `bun test` |
+| lint (vue-tsc -b) | `bun run lint` |
+| start the app in dev | `bun run dev` |
+| dev with frontend HMR | `bun run dev:hmr` |
+| build a release bundle | `bun run build` |
 
 ### Run in development
 ```bash
-npm run tauri dev
+bun run dev
 ```
+
 ### Build a release bundle
 ```bash
-npm run tauri build
+bun run build
 ```
+
 ## Project layout
 ```
-src/                # Vue 3 + TypeScript frontend
-src-tauri/          # Rust backend (Tauri commands, SDK glue)
+src/                # Vue 3 + TypeScript renderer
+src-bun/            # Bun main process (RPC handlers, SDK glue, settings, logging)
+tools/              # Bun plugins (e.g. the Vue SFC test loader)
 plans/              # Design documents (the source of truth for direction)
-public/             # Static assets served by Vite
+electrobun.config.ts
+bunfig.toml
 ```
+
 ## Contributing
 Contributions are very welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and the design docs in [`plans/`](plans/). Please read the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
 ## Security
 To report a vulnerability, follow [`SECURITY.md`](SECURITY.md). Do not open public issues for security problems.
+
 ## License
-[MIT](LICENSE) Â© 2026 Dafman contributors.
+[MIT](LICENSE) © 2026 Dafman contributors.

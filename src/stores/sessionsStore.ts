@@ -1,15 +1,16 @@
-// Owns the list of active sessions and their per-session event buffers.
+// Owns the list of active sessions and their event buffers.
 //
-// Each session is paired with a `tauri::ipc::Channel<SessionEventPayload>`;
-// events push into the session's `events` array which `ChatWindow.vue`
-// watches. The store handles optimistic add/rollback so the UI never shows
-// half-created sessions if the backend rejects `create_session`.
+// In the Electrobun rewrite every backend session event arrives on a
+// single global `sessionEvent` channel (set up in `src/main.ts`); this
+// store subscribes once via `onSessionEvent` and dispatches by
+// `sessionId` to the right record. That replaces Tauri's per-session
+// `Channel<SessionEventPayload>` and lets us keep `SessionRecord` plain
+// reactive data.
 
 import { defineStore } from "pinia";
 import { reactive, ref } from "vue";
-import { Channel } from "@tauri-apps/api/core";
+import { invokeCommand, onSessionEvent } from "../ipc/invoke";
 import type { SessionEventPayload } from "../ipc/types";
-import { invokeCommand } from "../ipc/invoke";
 import { accentForIndex } from "../lib/color";
 import { useToastStore } from "./toastStore";
 
@@ -18,7 +19,6 @@ export type SessionRecord = {
   /// CSS color picked from a curated palette so the first N sessions are
   /// visually distinct.
   accent: string;
-  channel: Channel<SessionEventPayload>;
   events: SessionEventPayload[];
   /// Currently-selected model id; `null` until the user picks one or a
   /// `session.model_change` event arrives.
@@ -27,55 +27,59 @@ export type SessionRecord = {
   reasoningEffort: string | null;
 };
 
+let unsubscribe: (() => void) | null = null;
+
 export const useSessionsStore = defineStore("sessions", () => {
   const sessions = ref<SessionRecord[]>([]);
   const isCreating = ref(false);
   let creationCount = 0;
 
+  function handleEvent(payload: SessionEventPayload): void {
+    const record = sessions.value.find((s) => s.id === payload.sessionId);
+    if (!record) return;
+    record.events.push(payload);
+
+    if (import.meta.env.DEV) {
+      console.debug("[session-event]", payload.eventType, payload.data);
+    }
+
+    // Keep model + reasoning effort in sync with backend-initiated changes
+    // (rate-limit auto-switch, /model commands, etc.). The session.model_change
+    // event ships both fields when applicable.
+    if (payload.eventType === "session.model_change") {
+      const data = payload.data as {
+        newModel?: unknown;
+        reasoningEffort?: unknown;
+      };
+      if (typeof data.newModel === "string") {
+        record.model = data.newModel;
+      }
+      if (typeof data.reasoningEffort === "string") {
+        record.reasoningEffort = data.reasoningEffort;
+      }
+    }
+  }
+
+  function ensureSubscription(): void {
+    if (unsubscribe) return;
+    unsubscribe = onSessionEvent(handleEvent);
+  }
+
   async function createSession(): Promise<SessionRecord | null> {
     if (isCreating.value) return null;
+    ensureSubscription();
     const toasts = useToastStore();
     isCreating.value = true;
-    const channel = new Channel<SessionEventPayload>();
-    const events = reactive<SessionEventPayload[]>([]);
-    channel.onmessage = (payload) => {
-      events.push(payload);
-      // Dev-time visibility into the raw wire shape -- helps debug when a
-      // new SDK version drifts field names. Visible in the browser
-      // devtools when "Verbose" logging is enabled.
-      if (import.meta.env.DEV) {
-        console.debug("[session-event]", payload.eventType, payload.data);
-      }
-      // Keep model + reasoning effort in sync with backend-initiated changes
-      // (rate-limit auto-switch, /model commands, etc.). The session.model_change
-      // event ships both fields when applicable.
-      if (payload.eventType === "session.model_change") {
-        const data = payload.data as {
-          newModel?: unknown;
-          reasoningEffort?: unknown;
-        };
-        const record = sessions.value.find((s) => s.id === pendingId);
-        if (record && typeof data.newModel === "string") {
-          record.model = data.newModel;
-        }
-        if (record && typeof data.reasoningEffort === "string") {
-          record.reasoningEffort = data.reasoningEffort;
-        }
-      }
-    };
-    let pendingId: string | null = null;
     try {
-      const id = await invokeCommand("create_session", { onEvent: channel });
-      pendingId = id;
+      const id = await invokeCommand("createSession", {});
       const accent = accentForIndex(creationCount++);
-      const record: SessionRecord = {
+      const record: SessionRecord = reactive({
         id,
         accent,
-        channel,
-        events,
+        events: [],
         model: null,
         reasoningEffort: null,
-      };
+      });
       sessions.value.push(record);
       toasts.success("Session created", id);
       return record;
@@ -91,7 +95,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function closeSession(id: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("disconnect_session", { sessionId: id });
+      await invokeCommand("disconnectSession", { sessionId: id });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       toasts.error("Failed to close session", message);
@@ -101,7 +105,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   }
 
   async function sendMessage(sessionId: string, text: string): Promise<void> {
-    await invokeCommand("send_message", { sessionId, text });
+    await invokeCommand("sendMessage", { sessionId, text });
   }
 
   async function setSessionModel(
@@ -111,7 +115,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   ): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("set_session_model", {
+      await invokeCommand("setSessionModel", {
         sessionId,
         model,
         reasoningEffort,

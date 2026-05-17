@@ -1,4 +1,5 @@
-﻿# Dafman — SDK & External Surfaces (Supercharged alignment)
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — SDK & External Surfaces (Supercharged alignment)
 Adds the bits the rest of the plan was missing once we accept that we''ll track the **Supercharged** distribution of the SDK (Rust), which is a superset of upstream `github-copilot-sdk` v0.3.x.
 ## SDK pinning strategy
 - **Primary dependency:** `github-copilot-sdk` (lib name `github_copilot_sdk`) sourced from the Supercharged repo''s `rust/` subdir as a git dependency until the matching version is published on crates.io.
@@ -136,3 +137,4 @@ When implementing, reference these examples from the Supercharged repo:
 - `rust/examples/` — quick patterns.
 - `rust/cookbook/` — common recipes.
 - `docs/` for cross-language conceptual docs.
+

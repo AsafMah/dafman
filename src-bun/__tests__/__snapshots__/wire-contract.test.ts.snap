@@ -1,0 +1,55 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`IPC wire contracts Settings shape 1`] = `
+{
+  "appearance": {
+    "reasoningVisibility": "compact",
+    "theme": "dark",
+  },
+  "version": 2,
+}
+`;
+
+exports[`IPC wire contracts ModelSummary shape 1`] = `
+{
+  "defaultReasoningEffort": "medium",
+  "id": "claude-sonnet-4.5",
+  "name": "Claude Sonnet 4.5",
+  "supportedReasoningEfforts": [
+    "low",
+    "medium",
+    "high",
+  ],
+  "supportsReasoningEffort": true,
+}
+`;
+
+exports[`IPC wire contracts SessionEventPayload shape 1`] = `
+{
+  "data": {
+    "deltaContent": "hi",
+  },
+  "eventType": "assistant.message_delta",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts AppErrorPayload variants 1`] = `
+[
+  {
+    "kind": "ClientNotStarted",
+  },
+  {
+    "data": "sess-42",
+    "kind": "SessionNotFound",
+  },
+  {
+    "data": "disk full",
+    "kind": "Settings",
+  },
+  {
+    "data": "rpc closed",
+    "kind": "Sdk",
+  },
+]
+`;

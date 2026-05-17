@@ -1,4 +1,5 @@
-﻿# Dafman — Roadmap
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — Roadmap
 Milestones are sized to ship in days–weeks. Each one ends with a runnable demo and tests.
 ## M0 — Foundations (DONE)
 - Tauri + Vue 3 + PrimeVue scaffold.
@@ -110,4 +111,5 @@ Ideas raised mid-M1 that need design before slotting into a milestone. Tracked h
 - **Make the dev playground a button** — `?dev` is awkward to type. Add a discoverable entry point: either a hidden corner button shown only when `import.meta.env.DEV`, or a tray menu item. Keep production builds clean (tree-shake must still drop the playground module). Cross-references: `src/dev/Playground.vue`, `src/main.ts`.
 - **Markdown rendering + message QoL** — proper markdown for assistant + reasoning content (code fences with syntax highlight, copy-code button, links, lists). Plus message actions called out in M2: copy whole message, retry, edit-and-resend, delete. Sanitization is mandatory — assistant output is untrusted. Cross-references: `plan-messagingAndUx.prompt.md` (Message types).
 - **GPT-5.5 `reasoning_opaque` decryption mystery** — the upstream CLI displays reasoning for GPT-5.5, but the SDK only ships an empty `content` + ~500-char base64 `reasoningId` to us. Worth one focused session to figure out how the CLI decodes/renders it (probably a separate provider call or a CLI-internal post-process). Cross-references: `src/lib/chatEvents.ts`, `plan-sdkAndExternalSurfaces.prompt.md`.
+
 

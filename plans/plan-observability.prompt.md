@@ -1,4 +1,5 @@
-﻿# Dafman — Observability: Logging, Tracing, Metrics, Performance
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — Observability: Logging, Tracing, Metrics, Performance
 The app spawns subprocesses (CLI, MCP servers), routes user data through streaming pipelines, and runs privileged tools. We need *observable* by default: when something is slow, broken, or suspicious, we can answer **what**, **when**, **where**, and **why** from logs and traces alone.
 ## Goals
 1. **Structured everything.** Logs are key=value, not free-form strings. Spans correlate across boundaries.
@@ -116,3 +117,4 @@ CI runs them in a separate optional job; failure threshold is configurable but *
 - **M5** — sub-agent + MCP span propagation; per-MCP-server metrics.
 - **M6** — automation runs emit audit + metric events; quiet hours respect.
 - **M7** — diagnostics bundle export; tokio-console feature flag; full perf dashboard.
+

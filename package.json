@@ -1,43 +1,39 @@
 {
-    "name": "dafman",
-    "private": true,
-    "version": "0.1.0",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vue-tsc --noEmit && vite build",
-        "preview": "vite preview",
-        "tauri": "tauri",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage",
-        "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-        "test:all": "npm test && npm run test:rust",
-        "lint:frontend": "vue-tsc --noEmit",
-        "lint:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
-        "lint": "npm run lint:frontend && npm run lint:rust",
-        "fmt:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
-        "check": "npm run lint && npm run test:all && npm run build"
-    },
-    "dependencies": {
-        "@primeuix/themes": "^2.0.3",
-        "@tauri-apps/api": "^2",
-        "@tauri-apps/plugin-opener": "^2",
-        "copilot-sdk-supercharged": "^2.1.2",
-        "pinia": "^3.0.4",
-        "primeicons": "^7.0.0",
-        "primevue": "^4.5.5",
-        "vue": "^3.5.13"
-    },
-    "devDependencies": {
-        "@tauri-apps/cli": "^2",
-        "@vitejs/plugin-vue": "^5.2.1",
-        "@vitest/coverage-v8": "^4.1.6",
-        "@vue/test-utils": "^2.4.10",
-        "happy-dom": "^20.9.0",
-        "typescript": "~5.6.2",
-        "vite": "^6.0.3",
-        "vitest": "^4.1.6",
-        "vue-tsc": "^2.1.10"
-    }
+  "name": "dafman",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "electrobun dev --watch",
+    "dev:hmr": "concurrently \"bun run hmr\" \"bun run dev\"",
+    "hmr": "vite --port 5173",
+    "start": "vite build && electrobun dev",
+    "build": "vite build && electrobun build",
+    "build:canary": "vite build && electrobun build --env=canary",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
+    "lint": "vue-tsc --noEmit",
+    "check": "bun run lint && bun run test && bun run build"
+  },
+  "dependencies": {
+    "@primeuix/themes": "^2.0.3",
+    "copilot-sdk-supercharged": "^2.1.2",
+    "electrobun": "1.18.1",
+    "pinia": "^3.0.4",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.0.0",
+    "@testing-library/vue": "^8.1.0",
+    "@types/bun": "latest",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/compiler-sfc": "^3.5.13",
+    "concurrently": "^9.1.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  }
 }

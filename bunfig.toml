@@ -1,0 +1,4 @@
+# bunfig.toml — runtime + test configuration for the Bun-side tooling.
+
+[test]
+preload = ["./tools/bun-vue-loader.ts"]

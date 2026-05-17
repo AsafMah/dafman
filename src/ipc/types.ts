@@ -1,59 +1,54 @@
-// Hand-mirrored Tauri IPC types.
+// Hand-mirrored types for the Electrobun RPC bridge.
 //
-// Keep these in sync with `src-tauri/src/app/events.rs` /
-// `src-tauri/src/app/settings.rs` and friends; the
-// `src-tauri/tests/ipc_contract.rs` snapshot guards the wire shape on the
-// Rust side. Drift is caught when either side updates without the other.
+// The Bun side's source of truth is `src-bun/rpc.ts`; we re-state the
+// payload-only types here so the Vue tree never imports from
+// `electrobun/bun` (which is a Bun-only module).
 
-import type { Channel } from "@tauri-apps/api/core";
+export type ThemeChoice = "system" | "light" | "dark";
 
-export type SessionEventPayload = {
+export type ReasoningVisibility = "hidden" | "compact" | "expanded";
+
+export interface Appearance {
+  theme: ThemeChoice;
+  reasoningVisibility: ReasoningVisibility;
+}
+
+export interface Settings {
+  version: number;
+  appearance: Appearance;
+}
+
+export interface ModelSummary {
+  id: string;
+  name: string;
+  supportsReasoningEffort: boolean;
+  supportedReasoningEfforts: string[];
+  defaultReasoningEffort: string | null;
+}
+
+export interface SessionEventPayload {
+  sessionId: string;
   eventType: string;
   data: Record<string, unknown>;
-};
+}
 
-/// Discriminated union mirroring `AppError` in `src-tauri/src/app/error.rs`.
-/// `invoke` rejections are deserialized into this shape.
+/// Discriminated union mirroring `AppErrorPayload` in `src-bun/app/errors.ts`.
+/// RPC rejections are deserialized into this shape by `invokeCommand`.
 export type AppErrorPayload =
   | { kind: "ClientNotStarted" }
   | { kind: "SessionNotFound"; data: string }
   | { kind: "Settings"; data: string }
   | { kind: "Sdk"; data: string };
 
-export type ThemeChoice = "system" | "light" | "dark";
-
-export type ReasoningVisibility = "hidden" | "compact" | "expanded";
-
-export type Appearance = {
-  theme: ThemeChoice;
-  reasoningVisibility: ReasoningVisibility;
-};
-
-export type Settings = {
-  version: number;
-  appearance: Appearance;
-};
-
-export type ModelSummary = {
-  id: string;
-  name: string;
-  supportsReasoningEffort: boolean;
-  supportedReasoningEfforts: string[];
-  defaultReasoningEffort: string | null;
-};
-
+/// Single source of truth for the request surface. Adding a new RPC?
+/// Add it here, then implement on the bun side in `src-bun/index.ts`.
 export type CommandMap = {
-  create_client: { args: Record<string, never>; result: string };
-  create_session: {
-    args: { onEvent: Channel<SessionEventPayload> };
-    result: string;
-  };
-  disconnect_session: { args: { sessionId: string }; result: string };
-  send_message: { args: { sessionId: string; text: string }; result: string };
-  get_settings: { args: Record<string, never>; result: Settings };
-  update_settings: { args: { next: Settings }; result: Settings };
-  list_models: { args: Record<string, never>; result: ModelSummary[] };
-  set_session_model: {
+  createClient: { args: Record<string, never>; result: string };
+  createSession: { args: Record<string, never>; result: string };
+  disconnectSession: { args: { sessionId: string }; result: string };
+  sendMessage: { args: { sessionId: string; text: string }; result: string };
+  listModels: { args: Record<string, never>; result: ModelSummary[] };
+  setSessionModel: {
     args: {
       sessionId: string;
       model: string;
@@ -61,8 +56,10 @@ export type CommandMap = {
     };
     result: string;
   };
-  get_log_dir: { args: Record<string, never>; result: string };
+  getSettings: { args: Record<string, never>; result: Settings };
+  updateSettings: { args: { next: Settings }; result: Settings };
+  getLogDir: { args: Record<string, never>; result: string };
+  openLogFolder: { args: Record<string, never>; result: boolean };
 };
 
 export type CommandName = keyof CommandMap;
-

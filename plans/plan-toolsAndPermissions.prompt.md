@@ -1,4 +1,5 @@
-﻿# Dafman — Tools & Permissions
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — Tools & Permissions
 ## Goals
 - Provide tools that match (and exceed) the Copilot CLI baseline: file ops, search, shell, web.
 - Every privileged action — tool calls AND browser opens — runs behind an explicit, auditable permission flow.
@@ -127,3 +128,4 @@ URL opens (from URL-mode elicitation, MCP OAuth, or user-clicked links) flow thr
 - Snapshot-test JSON Schemas (`insta`).
 - Integration: a fake `SessionHandler` requests permissions; assert flow ends with the right decision under each policy.
 - Integration: simulated MCP OAuth → URL policy decision → toast finalizes on status change.
+

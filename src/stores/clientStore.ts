@@ -21,7 +21,7 @@ export const useClientStore = defineStore("client", () => {
     isCreating.value = true;
     lastError.value = null;
     try {
-      const status = await invokeCommand("create_client", {});
+      const status = await invokeCommand("createClient", {});
       ready.value = true;
       toasts.success(status);
     } catch (err) {

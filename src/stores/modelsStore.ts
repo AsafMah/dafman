@@ -23,7 +23,7 @@ export const useModelsStore = defineStore("models", () => {
     isLoading.value = true;
     inflight = (async () => {
       try {
-        const next = await invokeCommand("list_models", {});
+        const next = await invokeCommand("listModels", {});
         models.value = next;
         loaded.value = true;
         return next;

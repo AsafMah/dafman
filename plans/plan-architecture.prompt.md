@@ -1,4 +1,5 @@
-﻿# Dafman — Architecture
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — Architecture
 ## Goals
 - Replace today''s single-file `src-tauri/src/lib.rs` with a layered, module-per-concern backend.
 - Replace today''s flat `src/` with a feature-oriented frontend.
@@ -303,6 +304,7 @@ Frontend mirror:
 - CI matrix: `cargo test`, `cargo clippy`, `vue-tsc`, `vitest`, Playwright e2e against `tauri build`.
 - Pinned `github-copilot-sdk` (Supercharged) SHA per release; CI verifies the lockfile.
 - Release builds use SDK `embedded-cli` feature for self-contained binaries.
+
 
 
 

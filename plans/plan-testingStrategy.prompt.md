@@ -1,4 +1,5 @@
-﻿# Dafman — Testing Strategy
+> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+# Dafman — Testing Strategy
 ## Goals
 - High confidence with minimal manual QA so we can ship daily.
 - Fast feedback: most tests under a second; full suite under a couple of minutes locally.
@@ -138,4 +139,5 @@ Tracked via:
 - One assertion concept per test; names describe behavior.
 - No flaky test ships; quarantined tests are deleted within a week.
 - Snapshots reviewed in PRs; updated via explicit script, never auto.
+
 

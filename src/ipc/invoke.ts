@@ -1,16 +1,17 @@
-// Typed wrapper around `@tauri-apps/api/core`'s `invoke`.
+// Typed wrapper over the Electrobun RPC bridge.
 //
-// Components and stores MUST call `invokeCommand` instead of `invoke`
-// directly (see `AGENTS.md` -> "No raw `invoke()` in components"). The
-// `CommandMap` in `./types.ts` is the single source of truth for command
-// names and argument shapes; if you add a new Tauri command, register it
-// there first.
+// Components and stores MUST call `invokeCommand` instead of touching
+// the raw RPC client directly; the same rule that applied to
+// `@tauri-apps/api`'s `invoke` still holds. The Electrobun bridge is
+// injected by `src/main.ts` via `setRpcBridge`, which mockable
+// alternatives (tests, the dev playground) override before the app
+// mounts.
 
-import { invoke } from "@tauri-apps/api/core";
 import type {
   AppErrorPayload,
   CommandMap,
   CommandName,
+  SessionEventPayload,
 } from "./types";
 
 export type InvokeResult<N extends CommandName> = CommandMap[N]["result"];
@@ -48,17 +49,51 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
   );
 }
 
+export type SessionEventListener = (event: SessionEventPayload) => void;
+
+/// Minimal surface that the IPC bridge has to implement. Both the real
+/// Electrobun bridge and unit-test fakes match this shape; tests inject a
+/// stub via `setRpcBridge`.
+export interface RpcBridge {
+  request<N extends CommandName>(
+    name: N,
+    args: CommandMap[N]["args"],
+  ): Promise<InvokeResult<N>>;
+  onSessionEvent(listener: SessionEventListener): () => void;
+}
+
+let bridge: RpcBridge | null = null;
+const pendingSessionListeners = new Set<SessionEventListener>();
+
+export function setRpcBridge(next: RpcBridge | null): void {
+  bridge = next;
+  if (!next) return;
+  for (const listener of pendingSessionListeners) {
+    next.onSessionEvent(listener);
+  }
+  pendingSessionListeners.clear();
+}
+
 export async function invokeCommand<N extends CommandName>(
   name: N,
   args: CommandMap[N]["args"],
 ): Promise<InvokeResult<N>> {
+  if (!bridge) {
+    throw new Error(
+      `RPC bridge not initialized; cannot invoke '${String(name)}'`,
+    );
+  }
   try {
-    return (await invoke(name, args as Record<string, unknown>)) as InvokeResult<N>;
+    return await bridge.request(name, args);
   } catch (raw) {
-    if (isAppErrorPayload(raw)) {
-      throw new AppError(raw);
-    }
+    if (isAppErrorPayload(raw)) throw new AppError(raw);
     if (raw instanceof Error) throw raw;
     throw new Error(String(raw));
   }
+}
+
+export function onSessionEvent(listener: SessionEventListener): () => void {
+  if (bridge) return bridge.onSessionEvent(listener);
+  pendingSessionListeners.add(listener);
+  return () => pendingSessionListeners.delete(listener);
 }

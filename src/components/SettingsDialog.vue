@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import SelectButton from "primevue/selectbutton";
@@ -56,8 +55,8 @@ function close() {
 async function openLogFolder() {
   const toasts = useToastStore();
   try {
-    const dir = await invokeCommand("get_log_dir", {});
-    await revealItemInDir(dir);
+    const ok = await invokeCommand("openLogFolder", {});
+    if (!ok) toasts.warn("Log folder not available yet");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     toasts.error("Couldn't open log folder", message);
@@ -84,7 +83,7 @@ async function openLogFolder() {
           <p class="muted">
             Schema version
             <strong>{{ settings.version }}</strong> - stored under
-            <code>app_config_dir()/settings.json</code>.
+            <code>userData/settings.json</code>.
           </p>
           <div class="row">
             <label>Diagnostics</label>
@@ -97,8 +96,7 @@ async function openLogFolder() {
             />
             <p class="muted hint">
               Opens the daily JSON log file in your file manager. Set
-              <code>DAFMAN_LOG=dafman_lib::session_events=trace</code> for the
-              full event payload.
+              <code>DAFMAN_LOG=debug</code> to capture full event payloads.
             </p>
           </div>
         </TabPanel>

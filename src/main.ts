@@ -7,6 +7,8 @@ import { definePreset } from "@primeuix/themes";
 import "primeicons/primeicons.css";
 import "./style.css";
 import App from "./App.vue";
+import { setRpcBridge } from "./ipc/invoke";
+import { createElectrobunBridge } from "./ipc/electrobunBridge";
 
 const GreenAura = definePreset(Aura, {
   semantic: {
@@ -26,7 +28,12 @@ const GreenAura = definePreset(Aura, {
   },
 });
 
-// Dev-only playground: open with `?dev` during `npm run tauri dev`. The
+// Wire the Electrobun RPC bridge before any store/component invokes an
+// IPC. Tests inject their own bridge via `setRpcBridge` before mount.
+const { bridge } = createElectrobunBridge();
+setRpcBridge(bridge);
+
+// Dev-only playground: open with `?dev` during `bun run dev:hmr`. The
 // dynamic import + DEV guard keeps Playground.vue out of production
 // bundles via tree-shaking.
 function mountWith(Root: typeof App) {
