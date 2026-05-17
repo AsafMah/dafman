@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { defaultAmbient, processEvents, type IdCounter } from "../chatEvents";
+import {
+  defaultAmbient,
+  processEvents,
+  TOOL_OUTPUT_CAP_BYTES,
+  type IdCounter,
+} from "../chatEvents";
 import type { SessionEventPayload } from "../../ipc/types";
 
 function event(data: Record<string, unknown>): SessionEventPayload {
@@ -7,6 +12,19 @@ function event(data: Record<string, unknown>): SessionEventPayload {
     sessionId: "sess-1",
     eventType: "session.model_change",
     data,
+  };
+}
+
+function toolEvent(
+  eventType: string,
+  data: Record<string, unknown>,
+  extras: Partial<SessionEventPayload> = {},
+): SessionEventPayload {
+  return {
+    sessionId: "sess-1",
+    eventType,
+    data,
+    ...extras,
   };
 }
 
@@ -50,5 +68,216 @@ describe("processEvents", () => {
 
     expect(first.toasts).toHaveLength(1);
     expect(second.toasts).toHaveLength(0);
+  });
+});
+
+describe("processEvents — tool calls", () => {
+  test("happy path: start → progress → partial → complete success", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_start", {
+          toolCallId: "call-1",
+          toolName: "shell",
+          arguments: { command: "ls" },
+        }),
+        toolEvent("tool.execution_progress", {
+          toolCallId: "call-1",
+          progressMessage: "Spawning shell…",
+        }),
+        toolEvent("tool.execution_partial_result", {
+          toolCallId: "call-1",
+          partialOutput: "file-a\n",
+        }),
+        toolEvent("tool.execution_partial_result", {
+          toolCallId: "call-1",
+          partialOutput: "file-b\n",
+        }),
+        toolEvent("tool.execution_complete", {
+          toolCallId: "call-1",
+          success: true,
+          result: { content: "ok", detailedContent: "file-a\nfile-b\n" },
+        }),
+      ],
+      counter,
+    );
+
+    expect(result.items).toHaveLength(1);
+    const tool = result.items[0];
+    expect(tool.kind).toBe("tool");
+    if (tool.kind !== "tool") return;
+    expect(tool.toolCallId).toBe("call-1");
+    expect(tool.toolName).toBe("shell");
+    expect(tool.args).toEqual({ command: "ls" });
+    expect(tool.status).toBe("success");
+    expect(tool.progressMessage).toBe("Spawning shell…");
+    expect(tool.partialOutput).toBe("file-a\nfile-b\n");
+    // detailedContent wins over content (the SDK's content is LLM-truncated).
+    expect(tool.resultContent).toBe("file-a\nfile-b\n");
+  });
+
+  test("error path: start → complete failure surfaces error message + code", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_start", {
+          toolCallId: "call-1",
+          toolName: "write",
+        }),
+        toolEvent("tool.execution_complete", {
+          toolCallId: "call-1",
+          success: false,
+          error: { code: "EACCES", message: "permission denied" },
+        }),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.status).toBe("error");
+    expect(tool.errorMessage).toBe("permission denied");
+    expect(tool.errorCode).toBe("EACCES");
+  });
+
+  test("out-of-order: partial before start creates an item, start later fills metadata", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_partial_result", {
+          toolCallId: "call-1",
+          partialOutput: "early\n",
+        }),
+        toolEvent("tool.execution_start", {
+          toolCallId: "call-1",
+          toolName: "shell",
+          arguments: { command: "echo hi" },
+        }),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.toolName).toBe("shell");
+    expect(tool.args).toEqual({ command: "echo hi" });
+    expect(tool.partialOutput).toBe("early\n");
+  });
+
+  test("terminal status is monotonic: late start does not regress completed tool to running", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_complete", {
+          toolCallId: "call-1",
+          success: true,
+          result: { content: "ok" },
+        }),
+        toolEvent("tool.execution_start", {
+          toolCallId: "call-1",
+          toolName: "shell",
+        }),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.status).toBe("success");
+    expect(tool.toolName).toBe("shell");
+  });
+
+  test("falls back to a shortened id when toolName is missing", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_partial_result", {
+          toolCallId: "abcdef1234567890",
+          partialOutput: "x",
+        }),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.toolName).toBe("tool abcdef12");
+  });
+
+  test("mcp metadata is preserved", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_start", {
+          toolCallId: "call-1",
+          toolName: "github_search",
+          mcpServerName: "github",
+          mcpToolName: "search_issues",
+        }),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.mcpServerName).toBe("github");
+    expect(tool.mcpToolName).toBe("search_issues");
+  });
+
+  test("agentId from envelope is preserved on the tool item", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent(
+          "tool.execution_start",
+          { toolCallId: "call-1", toolName: "view" },
+          { agentId: "sub-agent-7" },
+        ),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.agentId).toBe("sub-agent-7");
+  });
+
+  test("partialOutput is capped to avoid runaway memory", () => {
+    const counter: IdCounter = { next: 1 };
+    const huge = "x".repeat(TOOL_OUTPUT_CAP_BYTES + 5_000);
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        toolEvent("tool.execution_start", {
+          toolCallId: "call-1",
+          toolName: "shell",
+        }),
+        toolEvent("tool.execution_partial_result", {
+          toolCallId: "call-1",
+          partialOutput: huge,
+        }),
+      ],
+      counter,
+    );
+
+    const tool = result.items[0];
+    if (tool.kind !== "tool") throw new Error("expected tool item");
+    expect(tool.partialOutput.length).toBeLessThan(huge.length);
+    expect(tool.partialOutput).toContain("output truncated");
   });
 });

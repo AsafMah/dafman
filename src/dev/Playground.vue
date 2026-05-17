@@ -162,6 +162,94 @@ const SCRIPTS: Script[] = [
       { eventType: "session.error", data: { message: "Upstream connection reset" } },
     ],
   },
+  {
+    label: "Tool call: shell (success)",
+    events: [
+      { eventType: "assistant.turn_start", data: { turnId: "t-tool" } },
+      {
+        eventType: "tool.execution_start",
+        data: {
+          toolCallId: "call-shell-1",
+          toolName: "shell",
+          arguments: { command: "ls -la" },
+        },
+      },
+      {
+        eventType: "tool.execution_progress",
+        data: { toolCallId: "call-shell-1", progressMessage: "Spawning shell…" },
+      },
+      {
+        eventType: "tool.execution_partial_result",
+        data: { toolCallId: "call-shell-1", partialOutput: "total 24\n" },
+      },
+      {
+        eventType: "tool.execution_partial_result",
+        data: {
+          toolCallId: "call-shell-1",
+          partialOutput: "drwxr-xr-x  2 user user 4096 May 17 16:00 src\n",
+        },
+      },
+      {
+        eventType: "tool.execution_complete",
+        data: {
+          toolCallId: "call-shell-1",
+          success: true,
+          result: {
+            content: "ok",
+            detailedContent:
+              "total 24\ndrwxr-xr-x  2 user user 4096 May 17 16:00 src\n-rw-r--r--  1 user user  234 May 17 15:58 README.md\n",
+          },
+        },
+      },
+      { eventType: "assistant.turn_end", data: { turnId: "t-tool" } },
+    ],
+  },
+  {
+    label: "Tool call: write (failure)",
+    events: [
+      {
+        eventType: "tool.execution_start",
+        data: {
+          toolCallId: "call-write-1",
+          toolName: "write",
+          arguments: { path: "/etc/hosts", content: "127.0.0.1 evil.example\n" },
+        },
+      },
+      {
+        eventType: "tool.execution_complete",
+        data: {
+          toolCallId: "call-write-1",
+          success: false,
+          error: { code: "EACCES", message: "permission denied: /etc/hosts" },
+        },
+      },
+    ],
+  },
+  {
+    label: "Tool call: MCP (github · search_issues)",
+    events: [
+      {
+        eventType: "tool.execution_start",
+        data: {
+          toolCallId: "call-mcp-1",
+          toolName: "github_search_issues",
+          mcpServerName: "github",
+          mcpToolName: "search_issues",
+          arguments: { query: "is:open is:issue assignee:@me" },
+        },
+        agentId: "sub-agent-7",
+      },
+      {
+        eventType: "tool.execution_complete",
+        data: {
+          toolCallId: "call-mcp-1",
+          success: true,
+          result: { content: "Found 3 issues.", detailedContent: "- #42 fix flake\n- #51 docs\n- #58 perf\n" },
+        },
+        agentId: "sub-agent-7",
+      },
+    ],
+  },
 ];
 
 const PLAYGROUND_SESSION_ID = "playground";
@@ -174,6 +262,40 @@ function run(script: Script) {
 
 function clearChat() {
   events.length = 0;
+}
+
+/// Self-contained echo: the playground chat is not connected to the SDK.
+/// `ChatWindow` already appends the user's message locally; here we
+/// synthesize an assistant turn that echoes the text back so the
+/// reducer, streaming animation, and idle handling all exercise without
+/// needing a real session. `sleep` lets you observe the streaming feel.
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function echoSend(text: string): Promise<void> {
+  const turnId = `echo-${Date.now()}`;
+  const messageId = `echo-msg-${Date.now()}`;
+  const push = (e: ScriptEvent) =>
+    events.push({ ...e, sessionId: PLAYGROUND_SESSION_ID });
+
+  push({ eventType: "assistant.turn_start", data: { turnId } });
+  push({ eventType: "assistant.message_start", data: { messageId } });
+
+  const reply = `echo: ${text}`;
+  // Stream a few characters at a time so the streaming-delta animation
+  // is observable in the playground.
+  const chunkSize = 4;
+  for (let i = 0; i < reply.length; i += chunkSize) {
+    push({
+      eventType: "assistant.message_delta",
+      data: { messageId, deltaContent: reply.slice(i, i + chunkSize) },
+    });
+    await sleep(35);
+  }
+
+  push({ eventType: "assistant.turn_end", data: { turnId } });
+  push({ eventType: "session.idle", data: {} });
 }
 
 const customEventJson = ref('{"eventType":"assistant.intent","data":{"intent":"Custom intent"}}');
@@ -278,6 +400,7 @@ function exitPlayground() {
           :events="events"
           :model="null"
           :reasoning-effort="null"
+          :send-handler="echoSend"
           @close="clearChat"
         />
       </div>

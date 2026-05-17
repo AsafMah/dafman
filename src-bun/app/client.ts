@@ -4,6 +4,8 @@
 // `AppState.client` slot. `ensure()` is idempotent — the second call
 // returns the existing instance and `start()` is only invoked once.
 
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { CopilotClient } from "copilot-sdk-supercharged";
 import { AppError } from "./errors";
 import { log } from "./logging";
@@ -11,11 +13,41 @@ import { log } from "./logging";
 let instance: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 
+/// Resolves the prebuilt platform-native `copilot` binary shipped by
+/// `@github/copilot-<platform>-<arch>` (an optional dependency of
+/// `@github/copilot`). When present we hand its path to the SDK via
+/// `cliPath` so the SDK spawns the binary directly instead of falling
+/// back to the JS entrypoint, which requires Node 24+ for
+/// `node:sqlite` and crashes immediately under older Node runtimes.
+/// Returns `undefined` if the platform package isn't installed (e.g.
+/// running on an arch without prebuilds, or `npm install --no-optional`),
+/// in which case we let the SDK use its bundled JS path.
+function resolvePlatformCliBinary(): string | undefined {
+	const pkg = `@github/copilot-${process.platform}-${process.arch}`;
+	try {
+		const resolved = import.meta.resolve(pkg);
+		const path = fileURLToPath(resolved);
+		if (existsSync(path)) return path;
+	} catch {
+		/* package not installed for this platform; fall through */
+	}
+	return undefined;
+}
+
 export async function ensureClient(): Promise<CopilotClient> {
 	if (instance) return instance;
 	if (starting) return starting;
 	starting = (async () => {
-		const client = new CopilotClient();
+		const cliPath = resolvePlatformCliBinary();
+		if (cliPath) {
+			log.info("using prebuilt copilot binary", { cliPath });
+		} else {
+			log.warn(
+				"prebuilt copilot binary not found for this platform; SDK will fall back to bundled JS (requires Node >= 24)",
+				{ platform: process.platform, arch: process.arch },
+			);
+		}
+		const client = new CopilotClient(cliPath ? { cliPath } : undefined);
 		try {
 			await client.start();
 		} catch (err) {

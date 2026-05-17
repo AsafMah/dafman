@@ -16,6 +16,11 @@ export interface Appearance {
 export interface Settings {
   version: number;
   appearance: Appearance;
+  layout: Layout;
+}
+
+export interface Layout {
+  dockview: unknown | null;
 }
 
 export interface ModelSummary {
@@ -26,10 +31,24 @@ export interface ModelSummary {
   defaultReasoningEffort: string | null;
 }
 
+export interface SessionMetadataSummary {
+  sessionId: string;
+  startTime: string;
+  modifiedTime: string;
+  summary?: string;
+  isRemote: boolean;
+  cwd?: string;
+  repository?: string;
+  branch?: string;
+}
+
 export interface SessionEventPayload {
   sessionId: string;
   eventType: string;
   data: Record<string, unknown>;
+  agentId?: string;
+  eventId?: string;
+  timestamp?: string;
 }
 
 /// Discriminated union mirroring `AppErrorPayload` in `src-bun/app/errors.ts`.
@@ -56,6 +75,15 @@ export type CommandMap = {
     };
     result: string;
   };
+  resumeSession: {
+    args: {
+      sessionId: string;
+      model: string | null;
+      reasoningEffort: string | null;
+    };
+    result: string;
+  };
+  listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };

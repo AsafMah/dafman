@@ -6,6 +6,7 @@ import Select from "primevue/select";
 import Tag from "primevue/tag";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
+import ToolCallBlock from "./ToolCallBlock.vue";
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -32,6 +33,13 @@ const props = defineProps<{
   events: SessionEventPayload[];
   model: string | null;
   reasoningEffort: string | null;
+  /// Optional override for the send action. When provided, ChatWindow
+  /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
+  /// playground to keep the chat self-contained (echo-only, no SDK).
+  sendHandler?: (text: string) => Promise<void> | void;
+  /// Hide the in-header close (X) button. Set when a parent container
+  /// (e.g. the dockview tab bar) owns panel removal.
+  hideClose?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -172,7 +180,9 @@ watch(
       const lastSystem = [...result.items]
         .reverse()
         .find((i) => i.kind === "system" && i.severity === "error");
-      if (lastSystem) toasts.error("Session error", lastSystem.text);
+      if (lastSystem && lastSystem.kind === "system") {
+        toasts.error("Session error", lastSystem.text);
+      }
     }
     scrollToBottom();
   },
@@ -198,7 +208,11 @@ async function sendMessage(text: string) {
   await scrollToBottom();
 
   try {
-    await sessionsStore.sendMessage(props.sessionId, text);
+    if (props.sendHandler) {
+      await props.sendHandler(text);
+    } else {
+      await sessionsStore.sendMessage(props.sessionId, text);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     items.value = appendSystemMessage(
@@ -267,6 +281,7 @@ async function sendMessage(text: string) {
           />
         </label>
         <Button
+          v-if="!props.hideClose"
           icon="pi pi-times"
           text
           rounded
@@ -286,6 +301,21 @@ async function sendMessage(text: string) {
           v-if="item.kind === 'reasoning'"
           :text="item.text"
           :visibility="reasoningVisibility"
+        />
+        <ToolCallBlock
+          v-else-if="item.kind === 'tool'"
+          :tool-name="item.toolName"
+          :tool-call-id="item.toolCallId"
+          :mcp-server-name="item.mcpServerName"
+          :mcp-tool-name="item.mcpToolName"
+          :args="item.args"
+          :status="item.status"
+          :progress-message="item.progressMessage"
+          :partial-output="item.partialOutput"
+          :result-content="item.resultContent"
+          :error-message="item.errorMessage"
+          :error-code="item.errorCode"
+          :agent-id="item.agentId"
         />
         <article
           v-else

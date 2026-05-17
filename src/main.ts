@@ -5,6 +5,7 @@ import ToastService from "primevue/toastservice";
 import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import "primeicons/primeicons.css";
+import "dockview-vue/dist/styles/dockview.css";
 import "./style.css";
 import "./lexical/lexical.css";
 import App from "./App.vue";
