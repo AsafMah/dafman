@@ -136,8 +136,18 @@ export class SessionRegistry {
 		if (!entry) throw AppError.sessionNotFound(sessionId);
 		try {
 			const result = await entry.session.rpc.mode.get();
-			return result as SessionMode;
+			if (
+				result !== "interactive" &&
+				result !== "plan" &&
+				result !== "autopilot"
+			) {
+				throw AppError.sdk(
+					`unexpected session mode from SDK: ${JSON.stringify(result)}`,
+				);
+			}
+			return result;
 		} catch (err) {
+			if (err instanceof AppError) throw err;
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
 	}
@@ -158,8 +168,14 @@ export class SessionRegistry {
 		if (!entry) throw AppError.sessionNotFound(sessionId);
 		try {
 			const result = await entry.session.rpc.name.get();
-			return result.name ?? null;
+			const name = (result as { name?: unknown }).name;
+			if (typeof name === "string") return name;
+			if (name === null || name === undefined) return null;
+			throw AppError.sdk(
+				`unexpected session name from SDK: ${JSON.stringify(name)}`,
+			);
 		} catch (err) {
+			if (err instanceof AppError) throw err;
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
 	}

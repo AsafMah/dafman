@@ -6,7 +6,6 @@ import InputText from "primevue/inputtext";
 import Popover from "primevue/popover";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
-import ToggleSwitch from "primevue/toggleswitch";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
 import {
@@ -29,6 +28,15 @@ import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
+
+// NOTE: `ToggleSwitch` import + `approveAllChoice` computed are intentionally
+// kept absent until a real permission UX lands. The SDK's
+// `permissions.setApproveAll` toggle is wired through the store
+// (`setSessionApproveAll`) but our local `onPermissionRequest: approveAll`
+// handler in `src-bun/app/sessions.ts` short-circuits every request, so
+// surfacing a UI switch today would be misleading. Prop + store state are
+// retained so the toggle row can be re-added in the popover when the
+// per-session handler stops hard-approving.
 
 const props = defineProps<{
   sessionId: string;
@@ -155,14 +163,6 @@ const modeChoice = computed<SessionMode | null>({
   },
 });
 
-const approveAllChoice = computed<boolean>({
-  get: () => props.approveAll,
-  set: (value) => {
-    if (value === props.approveAll) return;
-    void sessionsStore.setSessionApproveAll(props.sessionId, value);
-  },
-});
-
 const nameDraft = ref<string>("");
 const optionsMenu = ref<InstanceType<typeof Popover> | null>(null);
 
@@ -173,6 +173,11 @@ function toggleOptions(event: Event) {
 function onRenameSubmit() {
   const trimmed = nameDraft.value.trim();
   if (!trimmed) return;
+  // Reflect the trimmed value in the input so the user sees the same
+  // string we sent, and so the `ambient.title` watcher can resync on
+  // the next backend echo (it skips while `nameDraft` is non-empty,
+  // but the trimmed echo will match what's shown).
+  nameDraft.value = trimmed;
   void sessionsStore.setSessionName(props.sessionId, trimmed);
 }
 
@@ -348,19 +353,6 @@ async function sendMessage(text: string) {
                 aria-label="Reasoning visibility for this session"
               />
             </label>
-            <div class="option-row">
-              <label
-                class="option-label"
-                :for="`approve-all-${props.sessionId}`"
-              >
-                Auto-approve permissions
-              </label>
-              <ToggleSwitch
-                :input-id="`approve-all-${props.sessionId}`"
-                v-model="approveAllChoice"
-                aria-label="Auto-approve permission requests"
-              />
-            </div>
             <div class="option-row option-row-stack">
               <label
                 class="option-label"

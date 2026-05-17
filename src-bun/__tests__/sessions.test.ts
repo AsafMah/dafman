@@ -204,4 +204,28 @@ describe("SessionRegistry", () => {
 		await expect(reg.resetApprovals("ghost")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.setName("ghost", "x")).rejects.toBeInstanceOf(AppError);
 	});
+
+	test("getMode rejects an unexpected SDK value as AppError.sdk", async () => {
+		const client = new FakeClient();
+		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		(fake as unknown as { currentMode: string }).currentMode = "garbage";
+		await expect(reg.getMode(id)).rejects.toBeInstanceOf(AppError);
+	});
+
+	test("getName returns null for nullish/missing and rejects non-string", async () => {
+		const client = new FakeClient();
+		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		// nullish → null
+		fake.currentName = null;
+		expect(await reg.getName(id)).toBeNull();
+		// non-string → AppError.sdk
+		(fake as unknown as { currentName: unknown }).currentName = 42;
+		await expect(reg.getName(id)).rejects.toBeInstanceOf(AppError);
+	});
 });

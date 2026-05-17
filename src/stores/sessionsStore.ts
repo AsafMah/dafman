@@ -102,9 +102,13 @@ export const useSessionsStore = defineStore("sessions", () => {
       sessions.value.push(record);
       toasts.success("Session created", id);
       // Fire-and-forget: get the current run mode so the UI shows it.
+      // Re-look up the record by id when the RPC resolves — if the
+      // session was closed in the meantime it's no longer in
+      // `sessions.value` and we must not mutate a stale closure capture.
       void invokeCommand("getSessionMode", { sessionId: id })
         .then((mode) => {
-          record.mode = mode;
+          const current = sessions.value.find((s) => s.id === id);
+          if (current) current.mode = mode;
         })
         .catch(() => {
           /* mode RPC may be unavailable on older CLI hosts; ignore */
