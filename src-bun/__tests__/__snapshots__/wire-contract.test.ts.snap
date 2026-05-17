@@ -53,3 +53,19 @@ exports[`IPC wire contracts AppErrorPayload variants 1`] = `
   },
 ]
 `;
+
+exports[`IPC wire contracts SessionMode union 1`] = `
+[
+  "interactive",
+  "plan",
+  "autopilot",
+]
+`;
+
+exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
+{
+  "messagesRemoved": 5,
+  "success": true,
+  "tokensFreed": 1234,
+}
+`;

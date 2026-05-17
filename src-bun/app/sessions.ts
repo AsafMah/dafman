@@ -13,7 +13,11 @@ import {
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
-import type { SessionEventPayload } from "../rpc";
+import type {
+	SessionEventPayload,
+	SessionHistoryCompactionResult,
+	SessionMode,
+} from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
 /// type alias isn't re-exported from the package root, so we mirror it
@@ -125,6 +129,101 @@ export class SessionRegistry {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
 		return model;
+	}
+
+	async getMode(sessionId: string): Promise<SessionMode> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = await entry.session.rpc.mode.get();
+			return result as SessionMode;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setMode(sessionId: string, mode: SessionMode): Promise<SessionMode> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.mode.set({ mode });
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		return mode;
+	}
+
+	async getName(sessionId: string): Promise<string | null> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = await entry.session.rpc.name.get();
+			return result.name ?? null;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setName(sessionId: string, name: string): Promise<string> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.name.set({ name });
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		return name;
+	}
+
+	async compactHistory(
+		sessionId: string,
+	): Promise<SessionHistoryCompactionResult> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.history.compact()) as {
+				success?: boolean;
+				tokensFreed?: number;
+				messagesRemoved?: number;
+			};
+			return {
+				success: result.success ?? true,
+				tokensFreed:
+					typeof result.tokensFreed === "number" ? result.tokensFreed : null,
+				messagesRemoved:
+					typeof result.messagesRemoved === "number"
+						? result.messagesRemoved
+						: null,
+			};
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.permissions.setApproveAll({
+				enabled,
+			})) as { success?: boolean };
+			return result.success ?? true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async resetApprovals(sessionId: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.permissions.resetSessionApprovals()) as {
+				success?: boolean;
+			};
+			return result.success ?? true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
 	}
 
 	async disconnect(sessionId: string): Promise<string> {

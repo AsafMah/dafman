@@ -8,6 +8,7 @@
 - Prefer linking to commits / files / plans over re-writing rationale.
 ---
 ## Last completed
+- **Per-session options popover** (M1 "More session settings"). Chat header now has a gear button that opens a `Popover` with run mode, reasoning view, auto-approve permissions toggle, rename, compact-history, reset-approvals. Backend RPCs `getSessionMode`/`setSessionMode`/`getSessionName`/`setSessionName`/`compactSessionHistory`/`setSessionApproveAll`/`resetSessionApprovals` wrap `session.rpc.{mode,name,history,permissions}.*`; store reacts to `session.mode_changed`.
 - **Lexical-backed chat surface** (M1 markdown rendering). Composer and assistant/reasoning/user message display both run through Lexical. Markdown shortcuts (`# heading`, `**bold**`, fenced code, lists, links, hr, blockquote) auto-format as the user types; sends are serialized as markdown and re-rendered the same way for both peers. New `src/lexical/{theme,plugins,nodes}.ts` + `lexical.css`; new components `src/components/{MessageComposer,MessageContent}.vue`; `ChatWindow.vue` and `ReasoningBlock.vue` now delegate body rendering. Pinned `lexical@0.38.1` and matching `@lexical/*` packages to align with `lexical-vue@0.14.1`. Streaming deltas reparse via rAF throttle to keep the reconciler smooth.
 - **Initial-window clipping fix** (Windows). The WebView2 surface is created at the outer window size, so the renderer ships ~16px clipped until the first WM_SIZE. We now nudge the frame ±1px on a staggered schedule (0/150/400/900ms after dom-ready plus belt-and-suspenders fallbacks) so a single resize event always lands after the renderer has painted.
 - **Composer auto-grow.** A `ResizeObserver` on `.chat-tile` publishes `--tile-height`; the composer input caps at `calc(var(--tile-height) * 0.6)` so it grows up to ~60 % of the tile before scrolling.
@@ -23,7 +24,7 @@ Carried-over M1 backlog (full detail in `plans/plan-roadmap.prompt.md` → "Back
 3. **URL elicitation card + URL opener** (use Electrobun `Utils.openExternal` once the elicitation flow lands).
 4. Steering & message queueing.
 5. File / image attachments.
-6. More session settings exposed (compaction, reasoning summary, system prompt modes).
+6. More session settings exposed (compaction, reasoning summary, system prompt modes). *Partially done in this PR — gear-menu popover exposes run mode, reasoning view, auto-approve, reset approvals, compact-history, rename. System-prompt-mode override still pending.*
 7. **Make the dev playground a discoverable button (currently `?dev`).** Done — wrench button in topbar (dev builds only) + "Back to app" in the playground.
 8. Markdown + message QoL (copy/retry/edit-and-resend).
 9. GPT-5.5 `reasoning_opaque` mystery — CLI shows it, our UI gets `content: ""`.

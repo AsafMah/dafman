@@ -15,6 +15,20 @@ import type { AppErrorPayload } from "./app/errors";
 export type ThemeChoice = "system" | "light" | "dark";
 export type ReasoningVisibility = "hidden" | "compact" | "expanded";
 
+/// Agent run mode, mirrors the SDK `SessionMode` union.
+/// "interactive" prompts for permission per action; "plan" stays in
+/// read-only planning mode; "autopilot" runs unattended.
+export type SessionMode = "interactive" | "plan" | "autopilot";
+
+export interface SessionHistoryCompactionResult {
+	/// Whether compaction completed successfully.
+	success: boolean;
+	/// Tokens freed by compaction (when available).
+	tokensFreed: number | null;
+	/// Number of messages removed during compaction (when available).
+	messagesRemoved: number | null;
+}
+
 export interface Appearance {
 	theme: ThemeChoice;
 	reasoningVisibility: ReasoningVisibility;
@@ -67,6 +81,34 @@ export type DafmanRPC = {
 					reasoningEffort: string | null;
 				};
 				response: string;
+			};
+			getSessionMode: {
+				params: { sessionId: string };
+				response: SessionMode;
+			};
+			setSessionMode: {
+				params: { sessionId: string; mode: SessionMode };
+				response: SessionMode;
+			};
+			getSessionName: {
+				params: { sessionId: string };
+				response: string | null;
+			};
+			setSessionName: {
+				params: { sessionId: string; name: string };
+				response: string;
+			};
+			compactSessionHistory: {
+				params: { sessionId: string };
+				response: SessionHistoryCompactionResult;
+			};
+			setSessionApproveAll: {
+				params: { sessionId: string; enabled: boolean };
+				response: boolean;
+			};
+			resetSessionApprovals: {
+				params: { sessionId: string };
+				response: boolean;
 			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };

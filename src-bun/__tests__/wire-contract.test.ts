@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import type { ModelSummary, Settings, SessionEventPayload } from "../rpc";
+import type {
+	ModelSummary,
+	SessionHistoryCompactionResult,
+	SessionMode,
+	Settings,
+	SessionEventPayload,
+} from "../rpc";
 import type { AppErrorPayload } from "../app/errors";
 
 // Wire-shape snapshots — equivalent to the old `insta` snapshots in
@@ -44,5 +50,19 @@ describe("IPC wire contracts", () => {
 			{ kind: "Sdk", data: "rpc closed" },
 		];
 		expect(variants).toMatchSnapshot();
+	});
+
+	test("SessionMode union", () => {
+		const variants: SessionMode[] = ["interactive", "plan", "autopilot"];
+		expect(variants).toMatchSnapshot();
+	});
+
+	test("SessionHistoryCompactionResult shape", () => {
+		const sample: SessionHistoryCompactionResult = {
+			success: true,
+			tokensFreed: 1234,
+			messagesRemoved: 5,
+		};
+		expect(sample).toMatchSnapshot();
 	});
 });

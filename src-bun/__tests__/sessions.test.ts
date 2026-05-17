@@ -15,8 +15,36 @@ interface FakeSession {
 	setModel(model: string, opts?: { reasoningEffort?: string }): Promise<void>;
 	disconnect(): Promise<void>;
 	fire(event: { type: string; [k: string]: unknown }): void;
+	rpc: {
+		mode: {
+			get: () => Promise<string>;
+			set: (params: { mode: string }) => Promise<void>;
+		};
+		name: {
+			get: () => Promise<{ name: string | null }>;
+			set: (params: { name: string }) => Promise<void>;
+		};
+		history: {
+			compact: () => Promise<{
+				success: boolean;
+				tokensFreed?: number;
+				messagesRemoved?: number;
+			}>;
+		};
+		permissions: {
+			setApproveAll: (params: { enabled: boolean }) => Promise<{
+				success: boolean;
+			}>;
+			resetSessionApprovals: () => Promise<{ success: boolean }>;
+		};
+	};
 	lastSentPrompt?: string;
 	lastModel?: { model: string; opts?: { reasoningEffort?: string } };
+	currentMode: string;
+	currentName: string | null;
+	approveAll: boolean;
+	approvalsReset: number;
+	compactCalls: number;
 }
 
 function makeFakeSession(sessionId: string): FakeSession {
@@ -39,6 +67,45 @@ function makeFakeSession(sessionId: string): FakeSession {
 		async disconnect() {},
 		fire(event) {
 			listener?.(event);
+		},
+		currentMode: "interactive",
+		currentName: null,
+		approveAll: true,
+		approvalsReset: 0,
+		compactCalls: 0,
+		rpc: {
+			mode: {
+				async get() {
+					return session.currentMode;
+				},
+				async set({ mode }) {
+					session.currentMode = mode;
+				},
+			},
+			name: {
+				async get() {
+					return { name: session.currentName };
+				},
+				async set({ name }) {
+					session.currentName = name;
+				},
+			},
+			history: {
+				async compact() {
+					session.compactCalls++;
+					return { success: true, tokensFreed: 42, messagesRemoved: 3 };
+				},
+			},
+			permissions: {
+				async setApproveAll({ enabled }) {
+					session.approveAll = enabled;
+					return { success: true };
+				},
+				async resetSessionApprovals() {
+					session.approvalsReset++;
+					return { success: true };
+				},
+			},
 		},
 	};
 	return session;
@@ -94,5 +161,47 @@ describe("SessionRegistry", () => {
 	test("disconnect on unknown sessionId throws SessionNotFound", async () => {
 		const reg = new SessionRegistry(() => {});
 		await expect(reg.disconnect("ghost")).rejects.toBeInstanceOf(AppError);
+	});
+
+	test("mode/name/compact/approve-all proxy to the session rpc surface", async () => {
+		const client = new FakeClient();
+		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+
+		expect(await reg.getMode(id)).toBe("interactive");
+		await reg.setMode(id, "plan");
+		expect(fake.currentMode).toBe("plan");
+
+		await reg.setName(id, "My chat");
+		expect(fake.currentName).toBe("My chat");
+		expect(await reg.getName(id)).toBe("My chat");
+
+		const compaction = await reg.compactHistory(id);
+		expect(compaction).toEqual({
+			success: true,
+			tokensFreed: 42,
+			messagesRemoved: 3,
+		});
+		expect(fake.compactCalls).toBe(1);
+
+		await reg.setApproveAll(id, false);
+		expect(fake.approveAll).toBe(false);
+
+		await reg.resetApprovals(id);
+		expect(fake.approvalsReset).toBe(1);
+	});
+
+	test("session-rpc methods on unknown sessionId throw SessionNotFound", async () => {
+		const reg = new SessionRegistry(() => {});
+		await expect(reg.getMode("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.setMode("ghost", "plan")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.compactHistory("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.setApproveAll("ghost", true)).rejects.toBeInstanceOf(
+			AppError,
+		);
+		await expect(reg.resetApprovals("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.setName("ghost", "x")).rejects.toBeInstanceOf(AppError);
 	});
 });

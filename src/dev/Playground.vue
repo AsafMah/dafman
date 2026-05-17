@@ -278,6 +278,8 @@ function exitPlayground() {
           :events="events"
           :model="null"
           :reasoning-effort="null"
+          :mode="null"
+          :approve-all="true"
           @close="clearChat"
         />
       </div>

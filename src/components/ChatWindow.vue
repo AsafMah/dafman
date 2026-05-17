@@ -2,8 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import Popover from "primevue/popover";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
+import ToggleSwitch from "primevue/toggleswitch";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
 import {
@@ -19,6 +22,7 @@ import type {
   ModelSummary,
   ReasoningVisibility,
   SessionEventPayload,
+  SessionMode,
 } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
@@ -32,6 +36,8 @@ const props = defineProps<{
   events: SessionEventPayload[];
   model: string | null;
   reasoningEffort: string | null;
+  mode: SessionMode | null;
+  approveAll: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -135,6 +141,49 @@ const effortChoice = computed<string | null>({
   },
 });
 
+const modeOptions: { label: string; value: SessionMode }[] = [
+  { label: "Interactive", value: "interactive" },
+  { label: "Plan", value: "plan" },
+  { label: "Autopilot", value: "autopilot" },
+];
+
+const modeChoice = computed<SessionMode | null>({
+  get: () => props.mode,
+  set: (value) => {
+    if (!value || value === props.mode) return;
+    void sessionsStore.setSessionMode(props.sessionId, value);
+  },
+});
+
+const approveAllChoice = computed<boolean>({
+  get: () => props.approveAll,
+  set: (value) => {
+    if (value === props.approveAll) return;
+    void sessionsStore.setSessionApproveAll(props.sessionId, value);
+  },
+});
+
+const nameDraft = ref<string>("");
+const optionsMenu = ref<InstanceType<typeof Popover> | null>(null);
+
+function toggleOptions(event: Event) {
+  optionsMenu.value?.toggle(event);
+}
+
+function onRenameSubmit() {
+  const trimmed = nameDraft.value.trim();
+  if (!trimmed) return;
+  void sessionsStore.setSessionName(props.sessionId, trimmed);
+}
+
+function onCompactNow() {
+  void sessionsStore.compactSessionHistory(props.sessionId);
+}
+
+function onResetApprovals() {
+  void sessionsStore.resetSessionApprovals(props.sessionId);
+}
+
 const accentColor = computed(() => props.accent);
 
 async function scrollToBottom() {
@@ -186,7 +235,16 @@ watch(
     ambient.value = defaultAmbient();
     isSendingFallback.value = false;
     sessionOverride.value = "default";
+    nameDraft.value = "";
     processedEvents = props.events.length;
+  },
+);
+
+// Keep the rename draft in sync with the session title coming from events.
+watch(
+  () => ambient.value.title,
+  (title) => {
+    if (title && !nameDraft.value) nameDraft.value = title;
   },
 );
 
@@ -254,18 +312,95 @@ async function sendMessage(text: string) {
             aria-label="Reasoning effort for this session"
           />
         </label>
-        <label class="control" :for="`reasoning-${props.sessionId}`">
-          <span class="control-label">Reasoning</span>
-          <Select
-            :input-id="`reasoning-${props.sessionId}`"
-            v-model="sessionOverride"
-            :options="reasoningOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            aria-label="Reasoning visibility for this session"
-          />
-        </label>
+        <Button
+          icon="pi pi-cog"
+          text
+          rounded
+          aria-label="Session options"
+          aria-haspopup="true"
+          @click="toggleOptions"
+        />
+        <Popover ref="optionsMenu">
+          <div class="session-options">
+            <label class="option-row" :for="`mode-${props.sessionId}`">
+              <span class="option-label">Run mode</span>
+              <Select
+                :input-id="`mode-${props.sessionId}`"
+                v-model="modeChoice"
+                :options="modeOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                placeholder="Loading..."
+                :disabled="!props.mode"
+                aria-label="Agent run mode"
+              />
+            </label>
+            <label class="option-row" :for="`reasoning-${props.sessionId}`">
+              <span class="option-label">Reasoning view</span>
+              <Select
+                :input-id="`reasoning-${props.sessionId}`"
+                v-model="sessionOverride"
+                :options="reasoningOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                aria-label="Reasoning visibility for this session"
+              />
+            </label>
+            <div class="option-row">
+              <label
+                class="option-label"
+                :for="`approve-all-${props.sessionId}`"
+              >
+                Auto-approve permissions
+              </label>
+              <ToggleSwitch
+                :input-id="`approve-all-${props.sessionId}`"
+                v-model="approveAllChoice"
+                aria-label="Auto-approve permission requests"
+              />
+            </div>
+            <div class="option-row option-row-stack">
+              <label
+                class="option-label"
+                :for="`name-${props.sessionId}`"
+              >
+                Session name
+              </label>
+              <form class="rename-form" @submit.prevent="onRenameSubmit">
+                <InputText
+                  :id="`name-${props.sessionId}`"
+                  v-model="nameDraft"
+                  size="small"
+                  placeholder="Untitled"
+                />
+                <Button
+                  type="submit"
+                  label="Save"
+                  size="small"
+                  :disabled="!nameDraft.trim()"
+                />
+              </form>
+            </div>
+            <div class="option-actions">
+              <Button
+                icon="pi pi-compress"
+                label="Compact history"
+                size="small"
+                severity="secondary"
+                @click="onCompactNow"
+              />
+              <Button
+                icon="pi pi-refresh"
+                label="Reset approvals"
+                size="small"
+                severity="secondary"
+                @click="onResetApprovals"
+              />
+            </div>
+          </div>
+        </Popover>
         <Button
           icon="pi pi-times"
           text
@@ -401,6 +536,55 @@ async function sendMessage(text: string) {
   color: var(--p-text-muted-color);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.session-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 18rem;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.option-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.option-label {
+  font-size: 0.8rem;
+  color: var(--p-text-color);
+}
+
+.option-row :deep(.p-select) {
+  min-width: 9rem;
+}
+
+.rename-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.rename-form :deep(.p-inputtext) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.option-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--p-content-border-color);
 }
 
 .session-id {
