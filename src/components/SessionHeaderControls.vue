@@ -23,6 +23,7 @@ import type {
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { basename } from "../stores/layoutStore";
+import { invokeCommand } from "../ipc/invoke";
 
 const props = defineProps<{ sessionId: string }>();
 
@@ -142,6 +143,12 @@ function onResetApprovals() {
 /// Workspace label shown in the tab strip — basename only, so it
 /// stays short. Full absolute path is in the tooltip.
 const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
+
+function onWorkspaceClick() {
+  const path = record.value?.workingDirectory;
+  if (!path) return;
+  void invokeCommand("revealPath", { path });
+}
 </script>
 
 <template>
@@ -150,9 +157,9 @@ const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
       v-if="workspaceLabel"
       type="button"
       class="workspace-chip"
-      :title="record.workingDirectory ?? ''"
-      :aria-label="`Workspace: ${record.workingDirectory ?? ''}`"
-      @click="toggleOptions"
+      :title="`Open ${record.workingDirectory ?? ''}`"
+      :aria-label="`Open workspace folder ${record.workingDirectory ?? ''}`"
+      @click="onWorkspaceClick"
     >
       <i class="pi pi-folder" aria-hidden="true" />
       <span class="workspace-chip-text">{{ workspaceLabel }}</span>
@@ -305,12 +312,12 @@ const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
 }
 
 .workspace-chip:hover {
-  background: var(--p-surface-100);
+  /* Theme-aware: mix the text colour into transparent so the chip
+   * gets a faint backdrop on hover that auto-flips between light and
+   * dark. `:global(.app-dark)` overrides inside scoped CSS turned
+   * out unreliable here. */
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
   color: var(--p-text-color);
-}
-
-:global(.app-dark) .workspace-chip:hover {
-  background: var(--p-surface-800);
 }
 
 .workspace-chip-text {

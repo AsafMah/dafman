@@ -129,6 +129,20 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				Utils.showItemInFolder(dir);
 				return true;
 			}),
+			revealPath: rpcGuard(async ({ path }) => {
+				const trimmed = path.trim();
+				if (!trimmed) return false;
+				try {
+					Utils.showItemInFolder(trimmed);
+					return true;
+				} catch (err) {
+					log.warn("revealPath failed", {
+						path: trimmed,
+						error: err instanceof Error ? err.message : String(err),
+					});
+					return false;
+				}
+			}),
 			rendererLog: rpcGuard(async ({ level, message, extra }) => {
 				// Mirror the renderer's structured log into the bun-side
 				// JSON log so a developer can `tail` it instead of needing

@@ -191,6 +191,13 @@ export type DafmanRPC = {
 				params: Record<string, never>;
 				response: boolean;
 			};
+			/// Reveal an arbitrary path in the OS file explorer. Used
+			/// by the workspace chip in the tab strip; returns `false`
+			/// when the path is empty or doesn't exist.
+			revealPath: {
+				params: { path: string };
+				response: boolean;
+			};
 			// Lets the webview pipe console messages + uncaught errors back
 			// through the existing RPC channel so they show up in bun's
 			// JSON log even when WebView2 devtools is closed. Pure

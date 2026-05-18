@@ -129,6 +129,7 @@ export type CommandMap = {
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };
   openLogFolder: { args: Record<string, never>; result: boolean };
+  revealPath: { args: { path: string }; result: boolean };
   rendererLog: {
     args: {
       level: "debug" | "info" | "warn" | "error";
