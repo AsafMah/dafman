@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
-import Button from "primevue/button";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
@@ -245,18 +244,44 @@ function scheduleLayoutSave() {
 // activity-item config below and with the open-by-default path.
 const SESSIONS_PANEL_ID = "sessions-manager";
 
-/// ActivityBar items. Currently only Sessions; future activities
-/// (Library, Log viewer, MCP status, …) append here.
-const activityItems: ActivityItem[] = [
-  {
-    id: SESSIONS_PANEL_ID,
-    component: "sessionsManager",
-    icon: "pi-list",
-    label: "Sessions",
-    title: "Sessions",
-    initialSize: 320,
-  },
-];
+/// ActivityBar items.
+/// - Top stack (default `group: "top"`): panel toggles. Sessions today;
+///   Library / Log viewer / MCP status / ... append here.
+/// - Bottom stack (`group: "bottom"`): global actions. Dev wrench is
+///   conditional on `import.meta.env.DEV`.
+const activityItems = computed<ActivityItem[]>(() => {
+  const items: ActivityItem[] = [
+    {
+      kind: "panel",
+      id: SESSIONS_PANEL_ID,
+      component: "sessionsManager",
+      icon: "pi-list",
+      title: "Sessions",
+      initialSize: 320,
+    },
+  ];
+  if (isDev) {
+    items.push({
+      kind: "action",
+      id: "playground",
+      icon: "pi-wrench",
+      title: "Open dev playground",
+      group: "bottom",
+      onClick: openPlayground,
+    });
+  }
+  items.push({
+    kind: "action",
+    id: "settings",
+    icon: "pi-cog",
+    title: "Settings",
+    group: "bottom",
+    onClick: () => {
+      settingsOpen.value = true;
+    },
+  });
+  return items;
+});
 
 /// Ref to the ActivityBar so onDockReady can ask it to resync after
 /// any layout change (covers panels closed via their own X, restored
@@ -305,35 +330,10 @@ function openSessionsByDefault(attempt = 0) {
       @update:visible="(v) => (settingsOpen = v)"
     />
 
-    <!-- Slim topbar: just global actions (settings + dev wrench).
-         New-session lives inside the Sessions panel now. -->
-    <div class="topbar">
-      <div class="topbar-spacer" />
-      <div class="topbar-right">
-        <Button
-          v-if="isDev"
-          icon="pi pi-wrench"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Open dev playground"
-          title="Open dev playground"
-          @click="openPlayground"
-        />
-        <Button
-          icon="pi pi-cog"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Open settings"
-          @click="settingsOpen = true"
-        />
-      </div>
-    </div>
-
     <!-- App body: persistent ActivityBar on the far left + dockview
-         body taking the rest. Activity items toggle their respective
-         dockview edge panels. -->
+         body taking the rest. The ActivityBar hosts everything that
+         used to live in the topbar (settings, dev wrench) plus the
+         panel toggles. No topbar — the rail is the only chrome. -->
     <div class="app-body">
       <ActivityBar ref="activityBarRef" :items="activityItems" />
       <div
@@ -365,27 +365,6 @@ function openSessionsByDefault(attempt = 0) {
 
 .app-root.app-dark {
   background: var(--p-surface-950);
-}
-
-.topbar {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-bottom: 1px solid var(--p-content-border-color);
-  min-height: 2rem;
-}
-
-.topbar-spacer {
-  flex: 1 1 auto;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .app-body {

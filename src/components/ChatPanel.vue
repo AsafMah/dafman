@@ -156,12 +156,11 @@ function dismissPanel() {
   font-size: 0.85em;
   padding: 0.05em 0.35em;
   border-radius: 4px;
-  background: var(--p-surface-200);
+  /* Theme-aware: mix text-color into the content background — auto-
+   * flips between light + dark without relying on :global(.app-dark)
+   * overrides (which don't compose reliably with Vue scoped CSS). */
+  background: color-mix(in srgb, var(--p-text-color) 10%, transparent);
   color: var(--p-text-color);
-}
-
-:global(.app-dark) .missing-detail code {
-  background: var(--p-surface-800);
 }
 
 .missing-actions {
