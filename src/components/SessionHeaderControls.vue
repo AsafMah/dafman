@@ -288,10 +288,20 @@ function onWorkspaceClick() {
    * collapse first (flex-shrink); workspace chip drops out below a
    * certain width via a container query; the options gear is the
    * last thing standing because it's the only entry point to mode,
-   * rename, compact, etc. */
+   * rename, compact, etc.
+   *
+   * NOTE: do NOT set `container-type: inline-size` on this element —
+   * it's a shrink-to-fit flex child, so its width is determined by
+   * its visible content. Putting the container context here creates a
+   * feedback loop: hide a child → container narrows → next breakpoint
+   * fires → hide more, until only the gear survives. The container
+   * context lives on the host instead (`.chat-tile-header` in
+   * ChatWindow.vue), which has a stable width derived from the
+   * dockview tile. Queries below resolve against that ancestor. */
   min-width: 0;
+  flex: 1 1 auto;
+  justify-content: flex-end;
   flex-wrap: nowrap;
-  container-type: inline-size;
 }
 
 /* Drop the workspace chip when the tab-strip actions area gets
