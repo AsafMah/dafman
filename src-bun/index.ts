@@ -21,6 +21,7 @@ import { getLogDir as currentLogDir, initLogger, log } from "./app/logging";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { SettingsService } from "./app/settings";
+import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
 import type { DafmanRPC, SessionEventPayload } from "./rpc";
 
@@ -28,6 +29,14 @@ const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 
 await initLogger({ logDir: Utils.paths.userLogs });
+
+// Install the stderr filter *after* the logger is up (so dropped lines
+// are routed to the JSON log) but *before* the SDK starts the CLI
+// subprocess and relays its stderr to ours. node-pty on Windows emits a
+// harmless multi-line AttachConsole stack trace from inside the CLI;
+// filtering it here keeps the terminal clean while preserving the
+// trace in the log file for diagnostics.
+installStderrFilter();
 
 const settingsPath = join(Utils.paths.userData, "settings.json");
 const settings = SettingsService.loadOrDefault(settingsPath);
@@ -51,7 +60,24 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				await ensureClient();
 				return "Copilot client created";
 			}),
-			createSession: rpcGuard(async () => sessions.create()),
+			createSession: rpcGuard(async ({ workingDirectory }) =>
+				sessions.create({
+					...(workingDirectory ? { workingDirectory } : {}),
+				}),
+			),
+			pickFolder: rpcGuard(async ({ startingFolder }) => {
+				const paths = await Utils.openFileDialog({
+					canChooseFiles: false,
+					canChooseDirectory: true,
+					allowsMultipleSelection: false,
+					...(startingFolder ? { startingFolder } : {}),
+				});
+				// `openFileDialog` returns `[""]` on cancel (the FFI
+				// hands back an empty comma-separated string). Treat
+				// any empty / whitespace-only entry as a cancel.
+				const first = paths[0]?.trim();
+				return first && first.length > 0 ? first : null;
+			}),
 			disconnectSession: rpcGuard(async ({ sessionId }) =>
 				sessions.disconnect(sessionId),
 			),

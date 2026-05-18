@@ -199,8 +199,14 @@ async function sendMessage(text: string) {
           :error-code="item.errorCode"
           :agent-id="item.agentId"
         />
+        <!-- Skip empty assistant items entirely. The model emits
+             `assistant.message_start` (creating an empty item) before
+             every turn; when the turn goes straight to a tool call
+             without text, the empty card used to render as "..." right
+             before the tool block. The pending spinner below already
+             covers the "waiting for response" state. -->
         <article
-          v-else
+          v-else-if="!(item.kind === 'assistant' && item.text === '')"
           class="message-card"
           :class="[
             item.kind,
@@ -222,15 +228,15 @@ async function sendMessage(text: string) {
           </header>
           <MessageContent
             v-if="item.kind === 'assistant' || item.kind === 'user'"
-            :text="item.text || '...'"
+            :text="item.text"
             :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
           />
-          <p v-else class="message-body">{{ item.text || "..." }}</p>
+          <p v-else class="message-body">{{ item.text }}</p>
         </article>
       </template>
 
       <article
-        v-if="isSending && !items.some((m) => m.kind === 'assistant' && m.text === '')"
+        v-if="isSending && !items.some((m) => m.kind === 'assistant' && m.text !== '')"
         class="message-card assistant pending"
       >
         <header class="role-label">Assistant</header>
