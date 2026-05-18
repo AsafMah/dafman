@@ -186,11 +186,12 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
   }
 
-  function drainPending(sessionId: string, record: SessionRecord): void {
+  function drainPending(sessionId: string, record: SessionRecord): number {
     const list = pendingEvents.get(sessionId);
-    if (!list) return;
+    if (!list) return 0;
     pendingEvents.delete(sessionId);
     for (const event of list) applyToRecord(record, event);
+    return list.length;
   }
 
   function ensureSubscription(): void {
@@ -287,7 +288,18 @@ export const useSessionsStore = defineStore("sessions", () => {
       // the RPC response reaching us — chiefly the history replay
       // (assistant.message_*, tool.*, session.start, …), which would
       // otherwise be lost and the pane would render blank.
-      drainPending(actualId, record);
+      const drained = drainPending(actualId, record);
+      if (import.meta.env.DEV) {
+        console.debug(
+          "[restoreSession] resumed",
+          {
+            requestedId: sessionId,
+            actualId,
+            drainedEvents: drained,
+            recordEvents: record.events.length,
+          },
+        );
+      }
       // Pick up the run mode the SDK is currently using for the
       // restored session — same fire-and-forget shape as createSession.
       void invokeCommand("getSessionMode", { sessionId: actualId })
