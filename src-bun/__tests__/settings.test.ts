@@ -51,12 +51,14 @@ describe("SettingsService", () => {
 				reasoningVisibility: "compact" as const,
 			},
 			layout: { dockview: null },
+			workspaces: { recent: ["D:\\repo\\dafman"] },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);
 
 		const reloaded = SettingsService.loadOrDefault(path);
 		expect(reloaded.get().appearance.theme).toBe("dark");
+		expect(reloaded.get().workspaces.recent).toEqual(["D:\\repo\\dafman"]);
 	});
 
 	test("update persists an opaque dockview layout blob", async () => {
@@ -75,6 +77,7 @@ describe("SettingsService", () => {
 			version: SETTINGS_VERSION,
 			appearance: { theme: "system", reasoningVisibility: "compact" },
 			layout: { dockview: blob },
+			workspaces: { recent: [] },
 		});
 		const reloaded = SettingsService.loadOrDefault(path);
 		expect(reloaded.get().layout.dockview).toEqual(blob);
@@ -122,6 +125,67 @@ describe("SettingsService", () => {
 		expect(settings.appearance.theme).toBe("dark");
 		expect(settings.appearance.reasoningVisibility).toBe("expanded");
 		expect(settings.layout).toEqual({ dockview: null });
+		expect(settings.workspaces).toEqual({ recent: [] });
+	});
+
+	test("v3 document migrates with an empty workspaces MRU", () => {
+		const dir = newTempDir();
+		const path = join(dir, "settings.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				version: 3,
+				appearance: { theme: "light", reasoningVisibility: "compact" },
+				layout: { dockview: null },
+			}),
+		);
+		const svc = SettingsService.loadOrDefault(path);
+		const settings = svc.get();
+		expect(settings.version).toBe(SETTINGS_VERSION);
+		expect(settings.workspaces).toEqual({ recent: [] });
+	});
+
+	test("workspaces.recent coerces: drops non-strings, trims, dedupes, caps to limit", () => {
+		const tooMany = Array.from({ length: 25 }, (_, i) => `/path/${i}`);
+		const settings = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact" },
+			layout: { dockview: null },
+			workspaces: {
+				recent: [
+					"  D:\\repo  ",
+					"D:\\repo", // duplicate post-trim
+					42, // non-string
+					null, // non-string
+					"",
+					"   ",
+					"C:\\code\\demo",
+					...tooMany,
+				],
+			},
+		});
+		expect(settings.workspaces.recent[0]).toBe("D:\\repo");
+		expect(settings.workspaces.recent[1]).toBe("C:\\code\\demo");
+		expect(settings.workspaces.recent.length).toBeLessThanOrEqual(10);
+	});
+
+	test("workspaces malformed (non-array / non-object) coerces to empty list", () => {
+		expect(
+			migrate({
+				version: SETTINGS_VERSION,
+				appearance: { theme: "system", reasoningVisibility: "compact" },
+				layout: { dockview: null },
+				workspaces: { recent: "not-an-array" },
+			}).workspaces,
+		).toEqual({ recent: [] });
+		expect(
+			migrate({
+				version: SETTINGS_VERSION,
+				appearance: { theme: "system", reasoningVisibility: "compact" },
+				layout: { dockview: null },
+				workspaces: 42,
+			}).workspaces,
+		).toEqual({ recent: [] });
 	});
 
 	test("malformed layout coerces to a safe default", () => {

@@ -44,7 +44,7 @@ export class SessionRegistry {
 
 	constructor(private readonly emit: Emit) {}
 
-	async create(): Promise<string> {
+	async create(opts: { workingDirectory?: string } = {}): Promise<string> {
 		const client = tryGetClient();
 		// Capture a placeholder sessionId for early events that fire before
 		// `client.createSession` resolves. We rebind once we know the real
@@ -54,9 +54,11 @@ export class SessionRegistry {
 		const earlyForward = (event: SessionEvent) => {
 			this.forward(resolvedSessionId ?? "pending", event);
 		};
+		const wd = opts.workingDirectory?.trim();
 		const session = await client.createSession({
 			...baseSessionConfig(),
 			onEvent: earlyForward,
+			...(wd ? { workingDirectory: wd } : {}),
 		});
 		const sessionId = session.sessionId;
 		resolvedSessionId = sessionId;
@@ -66,7 +68,7 @@ export class SessionRegistry {
 			this.forward(sessionId, event);
 		});
 		this.entries.set(sessionId, { session, unsubscribe });
-		log.info("session created", { sessionId });
+		log.info("session created", { sessionId, workingDirectory: wd ?? null });
 		return sessionId;
 	}
 

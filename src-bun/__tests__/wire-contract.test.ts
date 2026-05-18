@@ -16,16 +16,17 @@ import type { AppErrorPayload } from "../app/errors";
 describe("IPC wire contracts", () => {
 	test("Settings shape", () => {
 		const sample: Settings = {
-			version: 3,
+			version: 4,
 			appearance: { theme: "dark", reasoningVisibility: "compact" },
 			layout: { dockview: null },
+			workspaces: { recent: ["D:\\repo\\dafman", "C:\\code\\demo"] },
 		};
 		expect(sample).toMatchSnapshot();
 	});
 
 	test("Settings with persisted layout", () => {
 		const sample: Settings = {
-			version: 3,
+			version: 4,
 			appearance: { theme: "dark", reasoningVisibility: "compact" },
 			layout: {
 				dockview: {
@@ -39,6 +40,7 @@ describe("IPC wire contracts", () => {
 					activeGroup: "g1",
 				},
 			},
+			workspaces: { recent: [] },
 		};
 		expect(sample).toMatchSnapshot();
 	});

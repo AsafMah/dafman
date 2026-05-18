@@ -9,7 +9,13 @@ exports[`IPC wire contracts Settings shape 1`] = `
   "layout": {
     "dockview": null,
   },
-  "version": 3,
+  "version": 4,
+  "workspaces": {
+    "recent": [
+      "D:\\repo\\dafman",
+      "C:\\code\\demo",
+    ],
+  },
 }
 `;
 
@@ -36,7 +42,10 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
       },
     },
   },
-  "version": 3,
+  "version": 4,
+  "workspaces": {
+    "recent": [],
+  },
 }
 `;
 

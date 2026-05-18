@@ -18,11 +18,17 @@ import type {
 	ReasoningVisibility,
 	Settings,
 	ThemeChoice,
+	Workspaces,
 } from "../rpc";
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
+/// Hard upper bound on the size of the workspace MRU. Anything beyond
+/// this trims off the tail so the on-disk settings file doesn't grow
+/// unbounded. Kept conservative — the AutoComplete dropdown becomes
+/// unwieldy past ~10 items anyway.
+export const WORKSPACES_MRU_LIMIT = 10;
 
 const VALID_THEMES: readonly ThemeChoice[] = ["system", "light", "dark"];
 const VALID_REASONING: readonly ReasoningVisibility[] = [
@@ -36,6 +42,7 @@ export function defaultSettings(): Settings {
 		version: SETTINGS_VERSION,
 		appearance: { theme: "system", reasoningVisibility: "compact" },
 		layout: { dockview: null },
+		workspaces: { recent: [] },
 	};
 }
 
@@ -66,6 +73,27 @@ function coerceLayout(raw: unknown): Layout {
 	};
 }
 
+/// Coerces a raw `workspaces` blob into the canonical shape. Drops
+/// non-string entries, trims whitespace, deduplicates (case-sensitive
+/// — Windows-vs-Unix mixed paths aren't normalized here; the renderer
+/// avoids inserting a path that already exists modulo trim).
+function coerceWorkspaces(raw: unknown): Workspaces {
+	if (!raw || typeof raw !== "object") return { recent: [] };
+	const list = (raw as { recent?: unknown }).recent;
+	if (!Array.isArray(list)) return { recent: [] };
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const entry of list) {
+		if (typeof entry !== "string") continue;
+		const trimmed = entry.trim();
+		if (!trimmed || seen.has(trimmed)) continue;
+		seen.add(trimmed);
+		out.push(trimmed);
+		if (out.length >= WORKSPACES_MRU_LIMIT) break;
+	}
+	return { recent: out };
+}
+
 export function migrate(input: unknown): Settings {
 	const defaults = defaultSettings();
 	if (!input || typeof input !== "object") return defaults;
@@ -74,6 +102,7 @@ export function migrate(input: unknown): Settings {
 		version: SETTINGS_VERSION,
 		appearance: coerceAppearance(raw.appearance),
 		layout: coerceLayout(raw.layout),
+		workspaces: coerceWorkspaces(raw.workspaces),
 	};
 }
 

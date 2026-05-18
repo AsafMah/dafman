@@ -11,11 +11,16 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 3,
+    version: 4,
     appearance: { theme: "system", reasoningVisibility: "compact" },
     layout: { dockview: null },
+    workspaces: { recent: [] },
   };
 }
+
+/// Hard upper bound on the workspace MRU; matches the backend constant
+/// `WORKSPACES_MRU_LIMIT`. Anything past this is trimmed off the tail.
+const WORKSPACES_MRU_LIMIT = 10;
 
 export const useSettingsStore = defineStore("settings", () => {
   const settings = ref<Settings>(defaultSettings());
@@ -81,6 +86,33 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  /// Promotes a workspace path to the head of the MRU list and
+  /// persists. Empty / whitespace inputs are ignored. The list is
+  /// deduped (case-sensitive — keeping the freshly-cased version) and
+  /// capped at WORKSPACES_MRU_LIMIT.
+  async function recordWorkspaceUse(path: string): Promise<void> {
+    const trimmed = path.trim();
+    if (!trimmed) return;
+    const prev = settings.value.workspaces.recent;
+    const filtered = prev.filter((p) => p !== trimmed);
+    const next = [trimmed, ...filtered].slice(0, WORKSPACES_MRU_LIMIT);
+    // Avoid a write if nothing changed (same head, same length).
+    if (
+      prev.length === next.length &&
+      prev.every((p, i) => p === next[i])
+    ) {
+      return;
+    }
+    try {
+      await update({
+        ...settings.value,
+        workspaces: { recent: next },
+      });
+    } catch {
+      /* toast already shown */
+    }
+  }
+
   return {
     settings,
     loaded,
@@ -90,5 +122,6 @@ export const useSettingsStore = defineStore("settings", () => {
     setTheme,
     setReasoningVisibility,
     persistLayout,
+    recordWorkspaceUse,
   };
 });

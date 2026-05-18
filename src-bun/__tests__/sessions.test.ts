@@ -122,6 +122,7 @@ function makeFakeSession(
 
 class FakeClient {
 	createdSessions: FakeSession[] = [];
+	createdConfigs: Array<Record<string, unknown>> = [];
 	resumedSessions: FakeSession[] = [];
 	listed: Array<{
 		sessionId: string;
@@ -134,7 +135,8 @@ class FakeClient {
 	/// Seeds history that the next `resumeSession` call will hand back
 	/// via `getMessages()`. Populated by tests before triggering resume.
 	nextResumeHistory: Array<{ type: string; [k: string]: unknown }> = [];
-	async createSession(): Promise<FakeSession> {
+	async createSession(config: Record<string, unknown> = {}): Promise<FakeSession> {
+		this.createdConfigs.push(config);
 		const s = makeFakeSession(`sess-${this.createdSessions.length + 1}`);
 		this.createdSessions.push(s);
 		return s;
@@ -330,6 +332,23 @@ describe("SessionRegistry", () => {
 		const fake = client.createdSessions[0]!;
 		(fake as unknown as { currentMode: string }).currentMode = "garbage";
 		await expect(reg.getMode(id)).rejects.toBeInstanceOf(AppError);
+	});
+
+	test("create forwards workingDirectory to the SDK when provided", async () => {
+		const client = new FakeClient();
+		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+		const reg = new SessionRegistry(() => {});
+		await reg.create({ workingDirectory: "C:\\repo" });
+		expect(client.createdConfigs[0]).toMatchObject({
+			workingDirectory: "C:\\repo",
+		});
+		// Empty / whitespace-only paths must NOT be forwarded — the SDK
+		// would treat them literally instead of falling back to its
+		// default cwd.
+		await reg.create({ workingDirectory: "   " });
+		expect(client.createdConfigs[1]).not.toHaveProperty("workingDirectory");
+		await reg.create();
+		expect(client.createdConfigs[2]).not.toHaveProperty("workingDirectory");
 	});
 
 	test("getName returns null for nullish/missing and rejects non-string", async () => {

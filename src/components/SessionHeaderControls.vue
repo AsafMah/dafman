@@ -221,6 +221,18 @@ function onResetApprovals() {
             />
           </form>
         </div>
+        <div class="option-row option-row-stack">
+          <span class="option-label">Workspace</span>
+          <div
+            class="workspace-path"
+            :title="record.workingDirectory ?? 'Default (cli process cwd)'"
+          >
+            <i class="pi pi-folder" aria-hidden="true" />
+            <span class="workspace-path-text">
+              {{ record.workingDirectory ?? "Default" }}
+            </span>
+          </div>
+        </div>
         <div class="option-actions">
           <Button
             icon="pi pi-compress"
@@ -323,5 +335,22 @@ function onResetApprovals() {
   justify-content: flex-end;
   padding-top: 0.25rem;
   border-top: 1px solid var(--p-content-border-color);
+}
+
+.workspace-path {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  min-width: 0;
+}
+
+.workspace-path-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
 }
 </style>

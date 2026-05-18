@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
+import AutoComplete, {
+  type AutoCompleteCompleteEvent,
+} from "primevue/autocomplete";
 import Button from "primevue/button";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
@@ -13,6 +16,7 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
 import { useLayoutStore, shortPanelTitle } from "./stores/layoutStore";
 import { resolveIsDark } from "./lib/theme";
+import { invokeCommand } from "./ipc/invoke";
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -201,10 +205,59 @@ function scheduleLayoutSave() {
   }, 300);
 }
 
-async function onCreateSession() {
+// Inline new-session controls (no dialog) — the path lives in the
+// topbar so creating sessions in different workspaces is a one-step
+// flow. The AutoComplete suggests from `settings.workspaces.recent`,
+// which is persisted across runs by `settingsStore.recordWorkspaceUse`.
+const workspaceDraft = ref("");
+const workspaceSuggestions = ref<string[]>([]);
+const isPickingFolder = ref(false);
+
+const recentWorkspaces = computed(
+  () => settings.value.workspaces?.recent ?? [],
+);
+
+function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
+  const query = (event.query ?? "").trim().toLowerCase();
+  const recent = recentWorkspaces.value;
+  if (!query) {
+    workspaceSuggestions.value = [...recent];
+    return;
+  }
+  workspaceSuggestions.value = recent.filter((p) =>
+    p.toLowerCase().includes(query),
+  );
+}
+
+async function onPickFolder() {
+  if (isPickingFolder.value) return;
+  isPickingFolder.value = true;
   try {
-    const record = await sessionsStore.createSession();
-    if (record) layoutStore.addPanel(record.id);
+    const picked = await invokeCommand("pickFolder", {
+      ...(workspaceDraft.value.trim()
+        ? { startingFolder: workspaceDraft.value.trim() }
+        : {}),
+    });
+    if (picked) workspaceDraft.value = picked;
+  } catch {
+    /* toast already shown */
+  } finally {
+    isPickingFolder.value = false;
+  }
+}
+
+async function onCreateSession() {
+  const wd = workspaceDraft.value.trim();
+  try {
+    const record = await sessionsStore.createSession(
+      wd ? { workingDirectory: wd } : {},
+    );
+    if (record) {
+      // Fire-and-forget MRU bump. Failures only get a toast; the
+      // session itself is already created and visible.
+      if (wd) void settingsStore.recordWorkspaceUse(wd);
+      layoutStore.addPanel(record.id);
+    }
   } catch {
     /* toast already shown */
   }
@@ -219,15 +272,35 @@ async function onCreateSession() {
       @update:visible="(v) => (settingsOpen = v)"
     />
     <div class="topbar">
-      <div class="topbar-actions">
+      <form class="topbar-actions new-session-form" @submit.prevent="onCreateSession">
+        <AutoComplete
+          v-model="workspaceDraft"
+          :suggestions="workspaceSuggestions"
+          :complete-on-focus="true"
+          placeholder="Workspace (defaults to cwd)"
+          aria-label="Workspace folder for the next session"
+          class="workspace-input"
+          :disabled="!clientReady"
+          @complete="onSearchWorkspaces"
+        />
         <Button
+          type="button"
+          icon="pi pi-folder-open"
+          severity="secondary"
+          aria-label="Pick folder"
+          title="Pick folder"
+          :loading="isPickingFolder"
+          :disabled="!clientReady"
+          @click="onPickFolder"
+        />
+        <Button
+          type="submit"
           label="New Session"
           icon="pi pi-plus"
           :loading="isCreatingSession || (isCreatingClient && !clientReady)"
           :disabled="!clientReady"
-          @click="onCreateSession"
         />
-      </div>
+      </form>
       <div class="topbar-right">
         <Button
           v-if="isDev"
@@ -317,5 +390,24 @@ async function onCreateSession() {
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+}
+
+.new-session-form {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.workspace-input {
+  flex: 1 1 24rem;
+  min-width: 12rem;
+  max-width: 36rem;
+}
+
+.workspace-input :deep(.p-autocomplete-input) {
+  width: 100%;
+  font-size: 0.85rem;
 }
 </style>

@@ -43,12 +43,24 @@ export interface Settings {
 	/// dockview JSON is opaque to us; we never inspect or mutate it
 	/// directly, just hand it back to `api.fromJSON()`.
 	layout: Layout;
+	/// Workspace MRU. Populated by the topbar's path input every time
+	/// a session is successfully created with a non-empty
+	/// `workingDirectory`. The most-recently-used path is at index 0.
+	workspaces: Workspaces;
 }
 
 export interface Layout {
 	/// Serialized dockview state (`api.toJSON()`). `null` means
 	/// "no panes were open last time" — start with an empty dockview.
 	dockview: unknown | null;
+}
+
+export interface Workspaces {
+	/// Most-recently-used absolute filesystem paths the user has spun
+	/// sessions in. Capped at WORKSPACES_MRU_LIMIT (10) entries; head
+	/// of the list is the most recent. Persisted as-is so the topbar
+	/// AutoComplete can suggest from prior runs.
+	recent: string[];
 }
 
 export interface ModelSummary {
@@ -98,7 +110,20 @@ export type DafmanRPC = {
 	bun: RPCSchema<{
 		requests: {
 			createClient: { params: Record<string, never>; response: string };
-			createSession: { params: Record<string, never>; response: string };
+			createSession: {
+				/// `workingDirectory` is the absolute filesystem path the
+				/// SDK uses as `cwd` for all tool invocations in this
+				/// session. Empty / omitted falls back to the bun
+				/// process's cwd (the SDK's own default).
+				params: { workingDirectory?: string };
+				response: string;
+			};
+			/// Native folder picker. Returns the absolute path of the
+			/// chosen directory, or `null` if the user cancelled.
+			pickFolder: {
+				params: { startingFolder?: string };
+				response: string | null;
+			};
 			disconnectSession: {
 				params: { sessionId: string };
 				response: string;

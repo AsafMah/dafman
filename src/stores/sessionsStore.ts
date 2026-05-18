@@ -43,6 +43,11 @@ export type SessionRecord = {
   /// fall back to `settings.appearance.reasoningVisibility`. In-memory
   /// only (we don't yet persist per-session UI preferences).
   reasoningVisibilityOverride: ReasoningVisibility | "default";
+  /// Absolute filesystem path the SDK uses as `cwd` for tool invocations
+  /// in this session. Populated either from the user's choice at
+  /// creation time, or from the `session.start` event's
+  /// `data.context.cwd` (which the CLI persists across resume).
+  workingDirectory: string | null;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -97,6 +102,16 @@ export const useSessionsStore = defineStore("sessions", () => {
         record.title = title;
       }
     }
+    // The `session.start` event carries the SDK-side cwd / git context.
+    // Backfilling from the event (rather than only from the create
+    // call) means resumed sessions also pick up the workspace path.
+    if (payload.eventType === "session.start") {
+      const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
+      const cwd = ctx?.cwd;
+      if (typeof cwd === "string" && cwd.length > 0) {
+        record.workingDirectory = cwd;
+      }
+    }
   }
 
   function ensureSubscription(): void {
@@ -104,13 +119,16 @@ export const useSessionsStore = defineStore("sessions", () => {
     unsubscribe = onSessionEvent(handleEvent);
   }
 
-  async function createSession(): Promise<SessionRecord | null> {
+  async function createSession(opts: { workingDirectory?: string } = {}): Promise<SessionRecord | null> {
     if (isCreating.value) return null;
     ensureSubscription();
     const toasts = useToastStore();
     isCreating.value = true;
     try {
-      const id = await invokeCommand("createSession", {});
+      const wd = opts.workingDirectory?.trim();
+      const id = await invokeCommand("createSession", {
+        ...(wd ? { workingDirectory: wd } : {}),
+      });
       const accent = accentForIndex(creationCount++);
       const record: SessionRecord = reactive({
         id,
@@ -122,6 +140,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         mode: null,
         approveAll: true, // current backend default (`approveAll` permission handler)
         reasoningVisibilityOverride: "default",
+        workingDirectory: wd && wd.length > 0 ? wd : null,
       });
       sessions.value.push(record);
       toasts.success("Session created", id);
@@ -179,6 +198,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         mode: null,
         approveAll: true,
         reasoningVisibilityOverride: "default",
+        workingDirectory: null,
       });
       sessions.value.push(record);
       // Pick up the run mode the SDK is currently using for the

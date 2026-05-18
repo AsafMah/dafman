@@ -27,10 +27,15 @@ export interface Settings {
   version: number;
   appearance: Appearance;
   layout: Layout;
+  workspaces: Workspaces;
 }
 
 export interface Layout {
   dockview: unknown | null;
+}
+
+export interface Workspaces {
+  recent: string[];
 }
 
 export interface ModelSummary {
@@ -73,7 +78,14 @@ export type AppErrorPayload =
 /// Add it here, then implement on the bun side in `src-bun/index.ts`.
 export type CommandMap = {
   createClient: { args: Record<string, never>; result: string };
-  createSession: { args: Record<string, never>; result: string };
+  createSession: {
+    args: { workingDirectory?: string };
+    result: string;
+  };
+  pickFolder: {
+    args: { startingFolder?: string };
+    result: string | null;
+  };
   disconnectSession: { args: { sessionId: string }; result: string };
   sendMessage: { args: { sessionId: string; text: string }; result: string };
   listModels: { args: Record<string, never>; result: ModelSummary[] };
