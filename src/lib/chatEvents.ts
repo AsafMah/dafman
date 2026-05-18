@@ -13,6 +13,12 @@ export type ChatItem =
       id: number;
       kind: "user";
       text: string;
+      /// SDK envelope event id, set when the item originates from (or
+      /// has been reconciled with) a `user.message` event. Locally
+      /// appended optimistic items leave this `undefined` until the
+      /// matching echo arrives; the reducer then adopts it in place
+      /// rather than duplicating the bubble.
+      messageId?: string;
     }
   | {
       id: number;
@@ -253,6 +259,44 @@ export function processEvents(
           const msg = upsertAssistant(messageId);
           if (msg.kind === "assistant") msg.text = content;
         }
+        break;
+      }
+      // --- User echo ---
+      // The SDK emits `user.message` both as an echo of the live send
+      // and during history replay on resume. Dedup against the local
+      // optimistic item appended by `appendUserMessage` (matched by
+      // text + missing messageId) so the bubble doesn't double on
+      // live sends; otherwise append a new item so resumed sessions
+      // show the user side of the transcript.
+      case "user.message": {
+        const content = pickString(data, ["content", "text", "message"]);
+        if (!content) break;
+        // Prefer the envelope-level event id (`payload.eventId`) as a
+        // stable dedup key; fall back to data.messageId if some SDK
+        // variant ever ships it. Either way, items with the same key
+        // are coalesced.
+        const eventId =
+          payload.eventId ?? pickString(data, ["messageId"]) ?? undefined;
+        if (eventId) {
+          const byId = items.find(
+            (i) => i.kind === "user" && i.messageId === eventId,
+          );
+          if (byId) break;
+        }
+        // Adopt the most recent local-only user item with matching text.
+        const optimistic = [...items].reverse().find(
+          (i) => i.kind === "user" && !i.messageId && i.text === content,
+        );
+        if (optimistic && optimistic.kind === "user") {
+          optimistic.messageId = eventId;
+          break;
+        }
+        items.push({
+          id: counter.next++,
+          kind: "user",
+          text: content,
+          ...(eventId ? { messageId: eventId } : {}),
+        });
         break;
       }
       // --- Reasoning ---
@@ -503,7 +547,6 @@ export function processEvents(
       // --- Explicitly ignored (handled elsewhere or non-displayable) ---
       case "assistant.streaming_delta": // duplicates message_delta
       case "system.message": // raw system prompt; not user-facing
-      case "user.message": // we render user input from our own append
       case "session.tools_updated":
       case "session.skills_loaded":
       case "session.custom_agents_updated":

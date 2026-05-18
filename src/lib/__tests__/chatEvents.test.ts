@@ -69,6 +69,98 @@ describe("processEvents", () => {
     expect(first.toasts).toHaveLength(1);
     expect(second.toasts).toHaveLength(0);
   });
+
+  test("user.message from history replay appends a user item", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "sess-1",
+          eventType: "user.message",
+          data: { content: "hello" },
+          eventId: "evt-1",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toEqual([
+      { id: 1, kind: "user", text: "hello", messageId: "evt-1" },
+    ]);
+  });
+
+  test("user.message dedupes against a local optimistic item", () => {
+    const counter: IdCounter = { next: 5 };
+    // appendUserMessage produces an item without a messageId.
+    const optimistic = { id: 4, kind: "user" as const, text: "ping" };
+    const result = processEvents(
+      [optimistic],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "sess-1",
+          eventType: "user.message",
+          data: { content: "ping" },
+          eventId: "evt-9",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      id: 4,
+      kind: "user",
+      text: "ping",
+      messageId: "evt-9",
+    });
+    // counter was NOT advanced — adopting an existing item leaves
+    // ID space intact.
+    expect(counter.next).toBe(5);
+  });
+
+  test("user.message echo with no matching optimistic item appends a fresh bubble", () => {
+    const counter: IdCounter = { next: 10 };
+    const result = processEvents(
+      [{ id: 9, kind: "user", text: "earlier" }],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "sess-1",
+          eventType: "user.message",
+          data: { content: "different" },
+          eventId: "evt-2",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(2);
+    expect(result.items[1]).toEqual({
+      id: 10,
+      kind: "user",
+      text: "different",
+      messageId: "evt-2",
+    });
+  });
+
+  test("user.message dedupes by messageId on repeat (idempotent replay)", () => {
+    const counter: IdCounter = { next: 1 };
+    const payload: SessionEventPayload = {
+      sessionId: "sess-1",
+      eventType: "user.message",
+      data: { content: "hello" },
+      eventId: "evt-7",
+    };
+    const first = processEvents([], defaultAmbient(), [payload], counter);
+    const second = processEvents(
+      first.items,
+      first.ambient,
+      [payload],
+      counter,
+    );
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0]?.kind).toBe("user");
+  });
 });
 
 describe("processEvents — tool calls", () => {
