@@ -14,6 +14,7 @@ import ChatPanel from "./components/ChatPanel.vue";
 import ChatTab from "./components/ChatTab.vue";
 import ChatTabActions from "./components/ChatTabActions.vue";
 import SessionsManager from "./components/SessionsManager.vue";
+import SidebarTab from "./components/SidebarTab.vue";
 import Watermark from "./components/Watermark.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
@@ -73,6 +74,7 @@ function mountWith(Root: typeof App) {
   app.component("watermark", Watermark);
   app.component("chatTabActions", ChatTabActions);
   app.component("chatTab", ChatTab);
+  app.component("sidebarTab", SidebarTab);
   app.mount("#app");
 }
 

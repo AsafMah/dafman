@@ -126,11 +126,11 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 <template>
   <div class="sessions-manager">
     <ConfirmPopup />
-    <header class="manager-header">
-      <h2 class="manager-title">
-        <i class="pi pi-list" aria-hidden="true" />
-        Sessions
-      </h2>
+    <!-- Tab strip already carries the "Sessions" label via SidebarTab,
+         so the inner panel doesn't repeat the title. The refresh
+         button + future toolbar bits live in a slim toolbar above
+         the list. -->
+    <div class="manager-toolbar">
       <Button
         icon="pi pi-refresh"
         text
@@ -141,7 +141,7 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
         title="Refresh"
         @click="onRefresh"
       />
-    </header>
+    </div>
 
     <div class="manager-body">
       <p v-if="error" class="state-message error-message">
@@ -223,25 +223,13 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   color: var(--p-text-color);
 }
 
-.manager-header {
+.manager-toolbar {
   flex: 0 0 auto;
   display: flex;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.6rem;
+  padding: 0.2rem 0.4rem;
   border-bottom: 1px solid var(--p-content-border-color);
-}
-
-.manager-title {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin: 0;
-  color: var(--p-text-color);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .manager-body {

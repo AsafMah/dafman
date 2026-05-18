@@ -78,10 +78,15 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     }
   }
 
-  /// Groups the cached list by workspace path. The "no workspace"
-  /// bucket comes last; named workspaces are sorted alphabetically by
-  /// basename (case-insensitive). Sessions within a group keep the
-  /// modifiedTime DESC ordering established in `refresh`.
+  /// Groups the cached list by workspace path. Groups are ordered by
+  /// their most-recently-modified session (descending) — so the
+  /// workspace you touched last is at the top, matching how the
+  /// sessions themselves are sorted within each group. The "no
+  /// workspace" bucket interleaves naturally by recency rather than
+  /// being pinned to the bottom.
+  ///
+  /// Search / explicit sort modes will land later; this is the simple
+  /// MRU default.
   const grouped = computed<WorkspaceGroup[]>(() => {
     const map = new Map<string, SessionMetadataSummary[]>();
     for (const session of sessions.value) {
@@ -90,29 +95,25 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
       list.push(session);
       map.set(key, list);
     }
-    const named: WorkspaceGroup[] = [];
-    let noWorkspace: WorkspaceGroup | null = null;
+    const groups: WorkspaceGroup[] = [];
     for (const [key, list] of map.entries()) {
-      if (key === "") {
-        noWorkspace = {
-          key: "",
-          label: "No workspace",
-          path: "",
-          sessions: list,
-        };
-      } else {
-        named.push({
-          key,
-          label: basename(key) || key,
-          path: key,
-          sessions: list,
-        });
-      }
+      groups.push({
+        key,
+        label: key === "" ? "No workspace" : basename(key) || key,
+        path: key,
+        sessions: list,
+      });
     }
-    named.sort((a, b) =>
-      a.label.toLowerCase().localeCompare(b.label.toLowerCase()),
-    );
-    return noWorkspace ? [...named, noWorkspace] : named;
+    // Each group's `sessions[0]` is the newest (sessions are pre-sorted
+    // DESC in `refresh`). String-compare ISO 8601 timestamps for the
+    // group ordering — lexical order matches chronological order for
+    // well-formed ISO strings.
+    groups.sort((a, b) => {
+      const aLatest = a.sessions[0]?.modifiedTime ?? "";
+      const bLatest = b.sessions[0]?.modifiedTime ?? "";
+      return bLatest.localeCompare(aLatest);
+    });
+    return groups;
   });
 
   return {

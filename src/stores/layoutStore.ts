@@ -54,6 +54,10 @@ export interface EdgePanelOptions {
   id: string;
   /// Registered component name (named template slot in App.vue).
   component: string;
+  /// Optional dockview tab-component name. Sidebar / edge-group panels
+  /// usually want the slimmer `sidebarTab` instead of the session-styled
+  /// `chatTab` default.
+  tabComponent?: string;
   /// Tab title (visible on the panel's tab).
   title?: string;
   /// Arbitrary panel params forwarded to the component slot.
@@ -180,8 +184,32 @@ export const useLayoutStore = defineStore("layout", () => {
       component: options.component,
       title: options.title ?? options.id,
       params: options.params ?? {},
+      ...(options.tabComponent ? { tabComponent: options.tabComponent } : {}),
       position: { referenceGroup: edge.id },
     });
+  }
+
+  /// Removes the edge group at `position` if the given group id matches
+  /// and the group is now empty. Returns true if we cleaned up. Used by
+  /// `onDidRemovePanel` handlers so closing a sidebar panel via
+  /// dockview's own X (which doesn't go through `closePanel`) still
+  /// tears down the parent shell so the next open gets a fresh
+  /// `initialSize`.
+  function pruneEmptyEdgeGroup(groupId: string): boolean {
+    const dock = api.value;
+    if (!dock) return false;
+    for (const pos of ["left", "right", "top", "bottom"] as const) {
+      const edge = dock.getEdgeGroup(pos);
+      if (!edge) continue;
+      if ((edge as unknown as { id?: string }).id !== groupId) continue;
+      const panels = (edge as unknown as { panels?: unknown[] }).panels;
+      if (Array.isArray(panels) && panels.length === 0) {
+        dock.removeEdgeGroup(pos);
+        return true;
+      }
+      return false;
+    }
+    return false;
   }
 
   /// Returns `true` if a panel with the given id is currently in the
@@ -258,6 +286,7 @@ export const useLayoutStore = defineStore("layout", () => {
     openEdgePanel,
     isPanelOpen,
     closePanel,
+    pruneEmptyEdgeGroup,
     toggleEdgeGroup,
     snapshot,
     restore,

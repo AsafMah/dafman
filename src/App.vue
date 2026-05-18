@@ -194,9 +194,20 @@ function onDockReady(event: DockviewReadyEvent) {
   // the underlying session too. closeSession is idempotent and safe to
   // call even if the session is already gone.
   event.api.onDidRemovePanel((panel) => {
+    // Capture the parent group id BEFORE the panel is fully torn down
+    // — at this point the panel still has its `api.group` reference,
+    // but its `group.panels.length` reflects the post-removal count.
+    const groupId = panel.api.group.id;
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
       void sessionsStore.closeSession(panel.id);
     }
+    // If this panel was the last one in its edge group (e.g. user
+    // closed the Sessions sidebar via dockview's own X), tear down
+    // the edge group too so the next open recreates at the
+    // configured `initialSize` instead of inheriting a residual
+    // sliver. Safe to call for body groups: it's a no-op when the
+    // group isn't an edge group.
+    layoutStore.pruneEmptyEdgeGroup(groupId);
   });
   // If startup-resume already produced a pruned layout, hand it over
   // now that the api is alive. Done before subscribing to layout
@@ -317,6 +328,7 @@ function toggleSessionsPanel() {
     layoutStore.openEdgePanel("left", {
       id: SESSIONS_PANEL_ID,
       component: "sessionsManager",
+      tabComponent: "sidebarTab",
       title: "Sessions",
       initialSize: 280,
     });
@@ -350,6 +362,7 @@ function openSessionsByDefault(attempt = 0) {
   layoutStore.openEdgePanel("left", {
     id: SESSIONS_PANEL_ID,
     component: "sessionsManager",
+    tabComponent: "sidebarTab",
     title: "Sessions",
     initialSize: 280,
   });
