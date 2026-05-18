@@ -16,6 +16,7 @@ import {
 	Utils,
 } from "electrobun/bun";
 import { ensureClient, shutdownClient } from "./app/client";
+import { browseDirectorySync } from "./app/directoryBrowser";
 import { rpcGuard } from "./app/errors";
 import { getLogDir as currentLogDir, initLogger, log } from "./app/logging";
 import { toModelSummary } from "./app/models";
@@ -149,6 +150,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 					return false;
 				}
 			}),
+			browseDirectory: rpcGuard(async ({ prefix }) =>
+				browseDirectorySync(prefix),
+			),
 			rendererLog: rpcGuard(async ({ level, message, extra }) => {
 				// Mirror the renderer's structured log into the bun-side
 				// JSON log so a developer can `tail` it instead of needing

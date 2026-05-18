@@ -246,7 +246,8 @@ function scheduleLayoutSave() {
 // Inline new-session controls (no dialog) — the path lives in the
 // topbar so creating sessions in different workspaces is a one-step
 // flow. The AutoComplete suggests from `settings.workspaces.recent`,
-// which is persisted across runs by `settingsStore.recordWorkspaceUse`.
+// which is persisted across runs by `settingsStore.recordWorkspaceUse`,
+// AND from a live filesystem browse for unknown paths.
 const workspaceDraft = ref("");
 const workspaceSuggestions = ref<string[]>([]);
 const isPickingFolder = ref(false);
@@ -270,16 +271,69 @@ watch(
   { immediate: true },
 );
 
-function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
-  const query = (event.query ?? "").trim().toLowerCase();
+/// Debounce the filesystem browse so we don't hammer the IPC bridge
+/// on every keystroke. 120ms is fast enough to feel live and slow
+/// enough that holding backspace doesn't fire 20 RPCs.
+let browseTimer: ReturnType<typeof setTimeout> | null = null;
+let browseSeq = 0;
+
+async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
+  const query = (event.query ?? "").trim();
+  const lowerQuery = query.toLowerCase();
   const recent = recentWorkspaces.value;
+
+  // MRU-only when the input is empty — shows recently-used
+  // workspaces on focus.
   if (!query) {
     workspaceSuggestions.value = [...recent];
+    if (browseTimer !== null) clearTimeout(browseTimer);
     return;
   }
-  workspaceSuggestions.value = recent.filter((p) =>
-    p.toLowerCase().includes(query),
-  );
+
+  // Filter MRU first (synchronous, no IPC). Substring match keeps
+  // partial-name search useful ("dafm" should still surface
+  // "C:\repo\dafman").
+  const mruMatches = recent.filter((p) => p.toLowerCase().includes(lowerQuery));
+
+  // Only attempt a filesystem browse when the input looks pathy —
+  // i.e. contains a separator. This avoids confusing the parent-
+  // directory inference for bare keywords like "dafman" (which
+  // would try to list `dirname("dafman") === "."`).
+  const looksLikePath = /[/\\]/.test(query);
+  if (!looksLikePath) {
+    workspaceSuggestions.value = mruMatches;
+    return;
+  }
+
+  // Render MRU immediately; FS results merge in shortly.
+  workspaceSuggestions.value = mruMatches;
+
+  if (browseTimer !== null) clearTimeout(browseTimer);
+  const seq = ++browseSeq;
+  browseTimer = setTimeout(async () => {
+    browseTimer = null;
+    let fs: string[] = [];
+    try {
+      fs = await invokeCommand("browseDirectory", { prefix: query });
+    } catch {
+      // Filesystem errors (no permission, path-doesn't-exist) are
+      // expected while typing; swallow and keep MRU-only.
+    }
+    // Discard stale results — a later query may have come in.
+    if (seq !== browseSeq) return;
+    // Merge: MRU first (familiar), then FS entries that aren't
+    // already in MRU. De-dup is case-insensitive to match the
+    // browse match semantics.
+    const seen = new Set(mruMatches.map((p) => p.toLowerCase()));
+    const merged = [...mruMatches];
+    for (const candidate of fs) {
+      const k = candidate.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      merged.push(candidate);
+    }
+    workspaceSuggestions.value = merged;
+  }, 120);
 }
 
 async function onPickFolder() {

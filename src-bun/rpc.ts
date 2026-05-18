@@ -124,6 +124,19 @@ export type DafmanRPC = {
 				params: { startingFolder?: string };
 				response: string | null;
 			};
+			/// Directory autocomplete. Given a partial absolute path
+			/// like `C:\repo\dafm`, lists immediate subdirectories of
+			/// the parent (`C:\repo`) whose name starts with the leaf
+			/// prefix (`dafm`). Used by the workspace AutoComplete in
+			/// the topbar + Sessions panel to suggest filesystem
+			/// completions alongside the persisted MRU. Capped at 20
+			/// entries; case-insensitive prefix match. Returns `[]` on
+			/// any filesystem error (path doesn't exist, permission
+			/// denied, etc.) — the UI falls back to MRU-only.
+			browseDirectory: {
+				params: { prefix: string };
+				response: string[];
+			};
 			disconnectSession: {
 				params: { sessionId: string };
 				response: string;

@@ -86,6 +86,10 @@ export type CommandMap = {
     args: { startingFolder?: string };
     result: string | null;
   };
+  browseDirectory: {
+    args: { prefix: string };
+    result: string[];
+  };
   disconnectSession: { args: { sessionId: string }; result: string };
   sendMessage: {
     args: {
