@@ -16,6 +16,9 @@ import Chip from "primevue/chip";
 import InputText from "primevue/inputtext";
 import Popover from "primevue/popover";
 import Select from "primevue/select";
+import SelectButton from "primevue/selectbutton";
+import TreeSelect from "primevue/treeselect";
+import type { TreeNode } from "primevue/treenode";
 import type {
   ModelSummary,
   ReasoningVisibility,
@@ -25,6 +28,9 @@ import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { basename } from "../stores/layoutStore";
 import { invokeCommand } from "../ipc/invoke";
+import {
+  buildModelTree,
+} from "../lib/modelTree";
 
 const props = defineProps<{ sessionId: string }>();
 
@@ -47,9 +53,88 @@ const selectedModel = computed<ModelSummary | undefined>(() => {
   return id ? models.value.find((m) => m.id === id) : undefined;
 });
 
-const modelOptions = computed(() =>
-  models.value.map((m) => ({ label: m.name, value: m.id })),
+/// Hierarchical model picker — see `lib/modelTree.ts` for the
+/// taxonomy (Auto pinned on top, provider → optional type → version).
+const modelTree = computed<TreeNode[]>(() =>
+  buildModelTree(models.value) as unknown as TreeNode[],
 );
+
+/// All group (non-leaf) keys in the tree. Used to expand the whole
+/// tree by default so the user sees every option without manually
+/// disclosing each provider/type. Recomputed when the catalogue
+/// changes so newly-added groups also start expanded.
+const allGroupKeys = computed<Record<string, boolean>>(() => {
+  const out: Record<string, boolean> = {};
+  const walk = (nodes: TreeNode[]): void => {
+    for (const n of nodes) {
+      if (n.children && n.children.length > 0) {
+        if (n.key) out[String(n.key)] = true;
+        walk(n.children);
+      }
+    }
+  };
+  walk(modelTree.value);
+  return out;
+});
+
+/// Two-way bound expanded-keys for the TreeSelect popup. Initialized
+/// from `allGroupKeys` so everything starts open; users can collapse
+/// individual groups (chevron OR clicking the row, see the #option
+/// template) and we respect that for the rest of the session.
+const expandedKeys = ref<Record<string, boolean>>({});
+
+watch(
+  allGroupKeys,
+  (next, prev) => {
+    // First population: take everything.
+    if (!prev || Object.keys(expandedKeys.value).length === 0) {
+      expandedKeys.value = { ...next };
+      return;
+    }
+    // Subsequent updates: add NEW groups (those not in prev) as
+    // expanded, but leave existing user collapses alone.
+    for (const key of Object.keys(next)) {
+      if (!(key in prev)) expandedKeys.value[key] = true;
+    }
+  },
+  { immediate: true },
+);
+
+/// Click handler bound to non-leaf rows in the TreeSelect option
+/// template — toggles that group's expansion. We bypass the chevron
+/// because the user wanted "clicking a provider or a type anywhere
+/// should expand it" (not just the small caret).
+function toggleGroupExpansion(key: string) {
+  if (expandedKeys.value[key]) {
+    const next = { ...expandedKeys.value };
+    delete next[key];
+    expandedKeys.value = next;
+  } else {
+    expandedKeys.value = { ...expandedKeys.value, [key]: true };
+  }
+}
+
+/// TreeSelect v-models as `{ [key]: { checked: true, partialChecked: false } }`
+/// for selectionMode="single". We translate to/from the single id
+/// string the store actually persists.
+const modelTreeChoice = computed<Record<string, unknown> | null>({
+  get: () => {
+    const id = record.value?.model;
+    if (!id) return null;
+    return { [id]: true };
+  },
+  set: (value) => {
+    if (!value || !record.value) return;
+    const id = Object.keys(value)[0];
+    if (!id) return;
+    const fresh = models.value.find((m) => m.id === id);
+    if (!fresh) return;
+    const effort = fresh.supportsReasoningEffort
+      ? record.value.reasoningEffort ?? fresh.defaultReasoningEffort ?? null
+      : null;
+    void sessionsStore.setSessionModel(props.sessionId, id, effort);
+  },
+});
 
 const effortOptions = computed(() =>
   (selectedModel.value?.supportedReasoningEfforts ?? []).map((effort) => ({
@@ -57,18 +142,6 @@ const effortOptions = computed(() =>
     value: effort,
   })),
 );
-
-const modelChoice = computed<string | null>({
-  get: () => record.value?.model ?? null,
-  set: (value) => {
-    if (!value || !record.value) return;
-    const fresh = models.value.find((m) => m.id === value);
-    const effort = fresh?.supportsReasoningEffort
-      ? record.value.reasoningEffort ?? fresh.defaultReasoningEffort ?? null
-      : null;
-    void sessionsStore.setSessionModel(props.sessionId, value, effort);
-  },
-});
 
 const effortChoice = computed<string | null>({
   get: () => record.value?.reasoningEffort ?? null,
@@ -78,10 +151,12 @@ const effortChoice = computed<string | null>({
   },
 });
 
-const modeOptions: { label: string; value: SessionMode }[] = [
-  { label: "Interactive", value: "interactive" },
-  { label: "Plan", value: "plan" },
-  { label: "Autopilot", value: "autopilot" },
+const modeOptions: { label: string; value: SessionMode; icon: string }[] = [
+  // Icons read as: interactive = chat bubble, plan = clipboard
+  // checklist, autopilot = play (auto-execute).
+  { label: "Interactive", value: "interactive", icon: "pi pi-comments" },
+  { label: "Plan", value: "plan", icon: "pi pi-list-check" },
+  { label: "Autopilot", value: "autopilot", icon: "pi pi-bolt" },
 ];
 
 const modeChoice = computed<SessionMode | null>({
@@ -167,18 +242,33 @@ function onWorkspaceClick() {
       @keydown.enter.prevent="onWorkspaceClick"
       @keydown.space.prevent="onWorkspaceClick"
     />
-    <Select
+    <TreeSelect
       :input-id="`model-${props.sessionId}`"
-      v-model="modelChoice"
-      :options="modelOptions"
-      option-label="label"
-      option-value="value"
+      v-model="modelTreeChoice"
+      v-model:expanded-keys="expandedKeys"
+      :options="modelTree"
+      selection-mode="single"
       size="small"
+      filter
       placeholder="Model"
       :disabled="models.length === 0"
       aria-label="Model for this session"
-      class="compact-select"
-    />
+      class="compact-select compact-tree-select"
+    >
+      <template #option="{ node }">
+        <!-- Custom node label. For non-leaf rows (providers / types)
+             we want clicking the row to toggle expansion in addition
+             to the chevron — the row is bigger and easier to hit. -->
+        <span
+          v-if="node.children && node.children.length > 0"
+          class="tree-group-label"
+          @click="toggleGroupExpansion(String(node.key))"
+        >
+          {{ node.label }}
+        </span>
+        <span v-else>{{ node.label }}</span>
+      </template>
+    </TreeSelect>
     <Select
       v-if="selectedModel?.supportsReasoningEffort"
       :input-id="`effort-${props.sessionId}`"
@@ -187,22 +277,25 @@ function onWorkspaceClick() {
       option-label="label"
       option-value="value"
       size="small"
+      filter
       placeholder="Effort"
       aria-label="Reasoning effort for this session"
       class="compact-select compact-select-effort"
     />
-    <Select
-      :input-id="`mode-inline-${props.sessionId}`"
+    <SelectButton
       v-model="modeChoice"
       :options="modeOptions"
       option-label="label"
       option-value="value"
+      :allow-empty="false"
       size="small"
-      placeholder="Mode"
-      :disabled="!record.mode"
       aria-label="Agent run mode"
-      class="compact-select compact-select-mode"
-    />
+      class="compact-mode-group compact-select-mode"
+    >
+      <template #option="slotProps">
+        <i :class="slotProps.option.icon" :title="slotProps.option.label" />
+      </template>
+    </SelectButton>
     <Select
       :input-id="`reasoning-inline-${props.sessionId}`"
       v-model="reasoningChoice"
@@ -210,6 +303,7 @@ function onWorkspaceClick() {
       option-label="label"
       option-value="value"
       size="small"
+      filter
       placeholder="Reasoning"
       aria-label="Reasoning visibility for this session"
       class="compact-select compact-select-reasoning"
@@ -247,23 +341,26 @@ function onWorkspaceClick() {
         <!-- Run mode + reasoning view live inline in the header strip
              when there's room; the popover keeps them as a guaranteed
              fallback so a narrow pane can still reach them. -->
-        <label
-          class="option-row"
-          :for="`mode-${props.sessionId}`"
-        >
+        <div class="option-row">
           <span class="option-label">Run mode</span>
-          <Select
-            :input-id="`mode-${props.sessionId}`"
+          <SelectButton
             v-model="modeChoice"
             :options="modeOptions"
             option-label="label"
             option-value="value"
+            :allow-empty="false"
             size="small"
-            placeholder="Loading..."
-            :disabled="!record.mode"
             aria-label="Agent run mode (popover)"
-          />
-        </label>
+          >
+            <template #option="slotProps">
+              <i
+                :class="slotProps.option.icon"
+                :title="slotProps.option.label"
+              />
+              <span class="sr-only">{{ slotProps.option.label }}</span>
+            </template>
+          </SelectButton>
+        </div>
         <label
           class="option-row"
           :for="`reasoning-${props.sessionId}`"
@@ -276,6 +373,7 @@ function onWorkspaceClick() {
             option-label="label"
             option-value="value"
             size="small"
+            filter
             aria-label="Reasoning visibility for this session (popover)"
           />
         </label>
@@ -417,6 +515,63 @@ function onWorkspaceClick() {
 .compact-select {
   flex: 0 1 auto;
   min-width: 0;
+}
+
+/* Non-leaf tree rows (provider / type). We render the label inside a
+ * span with a click handler so the user can expand/collapse by
+ * clicking anywhere on the row, not just the small chevron. */
+.tree-group-label {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+}
+
+/* Visually hidden but exposed to assistive tech — used on the mode
+ * SelectButton's icon-only options so screen readers announce the
+ * mode label. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* TreeSelect (model picker) uses a different root class than Select;
+ * mirror the same sizing so the model field reads as part of the
+ * same row. */
+.compact-tree-select :deep(.p-treeselect) {
+  min-width: 7rem;
+  max-width: 12rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+.compact-tree-select :deep(.p-treeselect-label) {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Run-mode SelectButton (icon-only segmented control). Shows the
+ * three modes as a button group with icons so it stays compact and
+ * legible without a placeholder. */
+.compact-mode-group {
+  flex: 0 0 auto;
+}
+.compact-mode-group :deep(.p-selectbutton .p-button) {
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  font-size: 0.85rem;
+}
+.compact-mode-group :deep(.p-selectbutton .p-button .pi) {
+  font-size: 0.85rem;
 }
 
 .compact-select :deep(.p-select) {

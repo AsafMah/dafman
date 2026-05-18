@@ -98,6 +98,7 @@ function toggle(id: string) {
             option-label="label"
             option-value="value"
             size="small"
+            filter
             class="field-control"
           />
         </label>
@@ -111,6 +112,7 @@ function toggle(id: string) {
             option-label="label"
             option-value="value"
             size="small"
+            filter
             class="field-control"
           />
           <p class="field-hint">
