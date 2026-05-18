@@ -16,7 +16,7 @@ import { RichTextPlugin } from "lexical-vue/LexicalRichTextPlugin";
 import { ListPlugin } from "lexical-vue/LexicalListPlugin";
 import { LinkPlugin } from "lexical-vue/LexicalLinkPlugin";
 import { HorizontalRulePlugin } from "lexical-vue/LexicalHorizontalRulePlugin";
-import { MarkdownSync } from "../lexical/plugins";
+import { MarkdownSync, CodeHighlightPlugin } from "../lexical/plugins";
 import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 
@@ -61,6 +61,7 @@ const initialConfig = {
       <ListPlugin />
       <LinkPlugin />
       <HorizontalRulePlugin />
+      <CodeHighlightPlugin />
     </LexicalComposer>
   </div>
 </template>

@@ -96,6 +96,93 @@
   overflow-x: auto;
 }
 
+/* Prism syntax-highlight token colors. Lexical's @lexical/code maps
+ * each token to one of the class names listed in `lexicalTheme`. The
+ * palette below leans on PrimeVue tokens where possible so it reads
+ * correctly in both light and dark themes — accents use color-mix
+ * over the page text so they shift hue with the theme. */
+.lex-token-comment {
+  color: color-mix(in srgb, var(--p-text-color) 50%, transparent);
+  font-style: italic;
+}
+.lex-token-string,
+.lex-token-regex,
+.lex-token-url {
+  color: var(--p-green-600, #16a34a);
+}
+.app-dark .lex-token-string,
+.app-dark .lex-token-regex,
+.app-dark .lex-token-url {
+  color: var(--p-green-400, #4ade80);
+}
+.lex-token-keyword,
+.lex-token-atrule,
+.lex-token-important,
+.lex-token-tag,
+.lex-token-selector {
+  color: var(--p-purple-600, #9333ea);
+}
+.app-dark .lex-token-keyword,
+.app-dark .lex-token-atrule,
+.app-dark .lex-token-important,
+.app-dark .lex-token-tag,
+.app-dark .lex-token-selector {
+  color: var(--p-purple-400, #c084fc);
+}
+.lex-token-function,
+.lex-token-class,
+.lex-token-builtin {
+  color: var(--p-blue-600, #2563eb);
+}
+.app-dark .lex-token-function,
+.app-dark .lex-token-class,
+.app-dark .lex-token-builtin {
+  color: var(--p-blue-400, #60a5fa);
+}
+.lex-token-number,
+.lex-token-boolean,
+.lex-token-constant,
+.lex-token-symbol {
+  color: var(--p-orange-600, #ea580c);
+}
+.app-dark .lex-token-number,
+.app-dark .lex-token-boolean,
+.app-dark .lex-token-constant,
+.app-dark .lex-token-symbol {
+  color: var(--p-orange-400, #fb923c);
+}
+.lex-token-property,
+.lex-token-attr,
+.lex-token-variable,
+.lex-token-entity {
+  color: var(--p-cyan-600, #0891b2);
+}
+.app-dark .lex-token-property,
+.app-dark .lex-token-attr,
+.app-dark .lex-token-variable,
+.app-dark .lex-token-entity {
+  color: var(--p-cyan-400, #22d3ee);
+}
+.lex-token-operator,
+.lex-token-punctuation,
+.lex-token-namespace {
+  color: color-mix(in srgb, var(--p-text-color) 70%, transparent);
+}
+.lex-token-inserted {
+  color: var(--p-green-700, #15803d);
+  background: color-mix(in srgb, var(--p-green-500, #22c55e) 12%, transparent);
+}
+.lex-token-deleted {
+  color: var(--p-red-700, #b91c1c);
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 12%, transparent);
+}
+.app-dark .lex-token-inserted {
+  color: var(--p-green-300, #86efac);
+}
+.app-dark .lex-token-deleted {
+  color: var(--p-red-300, #fca5a5);
+}
+
 /* Composer-specific layout. The composer's contenteditable sits inside
  * an `InputGroup`-like flex row alongside the submit button. */
 .lex-composer {
@@ -185,3 +272,4 @@
 .lex-display .lex-content:focus-visible {
   outline: none;
 }
+

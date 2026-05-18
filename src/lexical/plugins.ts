@@ -205,6 +205,22 @@ export const MarkdownSync = defineComponent({
 
 export { useLexicalComposer };
 
+/// Activates prism-backed syntax highlighting for any `CodeNode` in
+/// the editor. Mount inside `LexicalComposer` once. Lexical's
+/// `registerCodeHighlighting` returns an unregister; we tear down on
+/// unmount so HMR doesn't double-wire the highlighter.
+import { registerCodeHighlighting } from "@lexical/code";
+
+export const CodeHighlightPlugin = defineComponent({
+  name: "CodeHighlightPlugin",
+  setup() {
+    const editor = useLexicalComposer();
+    const unregister = registerCodeHighlighting(editor);
+    onBeforeUnmount(() => unregister());
+    return () => null;
+  },
+});
+
 /// Dev-only diagnostic: on mount, log enough state to bun's JSON log so
 /// we can figure out why typing might not work without needing WebView2
 /// devtools open. Mount this inside `LexicalComposer`. Only fires when

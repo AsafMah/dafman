@@ -7,7 +7,7 @@
 // can promote a paragraph to a heading/list/etc. as the user types) and
 // the read-only display (so streamed assistant markdown renders).
 
-import { CodeNode } from "@lexical/code";
+import { CodeNode, CodeHighlightNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
@@ -20,6 +20,7 @@ export const markdownNodes: ReadonlyArray<Klass<LexicalNode>> = [
   ListNode,
   ListItemNode,
   CodeNode,
+  CodeHighlightNode,
   LinkNode,
   HorizontalRuleNode,
 ];

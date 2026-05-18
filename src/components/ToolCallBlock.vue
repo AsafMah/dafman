@@ -3,6 +3,8 @@ import { computed, ref } from "vue";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import type { ToolStatus } from "../lib/chatEvents";
+import { getToolRenderer } from "../lib/toolRenderers";
+import MessageContent from "./MessageContent.vue";
 
 const props = defineProps<{
   toolName: string;
@@ -50,11 +52,27 @@ const statusLabel = computed(() => {
   }
 });
 
-/// Short one-liner under the header when collapsed. Priority:
-/// error message > final result first line > latest progress >
-/// last line of partial output.
+/// Per-tool render hints (summary + languages). The renderer is
+/// re-evaluated whenever args or result change so e.g. read_file can
+/// pick its result language from the file extension once we see the
+/// arguments.
+const renderHints = computed(() =>
+  getToolRenderer(props.toolName, props.mcpServerName)({
+    args: props.args,
+    result: props.resultContent,
+    partialOutput: props.partialOutput,
+    toolName: props.toolName,
+    mcpServerName: props.mcpServerName,
+    mcpToolName: props.mcpToolName,
+  }),
+);
+
+/// Header preview. Renderer summary wins (e.g. `shell ls -la`); falls
+/// back to the historical "first line of latest output" behaviour
+/// when the tool has no registered renderer.
 const previewLine = computed(() => {
   if (props.status === "error" && props.errorMessage) return props.errorMessage;
+  if (renderHints.value.summary) return renderHints.value.summary;
   const source =
     props.resultContent ||
     props.progressMessage ||
@@ -73,6 +91,26 @@ const argsPretty = computed(() => {
     return String(props.args);
   }
 });
+
+/// Wrap a string in a fenced markdown code block so `MessageContent`
+/// renders it via Lexical's prism-backed CodeNode. Language tag is
+/// supplied by the per-tool renderer (`argsLanguage` / `resultLanguage`).
+function fenced(content: string, language: string): string {
+  if (!content) return "";
+  // Add a trailing newline so the closing fence is on its own line.
+  const body = content.endsWith("\n") ? content : `${content}\n`;
+  return `\`\`\`${language}\n${body}\`\`\``;
+}
+
+const argsBlock = computed(() =>
+  fenced(argsPretty.value, renderHints.value.argsLanguage),
+);
+const partialBlock = computed(() =>
+  fenced(props.partialOutput, renderHints.value.resultLanguage),
+);
+const resultBlock = computed(() =>
+  fenced(props.resultContent ?? "", renderHints.value.resultLanguage),
+);
 </script>
 
 <template>
@@ -105,7 +143,11 @@ const argsPretty = computed(() => {
     <div v-if="expanded" class="tool-body">
       <section v-if="argsPretty" class="tool-section">
         <header class="tool-section-label">Arguments</header>
-        <pre class="tool-block">{{ argsPretty }}</pre>
+        <MessageContent
+          class="tool-block"
+          :text="argsBlock"
+          :label="`Arguments for ${displayName}`"
+        />
       </section>
 
       <section v-if="props.progressMessage" class="tool-section">
@@ -115,12 +157,20 @@ const argsPretty = computed(() => {
 
       <section v-if="props.partialOutput" class="tool-section">
         <header class="tool-section-label">Output</header>
-        <pre class="tool-block">{{ props.partialOutput }}</pre>
+        <MessageContent
+          class="tool-block"
+          :text="partialBlock"
+          :label="`Partial output for ${displayName}`"
+        />
       </section>
 
       <section v-if="props.resultContent" class="tool-section">
         <header class="tool-section-label">Result</header>
-        <pre class="tool-block">{{ props.resultContent }}</pre>
+        <MessageContent
+          class="tool-block"
+          :text="resultBlock"
+          :label="`Result for ${displayName}`"
+        />
       </section>
 
       <section v-if="props.errorMessage" class="tool-section">
@@ -241,12 +291,16 @@ const argsPretty = computed(() => {
   padding: 0.4rem 0.5rem;
   background: color-mix(in srgb, var(--p-text-color) 6%, var(--p-content-background));
   border-radius: var(--p-border-radius-sm);
-  font-family: var(--p-font-family-mono, monospace);
   font-size: 0.78rem;
-  white-space: pre-wrap;
-  word-break: break-word;
   max-height: 24rem;
   overflow: auto;
+}
+
+/* MessageContent's content-editable is non-interactive but still
+ * applies its own padding inside .lex-content; clear it so the tool
+ * block's own padding controls spacing consistently. */
+.tool-block :deep(.lex-content) {
+  padding: 0;
 }
 
 .tool-progress,
