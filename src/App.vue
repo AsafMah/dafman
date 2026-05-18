@@ -14,7 +14,7 @@ import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
-import { useLayoutStore, shortPanelTitle } from "./stores/layoutStore";
+import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
 import { resolveIsDark } from "./lib/theme";
 import { invokeCommand } from "./ipc/invoke";
 
@@ -157,14 +157,19 @@ function closeToast({ message }: { message: ToastMessageOptions }) {
   primeToast.remove(message);
 }
 
-/// Keep each dockview tab's title in sync with the SDK-supplied
-/// `session.title_changed` value. We watch the live `(id, title)` map
-/// and call into the layout store on any delta.
+/// Keep each dockview tab's title in sync with both the SDK-supplied
+/// `session.title_changed` value and the session's workspace path. The
+/// composed title leads with the workspace basename — it's the most
+/// recognisable label, especially before the model has auto-summarised
+/// the conversation — followed by the SDK title (`folder · title`).
 watch(
-  () => sessions.value.map((s) => [s.id, s.title] as const),
+  () =>
+    sessions.value.map(
+      (s) => [s.id, s.title, s.workingDirectory] as const,
+    ),
   (entries) => {
-    for (const [id, title] of entries) {
-      layoutStore.renamePanel(id, title ?? shortPanelTitle(id));
+    for (const [id, title, wd] of entries) {
+      layoutStore.renamePanel(id, composePanelTitle(id, title, wd));
     }
   },
   { deep: true },
@@ -217,6 +222,21 @@ const recentWorkspaces = computed(
   () => settings.value.workspaces?.recent ?? [],
 );
 
+// Pre-fill the workspace input with the last-used path so quick
+// repeat creates don't make the user retype or repick. We seed once
+// per page load after settings finish loading; subsequent edits by
+// the user aren't clobbered (the watcher fires only on the empty →
+// non-empty transition).
+watch(
+  recentWorkspaces,
+  (next) => {
+    if (workspaceDraft.value === "" && next.length > 0) {
+      workspaceDraft.value = next[0];
+    }
+  },
+  { immediate: true },
+);
+
 function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
   const query = (event.query ?? "").trim().toLowerCase();
   const recent = recentWorkspaces.value;
@@ -256,7 +276,9 @@ async function onCreateSession() {
       // Fire-and-forget MRU bump. Failures only get a toast; the
       // session itself is already created and visible.
       if (wd) void settingsStore.recordWorkspaceUse(wd);
-      layoutStore.addPanel(record.id);
+      layoutStore.addPanel(record.id, {
+        title: composePanelTitle(record.id, record.title, record.workingDirectory),
+      });
     }
   } catch {
     /* toast already shown */

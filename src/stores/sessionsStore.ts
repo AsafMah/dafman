@@ -52,6 +52,20 @@ export type SessionRecord = {
 
 let unsubscribe: (() => void) | null = null;
 
+/// Pending events for sessions whose `SessionRecord` doesn't exist
+/// yet. Triggered by the resume race: bun emits the full history via
+/// `webview.rpc.send.sessionEvent` *during* the `resumeSession` RPC
+/// handler — those messages travel over the same channel as the RPC
+/// response and arrive at the renderer before the awaiting promise
+/// resolves. Without this buffer, every replayed event (transcript,
+/// `session.start`, model, title, …) would hit `handleEvent` with no
+/// matching record and be silently dropped, leaving the resumed pane
+/// blank.
+///
+/// Capped per-session so a runaway producer doesn't pin memory.
+const pendingEvents = new Map<string, SessionEventPayload[]>();
+const MAX_PENDING_PER_SESSION = 5000;
+
 export const useSessionsStore = defineStore("sessions", () => {
   const sessions = ref<SessionRecord[]>([]);
   const isCreating = ref(false);
@@ -59,7 +73,21 @@ export const useSessionsStore = defineStore("sessions", () => {
 
   function handleEvent(payload: SessionEventPayload): void {
     const record = sessions.value.find((s) => s.id === payload.sessionId);
-    if (!record) return;
+    if (!record) {
+      // Buffer for later — the SessionRecord is still in flight (see
+      // `pendingEvents` comment). `drainPending` will replay these
+      // through `applyToRecord` in order once the record materializes.
+      const list = pendingEvents.get(payload.sessionId) ?? [];
+      if (list.length < MAX_PENDING_PER_SESSION) {
+        list.push(payload);
+        pendingEvents.set(payload.sessionId, list);
+      }
+      return;
+    }
+    applyToRecord(record, payload);
+  }
+
+  function applyToRecord(record: SessionRecord, payload: SessionEventPayload): void {
     record.events.push(payload);
 
     if (import.meta.env.DEV) {
@@ -102,16 +130,28 @@ export const useSessionsStore = defineStore("sessions", () => {
         record.title = title;
       }
     }
-    // The `session.start` event carries the SDK-side cwd / git context.
-    // Backfilling from the event (rather than only from the create
-    // call) means resumed sessions also pick up the workspace path.
-    if (payload.eventType === "session.start") {
+    // Both `session.start` (fresh create) and `session.resume` carry
+    // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
+    // Resumed sessions don't fire `session.start` again, so we have
+    // to listen on both — otherwise the workspace would only appear
+    // on freshly-created sessions and never on restored ones.
+    if (
+      payload.eventType === "session.start" ||
+      payload.eventType === "session.resume"
+    ) {
       const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
       const cwd = ctx?.cwd;
       if (typeof cwd === "string" && cwd.length > 0) {
         record.workingDirectory = cwd;
       }
     }
+  }
+
+  function drainPending(sessionId: string, record: SessionRecord): void {
+    const list = pendingEvents.get(sessionId);
+    if (!list) return;
+    pendingEvents.delete(sessionId);
+    for (const event of list) applyToRecord(record, event);
   }
 
   function ensureSubscription(): void {
@@ -143,6 +183,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         workingDirectory: wd && wd.length > 0 ? wd : null,
       });
       sessions.value.push(record);
+      drainPending(id, record);
       toasts.success("Session created", id);
       // Fire-and-forget: get the current run mode so the UI shows it.
       // Re-look up the record by id when the RPC resolves — if the
@@ -201,6 +242,11 @@ export const useSessionsStore = defineStore("sessions", () => {
         workingDirectory: null,
       });
       sessions.value.push(record);
+      // Drain any events that arrived between bun-side `resume()` and
+      // the RPC response reaching us — chiefly the history replay
+      // (assistant.message_*, tool.*, session.start, …), which would
+      // otherwise be lost and the pane would render blank.
+      drainPending(actualId, record);
       // Pick up the run mode the SDK is currently using for the
       // restored session — same fire-and-forget shape as createSession.
       void invokeCommand("getSessionMode", { sessionId: actualId })

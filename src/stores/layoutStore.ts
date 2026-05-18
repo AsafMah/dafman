@@ -24,6 +24,34 @@ export function shortPanelTitle(sessionId: string): string {
   return sessionId.length > 12 ? `${sessionId.slice(0, 8)}…` : sessionId;
 }
 
+/// Returns the last path segment of a Unix or Windows absolute path.
+/// Empty / whitespace input → "". Trailing slashes are tolerated so
+/// "C:\\repo\\dafman\\" and "C:\\repo\\dafman" produce the same result.
+export function basename(path: string | null | undefined): string {
+  if (!path) return "";
+  const trimmed = path.trim().replace(/[\\/]+$/, "");
+  if (!trimmed) return "";
+  const match = trimmed.match(/[\\/]([^\\/]+)$/);
+  return match ? match[1] : trimmed;
+}
+
+/// Composes the dockview tab title from a session's workspace +
+/// SDK-supplied title. Workspace basename leads (it's the most
+/// stable, user-recognisable label); SDK title follows after `·` once
+/// the model auto-summarises. Falls back to `shortPanelTitle(id)` if
+/// neither is available.
+export function composePanelTitle(
+  sessionId: string,
+  title: string | null,
+  workingDirectory: string | null,
+): string {
+  const folder = basename(workingDirectory);
+  if (folder && title) return `${folder} · ${title}`;
+  if (folder) return folder;
+  if (title) return title;
+  return shortPanelTitle(sessionId);
+}
+
 export interface EdgePanelOptions {
   /// Unique panel id (used by `getPanel` for toggle behaviour).
   id: string;
