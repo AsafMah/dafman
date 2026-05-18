@@ -6,10 +6,9 @@ import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
 import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
-import ChatWindow from "./components/ChatWindow.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import { useClientStore } from "./stores/clientStore";
-import { useSessionsStore, type SessionRecord } from "./stores/sessionsStore";
+import { useSessionsStore } from "./stores/sessionsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
 import { useLayoutStore, shortPanelTitle } from "./stores/layoutStore";
@@ -43,25 +42,6 @@ const isDarkMode = computed(() =>
 
 function applyThemeClass(isDark: boolean) {
   document.documentElement.classList.toggle("app-dark", isDark);
-}
-
-/// Index sessions by id for O(1) lookup from the dockview panel slot.
-/// The slot only receives `params.sessionId`; everything else (events,
-/// model, accent, …) is sourced from the store via this map.
-const sessionsById = computed<Map<string, SessionRecord>>(() => {
-  const m = new Map<string, SessionRecord>();
-  for (const s of sessions.value) m.set(s.id, s);
-  return m;
-});
-
-/// Slot helpers — Vue templates can't use `as` casts, so we coerce
-/// dockview's `params: unknown` here and look up the record.
-function paneSessionId(params: unknown): string {
-  return (params as { sessionId?: string })?.sessionId ?? "";
-}
-
-function paneRecord(params: unknown): SessionRecord | undefined {
-  return sessionsById.value.get(paneSessionId(params));
 }
 
 onMounted(async () => {
@@ -293,33 +273,7 @@ async function onCreateSession() {
         class="dock"
         watermark-component="watermark"
         @ready="onDockReady"
-      >
-        <template #chat="{ params }">
-          <ChatWindow
-            v-if="paneRecord(params)"
-            :key="paneSessionId(params)"
-            :session-id="paneSessionId(params)"
-            :accent="paneRecord(params)!.accent"
-            :events="paneRecord(params)!.events"
-            :model="paneRecord(params)!.model"
-            :reasoning-effort="paneRecord(params)!.reasoningEffort"
-            :mode="paneRecord(params)!.mode"
-            :approve-all="paneRecord(params)!.approveAll"
-            :hide-close="true"
-          />
-          <p v-else class="missing-pane">
-            Session {{ paneSessionId(params) }} not loaded.
-          </p>
-        </template>
-        <template #watermark>
-          <div class="placeholder">
-            <template v-if="!clientReady">Starting Copilot client...</template>
-            <template v-else>
-              Click <strong>&nbsp;New Session&nbsp;</strong> to start chatting.
-            </template>
-          </div>
-        </template>
-      </DockviewVue>
+      />
     </div>
   </main>
 </template>
@@ -376,20 +330,5 @@ async function onCreateSession() {
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-}
-
-.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--p-text-muted-color);
-  padding: 1rem;
-}
-
-.missing-pane {
-  margin: 0;
-  padding: 1rem;
-  color: var(--p-text-muted-color);
 }
 </style>
