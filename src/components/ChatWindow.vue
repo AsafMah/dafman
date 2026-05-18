@@ -119,13 +119,23 @@ async function scrollToBottom() {
   if (el) el.scrollTop = el.scrollHeight;
 }
 
+let isFirstBatch = true;
+
 watch(
   () => props.events.length,
   (len) => {
     if (processedEvents >= len) return;
     const fresh = props.events.slice(processedEvents);
     processedEvents = len;
-    const result = processEvents(items.value, ambient.value, fresh, idCounter);
+    // The very first batch is replay (history hydrated from
+    // `getMessages()` + any in-flight live events that already
+    // arrived). Skip "Model changed" toasts during it — they're
+    // already-happened changes, not actionable signal.
+    const live = !isFirstBatch;
+    isFirstBatch = false;
+    const result = processEvents(items.value, ambient.value, fresh, idCounter, {
+      live,
+    });
     items.value = result.items;
     ambient.value = result.ambient;
     if (result.idle || result.error) isSendingFallback.value = false;

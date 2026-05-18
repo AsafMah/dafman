@@ -70,6 +70,40 @@ describe("processEvents", () => {
     expect(second.toasts).toHaveLength(0);
   });
 
+  test("skips model-change toast when previousModel is missing (initial setup)", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [event({ newModel: "gpt-5.5", reasoningEffort: "high" })],
+      counter,
+    );
+    // Ambient is still updated so the UI reflects the model, but the
+    // toast is suppressed — there's no actionable signal in "the SDK
+    // told us what model it's using on startup".
+    expect(result.ambient.model).toBe("gpt-5.5");
+    expect(result.toasts).toEqual([]);
+  });
+
+  test("skips model-change toasts during replay (live: false)", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        event({
+          previousModel: "claude-sonnet-4.5",
+          newModel: "gpt-5.5",
+          reasoningEffort: "high",
+        }),
+      ],
+      counter,
+      { live: false },
+    );
+    expect(result.ambient.model).toBe("gpt-5.5");
+    expect(result.toasts).toEqual([]);
+  });
+
   test("user.message from history replay appends a user item", () => {
     const counter: IdCounter = { next: 1 };
     const result = processEvents(

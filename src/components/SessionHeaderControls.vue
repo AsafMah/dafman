@@ -26,6 +26,7 @@ import type {
 } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { basename } from "../stores/layoutStore";
 import { invokeCommand } from "../ipc/invoke";
 import {
@@ -167,15 +168,25 @@ const modeChoice = computed<SessionMode | null>({
   },
 });
 
-const reasoningOptions: { label: string; value: ReasoningVisibility | "default" }[] = [
-  { label: "Default", value: "default" },
+const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
   { label: "Hidden", value: "hidden" },
   { label: "Compact", value: "compact" },
   { label: "Expanded", value: "expanded" },
 ];
 
-const reasoningChoice = computed<ReasoningVisibility | "default">({
-  get: () => record.value?.reasoningVisibilityOverride ?? "default",
+/// When the session record still carries the legacy `"default"`
+/// marker (older sessions / first-time setup), resolve it down to
+/// the concrete app-wide value so the picker shows a real option
+/// rather than a meaningless "Default". Writes always store a
+/// concrete value — there's no path back to "default".
+const settings = storeToRefs(useSettingsStore()).settings;
+
+const reasoningChoice = computed<ReasoningVisibility>({
+  get: () => {
+    const v = record.value?.reasoningVisibilityOverride;
+    if (!v || v === "default") return settings.value.appearance.reasoningVisibility;
+    return v;
+  },
   set: (value) => {
     sessionsStore.setSessionReasoningOverride(props.sessionId, value);
   },

@@ -166,12 +166,14 @@ export function processEvents(
   ambient: ChatAmbient,
   newPayloads: SessionEventPayload[],
   counter: IdCounter,
+  opts: { live?: boolean } = {},
 ): ProcessResult {
   const items = current.slice();
   const next: ChatAmbient = { ...ambient };
   const toasts: ChatToast[] = [];
   let idle = false;
   let error = false;
+  const isLive = opts.live ?? true;
 
   const upsertAssistant = (messageId: string): ChatItem => {
     let existing = items.find(
@@ -450,20 +452,28 @@ export function processEvents(
         if (newModel) {
           next.model = newModel;
           if (effort) next.reasoningEffort = effort;
-          const key = [prev, newModel, prevEffort, effort].join("\0");
-          const modelDetail = prev ? `${prev} → ${newModel}` : newModel;
-          const detail = effort
-            ? prevEffort && prevEffort !== effort
-              ? `${modelDetail} (${prevEffort} → ${effort} effort)`
-              : `${modelDetail} (${effort} effort)`
-            : modelDetail;
-          if (next.lastModelChangeToastKey !== key) {
-            toasts.push({
-              severity: "info",
-              summary: "Model changed",
-              detail,
-            });
-            next.lastModelChangeToastKey = key;
+          // Suppress noise: skip the toast when (a) this is the
+          // initial-setup event (no previous model — the SDK is just
+          // telling us what's already selected), or (b) we're
+          // replaying history (no need to re-toast past changes).
+          // Auto-switches from rate limits, /model commands, etc.,
+          // still toast because they have a real `previousModel`.
+          if (prev && isLive) {
+            const key = [prev, newModel, prevEffort, effort].join("\0");
+            const modelDetail = `${prev} → ${newModel}`;
+            const detail = effort
+              ? prevEffort && prevEffort !== effort
+                ? `${modelDetail} (${prevEffort} → ${effort} effort)`
+                : `${modelDetail} (${effort} effort)`
+              : modelDetail;
+            if (next.lastModelChangeToastKey !== key) {
+              toasts.push({
+                severity: "info",
+                summary: "Model changed",
+                detail,
+              });
+              next.lastModelChangeToastKey = key;
+            }
           }
         }
         break;
