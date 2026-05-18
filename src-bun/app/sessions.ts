@@ -154,6 +154,33 @@ export class SessionRegistry {
 		}));
 	}
 
+	/// Permanently deletes the CLI-side session data. If the session is
+	/// currently open in this app, disconnect it first so the SDK can
+	/// release its session handle cleanly before deletion.
+	async deleteCliSession(sessionId: string): Promise<string> {
+		const entry = this.entries.get(sessionId);
+		if (entry) {
+			this.entries.delete(sessionId);
+			entry.unsubscribe();
+			try {
+				await entry.session.disconnect();
+			} catch (err) {
+				log.warn("disconnect-before-delete threw", {
+					sessionId,
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+		}
+		const client = tryGetClient();
+		try {
+			await client.deleteSession(sessionId);
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		log.info("session deleted", { sessionId });
+		return sessionId;
+	}
+
 	private forward(sessionId: string, event: SessionEvent): void {
 		const eventType = event.type;
 		const isDiagnostic =

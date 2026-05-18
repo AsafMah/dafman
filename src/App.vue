@@ -196,7 +196,12 @@ function onDockReady(event: DockviewReadyEvent) {
   // Persist on every layout change (debounced). Covers add/remove/
   // resize/move/popout/dock — everything dockview considers a layout
   // mutation collapses into this single event.
-  event.api.onDidLayoutChange(() => scheduleLayoutSave());
+  event.api.onDidLayoutChange(() => {
+    scheduleLayoutSave();
+    // Keep the topbar button state in sync with reality (panel closed
+    // via dockview X, restored from layout, dragged out, etc.).
+    sessionsPanelOpen.value = layoutStore.isPanelOpen(SESSIONS_PANEL_ID);
+  });
 }
 
 /// Debounced write — drag-resize fires `onDidLayoutChange` continuously
@@ -266,7 +271,7 @@ async function onPickFolder() {
   }
 }
 
-async function onCreateSession() {
+async function onConfirmCreateSession() {
   const wd = workspaceDraft.value.trim();
   try {
     const record = await sessionsStore.createSession(
@@ -284,6 +289,28 @@ async function onCreateSession() {
     /* toast already shown */
   }
 }
+
+// Sessions Manager — left edge-group panel toggle. Track open state
+// separately so the toolbar button can show a pressed state; we sync
+// in onDockReady's layout-change subscription so reopens-from-layout
+// (and tab-X closes) keep the ref accurate.
+const SESSIONS_PANEL_ID = "sessions-manager";
+const sessionsPanelOpen = ref(false);
+
+function toggleSessionsPanel() {
+  if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) {
+    layoutStore.closePanel(SESSIONS_PANEL_ID);
+    sessionsPanelOpen.value = false;
+  } else {
+    layoutStore.openEdgePanel("left", {
+      id: SESSIONS_PANEL_ID,
+      component: "sessionsManager",
+      title: "Sessions",
+      initialSize: 280,
+    });
+    sessionsPanelOpen.value = true;
+  }
+}
 </script>
 
 <template>
@@ -294,7 +321,7 @@ async function onCreateSession() {
       @update:visible="(v) => (settingsOpen = v)"
     />
     <div class="topbar">
-      <form class="topbar-actions new-session-form" @submit.prevent="onCreateSession">
+      <form class="topbar-actions new-session-form" @submit.prevent="onConfirmCreateSession">
         <AutoComplete
           v-model="workspaceDraft"
           :suggestions="workspaceSuggestions"
@@ -324,6 +351,17 @@ async function onCreateSession() {
         />
       </form>
       <div class="topbar-right">
+        <Button
+          icon="pi pi-list"
+          severity="secondary"
+          text
+          rounded
+          aria-label="Sessions manager"
+          title="Sessions manager"
+          :class="{ 'is-active-toggle': sessionsPanelOpen }"
+          :disabled="!clientReady"
+          @click="toggleSessionsPanel"
+        />
         <Button
           v-if="isDev"
           icon="pi pi-wrench"
@@ -399,6 +437,14 @@ async function onCreateSession() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* Pressed-state for toggle buttons (Sessions panel). PrimeVue's `text`
+ * Button has no built-in "active" variant, so we tint it ourselves
+ * with a theme-aware mix. */
+.topbar-right :deep(.p-button.is-active-toggle) {
+  background: color-mix(in srgb, var(--p-text-color) 12%, transparent);
+  color: var(--p-text-color);
 }
 
 .dock-wrapper {

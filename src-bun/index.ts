@@ -102,6 +102,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				}),
 			),
 			listSessions: rpcGuard(async () => sessions.list()),
+			deleteSession: rpcGuard(async ({ sessionId }) =>
+				sessions.deleteCliSession(sessionId),
+			),
 			getSessionMode: rpcGuard(async ({ sessionId }) =>
 				sessions.getMode(sessionId),
 			),

@@ -165,6 +165,25 @@ export const useLayoutStore = defineStore("layout", () => {
     });
   }
 
+  /// Returns `true` if a panel with the given id is currently in the
+  /// dockview tree. Used by toggle-style toolbar buttons (Sessions
+  /// Manager, Library, …) to decide between open/close.
+  function isPanelOpen(id: string): boolean {
+    const dock = api.value;
+    if (!dock) return false;
+    return !!dock.getPanel(id);
+  }
+
+  /// Closes (removes) a panel by id. Idempotent — does nothing if the
+  /// panel isn't open. Doesn't remove the parent edge group; the
+  /// group stays so re-opening preserves its size.
+  function closePanel(id: string): void {
+    const dock = api.value;
+    if (!dock) return;
+    const panel = dock.getPanel(id);
+    if (panel) dock.removePanel(panel);
+  }
+
   /// Toggles edge-group visibility (e.g. collapse/expand a sidebar
   /// without destroying its contents).
   function toggleEdgeGroup(position: EdgeGroupPosition): void {
@@ -200,6 +219,8 @@ export const useLayoutStore = defineStore("layout", () => {
     renamePanel,
     replaceMissingPanel,
     openEdgePanel,
+    isPanelOpen,
+    closePanel,
     toggleEdgeGroup,
     snapshot,
     restore,

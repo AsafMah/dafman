@@ -114,6 +114,7 @@ export type CommandMap = {
     result: string;
   };
   listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
+  deleteSession: { args: { sessionId: string }; result: string };
   getSessionMode: { args: { sessionId: string }; result: SessionMode };
   setSessionMode: {
     args: { sessionId: string; mode: SessionMode };

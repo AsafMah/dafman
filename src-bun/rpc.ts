@@ -170,6 +170,14 @@ export type DafmanRPC = {
 				params: Record<string, never>;
 				response: SessionMetadataSummary[];
 			};
+			/// Permanently deletes a session's CLI-side data. Returns the
+			/// session id on success. If the session is currently
+			/// registered in this app, it's disconnected first so the
+			/// SDK can release its handle.
+			deleteSession: {
+				params: { sessionId: string };
+				response: string;
+			};
 			getSessionMode: {
 				params: { sessionId: string };
 				response: SessionMode;
