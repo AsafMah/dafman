@@ -10,8 +10,9 @@
 // `Utils.paths.userData` and hands it to `SettingsService.loadOrDefault`.
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import type {
 	Appearance,
 	Layout,
@@ -23,7 +24,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 /// Hard upper bound on the size of the workspace MRU. Anything beyond
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes
@@ -42,7 +43,7 @@ export function defaultSettings(): Settings {
 		version: SETTINGS_VERSION,
 		appearance: { theme: "system", reasoningVisibility: "compact" },
 		layout: { dockview: null },
-		workspaces: { recent: [] },
+		workspaces: { recent: [], defaultWorkspace: "" },
 	};
 }
 
@@ -78,20 +79,45 @@ function coerceLayout(raw: unknown): Layout {
 /// — Windows-vs-Unix mixed paths aren't normalized here; the renderer
 /// avoids inserting a path that already exists modulo trim).
 function coerceWorkspaces(raw: unknown): Workspaces {
-	if (!raw || typeof raw !== "object") return { recent: [] };
+	if (!raw || typeof raw !== "object") return { recent: [], defaultWorkspace: "" };
 	const list = (raw as { recent?: unknown }).recent;
-	if (!Array.isArray(list)) return { recent: [] };
 	const seen = new Set<string>();
 	const out: string[] = [];
-	for (const entry of list) {
-		if (typeof entry !== "string") continue;
-		const trimmed = entry.trim();
-		if (!trimmed || seen.has(trimmed)) continue;
-		seen.add(trimmed);
-		out.push(trimmed);
-		if (out.length >= WORKSPACES_MRU_LIMIT) break;
+	if (Array.isArray(list)) {
+		for (const entry of list) {
+			if (typeof entry !== "string") continue;
+			const trimmed = entry.trim();
+			if (!trimmed || seen.has(trimmed)) continue;
+			seen.add(trimmed);
+			out.push(trimmed);
+			if (out.length >= WORKSPACES_MRU_LIMIT) break;
+		}
 	}
-	return { recent: out };
+	const rawDefault = (raw as { defaultWorkspace?: unknown }).defaultWorkspace;
+	const defaultWorkspace =
+		typeof rawDefault === "string" ? rawDefault.trim() : "";
+	return { recent: out, defaultWorkspace };
+}
+
+/// Resolves the auto-default workspace (`<homedir>/dafman`) and ensures
+/// the directory exists. Returns the absolute path on success, or an
+/// empty string when home-directory resolution / mkdir fails so the
+/// renderer falls back to "no default". Idempotent — safe to call on
+/// every startup; `recursive: true` makes the mkdir a no-op when the
+/// directory already exists.
+export async function ensureDefaultWorkspace(): Promise<string> {
+	try {
+		const home = homedir();
+		if (!home) return "";
+		const target = join(home, "dafman");
+		await mkdir(target, { recursive: true });
+		return target;
+	} catch (err) {
+		log.warn("ensureDefaultWorkspace failed", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return "";
+	}
 }
 
 export function migrate(input: unknown): Settings {

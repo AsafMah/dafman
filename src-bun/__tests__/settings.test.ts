@@ -51,7 +51,7 @@ describe("SettingsService", () => {
 				reasoningVisibility: "compact" as const,
 			},
 			layout: { dockview: null },
-			workspaces: { recent: ["D:\\repo\\dafman"] },
+			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);
@@ -77,7 +77,7 @@ describe("SettingsService", () => {
 			version: SETTINGS_VERSION,
 			appearance: { theme: "system", reasoningVisibility: "compact" },
 			layout: { dockview: blob },
-			workspaces: { recent: [] },
+			workspaces: { recent: [], defaultWorkspace: "" },
 		});
 		const reloaded = SettingsService.loadOrDefault(path);
 		expect(reloaded.get().layout.dockview).toEqual(blob);
@@ -125,7 +125,7 @@ describe("SettingsService", () => {
 		expect(settings.appearance.theme).toBe("dark");
 		expect(settings.appearance.reasoningVisibility).toBe("expanded");
 		expect(settings.layout).toEqual({ dockview: null });
-		expect(settings.workspaces).toEqual({ recent: [] });
+		expect(settings.workspaces).toEqual({ recent: [], defaultWorkspace: "" });
 	});
 
 	test("v3 document migrates with an empty workspaces MRU", () => {
@@ -142,7 +142,7 @@ describe("SettingsService", () => {
 		const svc = SettingsService.loadOrDefault(path);
 		const settings = svc.get();
 		expect(settings.version).toBe(SETTINGS_VERSION);
-		expect(settings.workspaces).toEqual({ recent: [] });
+		expect(settings.workspaces).toEqual({ recent: [], defaultWorkspace: "" });
 	});
 
 	test("workspaces.recent coerces: drops non-strings, trims, dedupes, caps to limit", () => {
@@ -177,7 +177,7 @@ describe("SettingsService", () => {
 				layout: { dockview: null },
 				workspaces: { recent: "not-an-array" },
 			}).workspaces,
-		).toEqual({ recent: [] });
+		).toEqual({ recent: [], defaultWorkspace: "" });
 		expect(
 			migrate({
 				version: SETTINGS_VERSION,
@@ -185,7 +185,7 @@ describe("SettingsService", () => {
 				layout: { dockview: null },
 				workspaces: 42,
 			}).workspaces,
-		).toEqual({ recent: [] });
+		).toEqual({ recent: [], defaultWorkspace: "" });
 	});
 
 	test("malformed layout coerces to a safe default", () => {

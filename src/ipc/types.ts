@@ -36,6 +36,9 @@ export interface Layout {
 
 export interface Workspaces {
   recent: string[];
+  /// Default workspace for new sessions. May be empty when home-dir
+  /// resolution failed at startup; treat empty as "no default".
+  defaultWorkspace: string;
 }
 
 export interface ModelSummary {

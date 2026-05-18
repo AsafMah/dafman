@@ -21,7 +21,7 @@ import { rpcGuard } from "./app/errors";
 import { getLogDir as currentLogDir, initLogger, log } from "./app/logging";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
-import { SettingsService } from "./app/settings";
+import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
 import type { DafmanRPC, SessionEventPayload } from "./rpc";
@@ -41,6 +41,28 @@ installStderrFilter();
 
 const settingsPath = join(Utils.paths.userData, "settings.json");
 const settings = SettingsService.loadOrDefault(settingsPath);
+
+// One-time backfill: if the user has never set a default workspace,
+// auto-resolve to `<homedir>/dafman` (created on demand) and persist.
+// Async/fire-and-forget so we don't block startup; the renderer reads
+// `settings.workspaces.defaultWorkspace` lazily via `getSettings`.
+void (async () => {
+	const current = settings.get().workspaces.defaultWorkspace;
+	if (current && current.length > 0) return;
+	const resolved = await ensureDefaultWorkspace();
+	if (!resolved) return;
+	const snap = settings.get();
+	await settings
+		.update({
+			...snap,
+			workspaces: { ...snap.workspaces, defaultWorkspace: resolved },
+		})
+		.catch((err) => {
+			log.warn("default workspace backfill failed", {
+				error: err instanceof Error ? err.message : String(err),
+			});
+		});
+})();
 
 // `emitEvent` is rebound once the BrowserWindow's webview RPC is up.
 // Until then we buffer events (in practice none should fire before the

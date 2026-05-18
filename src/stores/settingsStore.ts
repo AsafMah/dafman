@@ -11,10 +11,10 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 4,
+    version: 5,
     appearance: { theme: "system", reasoningVisibility: "compact" },
     layout: { dockview: null },
-    workspaces: { recent: [] },
+    workspaces: { recent: [], defaultWorkspace: "" },
   };
 }
 
@@ -106,7 +106,25 @@ export const useSettingsStore = defineStore("settings", () => {
     try {
       await update({
         ...settings.value,
-        workspaces: { recent: next },
+        workspaces: { ...settings.value.workspaces, recent: next },
+      });
+    } catch {
+      /* toast already shown */
+    }
+  }
+
+  /// Updates the default workspace (used to pre-populate the new-session
+  /// form). Empty string clears it. Caller decides whether the path is
+  /// real — the backend doesn't validate at this layer.
+  async function setDefaultWorkspace(path: string): Promise<void> {
+    const trimmed = path.trim();
+    try {
+      await update({
+        ...settings.value,
+        workspaces: {
+          ...settings.value.workspaces,
+          defaultWorkspace: trimmed,
+        },
       });
     } catch {
       /* toast already shown */
@@ -123,5 +141,6 @@ export const useSettingsStore = defineStore("settings", () => {
     setReasoningVisibility,
     persistLayout,
     recordWorkspaceUse,
+    setDefaultWorkspace,
   };
 });

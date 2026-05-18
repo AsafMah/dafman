@@ -390,14 +390,23 @@ function onWorkspaceClick() {
         </label>
         <div class="option-row option-row-stack">
           <span class="option-label">Workspace</span>
-          <div
-            class="workspace-path"
-            :title="record.workingDirectory ?? 'Default (cli process cwd)'"
+          <button
+            v-if="record.workingDirectory"
+            type="button"
+            class="workspace-path workspace-path-button"
+            :title="`Open ${record.workingDirectory}`"
+            :aria-label="`Open workspace folder ${record.workingDirectory}`"
+            @click="onWorkspaceClick"
           >
             <i class="pi pi-folder" aria-hidden="true" />
             <span class="workspace-path-text">
-              {{ record.workingDirectory ?? "Default" }}
+              {{ record.workingDirectory }}
             </span>
+            <i class="pi pi-external-link workspace-path-hint" aria-hidden="true" />
+          </button>
+          <div v-else class="workspace-path" title="Default (cli process cwd)">
+            <i class="pi pi-folder" aria-hidden="true" />
+            <span class="workspace-path-text">Default</span>
           </div>
         </div>
         <div class="option-actions">
@@ -683,6 +692,32 @@ function onWorkspaceClick() {
   font-size: 0.75rem;
   color: var(--p-text-muted-color);
   min-width: 0;
+}
+
+.workspace-path-button {
+  /* Same row layout as the read-only div, just rendered as a button
+   * so click + keyboard focus work. */
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--p-border-radius-md);
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+.workspace-path-button:hover {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  color: var(--p-text-color);
+}
+.workspace-path-button:focus-visible {
+  outline: 2px solid var(--p-focus-ring-color, var(--p-primary-color));
+  outline-offset: 1px;
+}
+.workspace-path-hint {
+  margin-left: auto;
+  opacity: 0.6;
+  font-size: 0.7rem;
 }
 
 .workspace-path-text {

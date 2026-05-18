@@ -91,14 +91,19 @@ const allKnownWorkspaces = computed<string[]>(() => {
   return out;
 });
 
-// Pre-fill with the most-recently-used workspace on first settings
-// load. Only when the user hasn't typed anything yet (empty → non-empty
-// transition).
+// Pre-fill with the user's default workspace on first settings load,
+// falling back to the most-recently-used path. Only when the user
+// hasn't typed anything yet (empty → non-empty transition).
+const initialWorkspaceCandidate = computed<string>(() => {
+  const def = settings.value.workspaces?.defaultWorkspace ?? "";
+  if (def) return def;
+  return allKnownWorkspaces.value[0] ?? "";
+});
 watch(
-  allKnownWorkspaces,
+  initialWorkspaceCandidate,
   (next) => {
-    if (workspaceDraft.value === "" && next.length > 0) {
-      workspaceDraft.value = next[0];
+    if (workspaceDraft.value === "" && next) {
+      workspaceDraft.value = next;
     }
   },
   { immediate: true },

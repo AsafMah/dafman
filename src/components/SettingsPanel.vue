@@ -9,9 +9,10 @@
 // New settings categories slot in as additional <section> blocks; the
 // existing collapsedGroups reactive map keys them by id.
 
-import { computed, reactive } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
@@ -55,6 +56,59 @@ async function openLogFolder() {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     toasts.error("Couldn't open log folder", message);
+  }
+}
+
+/// Default-workspace draft kept separate from the persisted value so
+/// the user can type freely without firing an RPC on every keystroke.
+/// Committed on blur / Enter. Synced from the store whenever the
+/// canonical value changes (e.g. the startup backfill landed).
+const defaultWorkspaceDraft = ref<string>(
+  settings.value.workspaces.defaultWorkspace ?? "",
+);
+watch(
+  () => settings.value.workspaces.defaultWorkspace,
+  (next) => {
+    if (next !== defaultWorkspaceDraft.value) {
+      defaultWorkspaceDraft.value = next ?? "";
+    }
+  },
+);
+
+async function commitDefaultWorkspace() {
+  const next = defaultWorkspaceDraft.value.trim();
+  if (next === settings.value.workspaces.defaultWorkspace) return;
+  await settingsStore.setDefaultWorkspace(next);
+}
+
+const isPickingDefault = ref(false);
+async function pickDefaultWorkspace() {
+  if (isPickingDefault.value) return;
+  isPickingDefault.value = true;
+  try {
+    const picked = await invokeCommand("pickFolder", {
+      startingFolder: defaultWorkspaceDraft.value.trim() || undefined,
+    });
+    if (picked) {
+      defaultWorkspaceDraft.value = picked;
+      await settingsStore.setDefaultWorkspace(picked);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    useToastStore().error("Couldn't pick folder", message);
+  } finally {
+    isPickingDefault.value = false;
+  }
+}
+
+async function revealDefaultWorkspace() {
+  const path = defaultWorkspaceDraft.value.trim();
+  if (!path) return;
+  try {
+    await invokeCommand("revealPath", { path });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    useToastStore().error("Couldn't reveal folder", message);
   }
 }
 
@@ -119,6 +173,64 @@ function toggle(id: string) {
             Default for new chats. Each session can override this from its header.
           </p>
         </label>
+      </div>
+    </section>
+
+    <!-- Workspaces -->
+    <section class="settings-group">
+      <button
+        type="button"
+        class="group-header"
+        :aria-expanded="!collapsed.workspaces"
+        @click="toggle('workspaces')"
+      >
+        <i
+          class="pi group-chevron"
+          :class="
+            collapsed.workspaces ? 'pi-chevron-right' : 'pi-chevron-down'
+          "
+          aria-hidden="true"
+        />
+        <i class="pi pi-folder group-icon" aria-hidden="true" />
+        <span class="group-label">Workspaces</span>
+      </button>
+
+      <div v-show="!collapsed.workspaces" class="group-body">
+        <div class="field">
+          <span class="field-label" id="default-workspace-label">
+            Default workspace
+          </span>
+          <div class="field-control workspace-row">
+            <InputText
+              v-model="defaultWorkspaceDraft"
+              aria-labelledby="default-workspace-label"
+              placeholder="No default"
+              size="small"
+              @blur="commitDefaultWorkspace"
+              @keydown.enter.prevent="commitDefaultWorkspace"
+            />
+            <Button
+              icon="pi pi-folder-open"
+              severity="secondary"
+              size="small"
+              aria-label="Pick default workspace folder"
+              :loading="isPickingDefault"
+              @click="pickDefaultWorkspace"
+            />
+            <Button
+              v-if="defaultWorkspaceDraft"
+              icon="pi pi-external-link"
+              severity="secondary"
+              size="small"
+              aria-label="Reveal default workspace folder"
+              @click="revealDefaultWorkspace"
+            />
+          </div>
+          <p class="field-hint">
+            Used to pre-fill the path for new sessions. Defaults to
+            <code>~/dafman</code> (created on first launch).
+          </p>
+        </div>
       </div>
     </section>
 
@@ -272,6 +384,17 @@ function toggle(id: string) {
 .field-control {
   width: 100%;
   max-width: 100%;
+}
+
+/* Default-workspace row: input + pick + reveal buttons inline. */
+.workspace-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.workspace-row :deep(.p-inputtext) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* PrimeVue Select fills its container — let it shrink with the

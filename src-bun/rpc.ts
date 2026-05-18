@@ -61,6 +61,13 @@ export interface Workspaces {
 	/// of the list is the most recent. Persisted as-is so the topbar
 	/// AutoComplete can suggest from prior runs.
 	recent: string[];
+	/// Default workspace for newly-created sessions. Pre-populates the
+	/// new-session form's path input. Resolved at startup to
+	/// `<homedir>/dafman` (auto-created) when the user hasn't set one
+	/// explicitly. May still be empty if home-directory resolution
+	/// fails (e.g. headless test env) — the renderer treats empty as
+	/// "no default" and leaves the input blank.
+	defaultWorkspace: string;
 }
 
 export interface ModelSummary {
