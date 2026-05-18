@@ -216,6 +216,11 @@ function onDockReady(event: DockviewReadyEvent) {
     layoutStore.restore(pendingRestoreLayout.value);
     pendingRestoreLayout.value = null;
   }
+  // One-shot rescue: older builds (or a stale persisted layout) could
+  // leave chat panels stuck inside the Sessions sidebar's edge group,
+  // where they have no tab/header chrome and look broken. Move any
+  // such strays out to the body. Safe no-op when the layout is clean.
+  layoutStore.rescueChatPanelsFromEdgeGroups();
   // Persist on every layout change (debounced). Covers add/remove/
   // resize/move/popout/dock — everything dockview considers a layout
   // mutation collapses into this single event.

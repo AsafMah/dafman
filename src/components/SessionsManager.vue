@@ -17,7 +17,7 @@
 // can't subscribe directly), so background-changed sessions appear
 // only after a user-triggered refresh.
 
-import { computed, onMounted, reactive, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import { useConfirm } from "primevue/useconfirm";
@@ -44,6 +44,28 @@ const { grouped, isLoading, hasLoaded, error } = storeToRefs(sessionsList);
 const openSessionIds = computed(
   () => new Set(sessionsStore.sessions.map((s) => s.id)),
 );
+
+/// Tracks whether the dockview edge group is collapsed (slim strip)
+/// vs expanded (full content). Toggled by clicking the header title.
+/// Defaults to expanded; resets on mount.
+const sidebarCollapsed = ref(false);
+
+function toggleSidebarCollapsed() {
+  const dock = layoutStore.api;
+  if (!dock) return;
+  const next = !sidebarCollapsed.value;
+  // setEdgeGroupCollapsed takes the underlying group, so look up the
+  // panel and reach its group via the api.
+  const panel = dock.getPanel(PANEL_ID);
+  if (!panel) return;
+  // Cast: setEdgeGroupCollapsed exists on the DockviewApi but the
+  // type emitted from dockview-vue's ref doesn't always include the
+  // optional shell-manager methods. Runtime is fine.
+  (dock as unknown as {
+    setEdgeGroupCollapsed: (group: unknown, collapsed: boolean) => void;
+  }).setEdgeGroupCollapsed(panel.api.group, next);
+  sidebarCollapsed.value = next;
+}
 
 /// Map of workspace-group-key -> collapsed flag. Reactive so toggling
 /// re-renders the affected group. Default-collapsed for now would be
@@ -152,10 +174,21 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
     <ConfirmPopup />
 
     <header class="manager-header">
-      <h2 class="manager-title">
+      <button
+        type="button"
+        class="manager-title-button"
+        :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-expanded="!sidebarCollapsed"
+        @click="toggleSidebarCollapsed"
+      >
+        <i
+          class="pi manager-title-chevron"
+          :class="sidebarCollapsed ? 'pi-chevron-right' : 'pi-chevron-down'"
+          aria-hidden="true"
+        />
         <i class="pi pi-list" aria-hidden="true" />
-        Sessions
-      </h2>
+        <span class="manager-title-text">Sessions</span>
+      </button>
       <div class="manager-actions">
         <Button
           icon="pi pi-refresh"
@@ -300,20 +333,50 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   min-height: var(--dv-tabs-and-actions-container-height, 35px);
 }
 
-.manager-title {
+.manager-title-button {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   font-size: 0.75rem;
   font-weight: 600;
   margin: 0;
+  padding: 0.2rem 0.3rem;
   color: var(--p-text-color);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  border: none;
+  border-radius: var(--p-border-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.manager-title-button:hover {
+  background: color-mix(in srgb, var(--p-text-color) 6%, transparent);
+}
+
+.manager-title-button:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
+}
+
+.manager-title-chevron {
+  font-size: 0.65rem;
+  width: 0.75rem;
+  text-align: center;
+  flex: 0 0 auto;
+  color: var(--p-text-muted-color);
+}
+
+.manager-title-text {
+  flex: 1 1 auto;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
 }
 
 .manager-actions {
@@ -470,9 +533,14 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 
 .session-label {
   font-size: 0.85rem;
+  /* Allow long titles to wrap onto two lines rather than ellipsising
+   * away the tail — chat-summary titles are valuable as-is. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
+  line-height: 1.25;
 }
 
 .session-meta {

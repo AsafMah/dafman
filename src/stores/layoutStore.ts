@@ -84,28 +84,25 @@ export const useLayoutStore = defineStore("layout", () => {
     if (!dock) return;
     if (dock.getPanel(sessionId)) return;
     // When `targetGroupId` is provided (e.g. replacing an orphan panel
-    // inline) we drop the new panel as a tab inside that group. Otherwise
-    // we tile: a new group to the right of the active *body* group,
-    // falling back to dockview's default placement on the very first
-    // panel. We deliberately ignore edge / floating / popout groups
-    // here — landing a chat panel inside the Sessions sidebar (because
-    // that's where the focus happens to be) is jarring and looks
-    // broken in the rotated side-tab strip.
-    const referenceGroup =
-      opts.targetGroupId ?? firstBodyGroupId();
+    // inline) we drop the new panel as a tab inside that group.
+    // Otherwise we tile: a new group to the right of the active *body*
+    // group. If no body group exists at all (the only thing on screen
+    // is the Sessions sidebar), we explicitly create one so the panel
+    // doesn't end up tabbed inside the edge group.
+    let referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
+    if (!referenceGroup) {
+      const body = dock.addGroup();
+      referenceGroup = body.id;
+    }
     dock.addPanel({
       id: sessionId,
       component: "chat",
       title: opts.title ?? shortPanelTitle(sessionId),
       params: { sessionId },
-      ...(referenceGroup
-        ? {
-            position: {
-              referenceGroup,
-              direction: opts.targetGroupId ? "within" : "right",
-            },
-          }
-        : {}),
+      position: {
+        referenceGroup,
+        direction: opts.targetGroupId ? "within" : "right",
+      },
     });
   }
 
@@ -123,6 +120,46 @@ export const useLayoutStore = defineStore("layout", () => {
       if (group.model.location.type === "grid") return group.id;
     }
     return undefined;
+  }
+
+  /// One-shot cleanup: scans every panel and moves any chat panels
+  /// (component === "chat") that are stuck inside an edge group out
+  /// to the body. Runs once after layout restore to recover from
+  /// older bugs that let chat panels land in the Sessions sidebar.
+  ///
+  /// Uses `panel.api.moveTo({ group })` so the panel keeps its state;
+  /// creates a fresh body group when none exists.
+  function rescueChatPanelsFromEdgeGroups(): void {
+    const dock = api.value;
+    if (!dock) return;
+    const stuck: Array<{ panelId: string }> = [];
+    for (const group of dock.groups) {
+      if (group.model.location.type === "grid") continue;
+      for (const panel of group.panels) {
+        if (panel.api.component === "chat") {
+          stuck.push({ panelId: panel.api.id });
+        }
+      }
+    }
+    if (stuck.length === 0) return;
+    let bodyGroupId = firstBodyGroupId();
+    if (!bodyGroupId) {
+      const body = dock.addGroup();
+      bodyGroupId = body.id;
+    }
+    const target = dock.getGroup(bodyGroupId);
+    if (!target) return;
+    for (const { panelId } of stuck) {
+      const panel = dock.getPanel(panelId);
+      // `moveTo` takes the concrete DockviewGroupPanel class but
+      // `dock.getGroup()` is typed as IDockviewGroupPanel here. The
+      // runtime value is the same instance; cast through unknown.
+      if (panel) {
+        panel.api.moveTo({
+          group: target as unknown as Parameters<typeof panel.api.moveTo>[0]["group"],
+        });
+      }
+    }
   }
 
   /// Swaps an orphan panel (a session that failed to resume on
@@ -308,6 +345,7 @@ export const useLayoutStore = defineStore("layout", () => {
     isPanelOpen,
     closePanel,
     pruneEmptyEdgeGroup,
+    rescueChatPanelsFromEdgeGroups,
     toggleEdgeGroup,
     snapshot,
     restore,
