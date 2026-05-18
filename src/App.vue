@@ -40,10 +40,19 @@ function openPlayground() {
     existing.api.setActive();
     return;
   }
+  // Always land the playground in a body group, not the active edge
+  // group (Sessions / Settings). When no body group exists yet —
+  // e.g. only the Sessions sidebar is open at startup — create one
+  // explicitly so the panel doesn't get tabbed into the sidebar.
+  let referenceGroup = layoutStore.firstBodyGroupId();
+  if (!referenceGroup) {
+    referenceGroup = dock.addGroup().id;
+  }
   dock.addPanel({
     id: PLAYGROUND_PANEL_ID,
     component: "playground",
     title: "Dev Playground",
+    position: { referenceGroup, direction: "within" },
   });
 }
 

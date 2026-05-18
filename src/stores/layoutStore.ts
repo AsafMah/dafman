@@ -354,6 +354,7 @@ export const useLayoutStore = defineStore("layout", () => {
     pruneEmptyEdgeGroup,
     rescueChatPanelsFromEdgeGroups,
     toggleEdgeGroup,
+    firstBodyGroupId,
     snapshot,
     restore,
   };
