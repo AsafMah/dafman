@@ -323,13 +323,6 @@ async function sendMessage(text: string) {
   border-left: 3px solid transparent;
 }
 
-.message-card.user {
-  /* Tint user messages with a faint accent too, so the session colour
-   * runs end-to-end through the transcript. */
-  background: color-mix(in srgb, var(--accent) 8%, var(--p-content-background));
-  border-left-color: color-mix(in srgb, var(--accent) 65%, transparent);
-}
-
 .message-card.assistant {
   background: color-mix(in srgb, var(--accent) 18%, var(--p-content-background));
   border-left-color: var(--accent);

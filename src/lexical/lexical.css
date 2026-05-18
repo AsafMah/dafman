@@ -110,7 +110,11 @@
   flex: 1 1 auto;
   position: relative;
   min-width: 0;
-  border: 1px solid var(--p-content-border-color);
+  /* Use the session accent (inherited from `.chat-tile`) as the
+   * composer's idle border so the per-session identity reaches the
+   * input chrome too. Fall back to the neutral border token when
+   * mounted outside a session tile (dev playground, tests). */
+  border: 1px solid color-mix(in srgb, var(--accent, var(--p-content-border-color)) 50%, var(--p-content-border-color));
   border-radius: var(--p-border-radius-md);
   background: var(--p-content-background);
   /* Block (not flex) — Lexical warns that `display: flex` on the
@@ -122,8 +126,27 @@
 }
 
 .lex-composer-shell:focus-within {
-  border-color: var(--p-primary-color);
-  box-shadow: 0 0 0 1px var(--p-primary-color);
+  border-color: var(--accent, var(--p-primary-color));
+  box-shadow: 0 0 0 1px var(--accent, var(--p-primary-color));
+}
+
+/* Send button picks up the session accent inside a composer that lives
+ * inside a session tile. Targets the PrimeVue Button by class so the
+ * dev playground composer (no `--accent` set) falls back to PrimeVue's
+ * default primary colour. */
+.lex-composer .p-button {
+  background: var(--accent, var(--p-primary-color));
+  border-color: var(--accent, var(--p-primary-color));
+  color: var(--p-primary-contrast-color, white);
+}
+
+.lex-composer .p-button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 85%, black);
+  border-color: color-mix(in srgb, var(--accent, var(--p-primary-color)) 85%, black);
+}
+
+.lex-composer .p-button:not(:disabled):focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, var(--p-primary-color)) 40%, transparent);
 }
 
 .lex-composer-input {
