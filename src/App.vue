@@ -379,7 +379,6 @@ function openSessionsByDefault(attempt = 0) {
         <DockviewVue
           class="dock"
           watermark-component="watermark"
-          right-header-actions-component="chatTabActions"
           default-tab-component="chatTab"
           @ready="onDockReady"
         />
