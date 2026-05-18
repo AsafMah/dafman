@@ -76,6 +76,17 @@ const emit = defineEmits<{
   (e: "update:defaultMode", mode: DefaultSendMode): void;
 }>();
 
+/// Imperatively focus the editor. Used by ChatWindow when an external
+/// surface (e.g. the Sessions sidebar) asks to bring the composer
+/// into focus without going through normal click-to-focus.
+function focusComposer(): void {
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor) return;
+  editor.focus();
+}
+
+defineExpose({ focus: focusComposer });
+
 const editable = computed(() => !props.disabled);
 const richText = computed(() => props.enableMarkdownShortcuts);
 

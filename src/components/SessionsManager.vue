@@ -42,6 +42,19 @@ const openSessionIds = computed(
   () => new Set(sessionsStore.sessions.map((s) => s.id)),
 );
 
+/// Within a workspace group, push currently-open sessions to the top
+/// so the user can jump back to live conversations without scrolling
+/// past closed ones. Inside each subgroup, keep the existing MRU
+/// order (modifiedTime DESC). Stable sort across all browsers.
+function sortedGroupSessions(group: { sessions: SessionMetadataSummary[] }) {
+  const open: SessionMetadataSummary[] = [];
+  const closed: SessionMetadataSummary[] = [];
+  for (const s of group.sessions) {
+    (openSessionIds.value.has(s.sessionId) ? open : closed).push(s);
+  }
+  return [...open, ...closed];
+}
+
 // ---------- New-session form ----------
 
 const workspaceDraft = ref("");
@@ -227,7 +240,20 @@ function onRefresh() {
 }
 
 async function onResume(session: SessionMetadataSummary) {
-  if (openSessionIds.value.has(session.sessionId)) return;
+  // Already-open sessions: activate the panel and focus the composer
+  // rather than no-op. Clicking the row in the sidebar is the most
+  // natural "take me there" affordance.
+  if (openSessionIds.value.has(session.sessionId)) {
+    const dock = layoutStore.api;
+    const panel = dock?.getPanel(session.sessionId);
+    panel?.api.setActive();
+    window.dispatchEvent(
+      new CustomEvent("dafman:focus-composer", {
+        detail: { sessionId: session.sessionId },
+      }),
+    );
+    return;
+  }
   try {
     const record = await sessionsStore.restoreSession(session.sessionId);
     if (record) layoutStore.addPanel(record.id);
@@ -417,7 +443,7 @@ void toasts; // referenced inside async handlers
 
         <ul v-show="!collapsedGroups[group.key]" class="session-list">
           <li
-            v-for="session in group.sessions"
+            v-for="session in sortedGroupSessions(group)"
             :key="session.sessionId"
             class="session-row"
             :class="{ 'is-open': openSessionIds.has(session.sessionId) }"
@@ -426,8 +452,11 @@ void toasts; // referenced inside async handlers
               type="button"
               class="session-main"
               :title="session.sessionId"
-              :aria-label="`Resume ${sessionLabel(session)}`"
-              :disabled="openSessionIds.has(session.sessionId)"
+              :aria-label="
+                openSessionIds.has(session.sessionId)
+                  ? `Focus ${sessionLabel(session)}`
+                  : `Resume ${sessionLabel(session)}`
+              "
               @click="onResume(session)"
             >
               <span class="session-label">{{ sessionLabel(session) }}</span>

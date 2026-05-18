@@ -56,6 +56,24 @@ const items = ref<ChatItem[]>([]);
 const ambient = ref<ChatAmbient>(defaultAmbient());
 const messagesEl = ref<HTMLElement | null>(null);
 const tileEl = ref<HTMLElement | null>(null);
+const composerRef = ref<{ focus: () => void } | null>(null);
+
+/// External "focus my composer" requests arrive as a window event
+/// from the Sessions sidebar (clicking an already-open session row).
+/// Filter by sessionId so the event only acts on the matching tile.
+function onExternalFocusRequest(e: Event) {
+  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+  if (!detail || detail.sessionId !== props.sessionId) return;
+  composerRef.value?.focus();
+}
+
+onMounted(() => {
+  window.addEventListener("dafman:focus-composer", onExternalFocusRequest);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("dafman:focus-composer", onExternalFocusRequest);
+});
 /// Live `--tile-height` so the composer can cap itself at a percentage of
 /// the chat tile's height even though the tile lives inside a flex/grid
 /// layout with no fixed height.
@@ -293,6 +311,7 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
 
     <form class="chat-composer" @submit.prevent>
       <MessageComposer
+        ref="composerRef"
         :default-mode="props.defaultSendMode"
         @submit="sendMessage"
         @update:default-mode="onUpdateDefaultMode"

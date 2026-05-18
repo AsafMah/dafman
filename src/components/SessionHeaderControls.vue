@@ -12,6 +12,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
+import Chip from "primevue/chip";
 import InputText from "primevue/inputtext";
 import Popover from "primevue/popover";
 import Select from "primevue/select";
@@ -153,17 +154,19 @@ function onWorkspaceClick() {
 
 <template>
   <div v-if="record" class="session-header-controls">
-    <button
+    <Chip
       v-if="workspaceLabel"
-      type="button"
+      :label="workspaceLabel"
+      icon="pi pi-folder"
       class="workspace-chip"
       :title="`Open ${record.workingDirectory ?? ''}`"
       :aria-label="`Open workspace folder ${record.workingDirectory ?? ''}`"
+      role="button"
+      tabindex="0"
       @click="onWorkspaceClick"
-    >
-      <i class="pi pi-folder" aria-hidden="true" />
-      <span class="workspace-chip-text">{{ workspaceLabel }}</span>
-    </button>
+      @keydown.enter.prevent="onWorkspaceClick"
+      @keydown.space.prevent="onWorkspaceClick"
+    />
     <Select
       :input-id="`model-${props.sessionId}`"
       v-model="modelChoice"
@@ -340,78 +343,71 @@ function onWorkspaceClick() {
  * essential first) — gear is always visible because it's the
  * fallback entry point to the popover where everything still lives.
  *
- *   wide        →  model + effort + workspace + mode + reasoning + gear
- *   < 38rem     →  drop "reasoning"
- *   < 32rem     →  drop "mode"          (still in popover)
- *   < 26rem     →  drop workspace chip
- *   < 20rem     →  drop "effort"
- *   < 14rem     →  drop "model"         (gear only)
- *
- * Numbers are chosen so the next breakpoint kicks in only after the
- * previously-visible items genuinely don't fit at their min-widths
- * (selects ~7-11rem, workspace chip ~14rem, gap ~0.35rem * gaps). */
-@container (max-width: 38rem) {
+ *   wide        →  workspace + model + effort + mode + reasoning + gear
+ *   < 30rem     →  drop "reasoning"
+ *   < 24rem     →  drop "mode"          (still in popover)
+ *   < 20rem     →  drop workspace chip
+ *   < 16rem     →  drop "effort"
+ *   < 12rem     →  drop "model"         (gear only) */
+@container (max-width: 30rem) {
   .compact-select-reasoning {
     display: none;
   }
 }
-@container (max-width: 32rem) {
+@container (max-width: 24rem) {
   .compact-select-mode {
     display: none;
   }
 }
-@container (max-width: 26rem) {
+@container (max-width: 20rem) {
   .workspace-chip {
     display: none;
   }
 }
-@container (max-width: 20rem) {
+@container (max-width: 16rem) {
   .compact-select-effort {
     display: none;
   }
 }
-@container (max-width: 14rem) {
+@container (max-width: 12rem) {
   .compact-select {
     display: none;
   }
 }
 
-/* Workspace chip lives in the tab strip header (right-actions); the
- * basename is the visible label, full path is in the tooltip. The
- * button-with-no-background styling matches PrimeVue's `text` button
- * variant so it reads as a label, not a primary action. */
+/* Workspace chip sits on the LEFT edge of the header strip (the rest
+ * of the controls right-align). PrimeVue's Chip is a div with icon +
+ * label baked in — style it to read as a clickable affordance. */
 .workspace-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+  margin-right: auto;
   max-width: 14rem;
   min-width: 0;
   height: 1.75rem;
-  padding: 0 0.5rem;
-  border-radius: var(--p-border-radius-md);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--p-text-muted-color);
-  font-size: 0.75rem;
   cursor: pointer;
-  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .workspace-chip:hover {
   /* Theme-aware: mix the text colour into transparent so the chip
    * gets a faint backdrop on hover that auto-flips between light and
-   * dark. `:global(.app-dark)` overrides inside scoped CSS turned
-   * out unreliable here. */
+   * dark. */
   background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
   color: var(--p-text-color);
 }
 
-.workspace-chip-text {
+.workspace-chip:focus-visible {
+  outline: 2px solid var(--p-focus-ring-color, var(--p-primary-color));
+  outline-offset: 2px;
+}
+
+.workspace-chip :deep(.p-chip-label) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* RTL trick keeps the tail visible if the basename itself is long */
-  direction: ltr;
+  max-width: 11rem;
 }
 
 /* PrimeVue Select sized to fit comfortably alongside dockview tabs.
