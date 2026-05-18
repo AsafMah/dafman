@@ -256,12 +256,10 @@ function closeToast({ message }: { message: ToastMessageOptions }) {
 /// the conversation — followed by the SDK title (`folder · title`).
 watch(
   () =>
-    sessions.value.map(
-      (s) => [s.id, s.title, s.workingDirectory] as const,
-    ),
+    sessions.value.map((s) => [s.id, s.title] as const),
   (entries) => {
-    for (const [id, title, wd] of entries) {
-      layoutStore.renamePanel(id, composePanelTitle(id, title, wd));
+    for (const [id, title] of entries) {
+      layoutStore.renamePanel(id, composePanelTitle(id, title));
     }
   },
   { deep: true },

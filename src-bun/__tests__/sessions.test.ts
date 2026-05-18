@@ -175,6 +175,36 @@ describe("SessionRegistry", () => {
 		expect((emitted[0]?.data as { intent?: string }).intent).toBe("hi");
 	});
 
+	test("forward coerces non-object data payloads to empty object", async () => {
+		// SDK is typed as `data: Record<string, unknown>` but we can't
+		// trust the wire — if a build ever sends `null` / array / string
+		// the downstream reducer must still see an object. The previous
+		// `?? {}` fallback silently passed `null` through into a cast,
+		// so this regression-pins the guard added to `forward`.
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const emitted: SessionEventPayload[] = [];
+		const reg = new SessionRegistry((p) => emitted.push(p));
+		await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.fire({ type: "x.null", data: null as unknown as Record<string, unknown> });
+		fake.fire({
+			type: "x.array",
+			data: ["nope"] as unknown as Record<string, unknown>,
+		});
+		fake.fire({
+			type: "x.string",
+			data: "nope" as unknown as Record<string, unknown>,
+		});
+		fake.fire({ type: "x.missing" } as unknown as { type: string; data: Record<string, unknown> });
+		expect(emitted).toHaveLength(4);
+		for (const p of emitted) {
+			expect(p.data).toEqual({});
+		}
+	});
+
 	test("send/setModel proxy through the fake session", async () => {
 		const client = new FakeClient();
 		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);

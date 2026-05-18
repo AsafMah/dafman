@@ -206,12 +206,30 @@ export class SessionRegistry {
 		// (`agentId`, `id`, `timestamp`) so the frontend can correlate
 		// sub-agent activity without us mirroring every variant.
 		const envelope = event as unknown as {
-			data?: Record<string, unknown>;
+			data?: unknown;
 			agentId?: string;
 			id?: string;
 			timestamp?: string;
 		};
-		const data = (envelope.data ?? {}) as Record<string, unknown>;
+		// SDK is typed as `data: Record<string, unknown>` but we can't
+		// trust the wire — a malformed `null` / array / primitive would
+		// silently coerce to `{}` and downstream reducers (which read
+		// `data.messageId`, `data.toolCallId`, …) would see an empty
+		// payload instead of the real one. Reject anything that isn't a
+		// plain object and warn so the issue surfaces in diagnostics.
+		const rawData = envelope.data;
+		const isPlainObject =
+			rawData !== null &&
+			typeof rawData === "object" &&
+			!Array.isArray(rawData);
+		if (!isPlainObject && rawData !== undefined) {
+			log.warn("dropping malformed event.data on forward", {
+				sessionId,
+				eventType,
+				dataType: rawData === null ? "null" : Array.isArray(rawData) ? "array" : typeof rawData,
+			});
+		}
+		const data = (isPlainObject ? rawData : {}) as Record<string, unknown>;
 		try {
 			this.emit({
 				sessionId,

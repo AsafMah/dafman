@@ -54,6 +54,22 @@ installRendererLogBridge();
 // production bundles via Vite's chunk-splitting.
 async function mountWith(Root: typeof App) {
   const app = createApp(Root);
+  // Forward Vue lifecycle errors (render, watch, async setup, …) to
+  // the bun log. We deliberately rethrow into `console.error` so the
+  // global console interceptor installed by `installRendererLogBridge`
+  // covers devtools too — without double-logging through `rendererLog`
+  // here.
+  app.config.errorHandler = (err, instance, info) => {
+    const componentName =
+      (instance?.$options?.name as string | undefined) ??
+      (instance?.$options?.__name as string | undefined) ??
+      "<unknown>";
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    // Single log path via the console interceptor (one bun log entry,
+    // visible in devtools).
+    console.error(`[vue] ${message}`, { component: componentName, info, stack });
+  };
   app.use(createPinia());
   app.use(PrimeVue, {
     theme: {

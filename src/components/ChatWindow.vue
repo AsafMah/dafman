@@ -77,23 +77,35 @@ onBeforeUnmount(() => {
 });
 /// Live `--tile-height` so the composer can cap itself at a percentage of
 /// the chat tile's height even though the tile lives inside a flex/grid
-/// layout with no fixed height.
+/// layout with no fixed height. Resize events fire hundreds of times per
+/// second during a drag; coalesce to one CSS write per frame via rAF so
+/// style recalcs stay bounded.
 let tileResizeObserver: ResizeObserver | null = null;
+let tileResizeRaf: number | null = null;
 
 onMounted(() => {
   if (typeof ResizeObserver === "undefined" || !tileEl.value) return;
   const el = tileEl.value;
   const update = () => {
+    tileResizeRaf = null;
     el.style.setProperty("--tile-height", `${el.clientHeight}px`);
   };
+  const schedule = () => {
+    if (tileResizeRaf !== null) return;
+    tileResizeRaf = requestAnimationFrame(update);
+  };
   update();
-  tileResizeObserver = new ResizeObserver(update);
+  tileResizeObserver = new ResizeObserver(schedule);
   tileResizeObserver.observe(el);
 });
 
 onBeforeUnmount(() => {
   tileResizeObserver?.disconnect();
   tileResizeObserver = null;
+  if (tileResizeRaf !== null) {
+    cancelAnimationFrame(tileResizeRaf);
+    tileResizeRaf = null;
+  }
 });
 
 /// Fallback "thinking" flag used until we observe a turn boundary; after
@@ -321,17 +333,16 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
     </footer>
 
     <form class="chat-composer" @submit.prevent>
-      <div class="composer-row">
-        <ModeButtonGroup :session-id="props.sessionId" />
-        <div class="composer-grow">
-          <MessageComposer
-            ref="composerRef"
-            :default-mode="props.defaultSendMode"
-            @submit="sendMessage"
-            @update:default-mode="onUpdateDefaultMode"
-          />
-        </div>
-      </div>
+      <MessageComposer
+        ref="composerRef"
+        :default-mode="props.defaultSendMode"
+        @submit="sendMessage"
+        @update:default-mode="onUpdateDefaultMode"
+      >
+        <template #leading>
+          <ModeButtonGroup :session-id="props.sessionId" />
+        </template>
+      </MessageComposer>
     </form>
   </section>
 </template>
@@ -480,22 +491,10 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   flex: 0 0 auto;
 }
 
-/* Composer row: mode group on the left, MessageComposer (input +
- * SplitButton) takes the rest of the width. The mode group is a
- * fixed-width icon segmented control; the composer grows to fill the
- * remainder. */
-.composer-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  padding: 0.5rem 0.5rem 0 0.5rem;
-}
-.composer-grow {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 /* MessageComposer brings its own border-top + padding via the global
  * `.lex-composer` styles in `src/lexical/lexical.css`; the form wrapper
- * just contributes layout placement here. */
+ * just contributes layout placement here. The run-mode segmented control
+ * (`ModeButtonGroup`) is passed in via MessageComposer's `#leading`
+ * slot so it lives inside the same flex row — shared border-top, shared
+ * padding, height-stretched alongside the input + send button. */
 </style>

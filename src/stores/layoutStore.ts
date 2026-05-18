@@ -37,13 +37,17 @@ export function basename(path: string | null | undefined): string {
 
 /// Composes the dockview tab title. We deliberately keep tabs short
 /// — workspace shows up in the per-session controls (chat tab strip
-/// right actions), so duplicating it in the tab title makes the
-/// label very long for no extra info. SDK-supplied title preferred;
-/// fall back to a shortened session id.
+/// right actions), so duplicating it in the tab title makes the label
+/// very long for no extra info. SDK-supplied title preferred; fall
+/// back to a shortened session id.
+///
+/// (Used to also take a `workingDirectory` so an earlier design could
+/// prefix the folder; that approach was dropped — the param is gone
+/// now. If we re-introduce folder-prefixed titles, add an options bag
+/// rather than a positional arg.)
 export function composePanelTitle(
   sessionId: string,
   title: string | null,
-  _workingDirectory: string | null,
 ): string {
   if (title) return title;
   return shortPanelTitle(sessionId);

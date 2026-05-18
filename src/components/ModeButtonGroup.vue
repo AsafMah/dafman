@@ -55,16 +55,47 @@ const modeChoice = computed<SessionMode | null>({
 </template>
 
 <style scoped>
+/* Mode segmented control. Mounted via MessageComposer's `#leading`
+ * slot, so it inherits the composer row's `align-items: stretch` —
+ * but we pin to the top via `align-self: flex-start` so the control
+ * doesn't grow into a tall block when the input expands multiline.
+ * That also matches the "not stuck to the bottom" feedback. */
 .mode-button-group {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: stretch;
+  align-self: flex-start;
+}
+.mode-button-group :deep(.p-selectbutton) {
+  display: inline-flex;
+  align-items: stretch;
 }
 .mode-button-group :deep(.p-selectbutton .p-button) {
-  height: 2rem;
-  padding: 0 0.55rem;
+  /* Match SplitButton (send) size on the right so the row reads as
+   * three equal-height chrome blocks. */
+  height: auto;
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
   font-size: 0.9rem;
+  /* Idle: subtle accent tint so the control still reads as part of the
+   * session, but doesn't compete with the input. */
+  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 8%, var(--p-content-background));
+  border-color: color-mix(in srgb, var(--accent, var(--p-primary-color)) 35%, var(--p-content-border-color));
+  color: var(--p-text-color);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.mode-button-group :deep(.p-selectbutton .p-button:not(.p-togglebutton-checked):hover) {
+  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 18%, var(--p-content-background));
+}
+/* Selected button picks up the full accent — mirrors the SubmitButton
+ * styling in `lexical.css` so the row's two accented actions match. */
+.mode-button-group :deep(.p-selectbutton .p-button.p-togglebutton-checked) {
+  background: var(--accent, var(--p-primary-color));
+  border-color: var(--accent, var(--p-primary-color));
+  color: var(--p-primary-contrast-color, white);
 }
 .mode-button-group :deep(.p-selectbutton .p-button .pi) {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .sr-only {

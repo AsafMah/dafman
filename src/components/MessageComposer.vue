@@ -42,7 +42,6 @@ import {
 } from "../lexical/plugins";
 import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
-import { rendererLog } from "../ipc/rendererLog";
 import type { DefaultSendMode } from "../stores/sessionsStore";
 
 const props = withDefaults(
@@ -96,11 +95,10 @@ const initialConfig = computed(() => ({
   nodes: markdownNodes,
   theme: lexicalTheme,
   onError(error: Error) {
-    // Mirror into both consoles + bun log so we can debug typing /
-    // node-registration failures without devtools.
-    rendererLog("error", `[lexical composer] ${error.message}`, {
-      stack: error.stack,
-    });
+    // `installRendererLogBridge` (`src/ipc/rendererLog.ts`) already
+    // intercepts `console.error` and mirrors it to the bun JSON log,
+    // so a single `console.error` reaches both surfaces. Don't also
+    // call `rendererLog` here — that would double-log.
     console.error("[lexical composer]", error);
   },
 }));
@@ -219,6 +217,11 @@ const SubmitButton = defineComponent({
       <EditableSync :editable="editable" />
       <SubmitOnEnter @submit="onSubmit" />
       <TypingDiagnostic v-if="diagEnabled" />
+      <!-- Optional leading content rendered inside the composer's flex
+           row, before the input shell. Chat surfaces use this to host
+           the run-mode segmented control so it shares the composer's
+           border-top, padding, and height alignment. -->
+      <slot name="leading" />
       <div class="lex-composer-shell">
         <template v-if="richText">
           <RichTextPlugin>

@@ -128,10 +128,15 @@ function onClose(event: MouseEvent) {
   border-top-left-radius: var(--p-border-radius-xl);
   border-top-right-radius: var(--p-border-radius-xl);
   padding: 0.3rem 0.6rem 0.3rem 0.7rem;
-  margin: 0 2px;
+  /* No left margin: the active tab's 4 px accent rail must sit flush at
+   * x=0 so it lines up with `.chat-tile`'s 4 px left rail underneath.
+   * A right-side gap keeps stacked tabs visually separated. */
+  margin: 0 4px 0 0;
   /* Inactive tabs get a thinner accent rail; active gets the full 4 px
-   * to match `.chat-tile`'s left rail. */
+   * to match `.chat-tile`'s left rail. Inactive tabs add 2 px of left
+   * padding to compensate so their content still aligns with active. */
   border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  padding-left: calc(0.7rem + 2px);
   /* Slight accent tint even when inactive — keeps the session
    * identifiable in a stack. */
   background: color-mix(
@@ -153,6 +158,10 @@ function onClose(event: MouseEvent) {
 .chat-tab-active {
   border-left-width: 4px;
   border-left-color: var(--accent);
+  /* Active tab now has a 4 px border; reset the inactive 2 px padding
+   * compensation so content x-position is the same as inactive tabs and
+   * the rail is flush with `.chat-tile`'s 4 px left rail underneath. */
+  padding-left: 0.7rem;
   background: color-mix(in srgb, var(--accent) 18%, var(--p-content-background));
   color: var(--p-text-color);
   font-weight: 500;

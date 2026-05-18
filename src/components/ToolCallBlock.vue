@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import type { ToolStatus } from "../lib/chatEvents";
 import { getToolRenderer } from "../lib/toolRenderers";
+import { fenced } from "../lib/markdown";
 import MessageContent from "./MessageContent.vue";
 
 const props = defineProps<{
@@ -92,15 +93,10 @@ const argsPretty = computed(() => {
   }
 });
 
-/// Wrap a string in a fenced markdown code block so `MessageContent`
-/// renders it via Lexical's prism-backed CodeNode. Language tag is
-/// supplied by the per-tool renderer (`argsLanguage` / `resultLanguage`).
-function fenced(content: string, language: string): string {
-  if (!content) return "";
-  // Add a trailing newline so the closing fence is on its own line.
-  const body = content.endsWith("\n") ? content : `${content}\n`;
-  return `\`\`\`${language}\n${body}\`\`\``;
-}
+/// Args + result blocks render through `MessageContent` (Lexical's
+/// prism-backed CodeNode) by wrapping the payload in a markdown fence.
+/// `fenced` (lib/markdown) picks an outer fence longer than any inner
+/// backtick run so tool output containing ``` can't close the block.
 
 const argsBlock = computed(() =>
   fenced(argsPretty.value, renderHints.value.argsLanguage),

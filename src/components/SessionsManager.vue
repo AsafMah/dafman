@@ -188,11 +188,7 @@ async function onCreateSession() {
     if (record) {
       if (wd) void settingsStore.recordWorkspaceUse(wd);
       layoutStore.addPanel(record.id, {
-        title: composePanelTitle(
-          record.id,
-          record.title,
-          record.workingDirectory,
-        ),
+        title: composePanelTitle(record.id, record.title),
       });
     }
   } catch {
@@ -209,11 +205,7 @@ async function onNewInWorkspace(workspacePath: string) {
     if (record) {
       if (wd) void settingsStore.recordWorkspaceUse(wd);
       layoutStore.addPanel(record.id, {
-        title: composePanelTitle(
-          record.id,
-          record.title,
-          record.workingDirectory,
-        ),
+        title: composePanelTitle(record.id, record.title),
       });
     }
   } catch {
