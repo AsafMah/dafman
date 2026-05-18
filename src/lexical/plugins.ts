@@ -77,12 +77,35 @@ export const EditableSync = defineComponent({
   },
 });
 
-/// Submit-on-Enter behaviour for the composer.
+/// Submit-on-Ctrl-Enter behaviour for the composer.
 ///
-/// * Plain Enter -> emit `submit` with the current plain-text content and
-///   clear the editor. Empty/whitespace-only buffers are ignored.
-/// * Shift+Enter -> fall through to Lexical's default (newline).
-/// * IME composition (`event.isComposing` or `keyCode === 229`) -> no-op.
+/// New mapping (IDE convention — plain Enter is reserved for Lexical's
+/// own paragraph-break command so markdown block breaks reach the
+/// transcript):
+///   * `Ctrl+Enter` -> emit `submit` with `mode: "default"`
+///   * `Ctrl+Shift+Enter` -> emit `submit` with `mode: "interrupt"`
+///   * `Alt+Enter` -> emit `submit` with `mode: "queue"` (explicit
+///     non-default queue regardless of the session's default)
+///   * `Enter` / `Shift+Enter` -> not consumed (Lexical default — new
+///     paragraph / soft break respectively)
+///   * IME composition (`event.isComposing` or `keyCode === 229`) ->
+///     not consumed.
+///
+/// Lexical command priority: HIGH, so we run before the default Enter
+/// handler. We only `return true` (consume) when one of our chord
+/// matches fired — otherwise return false so the default paragraph
+/// command can run.
+///
+/// `mode` semantics:
+///   "default"   -> use the session's `defaultSendMode` (Steer by default)
+///   "queue"     -> force the queue mode regardless of default
+///   "interrupt" -> abort then send (force, regardless of default)
+export type ComposerSubmitMode = "default" | "queue" | "interrupt";
+export interface ComposerSubmitPayload {
+  text: string;
+  mode: ComposerSubmitMode;
+}
+
 export const SubmitOnEnter = defineComponent({
   name: "SubmitOnEnter",
   emits: ["submit"],
@@ -93,11 +116,25 @@ export const SubmitOnEnter = defineComponent({
       (event) => {
         const e = event as KeyboardEvent | null;
         if (!e) return false;
-        if (e.shiftKey) return false;
         if (e.isComposing || e.keyCode === 229) return false;
+        // We only handle modifier chords. Plain Enter / Shift+Enter
+        // fall through to Lexical's default paragraph / soft-break
+        // commands so markdown block breaks work.
+        const ctrl = e.ctrlKey || e.metaKey; // metaKey for macOS
+        const isCtrlEnter = ctrl && !e.shiftKey && !e.altKey;
+        const isCtrlShiftEnter = ctrl && e.shiftKey && !e.altKey;
+        const isAltEnter = e.altKey && !ctrl && !e.shiftKey;
+        let mode: ComposerSubmitMode | null = null;
+        if (isCtrlEnter) mode = "default";
+        else if (isCtrlShiftEnter) mode = "interrupt";
+        else if (isAltEnter) mode = "queue";
+        if (mode === null) return false;
         e.preventDefault();
         const text = consumeComposerText(editor);
-        if (text !== null) emit("submit", text);
+        if (text !== null) {
+          const payload: ComposerSubmitPayload = { text, mode };
+          emit("submit", payload);
+        }
         return true;
       },
       COMMAND_PRIORITY_HIGH,

@@ -92,6 +92,7 @@ function dismissPanel() {
     :accent="record.accent"
     :events="record.events"
     :reasoning-visibility-override="record.reasoningVisibilityOverride"
+    :default-send-mode="record.defaultSendMode"
   />
   <div v-else class="missing-pane">
     <i class="pi pi-inbox missing-icon" aria-hidden="true" />

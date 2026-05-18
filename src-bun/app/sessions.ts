@@ -203,14 +203,32 @@ export class SessionRegistry {
 		}
 	}
 
-	async send(sessionId: string, text: string): Promise<string> {
+	async send(
+		sessionId: string,
+		text: string,
+		mode?: "enqueue" | "immediate",
+	): Promise<string> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);
 		try {
-			return await entry.session.send({ prompt: text });
+			return await entry.session.send({
+				prompt: text,
+				...(mode ? { mode } : {}),
+			});
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
+	}
+
+	async abort(sessionId: string): Promise<string> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.abort();
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		return "Aborted";
 	}
 
 	async setModel(

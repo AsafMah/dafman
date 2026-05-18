@@ -110,6 +110,34 @@ describe("IPC wire contracts", () => {
 		expect(variants).toMatchSnapshot();
 	});
 
+	test("sendMessage request — default mode (omitted)", () => {
+		const sample = { sessionId: "sess-1", text: "hello" };
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("sendMessage request — explicit enqueue mode", () => {
+		const sample = {
+			sessionId: "sess-1",
+			text: "queue this",
+			mode: "enqueue" as const,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("sendMessage request — explicit immediate mode", () => {
+		const sample = {
+			sessionId: "sess-1",
+			text: "steer this",
+			mode: "immediate" as const,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("abortSession request shape", () => {
+		const sample = { sessionId: "sess-1" };
+		expect(sample).toMatchSnapshot();
+	});
+
 	test("SessionHistoryCompactionResult shape", () => {
 		const sample: SessionHistoryCompactionResult = {
 			success: true,

@@ -399,6 +399,7 @@ function exitPlayground() {
           accent="hsl(200, 80%, 52%)"
           :events="events"
           reasoning-visibility-override="default"
+          default-send-mode="steer"
           :send-handler="echoSend"
         />
       </div>

@@ -19,8 +19,9 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h } from "vue";
-import Button from "primevue/button";
+import { computed, defineComponent, h, ref } from "vue";
+import SplitButton from "primevue/splitbutton";
+import type { MenuItem } from "primevue/menuitem";
 import { LexicalComposer, useLexicalComposer } from "lexical-vue/LexicalComposer";
 import { ContentEditable } from "lexical-vue/LexicalContentEditable";
 import { PlainTextPlugin } from "lexical-vue/LexicalPlainTextPlugin";
@@ -29,40 +30,51 @@ import { HistoryPlugin } from "lexical-vue/LexicalHistoryPlugin";
 import { AutoFocusPlugin } from "lexical-vue/LexicalAutoFocusPlugin";
 import { ListPlugin } from "lexical-vue/LexicalListPlugin";
 import { LinkPlugin } from "lexical-vue/LexicalLinkPlugin";
+import type { LexicalEditor } from "lexical";
 import {
   EditableSync,
   RegisterMarkdownShortcuts,
   SubmitOnEnter,
   TypingDiagnostic,
   consumeComposerText,
+  type ComposerSubmitMode,
+  type ComposerSubmitPayload,
 } from "../lexical/plugins";
 import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 import { rendererLog } from "../ipc/rendererLog";
+import type { DefaultSendMode } from "../stores/sessionsStore";
 
 const props = withDefaults(
   defineProps<{
     disabled?: boolean;
     placeholder?: string;
     enableMarkdownShortcuts?: boolean;
+    /// Per-session default for the primary send button + Ctrl+Enter.
+    /// Defaults to "steer".
+    defaultMode?: DefaultSendMode;
   }>(),
   {
     disabled: false,
     placeholder: "Write your message...",
     enableMarkdownShortcuts: true,
+    defaultMode: "steer",
   },
 );
 
 const isDev = import.meta.env.DEV;
-// Toggle the typing-diagnostic via `?diag=1` rather than running it on
-// every dev mount; the diagnostic mutates the editor state to test API
-// inserts, which is noisy if you're actually trying to type.
 const diagEnabled =
   isDev &&
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).has("diag");
 
-const emit = defineEmits<{ (e: "submit", text: string): void }>();
+/// Emits a discriminated submit payload identifying which send mode
+/// the user invoked. The parent (`ChatWindow`) maps it to the
+/// session-store action.
+const emit = defineEmits<{
+  (e: "submit", payload: ComposerSubmitPayload): void;
+  (e: "update:defaultMode", mode: DefaultSendMode): void;
+}>();
 
 const editable = computed(() => !props.disabled);
 const richText = computed(() => props.enableMarkdownShortcuts);
@@ -82,34 +94,109 @@ const initialConfig = computed(() => ({
   },
 }));
 
-function onSubmit(text: string) {
-  emit("submit", text);
+function onSubmit(payload: ComposerSubmitPayload) {
+  emit("submit", payload);
 }
 
-/// Submit button rendered inside `LexicalComposer` so it has access to
-/// the provided editor via `useLexicalComposer()`. Routes the click
-/// through the same `consumeComposerText` path the Enter keybinding
-/// uses, and uses `mousedown.prevent` to keep focus on the editor so
-/// the next keystroke after a send still goes to the right place.
+/// Dropdown items for the SplitButton — let the user change the
+/// session's default send mode (the action attached to the primary
+/// button + plain Ctrl+Enter). Interrupt is intentionally NOT eligible
+/// as a default — it always aborts the current turn, which is a
+/// destructive choice that should require an explicit modifier.
+const defaultModeItems = computed<MenuItem[]>(() => [
+  {
+    label: "Steer (immediate)",
+    icon: props.defaultMode === "steer" ? "pi pi-check" : "pi pi-bolt",
+    command: () => emit("update:defaultMode", "steer"),
+  },
+  {
+    label: "Queue (wait for current turn)",
+    icon: props.defaultMode === "queue" ? "pi pi-check" : "pi pi-clock",
+    command: () => emit("update:defaultMode", "queue"),
+  },
+  { separator: true },
+  {
+    label: "Send & interrupt current turn",
+    icon: "pi pi-stop-circle",
+    command: () => triggerSubmit("interrupt"),
+  },
+]);
+
+/// Imperative send trigger used by the SplitButton's "interrupt" menu
+/// entry. Reaches into the editor via the editor-ref established by
+/// `EditorRefCapture` below.
+const editorRef = ref<unknown>(null);
+function triggerSubmit(mode: ComposerSubmitMode) {
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor || props.disabled) return;
+  const text = consumeComposerText(editor);
+  if (text === null) return;
+  emit("submit", { text, mode });
+}
+
+/// Captures the active editor instance so external menu items
+/// (e.g. the SplitButton's interrupt entry) can submit through the
+/// same code path as the in-editor button. Stored as `unknown` because
+/// `lexical-vue`'s `useLexicalComposer()` is typed against a slightly
+/// older `LexicalEditor` shape than the one exported by `lexical`;
+/// we cast at the call site where we actually use it.
+const EditorRefCapture = defineComponent({
+  name: "EditorRefCapture",
+  setup() {
+    editorRef.value = useLexicalComposer();
+    return () => null;
+  },
+});
+
+const primaryLabel = computed(() =>
+  props.defaultMode === "queue" ? "Queue" : "Send",
+);
+const primaryIcon = computed(() =>
+  props.defaultMode === "queue" ? "pi pi-clock" : "pi pi-send",
+);
+const primaryTooltip = computed(() =>
+  props.defaultMode === "queue"
+    ? "Queue (Ctrl+Enter) — wait behind current turn. Alt+Enter forces queue; Ctrl+Shift+Enter interrupts."
+    : "Steer (Ctrl+Enter) — send immediately into current turn. Alt+Enter queues; Ctrl+Shift+Enter interrupts.",
+);
+
+/// SplitButton-style submit. Primary action runs the session's
+/// `defaultSendMode` (Steer by default). The dropdown lets the user
+/// pick a different default or trigger an explicit interrupt. The
+/// shortcut hints in the dropdown labels match the bindings registered
+/// by `SubmitOnEnter`.
 const SubmitButton = defineComponent({
   name: "SubmitButton",
-  props: { disabled: { type: Boolean, default: false } },
+  props: {
+    disabled: { type: Boolean, default: false },
+    label: { type: String, required: true },
+    icon: { type: String, required: true },
+    tooltip: { type: String, required: true },
+    model: { type: Array as () => MenuItem[], required: true },
+  },
   emits: ["submit"],
   setup(p, { emit: emitInner }) {
     const editor = useLexicalComposer();
     function fire() {
       if (p.disabled) return;
       const text = consumeComposerText(editor);
-      if (text !== null) emitInner("submit", text);
+      if (text !== null) {
+        const payload: ComposerSubmitPayload = { text, mode: "default" };
+        emitInner("submit", payload);
+      }
     }
     return () =>
-      h(Button, {
-        type: "button",
-        icon: "pi pi-send",
-        "aria-label": "Send message",
+      h(SplitButton, {
+        label: p.label,
+        icon: p.icon,
+        title: p.tooltip,
+        "aria-label": p.tooltip,
         disabled: p.disabled,
-        onMousedown: (event: MouseEvent) => event.preventDefault(),
+        model: p.model,
         onClick: fire,
+        // Keep focus in the editor after primary-button click so the
+        // next keystroke after a send still routes to it.
+        onMousedown: (event: MouseEvent) => event.preventDefault(),
       });
   },
 });
@@ -160,7 +247,15 @@ const SubmitButton = defineComponent({
         <HistoryPlugin />
         <AutoFocusPlugin />
       </div>
-      <SubmitButton :disabled="props.disabled" @submit="onSubmit" />
+      <SubmitButton
+        :disabled="props.disabled"
+        :label="primaryLabel"
+        :icon="primaryIcon"
+        :tooltip="primaryTooltip"
+        :model="defaultModeItems"
+        @submit="onSubmit"
+      />
+      <EditorRefCapture />
     </LexicalComposer>
   </div>
 </template>

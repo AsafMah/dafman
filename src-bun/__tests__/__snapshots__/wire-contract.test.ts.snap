@@ -142,3 +142,32 @@ exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
   "tokensFreed": 1234,
 }
 `;
+
+exports[`IPC wire contracts sendMessage request — default mode (omitted) 1`] = `
+{
+  "sessionId": "sess-1",
+  "text": "hello",
+}
+`;
+
+exports[`IPC wire contracts sendMessage request — explicit enqueue mode 1`] = `
+{
+  "mode": "enqueue",
+  "sessionId": "sess-1",
+  "text": "queue this",
+}
+`;
+
+exports[`IPC wire contracts sendMessage request — explicit immediate mode 1`] = `
+{
+  "mode": "immediate",
+  "sessionId": "sess-1",
+  "text": "steer this",
+}
+`;
+
+exports[`IPC wire contracts abortSession request shape 1`] = `
+{
+  "sessionId": "sess-1",
+}
+`;

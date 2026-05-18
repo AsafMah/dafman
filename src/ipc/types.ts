@@ -87,7 +87,15 @@ export type CommandMap = {
     result: string | null;
   };
   disconnectSession: { args: { sessionId: string }; result: string };
-  sendMessage: { args: { sessionId: string; text: string }; result: string };
+  sendMessage: {
+    args: {
+      sessionId: string;
+      text: string;
+      mode?: "enqueue" | "immediate";
+    };
+    result: string;
+  };
+  abortSession: { args: { sessionId: string }; result: string };
   listModels: { args: Record<string, never>; result: ModelSummary[] };
   setSessionModel: {
     args: {

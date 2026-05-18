@@ -81,8 +81,11 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			disconnectSession: rpcGuard(async ({ sessionId }) =>
 				sessions.disconnect(sessionId),
 			),
-			sendMessage: rpcGuard(async ({ sessionId, text }) =>
-				sessions.send(sessionId, text),
+			sendMessage: rpcGuard(async ({ sessionId, text, mode }) =>
+				sessions.send(sessionId, text, mode),
+			),
+			abortSession: rpcGuard(async ({ sessionId }) =>
+				sessions.abort(sessionId),
 			),
 			listModels: rpcGuard(async () => {
 				const client = tryGetClient();

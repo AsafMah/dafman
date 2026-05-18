@@ -129,7 +129,21 @@ export type DafmanRPC = {
 				response: string;
 			};
 			sendMessage: {
-				params: { sessionId: string; text: string };
+				params: {
+					sessionId: string;
+					text: string;
+					/// SDK delivery mode. `"enqueue"` queues behind any
+					/// in-flight turn; `"immediate"` injects into the
+					/// running turn (steer). Omitted → SDK default.
+					mode?: "enqueue" | "immediate";
+				};
+				response: string;
+			};
+			/// Aborts the currently-running turn for this session. The
+			/// session remains valid; new sends after this point start a
+			/// fresh turn. Backed by `session.abort()`.
+			abortSession: {
+				params: { sessionId: string };
 				response: string;
 			};
 			listModels: {

@@ -18,6 +18,16 @@ import type {
 import { accentForIndex } from "../lib/color";
 import { useToastStore } from "./toastStore";
 
+/// User-facing send modes. Maps to SDK message delivery via
+/// `sessionsStore.sendMessage`:
+///   "steer"     -> session.send({ mode: "immediate" })
+///   "queue"     -> session.send({ mode: "enqueue" })
+///   "interrupt" -> session.abort() then session.send()
+/// Only "steer" and "queue" are valid *default* modes (selectable from
+/// the composer's SplitButton dropdown). Interrupt is always explicit.
+export type SendMode = "steer" | "queue" | "interrupt";
+export type DefaultSendMode = "steer" | "queue";
+
 export type SessionRecord = {
   id: string;
   /// CSS color picked from a curated palette so the first N sessions are
@@ -48,6 +58,12 @@ export type SessionRecord = {
   /// creation time, or from the `session.start` event's
   /// `data.context.cwd` (which the CLI persists across resume).
   workingDirectory: string | null;
+  /// Per-session default for the composer's primary send action. Used
+  /// when the user hits Ctrl+Enter or clicks the SplitButton's main
+  /// button. Initial value is "steer" — keeps the agent responsive
+  /// (Ctrl+Enter while a turn is running injects rather than queues
+  /// behind it). Not persisted across reloads in v1.
+  defaultSendMode: DefaultSendMode;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -181,6 +197,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         approveAll: true, // current backend default (`approveAll` permission handler)
         reasoningVisibilityOverride: "default",
         workingDirectory: wd && wd.length > 0 ? wd : null,
+        defaultSendMode: "steer",
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -240,6 +257,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         approveAll: true,
         reasoningVisibilityOverride: "default",
         workingDirectory: null,
+        defaultSendMode: "steer",
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and
@@ -280,8 +298,54 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
   }
 
-  async function sendMessage(sessionId: string, text: string): Promise<void> {
-    await invokeCommand("sendMessage", { sessionId, text });
+  /// Sends a message with the given mode.
+  /// - "steer" (default in v1): SDK `mode: "immediate"` — injects into a
+  ///   running turn if any, otherwise starts a new one.
+  /// - "queue": SDK `mode: "enqueue"` — waits behind the in-flight turn.
+  /// - "interrupt": abort current turn, then send a fresh one. The abort
+  ///   call resolves on SDK ack (not on idle); for v1 we let the SDK
+  ///   handle the rejoin race rather than waiting for `session.idle`
+  ///   ourselves. If we observe ordering issues we'll add a wait-for-idle
+  ///   gate (rubber-duck flagged this in the original plan).
+  async function sendMessage(
+    sessionId: string,
+    text: string,
+    mode: SendMode = "steer",
+  ): Promise<void> {
+    if (mode === "interrupt") {
+      try {
+        await invokeCommand("abortSession", { sessionId });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        useToastStore().warn("Abort failed; sending anyway", message);
+      }
+      await invokeCommand("sendMessage", { sessionId, text });
+      return;
+    }
+    const sdkMode = mode === "steer" ? "immediate" : "enqueue";
+    await invokeCommand("sendMessage", { sessionId, text, mode: sdkMode });
+  }
+
+  async function abortSession(sessionId: string): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("abortSession", { sessionId });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to abort turn", message);
+      throw err;
+    }
+  }
+
+  /// In-memory only — the per-session default for the composer's primary
+  /// send action. Mutating this updates `SessionRecord.defaultSendMode`,
+  /// which the composer subscribes to.
+  function setDefaultSendMode(
+    sessionId: string,
+    next: DefaultSendMode,
+  ): void {
+    const record = sessions.value.find((s) => s.id === sessionId);
+    if (record) record.defaultSendMode = next;
   }
 
   async function setSessionModel(
@@ -412,6 +476,8 @@ export const useSessionsStore = defineStore("sessions", () => {
     restoreSession,
     closeSession,
     sendMessage,
+    abortSession,
+    setDefaultSendMode,
     setSessionModel,
     setSessionMode,
     setSessionApproveAll,

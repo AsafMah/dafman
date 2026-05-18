@@ -17,10 +17,11 @@ import type {
   ReasoningVisibility,
   SessionEventPayload,
 } from "../ipc/types";
-import { useSessionsStore } from "../stores/sessionsStore";
+import { useSessionsStore, type DefaultSendMode } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
+import type { ComposerSubmitPayload } from "../lexical/plugins";
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -36,6 +37,9 @@ const props = defineProps<{
   /// controls (rendered in the dockview tab strip) can mutate it from
   /// outside this component.
   reasoningVisibilityOverride: ReasoningVisibility | "default";
+  /// Per-session default mode for the composer's primary send action.
+  /// "steer" maps to SDK `mode: "immediate"`; "queue" to `"enqueue"`.
+  defaultSendMode: "steer" | "queue";
   /// Optional override for the send action. When provided, ChatWindow
   /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
   /// playground to keep the chat self-contained (echo-only, no SDK).
@@ -144,18 +148,36 @@ watch(
   },
 );
 
-async function sendMessage(text: string) {
-  if (!text || isSending.value) return;
+/// Submission handler. The composer always submits a payload —
+/// `mode: "default"` (Ctrl+Enter, primary button), `mode: "queue"`
+/// (Alt+Enter — force queue regardless of default), or
+/// `mode: "interrupt"` (Ctrl+Shift+Enter / dropdown). We resolve
+/// `"default"` against the session's `defaultSendMode` here so the
+/// downstream sessionsStore action only sees concrete SendMode values.
+///
+/// Removed the busy guard (`isSending.value`) — queuing/steering
+/// while a turn is in flight is the whole point of this feature.
+/// The optimistic user bubble still appears immediately; the SDK
+/// reconciles it with the eventual `user.message` echo.
+async function sendMessage(payload: ComposerSubmitPayload) {
+  if (!payload.text) return;
+  const concreteMode =
+    payload.mode === "default" ? props.defaultSendMode : payload.mode;
 
-  items.value = appendUserMessage(items.value, text, idCounter);
+  items.value = appendUserMessage(items.value, payload.text, idCounter);
   isSendingFallback.value = true;
   await scrollToBottom();
 
   try {
     if (props.sendHandler) {
-      await props.sendHandler(text);
+      // Dev playground / tests don't care about modes; pass text only.
+      await props.sendHandler(payload.text);
     } else {
-      await sessionsStore.sendMessage(props.sessionId, text);
+      await sessionsStore.sendMessage(
+        props.sessionId,
+        payload.text,
+        concreteMode,
+      );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -168,6 +190,10 @@ async function sendMessage(text: string) {
     isSendingFallback.value = false;
     await scrollToBottom();
   }
+}
+
+function onUpdateDefaultMode(next: DefaultSendMode) {
+  sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
 </script>
 
@@ -255,7 +281,11 @@ async function sendMessage(text: string) {
     </footer>
 
     <form class="chat-composer" @submit.prevent>
-      <MessageComposer :disabled="isSending" @submit="sendMessage" />
+      <MessageComposer
+        :default-mode="props.defaultSendMode"
+        @submit="sendMessage"
+        @update:default-mode="onUpdateDefaultMode"
+      />
     </form>
   </section>
 </template>
