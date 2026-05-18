@@ -101,22 +101,23 @@ async function restoreFromLayout() {
   if (!layout || typeof layout !== "object") return;
   const panelIds = extractPanelIds(layout);
   if (panelIds.length === 0) return;
-  const results = await Promise.all(
+  // Best-effort resume each session referenced by the layout. Failures
+  // are non-fatal — the panel still shows up (dockview replays it from
+  // the JSON below) but with no `SessionRecord` behind it; ChatPanel
+  // renders a friendly "session no longer available" surface with a
+  // button to spawn a replacement in the same tab.
+  await Promise.all(
     panelIds.map((id) => sessionsStore.restoreSession(id)),
   );
-  const restored = results.filter((r): r is NonNullable<typeof r> => r !== null);
-  if (restored.length === 0) {
-    // All sessions failed to restore — clear stale layout so we don't
-    // keep trying every startup.
-    await settingsStore.persistLayout(null);
-    return;
+  // Always apply the full layout, even when no sessions resumed —
+  // preserving the user's grid layout is more important than hiding
+  // dead panels (and the orphan UI gives them a one-click recovery
+  // path). See `ChatPanel.vue`.
+  if (layoutStore.api) {
+    layoutStore.restore(layout);
+  } else {
+    pendingRestoreLayout.value = layout;
   }
-  // If any panel ids could not be restored, drop them from the layout
-  // before handing it to dockview (otherwise `fromJSON` would create
-  // panels that the slot resolves to "Session … not loaded").
-  const restoredIds = new Set(restored.map((r) => r.id));
-  const pruned = prunePanels(layout, restoredIds);
-  pendingRestoreLayout.value = pruned;
 }
 
 /// Extract panel ids from a dockview `toJSON()` blob. The shape is
@@ -127,22 +128,6 @@ function extractPanelIds(layout: unknown): string[] {
   const panels = (layout as { panels?: unknown }).panels;
   if (!panels || typeof panels !== "object") return [];
   return Object.keys(panels);
-}
-
-/// Returns a shallow copy of `layout` whose `panels` map only contains
-/// entries whose key is in `keep`. The grid / floating / popout
-/// references to dropped panel ids will gracefully no-op inside
-/// dockview's `fromJSON`.
-function prunePanels(layout: unknown, keep: Set<string>): unknown {
-  if (!layout || typeof layout !== "object") return layout;
-  const obj = layout as Record<string, unknown>;
-  const panels = obj.panels;
-  if (!panels || typeof panels !== "object") return layout;
-  const filtered: Record<string, unknown> = {};
-  for (const [id, panel] of Object.entries(panels as Record<string, unknown>)) {
-    if (keep.has(id)) filtered[id] = panel;
-  }
-  return { ...obj, panels: filtered };
 }
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });

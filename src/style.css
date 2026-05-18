@@ -29,3 +29,46 @@ html.app-dark body,
 body.app-dark {
   background: var(--p-surface-950);
 }
+
+/* ---- Dockview theming ----
+ * Bridge dockview's `--dv-*` palette to PrimeVue's surface/text tokens so
+ * the dock chrome (tab bar, panel background, separators, drop overlays)
+ * stays in sync with the rest of the app on both light and dark themes.
+ * The `.dockview-theme-light` / `.dockview-theme-dark` classes are applied
+ * by `App.vue` on the wrapper around `<DockviewVue>`.
+ */
+.dockview-theme-light {
+  --dv-group-view-background-color: var(--p-content-background);
+  --dv-tabs-and-actions-container-background-color: var(--p-surface-100);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--p-content-background);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--p-surface-200);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--p-surface-50);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--p-surface-200);
+  --dv-tab-divider-color: var(--p-content-border-color);
+  --dv-activegroup-visiblepanel-tab-color: var(--p-text-color);
+  --dv-activegroup-hiddenpanel-tab-color: var(--p-text-muted-color);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--p-text-muted-color);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--p-text-muted-color);
+  --dv-separator-border: var(--p-content-border-color);
+  --dv-paneview-header-border-color: var(--p-content-border-color);
+  --dv-icon-hover-background-color: var(--p-surface-200);
+  --dv-tabs-container-scrollbar-color: var(--p-surface-400);
+}
+
+.dockview-theme-dark {
+  --dv-group-view-background-color: var(--p-content-background);
+  --dv-tabs-and-actions-container-background-color: var(--p-surface-900);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--p-content-background);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--p-surface-800);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--p-surface-950);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--p-surface-800);
+  --dv-tab-divider-color: var(--p-content-border-color);
+  --dv-activegroup-visiblepanel-tab-color: var(--p-text-color);
+  --dv-activegroup-hiddenpanel-tab-color: var(--p-text-muted-color);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--p-text-muted-color);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--p-text-muted-color);
+  --dv-separator-border: var(--p-content-border-color);
+  --dv-paneview-header-border-color: var(--p-content-border-color);
+  --dv-icon-hover-background-color: var(--p-surface-700);
+  --dv-tabs-container-scrollbar-color: var(--p-surface-600);
+}

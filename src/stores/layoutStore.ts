@@ -47,16 +47,47 @@ export const useLayoutStore = defineStore("layout", () => {
 
   // ---------- Chat panels (one per session) ----------
 
-  function addPanel(sessionId: string, title?: string): void {
+  function addPanel(
+    sessionId: string,
+    opts: { title?: string; targetGroupId?: string } = {},
+  ): void {
     const dock = api.value;
     if (!dock) return;
     if (dock.getPanel(sessionId)) return;
+    // When `targetGroupId` is provided (e.g. replacing an orphan panel
+    // inline) we drop the new panel as a tab inside that group. Otherwise
+    // we tile: a new group to the right of the active one, falling back
+    // to dockview's default placement on the very first panel.
+    const referenceGroup = opts.targetGroupId ?? dock.activeGroup?.id;
     dock.addPanel({
       id: sessionId,
       component: "chat",
-      title: title ?? shortPanelTitle(sessionId),
+      title: opts.title ?? shortPanelTitle(sessionId),
       params: { sessionId },
+      ...(referenceGroup
+        ? {
+            position: {
+              referenceGroup,
+              direction: opts.targetGroupId ? "within" : "right",
+            },
+          }
+        : {}),
     });
+  }
+
+  /// Swaps an orphan panel (a session that failed to resume on
+  /// restore) for a freshly-created session, in-place: the new panel
+  /// lands in the same group as the orphan and the orphan is removed.
+  /// Returns `true` if the swap happened (orphan was found).
+  function replaceMissingPanel(orphanId: string, newSessionId: string): boolean {
+    const dock = api.value;
+    if (!dock) return false;
+    const orphan = dock.getPanel(orphanId);
+    if (!orphan) return false;
+    const groupId = orphan.api.group.id;
+    addPanel(newSessionId, { targetGroupId: groupId });
+    dock.removePanel(orphan);
+    return true;
   }
 
   function removePanel(sessionId: string): void {
@@ -142,6 +173,7 @@ export const useLayoutStore = defineStore("layout", () => {
     addPanel,
     removePanel,
     renamePanel,
+    replaceMissingPanel,
     openEdgePanel,
     toggleEdgeGroup,
     snapshot,
