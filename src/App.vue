@@ -6,7 +6,6 @@ import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
 import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
 import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
-import SettingsDialog from "./components/SettingsDialog.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -25,7 +24,6 @@ const { sessions } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
 
 const prefersDark = ref(false);
-const settingsOpen = ref(false);
 
 // Dev playground is only built in dev mode; the button is tree-shaken in prod.
 const isDev = import.meta.env.DEV;
@@ -243,12 +241,14 @@ function scheduleLayoutSave() {
 // ActivityBar; the SESSIONS_PANEL_ID constant is shared with the
 // activity-item config below and with the open-by-default path.
 const SESSIONS_PANEL_ID = "sessions-manager";
+const SETTINGS_PANEL_ID = "settings-panel";
 
 /// ActivityBar items.
 /// - Top stack (default `group: "top"`): panel toggles. Sessions today;
 ///   Library / Log viewer / MCP status / ... append here.
-/// - Bottom stack (`group: "bottom"`): global actions. Dev wrench is
-///   conditional on `import.meta.env.DEV`.
+/// - Bottom stack (`group: "bottom"`): settings panel + (dev-only) the
+///   playground escape hatch. Settings is a panel like Sessions, not
+///   a modal dialog — collapsible groups inside, future search across.
 const activityItems = computed<ActivityItem[]>(() => {
   const items: ActivityItem[] = [
     {
@@ -257,7 +257,8 @@ const activityItems = computed<ActivityItem[]>(() => {
       component: "sessionsManager",
       icon: "pi-list",
       title: "Sessions",
-      initialSize: 320,
+      initialSize: 240,
+      minimumSize: 160,
     },
   ];
   if (isDev) {
@@ -271,14 +272,14 @@ const activityItems = computed<ActivityItem[]>(() => {
     });
   }
   items.push({
-    kind: "action",
-    id: "settings",
+    kind: "panel",
+    id: SETTINGS_PANEL_ID,
+    component: "settingsPanel",
     icon: "pi-cog",
     title: "Settings",
     group: "bottom",
-    onClick: () => {
-      settingsOpen.value = true;
-    },
+    initialSize: 280,
+    minimumSize: 200,
   });
   return items;
 });
@@ -316,7 +317,8 @@ function openSessionsByDefault(attempt = 0) {
     component: "sessionsManager",
     tabComponent: "sidebarTab",
     title: "Sessions",
-    initialSize: 320,
+    initialSize: 240,
+    minimumSize: 160,
   });
   activityBarRef.value?.sync();
 }
@@ -325,15 +327,12 @@ function openSessionsByDefault(attempt = 0) {
 <template>
   <main class="app-root" :class="{ 'app-dark': isDarkMode }">
     <Toast :on-click="closeToast" />
-    <SettingsDialog
-      :visible="settingsOpen"
-      @update:visible="(v) => (settingsOpen = v)"
-    />
 
     <!-- App body: persistent ActivityBar on the far left + dockview
          body taking the rest. The ActivityBar hosts everything that
-         used to live in the topbar (settings, dev wrench) plus the
-         panel toggles. No topbar — the rail is the only chrome. -->
+         used to live in the topbar (settings + dev wrench) plus the
+         panel toggles. No topbar — the rail is the only chrome.
+         Settings is a panel like Sessions, not a modal. -->
     <div class="app-body">
       <ActivityBar ref="activityBarRef" :items="activityItems" />
       <div

@@ -467,6 +467,9 @@ void toasts; // referenced inside async handlers
   min-height: 0;
   background: var(--p-content-background);
   color: var(--p-text-color);
+  /* Container-query context so descendant rules can adapt to the
+   * panel's own width — independent of viewport / parent flex. */
+  container-type: inline-size;
 }
 
 /* ---- New-session block ---- */
@@ -485,6 +488,7 @@ void toasts; // referenced inside async handlers
 
 .workspace-input {
   width: 100%;
+  min-width: 0;
 }
 
 /* The PrimeVue AutoComplete wraps its <input> in a panel + button shell;
@@ -492,9 +496,11 @@ void toasts; // referenced inside async handlers
  * still shows an editable strip rather than a centered 1-char box. */
 .workspace-input :deep(.p-autocomplete) {
   width: 100%;
+  min-width: 0;
 }
 .workspace-input :deep(.p-autocomplete-input) {
   width: 100%;
+  min-width: 0;
   font-size: 0.8rem;
 }
 
@@ -506,7 +512,17 @@ void toasts; // referenced inside async handlers
 
 .new-session-submit {
   flex: 1 1 auto;
+  min-width: 0;
   justify-content: center;
+}
+
+/* The submit button keeps its 'New session' label by default; below
+ * ~190px sidebar width the label drops out and the icon stands alone
+ * with a tooltip. */
+@container (max-width: 190px) {
+  .new-session-submit :deep(.p-button-label) {
+    display: none;
+  }
 }
 
 /* ---- Toolbar / list ---- */

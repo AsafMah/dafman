@@ -35,6 +35,9 @@ export interface PanelActivityItem extends ActivityItemBase {
   component: string;
   /// Initial width in pixels for the expanded panel.
   initialSize: number;
+  /// Minimum width below which the user-drag sash bottoms out.
+  /// Defaults to dockview's own fallback (`collapsedSize + 50`).
+  minimumSize?: number;
 }
 
 export interface ActionActivityItem extends ActivityItemBase {
@@ -81,6 +84,9 @@ function activate(item: ActivityItem) {
       tabComponent: "sidebarTab",
       title: item.title,
       initialSize: item.initialSize,
+      ...(item.minimumSize !== undefined
+        ? { minimumSize: item.minimumSize }
+        : {}),
     });
   }
   // Optimistic flip; the onDidLayoutChange subscription in App.vue

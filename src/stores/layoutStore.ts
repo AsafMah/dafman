@@ -65,6 +65,10 @@ export interface EdgePanelOptions {
   /// Initial size of the edge group along its main axis (px). Only
   /// applied when the edge group is being created for the first time.
   initialSize?: number;
+  /// Minimum size of the edge group along its main axis (px). Below
+  /// this, the user-drag sash bottoms out. Defaults to dockview's
+  /// own fallback (`collapsedSize + 50`) when omitted.
+  minimumSize?: number;
 }
 
 export const useLayoutStore = defineStore("layout", () => {
@@ -235,6 +239,9 @@ export const useLayoutStore = defineStore("layout", () => {
         id: `edge-${position}`,
         ...(options.initialSize !== undefined
           ? { initialSize: options.initialSize }
+          : {}),
+        ...(options.minimumSize !== undefined
+          ? { minimumSize: options.minimumSize }
           : {}),
       });
     dock.addPanel({
