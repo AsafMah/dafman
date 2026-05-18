@@ -25,12 +25,26 @@ const { settings } = storeToRefs(settingsStore);
 
 const prefersDark = ref(false);
 
-// Dev playground is only built in dev mode; the button is tree-shaken in prod.
+// Dev playground is only built in dev mode; the action item is
+// stripped from the ActivityBar in prod.
 const isDev = import.meta.env.DEV;
+const PLAYGROUND_PANEL_ID = "playground";
+
+/// Opens the Dev Playground as a regular dockview body tab (not a
+/// sidebar edge panel). Subsequent calls just focus the existing tab.
 function openPlayground() {
-  const url = new URL(window.location.href);
-  url.searchParams.set("dev", "1");
-  window.location.href = url.toString();
+  const dock = layoutStore.api;
+  if (!dock) return;
+  const existing = dock.getPanel(PLAYGROUND_PANEL_ID);
+  if (existing) {
+    existing.api.setActive();
+    return;
+  }
+  dock.addPanel({
+    id: PLAYGROUND_PANEL_ID,
+    component: "playground",
+    title: "Dev Playground",
+  });
 }
 
 const isDarkMode = computed(() =>

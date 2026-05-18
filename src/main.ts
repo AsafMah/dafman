@@ -48,10 +48,11 @@ setRpcBridge(bridge);
 // exceptions surface in the bun JSON log, not just WebView2 devtools.
 installRendererLogBridge();
 
-// Dev-only playground: open with `?dev` during `bun run dev:hmr`. The
-// dynamic import + DEV guard keeps Playground.vue out of production
-// bundles via tree-shaking.
-function mountWith(Root: typeof App) {
+// Dev-only playground: registered as a dockview panel component
+// `"playground"` when in dev builds. Activity-bar's wrench item opens
+// it as a body panel. The dynamic import keeps Playground.vue out of
+// production bundles via Vite's chunk-splitting.
+async function mountWith(Root: typeof App) {
   const app = createApp(Root);
   app.use(createPinia());
   app.use(PrimeVue, {
@@ -77,14 +78,11 @@ function mountWith(Root: typeof App) {
   app.component("chatTabActions", ChatTabActions);
   app.component("chatTab", ChatTab);
   app.component("sidebarTab", SidebarTab);
+  if (import.meta.env.DEV) {
+    const mod = await import("./dev/Playground.vue");
+    app.component("playground", mod.default);
+  }
   app.mount("#app");
 }
 
-if (
-  import.meta.env.DEV &&
-  new URLSearchParams(window.location.search).has("dev")
-) {
-  void import("./dev/Playground.vue").then((mod) => mountWith(mod.default));
-} else {
-  mountWith(App);
-}
+void mountWith(App);

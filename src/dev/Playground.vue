@@ -1,41 +1,20 @@
 <script setup lang="ts">
-// Dev-only playground -- gated behind `import.meta.env.DEV` in main.ts.
-// Lets you see every ChatItem kind side-by-side, fire toasts, and inject
-// synthetic session events without a real SDK turn. Tree-shaken out of
-// production builds.
+// Dev playground — opened as a normal dockview body panel via the
+// activity-bar wrench. Gated behind `import.meta.env.DEV` in main.ts
+// so prod builds tree-shake the module away.
 //
-// Open with `?dev` in the URL during `bun run dev:hmr`.
+// Lets you see every ChatItem kind side-by-side, fire toasts, and
+// inject synthetic session events without a real SDK turn. Uses the
+// surrounding App.vue's <Toast> service so we don't need our own
+// here.
 
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import Button from "primevue/button";
-import Toast from "primevue/toast";
-import { useToast } from "primevue/usetoast";
-import type { ToastMessageOptions } from "primevue/toast";
 import ChatWindow from "../components/ChatWindow.vue";
 import type { SessionEventPayload } from "../ipc/types";
 import { useToastStore } from "../stores/toastStore";
 
 const toastStore = useToastStore();
-const primeToast = useToast();
-
-watch(
-  () => toastStore.pending.length,
-  (len) => {
-    if (len === 0) return;
-    for (const msg of toastStore.consume()) {
-      primeToast.add({
-        severity: msg.severity,
-        summary: msg.summary,
-        detail: msg.detail,
-        life: msg.life,
-      });
-    }
-  },
-);
-
-function closeToast({ message }: { message: ToastMessageOptions }) {
-  primeToast.remove(message);
-}
 
 type ScriptEvent = Omit<SessionEventPayload, "sessionId">;
 type Script = { label: string; events: ScriptEvent[] };
@@ -325,30 +304,16 @@ function fireToast(severity: (typeof toastSeverities)[number]) {
 }
 
 const eventCount = computed(() => events.length);
-
-function exitPlayground() {
-  const url = new URL(window.location.href);
-  url.searchParams.delete("dev");
-  window.location.href = url.toString();
-}
 </script>
 
 <template>
-  <main class="playground">
-    <Toast :on-click="closeToast" />
+  <div class="playground">
     <header class="playground-header">
       <div class="playground-title">
         <h1>Dev Playground</h1>
-        <Button
-          label="Back to app"
-          icon="pi pi-arrow-left"
-          size="small"
-          severity="secondary"
-          @click="exitPlayground"
-        />
       </div>
       <p class="muted">
-        Dev-only surface for exercising chat components in isolation. Reload to reset.
+        Dev-only surface for exercising chat components in isolation. Close the tab to reset.
       </p>
     </header>
 
@@ -404,19 +369,26 @@ function exitPlayground() {
         />
       </div>
     </section>
-  </main>
+  </div>
 </template>
 
 <style scoped>
 .playground {
-  height: 100dvh;
+  /* Fills the dockview panel — width: 100%; height: 100% so the
+   * playground scrolls within the panel rather than the page. */
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  background: var(--p-surface-100, var(--p-content-background));
+  /* Theme-aware background — color-mix with --p-content-background so
+   * it shifts cleanly between light + dark mode. */
+  background: color-mix(in srgb, var(--p-text-color) 4%, var(--p-content-background));
   color: var(--p-text-color);
+  box-sizing: border-box;
 }
 
 .playground-header h1 {
@@ -448,11 +420,15 @@ function exitPlayground() {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  /* Don't collapse — the inner chat-wrapper has a fixed height that
+   * needs to flow normally inside this column. */
+  flex: 0 0 auto;
 }
 
 .panel h2 {
   margin: 0;
   font-size: 1rem;
+  color: var(--p-text-color);
 }
 
 .actions {
@@ -465,7 +441,8 @@ function exitPlayground() {
   font-family: var(--p-font-family-mono, monospace);
   font-size: 0.85rem;
   padding: 0.5rem;
-  background: var(--p-surface-100, var(--p-content-background));
+  /* Theme-aware code-block background — auto-flips with theme. */
+  background: color-mix(in srgb, var(--p-text-color) 8%, var(--p-content-background));
   color: var(--p-text-color);
   border: 1px solid var(--p-content-border-color);
   border-radius: var(--p-border-radius-sm);
@@ -479,8 +456,8 @@ function exitPlayground() {
 }
 
 .chat-wrapper .chat-frame {
-  /* Big enough to feel like a real chat surface in dev. The page itself
-   * scrolls, so we can be generous. Falls back to 600px on tiny windows. */
-  height: max(600px, 75dvh);
+  /* Big enough to feel like a real chat surface. The panel itself
+   * scrolls (overflow-y: auto), so we can be generous. */
+  height: max(600px, 60vh);
 }
 </style>
