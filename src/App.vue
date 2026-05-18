@@ -40,14 +40,14 @@ function openPlayground() {
     existing.api.setActive();
     return;
   }
-  // Always land the playground in a body group, not the active edge
-  // group (Sessions / Settings). When no body group exists yet —
-  // e.g. only the Sessions sidebar is open at startup — create one
-  // explicitly so the panel doesn't get tabbed into the sidebar.
-  let referenceGroup = layoutStore.firstBodyGroupId();
-  if (!referenceGroup) {
-    referenceGroup = dock.addGroup().id;
-  }
+  // Resolve a body (non-edge) group inline rather than going through
+  // layoutStore — exposing a new store method mid-session breaks
+  // Pinia's HMR, which left users on an older bundle staring at
+  // `firstBodyGroupId is not a function`.
+  const bodyGroups = dock.groups.filter(
+    (g) => (g as unknown as { location?: { type?: string } }).location?.type === "grid",
+  );
+  const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
   dock.addPanel({
     id: PLAYGROUND_PANEL_ID,
     component: "playground",
