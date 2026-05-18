@@ -75,6 +75,18 @@ onMounted(async () => {
     await restoreFromLayout();
   }
 
+  // Open the Sessions Manager by default. We do this only when the
+  // persisted dockview JSON didn't contain it — i.e. first launch, or
+  // the user explicitly closed it last time we don't want to reopen it.
+  // The presence check looks at the layout we tried to restore (so it
+  // covers the layout-not-ready-yet case too).
+  if (!persistedLayoutHasPanel(SESSIONS_PANEL_ID)) {
+    // Defer until the dockview api is up (`onDockReady` will run by
+    // then, but we mounted before the child component, so check via
+    // the store getter rather than assuming).
+    setTimeout(openSessionsByDefault, 0);
+  }
+
   // Dev-only: auto-create a session when none exist and the URL carries
   // `?autosession=1`. Used by the typing diagnostic flow so we can see
   // the composer mount without manually clicking "New Session". One-shot
@@ -310,6 +322,38 @@ function toggleSessionsPanel() {
     });
     sessionsPanelOpen.value = true;
   }
+}
+
+/// Returns true when the persisted dockview JSON references the
+/// given panel id. Used by the "open by default" path to avoid
+/// re-opening a panel the user explicitly closed last time.
+function persistedLayoutHasPanel(id: string): boolean {
+  const layout = settingsStore.settings.layout?.dockview;
+  if (!layout || typeof layout !== "object") return false;
+  const panels = (layout as { panels?: unknown }).panels;
+  if (!panels || typeof panels !== "object") return false;
+  return Object.prototype.hasOwnProperty.call(panels, id);
+}
+
+/// Opens the Sessions panel as the default sidebar on first launch.
+/// Retries briefly if the dockview api isn't up yet — the @ready
+/// event fires from the child component's onMounted, which races
+/// with our parent onMounted.
+function openSessionsByDefault(attempt = 0) {
+  if (!layoutStore.api) {
+    if (attempt < 20) {
+      setTimeout(() => openSessionsByDefault(attempt + 1), 50);
+    }
+    return;
+  }
+  if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) return;
+  layoutStore.openEdgePanel("left", {
+    id: SESSIONS_PANEL_ID,
+    component: "sessionsManager",
+    title: "Sessions",
+    initialSize: 280,
+  });
+  sessionsPanelOpen.value = true;
 }
 </script>
 

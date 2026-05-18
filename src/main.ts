@@ -9,6 +9,7 @@ import "primeicons/primeicons.css";
 import "dockview-vue/dist/styles/dockview.css";
 import "./style.css";
 import "./lexical/lexical.css";
+import "./lexical/prismLanguages";
 import App from "./App.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import ChatTab from "./components/ChatTab.vue";

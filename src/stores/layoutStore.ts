@@ -137,6 +137,11 @@ export const useLayoutStore = defineStore("layout", () => {
 
   /// Opens (or focuses) a panel inside an edge group at the given
   /// position. The edge group is created lazily on first call.
+  ///
+  /// If an existing edge group at this position is below `initialSize`
+  /// (e.g. the user dragged it to a sliver, or a previous close left
+  /// it collapsed), we tear it down and recreate at the requested size.
+  /// Without this, "close → reopen" produces a tiny strip.
   function openEdgePanel(
     position: EdgeGroupPosition,
     options: EdgePanelOptions,
@@ -147,6 +152,20 @@ export const useLayoutStore = defineStore("layout", () => {
     if (existing) {
       existing.api.setActive();
       return;
+    }
+    const existingGroup = dock.getEdgeGroup(position);
+    if (existingGroup && options.initialSize !== undefined) {
+      // dockview-vue's EdgeGroupApi exposes `width` / `height` via the
+      // underlying group element. Read defensively — if the property
+      // shape changes we just skip the resize check and use the
+      // existing group as-is.
+      const w =
+        position === "left" || position === "right"
+          ? (existingGroup as unknown as { width?: number }).width
+          : (existingGroup as unknown as { height?: number }).height;
+      if (typeof w === "number" && w < Math.max(40, options.initialSize / 2)) {
+        dock.removeEdgeGroup(position);
+      }
     }
     const edge =
       dock.getEdgeGroup(position) ??
@@ -174,14 +193,32 @@ export const useLayoutStore = defineStore("layout", () => {
     return !!dock.getPanel(id);
   }
 
-  /// Closes (removes) a panel by id. Idempotent — does nothing if the
-  /// panel isn't open. Doesn't remove the parent edge group; the
-  /// group stays so re-opening preserves its size.
+  /// Closes (removes) a panel by id, and also tears down the parent
+  /// edge group if removing this panel leaves it empty. Removing the
+  /// empty group means the *next* `openEdgePanel` call recreates at
+  /// the configured `initialSize` instead of inheriting a residual
+  /// collapsed size. Idempotent for unknown ids.
   function closePanel(id: string): void {
     const dock = api.value;
     if (!dock) return;
     const panel = dock.getPanel(id);
-    if (panel) dock.removePanel(panel);
+    if (!panel) return;
+    const group = panel.api.group;
+    const wasLastInGroup = group.panels.length <= 1;
+    dock.removePanel(panel);
+    // If the group it lived in is now empty *and* it's an edge group,
+    // remove it so size persistence resets. Body groups are left for
+    // dockview to clean up on its own — body layout is the user's
+    // grid and we don't want to collapse adjacent panels.
+    if (wasLastInGroup) {
+      for (const pos of ["left", "right", "top", "bottom"] as const) {
+        const edge = dock.getEdgeGroup(pos);
+        if (edge && (edge as unknown as { id?: string }).id === group.id) {
+          dock.removeEdgeGroup(pos);
+          break;
+        }
+      }
+    }
   }
 
   /// Toggles edge-group visibility (e.g. collapse/expand a sidebar
