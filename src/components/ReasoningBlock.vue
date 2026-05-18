@@ -23,17 +23,35 @@ const showFull = computed(
 
 <template>
   <div v-if="props.visibility !== 'hidden'" class="reasoning-card">
-    <div class="reasoning-header">
-      <span class="role-label">Reasoning</span>
+    <!-- Compact mode: the preview line lives in the header next to the
+         chevron, and the standalone "REASONING" label is dropped. The
+         label only appears in fully-expanded mode (no toggle), where
+         there's no preview to act as a title. -->
+    <div
+      v-if="props.visibility === 'compact'"
+      class="reasoning-header reasoning-header-compact"
+      :class="{ 'is-expanded': expanded }"
+      role="button"
+      tabindex="0"
+      :aria-expanded="expanded"
+      :aria-label="expanded ? 'Collapse reasoning' : 'Expand reasoning'"
+      @click="expanded = !expanded"
+      @keydown.enter.prevent="expanded = !expanded"
+      @keydown.space.prevent="expanded = !expanded"
+    >
+      <span class="reasoning-preview">{{ preview || "Thinking..." }}</span>
       <Button
-        v-if="props.visibility === 'compact'"
         :icon="expanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
         text
         rounded
         size="small"
         :aria-label="expanded ? 'Collapse reasoning' : 'Expand reasoning'"
-        @click="expanded = !expanded"
+        tabindex="-1"
+        @click.stop="expanded = !expanded"
       />
+    </div>
+    <div v-else class="reasoning-header">
+      <span class="role-label">Reasoning</span>
     </div>
     <MessageContent
       v-if="showFull"
@@ -41,7 +59,6 @@ const showFull = computed(
       :text="props.text || 'Thinking...'"
       label="Reasoning content"
     />
-    <p v-else class="reasoning-preview">{{ preview || "Thinking..." }}</p>
   </div>
 </template>
 
@@ -66,6 +83,15 @@ const showFull = computed(
   gap: 0.5rem;
 }
 
+.reasoning-header-compact {
+  cursor: pointer;
+  user-select: none;
+}
+
+.reasoning-header-compact:hover .reasoning-preview {
+  color: var(--p-text-color);
+}
+
 .role-label {
   text-transform: uppercase;
   font-size: 0.7rem;
@@ -74,16 +100,26 @@ const showFull = computed(
   color: var(--p-text-muted-color);
 }
 
-.reasoning-body,
-.reasoning-preview {
+.reasoning-body {
   margin: 0.25rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* In compact mode the preview line acts as the header's "title": muted,
+   single-line, truncated. Expanding hides it (full content shows
+   below), so we fade it slightly to make the affordance obvious. */
 .reasoning-preview {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-style: italic;
+  color: var(--p-text-muted-color);
+}
+
+.is-expanded .reasoning-preview {
+  opacity: 0.7;
 }
 </style>
