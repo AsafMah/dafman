@@ -82,6 +82,22 @@ let unsubscribe: (() => void) | null = null;
 const pendingEvents = new Map<string, SessionEventPayload[]>();
 const MAX_PENDING_PER_SESSION = 5000;
 
+/// Test-only seam: clears module-level state (subscription, buffered
+/// events) so each unit test starts from a clean slate. Production
+/// code never calls this — the module-level state is intentional
+/// (one subscription per app lifetime) and survives store re-creation.
+export function _resetSessionsStoreForTest(): void {
+  if (unsubscribe) {
+    try {
+      unsubscribe();
+    } catch {
+      /* best effort */
+    }
+    unsubscribe = null;
+  }
+  pendingEvents.clear();
+}
+
 export const useSessionsStore = defineStore("sessions", () => {
   const sessions = ref<SessionRecord[]>([]);
   const isCreating = ref(false);
@@ -97,6 +113,13 @@ export const useSessionsStore = defineStore("sessions", () => {
       if (list.length < MAX_PENDING_PER_SESSION) {
         list.push(payload);
         pendingEvents.set(payload.sessionId, list);
+      }
+      if (import.meta.env.DEV) {
+        console.debug(
+          "[session-event] buffered",
+          payload.eventType,
+          payload.sessionId,
+        );
       }
       return;
     }

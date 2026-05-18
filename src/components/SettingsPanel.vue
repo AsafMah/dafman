@@ -12,7 +12,7 @@
 import { computed, reactive } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
-import SelectButton from "primevue/selectbutton";
+import Select from "primevue/select";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
@@ -89,29 +89,27 @@ function toggle(id: string) {
       </button>
 
       <div v-show="!collapsed.appearance" class="group-body">
-        <label class="field" id="theme-label">
+        <label class="field" for="theme-select">
           <span class="field-label">Theme</span>
-          <SelectButton
+          <Select
+            id="theme-select"
             v-model="theme"
             :options="themeOptions"
             option-label="label"
             option-value="value"
-            :allow-empty="false"
-            aria-labelledby="theme-label"
             size="small"
             class="field-control"
           />
         </label>
 
-        <label class="field" id="reasoning-label">
+        <label class="field" for="reasoning-select">
           <span class="field-label">Reasoning visibility</span>
-          <SelectButton
+          <Select
+            id="reasoning-select"
             v-model="reasoningVisibility"
             :options="reasoningOptions"
             option-label="label"
             option-value="value"
-            :allow-empty="false"
-            aria-labelledby="reasoning-label"
             size="small"
             class="field-control"
           />
@@ -270,15 +268,14 @@ function toggle(id: string) {
 }
 
 .field-control {
-  align-self: flex-start;
+  width: 100%;
   max-width: 100%;
 }
 
-/* PrimeVue SelectButton width on narrow sidebars — let it wrap if
- * the labels can't fit on one line. */
-.field-control :deep(.p-selectbutton) {
-  display: flex;
-  flex-wrap: wrap;
+/* PrimeVue Select fills its container — let it shrink with the
+ * sidebar instead of demanding a fixed minimum width. */
+.field-control :deep(.p-select) {
+  width: 100%;
 }
 
 .field-hint {

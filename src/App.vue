@@ -108,15 +108,24 @@ const pendingRestoreLayout = ref<unknown | null>(null);
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;
   if (!layout || typeof layout !== "object") return;
-  const panelIds = extractPanelIds(layout);
-  if (panelIds.length === 0) return;
-  // Best-effort resume each session referenced by the layout. Failures
-  // are non-fatal — the panel still shows up (dockview replays it from
-  // the JSON below) but with no `SessionRecord` behind it; ChatPanel
-  // renders a friendly "session no longer available" surface with a
-  // button to spawn a replacement in the same tab.
+  const sessionIds = extractChatPanelIds(layout);
+  if (sessionIds.length === 0) {
+    // Even with no chat sessions to resume, hand the layout to
+    // dockview so sidebar panels (Sessions / Settings) restore.
+    if (layoutStore.api) {
+      layoutStore.restore(layout);
+    } else {
+      pendingRestoreLayout.value = layout;
+    }
+    return;
+  }
+  // Best-effort resume each CLI-side session referenced by the layout.
+  // Sidebar panel ids (sessions-manager, settings-panel, ...) are
+  // filtered out of `sessionIds` already — we never ask the SDK to
+  // resume those, which used to produce a flurry of spurious
+  // "Session not restored" toasts on every reload.
   await Promise.all(
-    panelIds.map((id) => sessionsStore.restoreSession(id)),
+    sessionIds.map((id) => sessionsStore.restoreSession(id)),
   );
   // Always apply the full layout, even when no sessions resumed —
   // preserving the user's grid layout is more important than hiding
@@ -129,14 +138,28 @@ async function restoreFromLayout() {
   }
 }
 
-/// Extract panel ids from a dockview `toJSON()` blob. The shape is
-/// `{ panels: Record<panelId, ...>, ... }`. We treat it opaquely
-/// elsewhere; this is the one place we peek inside.
-function extractPanelIds(layout: unknown): string[] {
+/// Extract panel ids from a dockview `toJSON()` blob whose
+/// `contentComponent` is `"chat"`. The layout shape is roughly
+/// `{ panels: Record<panelId, { contentComponent, params, ... }>, ... }`.
+/// We deliberately exclude sidebar / activity-bar panels (sessions-
+/// manager, settings-panel) — those don't correspond to CLI sessions
+/// and asking the SDK to resume them just produces error toasts.
+function extractChatPanelIds(layout: unknown): string[] {
   if (!layout || typeof layout !== "object") return [];
   const panels = (layout as { panels?: unknown }).panels;
   if (!panels || typeof panels !== "object") return [];
-  return Object.keys(panels);
+  const out: string[] = [];
+  for (const [id, entry] of Object.entries(
+    panels as Record<string, unknown>,
+  )) {
+    if (!entry || typeof entry !== "object") continue;
+    const component = (entry as { contentComponent?: unknown })
+      .contentComponent;
+    if (typeof component !== "string") continue;
+    if (component !== "chat") continue;
+    out.push(id);
+  }
+  return out;
 }
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
