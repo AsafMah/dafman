@@ -7,13 +7,17 @@
 //   - delete the session permanently (calls bun `deleteSession` →
 //     `client.deleteSession`)
 //
+// Edge-group panels host their own header chrome (title + close
+// button + toolbar) because dockview's side-rotated tab strip is
+// hidden via CSS (`.dv-edge-group .dv-tabs-and-actions-container`).
+//
 // Refresh is explicit + on-mount + after sessions open/close from this
 // app. We don't have a CLI-side session-lifecycle event stream yet
 // (the SDK exposes `SessionLifecycleEvent` types but the renderer
 // can't subscribe directly), so background-changed sessions appear
 // only after a user-triggered refresh.
 
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, reactive, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import { useConfirm } from "primevue/useconfirm";
@@ -23,6 +27,11 @@ import { useSessionsStore } from "../stores/sessionsStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useToastStore } from "../stores/toastStore";
 import type { SessionMetadataSummary } from "../ipc/types";
+
+/// The panel id we register from App.vue. Keep in sync with that
+/// file; if it ever moves to a shared constants module, both should
+/// import from there.
+const PANEL_ID = "sessions-manager";
 
 const sessionsList = useSessionsListStore();
 const sessionsStore = useSessionsStore();
@@ -35,6 +44,17 @@ const { grouped, isLoading, hasLoaded, error } = storeToRefs(sessionsList);
 const openSessionIds = computed(
   () => new Set(sessionsStore.sessions.map((s) => s.id)),
 );
+
+/// Map of workspace-group-key -> collapsed flag. Reactive so toggling
+/// re-renders the affected group. Default-collapsed for now would be
+/// "everything expanded"; the user can collapse what they don't need.
+/// State is in-memory only — persisting between launches can land
+/// later if there's demand.
+const collapsedGroups = reactive<Record<string, boolean>>({});
+
+function toggleGroup(key: string) {
+  collapsedGroups[key] = !collapsedGroups[key];
+}
 
 onMounted(() => {
   void sessionsList.refresh();
@@ -52,6 +72,10 @@ watch(
 
 function onRefresh() {
   void sessionsList.refresh();
+}
+
+function onClose() {
+  layoutStore.closePanel(PANEL_ID);
 }
 
 async function onResume(session: SessionMetadataSummary) {
@@ -126,22 +150,34 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 <template>
   <div class="sessions-manager">
     <ConfirmPopup />
-    <!-- Tab strip already carries the "Sessions" label via SidebarTab,
-         so the inner panel doesn't repeat the title. The refresh
-         button + future toolbar bits live in a slim toolbar above
-         the list. -->
-    <div class="manager-toolbar">
-      <Button
-        icon="pi pi-refresh"
-        text
-        rounded
-        size="small"
-        :loading="isLoading"
-        aria-label="Refresh sessions list"
-        title="Refresh"
-        @click="onRefresh"
-      />
-    </div>
+
+    <header class="manager-header">
+      <h2 class="manager-title">
+        <i class="pi pi-list" aria-hidden="true" />
+        Sessions
+      </h2>
+      <div class="manager-actions">
+        <Button
+          icon="pi pi-refresh"
+          text
+          rounded
+          size="small"
+          :loading="isLoading"
+          aria-label="Refresh sessions list"
+          title="Refresh"
+          @click="onRefresh"
+        />
+        <Button
+          icon="pi pi-times"
+          text
+          rounded
+          size="small"
+          aria-label="Close Sessions panel"
+          title="Close"
+          @click="onClose"
+        />
+      </div>
+    </header>
 
     <div class="manager-body">
       <p v-if="error" class="state-message error-message">
@@ -163,13 +199,43 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
         v-for="group in grouped"
         :key="group.key"
         class="workspace-group"
+        :class="{ 'is-collapsed': collapsedGroups[group.key] }"
       >
-        <header class="group-header" :title="group.path">
-          <i class="pi pi-folder" aria-hidden="true" />
+        <button
+          type="button"
+          class="group-header"
+          :title="group.path || 'Sessions without a workspace'"
+          :aria-expanded="!collapsedGroups[group.key]"
+          @click="toggleGroup(group.key)"
+        >
+          <i
+            class="pi group-chevron"
+            :class="
+              collapsedGroups[group.key] ? 'pi-chevron-right' : 'pi-chevron-down'
+            "
+            aria-hidden="true"
+          />
+          <i class="pi pi-folder group-folder" aria-hidden="true" />
           <span class="group-label">{{ group.label }}</span>
           <span class="group-count">{{ group.sessions.length }}</span>
-        </header>
-        <ul class="session-list">
+        </button>
+
+        <!-- Collapsed preview: show the latest session's label + relative
+             time so the user can scan recency without expanding. -->
+        <div
+          v-if="collapsedGroups[group.key] && group.sessions.length > 0"
+          class="group-preview"
+          :title="group.sessions[0]?.sessionId"
+        >
+          <span class="group-preview-label">
+            {{ sessionLabel(group.sessions[0]!) }}
+          </span>
+          <span class="group-preview-time">
+            {{ relativeTime(group.sessions[0]!.modifiedTime) }}
+          </span>
+        </div>
+
+        <ul v-show="!collapsedGroups[group.key]" class="session-list">
           <li
             v-for="session in group.sessions"
             :key="session.sessionId"
@@ -223,13 +289,38 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   color: var(--p-text-color);
 }
 
-.manager-toolbar {
+.manager-header {
   flex: 0 0 auto;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  padding: 0.2rem 0.4rem;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.6rem;
   border-bottom: 1px solid var(--p-content-border-color);
+  min-height: var(--dv-tabs-and-actions-container-height, 35px);
+}
+
+.manager-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--p-text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.manager-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
 }
 
 .manager-body {
@@ -254,20 +345,47 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 }
 
 .workspace-group {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .group-header {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  width: 100%;
   padding: 0.35rem 0.6rem;
   color: var(--p-text-muted-color);
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  cursor: default;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.group-header:hover {
+  background: color-mix(in srgb, var(--p-text-color) 5%, transparent);
+  color: var(--p-text-color);
+}
+
+.group-header:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
+}
+
+.group-chevron {
+  font-size: 0.65rem;
+  width: 0.75rem;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.group-folder {
+  font-size: 0.75rem;
+  flex: 0 0 auto;
 }
 
 .group-label {
@@ -278,6 +396,32 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 }
 
 .group-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-text-muted-color);
+}
+
+.group-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0.6rem 0.4rem 1.95rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  cursor: default;
+}
+
+.group-preview-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+.group-preview-time {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
 }

@@ -91,3 +91,19 @@ body.app-dark {
 .dv-tab.dv-tab-dragging {
   background-color: transparent !important;
 }
+
+/* Edge-group panels (Sessions sidebar today; future Library, Log
+ * viewer, …) host their own header inside the panel content — title +
+ * close button rendered by the component itself. Dockview's
+ * tab/actions strip would otherwise add a redundant (and on
+ * left/right positions, rotated 90°) chrome row. Hide the strip on
+ * edge groups only — body groups keep their tab bar so multi-session
+ * panels work normally.
+ *
+ * The drag handle for resizing the edge group lives on the group
+ * container's edge separator, which is outside `.dv-tabs-and-actions-
+ * container`, so hiding the tab strip leaves the side resize affordance
+ * untouched. */
+.dv-edge-group .dv-tabs-and-actions-container {
+  display: none !important;
+}

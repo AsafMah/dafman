@@ -85,9 +85,14 @@ export const useLayoutStore = defineStore("layout", () => {
     if (dock.getPanel(sessionId)) return;
     // When `targetGroupId` is provided (e.g. replacing an orphan panel
     // inline) we drop the new panel as a tab inside that group. Otherwise
-    // we tile: a new group to the right of the active one, falling back
-    // to dockview's default placement on the very first panel.
-    const referenceGroup = opts.targetGroupId ?? dock.activeGroup?.id;
+    // we tile: a new group to the right of the active *body* group,
+    // falling back to dockview's default placement on the very first
+    // panel. We deliberately ignore edge / floating / popout groups
+    // here — landing a chat panel inside the Sessions sidebar (because
+    // that's where the focus happens to be) is jarring and looks
+    // broken in the rotated side-tab strip.
+    const referenceGroup =
+      opts.targetGroupId ?? firstBodyGroupId();
     dock.addPanel({
       id: sessionId,
       component: "chat",
@@ -102,6 +107,22 @@ export const useLayoutStore = defineStore("layout", () => {
           }
         : {}),
     });
+  }
+
+  /// Returns the id of the active group when it lives inside the grid
+  /// body, or — if the active group is an edge / floating / popout —
+  /// the first body group we find. Returns undefined when no body
+  /// group exists yet (first panel ever; dockview will use default
+  /// placement).
+  function firstBodyGroupId(): string | undefined {
+    const dock = api.value;
+    if (!dock) return undefined;
+    const active = dock.activeGroup;
+    if (active && active.model.location.type === "grid") return active.id;
+    for (const group of dock.groups) {
+      if (group.model.location.type === "grid") return group.id;
+    }
+    return undefined;
   }
 
   /// Swaps an orphan panel (a session that failed to resume on
