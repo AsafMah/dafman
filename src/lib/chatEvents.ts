@@ -6,6 +6,8 @@ import type { SessionEventPayload } from "../ipc/types";
 
 export type SystemSeverity = "info" | "warn" | "error";
 
+export type ToolStatus = "running" | "success" | "error";
+
 export type ChatItem =
   | {
       id: number;
@@ -26,10 +28,46 @@ export type ChatItem =
     }
   | {
       id: number;
+      kind: "tool";
+      toolCallId: string;
+      toolName: string;
+      mcpServerName?: string;
+      mcpToolName?: string;
+      args?: Record<string, unknown>;
+      status: ToolStatus;
+      /// Latest progress notification text (e.g. from an MCP server's
+      /// `tool.execution_progress`). Overwritten on each event.
+      progressMessage?: string;
+      /// Accumulated `tool.execution_partial_result.partialOutput`,
+      /// capped to `TOOL_OUTPUT_CAP_BYTES` to keep the renderer happy
+      /// with shell commands that print megabytes.
+      partialOutput: string;
+      /// Final result content from `tool.execution_complete`. We prefer
+      /// `result.detailedContent` (full content for UI) over
+      /// `result.content` (LLM-truncated). Also capped.
+      resultContent?: string;
+      errorMessage?: string;
+      errorCode?: string;
+      /// Sub-agent that produced this tool call, when applicable.
+      agentId?: string;
+    }
+  | {
+      id: number;
       kind: "system";
       text: string;
       severity: SystemSeverity;
     };
+
+/// Maximum bytes of partial / result content we keep in memory and
+/// render per tool call. Streaming shell tools can emit huge blobs;
+/// without a cap the message list grinds to a halt.
+export const TOOL_OUTPUT_CAP_BYTES = 64 * 1024;
+
+function clampOutput(text: string): string {
+  if (text.length <= TOOL_OUTPUT_CAP_BYTES) return text;
+  const head = text.slice(0, TOOL_OUTPUT_CAP_BYTES);
+  return `${head}\n... [output truncated: ${text.length - TOOL_OUTPUT_CAP_BYTES} more bytes]`;
+}
 
 /// Ambient state derived from the event stream that is shown OUTSIDE the
 /// scrollable message list (header title/model, intent pill above the
@@ -161,6 +199,31 @@ export function processEvents(
     return existing;
   };
 
+  /// Upserts a `kind: "tool"` item keyed by `toolCallId`. `fallbackName`
+  /// is used when the first event we observe is a partial/progress and
+  /// we don't have the real tool name yet — replaced by later
+  /// `execution_start` metadata.
+  const upsertTool = (
+    toolCallId: string,
+    fallbackName?: string,
+  ): ChatItem => {
+    let existing = items.find(
+      (i) => i.kind === "tool" && i.toolCallId === toolCallId,
+    );
+    if (!existing) {
+      existing = {
+        id: counter.next++,
+        kind: "tool",
+        toolCallId,
+        toolName: fallbackName ?? `tool ${toolCallId.slice(0, 8)}`,
+        status: "running",
+        partialOutput: "",
+      };
+      items.push(existing);
+    }
+    return existing;
+  };
+
   const pushSystem = (text: string, severity: SystemSeverity) => {
     items.push({ id: counter.next++, kind: "system", text, severity });
   };
@@ -239,6 +302,75 @@ export function processEvents(
         const msg = upsertReasoning(key);
         if (msg.kind === "reasoning") {
           msg.text = content || msg.text;
+        }
+        break;
+      }
+      // --- Tool calls ---
+      // Tool items are keyed by `toolCallId`. Status transitions are
+      // monotonic: once a tool reaches `success` / `error` we don't
+      // regress to `running` even if a delayed `start` / `user_requested`
+      // arrives. Result-content priority is `detailedContent ?? content`
+      // (the SDK's `content` is LLM-truncated; `detailedContent` is the
+      // full UI/timeline blob).
+      case "tool.user_requested":
+      case "tool.execution_start": {
+        const toolCallId = pickString(data, ["toolCallId"]);
+        const toolName = pickString(data, ["toolName"]);
+        if (!toolCallId) break;
+        const item = upsertTool(toolCallId, toolName || undefined);
+        if (item.kind !== "tool") break;
+        if (toolName) item.toolName = toolName;
+        const args = (data as Record<string, unknown>).arguments;
+        if (args && typeof args === "object") {
+          item.args = args as Record<string, unknown>;
+        }
+        const mcpServer = pickString(data, ["mcpServerName"]);
+        if (mcpServer) item.mcpServerName = mcpServer;
+        const mcpTool = pickString(data, ["mcpToolName"]);
+        if (mcpTool) item.mcpToolName = mcpTool;
+        if (payload.agentId) item.agentId = payload.agentId;
+        // Never overwrite a terminal status — late `start` events can
+        // arrive after `complete` in pathological ordering.
+        if (item.status === "running") item.status = "running";
+        break;
+      }
+      case "tool.execution_partial_result": {
+        const toolCallId = pickString(data, ["toolCallId"]);
+        const partial = pickString(data, ["partialOutput"]);
+        if (!toolCallId || !partial) break;
+        const item = upsertTool(toolCallId);
+        if (item.kind !== "tool") break;
+        item.partialOutput = clampOutput(item.partialOutput + partial);
+        break;
+      }
+      case "tool.execution_progress": {
+        const toolCallId = pickString(data, ["toolCallId"]);
+        const progress = pickString(data, ["progressMessage"]);
+        if (!toolCallId) break;
+        const item = upsertTool(toolCallId);
+        if (item.kind !== "tool") break;
+        if (progress) item.progressMessage = progress;
+        break;
+      }
+      case "tool.execution_complete": {
+        const toolCallId = pickString(data, ["toolCallId"]);
+        if (!toolCallId) break;
+        const item = upsertTool(toolCallId);
+        if (item.kind !== "tool") break;
+        const success = (data as { success?: unknown }).success === true;
+        item.status = success ? "success" : "error";
+        const result = (data as { result?: unknown }).result;
+        if (result && typeof result === "object") {
+          // detailedContent is the full UI blob; content may be truncated for the LLM.
+          const detailed = pickString(result, ["detailedContent", "content"]);
+          if (detailed) item.resultContent = clampOutput(detailed);
+        }
+        const err = (data as { error?: unknown }).error;
+        if (err && typeof err === "object") {
+          const message = pickString(err, ["message"]);
+          if (message) item.errorMessage = message;
+          const code = pickString(err, ["code"]);
+          if (code) item.errorCode = code;
         }
         break;
       }
@@ -383,6 +515,34 @@ export function processEvents(
       case "session.start":
       case "session.resume":
       case "session.shutdown":
+      // Adjacent tool-ish surfaces we deliberately don't render yet:
+      // - permission.* — pending the permission-modal UX (will gate tool calls).
+      // - elicitation.* / user_input.* — pending the elicitation UX.
+      // - external_tool.* — client-side custom tools; surface once we register any.
+      // - command.* — TUI slash-command lifecycle (not relevant in the desktop UI).
+      // - subagent.* / hook.* / sampling.* / mcp_oauth.* — surfaced later.
+      case "permission.requested":
+      case "permission.completed":
+      case "user_input.requested":
+      case "user_input.completed":
+      case "elicitation.requested":
+      case "elicitation.completed":
+      case "external_tool.requested":
+      case "external_tool.completed":
+      case "command.queued":
+      case "command.execute":
+      case "command.completed":
+      case "subagent.started":
+      case "subagent.completed":
+      case "subagent.failed":
+      case "subagent.selected":
+      case "subagent.deselected":
+      case "hook.start":
+      case "hook.end":
+      case "sampling.requested":
+      case "sampling.completed":
+      case "mcp.oauth_required":
+      case "mcp.oauth_completed":
         break;
       default:
         break;

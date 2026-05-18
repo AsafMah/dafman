@@ -13,7 +13,8 @@ import {
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
-import type { SessionEventPayload } from "../rpc";
+import type {
+	SessionEventPayload, SessionMetadataSummary, SessionHistoryCompactionResult, SessionMode, } from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
 /// type alias isn't re-exported from the package root, so we mirror it
@@ -25,6 +26,17 @@ type Emit = (payload: SessionEventPayload) => void;
 interface Entry {
 	session: CopilotSession;
 	unsubscribe: () => void;
+}
+
+/// Config shared between `create()` and `resume()` so a resumed session
+/// behaves identically to a freshly created one (permission handler,
+/// streaming mode, etc.). Per-call overrides (model, reasoningEffort,
+/// onEvent) are layered on top by each caller.
+function baseSessionConfig() {
+	return {
+		onPermissionRequest: approveAll,
+		streaming: true as const,
+	};
 }
 
 export class SessionRegistry {
@@ -43,8 +55,7 @@ export class SessionRegistry {
 			this.forward(resolvedSessionId ?? "pending", event);
 		};
 		const session = await client.createSession({
-			onPermissionRequest: approveAll,
-			streaming: true,
+			...baseSessionConfig(),
 			onEvent: earlyForward,
 		});
 		const sessionId = session.sessionId;
@@ -57,6 +68,88 @@ export class SessionRegistry {
 		this.entries.set(sessionId, { session, unsubscribe });
 		log.info("session created", { sessionId });
 		return sessionId;
+	}
+
+	/// Resumes a previously-created session by id. After resume succeeds
+	/// we immediately replay `session.getMessages()` through the same
+	/// forwarder so the frontend reducer rebuilds its transcript from
+	/// scratch — the SDK's `session.on` does NOT replay history on its
+	/// own, so without this the restored pane would render empty until
+	/// the next turn.
+	///
+	/// Idempotent: a duplicate resume of an already-registered id is a
+	/// no-op (returns the same id).
+	async resume(
+		sessionId: string,
+		opts: { model?: string; reasoningEffort?: string } = {},
+	): Promise<string> {
+		if (this.entries.has(sessionId)) {
+			log.debug("resume on already-registered session, returning id", {
+				sessionId,
+			});
+			return sessionId;
+		}
+		const client = tryGetClient();
+		let resolvedSessionId: string | null = null;
+		const earlyForward = (event: SessionEvent) => {
+			this.forward(resolvedSessionId ?? sessionId, event);
+		};
+		let session: CopilotSession;
+		try {
+			session = await client.resumeSession(sessionId, {
+				...baseSessionConfig(),
+				onEvent: earlyForward,
+				...(opts.model ? { model: opts.model } : {}),
+				...(opts.reasoningEffort
+					? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
+					: {}),
+			});
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			log.warn("session resume failed", { sessionId, error: message });
+			throw AppError.sdk(message);
+		}
+		const actualId = session.sessionId;
+		resolvedSessionId = actualId;
+		const unsubscribe = session.on((event) => {
+			this.forward(actualId, event);
+		});
+		this.entries.set(actualId, { session, unsubscribe });
+		// Hydrate transcript. Failures here aren't fatal — the session is
+		// connected and will receive live events; we just won't have the
+		// scrollback.
+		try {
+			const history = await session.getMessages();
+			for (const event of history) this.forward(actualId, event);
+			log.info("session resumed", { sessionId: actualId, historyCount: history.length });
+		} catch (err) {
+			log.warn("failed to hydrate session history", {
+				sessionId: actualId,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
+		return actualId;
+	}
+
+	async list(): Promise<SessionMetadataSummary[]> {
+		const client = tryGetClient();
+		const items = await client.listSessions();
+		return items.map((m) => ({
+			sessionId: m.sessionId,
+			startTime:
+				m.startTime instanceof Date
+					? m.startTime.toISOString()
+					: String(m.startTime),
+			modifiedTime:
+				m.modifiedTime instanceof Date
+					? m.modifiedTime.toISOString()
+					: String(m.modifiedTime),
+			summary: m.summary,
+			isRemote: m.isRemote,
+			cwd: m.context?.cwd,
+			repository: m.context?.repository,
+			branch: m.context?.branch,
+		}));
 	}
 
 	private forward(sessionId: string, event: SessionEvent): void {
@@ -80,15 +173,24 @@ export class SessionRegistry {
 		// The Rust port forwarded only `event.data`, and our `chatEvents.ts`
 		// reads fields like `payload.data.messageId` directly off the
 		// payload. Unwrap the SDK's nested `data` so the frontend sees the
-		// same shape it always did.
-		const data = (
-			(event as unknown as { data?: Record<string, unknown> }).data ?? {}
-		) as Record<string, unknown>;
+		// same shape it always did, but also lift envelope-level fields
+		// (`agentId`, `id`, `timestamp`) so the frontend can correlate
+		// sub-agent activity without us mirroring every variant.
+		const envelope = event as unknown as {
+			data?: Record<string, unknown>;
+			agentId?: string;
+			id?: string;
+			timestamp?: string;
+		};
+		const data = (envelope.data ?? {}) as Record<string, unknown>;
 		try {
 			this.emit({
 				sessionId,
 				eventType,
 				data,
+				...(envelope.agentId ? { agentId: envelope.agentId } : {}),
+				...(envelope.id ? { eventId: envelope.id } : {}),
+				...(envelope.timestamp ? { timestamp: envelope.timestamp } : {}),
 			});
 		} catch (err) {
 			log.warn("failed to forward session event", {
@@ -125,6 +227,117 @@ export class SessionRegistry {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
 		return model;
+	}
+
+	async getMode(sessionId: string): Promise<SessionMode> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = await entry.session.rpc.mode.get();
+			if (
+				result !== "interactive" &&
+				result !== "plan" &&
+				result !== "autopilot"
+			) {
+				throw AppError.sdk(
+					`unexpected session mode from SDK: ${JSON.stringify(result)}`,
+				);
+			}
+			return result;
+		} catch (err) {
+			if (err instanceof AppError) throw err;
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setMode(sessionId: string, mode: SessionMode): Promise<SessionMode> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.mode.set({ mode });
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		return mode;
+	}
+
+	async getName(sessionId: string): Promise<string | null> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = await entry.session.rpc.name.get();
+			const name = (result as { name?: unknown }).name;
+			if (typeof name === "string") return name;
+			if (name === null || name === undefined) return null;
+			throw AppError.sdk(
+				`unexpected session name from SDK: ${JSON.stringify(name)}`,
+			);
+		} catch (err) {
+			if (err instanceof AppError) throw err;
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setName(sessionId: string, name: string): Promise<string> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.name.set({ name });
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		return name;
+	}
+
+	async compactHistory(
+		sessionId: string,
+	): Promise<SessionHistoryCompactionResult> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.history.compact()) as {
+				success?: boolean;
+				tokensFreed?: number;
+				messagesRemoved?: number;
+			};
+			return {
+				success: result.success ?? true,
+				tokensFreed:
+					typeof result.tokensFreed === "number" ? result.tokensFreed : null,
+				messagesRemoved:
+					typeof result.messagesRemoved === "number"
+						? result.messagesRemoved
+						: null,
+			};
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.permissions.setApproveAll({
+				enabled,
+			})) as { success?: boolean };
+			return result.success ?? true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async resetApprovals(sessionId: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.permissions.resetSessionApprovals()) as {
+				success?: boolean;
+			};
+			return result.success ?? true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
 	}
 
 	async disconnect(sessionId: string): Promise<string> {

@@ -2,10 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import Popover from "primevue/popover";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
+import ToolCallBlock from "./ToolCallBlock.vue";
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -19,6 +22,7 @@ import type {
   ModelSummary,
   ReasoningVisibility,
   SessionEventPayload,
+  SessionMode,
 } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
@@ -26,12 +30,30 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 
+// NOTE: `ToggleSwitch` import + `approveAllChoice` computed are intentionally
+// kept absent until a real permission UX lands. The SDK's
+// `permissions.setApproveAll` toggle is wired through the store
+// (`setSessionApproveAll`) but our local `onPermissionRequest: approveAll`
+// handler in `src-bun/app/sessions.ts` short-circuits every request, so
+// surfacing a UI switch today would be misleading. Prop + store state are
+// retained so the toggle row can be re-added in the popover when the
+// per-session handler stops hard-approving.
+
 const props = defineProps<{
   sessionId: string;
   accent: string;
   events: SessionEventPayload[];
   model: string | null;
   reasoningEffort: string | null;
+  mode: SessionMode | null;
+  approveAll: boolean;
+  /// Optional override for the send action. When provided, ChatWindow
+  /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
+  /// playground to keep the chat self-contained (echo-only, no SDK).
+  sendHandler?: (text: string) => Promise<void> | void;
+  /// Hide the in-header close (X) button. Set when a parent container
+  /// (e.g. the dockview tab bar) owns panel removal.
+  hideClose?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -135,6 +157,46 @@ const effortChoice = computed<string | null>({
   },
 });
 
+const modeOptions: { label: string; value: SessionMode }[] = [
+  { label: "Interactive", value: "interactive" },
+  { label: "Plan", value: "plan" },
+  { label: "Autopilot", value: "autopilot" },
+];
+
+const modeChoice = computed<SessionMode | null>({
+  get: () => props.mode,
+  set: (value) => {
+    if (!value || value === props.mode) return;
+    void sessionsStore.setSessionMode(props.sessionId, value);
+  },
+});
+
+const nameDraft = ref<string>("");
+const optionsMenu = ref<InstanceType<typeof Popover> | null>(null);
+
+function toggleOptions(event: Event) {
+  optionsMenu.value?.toggle(event);
+}
+
+function onRenameSubmit() {
+  const trimmed = nameDraft.value.trim();
+  if (!trimmed) return;
+  // Reflect the trimmed value in the input so the user sees the same
+  // string we sent, and so the `ambient.title` watcher can resync on
+  // the next backend echo (it skips while `nameDraft` is non-empty,
+  // but the trimmed echo will match what's shown).
+  nameDraft.value = trimmed;
+  void sessionsStore.setSessionName(props.sessionId, trimmed);
+}
+
+function onCompactNow() {
+  void sessionsStore.compactSessionHistory(props.sessionId);
+}
+
+function onResetApprovals() {
+  void sessionsStore.resetSessionApprovals(props.sessionId);
+}
+
 const accentColor = computed(() => props.accent);
 
 async function scrollToBottom() {
@@ -172,7 +234,9 @@ watch(
       const lastSystem = [...result.items]
         .reverse()
         .find((i) => i.kind === "system" && i.severity === "error");
-      if (lastSystem) toasts.error("Session error", lastSystem.text);
+      if (lastSystem && lastSystem.kind === "system") {
+        toasts.error("Session error", lastSystem.text);
+      }
     }
     scrollToBottom();
   },
@@ -186,7 +250,16 @@ watch(
     ambient.value = defaultAmbient();
     isSendingFallback.value = false;
     sessionOverride.value = "default";
+    nameDraft.value = "";
     processedEvents = props.events.length;
+  },
+);
+
+// Keep the rename draft in sync with the session title coming from events.
+watch(
+  () => ambient.value.title,
+  (title) => {
+    if (title && !nameDraft.value) nameDraft.value = title;
   },
 );
 
@@ -198,7 +271,11 @@ async function sendMessage(text: string) {
   await scrollToBottom();
 
   try {
-    await sessionsStore.sendMessage(props.sessionId, text);
+    if (props.sendHandler) {
+      await props.sendHandler(text);
+    } else {
+      await sessionsStore.sendMessage(props.sessionId, text);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     items.value = appendSystemMessage(
@@ -254,19 +331,84 @@ async function sendMessage(text: string) {
             aria-label="Reasoning effort for this session"
           />
         </label>
-        <label class="control" :for="`reasoning-${props.sessionId}`">
-          <span class="control-label">Reasoning</span>
-          <Select
-            :input-id="`reasoning-${props.sessionId}`"
-            v-model="sessionOverride"
-            :options="reasoningOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            aria-label="Reasoning visibility for this session"
-          />
-        </label>
         <Button
+          icon="pi pi-cog"
+          text
+          rounded
+          aria-label="Session options"
+          aria-haspopup="true"
+          @click="toggleOptions"
+        />
+        <Popover ref="optionsMenu">
+          <div class="session-options">
+            <label class="option-row" :for="`mode-${props.sessionId}`">
+              <span class="option-label">Run mode</span>
+              <Select
+                :input-id="`mode-${props.sessionId}`"
+                v-model="modeChoice"
+                :options="modeOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                placeholder="Loading..."
+                :disabled="!props.mode"
+                aria-label="Agent run mode"
+              />
+            </label>
+            <label class="option-row" :for="`reasoning-${props.sessionId}`">
+              <span class="option-label">Reasoning view</span>
+              <Select
+                :input-id="`reasoning-${props.sessionId}`"
+                v-model="sessionOverride"
+                :options="reasoningOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                aria-label="Reasoning visibility for this session"
+              />
+            </label>
+            <div class="option-row option-row-stack">
+              <label
+                class="option-label"
+                :for="`name-${props.sessionId}`"
+              >
+                Session name
+              </label>
+              <form class="rename-form" @submit.prevent="onRenameSubmit">
+                <InputText
+                  :id="`name-${props.sessionId}`"
+                  v-model="nameDraft"
+                  size="small"
+                  placeholder="Untitled"
+                />
+                <Button
+                  type="submit"
+                  label="Save"
+                  size="small"
+                  :disabled="!nameDraft.trim()"
+                />
+              </form>
+            </div>
+            <div class="option-actions">
+              <Button
+                icon="pi pi-compress"
+                label="Compact history"
+                size="small"
+                severity="secondary"
+                @click="onCompactNow"
+              />
+              <Button
+                icon="pi pi-refresh"
+                label="Reset approvals"
+                size="small"
+                severity="secondary"
+                @click="onResetApprovals"
+              />
+            </div>
+          </div>
+        </Popover>
+        <Button
+          v-if="!props.hideClose"
           icon="pi pi-times"
           text
           rounded
@@ -286,6 +428,21 @@ async function sendMessage(text: string) {
           v-if="item.kind === 'reasoning'"
           :text="item.text"
           :visibility="reasoningVisibility"
+        />
+        <ToolCallBlock
+          v-else-if="item.kind === 'tool'"
+          :tool-name="item.toolName"
+          :tool-call-id="item.toolCallId"
+          :mcp-server-name="item.mcpServerName"
+          :mcp-tool-name="item.mcpToolName"
+          :args="item.args"
+          :status="item.status"
+          :progress-message="item.progressMessage"
+          :partial-output="item.partialOutput"
+          :result-content="item.resultContent"
+          :error-message="item.errorMessage"
+          :error-code="item.errorCode"
+          :agent-id="item.agentId"
         />
         <article
           v-else
@@ -406,6 +563,55 @@ async function sendMessage(text: string) {
   color: var(--p-text-muted-color);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.session-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 18rem;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.option-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.option-label {
+  font-size: 0.8rem;
+  color: var(--p-text-color);
+}
+
+.option-row :deep(.p-select) {
+  min-width: 9rem;
+}
+
+.rename-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.rename-form :deep(.p-inputtext) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.option-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--p-content-border-color);
 }
 
 .session-id {

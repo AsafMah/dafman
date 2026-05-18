@@ -30,7 +30,8 @@ Dafman is a desktop replacement for the GitHub Copilot CLI built on Tauri (Rust 
 | Doc | Contents |
 |---|---|
 | `plan-overview.prompt.md` | Vision, principles, decisions register, glossary. |
-| `plan-architecture.prompt.md` | Backend & frontend module layout, IPC contract, state, errors, threading. |
+| **`plan-frontend-shell.prompt.md`** | **Current Vue + Bun frontend shell (dockview body, layoutStore, sessionsStore, settings v3, IPC, SDK gotchas). Read this first for frontend work — supersedes `plan-architecture.prompt.md` for the post-Bun-port reality.** |
+| `plan-architecture.prompt.md` | Legacy Rust/Tauri layout — historical context only. |
 | `plan-roadmap.prompt.md` | Milestones M0–M7 with definition-of-done. |
 | `plan-messagingAndUx.prompt.md` | Chat UX, reasoning, tools display, markdown, settings UI, inline elicitation. |
 | `plan-toolsAndPermissions.prompt.md` | Built-in tools, permission system, URL policy, MCP. |

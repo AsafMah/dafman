@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "electrobun dev --watch",
-    "dev:hmr": "concurrently \"bun run hmr\" \"bun run dev\"",
+    "predev": "bun run prep:dist",
+    "dev:hmr": "bun run prep:dist && concurrently \"bun run hmr\" \"bun run dev\"",
+    "prep:dist": "bun run tools/prep-dist.ts",
     "hmr": "vite --port 5173",
     "start": "vite build && electrobun dev",
     "build": "vite build && electrobun build",
@@ -25,6 +27,7 @@
     "@lexical/utils": "0.38.1",
     "@primeuix/themes": "^2.0.3",
     "copilot-sdk-supercharged": "^2.1.2",
+    "dockview-vue": "^6.3.0",
     "electrobun": "1.18.1",
     "lexical": "0.38.1",
     "lexical-vue": "^0.14.1",

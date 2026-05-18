@@ -50,12 +50,34 @@ describe("SettingsService", () => {
 				theme: "dark" as const,
 				reasoningVisibility: "compact" as const,
 			},
+			layout: { dockview: null },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);
 
 		const reloaded = SettingsService.loadOrDefault(path);
 		expect(reloaded.get().appearance.theme).toBe("dark");
+	});
+
+	test("update persists an opaque dockview layout blob", async () => {
+		const dir = newTempDir();
+		const path = join(dir, "settings.json");
+		const svc = SettingsService.loadOrDefault(path);
+		// We never inspect the dockview blob — just verify it round-trips
+		// as-is. Real dockview JSON would have `grid` + `panels`, but the
+		// service stays agnostic.
+		const blob = {
+			grid: { root: {}, height: 600, width: 800, orientation: "HORIZONTAL" },
+			panels: { "sess-1": { id: "sess-1", contentComponent: "chat" } },
+			activeGroup: "g1",
+		};
+		await svc.update({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact" },
+			layout: { dockview: blob },
+		});
+		const reloaded = SettingsService.loadOrDefault(path);
+		expect(reloaded.get().layout.dockview).toEqual(blob);
 	});
 
 	test("unknown version is stamped to current", () => {
@@ -82,6 +104,42 @@ describe("SettingsService", () => {
 		expect(settings.version).toBe(SETTINGS_VERSION);
 		expect(settings.appearance.theme).toBe("dark");
 		expect(settings.appearance.reasoningVisibility).toBe("compact");
+	});
+
+	test("v2 document migrates with an empty layout", () => {
+		const dir = newTempDir();
+		const path = join(dir, "settings.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				version: 2,
+				appearance: { theme: "dark", reasoningVisibility: "expanded" },
+			}),
+		);
+		const svc = SettingsService.loadOrDefault(path);
+		const settings = svc.get();
+		expect(settings.version).toBe(SETTINGS_VERSION);
+		expect(settings.appearance.theme).toBe("dark");
+		expect(settings.appearance.reasoningVisibility).toBe("expanded");
+		expect(settings.layout).toEqual({ dockview: null });
+	});
+
+	test("malformed layout coerces to a safe default", () => {
+		const settings = migrate({
+			version: 3,
+			appearance: { theme: "system" },
+			layout: { dockview: "not an object" },
+		});
+		expect(settings.layout).toEqual({ dockview: null });
+	});
+
+	test("array-shaped layout.dockview is rejected", () => {
+		const settings = migrate({
+			version: 3,
+			appearance: { theme: "system" },
+			layout: { dockview: [] },
+		});
+		expect(settings.layout).toEqual({ dockview: null });
 	});
 
 	test("migrate rejects bogus fields", () => {

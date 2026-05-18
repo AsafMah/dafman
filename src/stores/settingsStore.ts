@@ -11,8 +11,9 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 2,
+    version: 3,
     appearance: { theme: "system", reasoningVisibility: "compact" },
+    layout: { dockview: null },
   };
 }
 
@@ -65,6 +66,21 @@ export const useSettingsStore = defineStore("settings", () => {
     });
   }
 
+  /// Persists a fresh dockview-layout snapshot. Called (debounced) by
+  /// App.vue on every `onDidLayoutChange` once the api is ready. Errors
+  /// are intentionally swallowed — a layout-save failure should not
+  /// disrupt the user's workflow.
+  async function persistLayout(dockview: unknown | null): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        layout: { dockview },
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
+  }
+
   return {
     settings,
     loaded,
@@ -73,5 +89,6 @@ export const useSettingsStore = defineStore("settings", () => {
     update,
     setTheme,
     setReasoningVisibility,
+    persistLayout,
   };
 });

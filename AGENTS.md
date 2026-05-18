@@ -43,6 +43,15 @@ All commands live in `package.json` — that is the single source of truth.
 - **No hardcoded hex colors.** Use `var(--p-*)` PrimeVue tokens. Per-session accents (`accentForSession` from `src/lib/color.ts`) are the only exception.
 - Components are dumb; data + actions live in composables / Pinia stores.
 - Vue SFCs in `<script setup lang="ts">`.
+- **Dockview is the layout primitive.** The body of `App.vue` is a single `<DockviewVue>`. Sessions are panels (`layoutStore.addPanel`). Future sidebars / status bars / log viewers / pickers go in as **edge groups** via `layoutStore.openEdgePanel(position, options)` — never as new chrome around dockview. The slim topbar holds only global window-level actions (New Session, Settings, Dev wrench). See `plans/plan-frontend-shell.prompt.md` for the convention + lifecycle diagram.
+- **Panel id = session id.** Always `addPanel({ id: sessionId, … })`. Lets us extract session ids from the persisted layout JSON via `Object.keys(layout.panels)`.
+- **`sessionsStore.SessionRecord` is the runtime source of truth** for per-session state (events, model, reasoningEffort, title). Don't duplicate any of those into the dockview layout JSON — that blob is opaque UI shape only.
+
+### Copilot SDK gotchas
+- **The bundled CLI JS entrypoint requires Node ≥ 24** (uses `node:sqlite`). `src-bun/app/client.ts` resolves the prebuilt `@github/copilot-${platform}-${arch}` binary and hands its path to `CopilotClient({ cliPath })`. Don't revert to default cliPath without verifying on a Node ≤ 23 machine.
+- **SDK permissions are deny-by-default.** Removing the `approveAll` shim in `src-bun/app/sessions.ts` without a renderer-side `onPermissionRequest` modal will make every tool call silently fail. Real permission UX is M1 item #2.
+- **`session.on()` does not replay history.** `SessionRegistry.resume()` calls `session.getMessages()` and forwards each event through the standard emit path so the reducer rebuilds the transcript.
+- **Reach for SDK hooks before reimplementing tools.** `onPreToolUse` / `onPostToolUse` / `registerTools` / `availableTools` cover most of what you'd reach for in `overridesBuiltInTool` (which has real maintenance cost).
 
 ## Testing instructions
 - CI is `.github/workflows/ci.yml`. It runs the same scripts you do locally.
@@ -67,7 +76,8 @@ All commands live in `package.json` — that is the single source of truth.
 - For vulnerabilities, **do not open a public issue**. Follow [`SECURITY.md`](SECURITY.md) — file privately via GitHub Security Advisories.
 
 ## Architecture pointers
-- `plans/plan-architecture.prompt.md` — backend & frontend module layout, IPC contract, state, errors.
+- **`plans/plan-frontend-shell.prompt.md`** — current Vue + Bun shell (dockview body, layoutStore, sessionsStore, settings v3, IPC, SDK gotchas). Read this first for frontend work.
+- `plans/plan-architecture.prompt.md` — legacy Rust/Tauri layout. The runtime is now Bun + TypeScript everywhere; treat the Rust references as historical context. `plan-frontend-shell.prompt.md` supersedes it for the current frontend.
 - `plans/plan-sdkAndExternalSurfaces.prompt.md` — SDK pinning, URL/browser surface, MCP OAuth, `session.ui`, image generation.
 - `plans/plan-toolsAndPermissions.prompt.md` — built-in tools, permission model, URL policy, MCP.
 - `plans/plan-platformFeatures.prompt.md` — projects, accounts, skills, agents, automations.

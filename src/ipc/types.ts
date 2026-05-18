@@ -8,6 +8,16 @@ export type ThemeChoice = "system" | "light" | "dark";
 
 export type ReasoningVisibility = "hidden" | "compact" | "expanded";
 
+/// Mirrors `SessionMode` in `src-bun/rpc.ts`. Agent run mode.
+export type SessionMode = "interactive" | "plan" | "autopilot";
+
+/// Mirrors `SessionHistoryCompactionResult` in `src-bun/rpc.ts`.
+export interface SessionHistoryCompactionResult {
+  success: boolean;
+  tokensFreed: number | null;
+  messagesRemoved: number | null;
+}
+
 export interface Appearance {
   theme: ThemeChoice;
   reasoningVisibility: ReasoningVisibility;
@@ -16,6 +26,11 @@ export interface Appearance {
 export interface Settings {
   version: number;
   appearance: Appearance;
+  layout: Layout;
+}
+
+export interface Layout {
+  dockview: unknown | null;
 }
 
 export interface ModelSummary {
@@ -26,10 +41,24 @@ export interface ModelSummary {
   defaultReasoningEffort: string | null;
 }
 
+export interface SessionMetadataSummary {
+  sessionId: string;
+  startTime: string;
+  modifiedTime: string;
+  summary?: string;
+  isRemote: boolean;
+  cwd?: string;
+  repository?: string;
+  branch?: string;
+}
+
 export interface SessionEventPayload {
   sessionId: string;
   eventType: string;
   data: Record<string, unknown>;
+  agentId?: string;
+  eventId?: string;
+  timestamp?: string;
 }
 
 /// Discriminated union mirroring `AppErrorPayload` in `src-bun/app/errors.ts`.
@@ -56,6 +85,34 @@ export type CommandMap = {
     };
     result: string;
   };
+  resumeSession: {
+    args: {
+      sessionId: string;
+      model: string | null;
+      reasoningEffort: string | null;
+    };
+    result: string;
+  };
+  listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
+  getSessionMode: { args: { sessionId: string }; result: SessionMode };
+  setSessionMode: {
+    args: { sessionId: string; mode: SessionMode };
+    result: SessionMode;
+  };
+  getSessionName: { args: { sessionId: string }; result: string | null };
+  setSessionName: {
+    args: { sessionId: string; name: string };
+    result: string;
+  };
+  compactSessionHistory: {
+    args: { sessionId: string };
+    result: SessionHistoryCompactionResult;
+  };
+  setSessionApproveAll: {
+    args: { sessionId: string; enabled: boolean };
+    result: boolean;
+  };
+  resetSessionApprovals: { args: { sessionId: string }; result: boolean };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };

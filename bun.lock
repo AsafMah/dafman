@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 1,
   "workspaces": {
     "": {
       "name": "dafman",
@@ -13,6 +12,7 @@
         "@lexical/utils": "0.38.1",
         "@primeuix/themes": "^2.0.3",
         "copilot-sdk-supercharged": "^2.1.2",
+        "dockview-vue": "^6.3.0",
         "electrobun": "1.18.1",
         "lexical": "0.38.1",
         "lexical-vue": "^0.14.1",
@@ -434,6 +434,10 @@
     "define-properties": ["define-properties@1.2.1", "", { "dependencies": { "define-data-property": "^1.0.1", "has-property-descriptors": "^1.0.0", "object-keys": "^1.1.1" } }, "sha512-8QmQKqEASLd5nx0U1B1okLElbUuuttJ/AnYmRXbbbGDWh6uS208EjD4Xqq/I9wK7u0v6O08XhTWnt5XtEbR6Dg=="],
 
     "degenerator": ["degenerator@5.0.1", "", { "dependencies": { "ast-types": "^0.13.4", "escodegen": "^2.1.0", "esprima": "^4.0.1" } }, "sha512-TllpMR/t0M5sqCXfj85i4XaAzxmS5tVA16dqvdkMwGmzI+dXLXnw3J+3Vdv7VKw+ThlTMboK6i9rnZ6Nntj5CQ=="],
+
+    "dockview-core": ["dockview-core@6.3.0", "", {}, "sha512-KY4goMIcVrMh+LDtU+bwANkwK8FRxRUS6EKD/QH1OPNcj8wq0MjGKes5PojM4N0/1NxAsI4Bem/TFV4jiiOKGg=="],
+
+    "dockview-vue": ["dockview-vue@6.3.0", "", { "dependencies": { "dockview-core": "^6.3.0" }, "peerDependencies": { "vue": "^3.4.0" } }, "sha512-voK7aLQgXcovNFishC538rHM/PeywjwQ1rgRB3vDKylJIyd7eJ6LRsgtwbp9P7wDp4eg6kmZ6aaxdfOL1Q9Q1A=="],
 
     "dom-accessibility-api": ["dom-accessibility-api@0.5.16", "", {}, "sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg=="],
 

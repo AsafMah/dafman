@@ -5,9 +5,12 @@ import ToastService from "primevue/toastservice";
 import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import "primeicons/primeicons.css";
+import "dockview-vue/dist/styles/dockview.css";
 import "./style.css";
 import "./lexical/lexical.css";
 import App from "./App.vue";
+import ChatPanel from "./components/ChatPanel.vue";
+import Watermark from "./components/Watermark.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
 import { installRendererLogBridge } from "./ipc/rendererLog";
@@ -54,6 +57,14 @@ function mountWith(Root: typeof App) {
     },
   });
   app.use(ToastService);
+  // dockview-vue resolves panel/watermark/header-action component names
+  // via Vue's `instance.components[name]` lookup (not slots — slots
+  // inside `<DockviewVue>` are dropped). Register them globally so
+  // every consumer (App.vue, Playground if it ever uses dockview, …)
+  // can refer to them by name in `addPanel({ component })` and the
+  // `watermark-component` prop.
+  app.component("chat", ChatPanel);
+  app.component("watermark", Watermark);
   app.mount("#app");
 }
 

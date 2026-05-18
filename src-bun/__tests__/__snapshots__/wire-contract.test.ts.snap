@@ -6,7 +6,37 @@ exports[`IPC wire contracts Settings shape 1`] = `
     "reasoningVisibility": "compact",
     "theme": "dark",
   },
-  "version": 2,
+  "layout": {
+    "dockview": null,
+  },
+  "version": 3,
+}
+`;
+
+exports[`IPC wire contracts Settings with persisted layout 1`] = `
+{
+  "appearance": {
+    "reasoningVisibility": "compact",
+    "theme": "dark",
+  },
+  "layout": {
+    "dockview": {
+      "activeGroup": "g1",
+      "grid": {
+        "height": 600,
+        "orientation": "HORIZONTAL",
+        "root": {},
+        "width": 800,
+      },
+      "panels": {
+        "sess-1": {
+          "contentComponent": "chat",
+          "id": "sess-1",
+        },
+      },
+    },
+  },
+  "version": 3,
 }
 `;
 
@@ -34,6 +64,40 @@ exports[`IPC wire contracts SessionEventPayload shape 1`] = `
 }
 `;
 
+exports[`IPC wire contracts SessionEventPayload with envelope metadata (tool event) 1`] = `
+{
+  "agentId": "sub-agent-7",
+  "data": {
+    "result": {
+      "content": "ok",
+      "detailedContent": 
+"ok
+"
+,
+    },
+    "success": true,
+    "toolCallId": "call-abc",
+  },
+  "eventId": "00000000-0000-0000-0000-000000000001",
+  "eventType": "tool.execution_complete",
+  "sessionId": "sess-1",
+  "timestamp": "2026-05-17T15:00:00.000Z",
+}
+`;
+
+exports[`IPC wire contracts SessionMetadataSummary shape 1`] = `
+{
+  "branch": "main",
+  "cwd": "/repo",
+  "isRemote": false,
+  "modifiedTime": "2026-05-17T11:30:00.000Z",
+  "repository": "AsafMah/dafman",
+  "sessionId": "s-1",
+  "startTime": "2026-05-17T10:00:00.000Z",
+  "summary": "refactor auth",
+}
+`;
+
 exports[`IPC wire contracts AppErrorPayload variants 1`] = `
 [
   {
@@ -52,4 +116,20 @@ exports[`IPC wire contracts AppErrorPayload variants 1`] = `
     "kind": "Sdk",
   },
 ]
+`;
+
+exports[`IPC wire contracts SessionMode union 1`] = `
+[
+  "interactive",
+  "plan",
+  "autopilot",
+]
+`;
+
+exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
+{
+  "messagesRemoved": 5,
+  "success": true,
+  "tokensFreed": 1234,
+}
 `;

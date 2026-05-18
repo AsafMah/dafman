@@ -14,6 +14,7 @@ import { dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type {
 	Appearance,
+	Layout,
 	ReasoningVisibility,
 	Settings,
 	ThemeChoice,
@@ -21,7 +22,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 const VALID_THEMES: readonly ThemeChoice[] = ["system", "light", "dark"];
 const VALID_REASONING: readonly ReasoningVisibility[] = [
@@ -34,6 +35,7 @@ export function defaultSettings(): Settings {
 	return {
 		version: SETTINGS_VERSION,
 		appearance: { theme: "system", reasoningVisibility: "compact" },
+		layout: { dockview: null },
 	};
 }
 
@@ -50,6 +52,20 @@ function coerceAppearance(raw: unknown): Appearance {
 	return { theme, reasoningVisibility: rv };
 }
 
+/// Coerces a raw `layout` blob into the canonical shape. The dockview
+/// JSON is treated as opaque — we only validate that it's an object.
+/// Anything else (string, number, malformed) resets to `null`, which
+/// causes startup-resume to skip layout restoration entirely.
+function coerceLayout(raw: unknown): Layout {
+	if (!raw || typeof raw !== "object") return { dockview: null };
+	const obj = raw as Record<string, unknown>;
+	const dv = obj.dockview;
+	return {
+		dockview:
+			dv && typeof dv === "object" && !Array.isArray(dv) ? dv : null,
+	};
+}
+
 export function migrate(input: unknown): Settings {
 	const defaults = defaultSettings();
 	if (!input || typeof input !== "object") return defaults;
@@ -57,6 +73,7 @@ export function migrate(input: unknown): Settings {
 	return {
 		version: SETTINGS_VERSION,
 		appearance: coerceAppearance(raw.appearance),
+		layout: coerceLayout(raw.layout),
 	};
 }
 

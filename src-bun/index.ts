@@ -66,6 +66,34 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			setSessionModel: rpcGuard(async ({ sessionId, model, reasoningEffort }) =>
 				sessions.setModel(sessionId, model, reasoningEffort),
 			),
+			resumeSession: rpcGuard(async ({ sessionId, model, reasoningEffort }) =>
+				sessions.resume(sessionId, {
+					...(model ? { model } : {}),
+					...(reasoningEffort ? { reasoningEffort } : {}),
+				}),
+			),
+			listSessions: rpcGuard(async () => sessions.list()),
+			getSessionMode: rpcGuard(async ({ sessionId }) =>
+				sessions.getMode(sessionId),
+			),
+			setSessionMode: rpcGuard(async ({ sessionId, mode }) =>
+				sessions.setMode(sessionId, mode),
+			),
+			getSessionName: rpcGuard(async ({ sessionId }) =>
+				sessions.getName(sessionId),
+			),
+			setSessionName: rpcGuard(async ({ sessionId, name }) =>
+				sessions.setName(sessionId, name),
+			),
+			compactSessionHistory: rpcGuard(async ({ sessionId }) =>
+				sessions.compactHistory(sessionId),
+			),
+			setSessionApproveAll: rpcGuard(async ({ sessionId, enabled }) =>
+				sessions.setApproveAll(sessionId, enabled),
+			),
+			resetSessionApprovals: rpcGuard(async ({ sessionId }) =>
+				sessions.resetApprovals(sessionId),
+			),
 			getSettings: rpcGuard(async () => settings.get()),
 			updateSettings: rpcGuard(async ({ next }) => settings.update(next)),
 			getLogDir: rpcGuard(async () => currentLogDir()),
