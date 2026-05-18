@@ -293,20 +293,6 @@ function onWorkspaceClick() {
       aria-label="Reasoning effort for this session"
       class="compact-select compact-select-effort"
     />
-    <SelectButton
-      v-model="modeChoice"
-      :options="modeOptions"
-      option-label="label"
-      option-value="value"
-      :allow-empty="false"
-      size="small"
-      aria-label="Agent run mode"
-      class="compact-mode-group compact-select-mode"
-    >
-      <template #option="slotProps">
-        <i :class="slotProps.option.icon" :title="slotProps.option.label" />
-      </template>
-    </SelectButton>
     <Select
       :input-id="`reasoning-inline-${props.sessionId}`"
       v-model="reasoningChoice"
@@ -458,36 +444,31 @@ function onWorkspaceClick() {
 }
 
 /* Progressive collapse as the tile narrows. Order of removal (least-
- * essential first) — gear is always visible because it's the
- * fallback entry point to the popover where everything still lives.
+ * essential first). Mode used to live here too — it's now in the
+ * composer row at the bottom of the chat, leaving more room for the
+ * remaining controls so the workspace chip survives much longer.
  *
- *   wide        →  workspace + model + effort + mode + reasoning + gear
- *   < 30rem     →  drop "reasoning"
- *   < 24rem     →  drop "mode"          (still in popover)
- *   < 20rem     →  drop workspace chip
- *   < 16rem     →  drop "effort"
- *   < 12rem     →  drop "model"         (gear only) */
-@container (max-width: 30rem) {
+ *   wide        →  workspace + model + effort + reasoning + gear
+ *   < 26rem     →  drop "reasoning"
+ *   < 18rem     →  drop workspace chip
+ *   < 14rem     →  drop "effort"
+ *   < 10rem     →  drop "model"         (gear only) */
+@container (max-width: 26rem) {
   .compact-select-reasoning {
     display: none;
   }
 }
-@container (max-width: 24rem) {
-  .compact-select-mode {
-    display: none;
-  }
-}
-@container (max-width: 20rem) {
+@container (max-width: 18rem) {
   .workspace-chip {
     display: none;
   }
 }
-@container (max-width: 16rem) {
+@container (max-width: 14rem) {
   .compact-select-effort {
     display: none;
   }
 }
-@container (max-width: 12rem) {
+@container (max-width: 10rem) {
   .compact-select {
     display: none;
   }

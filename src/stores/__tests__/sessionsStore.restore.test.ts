@@ -105,7 +105,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
           deltaContent: "world",
         }),
       );
-      return sessionId;
+      return { sessionId, cwd: null };
     };
     setRpcBridge(bridge);
 
@@ -123,7 +123,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
   test("events fired AFTER the RPC resolves are appended live", async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
-      (args as { sessionId: string }).sessionId;
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
@@ -138,7 +138,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
   test("events for unknown sessions buffer indefinitely then drain on a later restore", async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
-      (args as { sessionId: string }).sessionId;
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
     setRpcBridge(bridge);
     const store = useSessionsStore();
 

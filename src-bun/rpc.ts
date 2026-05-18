@@ -184,7 +184,13 @@ export type DafmanRPC = {
 					model: string | null;
 					reasoningEffort: string | null;
 				};
-				response: string;
+				/// `sessionId` is the SDK's actual id (may differ from the
+				/// request if a fork happened). `cwd` is the resumed
+				/// session's working directory if the SDK reports one — we
+				/// surface it here because `getMessages()` history doesn't
+				/// include `session.resume`, so the renderer otherwise has
+				/// no chance to learn the workspace path on restore.
+				response: { sessionId: string; cwd: string | null };
 			};
 			listSessions: {
 				params: Record<string, never>;

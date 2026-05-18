@@ -118,12 +118,25 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			setSessionModel: rpcGuard(async ({ sessionId, model, reasoningEffort }) =>
 				sessions.setModel(sessionId, model, reasoningEffort),
 			),
-			resumeSession: rpcGuard(async ({ sessionId, model, reasoningEffort }) =>
-				sessions.resume(sessionId, {
+			resumeSession: rpcGuard(async ({ sessionId, model, reasoningEffort }) => {
+				const actualId = await sessions.resume(sessionId, {
 					...(model ? { model } : {}),
 					...(reasoningEffort ? { reasoningEffort } : {}),
-				}),
-			),
+				});
+				// `getMessages()` history never includes `session.resume`,
+				// so the renderer can't learn the cwd from the event
+				// stream. Look it up from the session catalog (already in
+				// memory CLI-side) and surface it on the RPC response.
+				let cwd: string | null = null;
+				try {
+					const list = await sessions.list();
+					const match = list.find((s) => s.sessionId === actualId);
+					if (match?.cwd) cwd = match.cwd;
+				} catch {
+					/* non-fatal — chip will just be hidden until next live event */
+				}
+				return { sessionId: actualId, cwd };
+			}),
 			listSessions: rpcGuard(async () => sessions.list()),
 			deleteSession: rpcGuard(async ({ sessionId }) =>
 				sessions.deleteCliSession(sessionId),

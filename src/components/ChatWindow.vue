@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { storeToRefs } from "pinia";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
+import ModeButtonGroup from "./ModeButtonGroup.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
 import {
@@ -320,12 +321,17 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
     </footer>
 
     <form class="chat-composer" @submit.prevent>
-      <MessageComposer
-        ref="composerRef"
-        :default-mode="props.defaultSendMode"
-        @submit="sendMessage"
-        @update:default-mode="onUpdateDefaultMode"
-      />
+      <div class="composer-row">
+        <ModeButtonGroup :session-id="props.sessionId" />
+        <div class="composer-grow">
+          <MessageComposer
+            ref="composerRef"
+            :default-mode="props.defaultSendMode"
+            @submit="sendMessage"
+            @update:default-mode="onUpdateDefaultMode"
+          />
+        </div>
+      </div>
     </form>
   </section>
 </template>
@@ -472,6 +478,21 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
 
 .chat-composer {
   flex: 0 0 auto;
+}
+
+/* Composer row: mode group on the left, MessageComposer (input +
+ * SplitButton) takes the rest of the width. The mode group is a
+ * fixed-width icon segmented control; the composer grows to fill the
+ * remainder. */
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0 0.5rem;
+}
+.composer-grow {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* MessageComposer brings its own border-top + padding via the global

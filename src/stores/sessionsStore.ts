@@ -259,16 +259,26 @@ export const useSessionsStore = defineStore("sessions", () => {
     const toasts = useToastStore();
     try {
       // The bun RPC handler may return a different id if the SDK
-      // forked on resume (rare, but the contract allows it).
-      const actualId = await invokeCommand("resumeSession", {
+      // forked on resume (rare, but the contract allows it). `cwd`
+      // comes from the session catalog, not the event stream —
+      // `getMessages()` history doesn't include `session.resume`, so
+      // the workspace chip would otherwise stay hidden after restore.
+      const response = await invokeCommand("resumeSession", {
         sessionId,
         model: null,
         reasoningEffort: null,
       });
+      const actualId = response.sessionId;
       // Idempotent: if a record for this id is already present (e.g.
       // double-restore), just return it.
       const existing = sessions.value.find((s) => s.id === actualId);
-      if (existing) return existing;
+      if (existing) {
+        // Still backfill cwd if the existing record is missing it.
+        if (!existing.workingDirectory && response.cwd) {
+          existing.workingDirectory = response.cwd;
+        }
+        return existing;
+      }
       const accent = accentForIndex(creationCount++);
       const record: SessionRecord = reactive({
         id: actualId,
@@ -280,7 +290,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         mode: null,
         approveAll: true,
         reasoningVisibilityOverride: "default",
-        workingDirectory: null,
+        workingDirectory: response.cwd ?? null,
         defaultSendMode: "steer",
       });
       sessions.value.push(record);

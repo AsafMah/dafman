@@ -118,7 +118,7 @@ export type CommandMap = {
       model: string | null;
       reasoningEffort: string | null;
     };
-    result: string;
+    result: { sessionId: string; cwd: string | null };
   };
   listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
   deleteSession: { args: { sessionId: string }; result: string };
