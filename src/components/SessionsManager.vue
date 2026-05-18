@@ -1,139 +1,173 @@
 <script setup lang="ts">
 // Sessions Manager — left edge-group panel.
 //
-// Lists every CLI-side session (from `listSessions` RPC), grouped by
-// workspace path. Each row supports:
-//   - resume into a new chat panel (drops a `chat` panel into the body)
-//   - delete the session permanently (calls bun `deleteSession` →
-//     `client.deleteSession`)
-//
-// Edge-group panels host their own header chrome (title + close
-// button + toolbar) because dockview's side-rotated tab strip is
-// hidden via CSS (`.dv-edge-group .dv-tabs-and-actions-container`).
-//
-// Refresh is explicit + on-mount + after sessions open/close from this
-// app. We don't have a CLI-side session-lifecycle event stream yet
-// (the SDK exposes `SessionLifecycleEvent` types but the renderer
-// can't subscribe directly), so background-changed sessions appear
-// only after a user-triggered refresh.
+// Hosts both the catalogue of CLI-side sessions (grouped by workspace,
+// per-group new-session shortcut, resume / delete) AND the create-new-
+// session form at the top — the topbar no longer carries it. This is
+// the primary control surface for sessions; the activity-bar item just
+// toggles its visibility.
 
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
+import AutoComplete, {
+  type AutoCompleteCompleteEvent,
+} from "primevue/autocomplete";
 import Button from "primevue/button";
 import { useConfirm } from "primevue/useconfirm";
 import ConfirmPopup from "primevue/confirmpopup";
 import { useSessionsListStore } from "../stores/sessionsListStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useClientStore } from "../stores/clientStore";
 import { useLayoutStore, composePanelTitle } from "../stores/layoutStore";
 import { useToastStore } from "../stores/toastStore";
+import { invokeCommand } from "../ipc/invoke";
 import type { SessionMetadataSummary } from "../ipc/types";
-
-/// The panel id we register from App.vue. Keep in sync with that
-/// file; if it ever moves to a shared constants module, both should
-/// import from there.
-const PANEL_ID = "sessions-manager";
 
 const sessionsList = useSessionsListStore();
 const sessionsStore = useSessionsStore();
 const settingsStore = useSettingsStore();
+const clientStore = useClientStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
 const confirm = useConfirm();
 
 const { grouped, isLoading, hasLoaded, error } = storeToRefs(sessionsList);
+const { ready: clientReady, isCreating: isCreatingClient } =
+  storeToRefs(clientStore);
+const { isCreating: isCreatingSession } = storeToRefs(sessionsStore);
+const { settings } = storeToRefs(settingsStore);
 
 const openSessionIds = computed(
   () => new Set(sessionsStore.sessions.map((s) => s.id)),
 );
 
-/// Tracks whether the dockview edge group is collapsed (slim strip)
-/// vs expanded (full content). Toggled by clicking the header title.
-/// Defaults to expanded; resets on mount.
-const sidebarCollapsed = ref(false);
+// ---------- New-session form ----------
 
-function toggleSidebarCollapsed() {
-  const dock = layoutStore.api;
-  if (!dock) return;
-  const next = !sidebarCollapsed.value;
-  // setEdgeGroupCollapsed takes the underlying group, so look up the
-  // panel and reach its group via the api.
-  const panel = dock.getPanel(PANEL_ID);
-  if (!panel) return;
-  // Cast: setEdgeGroupCollapsed exists on the DockviewApi but the
-  // type emitted from dockview-vue's ref doesn't always include the
-  // optional shell-manager methods. Runtime is fine.
-  (dock as unknown as {
-    setEdgeGroupCollapsed: (group: unknown, collapsed: boolean) => void;
-  }).setEdgeGroupCollapsed(panel.api.group, next);
-  sidebarCollapsed.value = next;
-}
+const workspaceDraft = ref("");
+const workspaceSuggestions = ref<string[]>([]);
+const isPickingFolder = ref(false);
 
-/// Map of workspace-group-key -> collapsed flag. Reactive so toggling
-/// re-renders the affected group. Default-collapsed for now would be
-/// "everything expanded"; the user can collapse what they don't need.
-/// State is in-memory only — persisting between launches can land
-/// later if there's demand.
-const collapsedGroups = reactive<Record<string, boolean>>({});
-
-function toggleGroup(key: string) {
-  collapsedGroups[key] = !collapsedGroups[key];
-}
-
-onMounted(() => {
-  void sessionsList.refresh();
-});
-
-// Refresh after any in-app session is opened or closed — keeps the
-// "currently open" badge accurate and picks up newly-created sessions
-// that may not yet have been indexed by the previous fetch.
-watch(
-  () => sessionsStore.sessions.length,
-  () => {
-    void sessionsList.refresh();
-  },
+const recentWorkspaces = computed(
+  () => settings.value.workspaces?.recent ?? [],
 );
 
-function onRefresh() {
-  void sessionsList.refresh();
-}
+/// Workspaces that have at least one CLI-side session. Pulled from
+/// `sessionsListStore.grouped` so even users who never recorded an MRU
+/// entry (e.g. fresh install where `recordWorkspaceUse` hasn't fired
+/// yet) still get autocomplete suggestions backed by the sessions
+/// the SDK already knows about. Empty-string key (the "No workspace"
+/// bucket) is filtered out.
+const sessionWorkspaces = computed<string[]>(() =>
+  grouped.value
+    .map((g) => g.path)
+    .filter((p): p is string => typeof p === "string" && p.length > 0),
+);
 
-function onClose() {
-  layoutStore.closePanel(PANEL_ID);
-}
+/// All known workspaces, ordered MRU first → session-derived (recency
+/// from `grouped` is already MRU-ordered). Deduped case-insensitively.
+const allKnownWorkspaces = computed<string[]>(() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of [...recentWorkspaces.value, ...sessionWorkspaces.value]) {
+    const key = p.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+});
 
-async function onResume(session: SessionMetadataSummary) {
-  // If the session is already open in a panel, just focus it.
-  if (openSessionIds.value.has(session.sessionId)) {
-    // dockview-vue exposes setActive on the panel api; we
-    // approximate by calling addPanel which is a no-op when the id
-    // is already present (it returns early). For the focus case
-    // we'd need extra plumbing — skip for v1, the user can click
-    // the tab.
+// Pre-fill with the most-recently-used workspace on first settings
+// load. Only when the user hasn't typed anything yet (empty → non-empty
+// transition).
+watch(
+  allKnownWorkspaces,
+  (next) => {
+    if (workspaceDraft.value === "" && next.length > 0) {
+      workspaceDraft.value = next[0];
+    }
+  },
+  { immediate: true },
+);
+
+let browseTimer: ReturnType<typeof setTimeout> | null = null;
+let browseSeq = 0;
+
+async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
+  const query = (event.query ?? "").trim();
+  const lowerQuery = query.toLowerCase();
+  const known = allKnownWorkspaces.value;
+
+  // Empty input → all known workspaces (MRU + session-derived).
+  if (!query) {
+    workspaceSuggestions.value = [...known];
+    if (browseTimer !== null) clearTimeout(browseTimer);
     return;
   }
-  try {
-    const record = await sessionsStore.restoreSession(session.sessionId);
-    if (record) {
-      layoutStore.addPanel(record.id);
+
+  // Synchronous substring match against known workspaces — handles
+  // the "type 'dafm' to find C:\repo\dafman" case without needing a
+  // filesystem trip.
+  const knownMatches = known.filter((p) => p.toLowerCase().includes(lowerQuery));
+
+  // Filesystem browse only when the input looks pathy (has a separator).
+  const looksLikePath = /[/\\]/.test(query);
+  if (!looksLikePath) {
+    workspaceSuggestions.value = knownMatches;
+    return;
+  }
+
+  // Render the synchronous matches immediately; FS results merge in.
+  workspaceSuggestions.value = knownMatches;
+
+  if (browseTimer !== null) clearTimeout(browseTimer);
+  const seq = ++browseSeq;
+  browseTimer = setTimeout(async () => {
+    browseTimer = null;
+    let fs: string[] = [];
+    try {
+      fs = await invokeCommand("browseDirectory", { prefix: query });
+    } catch {
+      /* expected while typing — keep known-matches-only */
     }
+    if (seq !== browseSeq) return;
+    const seenLower = new Set(knownMatches.map((p) => p.toLowerCase()));
+    const merged = [...knownMatches];
+    for (const candidate of fs) {
+      const k = candidate.toLowerCase();
+      if (seenLower.has(k)) continue;
+      seenLower.add(k);
+      merged.push(candidate);
+    }
+    workspaceSuggestions.value = merged;
+  }, 120);
+}
+
+async function onPickFolder() {
+  if (isPickingFolder.value) return;
+  isPickingFolder.value = true;
+  try {
+    const picked = await invokeCommand("pickFolder", {
+      ...(workspaceDraft.value.trim()
+        ? { startingFolder: workspaceDraft.value.trim() }
+        : {}),
+    });
+    if (picked) workspaceDraft.value = picked;
   } catch {
     /* toast already shown */
+  } finally {
+    isPickingFolder.value = false;
   }
 }
 
-/// Creates a fresh session in the given workspace path and drops it
-/// into a new chat panel in the body. Empty / "no workspace" group
-/// → bun-process cwd (the SDK default).
-async function onNewInWorkspace(workspacePath: string) {
-  const wd = workspacePath.trim();
+async function onCreateSession() {
+  const wd = workspaceDraft.value.trim();
   try {
     const record = await sessionsStore.createSession(
       wd ? { workingDirectory: wd } : {},
     );
     if (record) {
-      // Same MRU bump + composed-title-on-create that the topbar
-      // "New Session" button does — keep both code paths in sync.
       if (wd) void settingsStore.recordWorkspaceUse(wd);
       layoutStore.addPanel(record.id, {
         title: composePanelTitle(
@@ -148,10 +182,63 @@ async function onNewInWorkspace(workspacePath: string) {
   }
 }
 
+async function onNewInWorkspace(workspacePath: string) {
+  const wd = workspacePath.trim();
+  try {
+    const record = await sessionsStore.createSession(
+      wd ? { workingDirectory: wd } : {},
+    );
+    if (record) {
+      if (wd) void settingsStore.recordWorkspaceUse(wd);
+      layoutStore.addPanel(record.id, {
+        title: composePanelTitle(
+          record.id,
+          record.title,
+          record.workingDirectory,
+        ),
+      });
+    }
+  } catch {
+    /* toast already shown */
+  }
+}
+
+// ---------- Groups (collapse / latest preview / resume / delete) ----------
+
+const collapsedGroups = reactive<Record<string, boolean>>({});
+
+function toggleGroup(key: string) {
+  collapsedGroups[key] = !collapsedGroups[key];
+}
+
+onMounted(() => {
+  void sessionsList.refresh();
+});
+
+watch(
+  () => sessionsStore.sessions.length,
+  () => {
+    void sessionsList.refresh();
+  },
+);
+
+function onRefresh() {
+  void sessionsList.refresh();
+}
+
+async function onResume(session: SessionMetadataSummary) {
+  if (openSessionIds.value.has(session.sessionId)) return;
+  try {
+    const record = await sessionsStore.restoreSession(session.sessionId);
+    if (record) layoutStore.addPanel(record.id);
+  } catch {
+    /* toast already shown */
+  }
+}
+
 function onDelete(event: Event, session: SessionMetadataSummary) {
   const label =
-    session.summary ??
-    `session ${session.sessionId.slice(0, 8)}…`;
+    session.summary ?? `session ${session.sessionId.slice(0, 8)}…`;
   confirm.require({
     target: event.currentTarget as HTMLElement,
     message: `Permanently delete "${label}"? This removes all CLI-side data and can't be undone.`,
@@ -161,8 +248,6 @@ function onDelete(event: Event, session: SessionMetadataSummary) {
     acceptProps: { severity: "danger", size: "small" },
     rejectProps: { severity: "secondary", text: true, size: "small" },
     accept: async () => {
-      // If the session is currently open in a panel, close that panel
-      // first so we don't leave an orphan around after the delete.
       if (openSessionIds.value.has(session.sessionId)) {
         layoutStore.removePanel(session.sessionId);
       }
@@ -194,51 +279,66 @@ function sessionLabel(session: SessionMetadataSummary): string {
   return `session ${session.sessionId.slice(0, 8)}…`;
 }
 
-void toasts; // referenced inside async handlers; appease vue-tsc unused-import
+void toasts; // referenced inside async handlers
 </script>
 
 <template>
   <div class="sessions-manager">
     <ConfirmPopup />
 
-    <header class="manager-header">
-      <button
-        type="button"
-        class="manager-title-button"
-        :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-        :aria-expanded="!sidebarCollapsed"
-        @click="toggleSidebarCollapsed"
-      >
-        <i
-          class="pi manager-title-chevron"
-          :class="sidebarCollapsed ? 'pi-chevron-right' : 'pi-chevron-down'"
-          aria-hidden="true"
+    <!-- Create-new-session block. Stays at the top of the panel so
+         it's always reachable without scrolling. -->
+    <section class="new-session-block">
+      <form class="new-session-form" @submit.prevent="onCreateSession">
+        <AutoComplete
+          v-model="workspaceDraft"
+          :suggestions="workspaceSuggestions"
+          :complete-on-focus="true"
+          placeholder="Workspace (defaults to cwd)"
+          aria-label="Workspace folder"
+          class="workspace-input"
+          :disabled="!clientReady"
+          @complete="onSearchWorkspaces"
         />
-        <i class="pi pi-list" aria-hidden="true" />
-        <span class="manager-title-text">Sessions</span>
-      </button>
-      <div class="manager-actions">
-        <Button
-          icon="pi pi-refresh"
-          text
-          rounded
-          size="small"
-          :loading="isLoading"
-          aria-label="Refresh sessions list"
-          title="Refresh"
-          @click="onRefresh"
-        />
-        <Button
-          icon="pi pi-times"
-          text
-          rounded
-          size="small"
-          aria-label="Close Sessions panel"
-          title="Close"
-          @click="onClose"
-        />
-      </div>
-    </header>
+        <div class="new-session-actions">
+          <Button
+            type="button"
+            icon="pi pi-folder-open"
+            severity="secondary"
+            size="small"
+            aria-label="Pick folder"
+            title="Pick folder"
+            :loading="isPickingFolder"
+            :disabled="!clientReady"
+            @click="onPickFolder"
+          />
+          <Button
+            type="submit"
+            icon="pi pi-plus"
+            label="New session"
+            size="small"
+            class="new-session-submit"
+            :loading="isCreatingSession || (isCreatingClient && !clientReady)"
+            :disabled="!clientReady"
+          />
+        </div>
+      </form>
+    </section>
+
+    <!-- Sessions list -->
+    <div class="manager-toolbar">
+      <span class="manager-toolbar-label">Sessions</span>
+      <Button
+        icon="pi pi-refresh"
+        text
+        rounded
+        size="small"
+        :loading="isLoading"
+        aria-label="Refresh sessions list"
+        title="Refresh"
+        @click="onRefresh"
+      />
+    </div>
 
     <div class="manager-body">
       <p v-if="error" class="state-message error-message">
@@ -253,7 +353,7 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
         Loading sessions…
       </p>
       <p v-else-if="hasLoaded && grouped.length === 0" class="state-message">
-        No sessions yet. Create one from the topbar to get started.
+        No sessions yet.
       </p>
 
       <section
@@ -297,12 +397,11 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
                 ? `New session in ${group.path}`
                 : 'New session (no workspace)'
             "
+            :disabled="!clientReady"
             @click.stop="onNewInWorkspace(group.path)"
           />
         </div>
 
-        <!-- Collapsed preview: show the latest session's label + relative
-             time so the user can scan recency without expanding. -->
         <div
           v-if="collapsedGroups[group.key] && group.sessions.length > 0"
           class="group-preview"
@@ -370,68 +469,63 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   color: var(--p-text-color);
 }
 
-.manager-header {
+/* ---- New-session block ---- */
+
+.new-session-block {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.5rem 0.4rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.new-session-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.workspace-input {
+  width: 100%;
+}
+
+/* The PrimeVue AutoComplete wraps its <input> in a panel + button shell;
+ * force its input to take the full container width so a narrow sidebar
+ * still shows an editable strip rather than a centered 1-char box. */
+.workspace-input :deep(.p-autocomplete) {
+  width: 100%;
+}
+.workspace-input :deep(.p-autocomplete-input) {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.new-session-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.new-session-submit {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+/* ---- Toolbar / list ---- */
+
+.manager-toolbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
-  padding: 0.35rem 0.5rem 0.35rem 0.6rem;
+  padding: 0.2rem 0.4rem 0.2rem 0.55rem;
   border-bottom: 1px solid var(--p-content-border-color);
-  min-height: var(--dv-tabs-and-actions-container-height, 35px);
 }
 
-.manager-title-button {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin: 0;
-  padding: 0.2rem 0.3rem;
-  color: var(--p-text-color);
-  text-transform: uppercase;
+.manager-toolbar-label {
+  font-size: 0.7rem;
   letter-spacing: 0.05em;
-  overflow: hidden;
-  min-width: 0;
-  flex: 1 1 auto;
-  border: none;
-  border-radius: var(--p-border-radius-sm);
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-}
-
-.manager-title-button:hover {
-  background: color-mix(in srgb, var(--p-text-color) 6%, transparent);
-}
-
-.manager-title-button:focus-visible {
-  outline: 2px solid var(--p-primary-color);
-  outline-offset: -2px;
-}
-
-.manager-title-chevron {
-  font-size: 0.65rem;
-  width: 0.75rem;
-  text-align: center;
-  flex: 0 0 auto;
+  font-weight: 600;
+  text-transform: uppercase;
   color: var(--p-text-muted-color);
-}
-
-.manager-title-text {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.manager-actions {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 0.1rem;
 }
 
 .manager-body {
@@ -455,14 +549,12 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   gap: 0.4rem;
 }
 
+/* ---- Workspace groups ---- */
+
 .workspace-group {
   margin-bottom: 0.4rem;
 }
 
-/* Header row hosts the collapse-toggle button + a per-workspace
- * 'new session' (+) shortcut. The collapse button stretches to fill
- * available width; the + button sits on the right and is revealed
- * on hover for a quieter resting state. */
 .group-header-row {
   display: flex;
   align-items: stretch;
@@ -474,17 +566,12 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   background: color-mix(in srgb, var(--p-text-color) 5%, transparent);
 }
 
-.group-header-row:hover .group-new,
-.group-new:focus-visible {
-  opacity: 1;
-}
-
+/* Per-workspace '+' button — always visible (no hover-reveal) so
+ * the affordance is discoverable. */
 .group-new {
   flex: 0 0 auto;
   align-self: center;
   margin-right: 0.25rem;
-  opacity: 0;
-  transition: opacity 120ms ease;
 }
 
 .group-header {
@@ -548,7 +635,6 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   padding: 0.2rem 0.6rem 0.4rem 1.95rem;
   font-size: 0.75rem;
   color: var(--p-text-muted-color);
-  cursor: default;
 }
 
 .group-preview-label {
@@ -564,6 +650,8 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- Session rows ---- */
 
 .session-list {
   list-style: none;
@@ -609,8 +697,6 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 
 .session-label {
   font-size: 0.85rem;
-  /* Allow long titles to wrap onto two lines rather than ellipsising
-   * away the tail — chat-summary titles are valuable as-is. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

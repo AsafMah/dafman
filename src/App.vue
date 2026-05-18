@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
-import AutoComplete, {
-  type AutoCompleteCompleteEvent,
-} from "primevue/autocomplete";
 import Button from "primevue/button";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
 import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
+import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
@@ -16,7 +14,6 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
 import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
 import { resolveIsDark } from "./lib/theme";
-import { invokeCommand } from "./ipc/invoke";
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -25,8 +22,7 @@ const toastStore = useToastStore();
 const layoutStore = useLayoutStore();
 const primeToast = useToast();
 
-const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
-const { sessions, isCreating: isCreatingSession } = storeToRefs(sessionsStore);
+const { sessions } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
 
 const prefersDark = ref(false);
@@ -226,9 +222,10 @@ function onDockReady(event: DockviewReadyEvent) {
   // mutation collapses into this single event.
   event.api.onDidLayoutChange(() => {
     scheduleLayoutSave();
-    // Keep the topbar button state in sync with reality (panel closed
-    // via dockview X, restored from layout, dragged out, etc.).
-    sessionsPanelOpen.value = layoutStore.isPanelOpen(SESSIONS_PANEL_ID);
+    // Keep the ActivityBar's pressed-state in sync with reality
+    // (panels closed via their in-panel X, restored from layout,
+    // dragged into popouts, …).
+    activityBarRef.value?.sync();
   });
 }
 
@@ -243,157 +240,28 @@ function scheduleLayoutSave() {
   }, 300);
 }
 
-// Inline new-session controls (no dialog) — the path lives in the
-// topbar so creating sessions in different workspaces is a one-step
-// flow. The AutoComplete suggests from `settings.workspaces.recent`,
-// which is persisted across runs by `settingsStore.recordWorkspaceUse`,
-// AND from a live filesystem browse for unknown paths.
-const workspaceDraft = ref("");
-const workspaceSuggestions = ref<string[]>([]);
-const isPickingFolder = ref(false);
-
-const recentWorkspaces = computed(
-  () => settings.value.workspaces?.recent ?? [],
-);
-
-// Pre-fill the workspace input with the last-used path so quick
-// repeat creates don't make the user retype or repick. We seed once
-// per page load after settings finish loading; subsequent edits by
-// the user aren't clobbered (the watcher fires only on the empty →
-// non-empty transition).
-watch(
-  recentWorkspaces,
-  (next) => {
-    if (workspaceDraft.value === "" && next.length > 0) {
-      workspaceDraft.value = next[0];
-    }
-  },
-  { immediate: true },
-);
-
-/// Debounce the filesystem browse so we don't hammer the IPC bridge
-/// on every keystroke. 120ms is fast enough to feel live and slow
-/// enough that holding backspace doesn't fire 20 RPCs.
-let browseTimer: ReturnType<typeof setTimeout> | null = null;
-let browseSeq = 0;
-
-async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
-  const query = (event.query ?? "").trim();
-  const lowerQuery = query.toLowerCase();
-  const recent = recentWorkspaces.value;
-
-  // MRU-only when the input is empty — shows recently-used
-  // workspaces on focus.
-  if (!query) {
-    workspaceSuggestions.value = [...recent];
-    if (browseTimer !== null) clearTimeout(browseTimer);
-    return;
-  }
-
-  // Filter MRU first (synchronous, no IPC). Substring match keeps
-  // partial-name search useful ("dafm" should still surface
-  // "C:\repo\dafman").
-  const mruMatches = recent.filter((p) => p.toLowerCase().includes(lowerQuery));
-
-  // Only attempt a filesystem browse when the input looks pathy —
-  // i.e. contains a separator. This avoids confusing the parent-
-  // directory inference for bare keywords like "dafman" (which
-  // would try to list `dirname("dafman") === "."`).
-  const looksLikePath = /[/\\]/.test(query);
-  if (!looksLikePath) {
-    workspaceSuggestions.value = mruMatches;
-    return;
-  }
-
-  // Render MRU immediately; FS results merge in shortly.
-  workspaceSuggestions.value = mruMatches;
-
-  if (browseTimer !== null) clearTimeout(browseTimer);
-  const seq = ++browseSeq;
-  browseTimer = setTimeout(async () => {
-    browseTimer = null;
-    let fs: string[] = [];
-    try {
-      fs = await invokeCommand("browseDirectory", { prefix: query });
-    } catch {
-      // Filesystem errors (no permission, path-doesn't-exist) are
-      // expected while typing; swallow and keep MRU-only.
-    }
-    // Discard stale results — a later query may have come in.
-    if (seq !== browseSeq) return;
-    // Merge: MRU first (familiar), then FS entries that aren't
-    // already in MRU. De-dup is case-insensitive to match the
-    // browse match semantics.
-    const seen = new Set(mruMatches.map((p) => p.toLowerCase()));
-    const merged = [...mruMatches];
-    for (const candidate of fs) {
-      const k = candidate.toLowerCase();
-      if (seen.has(k)) continue;
-      seen.add(k);
-      merged.push(candidate);
-    }
-    workspaceSuggestions.value = merged;
-  }, 120);
-}
-
-async function onPickFolder() {
-  if (isPickingFolder.value) return;
-  isPickingFolder.value = true;
-  try {
-    const picked = await invokeCommand("pickFolder", {
-      ...(workspaceDraft.value.trim()
-        ? { startingFolder: workspaceDraft.value.trim() }
-        : {}),
-    });
-    if (picked) workspaceDraft.value = picked;
-  } catch {
-    /* toast already shown */
-  } finally {
-    isPickingFolder.value = false;
-  }
-}
-
-async function onConfirmCreateSession() {
-  const wd = workspaceDraft.value.trim();
-  try {
-    const record = await sessionsStore.createSession(
-      wd ? { workingDirectory: wd } : {},
-    );
-    if (record) {
-      // Fire-and-forget MRU bump. Failures only get a toast; the
-      // session itself is already created and visible.
-      if (wd) void settingsStore.recordWorkspaceUse(wd);
-      layoutStore.addPanel(record.id, {
-        title: composePanelTitle(record.id, record.title, record.workingDirectory),
-      });
-    }
-  } catch {
-    /* toast already shown */
-  }
-}
-
-// Sessions Manager — left edge-group panel toggle. Track open state
-// separately so the toolbar button can show a pressed state; we sync
-// in onDockReady's layout-change subscription so reopens-from-layout
-// (and tab-X closes) keep the ref accurate.
+// Sessions Manager — left edge-group panel toggle. Owned by the
+// ActivityBar; the SESSIONS_PANEL_ID constant is shared with the
+// activity-item config below and with the open-by-default path.
 const SESSIONS_PANEL_ID = "sessions-manager";
-const sessionsPanelOpen = ref(false);
 
-function toggleSessionsPanel() {
-  if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) {
-    layoutStore.closePanel(SESSIONS_PANEL_ID);
-    sessionsPanelOpen.value = false;
-  } else {
-    layoutStore.openEdgePanel("left", {
-      id: SESSIONS_PANEL_ID,
-      component: "sessionsManager",
-      tabComponent: "sidebarTab",
-      title: "Sessions",
-      initialSize: 280,
-    });
-    sessionsPanelOpen.value = true;
-  }
-}
+/// ActivityBar items. Currently only Sessions; future activities
+/// (Library, Log viewer, MCP status, …) append here.
+const activityItems: ActivityItem[] = [
+  {
+    id: SESSIONS_PANEL_ID,
+    component: "sessionsManager",
+    icon: "pi-list",
+    label: "Sessions",
+    title: "Sessions",
+    initialSize: 320,
+  },
+];
+
+/// Ref to the ActivityBar so onDockReady can ask it to resync after
+/// any layout change (covers panels closed via their own X, restored
+/// from layout, etc.).
+const activityBarRef = ref<InstanceType<typeof ActivityBar> | null>(null);
 
 /// Returns true when the persisted dockview JSON references the
 /// given panel id. Used by the "open by default" path to avoid
@@ -423,9 +291,9 @@ function openSessionsByDefault(attempt = 0) {
     component: "sessionsManager",
     tabComponent: "sidebarTab",
     title: "Sessions",
-    initialSize: 280,
+    initialSize: 320,
   });
-  sessionsPanelOpen.value = true;
+  activityBarRef.value?.sync();
 }
 </script>
 
@@ -436,48 +304,12 @@ function openSessionsByDefault(attempt = 0) {
       :visible="settingsOpen"
       @update:visible="(v) => (settingsOpen = v)"
     />
+
+    <!-- Slim topbar: just global actions (settings + dev wrench).
+         New-session lives inside the Sessions panel now. -->
     <div class="topbar">
-      <form class="topbar-actions new-session-form" @submit.prevent="onConfirmCreateSession">
-        <AutoComplete
-          v-model="workspaceDraft"
-          :suggestions="workspaceSuggestions"
-          :complete-on-focus="true"
-          placeholder="Workspace (defaults to cwd)"
-          aria-label="Workspace folder for the next session"
-          class="workspace-input"
-          :disabled="!clientReady"
-          @complete="onSearchWorkspaces"
-        />
-        <Button
-          type="button"
-          icon="pi pi-folder-open"
-          severity="secondary"
-          aria-label="Pick folder"
-          title="Pick folder"
-          :loading="isPickingFolder"
-          :disabled="!clientReady"
-          @click="onPickFolder"
-        />
-        <Button
-          type="submit"
-          label="New Session"
-          icon="pi pi-plus"
-          :loading="isCreatingSession || (isCreatingClient && !clientReady)"
-          :disabled="!clientReady"
-        />
-      </form>
+      <div class="topbar-spacer" />
       <div class="topbar-right">
-        <Button
-          icon="pi pi-list"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Sessions manager"
-          title="Sessions manager"
-          :class="{ 'is-active-toggle': sessionsPanelOpen }"
-          :disabled="!clientReady"
-          @click="toggleSessionsPanel"
-        />
         <Button
           v-if="isDev"
           icon="pi pi-wrench"
@@ -499,17 +331,23 @@ function openSessionsByDefault(attempt = 0) {
       </div>
     </div>
 
-    <div
-      class="dock-wrapper"
-      :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
-    >
-      <DockviewVue
-        class="dock"
-        watermark-component="watermark"
-        right-header-actions-component="chatTabActions"
-        default-tab-component="chatTab"
-        @ready="onDockReady"
-      />
+    <!-- App body: persistent ActivityBar on the far left + dockview
+         body taking the rest. Activity items toggle their respective
+         dockview edge panels. -->
+    <div class="app-body">
+      <ActivityBar ref="activityBarRef" :items="activityItems" />
+      <div
+        class="dock-wrapper"
+        :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
+      >
+        <DockviewVue
+          class="dock"
+          watermark-component="watermark"
+          right-header-actions-component="chatTabActions"
+          default-tab-component="chatTab"
+          @ready="onDockReady"
+        />
+      </div>
     </div>
   </main>
 </template>
@@ -536,17 +374,12 @@ function openSessionsByDefault(attempt = 0) {
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
-  /* Slim app-chrome strip — global actions only. All functional UI
-   * (recent sessions, permission queue, log viewer, MCP status, …)
-   * goes inside dockview as panels / edge groups (see layoutStore). */
   border-bottom: 1px solid var(--p-content-border-color);
+  min-height: 2rem;
 }
 
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.topbar-spacer {
+  flex: 1 1 auto;
 }
 
 .topbar-right {
@@ -555,12 +388,11 @@ function openSessionsByDefault(attempt = 0) {
   gap: 0.5rem;
 }
 
-/* Pressed-state for toggle buttons (Sessions panel). PrimeVue's `text`
- * Button has no built-in "active" variant, so we tint it ourselves
- * with a theme-aware mix. */
-.topbar-right :deep(.p-button.is-active-toggle) {
-  background: color-mix(in srgb, var(--p-text-color) 12%, transparent);
-  color: var(--p-text-color);
+.app-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  min-width: 0;
 }
 
 .dock-wrapper {
@@ -574,24 +406,5 @@ function openSessionsByDefault(attempt = 0) {
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-}
-
-.new-session-form {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.workspace-input {
-  flex: 1 1 24rem;
-  min-width: 12rem;
-  max-width: 36rem;
-}
-
-.workspace-input :deep(.p-autocomplete-input) {
-  width: 100%;
-  font-size: 0.85rem;
 }
 </style>

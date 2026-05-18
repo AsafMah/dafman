@@ -284,10 +284,36 @@ function onWorkspaceClick() {
   gap: 0.35rem;
   padding: 0 0.4rem;
   height: 100%;
-  /* When the tab strip is narrow, the trailing controls truncate from
-   * the left (model select shrinks first) rather than overflow. */
+  /* Layout shrinks gracefully on narrow widths: model/effort selects
+   * collapse first (flex-shrink); workspace chip drops out below a
+   * certain width via a container query; the options gear is the
+   * last thing standing because it's the only entry point to mode,
+   * rename, compact, etc. */
   min-width: 0;
   flex-wrap: nowrap;
+  container-type: inline-size;
+}
+
+/* Drop the workspace chip when the tab-strip actions area gets
+ * narrower than the chip's own min width. Container queries are
+ * supported in all dockview-supported chromium versions. */
+@container (max-width: 22rem) {
+  .workspace-chip {
+    display: none;
+  }
+}
+
+/* When even narrower, drop the effort select too — model select stays
+ * but shrinks to icon-width. */
+@container (max-width: 16rem) {
+  .compact-select-narrow {
+    display: none;
+  }
+}
+@container (max-width: 12rem) {
+  .compact-select {
+    display: none;
+  }
 }
 
 /* Workspace chip lives in the tab strip header (right-actions); the
@@ -330,9 +356,15 @@ function onWorkspaceClick() {
 
 /* PrimeVue Select sized to fit comfortably alongside dockview tabs.
  * The value itself shows the model/effort name — labels would just
- * eat horizontal space in the tab strip. */
+ * eat horizontal space in the tab strip. flex-shrink so the select
+ * can compress below its min-width when the tab strip is cramped. */
+.compact-select {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .compact-select :deep(.p-select) {
-  min-width: 7rem;
+  min-width: 5rem;
   max-width: 11rem;
   height: 1.75rem;
 }
@@ -340,10 +372,16 @@ function onWorkspaceClick() {
 .compact-select :deep(.p-select-label) {
   font-size: 0.75rem;
   padding: 0.15rem 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+.compact-select-narrow {
+  flex: 0 1 auto;
+  min-width: 0;
+}
 .compact-select-narrow :deep(.p-select) {
-  min-width: 5.5rem;
+  min-width: 4rem;
   max-width: 7rem;
 }
 
