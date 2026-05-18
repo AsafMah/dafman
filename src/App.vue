@@ -122,14 +122,19 @@ const pendingRestoreLayout = ref<unknown | null>(null);
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;
   if (!layout || typeof layout !== "object") return;
-  const sessionIds = extractChatPanelIds(layout);
+  // Settings panel is intentionally a "summon when needed" surface —
+  // restoring it on every launch is annoying because most users open
+  // it once and forget. Strip it from the layout before handing the
+  // blob to dockview so it starts closed regardless of last session.
+  const sanitized = stripPanelFromLayout(layout, SETTINGS_PANEL_ID);
+  const sessionIds = extractChatPanelIds(sanitized);
   if (sessionIds.length === 0) {
     // Even with no chat sessions to resume, hand the layout to
     // dockview so sidebar panels (Sessions / Settings) restore.
     if (layoutStore.api) {
-      layoutStore.restore(layout);
+      layoutStore.restore(sanitized);
     } else {
-      pendingRestoreLayout.value = layout;
+      pendingRestoreLayout.value = sanitized;
     }
     return;
   }
@@ -146,10 +151,46 @@ async function restoreFromLayout() {
   // dead panels (and the orphan UI gives them a one-click recovery
   // path). See `ChatPanel.vue`.
   if (layoutStore.api) {
-    layoutStore.restore(layout);
+    layoutStore.restore(sanitized);
   } else {
-    pendingRestoreLayout.value = layout;
+    pendingRestoreLayout.value = sanitized;
   }
+}
+
+/// Returns a shallow copy of a dockview layout JSON with the given
+/// panel id removed from `panels`, and pruned from any group's
+/// `data.views` so dockview doesn't error on a dangling reference.
+/// Other fields are left untouched. Pure: never mutates the input.
+function stripPanelFromLayout(layout: unknown, panelId: string): unknown {
+  if (!layout || typeof layout !== "object") return layout;
+  const obj = layout as Record<string, unknown>;
+  const panels = obj.panels;
+  if (!panels || typeof panels !== "object") return layout;
+  if (!Object.prototype.hasOwnProperty.call(panels, panelId)) return layout;
+  const nextPanels: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(panels as Record<string, unknown>)) {
+    if (k !== panelId) nextPanels[k] = v;
+  }
+  // Walk the grid + edge groups and remove the id from each group's
+  // views list. Dockview stores groups under `grid.root.data` (tree)
+  // and `floatingGroups` / edge groups under top-level arrays — but
+  // a JSON-walk over all "views: string[]" arrays is the robust path
+  // that doesn't depend on which exact slot the panel was in.
+  const stripViews = (node: unknown): unknown => {
+    if (!node || typeof node !== "object") return node;
+    if (Array.isArray(node)) return node.map(stripViews);
+    const next: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      if (k === "views" && Array.isArray(v)) {
+        next[k] = (v as unknown[]).filter((x) => x !== panelId);
+      } else {
+        next[k] = stripViews(v);
+      }
+    }
+    return next;
+  };
+  const stripped = stripViews({ ...obj, panels: nextPanels });
+  return stripped;
 }
 
 /// Extract panel ids from a dockview `toJSON()` blob whose

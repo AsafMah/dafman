@@ -186,7 +186,30 @@ function onWorkspaceClick() {
       size="small"
       placeholder="Effort"
       aria-label="Reasoning effort for this session"
-      class="compact-select compact-select-narrow"
+      class="compact-select compact-select-effort"
+    />
+    <Select
+      :input-id="`mode-inline-${props.sessionId}`"
+      v-model="modeChoice"
+      :options="modeOptions"
+      option-label="label"
+      option-value="value"
+      size="small"
+      placeholder="Mode"
+      :disabled="!record.mode"
+      aria-label="Agent run mode"
+      class="compact-select compact-select-mode"
+    />
+    <Select
+      :input-id="`reasoning-inline-${props.sessionId}`"
+      v-model="reasoningChoice"
+      :options="reasoningOptions"
+      option-label="label"
+      option-value="value"
+      size="small"
+      placeholder="Reasoning"
+      aria-label="Reasoning visibility for this session"
+      class="compact-select compact-select-reasoning"
     />
     <Button
       icon="pi pi-cog"
@@ -199,32 +222,6 @@ function onWorkspaceClick() {
     />
     <Popover ref="optionsMenu">
       <div class="session-options">
-        <label class="option-row" :for="`mode-${props.sessionId}`">
-          <span class="option-label">Run mode</span>
-          <Select
-            :input-id="`mode-${props.sessionId}`"
-            v-model="modeChoice"
-            :options="modeOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            placeholder="Loading..."
-            :disabled="!record.mode"
-            aria-label="Agent run mode"
-          />
-        </label>
-        <label class="option-row" :for="`reasoning-${props.sessionId}`">
-          <span class="option-label">Reasoning view</span>
-          <Select
-            :input-id="`reasoning-${props.sessionId}`"
-            v-model="reasoningChoice"
-            :options="reasoningOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            aria-label="Reasoning visibility for this session"
-          />
-        </label>
         <div class="option-row option-row-stack">
           <label class="option-label" :for="`name-${props.sessionId}`">
             Session name
@@ -244,6 +241,41 @@ function onWorkspaceClick() {
             />
           </form>
         </div>
+        <!-- Run mode + reasoning view live inline in the header strip
+             when there's room; the popover keeps them as a guaranteed
+             fallback so a narrow pane can still reach them. -->
+        <label
+          class="option-row"
+          :for="`mode-${props.sessionId}`"
+        >
+          <span class="option-label">Run mode</span>
+          <Select
+            :input-id="`mode-${props.sessionId}`"
+            v-model="modeChoice"
+            :options="modeOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            placeholder="Loading..."
+            :disabled="!record.mode"
+            aria-label="Agent run mode (popover)"
+          />
+        </label>
+        <label
+          class="option-row"
+          :for="`reasoning-${props.sessionId}`"
+        >
+          <span class="option-label">Reasoning view</span>
+          <Select
+            :input-id="`reasoning-${props.sessionId}`"
+            v-model="reasoningChoice"
+            :options="reasoningOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            aria-label="Reasoning visibility for this session (popover)"
+          />
+        </label>
         <div class="option-row option-row-stack">
           <span class="option-label">Workspace</span>
           <div
@@ -304,23 +336,41 @@ function onWorkspaceClick() {
   flex-wrap: nowrap;
 }
 
-/* Drop the workspace chip when the tab-strip actions area gets
- * narrower than the chip's own min width. Container queries are
- * supported in all dockview-supported chromium versions. */
-@container (max-width: 22rem) {
+/* Progressive collapse as the tile narrows. Order of removal (least-
+ * essential first) — gear is always visible because it's the
+ * fallback entry point to the popover where everything still lives.
+ *
+ *   wide        →  model + effort + workspace + mode + reasoning + gear
+ *   < 38rem     →  drop "reasoning"
+ *   < 32rem     →  drop "mode"          (still in popover)
+ *   < 26rem     →  drop workspace chip
+ *   < 20rem     →  drop "effort"
+ *   < 14rem     →  drop "model"         (gear only)
+ *
+ * Numbers are chosen so the next breakpoint kicks in only after the
+ * previously-visible items genuinely don't fit at their min-widths
+ * (selects ~7-11rem, workspace chip ~14rem, gap ~0.35rem * gaps). */
+@container (max-width: 38rem) {
+  .compact-select-reasoning {
+    display: none;
+  }
+}
+@container (max-width: 32rem) {
+  .compact-select-mode {
+    display: none;
+  }
+}
+@container (max-width: 26rem) {
   .workspace-chip {
     display: none;
   }
 }
-
-/* When even narrower, drop the effort select too — model select stays
- * but shrinks to icon-width. */
-@container (max-width: 16rem) {
-  .compact-select-narrow {
+@container (max-width: 20rem) {
+  .compact-select-effort {
     display: none;
   }
 }
-@container (max-width: 12rem) {
+@container (max-width: 14rem) {
   .compact-select {
     display: none;
   }
@@ -386,13 +436,31 @@ function onWorkspaceClick() {
   text-overflow: ellipsis;
 }
 
-.compact-select-narrow {
+.compact-select-effort {
   flex: 0 1 auto;
   min-width: 0;
 }
-.compact-select-narrow :deep(.p-select) {
+.compact-select-effort :deep(.p-select) {
   min-width: 4rem;
   max-width: 7rem;
+}
+
+.compact-select-mode {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.compact-select-mode :deep(.p-select) {
+  min-width: 5.5rem;
+  max-width: 8rem;
+}
+
+.compact-select-reasoning {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.compact-select-reasoning :deep(.p-select) {
+  min-width: 6rem;
+  max-width: 9rem;
 }
 
 /* The popover is mounted to the body so it lives outside the cramped
