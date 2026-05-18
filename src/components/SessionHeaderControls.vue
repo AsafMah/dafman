@@ -22,6 +22,7 @@ import type {
 } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
+import { basename } from "../stores/layoutStore";
 
 const props = defineProps<{ sessionId: string }>();
 
@@ -137,10 +138,25 @@ function onCompactNow() {
 function onResetApprovals() {
   void sessionsStore.resetSessionApprovals(props.sessionId);
 }
+
+/// Workspace label shown in the tab strip — basename only, so it
+/// stays short. Full absolute path is in the tooltip.
+const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
 </script>
 
 <template>
   <div v-if="record" class="session-header-controls">
+    <button
+      v-if="workspaceLabel"
+      type="button"
+      class="workspace-chip"
+      :title="record.workingDirectory ?? ''"
+      :aria-label="`Workspace: ${record.workingDirectory ?? ''}`"
+      @click="toggleOptions"
+    >
+      <i class="pi pi-folder" aria-hidden="true" />
+      <span class="workspace-chip-text">{{ workspaceLabel }}</span>
+    </button>
     <Select
       :input-id="`model-${props.sessionId}`"
       v-model="modelChoice"
@@ -265,6 +281,44 @@ function onResetApprovals() {
    * the left (model select shrinks first) rather than overflow. */
   min-width: 0;
   flex-wrap: nowrap;
+}
+
+/* Workspace chip lives in the tab strip header (right-actions); the
+ * basename is the visible label, full path is in the tooltip. The
+ * button-with-no-background styling matches PrimeVue's `text` button
+ * variant so it reads as a label, not a primary action. */
+.workspace-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 14rem;
+  min-width: 0;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border-radius: var(--p-border-radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.workspace-chip:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+:global(.app-dark) .workspace-chip:hover {
+  background: var(--p-surface-800);
+}
+
+.workspace-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* RTL trick keeps the tail visible if the basename itself is long */
+  direction: ltr;
 }
 
 /* PrimeVue Select sized to fit comfortably alongside dockview tabs.

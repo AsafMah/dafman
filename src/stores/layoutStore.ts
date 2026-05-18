@@ -35,19 +35,16 @@ export function basename(path: string | null | undefined): string {
   return match ? match[1] : trimmed;
 }
 
-/// Composes the dockview tab title from a session's workspace +
-/// SDK-supplied title. Workspace basename leads (it's the most
-/// stable, user-recognisable label); SDK title follows after `·` once
-/// the model auto-summarises. Falls back to `shortPanelTitle(id)` if
-/// neither is available.
+/// Composes the dockview tab title. We deliberately keep tabs short
+/// — workspace shows up in the per-session controls (chat tab strip
+/// right actions), so duplicating it in the tab title makes the
+/// label very long for no extra info. SDK-supplied title preferred;
+/// fall back to a shortened session id.
 export function composePanelTitle(
   sessionId: string,
   title: string | null,
-  workingDirectory: string | null,
+  _workingDirectory: string | null,
 ): string {
-  const folder = basename(workingDirectory);
-  if (folder && title) return `${folder} · ${title}`;
-  if (folder) return folder;
   if (title) return title;
   return shortPanelTitle(sessionId);
 }

@@ -324,10 +324,10 @@ async function sendMessage(text: string) {
 }
 
 .message-card.user {
-  /* Keep the per-session accent rail on user bubbles so they read as
-   * "yours" — but no background tint (that conflated user content
-   * with the session-identity signal). */
-  border-left-color: var(--accent);
+  /* User bubble gets a neutral rail (muted text colour) so user vs.
+   * assistant are visibly distinct — the accent is reserved for the
+   * assistant side. No background tint either. */
+  border-left-color: var(--p-text-muted-color);
 }
 
 .message-card.assistant {
