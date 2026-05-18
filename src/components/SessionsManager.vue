@@ -24,7 +24,8 @@ import { useConfirm } from "primevue/useconfirm";
 import ConfirmPopup from "primevue/confirmpopup";
 import { useSessionsListStore } from "../stores/sessionsListStore";
 import { useSessionsStore } from "../stores/sessionsStore";
-import { useLayoutStore } from "../stores/layoutStore";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useLayoutStore, composePanelTitle } from "../stores/layoutStore";
 import { useToastStore } from "../stores/toastStore";
 import type { SessionMetadataSummary } from "../ipc/types";
 
@@ -35,6 +36,7 @@ const PANEL_ID = "sessions-manager";
 
 const sessionsList = useSessionsListStore();
 const sessionsStore = useSessionsStore();
+const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
 const confirm = useConfirm();
@@ -114,6 +116,32 @@ async function onResume(session: SessionMetadataSummary) {
     const record = await sessionsStore.restoreSession(session.sessionId);
     if (record) {
       layoutStore.addPanel(record.id);
+    }
+  } catch {
+    /* toast already shown */
+  }
+}
+
+/// Creates a fresh session in the given workspace path and drops it
+/// into a new chat panel in the body. Empty / "no workspace" group
+/// → bun-process cwd (the SDK default).
+async function onNewInWorkspace(workspacePath: string) {
+  const wd = workspacePath.trim();
+  try {
+    const record = await sessionsStore.createSession(
+      wd ? { workingDirectory: wd } : {},
+    );
+    if (record) {
+      // Same MRU bump + composed-title-on-create that the topbar
+      // "New Session" button does — keep both code paths in sync.
+      if (wd) void settingsStore.recordWorkspaceUse(wd);
+      layoutStore.addPanel(record.id, {
+        title: composePanelTitle(
+          record.id,
+          record.title,
+          record.workingDirectory,
+        ),
+      });
     }
   } catch {
     /* toast already shown */
@@ -234,24 +262,44 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
         class="workspace-group"
         :class="{ 'is-collapsed': collapsedGroups[group.key] }"
       >
-        <button
-          type="button"
-          class="group-header"
-          :title="group.path || 'Sessions without a workspace'"
-          :aria-expanded="!collapsedGroups[group.key]"
-          @click="toggleGroup(group.key)"
-        >
-          <i
-            class="pi group-chevron"
-            :class="
-              collapsedGroups[group.key] ? 'pi-chevron-right' : 'pi-chevron-down'
+        <div class="group-header-row">
+          <button
+            type="button"
+            class="group-header"
+            :title="group.path || 'Sessions without a workspace'"
+            :aria-expanded="!collapsedGroups[group.key]"
+            @click="toggleGroup(group.key)"
+          >
+            <i
+              class="pi group-chevron"
+              :class="
+                collapsedGroups[group.key] ? 'pi-chevron-right' : 'pi-chevron-down'
+              "
+              aria-hidden="true"
+            />
+            <i class="pi pi-folder group-folder" aria-hidden="true" />
+            <span class="group-label">{{ group.label }}</span>
+            <span class="group-count">{{ group.sessions.length }}</span>
+          </button>
+          <Button
+            icon="pi pi-plus"
+            text
+            rounded
+            size="small"
+            class="group-new"
+            :aria-label="
+              group.path
+                ? `New session in ${group.label}`
+                : 'New session (no workspace)'
             "
-            aria-hidden="true"
+            :title="
+              group.path
+                ? `New session in ${group.path}`
+                : 'New session (no workspace)'
+            "
+            @click.stop="onNewInWorkspace(group.path)"
           />
-          <i class="pi pi-folder group-folder" aria-hidden="true" />
-          <span class="group-label">{{ group.label }}</span>
-          <span class="group-count">{{ group.sessions.length }}</span>
-        </button>
+        </div>
 
         <!-- Collapsed preview: show the latest session's label + relative
              time so the user can scan recency without expanding. -->
@@ -411,11 +459,40 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
   margin-bottom: 0.4rem;
 }
 
+/* Header row hosts the collapse-toggle button + a per-workspace
+ * 'new session' (+) shortcut. The collapse button stretches to fill
+ * available width; the + button sits on the right and is revealed
+ * on hover for a quieter resting state. */
+.group-header-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.1rem;
+  border-radius: var(--p-border-radius-md);
+}
+
+.group-header-row:hover {
+  background: color-mix(in srgb, var(--p-text-color) 5%, transparent);
+}
+
+.group-header-row:hover .group-new,
+.group-new:focus-visible {
+  opacity: 1;
+}
+
+.group-new {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-right: 0.25rem;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
 .group-header {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0.35rem 0.6rem;
   color: var(--p-text-muted-color);
   font-size: 0.7rem;
@@ -430,7 +507,6 @@ void toasts; // referenced inside async handlers; appease vue-tsc unused-import
 }
 
 .group-header:hover {
-  background: color-mix(in srgb, var(--p-text-color) 5%, transparent);
   color: var(--p-text-color);
 }
 
