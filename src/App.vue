@@ -257,6 +257,8 @@ async function onCreateSession() {
       <DockviewVue
         class="dock"
         watermark-component="watermark"
+        right-header-actions-component="chatTabActions"
+        default-tab-component="chatTab"
         @ready="onDockReady"
       />
     </div>

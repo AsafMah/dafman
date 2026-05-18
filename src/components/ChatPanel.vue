@@ -91,11 +91,7 @@ function dismissPanel() {
     :session-id="record.id"
     :accent="record.accent"
     :events="record.events"
-    :model="record.model"
-    :reasoning-effort="record.reasoningEffort"
-    :mode="record.mode"
-    :approve-all="record.approveAll"
-    :hide-close="true"
+    :reasoning-visibility-override="record.reasoningVisibilityOverride"
   />
   <div v-else class="missing-pane">
     <i class="pi pi-inbox missing-icon" aria-hidden="true" />

@@ -10,6 +10,8 @@ import "./style.css";
 import "./lexical/lexical.css";
 import App from "./App.vue";
 import ChatPanel from "./components/ChatPanel.vue";
+import ChatTab from "./components/ChatTab.vue";
+import ChatTabActions from "./components/ChatTabActions.vue";
 import Watermark from "./components/Watermark.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
@@ -65,6 +67,8 @@ function mountWith(Root: typeof App) {
   // `watermark-component` prop.
   app.component("chat", ChatPanel);
   app.component("watermark", Watermark);
+  app.component("chatTabActions", ChatTabActions);
+  app.component("chatTab", ChatTab);
   app.mount("#app");
 }
 

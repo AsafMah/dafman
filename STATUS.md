@@ -26,7 +26,9 @@
 - Branch port: Tauri (Rust + Vue) → Electrobun (Bun + Vue). `src-tauri/` removed. New `src-bun/` main process + `tools/bun-vue-loader.ts` Bun plugin for Vue SFC tests. One test runner (`bun test`). See `CHANGELOG.md` → Unreleased → "Port from Tauri → Electrobun".
 
 ## Next concrete step
-**Real permission UX.** Tool calls now render in the chat stream and persist across launches via dockview + `resumeSession`, but the agent still auto-approves everything (`approveAll` in `src-bun/app/sessions.ts`). Replace it with an `onPermissionRequest` handler that opens a renderer-side modal via the RPC bridge. The SDK is deny-by-default (see SDK gotcha in `plans/plan-frontend-shell.prompt.md`), so this is load-bearing for any future tool work. Suggested home in the UI: a dockview edge group panel (`layoutStore.openEdgePanel("right", { id: "permissions", component: "permissions", … })`) so multiple pending requests can queue without blocking the chat; modal escalation only for time-sensitive ones.
+**Steering & message queueing.** Three send modes — Queue (default, client-side queue with reorder/delete), Steer (`session.send({ mode: "immediate" })` injected into running turn), Interrupt (`session.abort()` then immediate send). Composer gets a `SplitButton` for default-mode selection plus keyboard shortcuts (proposal: `Ctrl+Q` queue, `Ctrl+Shift+Q` interrupt, `Ctrl+Enter` steer; `Enter` runs current default). New `PendingQueueStrip` between transcript and composer for pending items. Backend gains `mode` param on `sendMessage` and a new `abortSession` RPC. Full design in this session's `plan.md`.
+
+**Permission UX deferred** — yolo-mode is fine for now; the SDK auto-approve shim stays in `src-bun/app/sessions.ts`. Revisit before sharing the app externally.
 
 Then resume the M1 backlog below.
 
@@ -48,6 +50,7 @@ Carried-over M1 backlog (full detail in `plans/plan-roadmap.prompt.md` → "Back
 Other M1 items still open:
 1. **Tracing/log redaction** snapshot tests; runtime log level toggle in Settings → Diagnostics.
 2. **Cross-platform CI matrix** for `electrobun build` (Linux only today).
+3. **Dark-mode in the Playground.** The dev playground (`src/dev/Playground.vue`) doesn't honour the `theme.darkModeSelector` (`.app-dark` on `<html>`). Add a manual theme toggle button to its toolbar so we can preview both palettes without leaving dev mode; also flip `applyThemeClass` so the playground respects the OS / settings theme on first mount.
 
 ## M0 - Foundations (DONE)
 - [x] Tauri 2 + Vue 3 + PrimeVue scaffold. _(Now Electrobun + Vue 3 + PrimeVue.)_

@@ -398,12 +398,8 @@ function exitPlayground() {
           session-id="playground-sess"
           accent="hsl(200, 80%, 52%)"
           :events="events"
-          :model="null"
-          :reasoning-effort="null"
-          :mode="null"
-          :approve-all="true"
+          reasoning-visibility-override="default"
           :send-handler="echoSend"
-          @close="clearChat"
         />
       </div>
     </section>

@@ -10,7 +10,11 @@
 import { defineStore } from "pinia";
 import { reactive, ref } from "vue";
 import { invokeCommand, onSessionEvent } from "../ipc/invoke";
-import type { SessionEventPayload, SessionMode } from "../ipc/types";
+import type {
+  ReasoningVisibility,
+  SessionEventPayload,
+  SessionMode,
+} from "../ipc/types";
 import { accentForIndex } from "../lib/color";
 import { useToastStore } from "./toastStore";
 
@@ -35,6 +39,10 @@ export type SessionRecord = {
   /// `null` until that event arrives — callers fall back to a short
   /// form of `id` for display.
   title: string | null;
+  /// Per-session override for reasoning visibility. `"default"` means
+  /// fall back to `settings.appearance.reasoningVisibility`. In-memory
+  /// only (we don't yet persist per-session UI preferences).
+  reasoningVisibilityOverride: ReasoningVisibility | "default";
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -113,6 +121,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         title: null,
         mode: null,
         approveAll: true, // current backend default (`approveAll` permission handler)
+        reasoningVisibilityOverride: "default",
       });
       sessions.value.push(record);
       toasts.success("Session created", id);
@@ -169,6 +178,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         title: null,
         mode: null,
         approveAll: true,
+        reasoningVisibilityOverride: "default",
       });
       sessions.value.push(record);
       // Pick up the run mode the SDK is currently using for the
@@ -318,6 +328,17 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
   }
 
+  /// Per-session UI override for reasoning visibility. `"default"`
+  /// means inherit from `settings.appearance.reasoningVisibility`.
+  /// In-memory only — not persisted across reloads. No backend RPC.
+  function setSessionReasoningOverride(
+    sessionId: string,
+    value: ReasoningVisibility | "default",
+  ): void {
+    const record = sessions.value.find((s) => s.id === sessionId);
+    if (record) record.reasoningVisibilityOverride = value;
+  }
+
   return {
     sessions,
     isCreating,
@@ -331,5 +352,6 @@ export const useSessionsStore = defineStore("sessions", () => {
     resetSessionApprovals,
     compactSessionHistory,
     setSessionName,
+    setSessionReasoningOverride,
   };
 });

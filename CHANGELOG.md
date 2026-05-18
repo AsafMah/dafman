@@ -3,7 +3,17 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **Session controls moved into the dockview tab strip.** Each session's chrome (model + reasoning-effort selects, options gear + popover with run mode, reasoning visibility, rename, compact history, reset approvals) now lives in the group's tab strip via a new `ChatTabActions.vue` mounted as dockview's `rightHeaderActionsComponent`. The actions component reads dockview's `activePanel` (auto-updates on `onDidActivePanelChange`) and forwards to a new `SessionHeaderControls.vue` for the active chat panel. `ChatWindow.vue` lost its in-pane header entirely (~280 LOC trimmed) — it's now transcript + composer only. `sessionsStore.SessionRecord` gained an in-memory `reasoningVisibilityOverride: ReasoningVisibility | "default"` field + `setSessionReasoningOverride(id, value)` action so the controls in the tab strip can mutate per-session state without prop-drilling.
+- **Custom dockview tab (`ChatTab.vue`)** registered as the `defaultTabComponent`. Each tab is a top-rounded pill with the session accent as its left rail (4 px when active, 2 px when inactive) and an accent-tinted background (`color-mix` of `18% / 12% (hover) / 6% (idle)` over `--p-content-background`). Reactive to `api.onDidTitleChange` and `api.onDidActiveChange`; close ✕ is in-tab (fades in on hover; persistent when active). Active tab gets `margin-bottom: -1px` so it visually merges with the chat tile below. `src/style.css` neutralises dockview's own `.dv-tab` chrome (`padding: 0; background: transparent`) so our custom surface is the only visible layer.
+- **Prominent per-session accent in the chat tile.** Replaced the old 3 px top accent stripe with a 4 px left rail and a soft top-down accent wash (`color-mix(in srgb, var(--accent) 7%, content-background)` fading to background over 220 px) on `.chat-tile`. User-message bubbles also tint at 8 % accent so the session colour runs end-to-end through the transcript; assistant tint bumped 14 % → 18 %.
+- **Chat tile sits flush against the dockview tab strip.** Dropped the tile's top border + top corner radius (`border-top: none; border-radius: 0 0 xl xl`), so the active tab's rounded top and the tile below read as a single shape.
+- **Session options popover pre-fills the rename input.** `nameDraft` is now seeded from `record.title` and re-seeded every time the popover opens (inside the click handler, not a watcher, so an in-flight edit isn't clobbered by a late `session.title_changed` echo while the popover is still open).
+
 ### Fixed
+
+- **Vite dev server failed to resolve `dockview-vue/dist/styles/dockview.css`.** `dockview-vue` and `dockview-core` were declared in `package.json` but not actually installed in `node_modules` (drifted lockfile). Re-running `bun install` brought them back in.
 
 - **Startup-restore race + lost session panels after dockview `fromJSON`.** Three related fixes converged into one user-visible behavior:
   - `<DockviewVue @ready>` fires from the child component's `onMounted` — which in Vue 3 runs **before** the parent's `onMounted` — so `App.vue`'s async `restoreFromLayout()` was setting `pendingRestoreLayout` long after `onDockReady` had already seen it null. The persisted dockview layout was never applied. Restore now calls `layoutStore.restore(layout)` immediately when `layoutStore.api` is already up, and only falls back to stashing for `onDockReady` if it isn't (covers `<Suspense>` corner cases).

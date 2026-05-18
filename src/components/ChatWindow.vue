@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import Popover from "primevue/popover";
-import Select from "primevue/select";
-import Tag from "primevue/tag";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
@@ -19,59 +14,38 @@ import {
   type IdCounter,
 } from "../lib/chatEvents";
 import type {
-  ModelSummary,
   ReasoningVisibility,
   SessionEventPayload,
-  SessionMode,
 } from "../ipc/types";
-import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 
-// NOTE: `ToggleSwitch` import + `approveAllChoice` computed are intentionally
-// kept absent until a real permission UX lands. The SDK's
-// `permissions.setApproveAll` toggle is wired through the store
-// (`setSessionApproveAll`) but our local `onPermissionRequest: approveAll`
-// handler in `src-bun/app/sessions.ts` short-circuits every request, so
-// surfacing a UI switch today would be misleading. Prop + store state are
-// retained so the toggle row can be re-added in the popover when the
-// per-session handler stops hard-approving.
+// Per-session header controls (model, effort, options gear, rename,
+// compact, reset) live in `SessionHeaderControls.vue`, hosted by
+// dockview's right header-actions slot via `ChatTabActions.vue`. This
+// component is just transcript + composer.
 
 const props = defineProps<{
   sessionId: string;
   accent: string;
   events: SessionEventPayload[];
-  model: string | null;
-  reasoningEffort: string | null;
-  mode: SessionMode | null;
-  approveAll: boolean;
+  /// Per-session override for reasoning visibility (`"default"` =
+  /// inherit from app settings). Sourced from `SessionRecord` so the
+  /// controls (rendered in the dockview tab strip) can mutate it from
+  /// outside this component.
+  reasoningVisibilityOverride: ReasoningVisibility | "default";
   /// Optional override for the send action. When provided, ChatWindow
   /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
   /// playground to keep the chat self-contained (echo-only, no SDK).
   sendHandler?: (text: string) => Promise<void> | void;
-  /// Hide the in-header close (X) button. Set when a parent container
-  /// (e.g. the dockview tab bar) owns panel removal.
-  hideClose?: boolean;
-}>();
-
-const emit = defineEmits<{
-  (e: "close"): void;
 }>();
 
 const sessionsStore = useSessionsStore();
 const settingsStore = useSettingsStore();
-const modelsStore = useModelsStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
-const { models } = storeToRefs(modelsStore);
-
-onMounted(() => {
-  modelsStore.load().catch(() => {
-    /* toast already shown */
-  });
-});
 
 const items = ref<ChatItem[]>([]);
 const ambient = ref<ChatAmbient>(defaultAmbient());
@@ -97,6 +71,7 @@ onBeforeUnmount(() => {
   tileResizeObserver?.disconnect();
   tileResizeObserver = null;
 });
+
 /// Fallback "thinking" flag used until we observe a turn boundary; after
 /// the first `assistant.turn_start` we trust `ambient.turnActive` exclusively.
 const isSendingFallback = ref(false);
@@ -107,95 +82,11 @@ const isSending = computed(() =>
   ambient.value.sawTurnBoundary ? ambient.value.turnActive : isSendingFallback.value,
 );
 
-const sessionOverride = ref<ReasoningVisibility | "default">("default");
-
 const reasoningVisibility = computed<ReasoningVisibility>(() =>
-  sessionOverride.value === "default"
+  props.reasoningVisibilityOverride === "default"
     ? settings.value.appearance.reasoningVisibility
-    : sessionOverride.value,
+    : props.reasoningVisibilityOverride,
 );
-
-const reasoningOptions: { label: string; value: ReasoningVisibility | "default" }[] = [
-  { label: "Default", value: "default" },
-  { label: "Hidden", value: "hidden" },
-  { label: "Compact", value: "compact" },
-  { label: "Expanded", value: "expanded" },
-];
-
-const selectedModel = computed<ModelSummary | undefined>(() =>
-  props.model ? models.value.find((m) => m.id === props.model) : undefined,
-);
-
-const modelOptions = computed(() =>
-  models.value.map((m) => ({ label: m.name, value: m.id })),
-);
-
-const effortOptions = computed(() =>
-  (selectedModel.value?.supportedReasoningEfforts ?? []).map((effort) => ({
-    label: effort,
-    value: effort,
-  })),
-);
-
-const modelChoice = computed<string | null>({
-  get: () => props.model,
-  set: (value) => {
-    if (!value) return;
-    const fresh = models.value.find((m) => m.id === value);
-    const effort = fresh?.supportsReasoningEffort
-      ? props.reasoningEffort ?? fresh.defaultReasoningEffort ?? null
-      : null;
-    void sessionsStore.setSessionModel(props.sessionId, value, effort);
-  },
-});
-
-const effortChoice = computed<string | null>({
-  get: () => props.reasoningEffort,
-  set: (value) => {
-    if (!props.model || !value) return;
-    void sessionsStore.setSessionModel(props.sessionId, props.model, value);
-  },
-});
-
-const modeOptions: { label: string; value: SessionMode }[] = [
-  { label: "Interactive", value: "interactive" },
-  { label: "Plan", value: "plan" },
-  { label: "Autopilot", value: "autopilot" },
-];
-
-const modeChoice = computed<SessionMode | null>({
-  get: () => props.mode,
-  set: (value) => {
-    if (!value || value === props.mode) return;
-    void sessionsStore.setSessionMode(props.sessionId, value);
-  },
-});
-
-const nameDraft = ref<string>("");
-const optionsMenu = ref<InstanceType<typeof Popover> | null>(null);
-
-function toggleOptions(event: Event) {
-  optionsMenu.value?.toggle(event);
-}
-
-function onRenameSubmit() {
-  const trimmed = nameDraft.value.trim();
-  if (!trimmed) return;
-  // Reflect the trimmed value in the input so the user sees the same
-  // string we sent, and so the `ambient.title` watcher can resync on
-  // the next backend echo (it skips while `nameDraft` is non-empty,
-  // but the trimmed echo will match what's shown).
-  nameDraft.value = trimmed;
-  void sessionsStore.setSessionName(props.sessionId, trimmed);
-}
-
-function onCompactNow() {
-  void sessionsStore.compactSessionHistory(props.sessionId);
-}
-
-function onResetApprovals() {
-  void sessionsStore.resetSessionApprovals(props.sessionId);
-}
 
 const accentColor = computed(() => props.accent);
 
@@ -249,17 +140,7 @@ watch(
     items.value = [];
     ambient.value = defaultAmbient();
     isSendingFallback.value = false;
-    sessionOverride.value = "default";
-    nameDraft.value = "";
     processedEvents = props.events.length;
-  },
-);
-
-// Keep the rename draft in sync with the session title coming from events.
-watch(
-  () => ambient.value.title,
-  (title) => {
-    if (title && !nameDraft.value) nameDraft.value = title;
   },
 );
 
@@ -292,132 +173,6 @@ async function sendMessage(text: string) {
 
 <template>
   <section ref="tileEl" class="chat-tile" :style="{ '--accent': accentColor }">
-    <header class="chat-header">
-      <div class="chat-title">
-        <Tag :value="ambient.title || props.sessionId" severity="secondary" />
-        <span v-if="ambient.model" class="model-badge" :title="ambient.model">
-          {{ ambient.model }}
-        </span>
-      </div>
-      <div class="chat-header-actions">
-        <label class="control" :for="`model-${props.sessionId}`">
-          <span class="control-label">Model</span>
-          <Select
-            :input-id="`model-${props.sessionId}`"
-            v-model="modelChoice"
-            :options="modelOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            placeholder="Default"
-            :disabled="models.length === 0"
-            aria-label="Model for this session"
-          />
-        </label>
-        <label
-          v-if="selectedModel?.supportsReasoningEffort"
-          class="control"
-          :for="`effort-${props.sessionId}`"
-        >
-          <span class="control-label">Effort</span>
-          <Select
-            :input-id="`effort-${props.sessionId}`"
-            v-model="effortChoice"
-            :options="effortOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            placeholder="Default"
-            aria-label="Reasoning effort for this session"
-          />
-        </label>
-        <Button
-          icon="pi pi-cog"
-          text
-          rounded
-          aria-label="Session options"
-          aria-haspopup="true"
-          @click="toggleOptions"
-        />
-        <Popover ref="optionsMenu">
-          <div class="session-options">
-            <label class="option-row" :for="`mode-${props.sessionId}`">
-              <span class="option-label">Run mode</span>
-              <Select
-                :input-id="`mode-${props.sessionId}`"
-                v-model="modeChoice"
-                :options="modeOptions"
-                option-label="label"
-                option-value="value"
-                size="small"
-                placeholder="Loading..."
-                :disabled="!props.mode"
-                aria-label="Agent run mode"
-              />
-            </label>
-            <label class="option-row" :for="`reasoning-${props.sessionId}`">
-              <span class="option-label">Reasoning view</span>
-              <Select
-                :input-id="`reasoning-${props.sessionId}`"
-                v-model="sessionOverride"
-                :options="reasoningOptions"
-                option-label="label"
-                option-value="value"
-                size="small"
-                aria-label="Reasoning visibility for this session"
-              />
-            </label>
-            <div class="option-row option-row-stack">
-              <label
-                class="option-label"
-                :for="`name-${props.sessionId}`"
-              >
-                Session name
-              </label>
-              <form class="rename-form" @submit.prevent="onRenameSubmit">
-                <InputText
-                  :id="`name-${props.sessionId}`"
-                  v-model="nameDraft"
-                  size="small"
-                  placeholder="Untitled"
-                />
-                <Button
-                  type="submit"
-                  label="Save"
-                  size="small"
-                  :disabled="!nameDraft.trim()"
-                />
-              </form>
-            </div>
-            <div class="option-actions">
-              <Button
-                icon="pi pi-compress"
-                label="Compact history"
-                size="small"
-                severity="secondary"
-                @click="onCompactNow"
-              />
-              <Button
-                icon="pi pi-refresh"
-                label="Reset approvals"
-                size="small"
-                severity="secondary"
-                @click="onResetApprovals"
-              />
-            </div>
-          </div>
-        </Popover>
-        <Button
-          v-if="!props.hideClose"
-          icon="pi pi-times"
-          text
-          rounded
-          aria-label="Close session"
-          @click="emit('close')"
-        />
-      </div>
-    </header>
-
     <div ref="messagesEl" class="chat-messages">
       <p v-if="items.length === 0" class="empty-message">
         Start typing below to send a message.
@@ -512,111 +267,27 @@ async function sendMessage(text: string) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--p-content-background);
+  /* Soft accent wash on the panel background — visible enough that the
+   * session "owns" its area but light enough that text contrast is
+   * unaffected. Composes over `--p-content-background` so we stay
+   * correct on both themes. The heavier accent rail on the left makes
+   * the per-session identity prominent now that the chat header is gone
+   * (model + options live on the dockview tab strip via
+   * `ChatTabActions`). */
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--accent) 7%, var(--p-content-background)) 0,
+      var(--p-content-background) 220px
+    );
+  /* Tile sits flush against the dockview tab strip: drop the top border
+   * + top corner radius so we don't visually double up the strip's own
+   * bottom border. The 4 px left rail remains the dominant accent
+   * signal. */
   border: 1px solid var(--p-content-border-color);
-  border-top: 3px solid var(--accent);
-  border-radius: var(--p-border-radius-xl);
-}
-
-.chat-header {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--p-content-border-color);
-}
-
-.chat-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  flex: 1 1 14rem;
-}
-
-.chat-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.control {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-width: 0;
-}
-
-.control :deep(.p-select) {
-  max-width: 14rem;
-}
-
-.control-label {
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.session-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-width: 18rem;
-}
-
-.option-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.option-row-stack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
-}
-
-.option-label {
-  font-size: 0.8rem;
-  color: var(--p-text-color);
-}
-
-.option-row :deep(.p-select) {
-  min-width: 9rem;
-}
-
-.rename-form {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.rename-form :deep(.p-inputtext) {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.option-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--p-content-border-color);
-}
-
-.session-id {
-  /* unused since we hid the raw id; kept commented for quick reinstatement */
-  display: none;
+  border-top: none;
+  border-left: 4px solid var(--accent);
+  border-radius: 0 0 var(--p-border-radius-xl) var(--p-border-radius-xl);
 }
 
 .chat-messages {
@@ -640,10 +311,6 @@ async function sendMessage(text: string) {
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--p-border-radius-md);
-  /* Default to content background so text-color contrast is always right;
-     :global(.app-dark) selectors don't compose reliably with Vue's scoped
-     style hashing, so we lean on the auto-switching content tokens
-     instead. Per-role variants below add a subtle accent tint. */
   background: var(--p-content-background);
   color: var(--p-text-color);
   border: 1px solid var(--p-content-border-color);
@@ -651,11 +318,14 @@ async function sendMessage(text: string) {
 }
 
 .message-card.user {
-  border-left-color: var(--p-surface-400, var(--p-text-muted-color));
+  /* Tint user messages with a faint accent too, so the session colour
+   * runs end-to-end through the transcript. */
+  background: color-mix(in srgb, var(--accent) 8%, var(--p-content-background));
+  border-left-color: color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
 .message-card.assistant {
-  background: color-mix(in srgb, var(--accent) 14%, var(--p-content-background));
+  background: color-mix(in srgb, var(--accent) 18%, var(--p-content-background));
   border-left-color: var(--accent);
 }
 
@@ -677,19 +347,6 @@ async function sendMessage(text: string) {
 .message-card.system.severity-error {
   background: color-mix(in srgb, var(--p-red-500, #ef4444) 12%, var(--p-content-background));
   border-left-color: var(--p-red-500, #ef4444);
-}
-
-.model-badge {
-  font-family: var(--p-font-family-mono, monospace);
-  font-size: 0.7rem;
-  color: var(--p-text-muted-color);
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: var(--p-border-radius-sm);
-  max-width: 18ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .chat-usage {

@@ -72,3 +72,22 @@ body.app-dark {
   --dv-icon-hover-background-color: var(--p-surface-700);
   --dv-tabs-container-scrollbar-color: var(--p-surface-600);
 }
+
+/* When we hand dockview our custom `ChatTab.vue` as the
+ * `default-tab-component`, dockview still wraps it in its own
+ * `.dv-tab` container which carries the default-theme background +
+ * padding. Make the wrapper transparent and edge-to-edge so our chat
+ * tab is the only visible chrome, and the per-session accent isn't
+ * fighting with dockview's tab tinting. */
+.dv-tab {
+  padding: 0 !important;
+  background-color: transparent !important;
+  color: inherit !important;
+}
+.dv-tab.dv-active-tab,
+.dv-tab.dv-inactive-tab {
+  background-color: transparent !important;
+}
+.dv-tab.dv-tab-dragging {
+  background-color: transparent !important;
+}
