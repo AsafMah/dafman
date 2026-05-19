@@ -91,16 +91,31 @@ export const useLayoutStore = defineStore("layout", () => {
     const dock = api.value;
     if (!dock) return;
     if (dock.getPanel(sessionId)) return;
-    // When `targetGroupId` is provided (e.g. replacing an orphan panel
-    // inline) we drop the new panel as a tab inside that group.
-    // Otherwise we tile: a new group to the right of the active *body*
-    // group. If no body group exists at all (the only thing on screen
-    // is the Sessions sidebar), we explicitly create one so the panel
-    // doesn't end up tabbed inside the edge group.
-    let referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
+    // Three placement cases:
+    //
+    // 1. `targetGroupId` supplied (orphan replacement) → drop the panel
+    //    as a tab inside that specific group (`direction: "within"`).
+    // 2. A body (grid-located) group already exists → tile a new group
+    //    to the right of it so two sessions read as side-by-side panes
+    //    (the documented "new sessions tile by default" behaviour).
+    // 3. No body group exists yet (very first session, or every session
+    //    closed and only edge sidebars remain) → call `addPanel`
+    //    WITHOUT a `position` so dockview picks default placement in
+    //    the body and the new panel fills the grid. The previous code
+    //    here called `dock.addGroup()` followed by an
+    //    `addPanel({ direction: "right" })` against the brand-new
+    //    (still empty) body group — that left the empty group on the
+    //    left half of the body and the new session on the right half,
+    //    producing a 50/50 split with a dead pane on launch.
+    const referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
     if (!referenceGroup) {
-      const body = dock.addGroup();
-      referenceGroup = body.id;
+      dock.addPanel({
+        id: sessionId,
+        component: "chat",
+        title: opts.title ?? shortPanelTitle(sessionId),
+        params: { sessionId },
+      });
+      return;
     }
     dock.addPanel({
       id: sessionId,
