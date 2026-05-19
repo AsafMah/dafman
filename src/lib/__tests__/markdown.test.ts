@@ -47,6 +47,19 @@ describe("renderMarkdown", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
+  test("highlighted tokens carry lex-token-* classes for our CSS to style", () => {
+    // Bare prism emits `class="token keyword"`. Our stylesheet keys
+    // off `.lex-token-keyword` etc. (matching @lexical/code's theme
+    // map), so the highlight callback must rewrite the class names
+    // or every fence renders plain in WebView2.
+    const html = renderMarkdown("```python\ndef foo():\n  return 1\n```");
+    expect(html).toContain("lex-token-keyword"); // `def`, `return`
+    expect(html).toMatch(/class="token lex-token-/);
+    // The original `token` class is preserved alongside (defense in
+    // depth for any future @lexical/code-bridged code path).
+    expect(html).toMatch(/class="token lex-token-\w+"/);
+  });
+
   test("renders GFM tables", () => {
     const html = renderMarkdown(
       "| a | b |\n| --- | --- |\n| 1 | 2 |\n",

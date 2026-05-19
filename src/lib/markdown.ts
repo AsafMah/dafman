@@ -52,9 +52,21 @@ const md: MarkdownIt = new MarkdownIt({
           Prism.languages[language] as Prism.Grammar,
           language,
         );
+        // Prism emits `<span class="token comment">`, but our CSS in
+        // `lexical.css` is keyed to `.lex-token-*` (the class names
+        // Lexical's CodeHighlightNode applies via the `codeHighlight`
+        // theme map). Without the rewrite below, every token renders
+        // plain because the `.token.comment` etc. selectors don't
+        // exist in our stylesheet. Adding `lex-token-X` alongside
+        // the original `token X` keeps both styling paths viable
+        // (any future @lexical/code-bridged surface still works).
+        const relabeled = highlighted.replace(
+          /class="token ([\w-]+)"/g,
+          (_match, type: string) => `class="token lex-token-${type}"`,
+        );
         return (
           `<pre class="lex-code" data-highlight-language="${escapeAttr(language)}">` +
-          `<code class="language-${escapeAttr(language)}">${highlighted}</code></pre>`
+          `<code class="language-${escapeAttr(language)}">${relabeled}</code></pre>`
         );
       } catch {
         // fall through to unhighlighted rendering
