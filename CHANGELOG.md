@@ -9,6 +9,8 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added
 
+- **Reset Layout command.** `Ctrl/Cmd+K` → "Reset Layout" (Diagnostics group) closes every open panel (chat tabs, settings, dev playground, any sidebars) and re-opens the Sessions sidebar at its default 240 px width on the left. The persisted dockview JSON refreshes automatically via the existing `onDidLayoutChange` debounced writer. Sessions are disconnected (routes through `App.vue`'s `onDidRemovePanel` → `sessionsStore.closeSession`) but **not** deleted — they stay resumable from the Sessions Manager. Toast on completion shows how many sessions were closed. Backed by new `layoutStore.resetToDefault()`; 3 unit tests via a featureful fake `DockviewApi` covering: many panels closed and sidebar re-opened, no panels (first-launch idempotent reset), sidebar already open (re-creates cleanly in the existing edge group).
+
 - **Color-coded categories + per-session accent on "Switch to" commands.** Each category (`Navigation`, `Sessions`, `Active Session`, `Appearance`, `Diagnostics`) gets a distinct hue (blue / emerald / violet / amber / orange) applied to the group heading, the icon, the row's left rail (idle-thin, selected-full), and the hover/selected backgrounds via a `--cmd-accent` custom property cascaded from `[data-group]` selectors. "Switch to: `<session title>`" commands now carry the session's per-pane `accent` color (matching the chat tile's left rail), overriding the category default via inline `style="--cmd-accent: ..."`. `accent?: string` added to the `Command` shape.
 
 ### Fixed
