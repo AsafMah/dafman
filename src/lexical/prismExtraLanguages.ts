@@ -23,56 +23,53 @@
 //      where they wouldn't be useful yet.
 
 import "prismjs";
-// `prism-markup-templating` is a transitive dependency of several other
-// grammars (notably `prism-php` and indirectly `prism-bash`'s ecosystem
-// of templated shells). It used to load via `@lexical/code`'s grammar
-// bundle (prism-markdown pulls it in), but since `MessageContent` now
-// renders through markdown-it instead of Lexical we can't rely on
-// that side-effect. Load it explicitly so the languages below don't
-// throw `Prism.languages["markup-templating"].tokenizePlaceholders`
-// at first highlight.
-import "prismjs/components/prism-markup-templating";
 
-// Core grammars that used to load transitively via @lexical/code (it
-// imported prism-markdown which pulls clike/markup/etc, plus its own
-// auto-registered set for js/ts/python/rust/swift/java/cpp). Now that
-// MessageContent goes through markdown-it (not Lexical), those grammars
-// are no longer loaded as a side-effect. Register them explicitly here
-// so code fences highlight on first paint.
+// IMPORTANT: dependency order matters. Each prism component file
+// expects its prerequisites already registered on the global `Prism`
+// singleton at import time, and throws if they aren't. A blank-screen
+// regression has happened on this file before — see the comment block
+// above plus commit history for `748f65d`.
 //
-// Order matters for grammars with dependencies: clike must precede
-// javascript, javascript must precede typescript/jsx, markup must
-// precede markdown.
-import "prismjs/components/prism-clike";
-import "prismjs/components/prism-c";
-import "prismjs/components/prism-cpp";
-import "prismjs/components/prism-javascript";
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-jsx";
-import "prismjs/components/prism-tsx";
-import "prismjs/components/prism-markup";
-import "prismjs/components/prism-css";
-import "prismjs/components/prism-markdown";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-rust";
-import "prismjs/components/prism-java";
-import "prismjs/components/prism-swift";
-import "prismjs/components/prism-objectivec";
-import "prismjs/components/prism-sql";
-import "prismjs/components/prism-powershell";
+// Grouped by dependency tier so reorderings are obvious:
+//   tier 0  — no deps
+//   tier 1  — depends on tier 0
+//   tier 2  — depends on tier 1
+//   tier 3  — depends on tier 2
 
-// Extras beyond @lexical/code's stock bundle — covers shell output,
-// JSON args, apply_patch diffs, configs, and the languages our users
-// will paste most often that the upstream Lexical bundle didn't ship.
-import "prismjs/components/prism-bash";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-diff";
-import "prismjs/components/prism-yaml";
-import "prismjs/components/prism-toml";
-import "prismjs/components/prism-go";
-import "prismjs/components/prism-ruby";
-import "prismjs/components/prism-php";
-import "prismjs/components/prism-kotlin";
-import "prismjs/components/prism-csharp";
+// tier 0
+import "prismjs/components/prism-markup";
+import "prismjs/components/prism-clike";
+
+// tier 1 — need markup OR clike
+import "prismjs/components/prism-markup-templating"; // → markup
+import "prismjs/components/prism-css";               // → markup
+import "prismjs/components/prism-c";                 // → clike
+import "prismjs/components/prism-javascript";        // → clike
+import "prismjs/components/prism-sql";               // → clike
+import "prismjs/components/prism-java";              // → clike
+import "prismjs/components/prism-csharp";            // → clike
+import "prismjs/components/prism-go";                // → clike
+import "prismjs/components/prism-bash";              // standalone
+import "prismjs/components/prism-python";            // standalone
+import "prismjs/components/prism-rust";              // standalone
+import "prismjs/components/prism-yaml";              // standalone
+import "prismjs/components/prism-toml";              // standalone
+import "prismjs/components/prism-diff";              // standalone
+import "prismjs/components/prism-json";              // standalone
+import "prismjs/components/prism-swift";             // standalone
+import "prismjs/components/prism-powershell";        // standalone
+import "prismjs/components/prism-ruby";              // standalone
+
+// tier 2 — need a tier-1 lang
+import "prismjs/components/prism-cpp";               // → c
+import "prismjs/components/prism-typescript";        // → javascript
+import "prismjs/components/prism-objectivec";        // → c
+import "prismjs/components/prism-kotlin";            // → java/clike
+import "prismjs/components/prism-php";               // → markup-templating + clike
+import "prismjs/components/prism-markdown";          // → markup-templating
+
+// tier 3 — need a tier-2 lang
+import "prismjs/components/prism-jsx";               // → markup + javascript
+import "prismjs/components/prism-tsx";               // → jsx + typescript
 
 export const PRISM_EXTRA_LANGUAGES_LOADED = true;
