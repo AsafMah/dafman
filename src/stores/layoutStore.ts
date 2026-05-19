@@ -232,6 +232,48 @@ export const useLayoutStore = defineStore("layout", () => {
     return true;
   }
 
+  /// Resets the layout to "factory default": closes every panel
+  /// (chat tabs, settings, dev playground, sidebars), then re-opens
+  /// the Sessions sidebar at its configured initial size. Used by
+  /// the "Reset Layout" command in the palette + the (future)
+  /// Settings → Diagnostics surface.
+  ///
+  /// Closing chat panels routes through dockview's
+  /// `onDidRemovePanel` handler in `App.vue`, which calls
+  /// `sessionsStore.closeSession(id)` for each — disconnecting the
+  /// SDK session. Sessions remain available in the CLI catalog (so
+  /// the Sessions Manager can resume them later); we just shed the
+  /// open-pane state.
+  ///
+  /// Snapshots are pushed to settings.layout via the existing
+  /// `onDidLayoutChange` debounced writer, so we don't need to
+  /// touch persistence directly here.
+  function resetToDefault(): void {
+    const dock = api.value;
+    if (!dock) return;
+    // Copy the list — dockview mutates it during removePanel. The
+    // typed `panels: readonly IDockviewPanel[]` is structurally
+    // compatible with `removePanel(panel: DockviewGroupPanel)` at
+    // runtime; the cast matches the same pattern used elsewhere in
+    // this store for moveTo / removePanel calls.
+    const panels = dock.panels.slice();
+    for (const panel of panels) {
+      dock.removePanel(panel as unknown as Parameters<typeof dock.removePanel>[0]);
+    }
+    // Re-open the Sessions sidebar at default size. Hardcoded id /
+    // size to match App.vue's `SESSIONS_PANEL_ID` + `initialSize`.
+    // (Kept inline rather than imported from App.vue to keep the
+    // store free of UI imports.)
+    openEdgePanel("left", {
+      id: "sessions-manager",
+      component: "sessionsManager",
+      tabComponent: "sidebarTab",
+      title: "Sessions",
+      initialSize: 240,
+      minimumSize: 160,
+    });
+  }
+
   function removePanel(sessionId: string): void {
     const dock = api.value;
     if (!dock) return;
@@ -406,6 +448,7 @@ export const useLayoutStore = defineStore("layout", () => {
     pruneEmptyEdgeGroup,
     rescueChatPanelsFromEdgeGroups,
     toggleEdgeGroup,
+    resetToDefault,
     firstBodyGroupId,
     snapshot,
     restore,

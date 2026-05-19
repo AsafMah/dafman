@@ -305,6 +305,27 @@ export function registerBuiltinCommands(): void {
       },
     });
   }
+
+  // ---------- Static: Reset Layout ----------
+  registry.register({
+    id: "layout.reset",
+    label: "Reset Layout",
+    group: "Diagnostics",
+    icon: "pi pi-refresh",
+    keywords: ["close all", "default", "restore", "factory"],
+    run: () => {
+      const openSessionCount = sessionsStore.sessions.length;
+      layoutStore.resetToDefault();
+      if (openSessionCount > 0) {
+        toasts.info(
+          "Layout reset",
+          `Closed ${openSessionCount} open session${openSessionCount === 1 ? "" : "s"}. Resume any of them from the Sessions sidebar.`,
+        );
+      } else {
+        toasts.info("Layout reset", "Sessions sidebar re-opened.");
+      }
+    },
+  });
 }
 
 /// Compact a workspace path for the command label. `C:\Users\…\dafman`
