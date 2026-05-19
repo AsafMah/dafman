@@ -6,6 +6,7 @@ import MessageContent from "./MessageContent.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
+import PendingRequestCard from "./PendingRequestCard.vue";
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -305,12 +306,23 @@ const pendingStyle = computed(() => {
           :error-code="item.errorCode"
           :agent-id="item.agentId"
         />
+        <PendingRequestCard
+          v-else-if="item.kind === 'pendingRequest'"
+          :session-id="props.sessionId"
+          :request-id="item.requestId"
+          :pending-kind="item.pendingKind"
+          :message="item.message"
+          :request="item.request"
+        />
         <!-- Skip empty assistant items entirely. The model emits
              `assistant.message_start` (creating an empty item) before
              every turn; when the turn goes straight to a tool call
              without text, the empty card used to render as "..." right
              before the tool block. The pending spinner below already
-             covers the "waiting for response" state. -->
+             covers the "waiting for response" state.
+             pendingRequest items are handled by PendingRequestCard
+             above, so by the time we reach this branch the type is
+             narrowed to user / assistant / system. -->
         <article
           v-else-if="!(item.kind === 'assistant' && item.text === '')"
           class="message-card"
@@ -390,7 +402,11 @@ const pendingStyle = computed(() => {
         aria-hidden="true"
       />
       <div class="pending-banner-body">
-        <span class="pending-banner-kind">{{ pendingStyle.label }}</span>
+        <span class="pending-banner-kind">
+          {{ pendingStyle.label
+          }}<template v-if="ambient.pendingRequests.length > 1">
+            · {{ ambient.pendingRequests.length }} pending</template>
+        </span>
         <span class="pending-banner-message">{{ pendingHead.message }}</span>
       </div>
     </div>

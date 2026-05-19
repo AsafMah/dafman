@@ -8,7 +8,7 @@
 // reactive data.
 
 import { defineStore } from "pinia";
-import { computed, reactive, ref, watch } from "vue";
+import { reactive, ref, watch } from "vue";
 import { invokeCommand, onPendingRequest, onSessionEvent } from "../ipc/invoke";
 import type {
   ElicitationRequestData,
@@ -139,6 +139,14 @@ let unsubscribePending: (() => void) | null = null;
 const pendingEvents = new Map<string, SessionEventPayload[]>();
 const pendingRequestBuffer = new Map<string, PendingRequestPayload[]>();
 const MAX_PENDING_PER_SESSION = 5000;
+
+/// Sentinel session id used by `src/dev/Playground.vue` to exercise
+/// the PendingRequestModal without a real bun-side handler. The
+/// store's `respondToPending` short-circuits the RPC call when the
+/// `sessionId` matches this constant so the modal can be tested in
+/// isolation. Not exported — the playground constructs the same
+/// string literal.
+const PLAYGROUND_PENDING_SESSION_ID = "playground-pending";
 
 /// Test-only seam: clears module-level state (subscription, buffered
 /// events) so each unit test starts from a clean slate. Production
@@ -755,38 +763,18 @@ export const useSessionsStore = defineStore("sessions", () => {
     if (record) record.reasoningVisibilityOverride = value;
   }
 
-  /// The session + queue head the global pending-request modal
-  /// should open against. Prefers the currently-active session if
-  /// it has a pending request; otherwise picks the first session
-  /// with a non-empty queue. Returns `null` when no request is
-  /// pending across any session.
-  const firstPending = computed<
-    | { record: SessionRecord; request: PendingRecordRequest }
-    | null
-  >(() => {
-    const layoutStore = useLayoutStore();
-    const active = layoutStore.activeSessionId;
-    if (active) {
-      const record = sessions.value.find((s) => s.id === active);
-      if (record && record.pendingRequests.length > 0) {
-        return { record, request: record.pendingRequests[0]! };
-      }
-    }
-    for (const record of sessions.value) {
-      if (record.pendingRequests.length > 0) {
-        return { record, request: record.pendingRequests[0]! };
-      }
-    }
-    return null;
-  });
-
   /// Sends the user's answer to a pending SDK callback. The bun
   /// side resolves the awaiting Promise; the matching queue entry
   /// is removed locally immediately (don't wait for the SDK
   /// `_completed` echo, which can lag), and we also push a
   /// synthetic `dafman.pending_response` into the record's event
-  /// buffer so the reducer's `ambient.pendingRequests` queue
-  /// stays in sync.
+  /// buffer so the reducer's `ambient.pendingRequests` queue +
+  /// in-stream card both clear in the same tick.
+  ///
+  /// The `PLAYGROUND_PENDING_SESSION_ID` sentinel short-circuits
+  /// the RPC call so the dev playground can exercise the card
+  /// without a real bun-side handler (which would reject with
+  /// `Session ${id} not found`).
   async function respondToPending(
     params: RespondToRequestParams,
   ): Promise<void> {
@@ -802,6 +790,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         data: { requestId: params.requestId, kind: params.response.kind },
       });
     }
+    if (params.sessionId === PLAYGROUND_PENDING_SESSION_ID) return;
     try {
       await invokeCommand("respondToRequest", params);
     } catch (err) {
@@ -816,7 +805,6 @@ export const useSessionsStore = defineStore("sessions", () => {
   return {
     sessions,
     isCreating,
-    firstPending,
     createSession,
     restoreSession,
     closeSession,

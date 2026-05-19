@@ -1,45 +1,36 @@
 // Handlers for permission / user-input / elicitation events.
 //
-// The reducer now maintains a per-session FIFO queue
-// (`ambient.pendingRequests`) of SDK-blocking callbacks. The actual
-// modal lives at App.vue level — see `PendingRequestModal.vue` — and
-// responds via the `respondToRequest` RPC.
+// **Inline-in-chat design:** each pending SDK callback is rendered
+// as a card item in the chat stream (not a modal). The card sits
+// alongside assistant/user/tool blocks; the user can scroll, switch
+// sessions, or keep typing while it's there. Responding (or the
+// SDK resolving out-of-band) removes the card.
 //
-// **Sources of state changes for the queue:**
+// **State channels (two parallel queues):**
 //
-//   1. **`dafman.pending_request`** — synthetic event the sessionsStore
-//      pushes through the reducer when bun's `pendingRequest` channel
-//      fires. This is the authoritative "the SDK is blocked" signal,
-//      because the SDK callback is what gates the actual session.
-//      Carries the full typed `request` payload + `requestId`.
+//   1. `ctx.items[]` — the chat-stream queue. Cards live here so
+//      `ChatWindow.vue` renders them inline.
+//   2. `ctx.ambient.pendingRequests[]` — the at-a-glance queue used
+//      by ChatTab + SessionsManager dots and the composer banner's
+//      counter. Same entries, just mirrored separately so off-panel
+//      surfaces don't have to scan `items` (which is unbounded).
 //
-//   2. **SDK `*.requested`** — informational, fires alongside the
-//      callback. We DON'T set state from these because (a) the
-//      payload lacks our generated requestId and (b) the bun-side
-//      handler is already firing the canonical synthetic event.
-//      Kept as no-ops here so the completeness test still owns the
-//      events and doesn't move them to IGNORED.
-//
-//   3. **SDK `*.completed`** — stale-state cleanup. If the SDK
-//      resolves a request out-of-band (e.g. via resume with
-//      continuePendingWork:true that we don't know about), we still
-//      want to clear the queue entry. Best-effort match by kind
-//      since the completed event lacks our requestId — we remove
-//      the OLDEST entry of the same kind. Rare path.
+// Both are populated by the synthetic `dafman.pending_request` event
+// the sessionsStore pushes through the reducer. Both are cleared by
+// `dafman.pending_response` (immediate user action) or the SDK's
+// `*.completed` (out-of-band, stale-cleanup). SDK `*.requested` are
+// informational no-ops.
 
 import { pickString } from "../chatEvents";
-import type { PendingRequest } from "../chatEvents";
+import type { ChatItem, PendingRequest } from "../chatEvents";
 import type {
   ElicitationRequestData,
   PermissionRequestData,
   UserInputRequestData,
 } from "../../ipc/types";
-import type { Handler } from "./context";
+import type { Handler, ReducerContext } from "./context";
 
 function describePermission(data: PermissionRequestData | unknown): string {
-  // Bun side already computes a `summary` field — prefer it. Fall
-  // back to legacy path for the SDK informational events that lack
-  // our enriched shape.
   if (data && typeof data === "object" && typeof (data as PermissionRequestData).summary === "string") {
     return (data as PermissionRequestData).summary;
   }
@@ -70,28 +61,44 @@ function describeElicitation(data: ElicitationRequestData | unknown): string {
   );
 }
 
-/// Removes the first queue entry whose `kind` matches AND (when a
-/// requestId is provided) whose `requestId` matches. Used by the
-/// `_completed` stale-state cleanup path where the SDK doesn't echo
-/// our generated id.
+/// Removes entries from BOTH the ambient queue and the chat-stream
+/// items list. `requestId` removes exactly one matching entry;
+/// `kind` (used for SDK `_completed`) removes the OLDEST matching
+/// entry since the SDK echoes don't carry our generated id.
 function removePending(
-  queue: PendingRequest[],
+  ctx: ReducerContext,
   kind: PendingRequest["kind"],
   requestId?: string,
-): PendingRequest[] {
-  const idx = requestId
-    ? queue.findIndex((p) => p.kind === kind && p.requestId === requestId)
-    : queue.findIndex((p) => p.kind === kind);
-  if (idx < 0) return queue;
-  const next = queue.slice();
-  next.splice(idx, 1);
-  return next;
+): void {
+  // Ambient queue.
+  if (requestId) {
+    ctx.ambient.pendingRequests = ctx.ambient.pendingRequests.filter(
+      (p) => p.requestId !== requestId,
+    );
+  } else {
+    const idx = ctx.ambient.pendingRequests.findIndex((p) => p.kind === kind);
+    if (idx >= 0) {
+      const next = ctx.ambient.pendingRequests.slice();
+      next.splice(idx, 1);
+      ctx.ambient.pendingRequests = next;
+    }
+  }
+  // Items list — the inline cards.
+  const itemIdx = requestId
+    ? ctx.items.findIndex(
+        (i) => i.kind === "pendingRequest" && i.requestId === requestId,
+      )
+    : ctx.items.findIndex(
+        (i) => i.kind === "pendingRequest" && i.pendingKind === kind,
+      );
+  if (itemIdx >= 0) ctx.items.splice(itemIdx, 1);
 }
 
 export const notificationHandlers: Record<string, Handler> = {
   /// Synthetic event pushed by sessionsStore when the bun-side
-  /// pending-request channel fires. Carries the full typed shape
-  /// + requestId.
+  /// pending-request channel fires. Pushes both an ambient entry
+  /// (drives dots + banner counter) AND a card item (renders inline
+  /// in the chat stream).
   "dafman.pending_request": (ctx, data) => {
     const d = data as
       | {
@@ -107,86 +114,95 @@ export const notificationHandlers: Record<string, Handler> = {
     if (!d || typeof d.requestId !== "string" || typeof d.kind !== "string") {
       return;
     }
-    // Idempotency: ignore re-pushes of the same requestId (e.g. an
-    // IPC retry).
+    // Idempotency: ignore re-pushes of the same requestId.
     if (ctx.ambient.pendingRequests.some((p) => p.requestId === d.requestId)) {
       return;
     }
-    let entry: PendingRequest | null = null;
+    let ambientEntry: PendingRequest | null = null;
+    let cardItem: ChatItem | null = null;
+    const requestId = d.requestId;
+    const id = ctx.counter.next++;
     switch (d.kind) {
-      case "permission":
-        entry = {
-          kind: "permission",
-          requestId: d.requestId,
-          message: describePermission(d.request),
-          request: d.request as PermissionRequestData,
+      case "permission": {
+        const req = d.request as PermissionRequestData;
+        const message = describePermission(req);
+        ambientEntry = { kind: "permission", requestId, message, request: req };
+        cardItem = {
+          id,
+          kind: "pendingRequest",
+          requestId,
+          pendingKind: "permission",
+          message,
+          request: req,
         };
         break;
-      case "userInput":
-        entry = {
-          kind: "userInput",
-          requestId: d.requestId,
-          message: describeInput(d.request),
-          request: d.request as UserInputRequestData,
+      }
+      case "userInput": {
+        const req = d.request as UserInputRequestData;
+        const message = describeInput(req);
+        ambientEntry = { kind: "userInput", requestId, message, request: req };
+        cardItem = {
+          id,
+          kind: "pendingRequest",
+          requestId,
+          pendingKind: "userInput",
+          message,
+          request: req,
         };
         break;
-      case "elicitation":
-        entry = {
-          kind: "elicitation",
-          requestId: d.requestId,
-          message: describeElicitation(d.request),
-          request: d.request as ElicitationRequestData,
+      }
+      case "elicitation": {
+        const req = d.request as ElicitationRequestData;
+        const message = describeElicitation(req);
+        ambientEntry = { kind: "elicitation", requestId, message, request: req };
+        cardItem = {
+          id,
+          kind: "pendingRequest",
+          requestId,
+          pendingKind: "elicitation",
+          message,
+          request: req,
         };
         break;
+      }
     }
-    if (entry) ctx.ambient.pendingRequests.push(entry);
+    if (ambientEntry && cardItem) {
+      ctx.ambient.pendingRequests.push(ambientEntry);
+      ctx.items.push(cardItem);
+    }
   },
 
-  /// Synthetic event the sessionsStore fires when the user responds
-  /// via `respondToRequest`. The bun side has already resolved the
-  /// SDK callback by the time this lands; we just remove the queue
-  /// entry so the modal closes immediately (instead of waiting for
-  /// the SDK `_completed` event, which can lag).
+  /// Synthetic event fired by sessionsStore when the user responds.
+  /// Removes both the ambient queue entry and the card item by
+  /// requestId so the UI clears immediately (don't wait for the
+  /// SDK's `_completed` echo, which can lag).
   "dafman.pending_response": (ctx, data) => {
     const d = data as { requestId?: unknown } | undefined;
     if (!d || typeof d.requestId !== "string") return;
-    ctx.ambient.pendingRequests = ctx.ambient.pendingRequests.filter(
-      (p) => p.requestId !== d.requestId,
-    );
+    removePending(ctx, "permission", d.requestId); // kind is ignored when requestId is supplied — it removes the matching entry regardless of kind.
   },
 
-  // SDK informational events — no-op for state purposes. Owned here so
-  // they don't trip the completeness test.
+  // SDK informational events. `*.requested` are no-ops for state
+  // purposes (the canonical add path is dafman.pending_request).
+  // `*.completed` clears the OLDEST entry of the matching kind, as
+  // a stale-cleanup path for SDK-out-of-band resolutions (resume
+  // with continuePendingWork, etc.).
   "permission.requested": () => {
-    /* informational; state is set by dafman.pending_request */
+    /* informational */
   },
   "permission.completed": (ctx) => {
-    // Stale-state cleanup: SDK said the request resolved. Drop the
-    // oldest permission queue entry. If we already removed via
-    // dafman.pending_response, this is a no-op.
-    ctx.ambient.pendingRequests = removePending(
-      ctx.ambient.pendingRequests,
-      "permission",
-    );
+    removePending(ctx, "permission");
   },
-
   "user_input.requested": () => {
-    /* informational; state is set by dafman.pending_request */
+    /* informational */
   },
   "user_input.completed": (ctx) => {
-    ctx.ambient.pendingRequests = removePending(
-      ctx.ambient.pendingRequests,
-      "userInput",
-    );
+    removePending(ctx, "userInput");
   },
-
   "elicitation.requested": () => {
-    /* informational; state is set by dafman.pending_request */
+    /* informational */
   },
   "elicitation.completed": (ctx) => {
-    ctx.ambient.pendingRequests = removePending(
-      ctx.ambient.pendingRequests,
-      "elicitation",
-    );
+    removePending(ctx, "elicitation");
   },
 };

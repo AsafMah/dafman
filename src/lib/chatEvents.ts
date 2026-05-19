@@ -83,6 +83,25 @@ export type ChatItem =
       kind: "system";
       text: string;
       severity: SystemSeverity;
+    }
+  | {
+      id: number;
+      kind: "pendingRequest";
+      /// Bun-generated id used to correlate the response via
+      /// `respondToRequest`. Card is removed from `items` when
+      /// either `dafman.pending_response` (immediate user action)
+      /// or the SDK's `*.completed` (out-of-band resolution)
+      /// arrives.
+      requestId: string;
+      pendingKind: "permission" | "userInput" | "elicitation";
+      /// Short human-readable summary used by accessible labels and
+      /// as a fallback when the renderer wants a single string.
+      message: string;
+      /// Full typed payload for the per-kind layout.
+      request:
+        | import("../ipc/types").PermissionRequestData
+        | import("../ipc/types").UserInputRequestData
+        | import("../ipc/types").ElicitationRequestData;
     };
 
 /// Maximum bytes of partial / result content we keep in memory and

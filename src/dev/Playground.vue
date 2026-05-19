@@ -11,10 +11,18 @@
 import { computed, reactive, ref } from "vue";
 import Button from "primevue/button";
 import ChatWindow from "../components/ChatWindow.vue";
-import type { SessionEventPayload } from "../ipc/types";
+import type {
+  ElicitationRequestData,
+  PermissionRequestData,
+  SessionEventPayload,
+  UserInputRequestData,
+} from "../ipc/types";
+import { accentForIndex } from "../lib/color";
+import { useSessionsStore, type SessionRecord } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
 
 const toastStore = useToastStore();
+const sessionsStore = useSessionsStore();
 
 type ScriptEvent = Omit<SessionEventPayload, "sessionId">;
 type Script = { label: string; events: ScriptEvent[] };
@@ -231,12 +239,47 @@ const SCRIPTS: Script[] = [
   },
 ];
 
-const PLAYGROUND_SESSION_ID = "playground";
-const events = reactive<SessionEventPayload[]>([]);
+// All scripted events AND pending-request injections share the
+// synthetic session record below so the inline PendingRequestCard
+// can be exercised end-to-end without a real SDK / bun handler.
+// `respondToPending(sessionId = PLAYGROUND_PENDING_SESSION_ID)` is
+// short-circuited inside the store (skips the RPC) but still
+// mutates this record's `events` array, so the reducer in the
+// playground's ChatWindow removes the card on response.
+const PLAYGROUND_PENDING_SESSION_ID = "playground-pending";
+
+function ensurePlaygroundSession(): SessionRecord {
+  const existing = sessionsStore.sessions.find(
+    (s) => s.id === PLAYGROUND_PENDING_SESSION_ID,
+  );
+  if (existing) return existing;
+  const fresh: SessionRecord = reactive({
+    id: PLAYGROUND_PENDING_SESSION_ID,
+    accent: accentForIndex(99),
+    events: [],
+    model: null,
+    reasoningEffort: null,
+    title: "Playground",
+    mode: null,
+    approveAll: false,
+    reasoningVisibilityOverride: "default" as const,
+    workingDirectory: null,
+    defaultSendMode: "steer" as const,
+    pendingRequests: [],
+    unseenTurns: 0,
+    isThinking: false,
+    sawTurnBoundary: false,
+  });
+  sessionsStore.sessions.push(fresh);
+  return fresh;
+}
+
+const playgroundRecord = ensurePlaygroundSession();
+const events = playgroundRecord.events;
 
 function run(script: Script) {
   for (const e of script.events)
-    events.push({ ...e, sessionId: PLAYGROUND_SESSION_ID });
+    events.push({ ...e, sessionId: PLAYGROUND_PENDING_SESSION_ID });
 }
 
 function clearChat() {
@@ -256,7 +299,7 @@ async function echoSend(text: string): Promise<void> {
   const turnId = `echo-${Date.now()}`;
   const messageId = `echo-msg-${Date.now()}`;
   const push = (e: ScriptEvent) =>
-    events.push({ ...e, sessionId: PLAYGROUND_SESSION_ID });
+    events.push({ ...e, sessionId: PLAYGROUND_PENDING_SESSION_ID });
 
   push({ eventType: "assistant.turn_start", data: { turnId } });
   push({ eventType: "assistant.message_start", data: { messageId } });
@@ -286,7 +329,7 @@ function pushCustom() {
     const parsed = JSON.parse(customEventJson.value) as Partial<SessionEventPayload>;
     if (!parsed.eventType) throw new Error("missing eventType");
     events.push({
-      sessionId: PLAYGROUND_SESSION_ID,
+      sessionId: PLAYGROUND_PENDING_SESSION_ID,
       eventType: parsed.eventType,
       data: parsed.data ?? {},
     });
@@ -301,6 +344,164 @@ function fireToast(severity: (typeof toastSeverities)[number]) {
     `${severity.toUpperCase()} toast`,
     `Fired at ${new Date().toLocaleTimeString()}`,
   );
+}
+
+// ----- Pending-request injection ----------------------------------
+//
+// Pushes synthetic `dafman.pending_request` events into the
+// playground record's `events` array — the same channel the
+// production sessionsStore uses when bun's `pendingRequest` push
+// arrives. The reducer then creates an inline card item; clicking
+// a card button calls `sessionsStore.respondToPending(sessionId =
+// PLAYGROUND_PENDING_SESSION_ID)` which is short-circuited by the
+// store (skips the RPC, just mutates the record), so the response
+// pushes a `dafman.pending_response` back into the same events
+// array and the reducer removes the card. End-to-end, no bun
+// handler involved.
+
+let pendingRequestCounter = 0;
+
+function nextRequestId(): string {
+  pendingRequestCounter += 1;
+  return `playground-${pendingRequestCounter}-${Date.now()}`;
+}
+
+function injectPending(
+  kind: "permission" | "userInput" | "elicitation",
+  request:
+    | PermissionRequestData
+    | UserInputRequestData
+    | ElicitationRequestData,
+): void {
+  const requestId = nextRequestId();
+  events.push({
+    sessionId: PLAYGROUND_PENDING_SESSION_ID,
+    eventType: "dafman.pending_request",
+    data: {
+      sessionId: PLAYGROUND_PENDING_SESSION_ID,
+      requestId,
+      kind,
+      request,
+    },
+  });
+}
+
+function injectPermission(
+  kind: PermissionRequestData["kind"],
+  summary: string,
+  raw: Record<string, unknown>,
+) {
+  injectPending("permission", { kind, summary, raw });
+}
+
+function injectUserInput(request: UserInputRequestData) {
+  injectPending("userInput", request);
+}
+
+function injectElicitation(request: ElicitationRequestData) {
+  injectPending("elicitation", request);
+}
+
+function clearPlaygroundQueue() {
+  // Clear by responding-cancel via the store so the reducer pushes
+  // pending_response events; that keeps the local events array in
+  // sync without us hand-removing entries by index.
+  const queue = [...playgroundRecord.pendingRequests];
+  for (const p of queue) {
+    const base = {
+      sessionId: PLAYGROUND_PENDING_SESSION_ID,
+      requestId: p.requestId,
+    };
+    if (p.kind === "permission") {
+      void sessionsStore.respondToPending({
+        ...base,
+        response: { kind: "permission", decision: "reject" },
+      });
+    } else if (p.kind === "userInput") {
+      void sessionsStore.respondToPending({
+        ...base,
+        response: { kind: "userInput", answer: "", wasFreeform: false },
+      });
+    } else {
+      void sessionsStore.respondToPending({
+        ...base,
+        response: { kind: "elicitation", action: "cancel" },
+      });
+    }
+  }
+}
+
+function injectShellPermission() {
+  injectPermission(
+    "shell",
+    "shell: rm -rf /tmp/cache && echo done",
+    { command: "rm -rf /tmp/cache && echo done", cwd: "/home/user" },
+  );
+}
+
+function injectWritePermission() {
+  injectPermission(
+    "write",
+    "write: C:\\Users\\me\\Documents\\notes.txt",
+    { path: "C:\\Users\\me\\Documents\\notes.txt", contentPreview: "Hello\n" },
+  );
+}
+
+function injectUrlPermission() {
+  injectPermission(
+    "url",
+    "open url: https://example.com/api/data",
+    { url: "https://example.com/api/data" },
+  );
+}
+
+function injectUserInputFreeform() {
+  injectUserInput({
+    question: "What should I name the new component?",
+    allowFreeform: true,
+  });
+}
+
+function injectUserInputChoices() {
+  injectUserInput({
+    question: "Which testing framework should I use?",
+    choices: ["Vitest", "Bun test", "Mocha", "Jest"],
+    allowFreeform: false,
+  });
+}
+
+function injectUserInputChoicesPlusFreeform() {
+  injectUserInput({
+    question: "Pick a deployment target (or type a custom name).",
+    choices: ["staging", "production", "preview"],
+    allowFreeform: true,
+  });
+}
+
+function injectElicitationUrl() {
+  injectElicitation({
+    message: "Authenticate with GitHub to continue.",
+    mode: "url",
+    elicitationSource: "mcp/github",
+    url: "https://github.com/login/oauth/authorize?client_id=demo",
+  });
+}
+
+function injectElicitationForm() {
+  // Form-mode renders Cancel-only with the "not yet supported" note
+  // (full JSON-Schema renderer is the next ticket per plan.md).
+  injectElicitation({
+    message: "Configure the database connection (form-mode).",
+    mode: "form",
+    elicitationSource: "mcp/database",
+    requestedSchema: {
+      type: "object",
+      properties: {
+        host: { type: "string", title: "Host" },
+        port: { type: "number", title: "Port" },
+      },
+    },
+  });
 }
 
 const eventCount = computed(() => events.length);
@@ -356,11 +557,36 @@ const eventCount = computed(() => events.length);
       </div>
     </section>
 
+    <section class="panel">
+      <h2>Pending requests (PendingRequestModal)</h2>
+      <p class="muted small">
+        Each button enqueues a fake SDK callback on a synthetic
+        session. The global modal opens against the queue head;
+        FIFO across all kinds. Responses short-circuit the RPC so
+        you can iterate on the UI without a live bun handler.
+      </p>
+      <div class="actions">
+        <Button label="Permission: shell" size="small" severity="secondary" @click="injectShellPermission" />
+        <Button label="Permission: write" size="small" severity="secondary" @click="injectWritePermission" />
+        <Button label="Permission: url" size="small" severity="secondary" @click="injectUrlPermission" />
+      </div>
+      <div class="actions">
+        <Button label="User input: freeform" size="small" severity="secondary" @click="injectUserInputFreeform" />
+        <Button label="User input: choices" size="small" severity="secondary" @click="injectUserInputChoices" />
+        <Button label="User input: both" size="small" severity="secondary" @click="injectUserInputChoicesPlusFreeform" />
+      </div>
+      <div class="actions">
+        <Button label="Elicitation: URL (OAuth)" size="small" severity="secondary" @click="injectElicitationUrl" />
+        <Button label="Elicitation: form (defer)" size="small" severity="secondary" @click="injectElicitationForm" />
+        <Button label="Clear queue" icon="pi pi-trash" severity="danger" text size="small" @click="clearPlaygroundQueue" />
+      </div>
+    </section>
+
     <section class="panel chat-wrapper">
       <h2>Chat preview</h2>
       <div class="chat-frame">
         <ChatWindow
-          session-id="playground-sess"
+          :session-id="PLAYGROUND_PENDING_SESSION_ID"
           accent="hsl(200, 80%, 52%)"
           :events="events"
           reasoning-visibility-override="default"
