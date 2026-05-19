@@ -1,34 +1,34 @@
 <script setup lang="ts">
-// Read-only Lexical-rendered message body.
+// Read-only markdown renderer for assistant/user/reasoning/tool bubbles.
 //
-// Renders a markdown `text` prop into Lexical's editor state using the
-// stock `@lexical/markdown` `TRANSFORMERS` bundle. The editor is mounted
-// non-editable; `MarkdownSync` rAF-throttles incoming changes so a burst
-// of streaming deltas doesn't trigger one full reconcile per character.
+// History: previously rendered through Lexical so the same engine
+// powered both display and composition. The display side only needs
+// to render markdown, never edit, and Lexical's bundled
+// `@lexical/markdown` `TRANSFORMERS` set is intentionally minimal —
+// no GFM tables, no task lists, no images, no autolinks. Owning
+// custom transformers for each of those is more code than just
+// using a markdown parser that already supports them.
 //
-// Accessibility: the contenteditable defaults to `role="textbox"`, which
-// is wrong for a rendered message. We override with `role="article"` and
-// `aria-readonly` so screen readers treat each message as static content.
+// markdown-it covers the GFM subset we want (tables, strikethrough,
+// fenced code, autolinks via linkify, task lists via plugin) and
+// `renderMarkdown` in `lib/markdown.ts` pipes its output through
+// DOMPurify before we hand the HTML to `v-html`. The composer
+// (MessageComposer.vue) still uses Lexical — see plan.md / AGENTS.md
+// for the rationale: read-only display and rich editing have
+// different needs, and Lexical's DecoratorNode + Typeahead primitives
+// are the right surface for upcoming features (@file mentions, slash
+// commands, attachments) on the composer side.
+//
+// Accessibility: the rendered HTML is wrapped in a `role="article"`
+// container with `aria-readonly` so screen readers treat each
+// message as a static document instead of an editable region.
 
-import { LexicalComposer } from "lexical-vue/LexicalComposer";
-import { ContentEditable } from "lexical-vue/LexicalContentEditable";
-import { RichTextPlugin } from "lexical-vue/LexicalRichTextPlugin";
-import { ListPlugin } from "lexical-vue/LexicalListPlugin";
-import { LinkPlugin } from "lexical-vue/LexicalLinkPlugin";
-import { HorizontalRulePlugin } from "lexical-vue/LexicalHorizontalRulePlugin";
-import { MarkdownSync, CodeHighlightPlugin } from "../lexical/plugins";
-import { markdownNodes } from "../lexical/nodes";
-import { lexicalTheme } from "../lexical/theme";
-// Side-effect import: registers extra prism grammars on the global
-// Prism instance. `@lexical/code` only bundles a fixed subset (clike,
-// js/ts, markup, markdown, c, css, objc, sql, powershell, python, rust,
-// swift, java, cpp), so without this bash / json / diff / yaml / etc.
-// render as un-highlighted monospace. Loading it from inside this file
-// (rather than `main.ts`) guarantees `@lexical/code` — also imported
-// transitively via `CodeHighlightPlugin` / `markdownNodes` — has
-// already registered the global Prism singleton, so the component
-// imports inside `prismExtraLanguages.ts` register against the same
-// instance instead of throwing at module-init.
+import { computed } from "vue";
+import { renderMarkdown } from "../lib/markdown";
+// Side-effect import: registers extra prism grammars (bash, json,
+// diff, yaml, toml, …) on the global Prism singleton so code fences
+// in tool output highlight correctly. See prismExtraLanguages.ts
+// for the language list + rationale on the load order.
 import "../lexical/prismExtraLanguages";
 
 const props = withDefaults(
@@ -39,40 +39,15 @@ const props = withDefaults(
   { label: "Message content" },
 );
 
-const initialConfig = {
-  namespace: "DafmanMessage",
-  editable: false,
-  nodes: markdownNodes,
-  theme: lexicalTheme,
-  onError(error: Error) {
-    console.error("[lexical message]", error);
-  },
-};
+const html = computed(() => renderMarkdown(props.text));
 </script>
 
 <template>
-  <div class="lex-display">
-    <LexicalComposer :initial-config="initialConfig">
-      <MarkdownSync :markdown="props.text" />
-      <RichTextPlugin>
-        <template #contentEditable>
-          <ContentEditable
-            class="lex-content"
-            role="article"
-            :aria-readonly="true"
-            :aria-label="props.label"
-            :spellcheck="false"
-            :tabindex="-1"
-          />
-        </template>
-        <template #placeholder>
-          <div />
-        </template>
-      </RichTextPlugin>
-      <ListPlugin />
-      <LinkPlugin />
-      <HorizontalRulePlugin />
-      <CodeHighlightPlugin />
-    </LexicalComposer>
-  </div>
+  <div
+    class="md-content lex-content"
+    role="article"
+    :aria-readonly="true"
+    :aria-label="props.label"
+    v-html="html"
+  />
 </template>

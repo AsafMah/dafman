@@ -273,3 +273,64 @@
   outline: none;
 }
 
+
+/* ------------------------------------------------------------------
+ * Markdown-it display (MessageContent.vue).
+ *
+ * The read-only message bubbles render through markdown-it instead of
+ * Lexical. We tag each block with the same `lex-*` classes Lexical
+ * uses so the bulk of the typography rules above carry over, but a
+ * handful of features (tables, task lists, horizontal rules, images)
+ * need their own styles since they don't appear in the composer.
+ * ------------------------------------------------------------------ */
+
+.md-content .md-table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.95em;
+  width: max-content;
+  max-width: 100%;
+}
+
+.md-content .md-table th,
+.md-content .md-table td {
+  border: 1px solid var(--p-content-border-color);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.md-content .md-table th {
+  background: var(--p-content-hover-background);
+  font-weight: 600;
+}
+
+.md-content .md-table tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--p-content-hover-background) 40%, transparent);
+}
+
+/* Task list checkboxes (markdown-it-task-lists). The plugin renders
+ * `- [ ] x` as `<li><input type="checkbox" disabled> x</li>`. Strip
+ * the default list bullet on those items and pull the checkbox inline
+ * with the label. */
+.md-content .lex-li > input[type="checkbox"][disabled] {
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  cursor: default;
+}
+
+.md-content .lex-ul:has(> .lex-li > input[type="checkbox"]) {
+  list-style: none;
+  padding-left: 0.5rem;
+}
+
+.md-content hr {
+  border: 0;
+  border-top: 1px solid var(--p-content-border-color);
+  margin: 0.75rem 0;
+}
+
+.md-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--p-border-radius-sm);
+}

@@ -6,3 +6,15 @@
 // the compiler without pulling real `@types/three`/`@babylonjs/core`.
 declare module "three";
 declare module "@babylonjs/core";
+
+// markdown-it-task-lists ships no @types. The plugin signature matches
+// markdown-it's PluginWithOptions contract.
+declare module "markdown-it-task-lists" {
+  import type { PluginWithOptions } from "markdown-it";
+  const plugin: PluginWithOptions<{
+    enabled?: boolean;
+    label?: boolean;
+    labelAfter?: boolean;
+  }>;
+  export default plugin;
+}

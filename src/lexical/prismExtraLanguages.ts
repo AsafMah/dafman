@@ -23,6 +23,15 @@
 //      where they wouldn't be useful yet.
 
 import "prismjs";
+// `prism-markup-templating` is a transitive dependency of several other
+// grammars (notably `prism-php` and indirectly `prism-bash`'s ecosystem
+// of templated shells). It used to load via `@lexical/code`'s grammar
+// bundle (prism-markdown pulls it in), but since `MessageContent` now
+// renders through markdown-it instead of Lexical we can't rely on
+// that side-effect. Load it explicitly so the languages below don't
+// throw `Prism.languages["markup-templating"].tokenizePlaceholders`
+// at first highlight.
+import "prismjs/components/prism-markup-templating";
 import "prismjs/components/prism-bash";
 import "prismjs/components/prism-json";
 import "prismjs/components/prism-diff";
