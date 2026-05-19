@@ -244,6 +244,45 @@ export function registerBuiltinCommands(): void {
     { immediate: true, deep: true },
   );
 
+  // ---------- Dynamic: Switch to Session: <title> ----------
+  const sessionCommandIds = new Set<string>();
+  watch(
+    () => sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title })),
+    (records) => {
+      const nextIds = new Set<string>();
+      for (const r of records) {
+        const id = `session.switch.${r.id}`;
+        nextIds.add(id);
+        const label = r.title ?? `Session ${r.id.slice(0, 8)}…`;
+        registry.register({
+          id,
+          label: `Switch to: ${label}`,
+          hint: r.id.slice(0, 8),
+          group: "Sessions",
+          icon: "pi pi-comments",
+          // Include both the short and full id in the searchable
+          // keywords so users can paste a session id from
+          // logs/URLs and still find it.
+          keywords: [r.id, r.id.slice(0, 8), label],
+          // Disabled when the panel isn't currently in the dock —
+          // we'd need to restore-then-switch, which the Sessions
+          // Manager already does better.
+          when: () => Boolean(layoutStore.api?.getPanel(r.id)),
+          run: () => {
+            const panel = layoutStore.api?.getPanel(r.id);
+            panel?.api.setActive();
+          },
+        });
+      }
+      for (const id of sessionCommandIds) {
+        if (!nextIds.has(id)) registry.unregister(id);
+      }
+      sessionCommandIds.clear();
+      for (const id of nextIds) sessionCommandIds.add(id);
+    },
+    { immediate: true, deep: true },
+  );
+
   // ---------- Static, but session-gated: Run Mode ----------
   const RUN_MODES: { mode: SessionMode; label: string; icon: string }[] = [
     { mode: "interactive", label: "Interactive", icon: "pi pi-comments" },

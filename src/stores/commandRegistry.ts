@@ -43,6 +43,12 @@ export interface Command {
   /// aliases, "vscode-style verbs"). The label + group + hint are
   /// always included; this is purely additive.
   keywords?: string[];
+  /// Optional keyboard shortcut, rendered as `<kbd>` pills in the
+  /// palette row. Pass the chord segments as an array, e.g.
+  /// `["Ctrl", "K"]`. The library also wires this to fire `perform`
+  /// when the chord is pressed globally — we leave that wiring on
+  /// for free.
+  shortcut?: string[];
   /// Visibility predicate. Hidden commands are excluded from the list
   /// (we don't render greyed-out rows — `when()` failure means the
   /// command is irrelevant to the current state). Must read live
