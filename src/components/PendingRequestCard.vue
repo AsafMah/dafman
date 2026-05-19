@@ -40,6 +40,7 @@ import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import { styleFor } from "../lib/notificationStyles";
 import PermissionDetails from "./PermissionDetails.vue";
+import JsonSchemaForm from "./JsonSchemaForm.vue";
 
 const props = defineProps<{
   sessionId: string;
@@ -71,6 +72,8 @@ const title = computed(() => {
 const inputAnswer = ref("");
 const inputChoice = ref<string | null>(null);
 const urlOpened = ref(false);
+const formContent = ref<Record<string, unknown>>({});
+const formComponentRef = ref<{ validate: () => string | null } | null>(null);
 
 // Type-narrowed accessors so the template doesn't need casts.
 const asPermission = computed(() =>
@@ -176,6 +179,27 @@ async function openElicitationUrl(): Promise<void> {
 }
 
 async function elicitationAccept(): Promise<void> {
+  // Form-mode: validate first, then ship the collected content.
+  if (asElicitation.value && asElicitation.value.mode === "form") {
+    const formRef = formComponentRef.value;
+    if (formRef) {
+      const err = formRef.validate();
+      if (err) {
+        toasts.warn("Form incomplete", `Please fill in ${err}.`);
+        return;
+      }
+    }
+    await sessionsStore.respondToPending({
+      sessionId: props.sessionId,
+      requestId: props.requestId,
+      response: {
+        kind: "elicitation",
+        action: "accept",
+        content: formContent.value,
+      },
+    });
+    return;
+  }
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -318,15 +342,38 @@ async function elicitationCancel(
       </div>
     </template>
 
-    <!-- Elicitation form-mode (deferred) -->
+    <!-- Elicitation form-mode (JSON-Schema → form) -->
     <template v-else-if="asElicitation">
-      <p class="pending-card-unsupported">
+      <JsonSchemaForm
+        v-if="asElicitation.requestedSchema"
+        ref="formComponentRef"
+        :schema="(asElicitation.requestedSchema as Record<string, unknown>)"
+        v-model="formContent"
+      />
+      <p v-else class="pending-card-unsupported">
         <i class="pi pi-info-circle" aria-hidden="true" />
-        Form-based input isn't supported in this build yet. Cancel to let the
-        agent proceed; a future release will render the requested form fields.
+        No schema was provided. Cancel to let the agent proceed.
+      </p>
+      <p v-if="asElicitation.elicitationSource" class="pending-card-source">
+        Requested by: {{ asElicitation.elicitationSource }}
       </p>
       <div class="pending-card-actions">
         <Button
+          label="Decline"
+          severity="secondary"
+          size="small"
+          @click="elicitationCancel('decline')"
+        />
+        <Button
+          v-if="asElicitation.requestedSchema"
+          label="Submit"
+          severity="primary"
+          icon="pi pi-check"
+          size="small"
+          @click="elicitationAccept"
+        />
+        <Button
+          v-else
           label="Cancel"
           severity="secondary"
           size="small"

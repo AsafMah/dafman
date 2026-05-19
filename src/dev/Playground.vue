@@ -1001,18 +1001,91 @@ function injectElicitationUrl() {
 }
 
 function injectElicitationForm() {
-  // Form-mode renders Cancel-only with the "not yet supported" note
-  // (full JSON-Schema renderer is the next ticket per plan.md).
   injectElicitation({
-    message: "Configure the database connection (form-mode).",
+    message: "Configure the database connection.",
     mode: "form",
     elicitationSource: "mcp/database",
     requestedSchema: {
       type: "object",
+      description: "Connection settings for the dev database.",
       properties: {
-        host: { type: "string", title: "Host" },
-        port: { type: "number", title: "Port" },
+        host: {
+          type: "string",
+          title: "Host",
+          description: "Hostname or IP address.",
+          default: "localhost",
+        },
+        port: {
+          type: "integer",
+          title: "Port",
+          minimum: 1,
+          maximum: 65535,
+          default: 5432,
+        },
+        engine: {
+          type: "string",
+          title: "Engine",
+          enum: ["postgres", "mysql", "sqlite"],
+          default: "postgres",
+        },
+        useSsl: {
+          type: "boolean",
+          title: "Use SSL",
+          description: "Require TLS when connecting.",
+          default: true,
+        },
+        credentials: {
+          type: "object",
+          title: "Credentials",
+          required: ["username"],
+          properties: {
+            username: { type: "string", title: "Username" },
+            password: { type: "string", title: "Password" },
+          },
+        },
       },
+      required: ["host", "port", "engine"],
+    },
+  });
+}
+
+function injectElicitationFormRich() {
+  injectElicitation({
+    message: "Pick deployment options.",
+    mode: "form",
+    elicitationSource: "mcp/deploy",
+    requestedSchema: {
+      type: "object",
+      properties: {
+        environment: {
+          type: "string",
+          title: "Environment",
+          oneOf: [
+            { const: "dev", title: "Development" },
+            { const: "staging", title: "Staging" },
+            { const: "prod", title: "Production" },
+          ],
+          default: "dev",
+        },
+        region: {
+          type: "string",
+          title: "Region",
+          enum: ["us-east-1", "us-west-2", "eu-west-1", "ap-south-1", "sa-east-1"],
+        },
+        tags: {
+          type: "array",
+          title: "Tags",
+          description: "Free-form labels for the deployment.",
+          items: { type: "string" },
+        },
+        contact: {
+          type: "string",
+          title: "On-call email",
+          format: "email",
+        },
+        notes: { type: "string", title: "Notes" },
+      },
+      required: ["environment", "region"],
     },
   });
 }
@@ -1113,7 +1186,8 @@ const activeTab = ref<"session" | "tools" | "pending" | "markdown" | "callouts" 
           </div>
           <div class="actions">
             <Button label="Elicitation: URL (OAuth)" size="small" severity="secondary" @click="injectElicitationUrl" />
-            <Button label="Elicitation: form (defer)" size="small" severity="secondary" @click="injectElicitationForm" />
+            <Button label="Elicitation: form (database)" size="small" severity="secondary" @click="injectElicitationForm" />
+            <Button label="Elicitation: form (deploy)" size="small" severity="secondary" @click="injectElicitationFormRich" />
             <Button label="Clear queue" icon="pi pi-trash" severity="danger" text size="small" @click="clearPlaygroundQueue" />
           </div>
         </TabPanel>
