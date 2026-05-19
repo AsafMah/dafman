@@ -322,7 +322,15 @@ export const useLayoutStore = defineStore("layout", () => {
         position === "left" || position === "right"
           ? (existingGroup as unknown as { width?: number }).width
           : (existingGroup as unknown as { height?: number }).height;
-      if (typeof w === "number" && w < Math.max(40, options.initialSize / 2)) {
+      // Threshold: if the caller declared a `minimumSize`, that's the
+      // floor — anything below it (e.g. a stale persisted layout from
+      // before a min-size bump) gets torn down + recreated at
+      // `initialSize`. Without a `minimumSize`, fall back to the older
+      // half-of-initialSize heuristic that just rescues "sliver"
+      // panels.
+      const recreateBelow =
+        options.minimumSize ?? Math.max(40, options.initialSize / 2);
+      if (typeof w === "number" && w < recreateBelow) {
         dock.removeEdgeGroup(position);
       }
     }

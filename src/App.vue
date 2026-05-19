@@ -440,8 +440,12 @@ const activityItems = computed<ActivityItem[]>(() => {
     icon: "pi-cog",
     title: "Settings",
     group: "bottom",
-    initialSize: 280,
-    minimumSize: 200,
+    // Settings rows pack an input + 2 icon buttons + a "Request
+    // permission" button — 280 px clipped the right edge in
+    // practice. 340 / 300 fits comfortably and still leaves the
+    // body group ~60 % of a 1280 px viewport.
+    initialSize: 340,
+    minimumSize: 300,
   });
   return items;
 });

@@ -93,8 +93,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           component: "settingsPanel",
           tabComponent: "sidebarTab",
           title: "Settings",
-          initialSize: 280,
-          minimumSize: 200,
+          // Keep in sync with App.vue's ActivityBar settings item —
+          // both paths must use the same size or the panel jumps
+          // width when opened via different surfaces.
+          initialSize: 340,
+          minimumSize: 300,
         });
       },
     },
