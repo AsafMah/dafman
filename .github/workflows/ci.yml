@@ -22,5 +22,21 @@ jobs:
         run: bun test
       - name: Vite build
         run: bunx vite build
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium --with-deps
+      - name: Renderer smoke (Playwright)
+        # Required check — must pass for the PR to merge.
+        # `bun run smoke:run` reuses the dist/ Vite already built above,
+        # launches `vite preview` via Playwright's webServer config,
+        # asserts the boot splash mounts and the bundle reaches "ready"
+        # without console errors.
+        run: bun run smoke:run
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
       # NOTE: cross-platform `electrobun build` matrix lands as a follow-up;
       # this job validates the Vue bundle on Linux only.

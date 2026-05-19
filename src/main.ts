@@ -44,8 +44,23 @@ const GreenAura = definePreset(Aura, {
 });
 
 // Wire the Electrobun RPC bridge before any store/component invokes an
-// IPC. Tests inject their own bridge via `setRpcBridge` before mount.
-const { bridge } = createElectrobunBridge();
+// IPC. Tests inject their own bridge via `setRpcBridge` before mount,
+// OR by pre-setting `window.__DAFMAN_TEST_RPC__` before the bundle
+// evaluates (used by the Playwright smoke harness in `e2e/`). The
+// global-hook path is necessary because the bundle constructs the
+// Electrobun bridge eagerly at module load, and constructing it
+// outside of an Electrobun host throws on the missing
+// `window.__electrobun` global.
+type TestBridgeWindow = Window & {
+  __DAFMAN_TEST_RPC__?: import("./ipc/invoke").RpcBridge;
+};
+const testBridge =
+  typeof window !== "undefined"
+    ? (window as TestBridgeWindow).__DAFMAN_TEST_RPC__
+    : undefined;
+const { bridge } = testBridge
+  ? { bridge: testBridge }
+  : createElectrobunBridge();
 setRpcBridge(bridge);
 
 // Install the renderer→bun log bridge so console.error and uncaught

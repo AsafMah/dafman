@@ -61,3 +61,8 @@ ehthumbs.db
 
 # Test coverage
 coverage/
+
+# Playwright artifacts (e2e/ folder is checked in; only outputs are ignored)
+playwright-report/
+test-results/
+e2e/.cache/

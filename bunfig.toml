@@ -2,3 +2,4 @@
 
 [test]
 preload = ["./tools/bun-vue-loader.ts"]
+
