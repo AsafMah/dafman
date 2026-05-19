@@ -246,6 +246,24 @@ function onClose(event: MouseEvent) {
   justify-content: center;
   font-size: 0.85rem;
   color: var(--icon-color, var(--p-primary-color));
+  /* Compositor-layered so the pi-spin animation on `thinking` keeps
+   * ticking through main-thread blocks (Lexical reconciles, reducer
+   * runs, dockview re-layouts). PrimeIcons' default pi-spin runs on
+   * the main thread; our keyframe override below replaces it with
+   * a transform-only version that runs on the compositor. */
+  will-change: transform;
+}
+
+/* Compositor-friendly override of PrimeIcons' default pi-spin
+ * keyframe — transform-only rotation goes to the compositor thread,
+ * unlike pi-spin's default which animates a CSS variable. */
+.chat-tab-icon.pi-spin {
+  animation: chat-tab-spin 1s linear infinite !important;
+}
+
+@keyframes chat-tab-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .chat-tab-icon.chat-tab-icon-pulse {

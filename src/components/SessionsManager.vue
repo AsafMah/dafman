@@ -830,6 +830,19 @@ void toasts; // referenced inside async handlers
   margin-right: 0.4rem;
   font-size: 0.85rem;
   color: var(--icon-color, var(--p-primary-color));
+  /* Compositor layer — see ChatTab.vue::.chat-tab-icon for rationale.
+   * Without this the pi-spin animation on the "thinking" indicator
+   * freezes under main-thread load. */
+  will-change: transform;
+}
+
+.session-icon.pi-spin {
+  animation: session-icon-spin 1s linear infinite !important;
+}
+
+@keyframes session-icon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .session-icon.session-icon-pulse {

@@ -119,6 +119,20 @@ const isSending = computed(() =>
   ambient.value.sawTurnBoundary ? ambient.value.turnActive : isSendingFallback.value,
 );
 
+/// "Agent is working right now" indicator for the in-chat card. Reads
+/// the session record's authoritative `isThinking` flag (driven by
+/// assistant.turn_start / turn_end / session.idle in sessionsStore),
+/// falls back to the local `isSending` heuristic when we haven't seen
+/// a turn boundary yet (older SDKs / non-streaming models that never
+/// emit `assistant.turn_start`). Used for the in-chat spinner card
+/// — the tab + sidebar dot read `record.isThinking` directly.
+const recordIsThinking = computed(() => {
+  const r = sessionsStore.sessions.find((s) => s.id === props.sessionId);
+  if (!r) return false;
+  if (r.sawTurnBoundary) return r.isThinking;
+  return isSending.value;
+});
+
 const reasoningVisibility = computed<ReasoningVisibility>(() =>
   props.reasoningVisibilityOverride === "default"
     ? settings.value.appearance.reasoningVisibility
@@ -323,14 +337,24 @@ const pendingStyle = computed(() => {
         </article>
       </template>
 
+      <!-- Mid-turn indicator inside the chat. Visible whenever the
+           record reports `isThinking` (driven by assistant.turn_start
+           / turn_end / session.idle in sessionsStore). Previously
+           this card only showed before the FIRST delta — which made
+           it disappear forever once any assistant text arrived,
+           even though the agent often keeps working through tool
+           calls + reasoning + more messages.
+           Now: appears at the bottom of the message list during the
+           ENTIRE mid-turn period, AFTER all the items so the user
+           sees "currently working" without losing prior context. -->
       <article
-        v-if="isSending && !items.some((m) => m.kind === 'assistant' && m.text !== '')"
+        v-if="recordIsThinking"
         class="message-card assistant pending"
       >
         <header class="role-label">Assistant</header>
         <p class="message-body">
-          <i class="pi pi-spin pi-spinner" />
-          {{ ambient.intent || "Thinking..." }}
+          <i class="pi pi-spin pi-spinner thinking-spinner" />
+          {{ ambient.intent || "Thinking…" }}
         </p>
       </article>
     </div>
@@ -520,6 +544,26 @@ const pendingStyle = computed(() => {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--p-text-color);
+}
+
+/* The mid-turn pending card spinner. PrimeIcons' default `pi-spin`
+ * keyframes run on the main thread; under heavy Lexical reconciles
+ * (every streaming delta re-mounts the message content) the spinner
+ * visually freezes. Promote to its own compositor layer + use a
+ * dedicated keyframe so the animation runs on the compositor thread
+ * regardless of main-thread load. Same pattern as the BootSplash
+ * spinner. */
+.thinking-spinner {
+  display: inline-block;
+  will-change: transform;
+  /* Override pi-spin's default rotation with one that runs from a
+   * transform-only keyframe, which is what gets accelerated. */
+  animation: thinking-spin 1s linear infinite !important;
+}
+
+@keyframes thinking-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .chat-composer {
