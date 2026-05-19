@@ -29,6 +29,7 @@
     "copilot-sdk-supercharged": "^2.1.2",
     "dockview-vue": "^6.3.0",
     "electrobun": "1.18.1",
+    "fuse.js": "^7.3.0",
     "lexical": "0.38.1",
     "lexical-vue": "^0.14.1",
     "pinia": "^3.0.4",

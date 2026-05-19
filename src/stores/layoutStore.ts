@@ -77,9 +77,42 @@ export interface EdgePanelOptions {
 
 export const useLayoutStore = defineStore("layout", () => {
   const api = ref<DockviewApi | null>(null);
+  /// Reactive id of the currently-focused chat panel, or `null` when no
+  /// chat panel is active (focus on Sessions sidebar, Settings, dev
+  /// playground, or nothing at all). Subscribers on dockview's
+  /// `onDidActiveGroupChange` / `onDidActivePanelChange` keep this in
+  /// sync; consumers (command palette `when()` predicates, future
+  /// status-bar bindings, …) just read the ref.
+  const activeSessionId = ref<string | null>(null);
+  let activeUnsubs: Array<() => void> = [];
+
+  function recomputeActiveSession(dock: DockviewApi): void {
+    const panel = dock.activeGroup?.activePanel;
+    if (panel && panel.api.component === "chat") {
+      activeSessionId.value = panel.api.id;
+    } else {
+      activeSessionId.value = null;
+    }
+  }
 
   function setApi(next: DockviewApi | null): void {
+    for (const unsub of activeUnsubs) unsub();
+    activeUnsubs = [];
     api.value = next;
+    if (!next) {
+      activeSessionId.value = null;
+      return;
+    }
+    recomputeActiveSession(next);
+    const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
+    const panelSub = next.onDidActivePanelChange(() => recomputeActiveSession(next));
+    // Removing the active panel can leave a stale id behind otherwise.
+    const removeSub = next.onDidRemovePanel(() => recomputeActiveSession(next));
+    activeUnsubs = [
+      () => groupSub.dispose(),
+      () => panelSub.dispose(),
+      () => removeSub.dispose(),
+    ];
   }
 
   // ---------- Chat panels (one per session) ----------
@@ -362,6 +395,7 @@ export const useLayoutStore = defineStore("layout", () => {
 
   return {
     api,
+    activeSessionId,
     setApi,
     addPanel,
     removePanel,

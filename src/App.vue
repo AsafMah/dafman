@@ -6,18 +6,22 @@ import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
 import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
 import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
+import CommandPalette from "./components/CommandPalette.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
 import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
+import { useModelsStore } from "./stores/modelsStore";
 import { resolveIsDark } from "./lib/theme";
+import { registerBuiltinCommands } from "./lib/registerBuiltinCommands";
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
 const settingsStore = useSettingsStore();
 const toastStore = useToastStore();
 const layoutStore = useLayoutStore();
+const modelsStore = useModelsStore();
 const primeToast = useToast();
 
 const { sessions } = storeToRefs(sessionsStore);
@@ -81,6 +85,20 @@ onMounted(async () => {
   } catch {
     /* toast already shown */
   }
+
+  // Seed the command palette catalog. Static commands land
+  // immediately; "Switch Model: …" entries fill in when
+  // modelsStore.load() resolves (`watch(immediate)` re-fires on
+  // each models[] mutation, registry replaces by id). Safe to call
+  // before the client is up — none of the commands run at register
+  // time.
+  registerBuiltinCommands();
+  // Lazy model catalog warm-up so palette commands have entries to
+  // surface without the user opening the per-session model picker
+  // first. Failures are toasted by modelsStore itself.
+  void modelsStore.load().catch(() => {
+    /* toast already shown */
+  });
 
   // Restore previously-open sessions. We resume *first*, then hand the
   // layout JSON to dockview — the slot can't render a session that
@@ -412,6 +430,10 @@ function openSessionsByDefault(attempt = 0) {
 <template>
   <main class="app-root" :class="{ 'app-dark': isDarkMode }">
     <Toast :on-click="closeToast" />
+    <!-- Command palette: global Ctrl/Cmd+K overlay. Mounted once at
+         the app root so the listener is alive regardless of which
+         panel has focus. -->
+    <CommandPalette />
 
     <!-- App body: persistent ActivityBar on the far left + dockview
          body taking the rest. The ActivityBar hosts everything that
