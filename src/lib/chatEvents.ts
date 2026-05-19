@@ -19,6 +19,7 @@ import type { Handler, ReducerContext } from "./chatEvents/context";
 import { IGNORED_EVENTS } from "./chatEvents/ignored";
 import { lifecycleHandlers } from "./chatEvents/lifecycleHandlers";
 import { messageHandlers } from "./chatEvents/messageHandlers";
+import { notificationHandlers } from "./chatEvents/notificationHandlers";
 import { reasoningHandlers } from "./chatEvents/reasoningHandlers";
 import { sessionMetaHandlers } from "./chatEvents/sessionMetaHandlers";
 import { toolHandlers } from "./chatEvents/toolHandlers";
@@ -121,6 +122,21 @@ export type ChatAmbient = {
   /// True once we've observed at least one turn_start so the caller knows
   /// it can trust `turnActive` going forward.
   sawTurnBoundary: boolean;
+  /// SDK-blocking request currently waiting on the user: permission
+  /// approval, free-form user input, or an MCP elicitation (e.g. a
+  /// URL OAuth handoff). Set by `permission.requested` /
+  /// `user_input.requested` / `elicitation.requested`; cleared by
+  /// the matching `_completed`. The real "accept / deny" UI is a
+  /// follow-up ticket — for now we surface this state for
+  /// indicators + the composer banner + OS notifications.
+  pendingRequest: PendingRequest | null;
+};
+
+export type PendingRequest = {
+  type: "permission" | "userInput" | "elicitation";
+  /// Short human-readable description shown in the composer banner
+  /// + as the OS notification body.
+  message: string;
 };
 
 export function defaultAmbient(): ChatAmbient {
@@ -133,6 +149,7 @@ export function defaultAmbient(): ChatAmbient {
     usage: null,
     turnActive: false,
     sawTurnBoundary: false,
+    pendingRequest: null,
   };
 }
 
@@ -195,6 +212,7 @@ const HANDLERS: Record<string, Handler> = {
   ...sessionMetaHandlers,
   ...calloutHandlers,
   ...lifecycleHandlers,
+  ...notificationHandlers,
 };
 
 /// Visible to tests for the "every event is handled or ignored"

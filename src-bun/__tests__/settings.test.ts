@@ -52,6 +52,7 @@ describe("SettingsService", () => {
 			},
 			layout: { dockview: null },
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);
@@ -78,6 +79,7 @@ describe("SettingsService", () => {
 			appearance: { theme: "system", reasoningVisibility: "compact" },
 			layout: { dockview: blob },
 			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
 		});
 		const reloaded = SettingsService.loadOrDefault(path);
 		expect(reloaded.get().layout.dockview).toEqual(blob);
@@ -143,6 +145,65 @@ describe("SettingsService", () => {
 		const settings = svc.get();
 		expect(settings.version).toBe(SETTINGS_VERSION);
 		expect(settings.workspaces).toEqual({ recent: [], defaultWorkspace: "" });
+	});
+
+	test("v5 document migrates to v6 with default notification prefs", () => {
+		const dir = newTempDir();
+		const path = join(dir, "settings.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				version: 5,
+				appearance: { theme: "system", reasoningVisibility: "compact" },
+				layout: { dockview: null },
+				workspaces: { recent: [], defaultWorkspace: "/tmp" },
+			}),
+		);
+		const svc = SettingsService.loadOrDefault(path);
+		const settings = svc.get();
+		expect(settings.version).toBe(SETTINGS_VERSION);
+		// v6 adds notifications — defaults: turnEnd OFF (noisy),
+		// waitingForInput ON (high signal).
+		expect(settings.notifications).toEqual({
+			turnEnd: false,
+			waitingForInput: true,
+		});
+		// Existing fields untouched.
+		expect(settings.workspaces.defaultWorkspace).toBe("/tmp");
+	});
+
+	test("notifications coercion drops non-boolean fields", () => {
+		const settings = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact" },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: {
+				turnEnd: "yes" as unknown as boolean,
+				waitingForInput: 0 as unknown as boolean,
+			},
+		});
+		// Non-booleans fall back to the defaultSettings() values.
+		expect(settings.notifications).toEqual({
+			turnEnd: false,
+			waitingForInput: true,
+		});
+	});
+
+	test("notifications: partial overrides preserve missing fields", () => {
+		const settings = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact" },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: true },
+		});
+		// turnEnd explicitly set; waitingForInput falls back to the
+		// default (true).
+		expect(settings.notifications).toEqual({
+			turnEnd: true,
+			waitingForInput: true,
+		});
 	});
 
 	test("workspaces.recent coerces: drops non-strings, trims, dedupes, caps to limit", () => {

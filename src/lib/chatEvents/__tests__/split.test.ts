@@ -3,21 +3,12 @@ import { calloutHandlers } from "../calloutHandlers";
 import { IGNORED_EVENTS } from "../ignored";
 import { lifecycleHandlers } from "../lifecycleHandlers";
 import { messageHandlers } from "../messageHandlers";
+import { notificationHandlers } from "../notificationHandlers";
 import { reasoningHandlers } from "../reasoningHandlers";
 import { sessionMetaHandlers } from "../sessionMetaHandlers";
 import { toolHandlers } from "../toolHandlers";
 import { turnHandlers } from "../turnHandlers";
 import { HANDLED_EVENT_TYPES } from "../../chatEvents";
-
-// Family-boundary + completeness tests. The point isn't to re-test
-// the per-event behavior (chatEvents.test.ts covers that through the
-// public processEvents API). These pin INVARIANTS that protect the
-// split itself:
-//
-// 1. No two family modules claim the same event type.
-// 2. The HANDLED set and IGNORED set are disjoint.
-// 3. Every event type the SDK currently emits is EITHER handled OR
-//    explicitly in IGNORED_EVENTS — no silent drops.
 
 const FAMILIES: Array<[string, Record<string, unknown>]> = [
   ["message", messageHandlers],
@@ -27,6 +18,7 @@ const FAMILIES: Array<[string, Record<string, unknown>]> = [
   ["sessionMeta", sessionMetaHandlers],
   ["callout", calloutHandlers],
   ["lifecycle", lifecycleHandlers],
+  ["notification", notificationHandlers],
 ];
 
 describe("chatEvents — split invariants", () => {
@@ -193,6 +185,17 @@ describe("chatEvents — family ownership", () => {
     expect(Object.keys(lifecycleHandlers).sort()).toEqual([
       "session.error",
       "session.idle",
+    ]);
+  });
+
+  test("notification handlers own permission/user_input/elicitation .requested+.completed", () => {
+    expect(Object.keys(notificationHandlers).sort()).toEqual([
+      "elicitation.completed",
+      "elicitation.requested",
+      "permission.completed",
+      "permission.requested",
+      "user_input.completed",
+      "user_input.requested",
     ]);
   });
 });

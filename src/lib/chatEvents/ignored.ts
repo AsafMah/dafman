@@ -31,15 +31,10 @@ export const IGNORED_EVENTS: ReadonlySet<string> = new Set([
   "session.shutdown",
 
   // ---- Pending UX, intentionally not surfaced as system items ----
-  // Permission modal will handle these.
-  "permission.requested",
-  "permission.completed",
   // Elicitation / user-input UX (URL elicitation, MCP OAuth prompts)
-  // will handle these.
-  "user_input.requested",
-  "user_input.completed",
-  "elicitation.requested",
-  "elicitation.completed",
+  // are now surfaced via the notification handlers + ambient.pendingRequest,
+  // not here. permission.* / user_input.* / elicitation.* are NOT in
+  // IGNORED_EVENTS anymore — see `notificationHandlers.ts`.
   // External tool registration — we don't ship any yet.
   "external_tool.requested",
   "external_tool.completed",

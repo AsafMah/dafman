@@ -16,6 +16,7 @@ import { homedir } from "node:os";
 import type {
 	Appearance,
 	Layout,
+	NotificationPrefs,
 	ReasoningVisibility,
 	Settings,
 	ThemeChoice,
@@ -24,7 +25,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 6;
 /// Hard upper bound on the size of the workspace MRU. Anything beyond
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes
@@ -44,6 +45,7 @@ export function defaultSettings(): Settings {
 		appearance: { theme: "system", reasoningVisibility: "compact" },
 		layout: { dockview: null },
 		workspaces: { recent: [], defaultWorkspace: "" },
+		notifications: { turnEnd: false, waitingForInput: true },
 	};
 }
 
@@ -120,6 +122,23 @@ export async function ensureDefaultWorkspace(): Promise<string> {
 	}
 }
 
+/// Coerces a raw `notifications` blob into the canonical shape. Both
+/// fields default to their `defaultSettings()` values (false +
+/// true) when missing — so v5 → v6 migration produces sensible
+/// behaviour out of the box (waiting-for-input ON, turn-end OFF).
+function coerceNotifications(raw: unknown): NotificationPrefs {
+	const base = defaultSettings().notifications;
+	if (!raw || typeof raw !== "object") return base;
+	const obj = raw as Record<string, unknown>;
+	const turnEnd =
+		typeof obj.turnEnd === "boolean" ? obj.turnEnd : base.turnEnd;
+	const waitingForInput =
+		typeof obj.waitingForInput === "boolean"
+			? obj.waitingForInput
+			: base.waitingForInput;
+	return { turnEnd, waitingForInput };
+}
+
 export function migrate(input: unknown): Settings {
 	const defaults = defaultSettings();
 	if (!input || typeof input !== "object") return defaults;
@@ -129,6 +148,7 @@ export function migrate(input: unknown): Settings {
 		appearance: coerceAppearance(raw.appearance),
 		layout: coerceLayout(raw.layout),
 		workspaces: coerceWorkspaces(raw.workspaces),
+		notifications: coerceNotifications(raw.notifications),
 	};
 }
 

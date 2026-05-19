@@ -159,6 +159,18 @@ onMounted(async () => {
   // Boot complete — splash fades out.
   bootStore.markReady();
 
+  // Click-on-OS-notification handler. The `notificationsStore`
+  // dispatches `dafman:focus-session` from a Notification's onclick;
+  // we activate the matching panel here. Window focus is already
+  // attempted on the store side.
+  window.addEventListener("dafman:focus-session", (e: Event) => {
+    const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+    if (!detail?.sessionId) return;
+    const dock = layoutStore.api;
+    const panel = dock?.getPanel(detail.sessionId);
+    panel?.api.setActive();
+  });
+
   // Dev-only: auto-create a session when none exist and the URL
   // carries `?autosession=1`. One-shot per page load; will not loop
   // on HMR refreshes.

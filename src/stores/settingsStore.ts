@@ -6,15 +6,16 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
-import type { ReasoningVisibility, Settings, ThemeChoice } from "../ipc/types";
+import type { NotificationPrefs, ReasoningVisibility, Settings, ThemeChoice } from "../ipc/types";
 import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 5,
+    version: 6,
     appearance: { theme: "system", reasoningVisibility: "compact" },
     layout: { dockview: null },
     workspaces: { recent: [], defaultWorkspace: "" },
+    notifications: { turnEnd: false, waitingForInput: true },
   };
 }
 
@@ -69,6 +70,24 @@ export const useSettingsStore = defineStore("settings", () => {
       ...settings.value,
       appearance: { ...settings.value.appearance, reasoningVisibility },
     });
+  }
+
+  /// Partial update for OS-notification toggles. Either key can be
+  /// omitted to leave the existing value intact.
+  async function setNotifications(
+    next: Partial<NotificationPrefs>,
+  ): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        notifications: {
+          ...settings.value.notifications,
+          ...next,
+        },
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
   }
 
   /// Persists a fresh dockview-layout snapshot. Called (debounced) by
@@ -139,6 +158,7 @@ export const useSettingsStore = defineStore("settings", () => {
     update,
     setTheme,
     setReasoningVisibility,
+    setNotifications,
     persistLayout,
     recordWorkspaceUse,
     setDefaultWorkspace,

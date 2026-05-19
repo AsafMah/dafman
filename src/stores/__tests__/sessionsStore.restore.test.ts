@@ -152,4 +152,65 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(record!.events).toHaveLength(1);
     expect(record!.events[0]?.eventType).toBe("assistant.message_start");
   });
+
+  test("permission.requested mirrors into record.pendingRequest; .completed clears", async () => {
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+    });
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession("s1");
+    expect(record!.pendingRequest).toBeNull();
+
+    fire(event("s1", "permission.requested", { tool: "shell", summary: "run `ls`" }));
+    expect(record!.pendingRequest).toEqual({ type: "permission", message: "run `ls`" });
+
+    fire(event("s1", "permission.completed", {}));
+    expect(record!.pendingRequest).toBeNull();
+  });
+
+  test("unrelated .completed events don't clear a pendingRequest of a different type", async () => {
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+    });
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession("s1");
+
+    fire(event("s1", "user_input.requested", { prompt: "name?" }));
+    expect(record!.pendingRequest?.type).toBe("userInput");
+
+    // permission.completed shouldn't clear a userInput-channel request.
+    fire(event("s1", "permission.completed", {}));
+    expect(record!.pendingRequest?.type).toBe("userInput");
+
+    fire(event("s1", "user_input.completed", {}));
+    expect(record!.pendingRequest).toBeNull();
+  });
+
+  test("assistant.turn_end bumps unseenTurns when session isn't the active dock panel", async () => {
+    // layoutStore.activeSessionId starts null in tests (no dockview
+    // wired) — every session is treated as 'not focused', so every
+    // turn_end bumps the counter. This pins the counter behavior;
+    // the "skip when focused" path is exercised by inspecting the
+    // active-session id (verified separately in
+    // layoutStore.addPanel.test.ts).
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+    });
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession("s1");
+    expect(record!.unseenTurns).toBe(0);
+
+    fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
+    fire(event("s1", "assistant.turn_end", { turnId: "t2" }));
+    expect(record!.unseenTurns).toBe(2);
+  });
 });

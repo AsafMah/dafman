@@ -8,7 +8,7 @@
 // reactive data.
 
 import { defineStore } from "pinia";
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 import { invokeCommand, onSessionEvent } from "../ipc/invoke";
 import type {
   ReasoningVisibility,
@@ -16,6 +16,8 @@ import type {
   SessionMode,
 } from "../ipc/types";
 import { accentForIndex } from "../lib/color";
+import { useLayoutStore } from "./layoutStore";
+import { useNotificationsStore } from "./notificationsStore";
 import { useToastStore } from "./toastStore";
 
 /// User-facing send modes. Maps to SDK message delivery via
@@ -64,6 +66,16 @@ export type SessionRecord = {
   /// (Ctrl+Enter while a turn is running injects rather than queues
   /// behind it). Not persisted across reloads in v1.
   defaultSendMode: DefaultSendMode;
+  /// SDK-blocking request currently waiting on the user. Mirrors
+  /// `chatEvents.ts::ChatAmbient.pendingRequest` at the record level
+  /// so the Sessions sidebar + tab dot can react without mounting
+  /// the chat panel. `null` when nothing's pending.
+  pendingRequest: { type: "permission" | "userInput" | "elicitation"; message: string } | null;
+  /// Count of completed turns the user hasn't seen because the panel
+  /// wasn't the dockview active panel at the time. Drives the
+  /// "new activity" dot on the tab + sidebar row. Cleared on focus
+  /// (via the `activeSessionId` watch below).
+  unseenTurns: number;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -184,6 +196,115 @@ export const useSessionsStore = defineStore("sessions", () => {
         record.workingDirectory = cwd;
       }
     }
+
+    // Mirror SDK pending-request signals into `record.pendingRequest`
+    // so the Sessions sidebar + tab dot can react without mounting
+    // the chat panel. The reducer also tracks this in
+    // `ambient.pendingRequest`, but ambient lives inside the
+    // ChatWindow component and is only available when the panel is
+    // open. The record-level mirror is what drives cross-pane
+    // indicators + OS notifications.
+    let pendingRequestSet = false;
+    if (payload.eventType === "permission.requested") {
+      record.pendingRequest = {
+        type: "permission",
+        message: describeFromData(payload.data, ["summary", "description", "message", "tool", "toolName"]) || "Tool wants permission",
+      };
+      pendingRequestSet = true;
+    } else if (
+      payload.eventType === "permission.completed" &&
+      record.pendingRequest?.type === "permission"
+    ) {
+      record.pendingRequest = null;
+    } else if (payload.eventType === "user_input.requested") {
+      record.pendingRequest = {
+        type: "userInput",
+        message: describeFromData(payload.data, ["prompt", "summary", "message", "description"]) || "Awaiting input",
+      };
+      pendingRequestSet = true;
+    } else if (
+      payload.eventType === "user_input.completed" &&
+      record.pendingRequest?.type === "userInput"
+    ) {
+      record.pendingRequest = null;
+    } else if (payload.eventType === "elicitation.requested") {
+      record.pendingRequest = {
+        type: "elicitation",
+        message: describeFromData(payload.data, ["prompt", "summary", "message", "description", "url"]) || "Awaiting input",
+      };
+      pendingRequestSet = true;
+    } else if (
+      payload.eventType === "elicitation.completed" &&
+      record.pendingRequest?.type === "elicitation"
+    ) {
+      record.pendingRequest = null;
+    }
+
+    // OS notification on a fresh pending request — only if the
+    // session ISN'T currently the dock's active panel, OR the app
+    // window isn't focused. The notifications store further gates
+    // on settings + browser permission state, so the call is cheap
+    // when disabled.
+    if (pendingRequestSet && shouldFireForRecord(record)) {
+      const notifications = useNotificationsStore();
+      notifications.notify({
+        kind: "waitingForInput",
+        title: record.title ?? `Session ${record.id.slice(0, 8)}`,
+        body: record.pendingRequest?.message ?? "Awaiting input",
+        sessionId: record.id,
+        tag: `${record.id}:pendingRequest`,
+      });
+    }
+
+    // Unseen-activity dot on the tab + sidebar row: bump on each
+    // `assistant.turn_end` that lands while the session ISN'T the
+    // dock's active panel. Cleared on focus by the watcher below.
+    if (payload.eventType === "assistant.turn_end") {
+      const layoutStore = useLayoutStore();
+      if (layoutStore.activeSessionId !== record.id) {
+        record.unseenTurns += 1;
+        if (shouldFireForRecord(record)) {
+          const notifications = useNotificationsStore();
+          notifications.notify({
+            kind: "turnEnd",
+            title: record.title ?? `Session ${record.id.slice(0, 8)}`,
+            body: "Turn complete.",
+            sessionId: record.id,
+            // Same tag → multiple turn-ends collapse to one entry
+            // in the OS tray.
+            tag: `${record.id}:turnEnd`,
+          });
+        }
+      }
+    }
+  }
+
+  /// True when the user can't see this session right now — either
+  /// because their dockview focus is elsewhere, OR because the app
+  /// window is hidden / blurred. The OS-notification call sites
+  /// gate on this so notifications never fire for the session the
+  /// user is actively watching.
+  function shouldFireForRecord(record: SessionRecord): boolean {
+    const layoutStore = useLayoutStore();
+    if (layoutStore.activeSessionId !== record.id) return true;
+    if (typeof document !== "undefined" && document.hidden) return true;
+    if (typeof document !== "undefined" && !document.hasFocus()) return true;
+    return false;
+  }
+
+  /// Tiny helper to keep `applyToRecord`'s pending-request branch
+  /// readable. Reads the first non-empty string field in `data` from
+  /// the candidate keys; mirrors `chatEvents/notificationHandlers.ts`'s
+  /// describe* helpers but lives here so the store doesn't have to
+  /// import from `chatEvents/`.
+  function describeFromData(data: unknown, keys: readonly string[]): string {
+    if (!data || typeof data !== "object") return "";
+    const obj = data as Record<string, unknown>;
+    for (const k of keys) {
+      const v = obj[k];
+      if (typeof v === "string" && v.length > 0) return v;
+    }
+    return "";
   }
 
   function drainPending(sessionId: string, record: SessionRecord): number {
@@ -197,6 +318,22 @@ export const useSessionsStore = defineStore("sessions", () => {
   function ensureSubscription(): void {
     if (unsubscribe) return;
     unsubscribe = onSessionEvent(handleEvent);
+    // Clear the "unseen activity" dot on the session the user just
+    // brought into focus. Watching layoutStore.activeSessionId means
+    // we react to dockview's onDidActivePanelChange + onDidActiveGroupChange
+    // (those drive activeSessionId in layoutStore.setApi).
+    const layoutStore = useLayoutStore();
+    watch(
+      () => layoutStore.activeSessionId,
+      (sid) => {
+        if (!sid) return;
+        const record = sessions.value.find((s) => s.id === sid);
+        if (record && record.unseenTurns > 0) {
+          record.unseenTurns = 0;
+        }
+      },
+      { immediate: true },
+    );
   }
 
   async function createSession(opts: { workingDirectory?: string } = {}): Promise<SessionRecord | null> {
@@ -222,6 +359,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningVisibilityOverride: "default",
         workingDirectory: wd && wd.length > 0 ? wd : null,
         defaultSendMode: "steer",
+        pendingRequest: null,
+        unseenTurns: 0,
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -292,6 +431,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningVisibilityOverride: "default",
         workingDirectory: response.cwd ?? null,
         defaultSendMode: "steer",
+        pendingRequest: null,
+        unseenTurns: 0,
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and

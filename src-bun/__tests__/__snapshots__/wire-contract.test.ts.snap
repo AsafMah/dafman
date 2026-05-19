@@ -9,8 +9,13 @@ exports[`IPC wire contracts Settings shape 1`] = `
   "layout": {
     "dockview": null,
   },
-  "version": 4,
+  "notifications": {
+    "turnEnd": false,
+    "waitingForInput": true,
+  },
+  "version": 6,
   "workspaces": {
+    "defaultWorkspace": "D:\\repo\\dafman",
     "recent": [
       "D:\\repo\\dafman",
       "C:\\code\\demo",
@@ -42,8 +47,13 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
       },
     },
   },
-  "version": 4,
+  "notifications": {
+    "turnEnd": true,
+    "waitingForInput": true,
+  },
+  "version": 6,
   "workspaces": {
+    "defaultWorkspace": "",
     "recent": [],
   },
 }
@@ -135,14 +145,6 @@ exports[`IPC wire contracts SessionMode union 1`] = `
 ]
 `;
 
-exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
-{
-  "messagesRemoved": 5,
-  "success": true,
-  "tokensFreed": 1234,
-}
-`;
-
 exports[`IPC wire contracts sendMessage request — default mode (omitted) 1`] = `
 {
   "sessionId": "sess-1",
@@ -169,5 +171,13 @@ exports[`IPC wire contracts sendMessage request — explicit immediate mode 1`] 
 exports[`IPC wire contracts abortSession request shape 1`] = `
 {
   "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
+{
+  "messagesRemoved": 5,
+  "success": true,
+  "tokensFreed": 1234,
 }
 `;

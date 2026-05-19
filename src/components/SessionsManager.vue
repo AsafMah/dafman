@@ -42,6 +42,23 @@ const openSessionIds = computed(
   () => new Set(sessionsStore.sessions.map((s) => s.id)),
 );
 
+/// Quick lookup: session-id → its live record (if currently open).
+/// Used by the row template to look up pendingRequest / unseenTurns
+/// without iterating `sessionsStore.sessions` per row.
+const recordsById = computed(() => {
+  const map = new Map<string, (typeof sessionsStore.sessions)[number]>();
+  for (const r of sessionsStore.sessions) map.set(r.id, r);
+  return map;
+});
+
+function indicatorFor(sessionId: string): "pending" | "unseen" | null {
+  const r = recordsById.value.get(sessionId);
+  if (!r) return null;
+  if (r.pendingRequest) return "pending";
+  if (r.unseenTurns > 0) return "unseen";
+  return null;
+}
+
 /// Within a workspace group, push currently-open sessions to the top
 /// so the user can jump back to live conversations without scrolling
 /// past closed ones. Inside each subgroup, keep the existing MRU
@@ -477,7 +494,23 @@ void toasts; // referenced inside async handlers
               "
               @click="onResume(session)"
             >
-              <span class="session-label">{{ sessionLabel(session) }}</span>
+              <span class="session-label">
+                <span
+                  v-if="indicatorFor(session.sessionId)"
+                  class="session-dot"
+                  :class="
+                    indicatorFor(session.sessionId) === 'pending'
+                      ? 'session-dot-pending'
+                      : 'session-dot-unseen'
+                  "
+                  :aria-label="
+                    indicatorFor(session.sessionId) === 'pending'
+                      ? 'Awaiting input'
+                      : 'New activity'
+                  "
+                />
+                {{ sessionLabel(session) }}
+              </span>
               <span class="session-meta">
                 <span
                   v-if="resumingIds.has(session.sessionId)"
@@ -793,6 +826,31 @@ void toasts; // referenced inside async handlers
   overflow: hidden;
   word-break: break-word;
   line-height: 1.25;
+}
+
+.session-dot {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+}
+
+.session-dot-pending {
+  background: var(--p-amber-500, #f59e0b);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-amber-500, #f59e0b) 35%, transparent);
+  animation: session-dot-pulse 1.6s ease-in-out infinite;
+}
+
+.session-dot-unseen {
+  background: var(--p-primary-color);
+  opacity: 0.85;
+}
+
+@keyframes session-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 .session-meta {

@@ -47,6 +47,24 @@ export interface Settings {
 	/// a session is successfully created with a non-empty
 	/// `workingDirectory`. The most-recently-used path is at index 0.
 	workspaces: Workspaces;
+	/// OS-native notification preferences. Inner indicators (status
+	/// dots on tabs + sidebar rows + composer banner) are always on
+	/// — these toggles only gate when we actually call
+	/// `new Notification()`.
+	notifications: NotificationPrefs;
+}
+
+export interface NotificationPrefs {
+	/// Fire an OS notification when `assistant.turn_end` arrives on a
+	/// session whose chat panel isn't the dock's active panel
+	/// (and/or the app window isn't focused). Off by default —
+	/// turn-end notifications are noisier than waiting-for-input.
+	turnEnd: boolean;
+	/// Fire an OS notification when the SDK is awaiting user input
+	/// (permission.requested / user_input.requested /
+	/// elicitation.requested) and the session isn't the active panel.
+	/// On by default — this is the high-signal case.
+	waitingForInput: boolean;
 }
 
 export interface Layout {

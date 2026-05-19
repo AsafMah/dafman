@@ -28,6 +28,7 @@ export interface Settings {
   appearance: Appearance;
   layout: Layout;
   workspaces: Workspaces;
+  notifications: NotificationPrefs;
 }
 
 export interface Layout {
@@ -39,6 +40,14 @@ export interface Workspaces {
   /// Default workspace for new sessions. May be empty when home-dir
   /// resolution failed at startup; treat empty as "no default".
   defaultWorkspace: string;
+}
+
+/// OS-native notification preferences. Mirrors `NotificationPrefs` in
+/// `src-bun/rpc.ts`. Inner indicators (status dots, banner) are
+/// always on; these only gate when we call `new Notification()`.
+export interface NotificationPrefs {
+  turnEnd: boolean;
+  waitingForInput: boolean;
 }
 
 export interface ModelSummary {

@@ -332,6 +332,26 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
       </span>
     </footer>
 
+    <!-- Pending-request banner. Visible whenever the SDK is blocked
+         on user input (permission / user_input / elicitation). Reads
+         from `ambient.pendingRequest` (set by the reducer's
+         notification handlers); the actual accept/deny UI is a
+         follow-up ticket — for now we just surface the state so the
+         user knows what they need to action and from where. -->
+    <div v-if="ambient.pendingRequest" class="pending-banner" role="status">
+      <i class="pi pi-bell pending-banner-icon" aria-hidden="true" />
+      <div class="pending-banner-body">
+        <span class="pending-banner-kind">{{
+          ambient.pendingRequest.type === "permission"
+            ? "Permission requested"
+            : ambient.pendingRequest.type === "userInput"
+              ? "Input requested"
+              : "Awaiting response"
+        }}</span>
+        <span class="pending-banner-message">{{ ambient.pendingRequest.message }}</span>
+      </div>
+    </div>
+
     <form class="chat-composer" @submit.prevent>
       <MessageComposer
         ref="composerRef"
@@ -489,6 +509,48 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
 
 .chat-composer {
   flex: 0 0 auto;
+}
+
+/* Pending-request banner: amber tint, sits between the message list
+ * and the composer. Mirrors the inner-indicator dot's coloring so
+ * the tab dot + banner read as the same signal. */
+.pending-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  margin: 0.5rem 0.5rem 0;
+  border-radius: var(--p-border-radius-md);
+  border: 1px solid color-mix(in srgb, var(--p-amber-500, #f59e0b) 40%, transparent);
+  background: color-mix(in srgb, var(--p-amber-500, #f59e0b) 14%, var(--p-content-background));
+  color: var(--p-text-color);
+}
+
+.pending-banner-icon {
+  font-size: 1.05rem;
+  color: var(--p-amber-500, #f59e0b);
+}
+
+.pending-banner-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pending-banner-kind {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-amber-500, #f59e0b);
+}
+
+.pending-banner-message {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* MessageComposer brings its own border-top + padding via the global
