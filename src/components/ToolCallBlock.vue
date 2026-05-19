@@ -4,8 +4,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import type { ToolStatus } from "../lib/chatEvents";
 import { getToolRenderer } from "../lib/toolRenderers";
-import { fenced } from "../lib/markdown";
-import MessageContent from "./MessageContent.vue";
+import ToolDetails from "./ToolDetails.vue";
 
 const props = defineProps<{
   toolName: string;
@@ -84,29 +83,8 @@ const previewLine = computed(() => {
   return firstLine.length > 160 ? `${firstLine.slice(0, 160)}…` : firstLine;
 });
 
-const argsPretty = computed(() => {
-  if (!props.args) return "";
-  try {
-    return JSON.stringify(props.args, null, 2);
-  } catch {
-    return String(props.args);
-  }
-});
-
-/// Args + result blocks render through `MessageContent` (Lexical's
-/// prism-backed CodeNode) by wrapping the payload in a markdown fence.
-/// `fenced` (lib/markdown) picks an outer fence longer than any inner
-/// backtick run so tool output containing ``` can't close the block.
-
-const argsBlock = computed(() =>
-  fenced(argsPretty.value, renderHints.value.argsLanguage),
-);
-const partialBlock = computed(() =>
-  fenced(props.partialOutput, renderHints.value.resultLanguage),
-);
-const resultBlock = computed(() =>
-  fenced(props.resultContent ?? "", renderHints.value.resultLanguage),
-);
+/// (ToolDetails now owns args + result rendering — see
+/// `src/components/ToolDetails.vue` for the per-tool layouts.)
 </script>
 
 <template>
@@ -137,36 +115,18 @@ const resultBlock = computed(() =>
     </button>
 
     <div v-if="expanded" class="tool-body">
-      <section v-if="argsPretty" class="tool-section">
-        <header class="tool-section-label">Arguments</header>
-        <MessageContent
-          class="tool-block"
-          :text="argsBlock"
-          :label="`Arguments for ${displayName}`"
-        />
-      </section>
+      <ToolDetails
+        :tool-name="props.toolName"
+        :args="props.args"
+        :mcp-server-name="props.mcpServerName"
+        :mcp-tool-name="props.mcpToolName"
+        :result-content="props.resultContent"
+        :partial-output="props.partialOutput"
+      />
 
       <section v-if="props.progressMessage" class="tool-section">
         <header class="tool-section-label">Progress</header>
         <p class="tool-progress">{{ props.progressMessage }}</p>
-      </section>
-
-      <section v-if="props.partialOutput" class="tool-section">
-        <header class="tool-section-label">Output</header>
-        <MessageContent
-          class="tool-block"
-          :text="partialBlock"
-          :label="`Partial output for ${displayName}`"
-        />
-      </section>
-
-      <section v-if="props.resultContent" class="tool-section">
-        <header class="tool-section-label">Result</header>
-        <MessageContent
-          class="tool-block"
-          :text="resultBlock"
-          :label="`Result for ${displayName}`"
-        />
       </section>
 
       <section v-if="props.errorMessage" class="tool-section">
