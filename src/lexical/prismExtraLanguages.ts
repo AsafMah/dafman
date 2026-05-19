@@ -58,21 +58,26 @@ import "prismjs/components/prism-diff";              // standalone
 import "prismjs/components/prism-json";              // standalone
 import "prismjs/components/prism-powershell";        // standalone
 import "prismjs/components/prism-ruby";              // standalone
-// Dropped: prism-objectivec and prism-swift. They depend on prism-c
-// at module-eval time, and despite a documented import order something
-// in WebView2's evaluator (Edge Chromium ~120) doesn't see `Prism.languages.c`
-// as defined when `prism-objectivec`'s top-level `extend('c', …)` runs,
-// even though chromium ~141 (Playwright) sees it just fine. Neither
-// language is a priority for our user base (Windows-only dev), so we
-// drop them rather than chase a WebView2-specific module-eval quirk.
-// Apple platforms aren't a target — re-add only if we go cross-platform.
-
 // tier 2 — need a tier-1 lang
 import "prismjs/components/prism-cpp";               // → c
 import "prismjs/components/prism-typescript";        // → javascript
 import "prismjs/components/prism-kotlin";            // → java/clike
 import "prismjs/components/prism-php";               // → markup-templating + clike
 import "prismjs/components/prism-markdown";          // → markup-templating
+
+// NOTE: prism-objectivec and prism-swift are imported here NOT because
+// we care about highlighting them (Windows-only dev tool, no Apple
+// target) but because `@lexical/code` imports them transitively. If
+// we don't also import them here, Vite's esbuild dep optimizer
+// inlines them directly into @lexical/code's chunk WITHOUT the
+// prerequisite prism-c, causing
+// `Cannot set properties of undefined (setting 'string')` in
+// HMR mode. By importing them here too, esbuild externalizes them
+// like the other prism components, which means they get loaded
+// after the others (proper order). prism-c (tier 1 above) is
+// guaranteed registered first.
+import "prismjs/components/prism-objectivec";        // → c
+import "prismjs/components/prism-swift";             // standalone
 
 // tier 3 — need a tier-2 lang
 import "prismjs/components/prism-jsx";               // → markup + javascript
