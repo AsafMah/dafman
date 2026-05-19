@@ -434,7 +434,7 @@ function clearPlaygroundQueue() {
 function injectShellPermission() {
   injectPermission(
     "shell",
-    "shell: rm -rf /tmp/cache && echo done",
+    "Run a shell command",
     { command: "rm -rf /tmp/cache && echo done", cwd: "/home/user" },
   );
 }
@@ -442,16 +442,50 @@ function injectShellPermission() {
 function injectWritePermission() {
   injectPermission(
     "write",
-    "write: C:\\Users\\me\\Documents\\notes.txt",
-    { path: "C:\\Users\\me\\Documents\\notes.txt", contentPreview: "Hello\n" },
+    "Modify src/components/NewWidget.vue",
+    {
+      path: "src/components/NewWidget.vue",
+      contentPreview:
+        "<template>\n  <div class=\"widget\">\n    <h2>{{ title }}</h2>\n  </div>\n</template>\n\n<" + "script setup lang=\"ts\">\nconst title = 'New widget';\n</" + "script>\n",
+    },
+  );
+}
+
+function injectReadPermission() {
+  injectPermission(
+    "read",
+    "Read package.json",
+    { path: "package.json" },
   );
 }
 
 function injectUrlPermission() {
   injectPermission(
     "url",
-    "open url: https://example.com/api/data",
-    { url: "https://example.com/api/data" },
+    "Open https://api.github.com/...",
+    { url: "https://api.github.com/repos/AsafMah/dafman/issues?state=open&assignee=me" },
+  );
+}
+
+function injectMcpPermission() {
+  injectPermission(
+    "mcp",
+    "Call github / create_issue",
+    {
+      serverName: "github",
+      toolName: "create_issue",
+      arguments: { repo: "AsafMah/dafman", title: "Bug: thing broken", body: "Steps to reproduce..." },
+    },
+  );
+}
+
+function injectMemoryPermission() {
+  injectPermission(
+    "memory",
+    "Save to memory",
+    {
+      content: "User prefers TypeScript with strict mode and 2-space indentation. Composer should default to plain text mode on Linux.",
+    },
   );
 }
 
@@ -558,17 +592,20 @@ const eventCount = computed(() => events.length);
     </section>
 
     <section class="panel">
-      <h2>Pending requests (PendingRequestModal)</h2>
+      <h2>Pending requests (PendingRequestCard)</h2>
       <p class="muted small">
-        Each button enqueues a fake SDK callback on a synthetic
-        session. The global modal opens against the queue head;
-        FIFO across all kinds. Responses short-circuit the RPC so
-        you can iterate on the UI without a live bun handler.
+        Each button enqueues a fake SDK callback on the playground
+        session. The card renders inline in the chat below; FIFO
+        across all kinds. Responses short-circuit the RPC so you
+        can iterate on the UI without a live bun handler.
       </p>
       <div class="actions">
         <Button label="Permission: shell" size="small" severity="secondary" @click="injectShellPermission" />
         <Button label="Permission: write" size="small" severity="secondary" @click="injectWritePermission" />
+        <Button label="Permission: read" size="small" severity="secondary" @click="injectReadPermission" />
         <Button label="Permission: url" size="small" severity="secondary" @click="injectUrlPermission" />
+        <Button label="Permission: mcp" size="small" severity="secondary" @click="injectMcpPermission" />
+        <Button label="Permission: memory" size="small" severity="secondary" @click="injectMemoryPermission" />
       </div>
       <div class="actions">
         <Button label="User input: freeform" size="small" severity="secondary" @click="injectUserInputFreeform" />

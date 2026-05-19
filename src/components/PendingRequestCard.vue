@@ -39,6 +39,7 @@ import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import { styleFor } from "../lib/notificationStyles";
+import PermissionDetails from "./PermissionDetails.vue";
 
 const props = defineProps<{
   sessionId: string;
@@ -170,16 +171,6 @@ async function elicitationCancel(
     response: { kind: "elicitation", action },
   });
 }
-
-const permissionDetails = computed(() => {
-  const req = asPermission.value;
-  if (!req) return null;
-  try {
-    return JSON.stringify(req.raw, null, 2);
-  } catch {
-    return null;
-  }
-});
 </script>
 
 <template>
@@ -201,10 +192,7 @@ const permissionDetails = computed(() => {
 
     <!-- Permission -->
     <template v-if="asPermission">
-      <details v-if="permissionDetails" class="pending-card-details">
-        <summary>Show details</summary>
-        <pre class="pending-card-raw">{{ permissionDetails }}</pre>
-      </details>
+      <PermissionDetails :request="asPermission" />
       <div class="pending-card-actions">
         <Button
           label="Reject"
@@ -362,31 +350,6 @@ const permissionDetails = computed(() => {
   font-size: 0.95rem;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.pending-card-details {
-  margin: 0;
-  padding: 0.4rem 0.6rem;
-  background: var(--p-content-hover-background);
-  border-radius: var(--p-border-radius-sm);
-  font-size: 0.8rem;
-}
-
-.pending-card-details summary {
-  cursor: pointer;
-  user-select: none;
-  color: var(--p-text-muted-color);
-}
-
-.pending-card-raw {
-  margin: 0.4rem 0 0;
-  padding: 0.4rem;
-  background: var(--p-content-background);
-  border-radius: var(--p-border-radius-sm);
-  overflow: auto;
-  max-height: 10rem;
-  font-size: 0.78rem;
-  font-family: var(--p-font-family-mono, ui-monospace, monospace);
 }
 
 .pending-card-choices {

@@ -73,34 +73,38 @@ interface PendingEntry {
 /// a `path` for write/read, a `url` for url, etc.). We probe common
 /// names and fall back to the kind so the modal always has something
 /// to display.
+/// Short message line shown above the bespoke per-kind detail block
+/// in `PermissionDetails.vue`. Keep these terse — the rich payload
+/// (command, path, args, etc.) is rendered by the bespoke component
+/// from the `raw` field, so the message line is just a one-glance
+/// "what kind of permission and against what target".
 function summarizePermission(request: PermissionRequest): string {
 	const raw = request as unknown as Record<string, unknown>;
-	const cmd = typeof raw.command === "string" ? raw.command : null;
 	const path = typeof raw.path === "string" ? raw.path : null;
 	const url = typeof raw.url === "string" ? raw.url : null;
 	const server = typeof raw.serverName === "string" ? raw.serverName : null;
 	const tool = typeof raw.toolName === "string" ? raw.toolName : null;
 	switch (request.kind) {
 		case "shell":
-			return cmd ? `shell: ${cmd}` : "shell command";
+			return "Run a shell command";
 		case "write":
-			return path ? `write: ${path}` : "file write";
+			return path ? `Modify ${path}` : "Modify a file";
 		case "read":
-			return path ? `read: ${path}` : "file read";
+			return path ? `Read ${path}` : "Read a file";
 		case "url":
-			return url ? `open url: ${url}` : "open url";
+			return url ? `Open ${url}` : "Open a URL";
 		case "mcp":
 			return server && tool
-				? `mcp: ${server} / ${tool}`
+				? `Call ${server} / ${tool}`
 				: server
-					? `mcp: ${server}`
-					: "mcp tool";
+					? `Call MCP server ${server}`
+					: "Call an MCP tool";
 		case "custom-tool":
-			return tool ? `custom tool: ${tool}` : "custom tool";
+			return tool ? `Run ${tool}` : "Run a custom tool";
 		case "memory":
-			return "memory write";
+			return "Save to memory";
 		case "hook":
-			return "hook";
+			return "Run a hook";
 	}
 }
 
