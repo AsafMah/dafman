@@ -97,13 +97,13 @@ describe("CommandPalette", () => {
 
   test("clicking an item invokes the command's run()", async () => {
     const registry = useCommandRegistry();
-    let ranWith: string | null = null;
+    const ranWith = { id: null as string | null };
     registry.register({
       id: "x.run-me",
       label: "Run Me",
       group: "Demo",
       run: () => {
-        ranWith = "x.run-me" as string;
+        ranWith.id = "x.run-me";
       },
     });
     registry.register({
@@ -111,7 +111,7 @@ describe("CommandPalette", () => {
       label: "Other",
       group: "Demo",
       run: () => {
-        ranWith = "x.other";
+        ranWith.id = "x.other";
       },
     });
 
@@ -131,7 +131,61 @@ describe("CommandPalette", () => {
     await nextTick();
     await nextTick();
 
-    expect(ranWith).toBe("x.run-me");
+    expect(ranWith.id).toBe("x.run-me");
+  });
+
+  test("dialog wrapper is bounded (max-height set on [command-dialog-wrapper], not [command-dialog=''])", async () => {
+    // Regression for: 'palette continues off-screen / no scrollbar'.
+    // The bounded-box rules MUST live on `[command-dialog-wrapper]` —
+    // `[command-dialog=""]` is just an inert outer div. happy-dom
+    // doesn't process SFC `<style>` blocks (it doesn't link Vue's
+    // compiled CSS), so we can't assert via `getComputedStyle`.
+    // Instead, read the component source and assert the right
+    // selector carries the bounding rules. Catches the literal CSS
+    // mistake that shipped (rules on the wrong selector).
+    const sourcePath = require("path").resolve(
+      __dirname,
+      "..",
+      "CommandPalette.vue",
+    );
+    const source = require("fs").readFileSync(sourcePath, "utf8") as string;
+
+    // Strip comments to avoid false matches inside CSS comment blocks.
+    const cssOnly = source.replace(/\/\*[\s\S]*?\*\//g, "");
+
+    // Wrapper rule block must include max-height and flex-direction.
+    const wrapperRule = cssOnly.match(
+      /div\[command-dialog-wrapper\][\s\S]*?\{[\s\S]*?\}/,
+    );
+    expect(wrapperRule).not.toBeNull();
+    const wrapperBlock = wrapperRule![0];
+    expect(wrapperBlock).toContain("max-height");
+    expect(wrapperBlock).toContain("flex-direction: column");
+
+    // Body must declare flex + min-height: 0 so the list scrolls
+    // instead of pushing the wrapper past max-height.
+    const bodyRule = cssOnly.match(
+      /div\[command-dialog-body\][\s\S]*?\{[\s\S]*?\}/,
+    );
+    expect(bodyRule).not.toBeNull();
+    const bodyBlock = bodyRule![0];
+    expect(bodyBlock).toContain("min-height: 0");
+    expect(bodyBlock).toContain("flex-direction: column");
+
+    // List must scroll internally.
+    const listRule = cssOnly.match(/div\[command-list=""\][\s\S]*?\{[\s\S]*?\}/);
+    expect(listRule).not.toBeNull();
+    const listBlock = listRule![0];
+    expect(listBlock).toContain("overflow-y: auto");
+    expect(listBlock).toContain("min-height: 0");
+
+    // Outer `[command-dialog=""]` is the inert wrapper. If anyone
+    // tries to put max-height there again, this fails — except we
+    // EXPECT it to be flattened via `display: contents` to allow the
+    // mask's fixed positioning, so this is the guard rule.
+    expect(cssOnly).toMatch(
+      /div\[command-dialog=""\][\s\S]{0,200}display:\s*contents/,
+    );
   });
 
   test("when() = false commands are not rendered", async () => {

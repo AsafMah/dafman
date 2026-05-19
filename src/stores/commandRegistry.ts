@@ -49,6 +49,11 @@ export interface Command {
   /// when the chord is pressed globally — we leave that wiring on
   /// for free.
   shortcut?: string[];
+  /// Optional accent color (CSS color string) that overrides the
+  /// category accent on this specific row. Used for "Switch to:
+  /// `<session>`" so each session's command picks up its own per-
+  /// session palette accent.
+  accent?: string;
   /// Visibility predicate. Hidden commands are excluded from the list
   /// (we don't render greyed-out rows — `when()` failure means the
   /// command is irrelevant to the current state). Must read live

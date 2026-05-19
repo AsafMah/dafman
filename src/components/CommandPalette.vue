@@ -1,37 +1,38 @@
 <script setup lang="ts">
-// Command palette overlay built on `vue-command-palette`
-// (xiaoluoboding/vue-command-palette).
+// Command palette overlay built on `vue-command-palette`.
 //
-// **Library quirks discovered the hard way (see the unit test in
-// `CommandPalette.test.ts`):**
+// **Library DOM hierarchy (verified by reading the compiled
+// `vue-command-palette.js`):**
 //
-// - `Command.Item`'s `perform` prop only fires for KEYBOARD SHORTCUTS
+//   <div command-theme="dafman">
+//     <div command-root="">
+//       <div command-dialog="">
+//         <div command-dialog-mask="">           ← fixed full-viewport overlay
+//           <div command-dialog-wrapper="">      ← THE actual dialog box (max-height lives here)
+//             <div command-dialog-header="">     ← header slot (Command.Input)
+//             <div command-dialog-body="">       ← body slot (Command.List)
+//               <div command-list="" role="listbox">
+//                 <div command-list-sizer="">   ← sized by library's ResizeObserver
+//                   ... groups + items ...
+//
+// The earlier styling put the bounded-box rules on `[command-dialog=""]`
+// (an outer wrapper that just `display: contents`) instead of
+// `[command-dialog-wrapper]`, so the dialog had no height bound and
+// scrolled off-screen. Comments + structure tests added so this
+// doesn't recur.
+//
+// **Library quirks discovered the hard way:**
+//
+// - `Command.Item`'s `:perform` fires ONLY for keyboard shortcuts
 //   (the lib checks `t.shortcut.length > 0 && t.perform()`). Clicks
-//   and Enter-on-selected go through `@select-item` on the parent
-//   `Command.Root` / `Command.Dialog`, emitting `{ key, value }`
-//   where `value` is each item's `data-value` attribute. We use that
-//   to map back to our `Command` registry entry.
+//   and Enter-on-selected go through `@select-item` on `Command.Dialog`
+//   emitting `{ key, value }` where `value` is each item's
+//   `data-value` attribute. We use `data-value` for lookup + as the
+//   searchable text (library's fuse indexes on it).
 //
-// - The library's fuzzy search reads `data-value` as the
-//   searchable text (NOT slot text content). Default fuse options:
-//   `{ threshold: 0.2, keys: ['label'] }` where each indexed item is
-//   `{ key: command-item-key (auto), label: data-value }`. So our
-//   `data-value` must be a human-searchable composite of label +
-//   group + hint + keywords (and, to keep values unique per
-//   command, the id appended). We then look the command up via a
-//   `valueToCommand` map.
-//
-// - The dialog teleports to `body`, so `Command.Dialog`'s mask,
-//   wrapper, and dialog elements live OUTSIDE our component root.
-//   Theme via CSS rules on the library's `[command-*=""]`
-//   data-attribute selectors (NOT scoped).
-//
-// Hotkey: Ctrl+K (Win/Linux) / Cmd+K (macOS). Strict modifier chord
-// — no Shift, no Alt. Suppressed while a PrimeVue confirm/dialog
-// overlay is open so destructive confirms aren't hijacked.
-//
-// Closing: Escape, or clicking the mask, or selecting an item.
-// (Library handles ↑/↓/Enter navigation internally.)
+// - `Command.Dialog` teleports to `document.body`. CSS rules must
+//   be unscoped, and tests must clean teleported nodes between
+//   cases (see `__tests__/CommandPalette.test.ts` afterEach).
 
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { Command } from "vue-command-palette";
@@ -47,9 +48,6 @@ let prevFocus: HTMLElement | null = null;
 
 const visibleCommands = computed(() => registry.visibleCommands);
 
-/// Lookup table from data-value → command. Rebuilt whenever the
-/// visible command set changes; the search value is unique because
-/// it starts with the command id.
 const valueToCommand = computed(() => {
   const map = new Map<string, CommandDef>();
   for (const cmd of visibleCommands.value) {
@@ -58,8 +56,6 @@ const valueToCommand = computed(() => {
   return map;
 });
 
-/// Group adjacent same-group commands so each section renders under
-/// one heading. Ungrouped commands go into a final unnamed bucket.
 const grouped = computed(() => {
   const sections = new Map<string, CommandDef[]>();
   const ungrouped: CommandDef[] = [];
@@ -140,9 +136,6 @@ function onSelectItem(item: { key: string; value: string }): void {
   });
 }
 
-/// Click on the backdrop closes the palette. The library doesn't
-/// expose a mask-click event, so we attach a global listener while
-/// the palette is open and check the target for the mask attribute.
 function onWindowClick(e: MouseEvent): void {
   if (!open.value) return;
   const target = e.target as HTMLElement | null;
@@ -163,13 +156,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onEscape, true);
   window.removeEventListener("click", onWindowClick, true);
 });
-
-defineExpose({
-  /// Test-only: open the palette imperatively.
-  __testOpen() {
-    openPalette();
-  },
-});
 </script>
 
 <template>
@@ -189,12 +175,16 @@ defineExpose({
           v-for="([heading, items]) in grouped.sections"
           :key="heading"
           :heading="heading"
+          :data-group="heading"
         >
           <Command.Item
             v-for="cmd in items"
             :key="cmd.id"
             :data-value="searchValueFor(cmd)"
+            :data-group="cmd.group ?? ''"
             :shortcut="cmd.shortcut"
+            :style="cmd.accent ? { '--cmd-accent': cmd.accent } : {}"
+            :data-has-accent="cmd.accent ? 'true' : 'false'"
           >
             <i
               v-if="cmd.icon"
@@ -222,6 +212,8 @@ defineExpose({
             :key="cmd.id"
             :data-value="searchValueFor(cmd)"
             :shortcut="cmd.shortcut"
+            :style="cmd.accent ? { '--cmd-accent': cmd.accent } : {}"
+            :data-has-accent="cmd.accent ? 'true' : 'false'"
           >
             <i
               v-if="cmd.icon"
@@ -247,59 +239,67 @@ defineExpose({
 </template>
 
 <style>
-/* `theme="dafman"` opts out of the library's built-in styles. Rules
- * are unscoped because the library teleports Command.Dialog to body.
- * Selectors target the library's `[command-*=""]` data attributes. */
+/*
+ * CRITICAL: the actual bounded "dialog box" is `[command-dialog-wrapper]`,
+ * NOT `[command-dialog=""]`. The latter is an inert outer div.
+ * See the structure comment in `<script>` and the DOM-structure tests
+ * in `CommandPalette.test.ts`.
+ */
 
-/* Backdrop. Dim + light blur — strong enough that the palette pops
- * but not so much that the app behind looks broken. Mask covers the
- * whole viewport; the dialog centers inside it via flex. */
+/* Flatten the outer chrome so the mask can position-fixed the real
+ * dialog. Without `display: contents` the intermediate divs trap the
+ * mask's fixed-positioning context and screw with stacking. */
+div[command-theme="dafman"],
+div[command-theme="dafman"] > div[command-root=""],
+div[command-theme="dafman"] > div[command-root=""] > div[command-dialog=""] {
+  display: contents;
+}
+
+/* The mask is the full-viewport overlay. Centers the wrapper. */
 div[command-dialog-mask] {
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: color-mix(in srgb, var(--p-text-color) 40%, transparent);
-  backdrop-filter: blur(1px);
+  background: color-mix(in srgb, var(--p-mask-background, rgb(0 0 0 / 35%)) 100%, transparent);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 10vh;
+  /* NO backdrop-filter — caused the "whole screen blurred" complaint.
+   * The mask alone provides enough visual separation. */
 }
 
-div[command-dialog=""] {
+/* THE dialog box. All bounding lives here. */
+div[command-dialog-wrapper] {
   width: min(640px, 92vw);
   max-width: 92vw;
-  max-height: 70vh;
+  max-height: 80vh;
   background: var(--p-content-background);
   color: var(--p-text-color);
-  border: 1px solid color-mix(in srgb, var(--p-primary-color) 30%, var(--p-content-border-color));
+  border: 1px solid color-mix(in srgb, var(--p-primary-color) 40%, var(--p-content-border-color));
   border-radius: 0.75rem;
   box-shadow:
-    0 24px 48px -12px color-mix(in srgb, black 50%, transparent),
+    0 24px 56px -12px color-mix(in srgb, black 60%, transparent),
     0 0 0 1px color-mix(in srgb, var(--p-primary-color) 8%, transparent);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* The library wraps each panel section in its own div; we drive
-   * the inner scroll from `[command-list=""]`. */
-}
-
-div[command-root=""] {
-  display: flex;
-  flex-direction: column;
   min-height: 0;
-  flex: 1 1 auto;
 }
 
 div[command-dialog-header] {
   flex: 0 0 auto;
 }
 
+/* The body must be a flex column with `min-height: 0` for its
+ * `[command-list]` descendant to be scrollable instead of pushing the
+ * wrapper past `max-height`. */
 div[command-dialog-body] {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 input[command-input=""] {
@@ -324,9 +324,12 @@ div[command-list=""] {
   min-height: 0;
   overflow-y: auto;
   padding: 0.35rem 0 0.5rem;
-  /* Custom scrollbar that doesn't look like a 90s widget on Windows */
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--p-text-color) 25%, transparent) transparent;
+}
+
+div[command-list-sizer] {
+  display: block;
 }
 
 div[command-empty=""] {
@@ -336,43 +339,93 @@ div[command-empty=""] {
   font-size: 0.9rem;
 }
 
+/* ----- group / item visuals + per-category accents ----- */
+
+/* Default group heading color: muted. Per-group heading colors come
+ * from the `[data-group]` attribute we put on the group element. */
 div[command-group-heading=""] {
   padding: 0.55rem 1rem 0.25rem;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--p-primary-color) 80%, var(--p-text-muted-color));
+  color: var(--p-text-muted-color);
 }
 
+/* Category color-coding. Each known group label resolves to a token
+ * we can also reuse on the row's left rail / icon. The user-asked
+ * "color-coded categories" lives here — pick colors that read on
+ * both light and dark by using `--p-{hue}-{500,400}` semantic
+ * tokens (PrimeVue ships these). */
+div[command-group=""][data-group="Navigation"] div[command-group-heading=""] {
+  color: var(--p-blue-500, #3b82f6);
+}
+div[command-group=""][data-group="Sessions"] div[command-group-heading=""] {
+  color: var(--p-emerald-500, #10b981);
+}
+div[command-group=""][data-group="Active Session"] div[command-group-heading=""] {
+  color: var(--p-violet-500, #8b5cf6);
+}
+div[command-group=""][data-group="Appearance"] div[command-group-heading=""] {
+  color: var(--p-amber-500, #f59e0b);
+}
+div[command-group=""][data-group="Diagnostics"] div[command-group-heading=""] {
+  color: var(--p-orange-500, #f97316);
+}
+
+/* Per-group accent passed down to items via custom property so the
+ * item rail + icon adopt the section's hue. Items can also override
+ * via `--cmd-accent` inline style (see "Switch to: session" — that
+ * uses the session's own accent). */
+div[command-group=""][data-group="Navigation"] div[command-item=""] {
+  --cmd-accent: var(--p-blue-500, #3b82f6);
+}
+div[command-group=""][data-group="Sessions"] div[command-item=""] {
+  --cmd-accent: var(--p-emerald-500, #10b981);
+}
+div[command-group=""][data-group="Active Session"] div[command-item=""] {
+  --cmd-accent: var(--p-violet-500, #8b5cf6);
+}
+div[command-group=""][data-group="Appearance"] div[command-item=""] {
+  --cmd-accent: var(--p-amber-500, #f59e0b);
+}
+div[command-group=""][data-group="Diagnostics"] div[command-item=""] {
+  --cmd-accent: var(--p-orange-500, #f97316);
+}
+
+/* Per-item override (e.g. session-specific accent on "Switch to: …").
+ * Inline `style="--cmd-accent: ..."` wins via specificity-of-style. */
+
 div[command-item=""] {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.45rem 1rem;
+  padding: 0.45rem 1rem 0.45rem calc(1rem + 3px);
   cursor: pointer;
   color: var(--p-text-color);
   font-size: 0.92rem;
-  /* Smooth selection transition. */
-  transition: background 80ms ease, color 80ms ease;
+  border-left: 3px solid transparent;
+  transition: background 80ms ease, color 80ms ease, border-left-color 80ms ease;
 }
 
-/* Selected (keyboard nav). The library toggles `aria-selected="true"`. */
+/* Idle: thin tinted rail in the category accent so groups read at a
+ * glance even when scrolled past the heading. */
+div[command-item=""][style*="--cmd-accent"],
+div[command-item=""] {
+  border-left-color: color-mix(in srgb, var(--cmd-accent, var(--p-primary-color)) 35%, transparent);
+}
+
+/* Selected via keyboard nav. Library sets aria-selected="true". */
 div[command-item=""][aria-selected="true"] {
-  background: var(--p-primary-color);
-  color: var(--p-primary-contrast-color, white);
-}
-
-div[command-item=""][aria-selected="true"] .cmd-icon,
-div[command-item=""][aria-selected="true"] .cmd-hint,
-div[command-item=""][aria-selected="true"] kbd {
-  color: var(--p-primary-contrast-color, white);
+  background: color-mix(in srgb, var(--cmd-accent, var(--p-primary-color)) 22%, transparent);
+  border-left-color: var(--cmd-accent, var(--p-primary-color));
 }
 
 /* Hover (mouse). Distinct from selected so users can read what
  * they'd hit if they Enter'd vs what they're hovering. */
 div[command-item=""]:hover:not([aria-selected="true"]) {
-  background: color-mix(in srgb, var(--p-primary-color) 14%, transparent);
+  background: color-mix(in srgb, var(--cmd-accent, var(--p-primary-color)) 12%, transparent);
 }
 
 /* Hidden by the library when filtered out via fuse. */
@@ -384,8 +437,13 @@ div[command-item=""][style*="display: none"] {
   width: 1rem;
   flex: 0 0 auto;
   font-size: 0.95rem;
-  color: var(--p-primary-color);
+  /* Per-category icon color via the same custom property. */
+  color: var(--cmd-accent, var(--p-primary-color));
   text-align: center;
+}
+
+div[command-item=""][aria-selected="true"] .cmd-icon {
+  color: var(--p-text-color);
 }
 
 .cmd-icon-empty {

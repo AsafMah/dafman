@@ -247,7 +247,7 @@ export function registerBuiltinCommands(): void {
   // ---------- Dynamic: Switch to Session: <title> ----------
   const sessionCommandIds = new Set<string>();
   watch(
-    () => sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title })),
+    () => sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
     (records) => {
       const nextIds = new Set<string>();
       for (const r of records) {
@@ -260,6 +260,7 @@ export function registerBuiltinCommands(): void {
           hint: r.id.slice(0, 8),
           group: "Sessions",
           icon: "pi pi-comments",
+          accent: r.accent,
           // Include both the short and full id in the searchable
           // keywords so users can paste a session id from
           // logs/URLs and still find it.
