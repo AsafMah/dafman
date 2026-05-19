@@ -24,6 +24,7 @@ export type BootPhase =
   | "settings"
   | "client"
   | "sessions"
+  | "applying"
   | "ready"
   | "failed";
 
@@ -40,6 +41,7 @@ export const useBootStore = defineStore("boot", () => {
   const statusText = computed<string>(() => {
     if (phase.value === "ready") return "Ready";
     if (phase.value === "failed") return error.value ?? "Failed to start";
+    if (phase.value === "applying") return "Applying layout…";
     if (phase.value === "sessions") {
       if (sessionsTotal.value === 0) return "Restoring sessions…";
       return `Restoring sessions… ${sessionsRestored.value} of ${sessionsTotal.value}`;
@@ -75,6 +77,15 @@ export const useBootStore = defineStore("boot", () => {
     sessionsRestored.value += 1;
   }
 
+  /// Transitions to the "applying layout" phase that covers
+  /// `dockview.fromJSON()` + panel mounting. Heavy synchronous work
+  /// happens here that blocks the main thread; the splash keeps
+  /// motion alive via CSS-only indeterminate-bar animation (runs
+  /// on the compositor thread, doesn't freeze under JS load).
+  function beginApplying(): void {
+    phase.value = "applying";
+  }
+
   function markReady(): void {
     phase.value = "ready";
   }
@@ -97,6 +108,7 @@ export const useBootStore = defineStore("boot", () => {
     markClientReady,
     beginSessions,
     markSessionRestored,
+    beginApplying,
     markReady,
     markFailed,
   };

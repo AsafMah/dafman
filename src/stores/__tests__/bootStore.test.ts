@@ -62,4 +62,21 @@ describe("bootStore", () => {
     b.beginSessions(0);
     expect(b.statusText).toBe("Restoring sessions…");
   });
+
+  test("beginApplying transitions to applying phase + status flips", () => {
+    // Regression for: 'splash stuck at 1/4, spinner frozen, pops up
+    // all at once'. After Promise.all of session restores resolves,
+    // we yield a frame and call beginApplying so the splash flips
+    // from a stuck N/M counter to a moving 'Applying layout…'
+    // state (with indeterminate shimmer) before the heavy
+    // dockview.fromJSON burst blocks the main thread.
+    const b = useBootStore();
+    b.beginSessions(4);
+    b.markSessionRestored();
+    b.markSessionRestored();
+    b.beginApplying();
+    expect(b.phase).toBe("applying");
+    expect(b.statusText).toBe("Applying layout…");
+    expect(b.isBooting).toBe(true);
+  });
 });

@@ -149,6 +149,13 @@ onMounted(async () => {
     setTimeout(openSessionsByDefault, 0);
   }
 
+  // Final yield: lets the just-mounted dockview panels paint at
+  // least one frame before the splash fades out. Without this the
+  // user briefly sees blank panels behind the fading splash.
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
+
   // Boot complete — splash fades out.
   bootStore.markReady();
 
@@ -199,6 +206,19 @@ async function restoreFromLayout() {
         .restoreSession(id)
         .finally(() => bootStore.markSessionRestored()),
     ),
+  );
+  // Yield a frame so the splash can paint "N of N" before we
+  // start the heavy `dockview.fromJSON` + panel mount work — that
+  // single synchronous burst can take hundreds of milliseconds and
+  // would otherwise look like a freeze on top of "0 of N".
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => resolve()),
+  );
+  bootStore.beginApplying();
+  // Yield once more so the "Applying layout…" status paints before
+  // the synchronous block.
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => resolve()),
   );
   // Always apply the full layout, even when no sessions resumed —
   // preserving the user's grid layout is more important than hiding
