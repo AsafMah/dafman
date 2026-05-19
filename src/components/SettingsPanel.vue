@@ -51,6 +51,13 @@ const reasoningVisibility = computed<ReasoningVisibility>({
   },
 });
 
+const streaming = computed<boolean>({
+  get: () => settings.value.appearance.streaming,
+  set: (value) => {
+    void settingsStore.setStreaming(value);
+  },
+});
+
 // ---------- Notifications ----------
 
 /// Two booleans bound to settings.notifications.{turnEnd,waitingForInput}.
@@ -222,6 +229,18 @@ function toggle(id: string) {
             Default for new chats. Each session can override this from its header.
           </p>
         </label>
+        <div class="field field-inline">
+          <label class="field-inline-label">
+            <ToggleSwitch v-model="streaming" />
+            <span>Stream assistant replies</span>
+          </label>
+          <p class="field-hint">
+            Off (default): the agent's reply appears in one chunk per
+            turn. On: text streams in word-by-word (livelier, but can
+            jitter under heavy load). Takes effect on the
+            <strong>next</strong> session you create.
+          </p>
+        </div>
       </div>
     </section>
 

@@ -4,6 +4,7 @@ exports[`IPC wire contracts Settings shape 1`] = `
 {
   "appearance": {
     "reasoningVisibility": "compact",
+    "streaming": false,
     "theme": "dark",
   },
   "layout": {
@@ -13,7 +14,7 @@ exports[`IPC wire contracts Settings shape 1`] = `
     "turnEnd": false,
     "waitingForInput": true,
   },
-  "version": 6,
+  "version": 7,
   "workspaces": {
     "defaultWorkspace": "D:\\repo\\dafman",
     "recent": [
@@ -28,6 +29,7 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
 {
   "appearance": {
     "reasoningVisibility": "compact",
+    "streaming": true,
     "theme": "dark",
   },
   "layout": {
@@ -51,7 +53,7 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
     "turnEnd": true,
     "waitingForInput": true,
   },
-  "version": 6,
+  "version": 7,
   "workspaces": {
     "defaultWorkspace": "",
     "recent": [],

@@ -49,6 +49,7 @@ describe("SettingsService", () => {
 			appearance: {
 				theme: "dark" as const,
 				reasoningVisibility: "compact" as const,
+				streaming: false,
 			},
 			layout: { dockview: null },
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
@@ -76,7 +77,7 @@ describe("SettingsService", () => {
 		};
 		await svc.update({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact" },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
 			layout: { dockview: blob },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
@@ -162,20 +163,66 @@ describe("SettingsService", () => {
 		const svc = SettingsService.loadOrDefault(path);
 		const settings = svc.get();
 		expect(settings.version).toBe(SETTINGS_VERSION);
-		// v6 adds notifications — defaults: turnEnd OFF (noisy),
-		// waitingForInput ON (high signal).
+		// v6 added notifications, v7 adds appearance.streaming —
+		// defaults: turnEnd OFF, waitingForInput ON, streaming OFF.
 		expect(settings.notifications).toEqual({
 			turnEnd: false,
 			waitingForInput: true,
 		});
+		expect(settings.appearance.streaming).toBe(false);
 		// Existing fields untouched.
 		expect(settings.workspaces.defaultWorkspace).toBe("/tmp");
+	});
+
+	test("v6 document migrates to v7 with default streaming = false", () => {
+		const dir = newTempDir();
+		const path = join(dir, "settings.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				version: 6,
+				appearance: { theme: "dark", reasoningVisibility: "compact" },
+				layout: { dockview: null },
+				workspaces: { recent: [], defaultWorkspace: "" },
+				notifications: { turnEnd: true, waitingForInput: true },
+			}),
+		);
+		const svc = SettingsService.loadOrDefault(path);
+		const settings = svc.get();
+		expect(settings.version).toBe(SETTINGS_VERSION);
+		// streaming defaults OFF — repeated-words bug at the SDK
+		// delta layer made the feature unreliable. Users can opt in
+		// from Settings → Appearance.
+		expect(settings.appearance.streaming).toBe(false);
+		// Existing notifications + theme untouched.
+		expect(settings.notifications.turnEnd).toBe(true);
+		expect(settings.appearance.theme).toBe("dark");
+	});
+
+	test("streaming coercion: explicit true preserved, non-boolean drops to false", () => {
+		const yes = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: true },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
+		});
+		expect(yes.appearance.streaming).toBe(true);
+
+		const bogus = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: "on" as unknown as boolean },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
+		});
+		expect(bogus.appearance.streaming).toBe(false);
 	});
 
 	test("notifications coercion drops non-boolean fields", () => {
 		const settings = migrate({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact" },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
 			layout: { dockview: null },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: {
@@ -193,7 +240,7 @@ describe("SettingsService", () => {
 	test("notifications: partial overrides preserve missing fields", () => {
 		const settings = migrate({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact" },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
 			layout: { dockview: null },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: true },

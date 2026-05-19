@@ -16,8 +16,8 @@ import type { AppErrorPayload } from "../app/errors";
 describe("IPC wire contracts", () => {
 	test("Settings shape", () => {
 		const sample: Settings = {
-			version: 6,
-			appearance: { theme: "dark", reasoningVisibility: "compact" },
+			version: 7,
+			appearance: { theme: "dark", reasoningVisibility: "compact", streaming: false },
 			layout: { dockview: null },
 			workspaces: {
 				recent: ["D:\\repo\\dafman", "C:\\code\\demo"],
@@ -30,8 +30,8 @@ describe("IPC wire contracts", () => {
 
 	test("Settings with persisted layout", () => {
 		const sample: Settings = {
-			version: 6,
-			appearance: { theme: "dark", reasoningVisibility: "compact" },
+			version: 7,
+			appearance: { theme: "dark", reasoningVisibility: "compact", streaming: true },
 			layout: {
 				dockview: {
 					grid: {

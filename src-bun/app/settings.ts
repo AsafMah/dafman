@@ -25,7 +25,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 7;
 /// Hard upper bound on the size of the workspace MRU. Anything beyond
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes
@@ -42,7 +42,14 @@ const VALID_REASONING: readonly ReasoningVisibility[] = [
 export function defaultSettings(): Settings {
 	return {
 		version: SETTINGS_VERSION,
-		appearance: { theme: "system", reasoningVisibility: "compact" },
+		// Default streaming = false: a botched rAF-throttle attempt
+		// (committed in 9474bf3, reverted in 51d5dd7) showed that
+		// per-delta reconciles cause jitter + repeated-words bugs.
+		// Until we have a reliable batching layer, default to non-
+		// streaming — the agent's reply lands in one chunk per
+		// `assistant.message` event. Users can opt back in via
+		// Settings → Appearance.
+		appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
 		layout: { dockview: null },
 		workspaces: { recent: [], defaultWorkspace: "" },
 		notifications: { turnEnd: false, waitingForInput: true },
@@ -59,7 +66,9 @@ function coerceAppearance(raw: unknown): Appearance {
 	const rv = VALID_REASONING.includes(obj.reasoningVisibility as ReasoningVisibility)
 		? (obj.reasoningVisibility as ReasoningVisibility)
 		: base.reasoningVisibility;
-	return { theme, reasoningVisibility: rv };
+	const streaming =
+		typeof obj.streaming === "boolean" ? obj.streaming : base.streaming;
+	return { theme, reasoningVisibility: rv, streaming };
 }
 
 /// Coerces a raw `layout` blob into the canonical shape. The dockview

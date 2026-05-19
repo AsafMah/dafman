@@ -73,7 +73,10 @@ let emitEvent: (payload: SessionEventPayload) => void = (payload) => {
 		eventType: payload.eventType,
 	});
 };
-const sessions = new SessionRegistry((payload) => emitEvent(payload));
+const sessions = new SessionRegistry(
+	(payload) => emitEvent(payload),
+	() => settings.get().appearance.streaming,
+);
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
 	maxRequestTime: 30000,

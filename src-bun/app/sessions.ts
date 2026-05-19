@@ -32,17 +32,31 @@ interface Entry {
 /// behaves identically to a freshly created one (permission handler,
 /// streaming mode, etc.). Per-call overrides (model, reasoningEffort,
 /// onEvent) are layered on top by each caller.
-function baseSessionConfig() {
+///
+/// `streaming` is read from a caller-supplied resolver so the bun
+/// side doesn't have to import `app/settings` (which would couple the
+/// session registry to the on-disk file). The resolver is captured
+/// at construction time; per-session lookups happen here.
+function baseSessionConfig(streaming: boolean) {
 	return {
 		onPermissionRequest: approveAll,
-		streaming: true as const,
+		streaming,
 	};
 }
 
 export class SessionRegistry {
 	private readonly entries = new Map<string, Entry>();
 
-	constructor(private readonly emit: Emit) {}
+	/// `streamingResolver` is called at session create/resume time to
+	/// pick the current SDK streaming mode. Decoupled from on-disk
+	/// settings so this module stays framework-agnostic (per AGENTS.md
+	/// `src-bun/app/` rule). The default `() => true` preserves the
+	/// pre-toggle behavior when the registry is constructed by tests
+	/// that don't care about the setting.
+	constructor(
+		private readonly emit: Emit,
+		private readonly streamingResolver: () => boolean = () => true,
+	) {}
 
 	async create(opts: { workingDirectory?: string } = {}): Promise<string> {
 		const client = tryGetClient();
@@ -56,7 +70,7 @@ export class SessionRegistry {
 		};
 		const wd = opts.workingDirectory?.trim();
 		const session = await client.createSession({
-			...baseSessionConfig(),
+			...baseSessionConfig(this.streamingResolver()),
 			onEvent: earlyForward,
 			...(wd ? { workingDirectory: wd } : {}),
 		});
@@ -99,7 +113,7 @@ export class SessionRegistry {
 		let session: CopilotSession;
 		try {
 			session = await client.resumeSession(sessionId, {
-				...baseSessionConfig(),
+				...baseSessionConfig(this.streamingResolver()),
 				onEvent: earlyForward,
 				...(opts.model ? { model: opts.model } : {}),
 				...(opts.reasoningEffort

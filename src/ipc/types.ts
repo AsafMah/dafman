@@ -21,6 +21,11 @@ export interface SessionHistoryCompactionResult {
 export interface Appearance {
   theme: ThemeChoice;
   reasoningVisibility: ReasoningVisibility;
+  /// Whether the SDK streams `assistant.message_delta` events for
+  /// the assistant's reply. `false` (default) renders only the
+  /// final `assistant.message` per turn. Takes effect on the NEXT
+  /// session created — existing sessions keep their original mode.
+  streaming: boolean;
 }
 
 export interface Settings {

@@ -11,8 +11,8 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 6,
-    appearance: { theme: "system", reasoningVisibility: "compact" },
+    version: 7,
+    appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
     layout: { dockview: null },
     workspaces: { recent: [], defaultWorkspace: "" },
     notifications: { turnEnd: false, waitingForInput: true },
@@ -70,6 +70,19 @@ export const useSettingsStore = defineStore("settings", () => {
       ...settings.value,
       appearance: { ...settings.value.appearance, reasoningVisibility },
     });
+  }
+
+  /// Partial update for the streaming toggle. Takes effect on the
+  /// NEXT session created — existing sessions keep their mode.
+  async function setStreaming(streaming: boolean): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        appearance: { ...settings.value.appearance, streaming },
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
   }
 
   /// Partial update for OS-notification toggles. Either key can be
@@ -158,6 +171,7 @@ export const useSettingsStore = defineStore("settings", () => {
     update,
     setTheme,
     setReasoningVisibility,
+    setStreaming,
     setNotifications,
     persistLayout,
     recordWorkspaceUse,
