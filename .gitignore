@@ -52,5 +52,12 @@ ehthumbs.db
 # Dafman app data (local-only)
 .dafman/
 
+# Personal Copilot CLI config — MCP servers, skills, agents.
+# These belong in `~/.copilot/` so each contributor's local IDE / MCP setup
+# stays private. See `~/.copilot/copilot-instructions.md` to bias the agent
+# toward IDE tools when you have them.
+.mcp.json
+.agents/
+
 # Test coverage
 coverage/
