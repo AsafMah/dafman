@@ -1,4 +1,17 @@
 import { createApp } from "vue";
+// Prism grammar registrations MUST happen before any module that
+// imports @lexical/code. In HMR (Vite dev) mode esbuild's dep
+// optimizer chunks the @lexical/code imports of `prism-objectivec`
+// and `prism-swift` into separate files but orders them BEFORE
+// the chunk that defines `Prism.languages.c`, so the transitive
+// `Prism.languages.extend("c", ...)` blows up at @lexical/code
+// load time. Importing prismExtraLanguages at the very top of
+// main.ts guarantees the full grammar set is registered before
+// any other module evaluates — including the dockview ChatPanel
+// and MessageComposer paths that pull @lexical/code in eagerly.
+// Re-imports from MessageContent.vue / src/lib/markdown.ts are
+// module-cache no-ops.
+import "./lexical/prismExtraLanguages";
 import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
 import ToastService from "primevue/toastservice";
