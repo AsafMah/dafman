@@ -12,6 +12,7 @@
 import { computed, onBeforeUnmount, ref, watchEffect } from "vue";
 import type { DockviewPanelApi } from "dockview-core";
 import { useSessionsStore } from "../stores/sessionsStore";
+import { indicatorStyle } from "../lib/notificationStyles";
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {
@@ -88,15 +89,18 @@ const displayTitle = computed(() => {
   return record.value?.title ?? sessionId.value.slice(0, 8);
 });
 
-/// Status indicator: `"pending"` when an SDK request is awaiting input
-/// (high-priority — amber dot), `"unseen"` when one or more turns
-/// completed off-screen (subtle — accent dot), or `null` when no
-/// indicator should render. Pending wins over unseen.
-const indicator = computed<"pending" | "unseen" | null>(() => {
-  if (record.value?.pendingRequest) return "pending";
-  if ((record.value?.unseenTurns ?? 0) > 0) return "unseen";
-  return null;
-});
+/// Status indicator for this session. Maps the record's
+/// `pendingRequest.type` + `unseenTurns` to one of four semantic
+/// styles (permission / userInput / elicitation / unseenActivity)
+/// via the shared `indicatorStyle` helper so the dot color, icon,
+/// and pulse behavior stay consistent with the Sessions sidebar
+/// row + the composer banner. `null` when nothing's worth surfacing.
+const indicator = computed(() =>
+  indicatorStyle(
+    record.value?.pendingRequest?.type,
+    record.value?.unseenTurns ?? 0,
+  ),
+);
 
 /// `pointerdown.stop` keeps the close click from bubbling into
 /// dockview's drag-start handler on the tab; `click.stop` keeps it
@@ -117,8 +121,10 @@ function onClose(event: MouseEvent) {
     <span
       v-if="indicator"
       class="chat-tab-dot"
-      :class="indicator === 'pending' ? 'chat-tab-dot-pending' : 'chat-tab-dot-unseen'"
-      :aria-label="indicator === 'pending' ? 'Awaiting input' : 'New activity'"
+      :class="{ 'chat-tab-dot-pulse': indicator.pulse }"
+      :style="{ '--dot-color': indicator.color }"
+      :aria-label="indicator.label"
+      :title="indicator.label"
     />
     <span class="chat-tab-title">{{ displayTitle }}</span>
     <button
@@ -235,19 +241,17 @@ function onClose(event: MouseEvent) {
   height: 0.55rem;
   border-radius: 50%;
   display: inline-block;
+  /* Color is driven by the type-specific --dot-color CSS variable
+   * set inline from `notificationStyles.ts`. The halo uses
+   * color-mix to derive a translucent ring from the same color. */
+  background: var(--dot-color, var(--p-primary-color));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot-color, var(--p-primary-color)) 35%, transparent);
 }
 
-.chat-tab-dot-pending {
-  /* High-priority — amber pulse so it draws the eye. */
-  background: var(--p-amber-500, #f59e0b);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-amber-500, #f59e0b) 35%, transparent);
+.chat-tab-dot.chat-tab-dot-pulse {
+  /* Pending requests pulse to draw the eye; unseen-activity dots
+   * stay static (no `chat-tab-dot-pulse` class). */
   animation: chat-tab-dot-pulse 1.6s ease-in-out infinite;
-}
-
-.chat-tab-dot-unseen {
-  /* Subtle — accent-colored to match the session's identity, no animation. */
-  background: var(--accent);
-  opacity: 0.85;
 }
 
 @keyframes chat-tab-dot-pulse {

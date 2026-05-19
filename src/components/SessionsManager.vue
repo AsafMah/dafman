@@ -17,6 +17,7 @@ import { useConfirm } from "primevue/useconfirm";
 import ConfirmPopup from "primevue/confirmpopup";
 import { useSessionsListStore } from "../stores/sessionsListStore";
 import { useSessionsStore } from "../stores/sessionsStore";
+import { indicatorStyle, type NotificationStyle } from "../lib/notificationStyles";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useClientStore } from "../stores/clientStore";
 import { useLayoutStore, composePanelTitle } from "../stores/layoutStore";
@@ -51,12 +52,10 @@ const recordsById = computed(() => {
   return map;
 });
 
-function indicatorFor(sessionId: string): "pending" | "unseen" | null {
+function indicatorFor(sessionId: string): NotificationStyle | null {
   const r = recordsById.value.get(sessionId);
   if (!r) return null;
-  if (r.pendingRequest) return "pending";
-  if (r.unseenTurns > 0) return "unseen";
-  return null;
+  return indicatorStyle(r.pendingRequest?.type, r.unseenTurns);
 }
 
 /// Within a workspace group, push currently-open sessions to the top
@@ -498,16 +497,10 @@ void toasts; // referenced inside async handlers
                 <span
                   v-if="indicatorFor(session.sessionId)"
                   class="session-dot"
-                  :class="
-                    indicatorFor(session.sessionId) === 'pending'
-                      ? 'session-dot-pending'
-                      : 'session-dot-unseen'
-                  "
-                  :aria-label="
-                    indicatorFor(session.sessionId) === 'pending'
-                      ? 'Awaiting input'
-                      : 'New activity'
-                  "
+                  :class="{ 'session-dot-pulse': indicatorFor(session.sessionId)!.pulse }"
+                  :style="{ '--dot-color': indicatorFor(session.sessionId)!.color }"
+                  :aria-label="indicatorFor(session.sessionId)!.label"
+                  :title="indicatorFor(session.sessionId)!.label"
                 />
                 {{ sessionLabel(session) }}
               </span>
@@ -835,17 +828,12 @@ void toasts; // referenced inside async handlers
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
+  background: var(--dot-color, var(--p-primary-color));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot-color, var(--p-primary-color)) 35%, transparent);
 }
 
-.session-dot-pending {
-  background: var(--p-amber-500, #f59e0b);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-amber-500, #f59e0b) 35%, transparent);
+.session-dot.session-dot-pulse {
   animation: session-dot-pulse 1.6s ease-in-out infinite;
-}
-
-.session-dot-unseen {
-  background: var(--p-primary-color);
-  opacity: 0.85;
 }
 
 @keyframes session-dot-pulse {

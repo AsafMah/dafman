@@ -24,6 +24,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 import type { ComposerSubmitPayload } from "../lexical/plugins";
+import { styleFor } from "../lib/notificationStyles";
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -237,6 +238,15 @@ async function sendMessage(payload: ComposerSubmitPayload) {
 function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
+
+/// Type-aware styling for the pending-request banner. Pulls the
+/// color + icon + label from the shared `notificationStyles` so the
+/// banner matches the dot color on the tab + sidebar row.
+const pendingStyle = computed(() => {
+  const req = ambient.value.pendingRequest;
+  if (!req) return null;
+  return styleFor(req.type);
+});
 </script>
 
 <template>
@@ -335,19 +345,24 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
     <!-- Pending-request banner. Visible whenever the SDK is blocked
          on user input (permission / user_input / elicitation). Reads
          from `ambient.pendingRequest` (set by the reducer's
-         notification handlers); the actual accept/deny UI is a
-         follow-up ticket — for now we just surface the state so the
-         user knows what they need to action and from where. -->
-    <div v-if="ambient.pendingRequest" class="pending-banner" role="status">
-      <i class="pi pi-bell pending-banner-icon" aria-hidden="true" />
+         notification handlers); style (color + icon + label) comes
+         from `notificationStyles.ts` so the banner's tint matches
+         the dot on the tab + sidebar. The actual accept/deny UI is
+         a follow-up ticket — for now we just surface the state so
+         the user knows what's blocking and from where. -->
+    <div
+      v-if="ambient.pendingRequest && pendingStyle"
+      class="pending-banner"
+      role="status"
+      :style="{ '--banner-color': pendingStyle.color }"
+    >
+      <i
+        class="pi pending-banner-icon"
+        :class="`pi-${pendingStyle.iconSuffix}`"
+        aria-hidden="true"
+      />
       <div class="pending-banner-body">
-        <span class="pending-banner-kind">{{
-          ambient.pendingRequest.type === "permission"
-            ? "Permission requested"
-            : ambient.pendingRequest.type === "userInput"
-              ? "Input requested"
-              : "Awaiting response"
-        }}</span>
+        <span class="pending-banner-kind">{{ pendingStyle.label }}</span>
         <span class="pending-banner-message">{{ ambient.pendingRequest.message }}</span>
       </div>
     </div>
@@ -511,9 +526,11 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   flex: 0 0 auto;
 }
 
-/* Pending-request banner: amber tint, sits between the message list
- * and the composer. Mirrors the inner-indicator dot's coloring so
- * the tab dot + banner read as the same signal. */
+/* Pending-request banner: type-tinted (color comes from
+ * `notificationStyles.ts` via the `--banner-color` inline custom
+ * property). Matches the dot color on the tab + sidebar so the
+ * banner reads as the same signal. Sits between the message list
+ * and the composer. */
 .pending-banner {
   flex: 0 0 auto;
   display: flex;
@@ -522,14 +539,14 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   padding: 0.55rem 0.85rem;
   margin: 0.5rem 0.5rem 0;
   border-radius: var(--p-border-radius-md);
-  border: 1px solid color-mix(in srgb, var(--p-amber-500, #f59e0b) 40%, transparent);
-  background: color-mix(in srgb, var(--p-amber-500, #f59e0b) 14%, var(--p-content-background));
+  border: 1px solid color-mix(in srgb, var(--banner-color, var(--p-primary-color)) 40%, transparent);
+  background: color-mix(in srgb, var(--banner-color, var(--p-primary-color)) 14%, var(--p-content-background));
   color: var(--p-text-color);
 }
 
 .pending-banner-icon {
   font-size: 1.05rem;
-  color: var(--p-amber-500, #f59e0b);
+  color: var(--banner-color, var(--p-primary-color));
 }
 
 .pending-banner-body {
@@ -543,7 +560,7 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--p-amber-500, #f59e0b);
+  color: var(--banner-color, var(--p-primary-color));
 }
 
 .pending-banner-message {
