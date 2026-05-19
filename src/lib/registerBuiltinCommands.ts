@@ -20,8 +20,10 @@
 // active session changes / models load / MRU changes.
 
 import { watch } from "vue";
+import type { ConfirmationOptions } from "primevue/confirmationoptions";
 import { invokeCommand } from "../ipc/invoke";
 import { useCommandRegistry, type Command } from "../stores/commandRegistry";
+import { useClientStore } from "../stores/clientStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -31,14 +33,28 @@ import type { SessionMode } from "../ipc/types";
 
 const SESSIONS_PANEL_ID = "sessions-manager";
 
+/// Confirmation surface — usually `primevue/useconfirm`'s instance.
+/// Typed minimally so tests can pass a stub without dragging PrimeVue
+/// in. Caller (App.vue setup) is responsible for resolving it from
+/// the component context where `useConfirm()` is valid.
+export interface ConfirmHandle {
+  require(options: ConfirmationOptions): void;
+}
+
+export interface RegisterOptions {
+  confirm?: ConfirmHandle;
+}
+
 /// Top-level entry point. Idempotent — safe to call from HMR boundaries.
-export function registerBuiltinCommands(): void {
+export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   const registry = useCommandRegistry();
+  const clientStore = useClientStore();
   const layoutStore = useLayoutStore();
   const sessionsStore = useSessionsStore();
   const settingsStore = useSettingsStore();
   const modelsStore = useModelsStore();
   const toasts = useToastStore();
+  const confirm = opts.confirm;
 
   // ---------- Static: navigation / app actions ----------
   const statics: Command[] = [
@@ -106,6 +122,7 @@ export function registerBuiltinCommands(): void {
       group: "Sessions",
       icon: "pi pi-plus",
       keywords: ["create", "start", "chat"],
+      when: () => clientStore.ready,
       run: async () => {
         const record = await sessionsStore.createSession();
         if (record) layoutStore.addPanel(record.id);
@@ -190,6 +207,7 @@ export function registerBuiltinCommands(): void {
               layoutStore.addPanel(record.id);
             }
           },
+          when: () => clientStore.ready,
         });
       }
       // Sweep entries that fell off the MRU.
@@ -218,7 +236,7 @@ export function registerBuiltinCommands(): void {
           group: "Active Session",
           icon: "pi pi-server",
           keywords: ["model", m.id, m.name],
-          when: () => layoutStore.activeSessionId !== null,
+          when: () => clientStore.ready && layoutStore.activeSessionId !== null,
           run: async () => {
             const sid = layoutStore.activeSessionId;
             if (!sid) return;
@@ -297,7 +315,7 @@ export function registerBuiltinCommands(): void {
       group: "Active Session",
       icon,
       keywords: ["mode", mode],
-      when: () => layoutStore.activeSessionId !== null,
+      when: () => clientStore.ready && layoutStore.activeSessionId !== null,
       run: async () => {
         const sid = layoutStore.activeSessionId;
         if (!sid) return;
@@ -315,14 +333,34 @@ export function registerBuiltinCommands(): void {
     keywords: ["close all", "default", "restore", "factory"],
     run: () => {
       const openSessionCount = sessionsStore.sessions.length;
-      layoutStore.resetToDefault();
-      if (openSessionCount > 0) {
-        toasts.info(
-          "Layout reset",
-          `Closed ${openSessionCount} open session${openSessionCount === 1 ? "" : "s"}. Resume any of them from the Sessions sidebar.`,
-        );
+      const doReset = () => {
+        layoutStore.resetToDefault();
+        if (openSessionCount > 0) {
+          toasts.info(
+            "Layout reset",
+            `Closed ${openSessionCount} open session${openSessionCount === 1 ? "" : "s"}. Resume any of them from the Sessions sidebar.`,
+          );
+        } else {
+          toasts.info("Layout reset", "Sessions sidebar re-opened.");
+        }
+      };
+      // Confirm when 2+ sessions are open. The action is reversible
+      // (sessions stay resumable from the Sessions Manager) but
+      // mass-closing tabs by accident is annoying enough that an
+      // explicit "yes" feels right. Single-session closes go through
+      // without confirm — that's the same friction the dockview X
+      // already requires anyway.
+      if (openSessionCount >= 2 && confirm) {
+        confirm.require({
+          message: `Reset layout? This will close ${openSessionCount} open sessions. They'll still be available in the Sessions Manager and can be resumed from there.`,
+          header: "Reset Layout",
+          icon: "pi pi-refresh",
+          acceptLabel: "Reset",
+          rejectLabel: "Cancel",
+          accept: doReset,
+        });
       } else {
-        toasts.info("Layout reset", "Sessions sidebar re-opened.");
+        doReset();
       }
     },
   });

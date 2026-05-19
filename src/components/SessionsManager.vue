@@ -236,6 +236,12 @@ function onRefresh() {
   void sessionsList.refresh();
 }
 
+/// Set of session ids the user is currently resuming via this
+/// sidebar. Drives a per-row spinner so a clicked "Resume" row gives
+/// immediate visual feedback during the ~200-800 ms it takes the SDK
+/// `resumeSession` RPC to read session.db + replay history.
+const resumingIds = ref<Set<string>>(new Set());
+
 async function onResume(session: SessionMetadataSummary) {
   // Already-open sessions: activate the panel and focus the composer
   // rather than no-op. Clicking the row in the sidebar is the most
@@ -251,11 +257,22 @@ async function onResume(session: SessionMetadataSummary) {
     );
     return;
   }
+  // Optimistic flip + finally-cleanup so a failed resume doesn't
+  // strand the spinner. The Set copy/reassign dance is so Vue's
+  // reactivity picks up the change — mutating the underlying Set
+  // doesn't notify watchers.
+  const next = new Set(resumingIds.value);
+  next.add(session.sessionId);
+  resumingIds.value = next;
   try {
     const record = await sessionsStore.restoreSession(session.sessionId);
     if (record) layoutStore.addPanel(record.id);
   } catch {
     /* toast already shown */
+  } finally {
+    const after = new Set(resumingIds.value);
+    after.delete(session.sessionId);
+    resumingIds.value = after;
   }
 }
 
@@ -443,11 +460,15 @@ void toasts; // referenced inside async handlers
             v-for="session in sortedGroupSessions(group)"
             :key="session.sessionId"
             class="session-row"
-            :class="{ 'is-open': openSessionIds.has(session.sessionId) }"
+            :class="{
+              'is-open': openSessionIds.has(session.sessionId),
+              'is-resuming': resumingIds.has(session.sessionId),
+            }"
           >
             <button
               type="button"
               class="session-main"
+              :disabled="resumingIds.has(session.sessionId)"
               :title="session.sessionId"
               :aria-label="
                 openSessionIds.has(session.sessionId)
@@ -458,14 +479,24 @@ void toasts; // referenced inside async handlers
             >
               <span class="session-label">{{ sessionLabel(session) }}</span>
               <span class="session-meta">
-                <span>{{ relativeTime(session.modifiedTime) }}</span>
                 <span
-                  v-if="openSessionIds.has(session.sessionId)"
-                  class="open-badge"
-                  title="Currently open in a panel"
+                  v-if="resumingIds.has(session.sessionId)"
+                  class="resuming-pill"
+                  aria-label="Resuming"
                 >
-                  open
+                  <i class="pi pi-spin pi-spinner" aria-hidden="true" />
+                  Resuming…
                 </span>
+                <template v-else>
+                  <span>{{ relativeTime(session.modifiedTime) }}</span>
+                  <span
+                    v-if="openSessionIds.has(session.sessionId)"
+                    class="open-badge"
+                    title="Currently open in a panel"
+                  >
+                    open
+                  </span>
+                </template>
               </span>
             </button>
             <Button
@@ -714,6 +745,23 @@ void toasts; // referenced inside async handlers
 
 .session-row.is-open {
   background: color-mix(in srgb, var(--p-primary-color) 10%, transparent);
+}
+
+.session-row.is-resuming {
+  background: color-mix(in srgb, var(--p-primary-color) 14%, transparent);
+}
+
+.session-row.is-resuming .session-main {
+  cursor: progress;
+}
+
+.resuming-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--p-primary-color);
+  font-style: italic;
 }
 
 .session-main {

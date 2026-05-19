@@ -6,6 +6,7 @@ import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
 import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
 import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
+import BootSplash from "./components/BootSplash.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
@@ -13,6 +14,9 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { useToastStore } from "./stores/toastStore";
 import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
 import { useModelsStore } from "./stores/modelsStore";
+import { useBootStore } from "./stores/bootStore";
+import { useConfirm } from "primevue/useconfirm";
+import ConfirmDialog from "primevue/confirmdialog";
 import { resolveIsDark } from "./lib/theme";
 import { registerBuiltinCommands } from "./lib/registerBuiltinCommands";
 
@@ -22,7 +26,9 @@ const settingsStore = useSettingsStore();
 const toastStore = useToastStore();
 const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
+const bootStore = useBootStore();
 const primeToast = useToast();
+const primeConfirm = useConfirm();
 
 const { sessions } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
@@ -75,24 +81,54 @@ onMounted(async () => {
     prefersDark.value = e.matches;
   });
   applyThemeClass(isDarkMode.value);
-  try {
-    await settingsStore.load();
-  } catch {
-    /* toast already shown */
-  }
-  try {
-    await clientStore.createClient();
-  } catch {
-    /* toast already shown */
-  }
+
+  // Settings + client load in parallel — they don't depend on each
+  // other. Previously these were sequential, costing ~50-200 ms of
+  // settings file I/O against the ~1-3 s CLI startup. We track each
+  // independently so the BootSplash status text can flip to "Loading
+  // settings…" if that piece is the only thing still pending (rare
+  // — usually it finishes first).
+  const settingsLoad = settingsStore
+    .load()
+    .then((s) => {
+      bootStore.markSettingsLoaded();
+      return s;
+    })
+    .catch((err) => {
+      // Don't fail the whole boot for settings — the defaults are
+      // good enough to get the user into the app. Toast already
+      // surfaced by the store.
+      bootStore.markSettingsLoaded();
+      console.error("[boot] settings.load failed; continuing with defaults", err);
+      return null;
+    });
+
+  const clientCreate = clientStore
+    .createClient()
+    .then(() => {
+      bootStore.markClientReady();
+    })
+    .catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      bootStore.markFailed(message);
+      // Re-throw is unnecessary — Promise.all below will see the
+      // failure via clientStore.ready remaining false.
+    });
+
+  await Promise.all([settingsLoad, clientCreate]);
+
+  // If client failed, leave the splash up so the user sees the
+  // error + reload button. They can't do anything useful without
+  // the client anyway.
+  if (!clientStore.ready) return;
 
   // Seed the command palette catalog. Static commands land
   // immediately; "Switch Model: …" entries fill in when
   // modelsStore.load() resolves (`watch(immediate)` re-fires on
   // each models[] mutation, registry replaces by id). Safe to call
-  // before the client is up — none of the commands run at register
+  // before sessions restore — none of the commands run at register
   // time.
-  registerBuiltinCommands();
+  registerBuiltinCommands({ confirm: primeConfirm });
   // Lazy model catalog warm-up so palette commands have entries to
   // surface without the user opening the per-session model picker
   // first. Failures are toasted by modelsStore itself.
@@ -100,31 +136,25 @@ onMounted(async () => {
     /* toast already shown */
   });
 
-  // Restore previously-open sessions. We resume *first*, then hand the
-  // layout JSON to dockview — the slot can't render a session that
-  // isn't in the store yet, and dockview won't call `addPanel` for
-  // panels we drop from the layout. This intentionally runs after the
-  // client is up (the SDK rejects `resumeSession` otherwise).
-  if (clientStore.ready) {
-    await restoreFromLayout();
-  }
+  // Restore previously-open sessions. The resume calls fan out in
+  // parallel (`Promise.all`); we report per-session completion to
+  // the boot store so the splash can show "Restoring 3 of 5…"
+  // without us threading progress through every layer.
+  await restoreFromLayout();
 
   // Open the Sessions Manager by default. We do this only when the
   // persisted dockview JSON didn't contain it — i.e. first launch, or
   // the user explicitly closed it last time we don't want to reopen it.
-  // The presence check looks at the layout we tried to restore (so it
-  // covers the layout-not-ready-yet case too).
   if (!persistedLayoutHasPanel(SESSIONS_PANEL_ID)) {
-    // Defer until the dockview api is up (`onDockReady` will run by
-    // then, but we mounted before the child component, so check via
-    // the store getter rather than assuming).
     setTimeout(openSessionsByDefault, 0);
   }
 
-  // Dev-only: auto-create a session when none exist and the URL carries
-  // `?autosession=1`. Used by the typing diagnostic flow so we can see
-  // the composer mount without manually clicking "New Session". One-shot
-  // per page load; will not loop on HMR refreshes.
+  // Boot complete — splash fades out.
+  bootStore.markReady();
+
+  // Dev-only: auto-create a session when none exist and the URL
+  // carries `?autosession=1`. One-shot per page load; will not loop
+  // on HMR refreshes.
   if (
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("autosession")
@@ -149,15 +179,9 @@ const pendingRestoreLayout = ref<unknown | null>(null);
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;
   if (!layout || typeof layout !== "object") return;
-  // Settings panel is intentionally a "summon when needed" surface —
-  // restoring it on every launch is annoying because most users open
-  // it once and forget. Strip it from the layout before handing the
-  // blob to dockview so it starts closed regardless of last session.
   const sanitized = stripPanelFromLayout(layout, SETTINGS_PANEL_ID);
   const sessionIds = extractChatPanelIds(sanitized);
   if (sessionIds.length === 0) {
-    // Even with no chat sessions to resume, hand the layout to
-    // dockview so sidebar panels (Sessions / Settings) restore.
     if (layoutStore.api) {
       layoutStore.restore(sanitized);
     } else {
@@ -165,13 +189,16 @@ async function restoreFromLayout() {
     }
     return;
   }
-  // Best-effort resume each CLI-side session referenced by the layout.
-  // Sidebar panel ids (sessions-manager, settings-panel, ...) are
-  // filtered out of `sessionIds` already — we never ask the SDK to
-  // resume those, which used to produce a flurry of spurious
-  // "Session not restored" toasts on every reload.
+  // Flip the boot store into "sessions" phase so the splash status
+  // text becomes "Restoring sessions… N of M". Each restoreSession
+  // bumps the counter when it settles (success or failure).
+  bootStore.beginSessions(sessionIds.length);
   await Promise.all(
-    sessionIds.map((id) => sessionsStore.restoreSession(id)),
+    sessionIds.map((id) =>
+      sessionsStore
+        .restoreSession(id)
+        .finally(() => bootStore.markSessionRestored()),
+    ),
   );
   // Always apply the full layout, even when no sessions resumed —
   // preserving the user's grid layout is more important than hiding
@@ -430,10 +457,16 @@ function openSessionsByDefault(attempt = 0) {
 <template>
   <main class="app-root" :class="{ 'app-dark': isDarkMode }">
     <Toast :on-click="closeToast" />
+    <ConfirmDialog />
     <!-- Command palette: global Ctrl/Cmd+K overlay. Mounted once at
          the app root so the listener is alive regardless of which
          panel has focus. -->
     <CommandPalette />
+    <!-- Boot splash: catches input until settings + client are up
+         and previously-open sessions have resumed. Fades on
+         bootStore.markReady(); stays put with an error + reload
+         button on bootStore.markFailed(). -->
+    <BootSplash />
 
     <!-- App body: persistent ActivityBar on the far left + dockview
          body taking the rest. The ActivityBar hosts everything that
