@@ -213,4 +213,51 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     fire(event("s1", "assistant.turn_end", { turnId: "t2" }));
     expect(record!.unseenTurns).toBe(2);
   });
+
+  test("OS notification fires for every pending-request channel AND turn_end (not just permission)", async () => {
+    // Pins the contract the user surfaced after the first
+    // notifications PR: notifications must cover ALL of
+    // permission.requested, user_input.requested, elicitation.requested,
+    // AND assistant.turn_end — not just permission. Each event for
+    // a non-active session should produce a notificationsStore.notify
+    // call with the right `kind`.
+    const { useNotificationsStore } = await import("../notificationsStore");
+    const { useSettingsStore } = await import("../settingsStore");
+    const notifications = useNotificationsStore();
+    const settings = useSettingsStore();
+    // Allow both kinds so we can observe firing decisions purely
+    // through the recorded calls below.
+    settings.settings.notifications = { turnEnd: true, waitingForInput: true };
+    const calls: Array<{ kind: string; title: string; body: string }> = [];
+    // Spy by overwriting the action. Pinia lets us reassign directly.
+    notifications.notify = (opts) => {
+      calls.push({ kind: opts.kind, title: opts.title, body: opts.body });
+      return true;
+    };
+
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+    });
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    await store.restoreSession("s1");
+
+    fire(event("s1", "permission.requested", { tool: "shell", summary: "run x" }));
+    fire(event("s1", "user_input.requested", { prompt: "your name?" }));
+    fire(event("s1", "elicitation.requested", { url: "https://oauth.example" }));
+    fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
+
+    // 3 waitingForInput + 1 turnEnd = 4 notify calls.
+    expect(calls).toHaveLength(4);
+    const kinds = calls.map((c) => c.kind);
+    expect(kinds.filter((k) => k === "waitingForInput")).toHaveLength(3);
+    expect(kinds.filter((k) => k === "turnEnd")).toHaveLength(1);
+    // The waitingForInput bodies carry the SDK-supplied summary so
+    // the notification shows what's being asked.
+    expect(calls.find((c) => c.body === "run x")).toBeTruthy();
+    expect(calls.find((c) => c.body === "your name?")).toBeTruthy();
+    expect(calls.find((c) => c.body === "https://oauth.example")).toBeTruthy();
+  });
 });
