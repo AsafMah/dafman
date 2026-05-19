@@ -19,6 +19,7 @@ import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
 import TreeSelect from "primevue/treeselect";
 import type { TreeNode } from "primevue/treenode";
+import ToggleSwitch from "primevue/toggleswitch";
 import type {
   ModelSummary,
   ReasoningVisibility,
@@ -227,6 +228,11 @@ function onResetApprovals() {
   void sessionsStore.resetSessionApprovals(props.sessionId);
 }
 
+const approveAll = computed(() => record.value?.approveAll ?? false);
+function onToggleApproveAll(next: boolean) {
+  void sessionsStore.setSessionApproveAll(props.sessionId, next);
+}
+
 /// Workspace label shown in the tab strip — basename only, so it
 /// stays short. Full absolute path is in the tooltip.
 const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
@@ -394,6 +400,20 @@ function onWorkspaceClick() {
             <i class="pi pi-folder" aria-hidden="true" />
             <span class="workspace-path-text">Default</span>
           </div>
+        </div>
+        <div class="option-row option-row-toggle">
+          <div class="option-row-label">
+            <span class="option-row-title">Auto-approve all tools</span>
+            <span class="option-row-hint">
+              Skip permission prompts for the rest of this session.
+              "Reset approvals" below clears any per-tool memory the
+              SDK kept; this toggle controls dafman's prompt gate.
+            </span>
+          </div>
+          <ToggleSwitch
+            :model-value="approveAll"
+            @update:model-value="onToggleApproveAll"
+          />
         </div>
         <div class="option-actions">
           <Button
@@ -664,6 +684,34 @@ function onWorkspaceClick() {
   justify-content: flex-end;
   padding-top: 0.25rem;
   border-top: 1px solid var(--p-content-border-color);
+}
+
+.option-row-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.option-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.option-row-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+
+.option-row-hint {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  line-height: 1.4;
 }
 
 .workspace-path {

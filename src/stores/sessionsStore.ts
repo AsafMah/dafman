@@ -686,6 +686,14 @@ export const useSessionsStore = defineStore("sessions", () => {
     sessionId: string,
     enabled: boolean,
   ): Promise<void> {
+    // Playground sentinel: skip the RPC (no real bun session) but
+    // still mirror the flag onto the in-memory record so the UI
+    // reflects the toggle for inline testing.
+    if (sessionId === PLAYGROUND_PENDING_SESSION_ID) {
+      const record = sessions.value.find((s) => s.id === sessionId);
+      if (record) record.approveAll = enabled;
+      return;
+    }
     const toasts = useToastStore();
     try {
       await invokeCommand("setSessionApproveAll", { sessionId, enabled });

@@ -89,8 +89,12 @@ const asElicitation = computed(() =>
     : null,
 );
 
-// Permission actions. Only Allow-once / Reject — see header comment
-// for why approve-for-session is gone.
+// Permission actions. Only Allow-once / Reject / Allow-and-stop-asking
+// — see header comment for why approve-for-session is gone. The
+// "Allow + don't ask again" path flips the registry-side approveAll
+// toggle on the session so subsequent prompts auto-approve without
+// surfacing a card. User can revert via the session-header gear
+// menu (the toggle there mirrors the same state).
 async function permissionRespond(
   decision: "approveOnce" | "reject",
 ): Promise<void> {
@@ -99,6 +103,23 @@ async function permissionRespond(
     requestId: props.requestId,
     response: { kind: "permission", decision },
   });
+}
+
+async function permissionAllowAndStopAsking(): Promise<void> {
+  // Approve this request first, THEN flip the toggle. Doing it in
+  // the other order would race the next-emit window: the registry
+  // could short-circuit a queued sibling request before we got to
+  // resolve this one.
+  await sessionsStore.respondToPending({
+    sessionId: props.sessionId,
+    requestId: props.requestId,
+    response: { kind: "permission", decision: "approveOnce" },
+  });
+  await sessionsStore.setSessionApproveAll(props.sessionId, true);
+  toasts.info(
+    "Auto-approve enabled for this session",
+    "Toggle it back from the session options gear if you want prompts again.",
+  );
 }
 
 // User-input actions.
@@ -199,6 +220,13 @@ async function elicitationCancel(
           severity="danger"
           size="small"
           @click="permissionRespond('reject')"
+        />
+        <Button
+          label="Allow + don't ask again"
+          severity="secondary"
+          size="small"
+          icon="pi pi-bolt"
+          @click="permissionAllowAndStopAsking"
         />
         <Button
           label="Allow once"
