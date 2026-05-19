@@ -148,92 +148,52 @@ async function scrollToBottom() {
 }
 
 let isFirstBatch = true;
-/// rAF-throttle state for the streaming-delta hot path. Streaming
-/// chat = many message_delta events per second (often 30+). Each one
-/// previously triggered:
-///   - a full `processEvents` reducer pass
-///   - a new `items.value = result.items` array (Vue diffs whole
-///     transcript)
-///   - a `scrollToBottom()` layout-forcing read
-///
-/// Burst delta load made the spinner stutter, the transcript jitter,
-/// and Lexical reconciles back up. Coalesce them to one drain per
-/// animation frame — `processedEvents` watermark already gives us
-/// the right "where did I leave off" anchor, so the rAF callback
-/// just runs the same logic on whatever's accumulated.
-let drainRaf: number | null = null;
 
 watch(
   () => props.events.length,
   (len) => {
     if (processedEvents >= len) return;
-    // Schedule a drain on the next frame if one isn't already
-    // pending. By the time the rAF fires, `props.events.length` may
-    // have advanced further — that's fine, we process whatever
-    // accumulated from `processedEvents` up to the current length.
-    if (drainRaf !== null) return;
-    drainRaf = requestAnimationFrame(() => {
-      drainRaf = null;
-      drainEvents();
+    const fresh = props.events.slice(processedEvents);
+    processedEvents = len;
+    // The very first batch is replay (history hydrated from
+    // `getMessages()` + any in-flight live events that already
+    // arrived). Skip "Model changed" toasts during it — they're
+    // already-happened changes, not actionable signal.
+    const live = !isFirstBatch;
+    isFirstBatch = false;
+    const result = processEvents(items.value, ambient.value, fresh, idCounter, {
+      live,
     });
+    items.value = result.items;
+    ambient.value = result.ambient;
+    if (result.idle || result.error) isSendingFallback.value = false;
+    for (const t of result.toasts) {
+      switch (t.severity) {
+        case "success":
+          toasts.success(t.summary, t.detail);
+          break;
+        case "warn":
+          toasts.warn(t.summary, t.detail);
+          break;
+        case "error":
+          toasts.error(t.summary, t.detail);
+          break;
+        default:
+          toasts.info(t.summary, t.detail);
+      }
+    }
+    if (result.error) {
+      const lastSystem = [...result.items]
+        .reverse()
+        .find((i) => i.kind === "system" && i.severity === "error");
+      if (lastSystem && lastSystem.kind === "system") {
+        toasts.error("Session error", lastSystem.text);
+      }
+    }
+    scrollToBottom();
   },
   { immediate: true },
 );
-
-/// Idempotent drain: process every event between `processedEvents`
-/// and the current `props.events.length`. Bypassing rAF (e.g. on
-/// session error / idle where we want immediate UI sync) is done
-/// by calling this directly in the watch above — currently every
-/// drain goes through rAF.
-function drainEvents() {
-  const len = props.events.length;
-  if (processedEvents >= len) return;
-  const fresh = props.events.slice(processedEvents);
-  processedEvents = len;
-  // The very first batch is replay (history hydrated from
-  // `getMessages()` + any in-flight live events that already
-  // arrived). Skip "Model changed" toasts during it — they're
-  // already-happened changes, not actionable signal.
-  const live = !isFirstBatch;
-  isFirstBatch = false;
-  const result = processEvents(items.value, ambient.value, fresh, idCounter, {
-    live,
-  });
-  items.value = result.items;
-  ambient.value = result.ambient;
-  if (result.idle || result.error) isSendingFallback.value = false;
-  for (const t of result.toasts) {
-    switch (t.severity) {
-      case "success":
-        toasts.success(t.summary, t.detail);
-        break;
-      case "warn":
-        toasts.warn(t.summary, t.detail);
-        break;
-      case "error":
-        toasts.error(t.summary, t.detail);
-        break;
-      default:
-        toasts.info(t.summary, t.detail);
-    }
-  }
-  if (result.error) {
-    const lastSystem = [...result.items]
-      .reverse()
-      .find((i) => i.kind === "system" && i.severity === "error");
-    if (lastSystem && lastSystem.kind === "system") {
-      toasts.error("Session error", lastSystem.text);
-    }
-  }
-  scrollToBottom();
-}
-
-onBeforeUnmount(() => {
-  if (drainRaf !== null) {
-    cancelAnimationFrame(drainRaf);
-    drainRaf = null;
-  }
-});
 
 watch(
   () => props.sessionId,
@@ -242,12 +202,6 @@ watch(
     ambient.value = defaultAmbient();
     isSendingFallback.value = false;
     processedEvents = props.events.length;
-    // Cancel any pending drain for the previous session — its
-    // payload is stale relative to the freshly-zeroed items array.
-    if (drainRaf !== null) {
-      cancelAnimationFrame(drainRaf);
-      drainRaf = null;
-    }
   },
 );
 
