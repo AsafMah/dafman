@@ -73,8 +73,16 @@ let emitEvent: (payload: SessionEventPayload) => void = (payload) => {
 		eventType: payload.eventType,
 	});
 };
+let emitPending: (payload: import("./rpc").PendingRequestPayload) => void = (payload) => {
+	log.warn("dropped pending request before webview ready", {
+		sessionId: payload.sessionId,
+		kind: payload.kind,
+		requestId: payload.requestId,
+	});
+};
 const sessions = new SessionRegistry(
 	(payload) => emitEvent(payload),
+	(payload) => emitPending(payload),
 	() => settings.get().appearance.streaming,
 );
 
@@ -188,6 +196,29 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 					return false;
 				}
 			}),
+			openUrl: rpcGuard(async ({ url }) => {
+				const trimmed = url.trim();
+				// Strict scheme allowlist. The handler is reachable by the
+				// renderer + any compromised renderer should not be able to
+				// shell out to arbitrary URI handlers (file:, javascript:,
+				// custom protocol handlers like ms-windows-store:, etc.).
+				if (!/^https?:\/\//i.test(trimmed)) {
+					log.warn("openUrl rejected non-http scheme", { url: trimmed });
+					return false;
+				}
+				try {
+					return Utils.openExternal(trimmed);
+				} catch (err) {
+					log.warn("openUrl threw", {
+						url: trimmed,
+						error: err instanceof Error ? err.message : String(err),
+					});
+					return false;
+				}
+			}),
+			respondToRequest: rpcGuard(async (params) =>
+				sessions.respondToRequest(params),
+			),
 			browseDirectory: rpcGuard(async ({ prefix }) =>
 				browseDirectorySync(prefix),
 			),
@@ -288,6 +319,11 @@ emitEvent = (payload) => {
 	(mainWindow.webview.rpc as unknown as {
 		send: { sessionEvent: (p: SessionEventPayload) => void };
 	}).send.sessionEvent(payload);
+};
+emitPending = (payload) => {
+	(mainWindow.webview.rpc as unknown as {
+		send: { pendingRequest: (p: import("./rpc").PendingRequestPayload) => void };
+	}).send.pendingRequest(payload);
 };
 
 log.info("dafman started", { version: "0.1.0" });

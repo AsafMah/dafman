@@ -55,7 +55,7 @@ const recordsById = computed(() => {
 function indicatorFor(sessionId: string): NotificationStyle | null {
   const r = recordsById.value.get(sessionId);
   if (!r) return null;
-  return indicatorStyle(r.pendingRequest?.type, r.isThinking, r.unseenTurns);
+  return indicatorStyle(r.pendingRequests[0]?.kind, r.isThinking, r.unseenTurns);
 }
 
 /// Within a workspace group, push currently-open sessions to the top

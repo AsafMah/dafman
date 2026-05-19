@@ -139,6 +139,98 @@ export interface SessionEventPayload {
 	timestamp?: string;
 }
 
+/// Permission request surfaced to the renderer. Mirrors the SDK's
+/// `PermissionRequest` shape with the bits we use. `args` is the
+/// opaque tool argument payload — typing it as `unknown` instead of
+/// the SDK's discriminated union avoids dragging the whole SDK type
+/// tree into the wire surface, and the renderer treats it as
+/// display-only (formatted JSON) anyway.
+export interface PermissionRequestData {
+	kind: "shell" | "write" | "mcp" | "read" | "url" | "custom-tool" | "memory" | "hook";
+	toolCallId?: string;
+	/// Best-effort summary string we compute on the bun side from the
+	/// SDK's `PermissionRequest` discriminated union (e.g. a shell
+	/// command line, a path being written, the URL being fetched).
+	/// Always populated so the renderer doesn't need to know the SDK
+	/// shape; full request is in `raw` for diagnostics.
+	summary: string;
+	/// The complete SDK request as a plain JS object, for diagnostic
+	/// display and any future ruleset / "approve for path" UI.
+	raw: Record<string, unknown>;
+}
+
+export interface UserInputRequestData {
+	question: string;
+	choices?: string[];
+	/// SDK default is true. Passed through so the renderer can decide
+	/// whether to render the free-text input alongside the choices.
+	allowFreeform: boolean;
+}
+
+export interface ElicitationRequestData {
+	message: string;
+	mode: "form" | "url";
+	/// Source of the elicitation (e.g. MCP server name) when known.
+	elicitationSource?: string;
+	/// Present for `mode: "url"` — the URL to open in the user's
+	/// default browser before they click "Done".
+	url?: string;
+	/// JSON Schema for the form when `mode: "form"`. Opaque to the
+	/// current renderer (form mode is Cancel-only until the
+	/// schema renderer lands as a follow-up).
+	requestedSchema?: unknown;
+}
+
+/// Dafman-internal "the SDK is blocked on a callback" push, sent
+/// alongside the existing SDK `*.requested` events. The renderer
+/// queues these per session and responds via `respondToRequest`. The
+/// `requestId` is generated on the bun side (NOT the SDK's — the SDK
+/// gives a Promise, not an id) so we can correlate the response.
+export type PendingRequestPayload =
+	| {
+		sessionId: string;
+		requestId: string;
+		kind: "permission";
+		request: PermissionRequestData;
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		kind: "userInput";
+		request: UserInputRequestData;
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		kind: "elicitation";
+		request: ElicitationRequestData;
+	};
+
+/// Renderer → bun response. Discriminated on `kind` so the bun side
+/// resolves the awaiting Promise with the right SDK shape. The
+/// renderer keeps these narrow and bun expands into the SDK's full
+/// union (e.g. `approveForSession` → `{ kind: "approve-for-session" }`
+/// without an approval rule — best-effort; SDK may reject if it
+/// requires a rule, in which case the registry settles with
+/// `{ kind: "user-not-available" }` and surfaces a toast).
+export type RespondToRequestParams =
+	| {
+		sessionId: string;
+		requestId: string;
+		response:
+			| { kind: "permission"; decision: "approveOnce" | "approveForSession" | "reject" };
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		response: { kind: "userInput"; answer: string; wasFreeform: boolean };
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		response: { kind: "elicitation"; action: "accept" | "decline" | "cancel"; content?: Record<string, unknown> };
+	};
+
 export type DafmanRPC = {
 	bun: RPCSchema<{
 		requests: {
@@ -272,6 +364,28 @@ export type DafmanRPC = {
 				params: { path: string };
 				response: boolean;
 			};
+			/// Opens an arbitrary URL in the user's default browser.
+			/// Only `http://` / `https://` schemes are accepted; anything
+			/// else returns `false` (no-op) so this can't be used as a
+			/// generic shell-out vector by a compromised renderer. Used
+			/// by the elicitation url-mode dialog and any future
+			/// "open in browser" affordances.
+			openUrl: {
+				params: { url: string };
+				response: boolean;
+			};
+			/// Responds to a pending SDK callback (permission /
+			/// user_input / elicitation). The bun side keeps the
+			/// awaiting Promise in `SessionRegistry.pendingHandlers`
+			/// keyed by `requestId`; resolving it unblocks the SDK
+			/// and lets the next turn proceed. Idempotent — a double
+			/// submit on an already-resolved request returns `false`
+			/// instead of throwing, so the renderer's double-click
+			/// guard is belt-and-suspenders.
+			respondToRequest: {
+				params: RespondToRequestParams;
+				response: boolean;
+			};
 			// Lets the webview pipe console messages + uncaught errors back
 			// through the existing RPC channel so they show up in bun's
 			// JSON log even when WebView2 devtools is closed. Pure
@@ -291,6 +405,16 @@ export type DafmanRPC = {
 		requests: Record<string, never>;
 		messages: {
 			sessionEvent: SessionEventPayload;
+			/// Pushed when the SDK calls one of the pending-callback
+			/// handlers (`onPermissionRequest`, `onUserInputRequest`,
+			/// `onElicitationRequest`). The renderer enqueues this on
+			/// the session's pending queue and shows the modal; user
+			/// response comes back via the `respondToRequest` RPC.
+			/// Settlement of the pending Promise happens on the bun
+			/// side when respondToRequest fires; we DON'T push a
+			/// completion event from the bun side because the SDK
+			/// already emits `*.completed` after the handler returns.
+			pendingRequest: PendingRequestPayload;
 		};
 	}>;
 };

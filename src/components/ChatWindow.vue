@@ -255,11 +255,15 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
 
 /// Type-aware styling for the pending-request banner. Pulls the
 /// color + icon + label from the shared `notificationStyles` so the
-/// banner matches the dot color on the tab + sidebar row.
+/// banner matches the dot color on the tab + sidebar row. Reads
+/// the queue head: if more than one request is pending, the banner
+/// surfaces the oldest; additional requests are reflected in the
+/// global modal's queue count.
+const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
 const pendingStyle = computed(() => {
-  const req = ambient.value.pendingRequest;
+  const req = pendingHead.value;
   if (!req) return null;
-  return styleFor(req.type);
+  return styleFor(req.kind);
 });
 </script>
 
@@ -375,7 +379,7 @@ const pendingStyle = computed(() => {
          a follow-up ticket — for now we just surface the state so
          the user knows what's blocking and from where. -->
     <div
-      v-if="ambient.pendingRequest && pendingStyle"
+      v-if="pendingHead && pendingStyle"
       class="pending-banner"
       role="status"
       :style="{ '--banner-color': pendingStyle.color }"
@@ -387,7 +391,7 @@ const pendingStyle = computed(() => {
       />
       <div class="pending-banner-body">
         <span class="pending-banner-kind">{{ pendingStyle.label }}</span>
-        <span class="pending-banner-message">{{ ambient.pendingRequest.message }}</span>
+        <span class="pending-banner-message">{{ pendingHead.message }}</span>
       </div>
     </div>
 

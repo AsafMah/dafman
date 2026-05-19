@@ -4,7 +4,11 @@ import {
   processEvents,
   type IdCounter,
 } from "../../chatEvents";
-import type { SessionEventPayload } from "../../../ipc/types";
+import type {
+  PermissionRequestData,
+  SessionEventPayload,
+  UserInputRequestData,
+} from "../../../ipc/types";
 
 function payload(
   eventType: string,
@@ -13,101 +17,136 @@ function payload(
   return { sessionId: "sess-1", eventType, data };
 }
 
+function pendingPush(
+  requestId: string,
+  kind: "permission" | "userInput" | "elicitation",
+  request: unknown,
+): SessionEventPayload {
+  return payload("dafman.pending_request", {
+    sessionId: "sess-1",
+    requestId,
+    kind,
+    request,
+  });
+}
+
 function run(payloads: SessionEventPayload[]) {
   const counter: IdCounter = { next: 1 };
   return processEvents([], defaultAmbient(), payloads, counter);
 }
 
-describe("notificationHandlers — ambient.pendingRequest", () => {
-  test("permission.requested sets pendingRequest of type 'permission'", () => {
-    const result = run([
-      payload("permission.requested", {
-        tool: "shell",
-        summary: "Run `rm -rf /tmp/x`",
-      }),
-    ]);
-    expect(result.ambient.pendingRequest).toEqual({
-      type: "permission",
-      message: "Run `rm -rf /tmp/x`",
+const SAMPLE_PERMISSION: PermissionRequestData = {
+  kind: "shell",
+  toolCallId: "tc-1",
+  summary: "shell: rm -rf /tmp/x",
+  raw: { command: "rm -rf /tmp/x" },
+};
+
+const SAMPLE_INPUT: UserInputRequestData = {
+  question: "What is your name?",
+  allowFreeform: true,
+};
+
+describe("notificationHandlers — ambient.pendingRequests (queue)", () => {
+  test("dafman.pending_request appends a permission entry", () => {
+    const result = run([pendingPush("req-1", "permission", SAMPLE_PERMISSION)]);
+    expect(result.ambient.pendingRequests).toHaveLength(1);
+    expect(result.ambient.pendingRequests[0]).toEqual({
+      kind: "permission",
+      requestId: "req-1",
+      message: "shell: rm -rf /tmp/x",
+      request: SAMPLE_PERMISSION,
     });
   });
 
-  test("permission.requested falls back to tool name when no summary", () => {
+  test("dafman.pending_response removes by requestId", () => {
     const result = run([
-      payload("permission.requested", { tool: "shell" }),
+      pendingPush("req-1", "permission", SAMPLE_PERMISSION),
+      payload("dafman.pending_response", { requestId: "req-1" }),
     ]);
-    expect(result.ambient.pendingRequest?.message).toBe("shell");
+    expect(result.ambient.pendingRequests).toEqual([]);
   });
 
-  test("permission.completed clears a matching pendingRequest", () => {
+  test("dafman.pending_response only removes the matching requestId", () => {
     const result = run([
-      payload("permission.requested", { tool: "shell", summary: "do x" }),
+      pendingPush("req-1", "permission", SAMPLE_PERMISSION),
+      pendingPush("req-2", "userInput", SAMPLE_INPUT),
+      payload("dafman.pending_response", { requestId: "req-1" }),
+    ]);
+    expect(result.ambient.pendingRequests).toHaveLength(1);
+    expect(result.ambient.pendingRequests[0]?.requestId).toBe("req-2");
+  });
+
+  test("SDK permission.completed clears the oldest permission entry", () => {
+    const result = run([
+      pendingPush("req-1", "permission", SAMPLE_PERMISSION),
+      pendingPush("req-2", "permission", SAMPLE_PERMISSION),
       payload("permission.completed", {}),
     ]);
-    expect(result.ambient.pendingRequest).toBeNull();
+    expect(result.ambient.pendingRequests).toHaveLength(1);
+    expect(result.ambient.pendingRequests[0]?.requestId).toBe("req-2");
   });
 
-  test("permission.completed does NOT clear a userInput pendingRequest (different channel)", () => {
+  test("SDK permission.completed does NOT remove a userInput entry (channel scoped)", () => {
     const result = run([
-      payload("user_input.requested", { prompt: "type something" }),
+      pendingPush("req-1", "userInput", SAMPLE_INPUT),
       payload("permission.completed", {}),
     ]);
-    expect(result.ambient.pendingRequest).toEqual({
-      type: "userInput",
-      message: "type something",
-    });
+    expect(result.ambient.pendingRequests).toHaveLength(1);
+    expect(result.ambient.pendingRequests[0]?.kind).toBe("userInput");
   });
 
-  test("user_input.requested + .completed round-trip", () => {
-    const requested = run([
-      payload("user_input.requested", { prompt: "your name?" }),
-    ]);
-    expect(requested.ambient.pendingRequest).toEqual({
-      type: "userInput",
-      message: "your name?",
-    });
-    const completed = run([
-      payload("user_input.requested", { prompt: "your name?" }),
+  test("SDK user_input.completed clears the oldest userInput entry", () => {
+    const result = run([
+      pendingPush("req-1", "userInput", SAMPLE_INPUT),
       payload("user_input.completed", {}),
     ]);
-    expect(completed.ambient.pendingRequest).toBeNull();
+    expect(result.ambient.pendingRequests).toEqual([]);
   });
 
-  test("elicitation.requested with url falls back to the url string", () => {
+  test("SDK elicitation.completed clears the oldest elicitation entry", () => {
     const result = run([
-      payload("elicitation.requested", {
-        url: "https://github.com/login/oauth",
+      pendingPush("req-1", "elicitation", {
+        message: "Open OAuth",
+        mode: "url",
+        url: "https://github.com",
       }),
-    ]);
-    expect(result.ambient.pendingRequest).toEqual({
-      type: "elicitation",
-      message: "https://github.com/login/oauth",
-    });
-  });
-
-  test("elicitation.completed clears matching pendingRequest", () => {
-    const result = run([
-      payload("elicitation.requested", { prompt: "approve OAuth?" }),
       payload("elicitation.completed", {}),
     ]);
-    expect(result.ambient.pendingRequest).toBeNull();
+    expect(result.ambient.pendingRequests).toEqual([]);
   });
 
-  test("a new request overwrites an older one (last wins)", () => {
-    // Real-world: SDK could fire permission.requested then a
-    // user_input.requested before the first completes. Latest-wins
-    // is a simplification but matches the "one banner at a time" UX.
+  test("SDK *.requested events are no-ops for state (canonical channel is dafman.pending_request)", () => {
     const result = run([
-      payload("permission.requested", { summary: "first" }),
-      payload("user_input.requested", { prompt: "second" }),
+      payload("permission.requested", { tool: "shell" }),
+      payload("user_input.requested", { prompt: "?" }),
+      payload("elicitation.requested", { url: "https://example.com" }),
     ]);
-    expect(result.ambient.pendingRequest).toEqual({
-      type: "userInput",
-      message: "second",
-    });
+    expect(result.ambient.pendingRequests).toEqual([]);
   });
 
-  test("default ambient has pendingRequest=null", () => {
-    expect(defaultAmbient().pendingRequest).toBeNull();
+  test("multiple pending requests stack as FIFO", () => {
+    const result = run([
+      pendingPush("req-1", "permission", SAMPLE_PERMISSION),
+      pendingPush("req-2", "userInput", SAMPLE_INPUT),
+      pendingPush("req-3", "elicitation", { message: "x", mode: "url" }),
+    ]);
+    expect(result.ambient.pendingRequests.map((p) => p.requestId)).toEqual([
+      "req-1",
+      "req-2",
+      "req-3",
+    ]);
+  });
+
+  test("dafman.pending_request is idempotent for duplicate requestIds", () => {
+    const result = run([
+      pendingPush("req-1", "permission", SAMPLE_PERMISSION),
+      pendingPush("req-1", "permission", SAMPLE_PERMISSION),
+    ]);
+    expect(result.ambient.pendingRequests).toHaveLength(1);
+  });
+
+  test("default ambient has pendingRequests=[]", () => {
+    expect(defaultAmbient().pendingRequests).toEqual([]);
   });
 });

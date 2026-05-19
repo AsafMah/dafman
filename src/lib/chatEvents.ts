@@ -122,22 +122,40 @@ export type ChatAmbient = {
   /// True once we've observed at least one turn_start so the caller knows
   /// it can trust `turnActive` going forward.
   sawTurnBoundary: boolean;
-  /// SDK-blocking request currently waiting on the user: permission
-  /// approval, free-form user input, or an MCP elicitation (e.g. a
-  /// URL OAuth handoff). Set by `permission.requested` /
-  /// `user_input.requested` / `elicitation.requested`; cleared by
-  /// the matching `_completed`. The real "accept / deny" UI is a
-  /// follow-up ticket — for now we surface this state for
-  /// indicators + the composer banner + OS notifications.
-  pendingRequest: PendingRequest | null;
+  /// Queue of SDK-blocking requests currently waiting on the user.
+  /// New requests append; responses or matching `_completed` events
+  /// remove by requestId. The render layer surfaces the head: banner
+  /// in ChatWindow, modal opens for the first pending across all
+  /// sessions (preferring the active one). Multiple in flight is
+  /// rare in practice but the SDK is allowed to re-enter — we don't
+  /// drop later requests just because we're showing an earlier one.
+  pendingRequests: PendingRequest[];
 };
 
-export type PendingRequest = {
-  type: "permission" | "userInput" | "elicitation";
-  /// Short human-readable description shown in the composer banner
-  /// + as the OS notification body.
-  message: string;
-};
+/// A single SDK-blocking pending callback. `requestId` is generated
+/// on the bun side (NOT by the SDK — the SDK passes a Promise) so the
+/// renderer can correlate the response via `respondToRequest`. The
+/// `request` payload is the typed per-kind shape mirrored from
+/// `src/ipc/types.ts`.
+export type PendingRequest =
+  | {
+      kind: "permission";
+      requestId: string;
+      message: string;
+      request: import("../ipc/types").PermissionRequestData;
+    }
+  | {
+      kind: "userInput";
+      requestId: string;
+      message: string;
+      request: import("../ipc/types").UserInputRequestData;
+    }
+  | {
+      kind: "elicitation";
+      requestId: string;
+      message: string;
+      request: import("../ipc/types").ElicitationRequestData;
+    };
 
 export function defaultAmbient(): ChatAmbient {
   return {
@@ -149,7 +167,7 @@ export function defaultAmbient(): ChatAmbient {
     usage: null,
     turnActive: false,
     sawTurnBoundary: false,
-    pendingRequest: null,
+    pendingRequests: [],
   };
 }
 

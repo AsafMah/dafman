@@ -8,12 +8,17 @@
 // reactive data.
 
 import { defineStore } from "pinia";
-import { reactive, ref, watch } from "vue";
-import { invokeCommand, onSessionEvent } from "../ipc/invoke";
+import { computed, reactive, ref, watch } from "vue";
+import { invokeCommand, onPendingRequest, onSessionEvent } from "../ipc/invoke";
 import type {
+  ElicitationRequestData,
+  PendingRequestPayload,
+  PermissionRequestData,
   ReasoningVisibility,
+  RespondToRequestParams,
   SessionEventPayload,
   SessionMode,
+  UserInputRequestData,
 } from "../ipc/types";
 import { accentForIndex } from "../lib/color";
 import { useLayoutStore } from "./layoutStore";
@@ -66,11 +71,12 @@ export type SessionRecord = {
   /// (Ctrl+Enter while a turn is running injects rather than queues
   /// behind it). Not persisted across reloads in v1.
   defaultSendMode: DefaultSendMode;
-  /// SDK-blocking request currently waiting on the user. Mirrors
-  /// `chatEvents.ts::ChatAmbient.pendingRequest` at the record level
-  /// so the Sessions sidebar + tab dot can react without mounting
-  /// the chat panel. `null` when nothing's pending.
-  pendingRequest: { type: "permission" | "userInput" | "elicitation"; message: string } | null;
+  /// FIFO queue of SDK-blocking pending callbacks. New requests
+  /// append; responses or matching `_completed` events remove by
+  /// requestId. Mirrors the reducer's `ambient.pendingRequests` at
+  /// the record level so cross-pane surfaces (sidebar dot, tab dot,
+  /// global modal) react without the chat panel being mounted.
+  pendingRequests: PendingRecordRequest[];
   /// Count of completed turns the user hasn't seen because the panel
   /// wasn't the dockview active panel at the time. Drives the
   /// "new activity" dot on the tab + sidebar row. Cleared on focus
@@ -91,7 +97,33 @@ export type SessionRecord = {
   sawTurnBoundary: boolean;
 };
 
+/// Per-record mirror of a single pending request. Matches the
+/// `PendingRequest` discriminated union in `chatEvents.ts`; lives
+/// here so the SessionRecord shape is self-contained (no cross-
+/// module import dance from places like SessionsManager that don't
+/// need the rest of the reducer).
+export type PendingRecordRequest =
+  | {
+      kind: "permission";
+      requestId: string;
+      message: string;
+      request: PermissionRequestData;
+    }
+  | {
+      kind: "userInput";
+      requestId: string;
+      message: string;
+      request: UserInputRequestData;
+    }
+  | {
+      kind: "elicitation";
+      requestId: string;
+      message: string;
+      request: ElicitationRequestData;
+    };
+
 let unsubscribe: (() => void) | null = null;
+let unsubscribePending: (() => void) | null = null;
 
 /// Pending events for sessions whose `SessionRecord` doesn't exist
 /// yet. Triggered by the resume race: bun emits the full history via
@@ -105,6 +137,7 @@ let unsubscribe: (() => void) | null = null;
 ///
 /// Capped per-session so a runaway producer doesn't pin memory.
 const pendingEvents = new Map<string, SessionEventPayload[]>();
+const pendingRequestBuffer = new Map<string, PendingRequestPayload[]>();
 const MAX_PENDING_PER_SESSION = 5000;
 
 /// Test-only seam: clears module-level state (subscription, buffered
@@ -120,7 +153,16 @@ export function _resetSessionsStoreForTest(): void {
     }
     unsubscribe = null;
   }
+  if (unsubscribePending) {
+    try {
+      unsubscribePending();
+    } catch {
+      /* best effort */
+    }
+    unsubscribePending = null;
+  }
   pendingEvents.clear();
+  pendingRequestBuffer.clear();
 }
 
 export const useSessionsStore = defineStore("sessions", () => {
@@ -210,70 +252,19 @@ export const useSessionsStore = defineStore("sessions", () => {
       }
     }
 
-    // Mirror SDK pending-request signals into `record.pendingRequest`
-    // so the Sessions sidebar + tab dot can react without mounting
-    // the chat panel. The reducer also tracks this in
-    // `ambient.pendingRequest`, but ambient lives inside the
-    // ChatWindow component and is only available when the panel is
-    // open. The record-level mirror is what drives cross-pane
-    // indicators + OS notifications.
-    let pendingRequestSet = false;
-    if (payload.eventType === "permission.requested") {
-      record.pendingRequest = {
-        type: "permission",
-        message: describeFromData(payload.data, ["summary", "description", "message", "tool", "toolName"]) || "Tool wants permission",
-      };
-      pendingRequestSet = true;
-    } else if (
-      payload.eventType === "permission.completed" &&
-      record.pendingRequest?.type === "permission"
-    ) {
-      record.pendingRequest = null;
-    } else if (payload.eventType === "user_input.requested") {
-      record.pendingRequest = {
-        type: "userInput",
-        message: describeFromData(payload.data, ["prompt", "summary", "message", "description"]) || "Awaiting input",
-      };
-      pendingRequestSet = true;
-    } else if (
-      payload.eventType === "user_input.completed" &&
-      record.pendingRequest?.type === "userInput"
-    ) {
-      record.pendingRequest = null;
-    } else if (payload.eventType === "elicitation.requested") {
-      record.pendingRequest = {
-        type: "elicitation",
-        message: describeFromData(payload.data, ["prompt", "summary", "message", "description", "url"]) || "Awaiting input",
-      };
-      pendingRequestSet = true;
-    } else if (
-      payload.eventType === "elicitation.completed" &&
-      record.pendingRequest?.type === "elicitation"
-    ) {
-      record.pendingRequest = null;
-    }
-
-    // OS notification on a fresh pending request — only if the
-    // session ISN'T currently the dock's active panel, OR the app
-    // window isn't focused. The notifications store further gates
-    // on settings + browser permission state, so the call is cheap
-    // when disabled.
-    if (pendingRequestSet && shouldFireForRecord(record)) {
-      const notifications = useNotificationsStore();
-      notifications.notify({
-        kind: "waitingForInput",
-        title: record.title ?? `Session ${record.id.slice(0, 8)}`,
-        body: record.pendingRequest?.message ?? "Awaiting input",
-        sessionId: record.id,
-        tag: `${record.id}:pendingRequest`,
-      });
-    }
-
-    // Unseen-activity dot on the tab + sidebar row: bump on each
-    // `assistant.turn_end` that lands while the session ISN'T the
-    // dock's active panel. Cleared on focus by the watcher below.
-    if (payload.eventType === "assistant.turn_end") {
+    // Mid-turn indicator: flips on at turn_start, off at turn_end /
+    // session.idle / session.error. The reducer (`ChatAmbient`)
+    // tracks the same thing inside the chat panel; this mirror lives
+    // on the record so the tab + sidebar dot react without the
+    // panel being mounted.
+    if (payload.eventType === "assistant.turn_start") {
+      record.isThinking = true;
+      record.sawTurnBoundary = true;
+    } else if (payload.eventType === "assistant.turn_end") {
       record.isThinking = false;
+      // Unseen-activity dot + optional OS notification when the
+      // session ISN'T the dock's active panel. Cleared on focus by
+      // the activeSessionId watcher below.
       const layoutStore = useLayoutStore();
       if (layoutStore.activeSessionId !== record.id) {
         record.unseenTurns += 1;
@@ -290,21 +281,27 @@ export const useSessionsStore = defineStore("sessions", () => {
           });
         }
       }
-    }
-
-    // Mid-turn indicator: flips on at turn_start, off at turn_end /
-    // session.idle / session.error. The reducer (`ChatAmbient`)
-    // tracks the same thing inside the chat panel; this mirror lives
-    // on the record so the tab + sidebar dot react without the
-    // panel being mounted.
-    if (payload.eventType === "assistant.turn_start") {
-      record.isThinking = true;
-      record.sawTurnBoundary = true;
     } else if (
       payload.eventType === "session.idle" ||
       payload.eventType === "session.error"
     ) {
       record.isThinking = false;
+    }
+
+    // Stale-state cleanup for SDK-emitted `*.completed` events. The
+    // dafman-internal `pendingRequest` channel is the canonical
+    // source for adds (handled in `handlePendingRequest` below); we
+    // remove on `_completed` as well in case the SDK resolves a
+    // callback out-of-band (e.g. resume-with-continue-pending-work
+    // re-emits). Best-effort match: remove the OLDEST entry of the
+    // same kind since SDK events lack our generated requestId.
+    let completedKind: PendingRecordRequest["kind"] | null = null;
+    if (payload.eventType === "permission.completed") completedKind = "permission";
+    else if (payload.eventType === "user_input.completed") completedKind = "userInput";
+    else if (payload.eventType === "elicitation.completed") completedKind = "elicitation";
+    if (completedKind) {
+      const idx = record.pendingRequests.findIndex((p) => p.kind === completedKind);
+      if (idx >= 0) record.pendingRequests.splice(idx, 1);
     }
   }
 
@@ -321,32 +318,102 @@ export const useSessionsStore = defineStore("sessions", () => {
     return false;
   }
 
-  /// Tiny helper to keep `applyToRecord`'s pending-request branch
-  /// readable. Reads the first non-empty string field in `data` from
-  /// the candidate keys; mirrors `chatEvents/notificationHandlers.ts`'s
-  /// describe* helpers but lives here so the store doesn't have to
-  /// import from `chatEvents/`.
-  function describeFromData(data: unknown, keys: readonly string[]): string {
-    if (!data || typeof data !== "object") return "";
-    const obj = data as Record<string, unknown>;
-    for (const k of keys) {
-      const v = obj[k];
-      if (typeof v === "string" && v.length > 0) return v;
+  /// Bun-side `pendingRequest` push handler. Appends to the matching
+  /// session's queue + fires the "waiting for input" OS notification
+  /// when the session isn't the active panel. Buffers if the
+  /// record doesn't exist yet (e.g. mid-resume) the same way
+  /// `handleEvent` does, by storing into a synthetic
+  /// `sessionEvent` and letting `drainPending` replay through
+  /// `applyPendingToRecord`.
+  function handlePendingRequest(payload: PendingRequestPayload): void {
+    const record = sessions.value.find((s) => s.id === payload.sessionId);
+    if (!record) {
+      // Bun's pendingRequest channel can fire before the
+      // createSession RPC promise resolves (early-session race —
+      // same shape as the sessionEvent buffer). Stash on a parallel
+      // queue keyed by sessionId so `drainPending` can replay.
+      const list = pendingRequestBuffer.get(payload.sessionId) ?? [];
+      list.push(payload);
+      pendingRequestBuffer.set(payload.sessionId, list);
+      return;
     }
-    return "";
+    applyPendingToRecord(record, payload);
+  }
+
+  function applyPendingToRecord(
+    record: SessionRecord,
+    payload: PendingRequestPayload,
+  ): void {
+    // Idempotency: drop duplicate pushes of the same requestId.
+    if (record.pendingRequests.some((p) => p.requestId === payload.requestId)) {
+      return;
+    }
+    let entry: PendingRecordRequest;
+    switch (payload.kind) {
+      case "permission":
+        entry = {
+          kind: "permission",
+          requestId: payload.requestId,
+          message: payload.request.summary,
+          request: payload.request,
+        };
+        break;
+      case "userInput":
+        entry = {
+          kind: "userInput",
+          requestId: payload.requestId,
+          message: payload.request.question,
+          request: payload.request,
+        };
+        break;
+      case "elicitation":
+        entry = {
+          kind: "elicitation",
+          requestId: payload.requestId,
+          message: payload.request.message,
+          request: payload.request,
+        };
+        break;
+    }
+    record.pendingRequests.push(entry);
+    // Also push a synthetic `dafman.pending_request` event into the
+    // record's event buffer so the reducer (which only sees the
+    // event stream) builds the same queue inside `ChatAmbient`.
+    record.events.push({
+      sessionId: record.id,
+      eventType: "dafman.pending_request",
+      data: payload as unknown as Record<string, unknown>,
+    });
+    if (shouldFireForRecord(record)) {
+      const notifications = useNotificationsStore();
+      notifications.notify({
+        kind: "waitingForInput",
+        title: record.title ?? `Session ${record.id.slice(0, 8)}`,
+        body: entry.message,
+        sessionId: record.id,
+        tag: `${record.id}:pendingRequest:${entry.requestId}`,
+      });
+    }
   }
 
   function drainPending(sessionId: string, record: SessionRecord): number {
     const list = pendingEvents.get(sessionId);
-    if (!list) return 0;
-    pendingEvents.delete(sessionId);
-    for (const event of list) applyToRecord(record, event);
-    return list.length;
+    if (list) {
+      pendingEvents.delete(sessionId);
+      for (const event of list) applyToRecord(record, event);
+    }
+    const pendingList = pendingRequestBuffer.get(sessionId);
+    if (pendingList) {
+      pendingRequestBuffer.delete(sessionId);
+      for (const p of pendingList) applyPendingToRecord(record, p);
+    }
+    return (list?.length ?? 0) + (pendingList?.length ?? 0);
   }
 
   function ensureSubscription(): void {
     if (unsubscribe) return;
     unsubscribe = onSessionEvent(handleEvent);
+    unsubscribePending = onPendingRequest(handlePendingRequest);
     // Clear the "unseen activity" dot on the session the user just
     // brought into focus. Watching layoutStore.activeSessionId means
     // we react to dockview's onDidActivePanelChange + onDidActiveGroupChange
@@ -384,11 +451,11 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningEffort: null,
         title: null,
         mode: null,
-        approveAll: true, // current backend default (`approveAll` permission handler)
+        approveAll: false, // dafman handler now drives permissions; default is interactive
         reasoningVisibilityOverride: "default",
         workingDirectory: wd && wd.length > 0 ? wd : null,
         defaultSendMode: "steer",
-        pendingRequest: null,
+        pendingRequests: [],
         unseenTurns: 0,
         isThinking: false,
         sawTurnBoundary: false,
@@ -458,11 +525,11 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningEffort: null,
         title: null,
         mode: null,
-        approveAll: true,
+        approveAll: false,
         reasoningVisibilityOverride: "default",
         workingDirectory: response.cwd ?? null,
         defaultSendMode: "steer",
-        pendingRequest: null,
+        pendingRequests: [],
         unseenTurns: 0,
         isThinking: false,
         sawTurnBoundary: false,
@@ -688,9 +755,68 @@ export const useSessionsStore = defineStore("sessions", () => {
     if (record) record.reasoningVisibilityOverride = value;
   }
 
+  /// The session + queue head the global pending-request modal
+  /// should open against. Prefers the currently-active session if
+  /// it has a pending request; otherwise picks the first session
+  /// with a non-empty queue. Returns `null` when no request is
+  /// pending across any session.
+  const firstPending = computed<
+    | { record: SessionRecord; request: PendingRecordRequest }
+    | null
+  >(() => {
+    const layoutStore = useLayoutStore();
+    const active = layoutStore.activeSessionId;
+    if (active) {
+      const record = sessions.value.find((s) => s.id === active);
+      if (record && record.pendingRequests.length > 0) {
+        return { record, request: record.pendingRequests[0]! };
+      }
+    }
+    for (const record of sessions.value) {
+      if (record.pendingRequests.length > 0) {
+        return { record, request: record.pendingRequests[0]! };
+      }
+    }
+    return null;
+  });
+
+  /// Sends the user's answer to a pending SDK callback. The bun
+  /// side resolves the awaiting Promise; the matching queue entry
+  /// is removed locally immediately (don't wait for the SDK
+  /// `_completed` echo, which can lag), and we also push a
+  /// synthetic `dafman.pending_response` into the record's event
+  /// buffer so the reducer's `ambient.pendingRequests` queue
+  /// stays in sync.
+  async function respondToPending(
+    params: RespondToRequestParams,
+  ): Promise<void> {
+    const record = sessions.value.find((s) => s.id === params.sessionId);
+    if (record) {
+      const idx = record.pendingRequests.findIndex(
+        (p) => p.requestId === params.requestId,
+      );
+      if (idx >= 0) record.pendingRequests.splice(idx, 1);
+      record.events.push({
+        sessionId: record.id,
+        eventType: "dafman.pending_response",
+        data: { requestId: params.requestId, kind: params.response.kind },
+      });
+    }
+    try {
+      await invokeCommand("respondToRequest", params);
+    } catch (err) {
+      const toasts = useToastStore();
+      toasts.error(
+        "Failed to send response",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   return {
     sessions,
     isCreating,
+    firstPending,
     createSession,
     restoreSession,
     closeSession,
@@ -704,5 +830,6 @@ export const useSessionsStore = defineStore("sessions", () => {
     compactSessionHistory,
     setSessionName,
     setSessionReasoningOverride,
+    respondToPending,
   };
 });

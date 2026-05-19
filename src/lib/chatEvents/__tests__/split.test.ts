@@ -188,8 +188,10 @@ describe("chatEvents — family ownership", () => {
     ]);
   });
 
-  test("notification handlers own permission/user_input/elicitation .requested+.completed", () => {
+  test("notification handlers own permission/user_input/elicitation .requested+.completed + dafman.pending_request/_response", () => {
     expect(Object.keys(notificationHandlers).sort()).toEqual([
+      "dafman.pending_request",
+      "dafman.pending_response",
       "elicitation.completed",
       "elicitation.requested",
       "permission.completed",

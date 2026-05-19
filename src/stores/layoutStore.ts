@@ -281,6 +281,16 @@ export const useLayoutStore = defineStore("layout", () => {
     if (panel) dock.removePanel(panel);
   }
 
+  /// Brings a panel forward in its group + activates it. Used by
+  /// the global PendingRequestModal to surface the owning session
+  /// when a pending request fires for a non-active panel.
+  function activatePanel(sessionId: string): void {
+    const dock = api.value;
+    if (!dock) return;
+    const panel = dock.getPanel(sessionId);
+    if (panel) panel.api.setActive();
+  }
+
   function renamePanel(sessionId: string, title: string): void {
     const dock = api.value;
     if (!dock) return;
@@ -448,6 +458,7 @@ export const useLayoutStore = defineStore("layout", () => {
     setApi,
     addPanel,
     removePanel,
+    activatePanel,
     renamePanel,
     replaceMissingPanel,
     openEdgePanel,

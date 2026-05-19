@@ -1,17 +1,22 @@
 // Electrobun-bridged implementation of the typed `RpcBridge` interface.
 //
 // `src/main.ts` instantiates the Electroview with this bridge wired up,
-// and routes the global `sessionEvent` message into a single fan-out
-// listener so multiple stores (sessions, permissions, etc.) can all
-// subscribe without the renderer needing to re-register handlers.
+// and routes the global `sessionEvent` + `pendingRequest` messages into
+// fan-out listeners so multiple stores can all subscribe without the
+// renderer needing to re-register handlers.
 
 import { Electroview } from "electrobun/view";
 import type {
   CommandMap,
   CommandName,
+  PendingRequestPayload,
   SessionEventPayload,
 } from "./types";
-import type { RpcBridge, SessionEventListener } from "./invoke";
+import type {
+  PendingRequestListener,
+  RpcBridge,
+  SessionEventListener,
+} from "./invoke";
 
 interface ElectrobunRpcType {
   bun: {
@@ -25,7 +30,10 @@ interface ElectrobunRpcType {
   };
   webview: {
     requests: Record<string, never>;
-    messages: { sessionEvent: SessionEventPayload };
+    messages: {
+      sessionEvent: SessionEventPayload;
+      pendingRequest: PendingRequestPayload;
+    };
   };
 }
 
@@ -33,7 +41,8 @@ export function createElectrobunBridge(): {
   bridge: RpcBridge;
   electroview: unknown;
 } {
-  const listeners = new Set<SessionEventListener>();
+  const sessionListeners = new Set<SessionEventListener>();
+  const pendingListeners = new Set<PendingRequestListener>();
 
   const rpc = Electroview.defineRPC<ElectrobunRpcType>({
     maxRequestTime: 30000,
@@ -41,11 +50,20 @@ export function createElectrobunBridge(): {
       requests: {},
       messages: {
         sessionEvent: (payload) => {
-          for (const listener of listeners) {
+          for (const listener of sessionListeners) {
             try {
               listener(payload);
             } catch (err) {
               console.error("[sessionEvent listener threw]", err);
+            }
+          }
+        },
+        pendingRequest: (payload) => {
+          for (const listener of pendingListeners) {
+            try {
+              listener(payload);
+            } catch (err) {
+              console.error("[pendingRequest listener threw]", err);
             }
           }
         },
@@ -63,8 +81,12 @@ export function createElectrobunBridge(): {
       return requester(args);
     }) as RpcBridge["request"],
     onSessionEvent(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
+      sessionListeners.add(listener);
+      return () => sessionListeners.delete(listener);
+    },
+    onPendingRequest(listener) {
+      pendingListeners.add(listener);
+      return () => pendingListeners.delete(listener);
     },
   };
 

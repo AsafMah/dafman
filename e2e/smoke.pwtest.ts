@@ -57,9 +57,11 @@ async function installRpcStub(page: Page): Promise<void> {
       listSessions: () => [],
       rendererLog: () => null,
       openLogFolder: () => true,
+      openUrl: () => true,
       pickFolder: () => null,
       browseDirectory: () => [],
       revealPath: () => null,
+      respondToRequest: () => true,
     } as Record<string, (args: unknown) => unknown>;
 
     (window as unknown as { __DAFMAN_TEST_RPC__: unknown }).__DAFMAN_TEST_RPC__ = {
@@ -81,6 +83,11 @@ async function installRpcStub(page: Page): Promise<void> {
       },
       onSessionEvent(): () => void {
         // No SDK events fire in the smoke; return a no-op disposer.
+        return () => undefined;
+      },
+      onPendingRequest(): () => void {
+        // No pending requests in the smoke. The handler is still
+        // required by the typed bridge contract.
         return () => undefined;
       },
     };

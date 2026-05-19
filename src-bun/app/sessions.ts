@@ -4,17 +4,37 @@
 // fans every event out through a caller-supplied `emit` callback
 // (typically `webview.rpc.send.sessionEvent`). On disconnect we drop
 // the entry but the SDK handles its own cleanup.
+//
+// Also owns the per-session "pending callback" map: when the SDK
+// calls one of `onPermissionRequest` / `onUserInputRequest` /
+// `onElicitationRequest` we store the Promise resolver, push a
+// `pendingRequest` message to the renderer, and resolve via the
+// `respondToRequest` RPC. Teardown paths (disconnect, delete,
+// shutdown) settle every outstanding entry with a typed
+// "user-not-available" / "cancel" so the SDK never hangs.
 
 import {
-	approveAll,
 	type CopilotSession,
+	type ElicitationContext,
+	type ElicitationResult,
+	type PermissionRequest,
+	type PermissionRequestResult,
 	type SessionEvent,
+	type UserInputRequest,
+	type UserInputResponse,
 } from "copilot-sdk-supercharged";
+import { randomUUID } from "node:crypto";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
 import type {
-	SessionEventPayload, SessionMetadataSummary, SessionHistoryCompactionResult, SessionMode, } from "../rpc";
+	ElicitationRequestData,
+	PendingRequestPayload,
+	PermissionRequestData,
+	RespondToRequestParams,
+	SessionEventPayload, SessionMetadataSummary, SessionHistoryCompactionResult, SessionMode,
+	UserInputRequestData,
+} from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
 /// type alias isn't re-exported from the package root, so we mirror it
@@ -22,30 +42,109 @@ import type {
 type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
 type Emit = (payload: SessionEventPayload) => void;
+type EmitPending = (payload: PendingRequestPayload) => void;
 
 interface Entry {
 	session: CopilotSession;
 	unsubscribe: () => void;
 }
 
-/// Config shared between `create()` and `resume()` so a resumed session
-/// behaves identically to a freshly created one (permission handler,
-/// streaming mode, etc.). Per-call overrides (model, reasoningEffort,
-/// onEvent) are layered on top by each caller.
-///
-/// `streaming` is read from a caller-supplied resolver so the bun
-/// side doesn't have to import `app/settings` (which would couple the
-/// session registry to the on-disk file). The resolver is captured
-/// at construction time; per-session lookups happen here.
-function baseSessionConfig(streaming: boolean) {
-	return {
-		onPermissionRequest: approveAll,
-		streaming,
-	};
+/// A single in-flight SDK callback. The handler returns the Promise
+/// (so the SDK blocks) and stores resolve/reject here so
+/// `respondToRequest` / `settlePendingForSession` can complete it.
+/// Resolution shape is a function the registry holds onto so the
+/// renderer can keep its discriminated-union narrow — the bun side
+/// converts to the SDK's wider shape (e.g. `approve-once` →
+/// `{ kind: "approve-once" }`).
+interface PendingEntry {
+	sessionId: string;
+	kind: "permission" | "userInput" | "elicitation";
+	resolve: (response: unknown) => void;
+	reject: (err: Error) => void;
+	/// Set to `true` by `respondToRequest` / teardown paths so a
+	/// second response is a benign no-op instead of double-resolving.
+	settled: boolean;
+}
+
+/// Build a one-line human-readable summary of a permission request
+/// from whatever extra fields the SDK happens to put on the runtime
+/// object. The SDK's TypeScript type lies about the shape — at
+/// runtime each `kind` carries extra payload (a `command` for shell,
+/// a `path` for write/read, a `url` for url, etc.). We probe common
+/// names and fall back to the kind so the modal always has something
+/// to display.
+function summarizePermission(request: PermissionRequest): string {
+	const raw = request as unknown as Record<string, unknown>;
+	const cmd = typeof raw.command === "string" ? raw.command : null;
+	const path = typeof raw.path === "string" ? raw.path : null;
+	const url = typeof raw.url === "string" ? raw.url : null;
+	const server = typeof raw.serverName === "string" ? raw.serverName : null;
+	const tool = typeof raw.toolName === "string" ? raw.toolName : null;
+	switch (request.kind) {
+		case "shell":
+			return cmd ? `shell: ${cmd}` : "shell command";
+		case "write":
+			return path ? `write: ${path}` : "file write";
+		case "read":
+			return path ? `read: ${path}` : "file read";
+		case "url":
+			return url ? `open url: ${url}` : "open url";
+		case "mcp":
+			return server && tool
+				? `mcp: ${server} / ${tool}`
+				: server
+					? `mcp: ${server}`
+					: "mcp tool";
+		case "custom-tool":
+			return tool ? `custom tool: ${tool}` : "custom tool";
+		case "memory":
+			return "memory write";
+		case "hook":
+			return "hook";
+	}
+}
+
+/// Plain-object copy of an SDK runtime payload. Recursively traverses
+/// only enumerable own properties and skips functions / non-JSON
+/// types — the wire layer otherwise serializes silently to `{}` on a
+/// `Date` or method-bearing object. Good enough for diagnostic
+/// display; the renderer never inspects the result.
+function toPlainObject(value: unknown): Record<string, unknown> {
+	if (value === null || typeof value !== "object") return {};
+	const out: Record<string, unknown> = {};
+	for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+		if (typeof v === "function") continue;
+		if (typeof v === "object" && v !== null) {
+			try {
+				JSON.stringify(v);
+				out[k] = v;
+			} catch {
+				/* skip un-serializable */
+			}
+		} else {
+			out[k] = v;
+		}
+	}
+	return out;
 }
 
 export class SessionRegistry {
 	private readonly entries = new Map<string, Entry>();
+
+	/// Pending SDK callbacks, keyed by our generated requestId. One
+	/// session may have many in flight (the SDK is allowed to re-enter
+	/// the handler before a prior one resolves), so we never assume
+	/// the queue has at most one. Per-session iteration is
+	/// O(pending entries) — fine in practice (rarely > 1).
+	private readonly pendingHandlers = new Map<string, PendingEntry>();
+
+	/// Registry-owned per-session "approve every permission" toggle.
+	/// Mirrors the SDK's `setApproveAll` (which we still call when
+	/// the renderer toggles it, for any SDK-internal short-circuits),
+	/// but is the authoritative source for OUR `onPermissionRequest`
+	/// handler — without this, a renderer-side toggle wouldn't affect
+	/// the dafman handler path.
+	private readonly approveAllBySession = new Map<string, boolean>();
 
 	/// `streamingResolver` is called at session create/resume time to
 	/// pick the current SDK streaming mode. Decoupled from on-disk
@@ -55,8 +154,218 @@ export class SessionRegistry {
 	/// that don't care about the setting.
 	constructor(
 		private readonly emit: Emit,
+		private readonly emitPending: EmitPending = () => {},
 		private readonly streamingResolver: () => boolean = () => true,
 	) {}
+
+	/// Config shared between `create()` and `resume()` so a resumed
+	/// session behaves identically to a freshly created one
+	/// (permission handler, streaming mode, etc.). Has to be a method
+	/// because handlers close over `this` (registry state).
+	private baseSessionConfig(sessionId: () => string) {
+		return {
+			onPermissionRequest: (request: PermissionRequest): Promise<PermissionRequestResult> => {
+				const sid = sessionId();
+				// Per-session approveAll short-circuit. Returns the SDK's
+				// minimal `approve-once` shape — no rule editor here.
+				if (this.approveAllBySession.get(sid) === true) {
+					return Promise.resolve({ kind: "approve-once" });
+				}
+				return this.enqueuePending(sid, "permission", (requestId) => {
+					const data: PermissionRequestData = {
+						kind: request.kind,
+						...(request.toolCallId ? { toolCallId: request.toolCallId } : {}),
+						summary: summarizePermission(request),
+						raw: toPlainObject(request),
+					};
+					this.emitPending({
+						sessionId: sid,
+						requestId,
+						kind: "permission",
+						request: data,
+					});
+				}) as Promise<PermissionRequestResult>;
+			},
+			onUserInputRequest: (request: UserInputRequest): Promise<UserInputResponse> => {
+				const sid = sessionId();
+				return this.enqueuePending(sid, "userInput", (requestId) => {
+					const data: UserInputRequestData = {
+						question: request.question,
+						...(request.choices ? { choices: request.choices } : {}),
+						allowFreeform: request.allowFreeform ?? true,
+					};
+					this.emitPending({
+						sessionId: sid,
+						requestId,
+						kind: "userInput",
+						request: data,
+					});
+				}) as Promise<UserInputResponse>;
+			},
+			onElicitationRequest: (context: ElicitationContext): Promise<ElicitationResult> => {
+				const sid = sessionId();
+				return this.enqueuePending(sid, "elicitation", (requestId) => {
+					const data: ElicitationRequestData = {
+						message: context.message,
+						mode: context.mode ?? "form",
+						...(context.elicitationSource
+							? { elicitationSource: context.elicitationSource }
+							: {}),
+						...(context.url ? { url: context.url } : {}),
+						...(context.requestedSchema
+							? { requestedSchema: toPlainObject(context.requestedSchema) }
+							: {}),
+					};
+					this.emitPending({
+						sessionId: sid,
+						requestId,
+						kind: "elicitation",
+						request: data,
+					});
+				}) as Promise<ElicitationResult>;
+			},
+			streaming: this.streamingResolver(),
+		};
+	}
+
+	/// Allocates a PendingEntry + Promise, registers it, runs the
+	/// caller's emit closure so the renderer hears about it. Returns
+	/// the Promise the SDK awaits.
+	private enqueuePending(
+		sessionId: string,
+		kind: PendingEntry["kind"],
+		emit: (requestId: string) => void,
+	): Promise<unknown> {
+		const requestId = randomUUID();
+		const promise = new Promise<unknown>((resolve, reject) => {
+			this.pendingHandlers.set(requestId, {
+				sessionId,
+				kind,
+				resolve,
+				reject,
+				settled: false,
+			});
+		});
+		try {
+			emit(requestId);
+		} catch (err) {
+			// Emit failure shouldn't deadlock the SDK. Resolve with a
+			// safe "unavailable" so the SDK can move on.
+			log.warn("pendingRequest emit threw; cancelling", {
+				sessionId,
+				requestId,
+				kind,
+				error: err instanceof Error ? err.message : String(err),
+			});
+			this.cancelPending(requestId, "emit-failure");
+		}
+		return promise;
+	}
+
+	/// Resolves a pending entry with a typed cancellation. Used by
+	/// teardown paths (disconnect, delete, shutdown) and the emit-
+	/// failure fallback above.
+	private cancelPending(requestId: string, _reason: string): void {
+		const entry = this.pendingHandlers.get(requestId);
+		if (!entry || entry.settled) return;
+		entry.settled = true;
+		this.pendingHandlers.delete(requestId);
+		const cancellation: unknown =
+			entry.kind === "permission"
+				? { kind: "user-not-available" }
+				: entry.kind === "userInput"
+					? { answer: "", wasFreeform: false }
+					: { action: "cancel" };
+		try {
+			entry.resolve(cancellation);
+		} catch (err) {
+			log.warn("cancelPending resolve threw", {
+				requestId,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
+	}
+
+	/// Drains every pending entry for a given session, used on
+	/// disconnect / delete / shutdown so the SDK never hangs on a
+	/// handler whose UI counterpart is gone.
+	private settlePendingForSession(sessionId: string, reason: string): void {
+		const requestIds: string[] = [];
+		for (const [id, entry] of this.pendingHandlers) {
+			if (entry.sessionId === sessionId) requestIds.push(id);
+		}
+		for (const id of requestIds) this.cancelPending(id, reason);
+	}
+
+	/// Renderer → bun: respond to a pending callback. Idempotent: a
+	/// double-submit on an already-resolved request returns `false`
+	/// instead of throwing. Type-narrows the renderer's compact
+	/// response shape into the SDK's wider one.
+	async respondToRequest(params: RespondToRequestParams): Promise<boolean> {
+		const entry = this.pendingHandlers.get(params.requestId);
+		if (!entry || entry.settled) {
+			log.debug("respondToRequest on already-resolved request", {
+				requestId: params.requestId,
+			});
+			return false;
+		}
+		if (entry.sessionId !== params.sessionId) {
+			log.warn("respondToRequest sessionId mismatch", {
+				requestId: params.requestId,
+				expected: entry.sessionId,
+				got: params.sessionId,
+			});
+			return false;
+		}
+		if (entry.kind !== params.response.kind) {
+			log.warn("respondToRequest kind mismatch", {
+				requestId: params.requestId,
+				expected: entry.kind,
+				got: params.response.kind,
+			});
+			return false;
+		}
+		entry.settled = true;
+		this.pendingHandlers.delete(params.requestId);
+		let sdkResult: unknown;
+		switch (params.response.kind) {
+			case "permission":
+				sdkResult =
+					params.response.decision === "approveOnce"
+						? { kind: "approve-once" }
+						: params.response.decision === "approveForSession"
+							// Best-effort: the SDK's full type includes an
+							// optional `approval` rule. We send the minimal
+							// shape and let the SDK either accept it or
+							// reject with a fallback we surface as a toast
+							// at the renderer.
+							? { kind: "approve-for-session" }
+							: { kind: "reject" };
+				break;
+			case "userInput":
+				sdkResult = {
+					answer: params.response.answer,
+					wasFreeform: params.response.wasFreeform,
+				};
+				break;
+			case "elicitation":
+				sdkResult = {
+					action: params.response.action,
+					...(params.response.content ? { content: params.response.content } : {}),
+				};
+				break;
+		}
+		try {
+			entry.resolve(sdkResult);
+		} catch (err) {
+			log.warn("respondToRequest resolve threw", {
+				requestId: params.requestId,
+				error: err instanceof Error ? err.message : String(err),
+			});
+			return false;
+		}
+		return true;
+	}
 
 	async create(opts: { workingDirectory?: string } = {}): Promise<string> {
 		const client = tryGetClient();
@@ -70,7 +379,7 @@ export class SessionRegistry {
 		};
 		const wd = opts.workingDirectory?.trim();
 		const session = await client.createSession({
-			...baseSessionConfig(this.streamingResolver()),
+			...this.baseSessionConfig(() => resolvedSessionId ?? "pending"),
 			onEvent: earlyForward,
 			...(wd ? { workingDirectory: wd } : {}),
 		});
@@ -113,7 +422,7 @@ export class SessionRegistry {
 		let session: CopilotSession;
 		try {
 			session = await client.resumeSession(sessionId, {
-				...baseSessionConfig(this.streamingResolver()),
+				...this.baseSessionConfig(() => resolvedSessionId ?? sessionId),
 				onEvent: earlyForward,
 				...(opts.model ? { model: opts.model } : {}),
 				...(opts.reasoningEffort
@@ -172,6 +481,10 @@ export class SessionRegistry {
 	/// currently open in this app, disconnect it first so the SDK can
 	/// release its session handle cleanly before deletion.
 	async deleteCliSession(sessionId: string): Promise<string> {
+		// Settle any pending callbacks first so the SDK doesn't hang
+		// awaiting a response that will never come once the session is
+		// gone.
+		this.settlePendingForSession(sessionId, "session deleted");
 		const entry = this.entries.get(sessionId);
 		if (entry) {
 			this.entries.delete(sessionId);
@@ -185,6 +498,7 @@ export class SessionRegistry {
 				});
 			}
 		}
+		this.approveAllBySession.delete(sessionId);
 		const client = tryGetClient();
 		try {
 			await client.deleteSession(sessionId);
@@ -396,6 +710,10 @@ export class SessionRegistry {
 	async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);
+		// Source of truth for OUR onPermissionRequest handler. Mirror to
+		// the SDK so any SDK-internal short-circuits that respect this
+		// flag stay consistent.
+		this.approveAllBySession.set(sessionId, enabled);
 		try {
 			const result = (await entry.session.rpc.permissions.setApproveAll({
 				enabled,
@@ -422,7 +740,11 @@ export class SessionRegistry {
 	async disconnect(sessionId: string): Promise<string> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);
+		// Settle pending callbacks BEFORE tearing down the session so
+		// the SDK never sees a hung onPermissionRequest / etc.
+		this.settlePendingForSession(sessionId, "session disconnected");
 		this.entries.delete(sessionId);
+		this.approveAllBySession.delete(sessionId);
 		entry.unsubscribe();
 		try {
 			await entry.session.disconnect();

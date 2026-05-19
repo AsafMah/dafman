@@ -83,6 +83,80 @@ export interface SessionEventPayload {
   timestamp?: string;
 }
 
+/// Mirrors `PermissionRequestData` in `src-bun/rpc.ts`. Permission
+/// request surfaced to the renderer for the pending-request modal.
+export interface PermissionRequestData {
+  kind: "shell" | "write" | "mcp" | "read" | "url" | "custom-tool" | "memory" | "hook";
+  toolCallId?: string;
+  /// Best-effort summary computed bun-side (e.g. "shell: ls -la").
+  summary: string;
+  /// Full request payload for diagnostic display.
+  raw: Record<string, unknown>;
+}
+
+export interface UserInputRequestData {
+  question: string;
+  choices?: string[];
+  allowFreeform: boolean;
+}
+
+export interface ElicitationRequestData {
+  message: string;
+  mode: "form" | "url";
+  elicitationSource?: string;
+  /// Present for `mode: "url"` — the URL to open in the browser.
+  url?: string;
+  /// JSON Schema for form mode. Opaque to the current renderer
+  /// (form mode is Cancel-only until the schema renderer ships).
+  requestedSchema?: unknown;
+}
+
+/// Dafman-internal pending-request push. See `src-bun/rpc.ts`.
+export type PendingRequestPayload =
+  | {
+      sessionId: string;
+      requestId: string;
+      kind: "permission";
+      request: PermissionRequestData;
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      kind: "userInput";
+      request: UserInputRequestData;
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      kind: "elicitation";
+      request: ElicitationRequestData;
+    };
+
+/// Renderer → bun response shape for `respondToRequest`.
+export type RespondToRequestParams =
+  | {
+      sessionId: string;
+      requestId: string;
+      response: {
+        kind: "permission";
+        decision: "approveOnce" | "approveForSession" | "reject";
+      };
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      response: { kind: "userInput"; answer: string; wasFreeform: boolean };
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      response: {
+        kind: "elicitation";
+        action: "accept" | "decline" | "cancel";
+        content?: Record<string, unknown>;
+      };
+    };
+
 /// Discriminated union mirroring `AppErrorPayload` in `src-bun/app/errors.ts`.
 /// RPC rejections are deserialized into this shape by `invokeCommand`.
 export type AppErrorPayload =
@@ -160,6 +234,8 @@ export type CommandMap = {
   getLogDir: { args: Record<string, never>; result: string };
   openLogFolder: { args: Record<string, never>; result: boolean };
   revealPath: { args: { path: string }; result: boolean };
+  openUrl: { args: { url: string }; result: boolean };
+  respondToRequest: { args: RespondToRequestParams; result: boolean };
   rendererLog: {
     args: {
       level: "debug" | "info" | "warn" | "error";

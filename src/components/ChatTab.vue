@@ -97,7 +97,7 @@ const displayTitle = computed(() => {
 /// banner. `null` when nothing's worth surfacing.
 const indicator = computed(() =>
   indicatorStyle(
-    record.value?.pendingRequest?.type,
+    record.value?.pendingRequests[0]?.kind,
     record.value?.isThinking ?? false,
     record.value?.unseenTurns ?? 0,
   ),

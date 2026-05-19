@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type {
 	ModelSummary,
+	PendingRequestPayload,
+	PermissionRequestData,
+	RespondToRequestParams,
 	SessionHistoryCompactionResult,
 	SessionMode,
 	Settings,
@@ -148,6 +151,78 @@ describe("IPC wire contracts", () => {
 			success: true,
 			tokensFreed: 1234,
 			messagesRemoved: 5,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("PendingRequestPayload — permission", () => {
+		const permission: PermissionRequestData = {
+			kind: "shell",
+			toolCallId: "tc-abc",
+			summary: "shell: rm -rf /tmp/x",
+			raw: { command: "rm -rf /tmp/x", cwd: "/home/user" },
+		};
+		const sample: PendingRequestPayload = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-1",
+			kind: "permission",
+			request: permission,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("PendingRequestPayload — userInput", () => {
+		const sample: PendingRequestPayload = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-2",
+			kind: "userInput",
+			request: {
+				question: "What is your name?",
+				choices: ["Alice", "Bob"],
+				allowFreeform: true,
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("PendingRequestPayload — elicitation url", () => {
+		const sample: PendingRequestPayload = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-3",
+			kind: "elicitation",
+			request: {
+				message: "Authenticate to GitHub",
+				mode: "url",
+				elicitationSource: "mcp/github",
+				url: "https://github.com/login/oauth/authorize",
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — permission approve once", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-1",
+			response: { kind: "permission", decision: "approveOnce" },
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — userInput freeform", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-2",
+			response: { kind: "userInput", answer: "Alice", wasFreeform: false },
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — elicitation accept", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-3",
+			response: { kind: "elicitation", action: "accept" },
 		};
 		expect(sample).toMatchSnapshot();
 	});

@@ -27,6 +27,7 @@ import { useSessionsStore, _resetSessionsStoreForTest } from "../sessionsStore";
 function makeFakeBridge(): {
   bridge: RpcBridge;
   fire: (payload: SessionEventPayload) => void;
+  firePending: (payload: import("../../ipc/types").PendingRequestPayload) => void;
   calls: Array<{ name: string; args: unknown }>;
   handlers: Partial<{
     [K in CommandName]: (
@@ -38,6 +39,10 @@ function makeFakeBridge(): {
   const listeners = new Set<SessionEventListener>();
   const fire = (payload: SessionEventPayload) => {
     for (const l of listeners) l(payload);
+  };
+  const pendingListeners = new Set<(p: import("../../ipc/types").PendingRequestPayload) => void>();
+  const firePending = (payload: import("../../ipc/types").PendingRequestPayload) => {
+    for (const l of pendingListeners) l(payload);
   };
   const calls: Array<{ name: string; args: unknown }> = [];
   const handlers: Partial<{
@@ -65,8 +70,12 @@ function makeFakeBridge(): {
       listeners.add(l);
       return () => listeners.delete(l);
     },
+    onPendingRequest: (l) => {
+      pendingListeners.add(l);
+      return () => pendingListeners.delete(l);
+    },
   };
-  return { bridge, fire, calls, handlers };
+  return { bridge, fire, firePending, calls, handlers };
 }
 
 function event(
@@ -153,8 +162,8 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(record!.events[0]?.eventType).toBe("assistant.message_start");
   });
 
-  test("permission.requested mirrors into record.pendingRequest; .completed clears", async () => {
-    const { bridge, fire, handlers } = makeFakeBridge();
+  test("dafman pendingRequest mirrors into record.pendingRequests; .completed clears", async () => {
+    const { bridge, fire, firePending, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
@@ -162,17 +171,24 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     setRpcBridge(bridge);
     const store = useSessionsStore();
     const record = await store.restoreSession("s1");
-    expect(record!.pendingRequest).toBeNull();
+    expect(record!.pendingRequests).toEqual([]);
 
-    fire(event("s1", "permission.requested", { tool: "shell", summary: "run `ls`" }));
-    expect(record!.pendingRequest).toEqual({ type: "permission", message: "run `ls`" });
+    firePending({
+      sessionId: "s1",
+      requestId: "req-1",
+      kind: "permission",
+      request: { kind: "shell", summary: "run `ls`", raw: {} },
+    });
+    expect(record!.pendingRequests).toHaveLength(1);
+    expect(record!.pendingRequests[0]?.kind).toBe("permission");
+    expect(record!.pendingRequests[0]?.message).toBe("run `ls`");
 
     fire(event("s1", "permission.completed", {}));
-    expect(record!.pendingRequest).toBeNull();
+    expect(record!.pendingRequests).toEqual([]);
   });
 
-  test("unrelated .completed events don't clear a pendingRequest of a different type", async () => {
-    const { bridge, fire, handlers } = makeFakeBridge();
+  test("unrelated .completed events don't clear a pendingRequest of a different kind", async () => {
+    const { bridge, fire, firePending, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
@@ -181,15 +197,20 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     const store = useSessionsStore();
     const record = await store.restoreSession("s1");
 
-    fire(event("s1", "user_input.requested", { prompt: "name?" }));
-    expect(record!.pendingRequest?.type).toBe("userInput");
+    firePending({
+      sessionId: "s1",
+      requestId: "req-1",
+      kind: "userInput",
+      request: { question: "name?", allowFreeform: true },
+    });
+    expect(record!.pendingRequests[0]?.kind).toBe("userInput");
 
     // permission.completed shouldn't clear a userInput-channel request.
     fire(event("s1", "permission.completed", {}));
-    expect(record!.pendingRequest?.type).toBe("userInput");
+    expect(record!.pendingRequests[0]?.kind).toBe("userInput");
 
     fire(event("s1", "user_input.completed", {}));
-    expect(record!.pendingRequest).toBeNull();
+    expect(record!.pendingRequests).toEqual([]);
   });
 
   test("assistant.turn_end bumps unseenTurns when session isn't the active dock panel", async () => {
@@ -265,7 +286,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
       return true;
     };
 
-    const { bridge, fire, handlers } = makeFakeBridge();
+    const { bridge, fire, firePending, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
@@ -274,9 +295,27 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     const store = useSessionsStore();
     await store.restoreSession("s1");
 
-    fire(event("s1", "permission.requested", { tool: "shell", summary: "run x" }));
-    fire(event("s1", "user_input.requested", { prompt: "your name?" }));
-    fire(event("s1", "elicitation.requested", { url: "https://oauth.example" }));
+    // Three SDK-pending-callback channels arrive over the new
+    // dafman pendingRequest push. The reducer no longer reacts to
+    // the SDK `*.requested` events for state purposes.
+    firePending({
+      sessionId: "s1",
+      requestId: "req-1",
+      kind: "permission",
+      request: { kind: "shell", summary: "run x", raw: {} },
+    });
+    firePending({
+      sessionId: "s1",
+      requestId: "req-2",
+      kind: "userInput",
+      request: { question: "your name?", allowFreeform: true },
+    });
+    firePending({
+      sessionId: "s1",
+      requestId: "req-3",
+      kind: "elicitation",
+      request: { message: "https://oauth.example", mode: "url", url: "https://oauth.example" },
+    });
     fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
 
     // 3 waitingForInput + 1 turnEnd = 4 notify calls.
@@ -284,8 +323,8 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     const kinds = calls.map((c) => c.kind);
     expect(kinds.filter((k) => k === "waitingForInput")).toHaveLength(3);
     expect(kinds.filter((k) => k === "turnEnd")).toHaveLength(1);
-    // The waitingForInput bodies carry the SDK-supplied summary so
-    // the notification shows what's being asked.
+    // The waitingForInput bodies carry the per-kind summary so the
+    // notification shows what's being asked.
     expect(calls.find((c) => c.body === "run x")).toBeTruthy();
     expect(calls.find((c) => c.body === "your name?")).toBeTruthy();
     expect(calls.find((c) => c.body === "https://oauth.example")).toBeTruthy();

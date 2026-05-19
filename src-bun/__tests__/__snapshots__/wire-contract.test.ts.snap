@@ -183,3 +183,84 @@ exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
   "tokensFreed": 1234,
 }
 `;
+
+exports[`IPC wire contracts PendingRequestPayload — permission 1`] = `
+{
+  "kind": "permission",
+  "request": {
+    "kind": "shell",
+    "raw": {
+      "command": "rm -rf /tmp/x",
+      "cwd": "/home/user",
+    },
+    "summary": "shell: rm -rf /tmp/x",
+    "toolCallId": "tc-abc",
+  },
+  "requestId": "req-uuid-1",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts PendingRequestPayload — userInput 1`] = `
+{
+  "kind": "userInput",
+  "request": {
+    "allowFreeform": true,
+    "choices": [
+      "Alice",
+      "Bob",
+    ],
+    "question": "What is your name?",
+  },
+  "requestId": "req-uuid-2",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts PendingRequestPayload — elicitation url 1`] = `
+{
+  "kind": "elicitation",
+  "request": {
+    "elicitationSource": "mcp/github",
+    "message": "Authenticate to GitHub",
+    "mode": "url",
+    "url": "https://github.com/login/oauth/authorize",
+  },
+  "requestId": "req-uuid-3",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — permission approve once 1`] = `
+{
+  "requestId": "req-uuid-1",
+  "response": {
+    "decision": "approveOnce",
+    "kind": "permission",
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — userInput freeform 1`] = `
+{
+  "requestId": "req-uuid-2",
+  "response": {
+    "answer": "Alice",
+    "kind": "userInput",
+    "wasFreeform": false,
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — elicitation accept 1`] = `
+{
+  "requestId": "req-uuid-3",
+  "response": {
+    "action": "accept",
+    "kind": "elicitation",
+  },
+  "sessionId": "sess-1",
+}
+`;

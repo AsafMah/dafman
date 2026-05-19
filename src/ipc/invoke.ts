@@ -11,6 +11,7 @@ import type {
   AppErrorPayload,
   CommandMap,
   CommandName,
+  PendingRequestPayload,
   SessionEventPayload,
 } from "./types";
 
@@ -50,6 +51,7 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
 }
 
 export type SessionEventListener = (event: SessionEventPayload) => void;
+export type PendingRequestListener = (payload: PendingRequestPayload) => void;
 
 /// Minimal surface that the IPC bridge has to implement. Both the real
 /// Electrobun bridge and unit-test fakes match this shape; tests inject a
@@ -60,10 +62,12 @@ export interface RpcBridge {
     args: CommandMap[N]["args"],
   ): Promise<InvokeResult<N>>;
   onSessionEvent(listener: SessionEventListener): () => void;
+  onPendingRequest(listener: PendingRequestListener): () => void;
 }
 
 let bridge: RpcBridge | null = null;
 const pendingSessionListeners = new Set<SessionEventListener>();
+const pendingPendingRequestListeners = new Set<PendingRequestListener>();
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
@@ -72,6 +76,10 @@ export function setRpcBridge(next: RpcBridge | null): void {
     next.onSessionEvent(listener);
   }
   pendingSessionListeners.clear();
+  for (const listener of pendingPendingRequestListeners) {
+    next.onPendingRequest(listener);
+  }
+  pendingPendingRequestListeners.clear();
 }
 
 export async function invokeCommand<N extends CommandName>(
@@ -96,4 +104,10 @@ export function onSessionEvent(listener: SessionEventListener): () => void {
   if (bridge) return bridge.onSessionEvent(listener);
   pendingSessionListeners.add(listener);
   return () => pendingSessionListeners.delete(listener);
+}
+
+export function onPendingRequest(listener: PendingRequestListener): () => void {
+  if (bridge) return bridge.onPendingRequest(listener);
+  pendingPendingRequestListeners.add(listener);
+  return () => pendingPendingRequestListeners.delete(listener);
 }

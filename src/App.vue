@@ -8,6 +8,7 @@ import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
 import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
 import BootSplash from "./components/BootSplash.vue";
 import CommandPalette from "./components/CommandPalette.vue";
+import PendingRequestModal from "./components/PendingRequestModal.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -498,6 +499,12 @@ function openSessionsByDefault(attempt = 0) {
          the app root so the listener is alive regardless of which
          panel has focus. -->
     <CommandPalette />
+    <!-- Pending-request modal: opens whenever any session has a
+         pending SDK callback (permission / user_input / elicitation).
+         Lives at app-root so requests on non-active panels can still
+         be answered; the modal auto-activates the owning panel so
+         the user has chat context behind it. -->
+    <PendingRequestModal />
     <!-- Boot splash: catches input until settings + client are up
          and previously-open sessions have resumed. Fades on
          bootStore.markReady(); stays put with an error + reload

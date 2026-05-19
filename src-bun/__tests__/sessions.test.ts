@@ -394,4 +394,131 @@ describe("SessionRegistry", () => {
 		(fake as unknown as { currentName: unknown }).currentName = 42;
 		await expect(reg.getName(id)).rejects.toBeInstanceOf(AppError);
 	});
+
+	test("onPermissionRequest emits a pending payload and respondToRequest resolves the SDK promise", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const pendingEmitted: unknown[] = [];
+		const reg = new SessionRegistry(
+			() => {},
+			(p) => pendingEmitted.push(p),
+		);
+		const id = await reg.create();
+		const config = client.createdConfigs[0] as {
+			onPermissionRequest: (req: { kind: string; command?: string }) => Promise<unknown>;
+		};
+		// SDK invokes the registered handler; we should get a pending
+		// emit synchronously and a Promise we can resolve later.
+		const sdkPromise = config.onPermissionRequest({
+			kind: "shell",
+			command: "ls -la",
+		});
+		expect(pendingEmitted).toHaveLength(1);
+		const emitted = pendingEmitted[0] as {
+			sessionId: string;
+			requestId: string;
+			kind: string;
+			request: { kind: string; summary: string };
+		};
+		expect(emitted.sessionId).toBe(id);
+		expect(emitted.kind).toBe("permission");
+		expect(emitted.request.kind).toBe("shell");
+		expect(emitted.request.summary).toBe("shell: ls -la");
+
+		const ok = await reg.respondToRequest({
+			sessionId: id,
+			requestId: emitted.requestId,
+			response: { kind: "permission", decision: "approveOnce" },
+		});
+		expect(ok).toBe(true);
+		await expect(sdkPromise).resolves.toEqual({ kind: "approve-once" });
+	});
+
+	test("respondToRequest on an already-resolved request is idempotent (returns false, no throw)", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const pendingEmitted: Array<{ requestId: string }> = [];
+		const reg = new SessionRegistry(
+			() => {},
+			(p) => pendingEmitted.push(p as { requestId: string }),
+		);
+		const id = await reg.create();
+		const config = client.createdConfigs[0] as {
+			onPermissionRequest: (req: { kind: string }) => Promise<unknown>;
+		};
+		const sdkPromise = config.onPermissionRequest({ kind: "shell" });
+		const reqId = pendingEmitted[0]!.requestId;
+		const first = await reg.respondToRequest({
+			sessionId: id,
+			requestId: reqId,
+			response: { kind: "permission", decision: "reject" },
+		});
+		expect(first).toBe(true);
+		const second = await reg.respondToRequest({
+			sessionId: id,
+			requestId: reqId,
+			response: { kind: "permission", decision: "reject" },
+		});
+		expect(second).toBe(false);
+		// SDK promise still resolves with the first response.
+		await expect(sdkPromise).resolves.toEqual({ kind: "reject" });
+	});
+
+	test("disconnect settles every pending callback for the session with a typed cancellation", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(
+			() => {},
+			() => {},
+		);
+		const id = await reg.create();
+		const config = client.createdConfigs[0] as {
+			onPermissionRequest: (req: { kind: string }) => Promise<unknown>;
+			onUserInputRequest: (req: { question: string }) => Promise<unknown>;
+			onElicitationRequest: (ctx: { sessionId: string; message: string; mode: string }) => Promise<unknown>;
+		};
+		// Three pending callbacks, none resolved yet.
+		const permPromise = config.onPermissionRequest({ kind: "shell" });
+		const inputPromise = config.onUserInputRequest({ question: "name?" });
+		const elicPromise = config.onElicitationRequest({
+			sessionId: id,
+			message: "go",
+			mode: "url",
+		});
+		await reg.disconnect(id);
+		// Each promise settles with the kind-appropriate cancellation
+		// so the SDK never hangs after the session is gone.
+		await expect(permPromise).resolves.toEqual({ kind: "user-not-available" });
+		await expect(inputPromise).resolves.toEqual({ answer: "", wasFreeform: false });
+		await expect(elicPromise).resolves.toEqual({ action: "cancel" });
+	});
+
+	test("registry-owned approveAll short-circuits the permission handler with approve-once", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const pendingEmitted: unknown[] = [];
+		const reg = new SessionRegistry(
+			() => {},
+			(p) => pendingEmitted.push(p),
+		);
+		const id = await reg.create();
+		await reg.setApproveAll(id, true);
+		const config = client.createdConfigs[0] as {
+			onPermissionRequest: (req: { kind: string }) => Promise<unknown>;
+		};
+		// With approveAll on, the handler must NOT emit a pending
+		// request — it short-circuits with approve-once so the user
+		// is never prompted.
+		const decision = await config.onPermissionRequest({ kind: "shell" });
+		expect(decision).toEqual({ kind: "approve-once" });
+		expect(pendingEmitted).toHaveLength(0);
+	});
 });
