@@ -132,33 +132,32 @@ export const useLayoutStore = defineStore("layout", () => {
     //    to the right of it so two sessions read as side-by-side panes
     //    (the documented "new sessions tile by default" behaviour).
     // 3. No body group exists yet (very first session, or every session
-    //    closed and only edge sidebars remain) → call `addPanel`
-    //    WITHOUT a `position` so dockview picks default placement in
-    //    the body and the new panel fills the grid. The previous code
-    //    here called `dock.addGroup()` followed by an
-    //    `addPanel({ direction: "right" })` against the brand-new
-    //    (still empty) body group — that left the empty group on the
-    //    left half of the body and the new session on the right half,
-    //    producing a 50/50 split with a dead pane on launch.
-    const referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
+    //    closed and only edge sidebars remain) → create a body group
+    //    ourselves and drop the panel `direction: "within"` it.
+    //
+    // Earlier "fix" tried calling `dock.addPanel` with no `position`
+    // when no body group existed, on the theory that dockview's default
+    // placement would land it in the body. It does NOT — when the only
+    // groups are edges, dockview's default places the panel inside the
+    // active group (the Sessions sidebar). The result was chat panels
+    // tabbed into the 240 px sidebar with the tab strip hidden by the
+    // `.dv-edge-group .dv-tabs-and-actions-container` rule in
+    // style.css — exactly the "sessions open at tiny percentage / no
+    // tab bar / lands in sidebar" cluster. Covered by tests now.
+    let referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
+    let createdBodyGroup = false;
     if (!referenceGroup) {
-      dock.addPanel({
-        id: sessionId,
-        component: "chat",
-        title: opts.title ?? shortPanelTitle(sessionId),
-        params: { sessionId },
-      });
-      return;
+      const body = dock.addGroup();
+      referenceGroup = body.id;
+      createdBodyGroup = true;
     }
+    const direction = opts.targetGroupId || createdBodyGroup ? "within" : "right";
     dock.addPanel({
       id: sessionId,
       component: "chat",
       title: opts.title ?? shortPanelTitle(sessionId),
       params: { sessionId },
-      position: {
-        referenceGroup,
-        direction: opts.targetGroupId ? "within" : "right",
-      },
+      position: { referenceGroup, direction },
     });
   }
 

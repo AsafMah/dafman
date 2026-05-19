@@ -29,13 +29,13 @@
     "copilot-sdk-supercharged": "^2.1.2",
     "dockview-vue": "^6.3.0",
     "electrobun": "1.18.1",
-    "fuse.js": "^7.3.0",
     "lexical": "0.38.1",
     "lexical-vue": "^0.14.1",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-command-palette": "^0.2.3"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.0.0",
