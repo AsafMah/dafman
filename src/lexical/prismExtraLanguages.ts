@@ -32,6 +32,38 @@ import "prismjs";
 // throw `Prism.languages["markup-templating"].tokenizePlaceholders`
 // at first highlight.
 import "prismjs/components/prism-markup-templating";
+
+// Core grammars that used to load transitively via @lexical/code (it
+// imported prism-markdown which pulls clike/markup/etc, plus its own
+// auto-registered set for js/ts/python/rust/swift/java/cpp). Now that
+// MessageContent goes through markdown-it (not Lexical), those grammars
+// are no longer loaded as a side-effect. Register them explicitly here
+// so code fences highlight on first paint.
+//
+// Order matters for grammars with dependencies: clike must precede
+// javascript, javascript must precede typescript/jsx, markup must
+// precede markdown.
+import "prismjs/components/prism-clike";
+import "prismjs/components/prism-c";
+import "prismjs/components/prism-cpp";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-jsx";
+import "prismjs/components/prism-tsx";
+import "prismjs/components/prism-markup";
+import "prismjs/components/prism-css";
+import "prismjs/components/prism-markdown";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-rust";
+import "prismjs/components/prism-java";
+import "prismjs/components/prism-swift";
+import "prismjs/components/prism-objectivec";
+import "prismjs/components/prism-sql";
+import "prismjs/components/prism-powershell";
+
+// Extras beyond @lexical/code's stock bundle — covers shell output,
+// JSON args, apply_patch diffs, configs, and the languages our users
+// will paste most often that the upstream Lexical bundle didn't ship.
 import "prismjs/components/prism-bash";
 import "prismjs/components/prism-json";
 import "prismjs/components/prism-diff";

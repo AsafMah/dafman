@@ -334,3 +334,65 @@
   height: auto;
   border-radius: var(--p-border-radius-sm);
 }
+
+/* Definition lists (markdown-it-deflist). */
+.md-content dl {
+  margin: 0.5rem 0;
+}
+.md-content dt {
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+.md-content dd {
+  margin: 0 0 0.4rem 1.5rem;
+}
+
+/* Footnotes (markdown-it-footnote). */
+.md-content .footnotes {
+  margin-top: 1.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--p-content-border-color);
+  font-size: 0.875em;
+  color: var(--p-text-muted-color);
+}
+.md-content .footnote-backref {
+  text-decoration: none;
+  margin-left: 0.25rem;
+}
+
+/* Collapsible <details>/<summary>. */
+.md-content details {
+  margin: 0.5rem 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-sm);
+  background: color-mix(in srgb, var(--p-content-hover-background) 35%, transparent);
+}
+.md-content details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+.md-content details[open] > summary {
+  margin-bottom: 0.4rem;
+}
+
+/* Inline `<kbd>` shortcut chips. */
+.md-content kbd {
+  display: inline-block;
+  padding: 0.05em 0.4em;
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-bottom-width: 2px;
+  border-radius: var(--p-border-radius-sm);
+}
+
+/* Inline `<mark>` highlight (same look as lex-text-highlight). */
+.md-content mark {
+  background: color-mix(in srgb, var(--p-yellow-500, #fde047) 40%, transparent);
+  color: inherit;
+  padding: 0 0.15em;
+  border-radius: 2px;
+}

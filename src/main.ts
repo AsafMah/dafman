@@ -9,6 +9,10 @@ import "primeicons/primeicons.css";
 import "dockview-vue/dist/styles/dockview.css";
 import "./style.css";
 import "./lexical/lexical.css";
+// KaTeX styles for math rendering inside MessageContent.vue (the
+// markdown-it-texmath plugin emits HTML that depends on these classes).
+// ~80 KB minified; only paid once.
+import "katex/dist/katex.min.css";
 import App from "./App.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import ChatTab from "./components/ChatTab.vue";
