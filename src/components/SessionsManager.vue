@@ -55,7 +55,7 @@ const recordsById = computed(() => {
 function indicatorFor(sessionId: string): NotificationStyle | null {
   const r = recordsById.value.get(sessionId);
   if (!r) return null;
-  return indicatorStyle(r.pendingRequest?.type, r.unseenTurns);
+  return indicatorStyle(r.pendingRequest?.type, r.isThinking, r.unseenTurns);
 }
 
 /// Within a workspace group, push currently-open sessions to the top
@@ -494,11 +494,14 @@ void toasts; // referenced inside async handlers
               @click="onResume(session)"
             >
               <span class="session-label">
-                <span
+                <i
                   v-if="indicatorFor(session.sessionId)"
-                  class="session-dot"
-                  :class="{ 'session-dot-pulse': indicatorFor(session.sessionId)!.pulse }"
-                  :style="{ '--dot-color': indicatorFor(session.sessionId)!.color }"
+                  class="pi session-icon"
+                  :class="[
+                    `pi-${indicatorFor(session.sessionId)!.iconSuffix}`,
+                    { 'session-icon-pulse': indicatorFor(session.sessionId)!.pulse },
+                  ]"
+                  :style="{ '--icon-color': indicatorFor(session.sessionId)!.color }"
                   :aria-label="indicatorFor(session.sessionId)!.label"
                   :title="indicatorFor(session.sessionId)!.label"
                 />
@@ -821,22 +824,19 @@ void toasts; // referenced inside async handlers
   line-height: 1.25;
 }
 
-.session-dot {
+.session-icon {
   display: inline-block;
   vertical-align: middle;
-  margin-right: 0.35rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--dot-color, var(--p-primary-color));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot-color, var(--p-primary-color)) 35%, transparent);
+  margin-right: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--icon-color, var(--p-primary-color));
 }
 
-.session-dot.session-dot-pulse {
-  animation: session-dot-pulse 1.6s ease-in-out infinite;
+.session-icon.session-icon-pulse {
+  animation: session-icon-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes session-dot-pulse {
+@keyframes session-icon-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }

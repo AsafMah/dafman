@@ -22,21 +22,26 @@ export type NotificationEventType =
   | "permission"
   | "userInput"
   | "elicitation"
+  | "thinking"
   | "unseenActivity";
 
 export interface NotificationStyle {
   /// Solid color CSS expression (already includes `var(--p-…-500)`).
   /// Use directly as `background`, `color`, or inside `color-mix`.
   color: string;
-  /// PrimeIcons class (without `pi pi-` prefix) — call sites prepend.
+  /// PrimeIcons class suffix(es) — call sites prepend `pi `. May
+  /// include additional modifiers when needed (e.g. the
+  /// "thinking" entry returns `"spin pi-spinner"` so the icon
+  /// self-animates without the call site having to know).
   iconSuffix: string;
   /// Short uppercase tag rendered in banners + a11y labels.
   /// (Banner body still shows the SDK-supplied message; this is
   /// just the "what kind of request" anchor.)
   label: string;
-  /// Whether this signal warrants a pulsing animation on the dot.
-  /// Pending requests pulse to draw attention; "unseen activity"
-  /// stays static.
+  /// Whether this signal warrants a pulsing animation on the
+  /// indicator (slow opacity fade). Pending requests pulse to draw
+  /// attention; "thinking" already self-animates via pi-spin so it
+  /// doesn't pulse; "unseen activity" stays static.
   pulse: boolean;
 }
 
@@ -59,9 +64,18 @@ const STYLES: Record<NotificationEventType, NotificationStyle> = {
     label: "Awaiting response",
     pulse: true,
   },
+  thinking: {
+    // Session-primary tinted so it reads as "this session is
+    // working" rather than as a blocking signal. Spinner icon
+    // self-animates; no extra pulse.
+    color: "var(--p-primary-color)",
+    iconSuffix: "spin pi-spinner",
+    label: "Thinking…",
+    pulse: false,
+  },
   unseenActivity: {
     color: "var(--p-emerald-500, #10b981)",
-    iconSuffix: "check-circle",
+    iconSuffix: "circle-fill",
     label: "New activity",
     pulse: false,
   },
@@ -71,15 +85,24 @@ export function styleFor(type: NotificationEventType): NotificationStyle {
   return STYLES[type];
 }
 
-/// Maps a `SessionRecord`'s pendingRequest type (and unseenTurns)
-/// to the appropriate notification style. Returns null when neither
-/// applies. Centralised so the three call sites can share priority:
-/// pendingRequest beats unseenTurns.
+/// Maps a `SessionRecord`'s pendingRequest type, isThinking flag,
+/// and unseenTurns to the appropriate notification style. Returns
+/// null when nothing's worth surfacing. Centralised so the three
+/// call sites can share priority:
+///
+///   pendingRequest > thinking > unseenActivity
+///
+/// Rationale: a blocking request is the most-urgent signal (user
+/// must act), thinking is informational ("don't close this — the
+/// agent is mid-turn"), and unseen activity is the lowest priority
+/// ("there was new output you haven't read yet").
 export function indicatorStyle(
   pendingRequestType: "permission" | "userInput" | "elicitation" | null | undefined,
+  isThinking: boolean,
   unseenTurns: number,
 ): NotificationStyle | null {
   if (pendingRequestType) return styleFor(pendingRequestType);
+  if (isThinking) return styleFor("thinking");
   if (unseenTurns > 0) return styleFor("unseenActivity");
   return null;
 }

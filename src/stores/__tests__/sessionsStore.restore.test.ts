@@ -214,6 +214,36 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(record!.unseenTurns).toBe(2);
   });
 
+  test("isThinking tracks assistant.turn_start / turn_end / session.idle", async () => {
+    // Drives the "Thinking…" spinner icon on the tab + sidebar row.
+    // Lives on the record (not just ChatAmbient) so sibling sessions
+    // can react without their chat panels being mounted.
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+    });
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession("s1");
+    expect(record!.isThinking).toBe(false);
+    expect(record!.sawTurnBoundary).toBe(false);
+
+    fire(event("s1", "assistant.turn_start", { turnId: "t1" }));
+    expect(record!.isThinking).toBe(true);
+    expect(record!.sawTurnBoundary).toBe(true);
+
+    fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
+    expect(record!.isThinking).toBe(false);
+
+    // session.idle is the SDK's "I'm done" fallback for older
+    // boundaries; should also clear isThinking.
+    fire(event("s1", "assistant.turn_start", { turnId: "t2" }));
+    expect(record!.isThinking).toBe(true);
+    fire(event("s1", "session.idle", {}));
+    expect(record!.isThinking).toBe(false);
+  });
+
   test("OS notification fires for every pending-request channel AND turn_end (not just permission)", async () => {
     // Pins the contract the user surfaced after the first
     // notifications PR: notifications must cover ALL of

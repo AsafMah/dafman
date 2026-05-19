@@ -90,14 +90,15 @@ const displayTitle = computed(() => {
 });
 
 /// Status indicator for this session. Maps the record's
-/// `pendingRequest.type` + `unseenTurns` to one of four semantic
-/// styles (permission / userInput / elicitation / unseenActivity)
-/// via the shared `indicatorStyle` helper so the dot color, icon,
-/// and pulse behavior stay consistent with the Sessions sidebar
-/// row + the composer banner. `null` when nothing's worth surfacing.
+/// `pendingRequest.type` + `isThinking` + `unseenTurns` to one of
+/// five semantic styles via the shared `indicatorStyle` helper —
+/// kept centralised so the dot color, icon, and pulse behavior
+/// stay consistent with the Sessions sidebar row + composer
+/// banner. `null` when nothing's worth surfacing.
 const indicator = computed(() =>
   indicatorStyle(
     record.value?.pendingRequest?.type,
+    record.value?.isThinking ?? false,
     record.value?.unseenTurns ?? 0,
   ),
 );
@@ -118,11 +119,14 @@ function onClose(event: MouseEvent) {
     :style="{ '--accent': accent }"
     :title="displayTitle"
   >
-    <span
+    <i
       v-if="indicator"
-      class="chat-tab-dot"
-      :class="{ 'chat-tab-dot-pulse': indicator.pulse }"
-      :style="{ '--dot-color': indicator.color }"
+      class="pi chat-tab-icon"
+      :class="[
+        `pi-${indicator.iconSuffix}`,
+        { 'chat-tab-icon-pulse': indicator.pulse },
+      ]"
+      :style="{ '--icon-color': indicator.color }"
       :aria-label="indicator.label"
       :title="indicator.label"
     />
@@ -235,26 +239,22 @@ function onClose(event: MouseEvent) {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-.chat-tab-dot {
+.chat-tab-icon {
   flex: 0 0 auto;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  display: inline-block;
-  /* Color is driven by the type-specific --dot-color CSS variable
-   * set inline from `notificationStyles.ts`. The halo uses
-   * color-mix to derive a translucent ring from the same color. */
-  background: var(--dot-color, var(--p-primary-color));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot-color, var(--p-primary-color)) 35%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--icon-color, var(--p-primary-color));
 }
 
-.chat-tab-dot.chat-tab-dot-pulse {
-  /* Pending requests pulse to draw the eye; unseen-activity dots
-   * stay static (no `chat-tab-dot-pulse` class). */
-  animation: chat-tab-dot-pulse 1.6s ease-in-out infinite;
+.chat-tab-icon.chat-tab-icon-pulse {
+  /* Pending requests pulse to draw the eye; "thinking" already
+   * self-animates via pi-spin, and unseen-activity stays static. */
+  animation: chat-tab-icon-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes chat-tab-dot-pulse {
+@keyframes chat-tab-icon-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }

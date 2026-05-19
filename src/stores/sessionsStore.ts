@@ -76,6 +76,19 @@ export type SessionRecord = {
   /// "new activity" dot on the tab + sidebar row. Cleared on focus
   /// (via the `activeSessionId` watch below).
   unseenTurns: number;
+  /// True while the agent is mid-turn for this session (between
+  /// `assistant.turn_start` and `assistant.turn_end`). Drives the
+  /// "Thinking…" indicator on the tab + sidebar row and the
+  /// pending-spinner card inside the chat. The `sawTurnBoundary`
+  /// flag below tracks whether we've ever observed a turn_start —
+  /// SDKs that don't emit those boundaries fall back to the
+  /// caller's optimistic flag (see `ChatWindow.vue::isSending`).
+  isThinking: boolean;
+  /// True once we've observed at least one `assistant.turn_start`.
+  /// Tracks the same invariant as `ChatAmbient.sawTurnBoundary` but
+  /// at the record level so other surfaces (the sidebar row) can
+  /// trust `isThinking` without mounting the chat panel.
+  sawTurnBoundary: boolean;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -260,6 +273,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     // `assistant.turn_end` that lands while the session ISN'T the
     // dock's active panel. Cleared on focus by the watcher below.
     if (payload.eventType === "assistant.turn_end") {
+      record.isThinking = false;
       const layoutStore = useLayoutStore();
       if (layoutStore.activeSessionId !== record.id) {
         record.unseenTurns += 1;
@@ -276,6 +290,21 @@ export const useSessionsStore = defineStore("sessions", () => {
           });
         }
       }
+    }
+
+    // Mid-turn indicator: flips on at turn_start, off at turn_end /
+    // session.idle / session.error. The reducer (`ChatAmbient`)
+    // tracks the same thing inside the chat panel; this mirror lives
+    // on the record so the tab + sidebar dot react without the
+    // panel being mounted.
+    if (payload.eventType === "assistant.turn_start") {
+      record.isThinking = true;
+      record.sawTurnBoundary = true;
+    } else if (
+      payload.eventType === "session.idle" ||
+      payload.eventType === "session.error"
+    ) {
+      record.isThinking = false;
     }
   }
 
@@ -361,6 +390,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         defaultSendMode: "steer",
         pendingRequest: null,
         unseenTurns: 0,
+        isThinking: false,
+        sawTurnBoundary: false,
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -433,6 +464,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         defaultSendMode: "steer",
         pendingRequest: null,
         unseenTurns: 0,
+        isThinking: false,
+        sawTurnBoundary: false,
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and
