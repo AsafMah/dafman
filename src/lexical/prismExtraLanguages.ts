@@ -56,14 +56,20 @@ import "prismjs/components/prism-yaml";              // standalone
 import "prismjs/components/prism-toml";              // standalone
 import "prismjs/components/prism-diff";              // standalone
 import "prismjs/components/prism-json";              // standalone
-import "prismjs/components/prism-swift";             // standalone
 import "prismjs/components/prism-powershell";        // standalone
 import "prismjs/components/prism-ruby";              // standalone
+// Dropped: prism-objectivec and prism-swift. They depend on prism-c
+// at module-eval time, and despite a documented import order something
+// in WebView2's evaluator (Edge Chromium ~120) doesn't see `Prism.languages.c`
+// as defined when `prism-objectivec`'s top-level `extend('c', …)` runs,
+// even though chromium ~141 (Playwright) sees it just fine. Neither
+// language is a priority for our user base (Windows-only dev), so we
+// drop them rather than chase a WebView2-specific module-eval quirk.
+// Apple platforms aren't a target — re-add only if we go cross-platform.
 
 // tier 2 — need a tier-1 lang
 import "prismjs/components/prism-cpp";               // → c
 import "prismjs/components/prism-typescript";        // → javascript
-import "prismjs/components/prism-objectivec";        // → c
 import "prismjs/components/prism-kotlin";            // → java/clike
 import "prismjs/components/prism-php";               // → markup-templating + clike
 import "prismjs/components/prism-markdown";          // → markup-templating

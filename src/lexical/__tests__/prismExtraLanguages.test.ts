@@ -16,10 +16,13 @@ describe("prismExtraLanguages", () => {
     expect(PRISM_EXTRA_LANGUAGES_LOADED).toBe(true);
   });
 
-  test("registers the full @lexical/code stock language set", () => {
+  test("registers the @lexical/code stock language set (minus Apple-only)", () => {
+    // Apple-only grammars (`objectivec`, `swift`) are intentionally
+    // dropped — see prismExtraLanguages.ts comment. The rest of
+    // the @lexical/code stock bundle remains.
     for (const lang of [
       "markup","clike","c","cpp","javascript","typescript","jsx","tsx",
-      "css","markdown","python","rust","java","swift","objectivec",
+      "css","markdown","python","rust","java",
       "sql","powershell",
     ]) {
       expect(Prism.languages[lang]).toBeDefined();
