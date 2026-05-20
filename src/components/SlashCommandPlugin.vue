@@ -11,7 +11,7 @@
 /// won't show — pressing Enter sends as a normal message, and the
 /// SDK's built-in command resolver picks it up.
 
-import { computed, ref, nextTick } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { TextNode, $isTextNode } from "lexical";
 import {
   TypeaheadMenuPlugin,
@@ -35,6 +35,16 @@ const props = defineProps<{
 
 const editor = useLexicalComposer();
 const query = ref("");
+
+/// Force the typeahead anchor to mount inside <body> so it positions
+/// page-absolute (not as a flex child of the composer row). Default
+/// in lexical-vue is body, but we set it explicitly so future
+/// composer layout changes can't accidentally re-parent it. Defer
+/// to a ref so it's safe in SSR (body is undefined at module load).
+const menuParent = ref<HTMLElement | null>(null);
+onMounted(() => {
+  if (typeof document !== "undefined") menuParent.value = document.body;
+});
 
 const allOptions = computed(() =>
   SESSION_COMMANDS.map((c) => new SlashOption(c)),
@@ -60,33 +70,12 @@ function onQueryChange(q: string | null) {
   query.value = q ?? "";
 }
 
-/// Lift the menu visually above the typing caret. The lexical-vue
-/// anchor sets `top` / `left` inline at the caret line; without a
-/// transform our menu would render BELOW (poking off the bottom of
-/// the composer). We watch for the anchor to mount and apply a
-/// translateY equal to the menu's own height + a small gap, so the
-/// menu floats above the caret.
-function liftMenu(anchorEl: HTMLElement | null) {
-  if (!anchorEl) return;
-  void nextTick(() => {
-    const menu = anchorEl.querySelector(".slash-menu") as HTMLElement | null;
-    if (!menu) return;
-    const h = menu.offsetHeight;
-    if (h > 0) {
-      anchorEl.style.transform = `translateY(${-(h + 12)}px)`;
-    }
-  });
-}
-
 async function onSelectOption(payload: {
   option: SlashOption;
   textNodeContainingQuery: TextNode | null;
   closeMenu: () => void;
 }) {
   const { option, textNodeContainingQuery, closeMenu } = payload;
-  // Strip the "/foo" the user typed — the command is executing
-  // locally, the composer shouldn't ship that text on the next
-  // Enter.
   editor.update(() => {
     if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
       textNodeContainingQuery.remove();
@@ -105,8 +94,10 @@ async function onSelectOption(payload: {
 
 <template>
   <TypeaheadMenuPlugin
+    v-if="menuParent"
     :options="filteredOptions"
     :trigger-fn="triggerFn"
+    :parent="menuParent"
     @query-change="onQueryChange"
     @select-option="onSelectOption"
   >
@@ -115,7 +106,6 @@ async function onSelectOption(payload: {
         v-if="itemProps.options.length > 0 && anchorElementRef"
         class="slash-menu"
         role="listbox"
-        :ref="() => liftMenu(anchorElementRef)"
       >
         <button
           v-for="(opt, i) in (itemProps.options as SlashOption[])"
@@ -146,6 +136,10 @@ async function onSelectOption(payload: {
 </template>
 
 <style scoped>
+/* CSS-only "pop above the caret" — the lexical-vue anchor positions
+ * absolutely at the caret line; transform: translateY(-100%) lifts
+ * the menu by its own height, then -12px adds breathing room. No
+ * JS measurement, no race with first render. */
 .slash-menu {
   display: flex;
   flex-direction: column;
@@ -157,6 +151,7 @@ async function onSelectOption(payload: {
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
+  transform: translateY(calc(-100% - 12px));
   z-index: 100;
 }
 
