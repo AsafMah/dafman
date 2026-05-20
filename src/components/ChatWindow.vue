@@ -4,6 +4,7 @@ import { storeToRefs } from "pinia";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
 import MessageActions from "./MessageActions.vue";
+import MessageEditor from "./MessageEditor.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
@@ -22,6 +23,7 @@ import type {
   SessionEventPayload,
 } from "../ipc/types";
 import { useSessionsStore, type DefaultSendMode } from "../stores/sessionsStore";
+import { useLayoutStore } from "../stores/layoutStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
@@ -52,6 +54,7 @@ const props = defineProps<{
 }>();
 
 const sessionsStore = useSessionsStore();
+const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
@@ -184,7 +187,7 @@ watch(
           toasts.info(t.summary, t.detail);
       }
     }
-    if (result.error) {
+    if (result.error && live) {
       const lastSystem = [...result.items]
         .reverse()
         .find((i) => i.kind === "system" && i.severity === "error");
@@ -223,36 +226,6 @@ async function sendMessage(payload: ComposerSubmitPayload) {
   const concreteMode =
     payload.mode === "default" ? props.defaultSendMode : payload.mode;
 
-  // Edit path: a prior Edit click anchored an eventId. Truncate
-  // server-side, drop the local items at that point, then send the
-  // new text. Optimistic-append happens after the truncate so the
-  // bubble doesn't briefly appear under the soon-to-be-deleted
-  // original.
-  if (pendingEditEventId.value && !props.sendHandler) {
-    const anchor = pendingEditEventId.value;
-    pendingEditEventId.value = null;
-    try {
-      await sessionsStore.editUserMessage(
-        props.sessionId,
-        anchor,
-        payload.text,
-      );
-      // The store dropped events at the anchor; rebuild local items
-      // from scratch so the reducer's processedEvents counter aligns.
-      items.value = [];
-      ambient.value = defaultAmbient();
-      processedEvents = 0;
-      isFirstBatch = true;
-      isSendingFallback.value = true;
-      await scrollToBottom();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toasts.error("Failed to edit message", message);
-      isSendingFallback.value = false;
-    }
-    return;
-  }
-
   items.value = appendUserMessage(items.value, payload.text, idCounter);
   isSendingFallback.value = true;
   await scrollToBottom();
@@ -284,19 +257,13 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
 
-/// Pending edit anchor. When the user clicks "Edit" on a user
-/// message, we load its text into the composer and stash the
-/// eventId here; the NEXT submit truncates from that anchor and
-/// resends instead of appending. Any other interaction (cancel,
-/// successful send) clears the anchor.
-const pendingEditEventId = ref<string | null>(null);
+/// Inline edit mode for user messages: when set, the matching user
+/// bubble is replaced by a MessageEditor in place. Reset on save,
+/// fork-and-save, or cancel. Keyed by ChatItem.id (counter-derived).
+const editingItemId = ref<number | null>(null);
 
-function onMessageEdit(text: string, eventId: string) {
-  pendingEditEventId.value = eventId;
-  const composer = composerRef.value as
-    | { setText?: (v: string) => void; focus: () => void }
-    | null;
-  composer?.setText?.(text);
+function onMessageEdit(itemId: number) {
+  editingItemId.value = itemId;
 }
 
 function onMessageQuote(quotedText: string) {
@@ -304,6 +271,53 @@ function onMessageQuote(quotedText: string) {
     | { appendText?: (v: string) => void; focus: () => void }
     | null;
   composer?.appendText?.(quotedText);
+}
+
+/// Save the edit in place: truncate at the user message's eventId
+/// and re-send the new text in the SAME session.
+async function onEditorSave(eventId: string, newText: string): Promise<void> {
+  editingItemId.value = null;
+  if (!eventId) {
+    toasts.warn("Can't save edit", "Missing server anchor for this message.");
+    return;
+  }
+  try {
+    await sessionsStore.editUserMessage(props.sessionId, eventId, newText);
+    items.value = [];
+    ambient.value = defaultAmbient();
+    processedEvents = 0;
+    isFirstBatch = true;
+    isSendingFallback.value = true;
+    await scrollToBottom();
+  } catch {
+    // Toast surfaced by the store action.
+  }
+}
+
+/// Save & fork: open a brand-new session forked at the user
+/// message's eventId, send the edited text there. Original session
+/// is left intact. The new session opens as a new dockview panel.
+async function onEditorSaveFork(eventId: string, newText: string): Promise<void> {
+  editingItemId.value = null;
+  if (!eventId) {
+    toasts.warn("Can't fork", "Missing server anchor for this message.");
+    return;
+  }
+  try {
+    const newId = await sessionsStore.forkAndSend(
+      props.sessionId,
+      eventId,
+      newText,
+    );
+    layoutStore.addPanel(newId);
+    toasts.success("Forked", `Edited message sent in the new session.`);
+  } catch {
+    // Toast surfaced by the store action.
+  }
+}
+
+function onEditorCancel(): void {
+  editingItemId.value = null;
 }
 
 async function onMessageRetry(assistantItemIndex: number) {
@@ -328,10 +342,13 @@ async function onMessageRetry(assistantItemIndex: number) {
 }
 
 async function onMessageFork(eventId: string) {
+  if (!eventId) return;
   try {
-    await sessionsStore.forkSession(props.sessionId, eventId);
+    const newId = await sessionsStore.forkSession(props.sessionId, eventId);
+    layoutStore.addPanel(newId);
+    toasts.success("Forked", "Opened the new session in a tab.");
   } catch {
-    // Toast already shown.
+    // Toast already shown by the store action.
   }
 }
 
@@ -424,42 +441,58 @@ const pendingStyle = computed(() => {
           v-else-if="!(item.kind === 'assistant' && item.text === '')"
           class="message-shell"
         >
-          <article
-            class="message-card"
-            :class="[
-              item.kind,
-              item.kind === 'system' ? `severity-${item.severity}` : '',
-            ]"
-          >
-            <header class="role-label">
-              {{
-                item.kind === "user"
-                  ? "You"
-                  : item.kind === "assistant"
-                    ? "Assistant"
-                    : item.kind === "system" && item.severity === "warn"
-                      ? "Warning"
-                      : item.kind === "system" && item.severity === "error"
-                        ? "Error"
-                        : "Info"
-              }}
-            </header>
-            <MessageContent
-              v-if="item.kind === 'assistant' || item.kind === 'user'"
-              :text="item.text"
-              :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
-            />
-            <p v-else class="message-body">{{ item.text }}</p>
-          </article>
-          <MessageActions
-            :kind="item.kind"
-            :text="item.text"
-            :event-id="'eventId' in item ? item.eventId : undefined"
-            @quote="onMessageQuote"
-            @edit="(text) => onMessageEdit(text, 'eventId' in item ? item.eventId ?? '' : '')"
-            @retry="onMessageRetry(idx)"
-            @fork="onMessageFork('eventId' in item ? item.eventId ?? '' : '')"
+          <!-- Inline editor swap. Only user messages support editing; -->
+          <!-- canFork is true iff the item has a server-acknowledged   -->
+          <!-- eventId we can pin the fork to.                          -->
+          <MessageEditor
+            v-if="
+              item.kind === 'user' &&
+              editingItemId === item.id
+            "
+            :original-text="item.text"
+            :can-fork="Boolean('eventId' in item && item.eventId)"
+            @save="(text) => onEditorSave(('eventId' in item && item.eventId) ? item.eventId : '', text)"
+            @save-and-fork="(text) => onEditorSaveFork(('eventId' in item && item.eventId) ? item.eventId : '', text)"
+            @cancel="onEditorCancel"
           />
+          <template v-else>
+            <article
+              class="message-card"
+              :class="[
+                item.kind,
+                item.kind === 'system' ? `severity-${item.severity}` : '',
+              ]"
+            >
+              <header class="role-label">
+                {{
+                  item.kind === "user"
+                    ? "You"
+                    : item.kind === "assistant"
+                      ? "Assistant"
+                      : item.kind === "system" && item.severity === "warn"
+                        ? "Warning"
+                        : item.kind === "system" && item.severity === "error"
+                          ? "Error"
+                          : "Info"
+                }}
+              </header>
+              <MessageContent
+                v-if="item.kind === 'assistant' || item.kind === 'user'"
+                :text="item.text"
+                :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
+              />
+              <p v-else class="message-body">{{ item.text }}</p>
+            </article>
+            <MessageActions
+              :kind="item.kind"
+              :text="item.text"
+              :event-id="'eventId' in item ? item.eventId : undefined"
+              @quote="onMessageQuote"
+              @edit="onMessageEdit(item.id)"
+              @retry="onMessageRetry(idx)"
+              @fork="onMessageFork('eventId' in item ? item.eventId ?? '' : '')"
+            />
+          </template>
         </div>
       </template>
 

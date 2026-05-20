@@ -82,16 +82,25 @@ const extensionMap: Record<string, string> = {
   go: "go",
 };
 
-/// Resolve a CM6 language extension by language id (one of the keys of
-/// `factories`) or null when we don't ship a pack. Result is cached
-/// across calls.
+/// Resolve a CM6 language extension by language id (one of the keys
+/// of `factories` OR a short alias from `extensionMap`). Result is
+/// cached across calls. Aliases mean a markdown fence like ```ts
+/// resolves to the typescript pack the same way `App.ts` does.
 export async function resolveLanguageExtension(
   langId: string | null | undefined,
 ): Promise<Extension | null> {
   if (!langId) return null;
   const key = langId.toLowerCase();
   if (cache.has(key)) return cache.get(key)!;
-  const factory = factories[key];
+  // Direct factory lookup first…
+  let factory = factories[key];
+  // …then fall through aliases ("ts" → "typescript", "py" → "python",
+  // "md" → "markdown", "rs" → "rust", "vue" → "html", etc.). Reuses
+  // the file-extension table so we only maintain one mapping.
+  if (!factory) {
+    const aliased = extensionMap[key];
+    if (aliased) factory = factories[aliased];
+  }
   if (!factory) return null;
   const ext = await factory();
   cache.set(key, ext);

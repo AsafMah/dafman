@@ -14,7 +14,7 @@ function mount(
     toolResultText?: string;
   },
   handlers: Partial<{
-    onEdit: (t: string) => void;
+    onEdit: () => void;
     onQuote: (t: string) => void;
     onRetry: () => void;
     onFork: () => void;
@@ -44,7 +44,7 @@ describe("MessageActions", () => {
     cleanup();
   });
 
-  test("assistant message renders Copy, Markdown, Quote, Retry, Fork", () => {
+  test("assistant message renders Copy, Quote, Retry, Fork", () => {
     const { container } = mount({
       kind: "assistant",
       text: "ack",
@@ -53,7 +53,7 @@ describe("MessageActions", () => {
     const labels = Array.from(container.querySelectorAll(".p-button-label"))
       .map((el) => el.textContent?.trim())
       .filter(Boolean);
-    expect(labels).toEqual(["Copy", "Markdown", "Quote", "Retry", "Fork"]);
+    expect(labels).toEqual(["Copy", "Quote", "Retry", "Fork"]);
     cleanup();
   });
 
@@ -97,7 +97,7 @@ describe("MessageActions", () => {
   });
 
   test("clicking Quote emits the quoted text with > prefix", async () => {
-    let received: string | null = null;
+    let received: string = "";
     const { container } = mount(
       { kind: "user", text: "line1\nline2", eventId: "e1" },
       { onQuote: (t) => (received = t) },
@@ -111,18 +111,18 @@ describe("MessageActions", () => {
     cleanup();
   });
 
-  test("clicking Edit emits the original text", async () => {
-    let received: string | null = null;
+  test("clicking Edit emits the edit event", async () => {
+    let fired = false;
     const { container } = mount(
       { kind: "user", text: "original", eventId: "e1" },
-      { onEdit: (t) => (received = t) },
+      { onEdit: () => (fired = true) },
     );
     const editBtn = Array.from(container.querySelectorAll("button")).find((b) =>
       b.textContent?.includes("Edit"),
     );
     await fireEvent.click(editBtn!);
     await nextTick();
-    expect(received).toBe("original");
+    expect(fired).toBe(true);
     cleanup();
   });
 });

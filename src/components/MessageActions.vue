@@ -34,7 +34,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "edit", text: string): void;
+  (e: "edit"): void;
   (e: "quote", text: string): void;
   (e: "retry"): void;
   (e: "fork"): void;
@@ -98,16 +98,6 @@ function quoteToCommand(text: string): string {
         :disabled="!text"
         @click="copyToClipboard(text ?? '')"
       />
-      <Button
-        v-if="kind === 'assistant'"
-        icon="pi pi-clone"
-        label="Markdown"
-        text
-        size="small"
-        class="msg-action"
-        :disabled="!text"
-        @click="copyToClipboard(text ?? '', 'Markdown copied')"
-      />
     </template>
 
     <!-- Quote (insert as blockquote in composer) — text-bearing kinds. -->
@@ -122,7 +112,7 @@ function quoteToCommand(text: string): string {
       @click="emit('quote', quoteToCommand(text ?? ''))"
     />
 
-    <!-- Edit (user only): load text into composer, on submit truncate + send. -->
+    <!-- Edit (user only): swap the bubble for an inline editor. -->
     <Button
       v-if="kind === 'user'"
       icon="pi pi-pencil"
@@ -132,7 +122,7 @@ function quoteToCommand(text: string): string {
       class="msg-action"
       :disabled="!text || !canAnchor"
       :title="canAnchor ? 'Edit and resend (replaces history from here)' : 'Wait for the server to acknowledge this message'"
-      @click="emit('edit', text ?? '')"
+      @click="emit('edit')"
     />
 
     <!-- Retry (assistant only): re-run from the preceding user message. -->
@@ -167,9 +157,10 @@ function quoteToCommand(text: string): string {
 .message-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.15rem;
-  margin-top: 0.2rem;
-  opacity: 0.55;
+  gap: 0;
+  margin-top: -0.15rem;
+  padding: 0 0.2rem;
+  opacity: 0.45;
   transition: opacity 0.15s ease;
 }
 
@@ -181,15 +172,16 @@ function quoteToCommand(text: string): string {
 /* PrimeVue text buttons render a touch large for under-message use.
  * Bring them down to a denser scale that fits the chat rhythm. */
 .msg-action :deep(.p-button) {
-  padding: 0.15rem 0.4rem;
-  font-size: 0.72rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.7rem;
   height: auto;
   min-height: 0;
   color: var(--p-text-muted-color);
+  gap: 0.25rem;
 }
 
 .msg-action :deep(.p-button-icon) {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .msg-action :deep(.p-button):hover {

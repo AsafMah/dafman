@@ -800,13 +800,26 @@ export const useSessionsStore = defineStore("sessions", () => {
         ...(toEventId ? { toEventId } : {}),
       });
       await restoreSession(result.sessionId);
-      toasts.success("Forked", `New session ${result.sessionId.slice(0, 8)}`);
       return result.sessionId;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       toasts.error("Failed to fork session", message);
       throw err;
     }
+  }
+
+  /// Fork-and-send: fork the session at the given event boundary,
+  /// then send `newText` as the first user message in the new
+  /// session. Returns the new session id so the caller can open it
+  /// as a panel.
+  async function forkAndSend(
+    sessionId: string,
+    toEventId: string,
+    newText: string,
+  ): Promise<string> {
+    const newId = await forkSession(sessionId, toEventId);
+    await sendMessage(newId, newText);
+    return newId;
   }
 
   async function setSessionName(
@@ -890,6 +903,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     editUserMessage,
     retryFromEvent,
     forkSession,
+    forkAndSend,
     setSessionName,
     setSessionReasoningOverride,
     respondToPending,
