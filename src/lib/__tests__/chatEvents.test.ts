@@ -199,6 +199,103 @@ describe("processEvents", () => {
   });
 });
 
+describe("processEvents — fork notices", () => {
+  test("session.info infoType=fork (source) parses into a forkNotice item", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "session.info",
+          data: {
+            infoType: "fork",
+            message: "Forked this session into Branch Idea 2.",
+          },
+          eventId: "evt-fork-1",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      id: 1,
+      kind: "forkNotice",
+      eventId: "evt-fork-1",
+      direction: "into",
+      referenceName: "Branch Idea 2",
+    });
+  });
+
+  test("session.info infoType=fork (destination) parses direction=from", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s2",
+          eventType: "session.info",
+          data: {
+            infoType: "fork",
+            message:
+              "Forked from Original Convo before event abc123 as Branch.",
+          },
+          eventId: "evt-fork-2",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      id: 1,
+      kind: "forkNotice",
+      eventId: "evt-fork-2",
+      direction: "from",
+      referenceName: "Original Convo",
+    });
+  });
+
+  test("duplicate fork session.info with the same eventId only renders once", () => {
+    const counter: IdCounter = { next: 1 };
+    const event = {
+      sessionId: "s1",
+      eventType: "session.info",
+      data: {
+        infoType: "fork",
+        message: "Forked this session into Branch A.",
+      },
+      eventId: "evt-dup",
+    };
+    const result = processEvents([], defaultAmbient(), [event, event], counter);
+    expect(result.items).toHaveLength(1);
+  });
+
+  test("non-fork session.info still falls through to a system bubble", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "session.info",
+          data: { message: "Welcome." },
+          eventId: "evt-info",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      kind: "system",
+      severity: "info",
+      text: "Welcome.",
+    });
+  });
+});
+
 describe("processEvents — tool calls", () => {
   test("happy path: start → progress → partial → complete success", () => {
     const counter: IdCounter = { next: 1 };

@@ -380,6 +380,25 @@ async function onMessageFork(itemIndex: number) {
   }
 }
 
+/// Fork-notice chip clicked → resolve the referenced session by
+/// name (best-effort) and surface it. If the session is open in a
+/// dockview panel we just activate it; otherwise add the panel
+/// first. Falls back to a toast when we can't find a match.
+function onForkNoticeClick(referenceName: string) {
+  const target = sessionsStore.findSessionByName(referenceName);
+  if (!target) {
+    toasts.warn(
+      "Session not loaded",
+      `No open session matches "${referenceName}". Open it from the sessions sidebar first.`,
+    );
+    return;
+  }
+  if (!layoutStore.isPanelOpen(target.id)) {
+    layoutStore.addPanel(target.id);
+  }
+  layoutStore.activatePanel(target.id);
+}
+
 /// Type-aware styling for the pending-request banner.Pulls the
 /// color + icon + label from the shared `notificationStyles` so the
 /// banner matches the dot color on the tab + sidebar row. Reads
@@ -456,6 +475,25 @@ const pendingStyle = computed(() => {
           :message="item.message"
           :request="item.request"
         />
+        <button
+          v-else-if="item.kind === 'forkNotice'"
+          type="button"
+          class="fork-notice"
+          :class="`dir-${item.direction}`"
+          :title="
+            item.direction === 'from'
+              ? `Open the parent session: ${item.referenceName}`
+              : `Open the forked session: ${item.referenceName}`
+          "
+          @click="onForkNoticeClick(item.referenceName)"
+        >
+          <i class="pi pi-share-alt" aria-hidden="true" />
+          <span class="fork-notice-label">
+            {{ item.direction === "from" ? "Forked from" : "Forked into" }}
+          </span>
+          <span class="fork-notice-target">{{ item.referenceName }}</span>
+          <i class="pi pi-arrow-right" aria-hidden="true" />
+        </button>
         <!-- Skip empty assistant items entirely. The model emits
              `assistant.message_start` (creating an empty item) before
              every turn; when the turn goes straight to a tool call
@@ -598,6 +636,41 @@ const pendingStyle = computed(() => {
 </template>
 
 <style scoped>
+.fork-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  margin: 0.1rem 0;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  background: color-mix(in srgb, var(--p-primary-500) 10%, transparent);
+  color: var(--p-primary-600, var(--p-primary-500));
+  border: 1px solid color-mix(in srgb, var(--p-primary-500) 35%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.fork-notice:hover {
+  background: color-mix(in srgb, var(--p-primary-500) 18%, transparent);
+  border-color: var(--p-primary-500);
+}
+
+.fork-notice .pi {
+  font-size: 0.78rem;
+}
+
+.fork-notice-label {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.fork-notice-target {
+  font-weight: 600;
+}
+
 .chat-tile {
   width: 100%;
   /* `height: 100%` so the tile fills its container in any layout: it

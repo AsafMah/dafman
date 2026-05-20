@@ -822,6 +822,31 @@ export const useSessionsStore = defineStore("sessions", () => {
     return newId;
   }
 
+  /// Best-effort lookup for the session that matches a free-form name
+  /// (used by the fork-notice chip to resolve a CLI-supplied "name"
+  /// to a sessionId we can activate). Matches exact title first, then
+  /// title-startsWith, then id prefix — the CLI's default unnamed
+  /// fork names are "Session <8 hex>" so the latter handles those.
+  function findSessionByName(name: string): SessionRecord | undefined {
+    if (!name) return undefined;
+    const trimmed = name.trim();
+    const lower = trimmed.toLowerCase();
+    const records = sessions.value;
+    const exact = records.find((s) => (s.title ?? "").toLowerCase() === lower);
+    if (exact) return exact;
+    const titleStarts = records.find((s) =>
+      (s.title ?? "").toLowerCase().startsWith(lower),
+    );
+    if (titleStarts) return titleStarts;
+    const m = trimmed.match(/([0-9a-f]{4,})/i);
+    if (m && m[1]) {
+      const prefix = m[1].toLowerCase();
+      const byId = records.find((s) => s.id.toLowerCase().startsWith(prefix));
+      if (byId) return byId;
+    }
+    return undefined;
+  }
+
   async function setSessionName(
     sessionId: string,
     name: string,
@@ -904,6 +929,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     retryFromEvent,
     forkSession,
     forkAndSend,
+    findSessionByName,
     setSessionName,
     setSessionReasoningOverride,
     respondToPending,

@@ -114,6 +114,21 @@ export type ChatItem =
         | import("../ipc/types").PermissionRequestData
         | import("../ipc/types").UserInputRequestData
         | import("../ipc/types").ElicitationRequestData;
+    }
+  | {
+      id: number;
+      kind: "forkNotice";
+      /// Anchor for dedup. The CLI emits the same fork session.info
+      /// twice in pathological resume flows (live + persisted on next
+      /// replay); we collapse them by eventId so users see one chip.
+      eventId?: string;
+      /// Whether this is the source session ("Forked into X") or the
+      /// destination ("Forked from X").
+      direction: "into" | "from";
+      /// Session name as the CLI rendered it (truncated id or
+      /// user-supplied). The renderer looks it up in the sessionsStore
+      /// to resolve to a clickable id.
+      referenceName: string;
     };
 
 /// Maximum bytes of partial / result content we keep in memory and
