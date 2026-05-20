@@ -48,6 +48,7 @@ const segments = computed(() => renderMarkdownSegments(props.text));
         :language="seg.language || undefined"
         :readonly="true"
         :max-height="320"
+        :show-header="true"
       />
     </template>
   </div>

@@ -76,6 +76,7 @@ const cmLanguage = computed<string | undefined>(() => {
     :filename="filename"
     :readonly="true"
     :max-height="240"
+    :show-header="true"
     class="command-block"
   />
 </template>

@@ -6,8 +6,9 @@
 /// Numbers are wall-clock on the dev machine — relative comparisons
 /// matter more than absolute values.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, beforeEach } from "bun:test";
 import { render, cleanup } from "@testing-library/vue";
+import { setActivePinia, createPinia } from "pinia";
 import { nextTick, h } from "vue";
 import PrimeVue from "primevue/config";
 import CodeEditor from "../CodeEditor.vue";
@@ -52,6 +53,10 @@ async function mountTimed<T extends () => unknown>(factory: T): Promise<number> 
 }
 
 describe("perf: CodeEditor", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   test("mount with TypeScript syntax highlighting", async () => {
     const ms = await mountTimed(() =>
       render(
@@ -91,6 +96,10 @@ describe("perf: CodeEditor", () => {
 });
 
 describe("perf: DiffEditor", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   test("mount inline (unifiedMergeView)", async () => {
     const ms = await mountTimed(() =>
       render(
@@ -133,7 +142,11 @@ describe("perf: DiffEditor", () => {
 });
 
 describe("perf: markdown rendering", () => {
-  const STREAMING_DOC = `# A long response
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  const STREAMING_DOC= `# A long response
 
 Here's some intro text with **bold** and \`inline code\` and a [link](https://example.com).
 
@@ -185,6 +198,10 @@ End of message.`;
 });
 
 describe("perf: streaming simulation", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   test("incremental MessageContent updates (50 chunks)", async () => {
     let doc = "Loading...\n\n\`\`\`typescript\n";
     const tail = SAMPLE_TS;

@@ -310,7 +310,7 @@ async function onEditorSaveFork(eventId: string, newText: string): Promise<void>
       newText,
     );
     layoutStore.addPanel(newId);
-    toasts.success("Forked", `Edited message sent in the new session.`);
+    layoutStore.activatePanel(newId);
   } catch {
     // Toast surfaced by the store action.
   }
@@ -341,12 +341,40 @@ async function onMessageRetry(assistantItemIndex: number) {
   );
 }
 
-async function onMessageFork(eventId: string) {
-  if (!eventId) return;
+/// Resolve the right fork anchor for the item at `itemIndex`.
+///
+/// "Fork from this assistant message" → branch at the user message
+/// that triggered this assistant turn. The SDK's `toEventId` is
+/// exclusive, so we'd otherwise land mid-turn (turn_start without
+/// turn_end → permanent loading spinner). Anchoring at the user
+/// message gives a clean state from the same conversation lead-up
+/// and lets the user re-prompt.
+///
+/// For user messages we just use their own eventId.
+function resolveForkAnchor(itemIndex: number): string | undefined {
+  const item = items.value[itemIndex];
+  if (!item) return undefined;
+  if (item.kind === "user" && item.eventId) return item.eventId;
+  for (let i = itemIndex; i >= 0; i--) {
+    const it = items.value[i];
+    if (it && it.kind === "user" && it.eventId) return it.eventId;
+  }
+  return undefined;
+}
+
+async function onMessageFork(itemIndex: number) {
+  const anchor = resolveForkAnchor(itemIndex);
+  if (!anchor) {
+    toasts.warn(
+      "Can't fork from here",
+      "Need a preceding user message with a server-acknowledged anchor.",
+    );
+    return;
+  }
   try {
-    const newId = await sessionsStore.forkSession(props.sessionId, eventId);
+    const newId = await sessionsStore.forkSession(props.sessionId, anchor);
     layoutStore.addPanel(newId);
-    toasts.success("Forked", "Opened the new session in a tab.");
+    layoutStore.activatePanel(newId);
   } catch {
     // Toast already shown by the store action.
   }
@@ -394,7 +422,7 @@ const pendingStyle = computed(() => {
             :text="item.text"
             :event-id="item.eventId"
             @quote="onMessageQuote"
-            @fork="onMessageFork(item.eventId ?? '')"
+            @fork="onMessageFork(idx)"
           />
         </div>
         <div v-else-if="item.kind === 'tool'" class="message-shell">
@@ -417,7 +445,7 @@ const pendingStyle = computed(() => {
             :event-id="item.eventId"
             :tool-args-text="item.args ? JSON.stringify(item.args, null, 2) : ''"
             :tool-result-text="item.resultContent || item.partialOutput || ''"
-            @fork="onMessageFork(item.eventId ?? '')"
+            @fork="onMessageFork(idx)"
           />
         </div>
         <PendingRequestCard
@@ -490,7 +518,7 @@ const pendingStyle = computed(() => {
               @quote="onMessageQuote"
               @edit="onMessageEdit(item.id)"
               @retry="onMessageRetry(idx)"
-              @fork="onMessageFork('eventId' in item ? item.eventId ?? '' : '')"
+              @fork="onMessageFork(idx)"
             />
           </template>
         </div>

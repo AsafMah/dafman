@@ -1,17 +1,23 @@
 <script setup lang="ts">
-/// Inline editor that replaces a user message bubble while the user
-/// amends its text. Two terminal actions:
+/// Inline editor that replaces a user message bubble. Uses the same
+/// Lexical plain-text stack as the main composer so behavior (paste,
+/// undo, cursor, future @mentions / slash-commands) matches.
+///
+/// Two terminal actions:
 /// - Save        — truncate the current session at this message's
 ///                 eventId and resend the new text in place
-/// - Save & Fork — fork the session at this message's eventId (so
-///                 the new session inherits everything BEFORE this
-///                 message), then send the edited text there as the
-///                 new user turn. Original session is left intact.
+/// - Save & Fork — fork the session at this message's eventId, open
+///                 the new session as a tab, send the edited text
+///                 there as the new user turn. Original session
+///                 left intact.
 /// Cancel restores the original text without touching history.
 
-import { onMounted, ref } from "vue";
+import { ref } from "vue";
 import Button from "primevue/button";
-import Textarea from "primevue/textarea";
+import { LexicalComposer } from "lexical-vue/LexicalComposer";
+import { markdownNodes } from "../lexical/nodes";
+import { lexicalTheme } from "../lexical/theme";
+import MessageEditorBody from "./MessageEditorBody.vue";
 
 const props = defineProps<{
   originalText: string;
@@ -24,39 +30,32 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
-const draft = ref(props.originalText);
-const textareaRef = ref<{ $el?: HTMLTextAreaElement } | null>(null);
+const draftText = ref(props.originalText);
 
-onMounted(() => {
-  // Focus + select all so the user can either retype or amend.
-  const el = textareaRef.value?.$el;
-  if (el instanceof HTMLTextAreaElement) {
-    el.focus();
-    el.select();
-  }
-});
+const lexicalConfig = {
+  namespace: "DafmanMessageEditor",
+  editable: true,
+  nodes: markdownNodes,
+  theme: lexicalTheme,
+  onError(error: Error) {
+    console.error("[lexical message editor]", error);
+  },
+};
 
-const hasContent = () => draft.value.trim().length > 0;
+const hasContent = () => draftText.value.trim().length > 0;
 
 function onSave() {
   if (!hasContent()) return;
-  emit("save", draft.value);
+  emit("save", draftText.value.trimEnd());
 }
 
 function onSaveFork() {
   if (!hasContent()) return;
-  emit("saveAndFork", draft.value);
+  emit("saveAndFork", draftText.value.trimEnd());
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    e.preventDefault();
-    emit("cancel");
-  } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    if (e.shiftKey && props.canFork) onSaveFork();
-    else onSave();
-  }
+function onDraftChange(text: string) {
+  draftText.value = text;
 }
 </script>
 
@@ -68,14 +67,16 @@ function onKeydown(e: KeyboardEvent) {
         Ctrl+Enter to save<span v-if="canFork">, Ctrl+Shift+Enter to fork</span>, Esc to cancel
       </span>
     </header>
-    <Textarea
-      ref="textareaRef"
-      v-model="draft"
-      class="me-textarea"
-      auto-resize
-      rows="2"
-      @keydown="onKeydown"
-    />
+    <LexicalComposer :initial-config="lexicalConfig">
+      <MessageEditorBody
+        :original-text="originalText"
+        :can-fork="canFork"
+        @save="(text) => emit('save', text)"
+        @save-and-fork="(text) => emit('saveAndFork', text)"
+        @cancel="emit('cancel')"
+        @draft-change="onDraftChange"
+      />
+    </LexicalComposer>
     <footer class="me-actions">
       <Button
         label="Cancel"
@@ -134,11 +135,6 @@ function onKeydown(e: KeyboardEvent) {
 .me-hint {
   font-size: 0.7rem;
   color: var(--p-text-muted-color);
-}
-
-.me-textarea {
-  width: 100%;
-  font-size: 0.9rem;
 }
 
 .me-actions {

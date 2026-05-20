@@ -14,15 +14,17 @@
 /// "editable but immutable" surface — confusing and slow on long
 /// outputs).
 
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { EditorState, Compartment } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import { oneDark } from "@codemirror/theme-one-dark";
+import Button from "primevue/button";
 import {
   resolveLanguageExtension,
   resolveLanguageForFile,
 } from "../lib/codeLanguage";
+import { useToastStore } from "../stores/toastStore";
 
 const props = withDefaults(
   defineProps<{
@@ -34,8 +36,16 @@ const props = withDefaults(
     showLineNumbers?: boolean;
     /// Max height before scroll. Use 0 for "fit content".
     maxHeight?: number;
+    /// Show the header bar with language label + copy button. Off by
+    /// default; on for markdown code blocks and tool-detail bodies.
+    showHeader?: boolean;
   }>(),
-  { readonly: true, showLineNumbers: false, maxHeight: 320 },
+  {
+    readonly: true,
+    showLineNumbers: false,
+    maxHeight: 320,
+    showHeader: false,
+  },
 );
 
 const emit = defineEmits<{
@@ -43,9 +53,35 @@ const emit = defineEmits<{
 }>();
 
 const host = ref<HTMLDivElement | null>(null);
+const toasts = useToastStore();
 let view: EditorView | null = null;
 const langCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
+
+/// Resolved display label for the header bar. Falls back through:
+/// 1. Explicit `language` prop (e.g. "typescript")
+/// 2. Filename extension uppercased ("App.ts" → "TS")
+/// 3. "code" generic
+const headerLabel = computed<string>(() => {
+  if (props.language && props.language.trim().length > 0) {
+    return props.language;
+  }
+  if (props.filename) {
+    const ext = props.filename.replace(/^.*[\\\/.]/, "");
+    if (ext && ext.length <= 5) return ext;
+  }
+  return "code";
+});
+
+async function copyAll(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(props.modelValue);
+    toasts.success("Code copied");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    toasts.error("Copy failed", message);
+  }
+}
 
 function baseExtensions(): Extension[] {
   return [
@@ -143,15 +179,69 @@ watch(
 </script>
 
 <template>
-  <div ref="host" class="code-editor" />
+  <div class="code-editor-wrap">
+    <header v-if="showHeader" class="code-header">
+      <span class="code-lang">{{ headerLabel }}</span>
+      <Button
+        icon="pi pi-copy"
+        text
+        size="small"
+        class="code-copy"
+        aria-label="Copy code"
+        @click="copyAll"
+      />
+    </header>
+    <div ref="host" class="code-editor" />
+  </div>
 </template>
 
 <style scoped>
-.code-editor {
+.code-editor-wrap {
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-sm);
   overflow: hidden;
   background: var(--p-content-background);
+  display: flex;
+  flex-direction: column;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.6rem;
+  background: var(--p-content-hover-background);
+  border-bottom: 1px solid var(--p-surface-border);
+  font-size: 0.7rem;
+  text-transform: lowercase;
+  color: var(--p-text-muted-color);
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+}
+
+.code-lang {
+  user-select: none;
+}
+
+.code-copy :deep(.p-button) {
+  padding: 0.1rem 0.3rem;
+  height: auto;
+  min-height: 0;
+  color: var(--p-text-muted-color);
+}
+
+.code-copy :deep(.p-button):hover {
+  color: var(--p-text-color);
+  background: transparent;
+}
+
+.code-copy :deep(.p-button-icon) {
+  font-size: 0.75rem;
+}
+
+.code-editor {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 :deep(.cm-editor.cm-focused) {
