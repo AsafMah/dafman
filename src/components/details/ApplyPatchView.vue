@@ -2,12 +2,14 @@
 /// Parse + render the `*** Begin Patch` patch format.
 ///
 /// Each file gets its own card with the op (badge) + path (PathChip)
-/// + colored hunks. Hunks are shown directly (without an LCS pass)
-/// because the patch already encodes which lines are +/-/context.
+/// + hunks rendered via DiffEditor. We reconstruct the before/after
+/// text for each hunk from the +/-/context lines so CM6's MergeView
+/// can show real language-aware syntax highlighting.
 
 import { computed } from "vue";
 import { parseApplyPatch } from "../../lib/diff";
 import PathChip from "./PathChip.vue";
+import DiffEditor from "./DiffEditor.vue";
 
 const props = defineProps<{
   patch: string;
@@ -25,6 +27,32 @@ function opLabel(op: "update" | "add" | "delete"): string {
       return "Delete";
   }
 }
+
+/// Reconstruct the "before" text from hunk lines (context + removed,
+/// in order). For Add files, before is empty.
+function hunkBefore(
+  op: "update" | "add" | "delete",
+  lines: Array<{ kind: "added" | "removed" | "context"; text: string }>,
+): string {
+  if (op === "add") return "";
+  return lines
+    .filter((l) => l.kind !== "added")
+    .map((l) => l.text)
+    .join("\n");
+}
+
+/// Reconstruct the "after" text from hunk lines (context + added,
+/// in order). For Delete files, after is empty.
+function hunkAfter(
+  op: "update" | "add" | "delete",
+  lines: Array<{ kind: "added" | "removed" | "context"; text: string }>,
+): string {
+  if (op === "delete") return "";
+  return lines
+    .filter((l) => l.kind !== "removed")
+    .map((l) => l.text)
+    .join("\n");
+}
 </script>
 
 <template>
@@ -34,24 +62,14 @@ function opLabel(op: "update" | "add" | "delete"): string {
         <span :class="['apply-patch-op', `op-${file.op}`]">{{ opLabel(file.op) }}</span>
         <PathChip :path="file.path" :icon="file.op === 'delete' ? 'trash' : 'file-edit'" />
       </header>
-      <table
+      <DiffEditor
         v-for="(hunk, hi) in file.hunks"
         :key="hi"
-        class="apply-patch-table"
-      >
-        <tbody>
-          <tr
-            v-for="(line, li) in hunk.lines"
-            :key="li"
-            :class="`patch-row patch-${line.kind}`"
-          >
-            <td class="patch-sign">
-              {{ line.kind === "added" ? "+" : line.kind === "removed" ? "−" : " " }}
-            </td>
-            <td class="patch-content">{{ line.text }}</td>
-          </tr>
-        </tbody>
-      </table>
+        class="apply-patch-hunk"
+        :old-text="hunkBefore(file.op, hunk.lines)"
+        :new-text="hunkAfter(file.op, hunk.lines)"
+        :filename="file.path"
+      />
       <p v-if="file.hunks.length === 0" class="apply-patch-empty">
         (no hunks)
       </p>
@@ -107,55 +125,14 @@ function opLabel(op: "update" | "add" | "delete"): string {
   color: var(--p-red-600, var(--p-red-500));
 }
 
-.apply-patch-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--p-font-family-mono, ui-monospace, monospace);
-  font-size: 0.82rem;
-}
-
-.apply-patch-table + .apply-patch-table {
+.apply-patch-hunk {
+  border: 0;
+  border-radius: 0;
   border-top: 1px dashed var(--p-surface-border);
 }
 
-.patch-row td {
-  padding: 0.02rem 0.4rem;
-  vertical-align: top;
-}
-
-.patch-sign {
-  width: 1.2em;
-  text-align: center;
-  user-select: none;
-  font-weight: bold;
-  color: var(--p-text-muted-color);
-}
-
-.patch-content {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.patch-context {
-  color: var(--p-text-muted-color);
-}
-
-.patch-removed {
-  background: color-mix(in srgb, var(--p-red-500) 12%, transparent);
-}
-
-.patch-removed .patch-sign,
-.patch-removed .patch-content {
-  color: var(--p-red-600, var(--p-red-500));
-}
-
-.patch-added {
-  background: color-mix(in srgb, var(--p-green-500) 12%, transparent);
-}
-
-.patch-added .patch-sign,
-.patch-added .patch-content {
-  color: var(--p-green-700, var(--p-green-500));
+.apply-patch-hunk:first-of-type {
+  border-top: 0;
 }
 
 .apply-patch-empty {

@@ -825,6 +825,12 @@ function ensurePlaygroundSession(): SessionRecord {
 
 const playgroundRecord = ensurePlaygroundSession();
 const events = playgroundRecord.events;
+/// Bumped to force ChatWindow to remount on Clear. ChatWindow's
+/// internal reducer tracks `processedEvents` separately from the
+/// underlying array, so a `length = 0` mutation is invisible to it
+/// (the watcher guards against re-processing). Real sessions never
+/// shrink the events array, so this is a dev-only escape hatch.
+const chatKey = ref(0);
 
 function run(script: Script) {
   for (const e of script.events)
@@ -833,6 +839,7 @@ function run(script: Script) {
 
 function clearChat() {
   events.length = 0;
+  chatKey.value++;
 }
 
 /// Self-contained echo: the playground chat is not connected to the SDK.
@@ -1336,6 +1343,7 @@ const activeTab = ref<"session" | "tools" | "pending" | "markdown" | "callouts" 
       </header>
       <div class="chat-frame">
         <ChatWindow
+          :key="chatKey"
           :session-id="PLAYGROUND_PENDING_SESSION_ID"
           accent="hsl(200, 80%, 52%)"
           :events="events"
