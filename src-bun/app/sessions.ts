@@ -27,6 +27,7 @@ import { randomUUID } from "node:crypto";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { buildBuiltInTools } from "./tools";
 import type {
 	ElicitationRequestData,
 	PendingRequestPayload,
@@ -162,12 +163,20 @@ export class SessionRegistry {
 		private readonly streamingResolver: () => boolean = () => true,
 	) {}
 
+	/// Returns the live `CopilotSession` for an id, or undefined if the
+	/// session is unknown. Used by built-in tools (see `app/tools.ts`)
+	/// that need to call `session.ui.*` from a tool handler.
+	public sessionFor(id: string): CopilotSession | undefined {
+		return this.entries.get(id)?.session;
+	}
+
 	/// Config shared between `create()` and `resume()` so a resumed
 	/// session behaves identically to a freshly created one
 	/// (permission handler, streaming mode, etc.). Has to be a method
 	/// because handlers close over `this` (registry state).
 	private baseSessionConfig(sessionId: () => string) {
 		return {
+			tools: buildBuiltInTools(this),
 			onPermissionRequest: (request: PermissionRequest): Promise<PermissionRequestResult> => {
 				const sid = sessionId();
 				// Per-session approveAll short-circuit. Returns the SDK's
