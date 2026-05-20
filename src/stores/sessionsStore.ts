@@ -21,6 +21,7 @@ import type {
   UserInputRequestData,
 } from "../ipc/types";
 import { accentForIndex } from "../lib/color";
+import { BUILTIN_SLASH_COMMANDS } from "../lib/slashCommands";
 import { useLayoutStore } from "./layoutStore";
 import { useNotificationsStore } from "./notificationsStore";
 import { useToastStore } from "./toastStore";
@@ -255,7 +256,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     if (payload.eventType === "commands.changed") {
       const cmds = (payload.data as { commands?: unknown }).commands;
       if (Array.isArray(cmds)) {
-        record.commands = cmds
+        const fromSdk = cmds
           .filter(
             (c): c is { name: string; description?: string } =>
               typeof c === "object" &&
@@ -268,6 +269,17 @@ export const useSessionsStore = defineStore("sessions", () => {
               ? { description: c.description }
               : {}),
           }));
+        // Merge with the baseline: SDK list wins on name collision
+        // (description from SDK is more accurate). New commands from
+        // plugins / extensions append. Baseline keeps the typeahead
+        // populated for stock sessions where commands.changed never
+        // fires for built-ins.
+        const merged = new Map<string, { name: string; description?: string }>();
+        for (const c of BUILTIN_SLASH_COMMANDS) merged.set(c.name, c);
+        for (const c of fromSdk) merged.set(c.name, c);
+        record.commands = Array.from(merged.values()).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
       }
     }
     // Both `session.start` (fresh create) and `session.resume` carry
@@ -489,7 +501,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningVisibilityOverride: "default",
         workingDirectory: wd && wd.length > 0 ? wd : null,
         defaultSendMode: "steer",
-        commands: [],
+        commands: [...BUILTIN_SLASH_COMMANDS],
         pendingRequests: [],
         unseenTurns: 0,
         isThinking: false,
@@ -564,7 +576,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningVisibilityOverride: "default",
         workingDirectory: response.cwd ?? null,
         defaultSendMode: "steer",
-        commands: [],
+        commands: [...BUILTIN_SLASH_COMMANDS],
         pendingRequests: [],
         unseenTurns: 0,
         isThinking: false,

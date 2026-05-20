@@ -113,16 +113,25 @@ function onSelectOption(payload: {
 
 <style scoped>
 .slash-menu {
+  /* The plugin positions the anchor div at the typing caret. Pull
+   * the menu visually upward via translateY(-100%) so it pops ABOVE
+   * the trigger character rather than below — matches user
+   * expectation for a composer pinned to the bottom of the chat
+   * tile. The -0.5rem nudge lifts it just clear of the caret. */
+  position: absolute;
+  bottom: 1.5em;
+  left: 0;
+  transform: translateY(0);
   display: flex;
   flex-direction: column;
-  min-width: 18rem;
+  min-width: 22rem;
   max-height: 16rem;
   overflow-y: auto;
   padding: 0.3rem;
   background: var(--p-content-background);
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-md);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.25);
   z-index: 100;
 }
 

@@ -129,7 +129,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(record!.workingDirectory).toBe("/r");
   });
 
-  test("commands.changed populates record.commands for the slash typeahead", async () => {
+  test("commands.changed merges SDK list with baseline for the slash typeahead", async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
       ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
@@ -137,13 +137,16 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
 
     const store = useSessionsStore();
     const record = await store.restoreSession("sess-cmds");
-    expect(record!.commands).toEqual([]);
+    // Baseline pre-seeded — non-empty before any commands.changed event.
+    expect(record!.commands.length).toBeGreaterThan(0);
+    const before = record!.commands.find((c) => c.name === "/help");
+    expect(before).toBeTruthy();
 
     fire(
       event("sess-cmds", "commands.changed", {
         commands: [
-          { name: "/help", description: "show help" },
-          { name: "/clear" },
+          { name: "/help", description: "overridden help" },
+          { name: "/custom-plugin", description: "added by plugin" },
           // bogus entries should be filtered out
           { description: "no name" },
           "not-an-object",
@@ -152,10 +155,16 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
       }),
     );
 
-    expect(record!.commands).toEqual([
-      { name: "/help", description: "show help" },
-      { name: "/clear" },
-    ]);
+    // Plugin-added command shows up.
+    expect(record!.commands.find((c) => c.name === "/custom-plugin")).toEqual({
+      name: "/custom-plugin",
+      description: "added by plugin",
+    });
+    // SDK description wins on name collision.
+    const help = record!.commands.find((c) => c.name === "/help");
+    expect(help?.description).toBe("overridden help");
+    // Baseline still present for things the SDK didn't override.
+    expect(record!.commands.find((c) => c.name === "/clear")).toBeTruthy();
   });
 
   test("events fired AFTER the RPC resolves are appended live", async () => {
