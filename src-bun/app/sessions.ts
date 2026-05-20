@@ -720,6 +720,51 @@ export class SessionRegistry {
 		}
 	}
 
+	/// Wraps `session.history.truncate`. The given event AND all later
+	/// events are removed; callers typically follow this with a fresh
+	/// `sendMessage` (Edit / Retry flows).
+	async truncateHistory(
+		sessionId: string,
+		eventId: string,
+	): Promise<{ eventsRemoved: number }> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.history.truncate({
+				eventId,
+			})) as { eventsRemoved?: number };
+			return { eventsRemoved: result.eventsRemoved ?? 0 };
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	/// Wraps `sessions.fork`. Returns the new session id; we do NOT
+	/// auto-register it — the renderer opens it via the regular
+	/// resume flow once it has the id (keeps lifecycle uniform).
+	async fork(
+		sessionId: string,
+		toEventId?: string,
+	): Promise<{ sessionId: string }> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			const result = (await client.rpc.sessions.fork({
+				sessionId,
+				...(toEventId ? { toEventId } : {}),
+			})) as { sessionId?: string };
+			if (!result.sessionId) {
+				throw AppError.sdk("fork: SDK returned no sessionId");
+			}
+			return { sessionId: result.sessionId };
+		} catch (err) {
+			if (err instanceof AppError) throw err;
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
 	async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);

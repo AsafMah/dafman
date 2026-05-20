@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { storeToRefs } from "pinia";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
+import MessageActions from "./MessageActions.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
@@ -222,13 +223,42 @@ async function sendMessage(payload: ComposerSubmitPayload) {
   const concreteMode =
     payload.mode === "default" ? props.defaultSendMode : payload.mode;
 
+  // Edit path: a prior Edit click anchored an eventId. Truncate
+  // server-side, drop the local items at that point, then send the
+  // new text. Optimistic-append happens after the truncate so the
+  // bubble doesn't briefly appear under the soon-to-be-deleted
+  // original.
+  if (pendingEditEventId.value && !props.sendHandler) {
+    const anchor = pendingEditEventId.value;
+    pendingEditEventId.value = null;
+    try {
+      await sessionsStore.editUserMessage(
+        props.sessionId,
+        anchor,
+        payload.text,
+      );
+      // The store dropped events at the anchor; rebuild local items
+      // from scratch so the reducer's processedEvents counter aligns.
+      items.value = [];
+      ambient.value = defaultAmbient();
+      processedEvents = 0;
+      isFirstBatch = true;
+      isSendingFallback.value = true;
+      await scrollToBottom();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toasts.error("Failed to edit message", message);
+      isSendingFallback.value = false;
+    }
+    return;
+  }
+
   items.value = appendUserMessage(items.value, payload.text, idCounter);
   isSendingFallback.value = true;
   await scrollToBottom();
 
   try {
     if (props.sendHandler) {
-      // Dev playground / tests don't care about modes; pass text only.
       await props.sendHandler(payload.text);
     } else {
       await sessionsStore.sendMessage(
@@ -254,7 +284,58 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
 
-/// Type-aware styling for the pending-request banner. Pulls the
+/// Pending edit anchor. When the user clicks "Edit" on a user
+/// message, we load its text into the composer and stash the
+/// eventId here; the NEXT submit truncates from that anchor and
+/// resends instead of appending. Any other interaction (cancel,
+/// successful send) clears the anchor.
+const pendingEditEventId = ref<string | null>(null);
+
+function onMessageEdit(text: string, eventId: string) {
+  pendingEditEventId.value = eventId;
+  const composer = composerRef.value as
+    | { setText?: (v: string) => void; focus: () => void }
+    | null;
+  composer?.setText?.(text);
+}
+
+function onMessageQuote(quotedText: string) {
+  const composer = composerRef.value as
+    | { appendText?: (v: string) => void; focus: () => void }
+    | null;
+  composer?.appendText?.(quotedText);
+}
+
+async function onMessageRetry(assistantItemIndex: number) {
+  // Walk backwards to find the most recent user item BEFORE this
+  // assistant block. That's the anchor we truncate to + the text
+  // we resend.
+  for (let i = assistantItemIndex - 1; i >= 0; i--) {
+    const it = items.value[i];
+    if (it && it.kind === "user" && it.eventId) {
+      try {
+        await sessionsStore.retryFromEvent(props.sessionId, it.eventId, it.text);
+      } catch {
+        // Toast already shown by the store action.
+      }
+      return;
+    }
+  }
+  toasts.warn(
+    "Can't retry from here",
+    "No preceding user message with a server-acknowledged anchor.",
+  );
+}
+
+async function onMessageFork(eventId: string) {
+  try {
+    await sessionsStore.forkSession(props.sessionId, eventId);
+  } catch {
+    // Toast already shown.
+  }
+}
+
+/// Type-aware styling for the pending-request banner.Pulls the
 /// color + icon + label from the shared `notificationStyles` so the
 /// banner matches the dot color on the tab + sidebar row. Reads
 /// the queue head: if more than one request is pending, the banner
@@ -285,27 +366,43 @@ const pendingStyle = computed(() => {
         Start typing below to send a message.
       </p>
 
-      <template v-for="item in items" :key="item.id">
-        <ReasoningBlock
-          v-if="item.kind === 'reasoning'"
-          :text="item.text"
-          :visibility="reasoningVisibility"
-        />
-        <ToolCallBlock
-          v-else-if="item.kind === 'tool'"
-          :tool-name="item.toolName"
-          :tool-call-id="item.toolCallId"
-          :mcp-server-name="item.mcpServerName"
-          :mcp-tool-name="item.mcpToolName"
-          :args="item.args"
-          :status="item.status"
-          :progress-message="item.progressMessage"
-          :partial-output="item.partialOutput"
-          :result-content="item.resultContent"
-          :error-message="item.errorMessage"
-          :error-code="item.errorCode"
-          :agent-id="item.agentId"
-        />
+      <template v-for="(item, idx) in items" :key="item.id">
+        <div v-if="item.kind === 'reasoning'" class="message-shell">
+          <ReasoningBlock
+            :text="item.text"
+            :visibility="reasoningVisibility"
+          />
+          <MessageActions
+            kind="reasoning"
+            :text="item.text"
+            :event-id="item.eventId"
+            @quote="onMessageQuote"
+            @fork="onMessageFork(item.eventId ?? '')"
+          />
+        </div>
+        <div v-else-if="item.kind === 'tool'" class="message-shell">
+          <ToolCallBlock
+            :tool-name="item.toolName"
+            :tool-call-id="item.toolCallId"
+            :mcp-server-name="item.mcpServerName"
+            :mcp-tool-name="item.mcpToolName"
+            :args="item.args"
+            :status="item.status"
+            :progress-message="item.progressMessage"
+            :partial-output="item.partialOutput"
+            :result-content="item.resultContent"
+            :error-message="item.errorMessage"
+            :error-code="item.errorCode"
+            :agent-id="item.agentId"
+          />
+          <MessageActions
+            kind="tool"
+            :event-id="item.eventId"
+            :tool-args-text="item.args ? JSON.stringify(item.args, null, 2) : ''"
+            :tool-result-text="item.resultContent || item.partialOutput || ''"
+            @fork="onMessageFork(item.eventId ?? '')"
+          />
+        </div>
         <PendingRequestCard
           v-else-if="item.kind === 'pendingRequest'"
           :session-id="props.sessionId"
@@ -323,34 +420,47 @@ const pendingStyle = computed(() => {
              pendingRequest items are handled by PendingRequestCard
              above, so by the time we reach this branch the type is
              narrowed to user / assistant / system. -->
-        <article
+        <div
           v-else-if="!(item.kind === 'assistant' && item.text === '')"
-          class="message-card"
-          :class="[
-            item.kind,
-            item.kind === 'system' ? `severity-${item.severity}` : '',
-          ]"
+          class="message-shell"
         >
-          <header class="role-label">
-            {{
-              item.kind === "user"
-                ? "You"
-                : item.kind === "assistant"
-                  ? "Assistant"
-                  : item.kind === "system" && item.severity === "warn"
-                    ? "Warning"
-                    : item.kind === "system" && item.severity === "error"
-                      ? "Error"
-                      : "Info"
-            }}
-          </header>
-          <MessageContent
-            v-if="item.kind === 'assistant' || item.kind === 'user'"
+          <article
+            class="message-card"
+            :class="[
+              item.kind,
+              item.kind === 'system' ? `severity-${item.severity}` : '',
+            ]"
+          >
+            <header class="role-label">
+              {{
+                item.kind === "user"
+                  ? "You"
+                  : item.kind === "assistant"
+                    ? "Assistant"
+                    : item.kind === "system" && item.severity === "warn"
+                      ? "Warning"
+                      : item.kind === "system" && item.severity === "error"
+                        ? "Error"
+                        : "Info"
+              }}
+            </header>
+            <MessageContent
+              v-if="item.kind === 'assistant' || item.kind === 'user'"
+              :text="item.text"
+              :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
+            />
+            <p v-else class="message-body">{{ item.text }}</p>
+          </article>
+          <MessageActions
+            :kind="item.kind"
             :text="item.text"
-            :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
+            :event-id="'eventId' in item ? item.eventId : undefined"
+            @quote="onMessageQuote"
+            @edit="(text) => onMessageEdit(text, 'eventId' in item ? item.eventId ?? '' : '')"
+            @retry="onMessageRetry(idx)"
+            @fork="onMessageFork('eventId' in item ? item.eventId ?? '' : '')"
           />
-          <p v-else class="message-body">{{ item.text }}</p>
-        </article>
+        </div>
       </template>
 
       <!-- Mid-turn indicator inside the chat. Visible whenever the

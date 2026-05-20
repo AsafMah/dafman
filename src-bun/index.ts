@@ -167,6 +167,12 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			compactSessionHistory: rpcGuard(async ({ sessionId }) =>
 				sessions.compactHistory(sessionId),
 			),
+			truncateSessionHistory: rpcGuard(async ({ sessionId, eventId }) =>
+				sessions.truncateHistory(sessionId, eventId),
+			),
+			forkSession: rpcGuard(async ({ sessionId, toEventId }) =>
+				sessions.fork(sessionId, toEventId),
+			),
 			setSessionApproveAll: rpcGuard(async ({ sessionId, enabled }) =>
 				sessions.setApproveAll(sessionId, enabled),
 			),

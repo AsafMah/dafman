@@ -342,6 +342,24 @@ export type DafmanRPC = {
 				params: { sessionId: string };
 				response: SessionHistoryCompactionResult;
 			};
+			/// Truncate the session's history to (and including) the
+			/// given eventId — that event AND everything after it are
+			/// removed. Used by Edit / Retry actions which need to roll
+			/// back the transcript before re-sending. Returns the
+			/// number of events the CLI removed.
+			truncateSessionHistory: {
+				params: { sessionId: string; eventId: string };
+				response: { eventsRemoved: number };
+			};
+			/// Fork the session at an optional event boundary. When
+			/// `toEventId` is provided, the new session inherits only
+			/// the events strictly BEFORE that id; omit it to clone the
+			/// full history. Returns the new session's id; the renderer
+			/// is responsible for opening the panel.
+			forkSession: {
+				params: { sessionId: string; toEventId?: string };
+				response: { sessionId: string };
+			};
 			setSessionApproveAll: {
 				params: { sessionId: string; enabled: boolean };
 				response: boolean;

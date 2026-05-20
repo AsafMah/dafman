@@ -224,6 +224,14 @@ export type CommandMap = {
     args: { sessionId: string };
     result: SessionHistoryCompactionResult;
   };
+  truncateSessionHistory: {
+    args: { sessionId: string; eventId: string };
+    result: { eventsRemoved: number };
+  };
+  forkSession: {
+    args: { sessionId: string; toEventId?: string };
+    result: { sessionId: string };
+  };
   setSessionApproveAll: {
     args: { sessionId: string; enabled: boolean };
     result: boolean;

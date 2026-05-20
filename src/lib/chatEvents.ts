@@ -40,18 +40,26 @@ export type ChatItem =
       /// matching echo arrives; the reducer then adopts it in place
       /// rather than duplicating the bubble.
       messageId?: string;
+      /// SDK envelope event id — the anchor used for Truncate / Fork
+      /// actions. Populated from the first `user.message` event the
+      /// reducer sees for this item.
+      eventId?: string;
     }
   | {
       id: number;
       kind: "assistant";
       text: string;
       messageId: string;
+      /// Envelope id of the `assistant.message_start` event that
+      /// created the item. Stable across deltas.
+      eventId?: string;
     }
   | {
       id: number;
       kind: "reasoning";
       text: string;
       reasoningId: string;
+      eventId?: string;
     }
   | {
       id: number;
@@ -77,6 +85,10 @@ export type ChatItem =
       errorCode?: string;
       /// Sub-agent that produced this tool call, when applicable.
       agentId?: string;
+      /// First-seen envelope id for this tool — usually the
+      /// `tool.execution_start` event. Used as the anchor for
+      /// truncate/fork actions invoked from the tool card.
+      eventId?: string;
     }
   | {
       id: number;
@@ -274,7 +286,7 @@ export function processEvents(
   let error = false;
   const isLive = opts.live ?? true;
 
-  const upsertAssistant = (messageId: string): ChatItem => {
+  const upsertAssistant = (messageId: string, eventId?: string): ChatItem => {
     let existing = items.find(
       (i) => i.kind === "assistant" && i.messageId === messageId,
     );
@@ -284,13 +296,16 @@ export function processEvents(
         kind: "assistant",
         text: "",
         messageId,
+        ...(eventId ? { eventId } : {}),
       };
       items.push(existing);
+    } else if (eventId && existing.kind === "assistant" && !existing.eventId) {
+      existing.eventId = eventId;
     }
     return existing;
   };
 
-  const upsertReasoning = (reasoningId: string): ChatItem => {
+  const upsertReasoning = (reasoningId: string, eventId?: string): ChatItem => {
     let existing = items.find(
       (i) => i.kind === "reasoning" && i.reasoningId === reasoningId,
     );
@@ -300,8 +315,11 @@ export function processEvents(
         kind: "reasoning",
         text: "",
         reasoningId,
+        ...(eventId ? { eventId } : {}),
       };
       items.push(existing);
+    } else if (eventId && existing.kind === "reasoning" && !existing.eventId) {
+      existing.eventId = eventId;
     }
     return existing;
   };
@@ -309,6 +327,7 @@ export function processEvents(
   const upsertTool = (
     toolCallId: string,
     fallbackName?: string,
+    eventId?: string,
   ): ChatItem => {
     let existing = items.find(
       (i) => i.kind === "tool" && i.toolCallId === toolCallId,
@@ -321,8 +340,11 @@ export function processEvents(
         toolName: fallbackName ?? `tool ${toolCallId.slice(0, 8)}`,
         status: "running",
         partialOutput: "",
+        ...(eventId ? { eventId } : {}),
       };
       items.push(existing);
+    } else if (eventId && existing.kind === "tool" && !existing.eventId) {
+      existing.eventId = eventId;
     }
     return existing;
   };

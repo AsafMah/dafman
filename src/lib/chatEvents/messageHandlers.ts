@@ -13,46 +13,49 @@ import { pickString } from "../chatEvents";
 import type { Handler } from "./context";
 
 export const messageHandlers: Record<string, Handler> = {
-  "assistant.message_start": (ctx, data) => {
+  "assistant.message_start": (ctx, data, payload) => {
     const messageId = pickString(data, ["messageId"]);
-    if (messageId) ctx.upsertAssistant(messageId);
+    if (messageId) ctx.upsertAssistant(messageId, payload.eventId);
   },
 
-  "assistant.message_delta": (ctx, data) => {
+  "assistant.message_delta": (ctx, data, payload) => {
     const messageId = pickString(data, ["messageId"]);
     const delta = pickString(data, ["deltaContent", "delta", "text"]);
     if (!messageId) return;
-    const msg = ctx.upsertAssistant(messageId);
+    const msg = ctx.upsertAssistant(messageId, payload.eventId);
     if (msg.kind === "assistant") msg.text += delta;
   },
 
-  "assistant.message": (ctx, data) => {
+  "assistant.message": (ctx, data, payload) => {
     const messageId = pickString(data, ["messageId"]);
     const content = pickString(data, ["content", "text", "message"]);
     if (!messageId) return;
-    const msg = ctx.upsertAssistant(messageId);
+    const msg = ctx.upsertAssistant(messageId, payload.eventId);
     if (msg.kind === "assistant") msg.text = content;
   },
 
   "user.message": (ctx, data, payload) => {
     const content = pickString(data, ["content", "text", "message"]);
     if (!content) return;
-    // Prefer envelope eventId as the stable dedup key; fall back to
-    // data.messageId if some SDK variant ever ships it.
     const eventId =
       payload.eventId ?? pickString(data, ["messageId"]) ?? undefined;
     if (eventId) {
       const byId = ctx.items.find(
         (i) => i.kind === "user" && i.messageId === eventId,
       );
-      if (byId) return;
+      if (byId) {
+        if (byId.kind === "user" && !byId.eventId && payload.eventId) {
+          byId.eventId = payload.eventId;
+        }
+        return;
+      }
     }
-    // Adopt the most recent local-only user item with matching text.
     const optimistic = [...ctx.items]
       .reverse()
       .find((i) => i.kind === "user" && !i.messageId && i.text === content);
     if (optimistic && optimistic.kind === "user") {
       optimistic.messageId = eventId;
+      if (payload.eventId) optimistic.eventId = payload.eventId;
       return;
     }
     ctx.items.push({
@@ -60,6 +63,7 @@ export const messageHandlers: Record<string, Handler> = {
       kind: "user",
       text: content,
       ...(eventId ? { messageId: eventId } : {}),
+      ...(payload.eventId ? { eventId: payload.eventId } : {}),
     });
   },
 };

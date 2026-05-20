@@ -120,7 +120,7 @@ describe("processEvents", () => {
       counter,
     );
     expect(result.items).toEqual([
-      { id: 1, kind: "user", text: "hello", messageId: "evt-1" },
+      { id: 1, kind: "user", text: "hello", messageId: "evt-1", eventId: "evt-1" },
     ]);
   });
 
@@ -147,6 +147,7 @@ describe("processEvents", () => {
       kind: "user",
       text: "ping",
       messageId: "evt-9",
+      eventId: "evt-9",
     });
     // counter was NOT advanced — adopting an existing item leaves
     // ID space intact.
@@ -174,6 +175,7 @@ describe("processEvents", () => {
       kind: "user",
       text: "different",
       messageId: "evt-2",
+      eventId: "evt-2",
     });
   });
 

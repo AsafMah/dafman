@@ -11,9 +11,13 @@ export interface ReducerContext {
   setIdle(): void;
   setError(): void;
 
-  upsertAssistant(messageId: string): ChatItem;
-  upsertReasoning(reasoningId: string): ChatItem;
-  upsertTool(toolCallId: string, fallbackName?: string): ChatItem;
+  upsertAssistant(messageId: string, eventId?: string): ChatItem;
+  upsertReasoning(reasoningId: string, eventId?: string): ChatItem;
+  upsertTool(
+    toolCallId: string,
+    fallbackName?: string,
+    eventId?: string,
+  ): ChatItem;
   pushSystem(text: string, severity: SystemSeverity): void;
 }
 

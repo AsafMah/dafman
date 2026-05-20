@@ -746,6 +746,69 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
   }
 
+  /// Truncate the session's history to (and including) `eventId`,
+  /// then send the new text. Used by the Edit action on a user
+  /// message: the user supplies replacement text in the composer,
+  /// the SDK is told to forget from that point onward, and the new
+  /// message is dispatched fresh.
+  async function editUserMessage(
+    sessionId: string,
+    eventId: string,
+    newText: string,
+  ): Promise<void> {
+    const toasts = useToastStore();
+    try {
+      await invokeCommand("truncateSessionHistory", { sessionId, eventId });
+      // Drop local items at the truncation point too — otherwise we
+      // double-render the edited message until the SDK echoes it.
+      const record = sessions.value.find((s) => s.id === sessionId);
+      if (record) {
+        const idx = record.events.findIndex((e) => e.eventId === eventId);
+        if (idx >= 0) record.events.splice(idx);
+      }
+      await invokeCommand("sendMessage", { sessionId, text: newText });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to edit message", message);
+      throw err;
+    }
+  }
+
+  /// Truncate to `eventId` (typically the preceding user message)
+  /// and re-send its text — "retry from here" semantics. Caller
+  /// passes the resolved user text so the store doesn't need to
+  /// search the items array.
+  async function retryFromEvent(
+    sessionId: string,
+    eventId: string,
+    userText: string,
+  ): Promise<void> {
+    return editUserMessage(sessionId, eventId, userText);
+  }
+
+  /// Fork the session at an optional event boundary. When the new
+  /// session id resolves, restoreSession opens it as a panel. Returns
+  /// the new session id so the caller can route to it / focus it.
+  async function forkSession(
+    sessionId: string,
+    toEventId?: string,
+  ): Promise<string> {
+    const toasts = useToastStore();
+    try {
+      const result = await invokeCommand("forkSession", {
+        sessionId,
+        ...(toEventId ? { toEventId } : {}),
+      });
+      await restoreSession(result.sessionId);
+      toasts.success("Forked", `New session ${result.sessionId.slice(0, 8)}`);
+      return result.sessionId;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to fork session", message);
+      throw err;
+    }
+  }
+
   async function setSessionName(
     sessionId: string,
     name: string,
@@ -824,6 +887,9 @@ export const useSessionsStore = defineStore("sessions", () => {
     setSessionApproveAll,
     resetSessionApprovals,
     compactSessionHistory,
+    editUserMessage,
+    retryFromEvent,
+    forkSession,
     setSessionName,
     setSessionReasoningOverride,
     respondToPending,

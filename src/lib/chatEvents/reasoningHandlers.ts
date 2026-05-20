@@ -12,7 +12,7 @@ import type { Handler } from "./context";
 const REASONING_SINGLETON_KEY = "_reasoning_singleton";
 
 export const reasoningHandlers: Record<string, Handler> = {
-  "assistant.reasoning_delta": (ctx, data) => {
+  "assistant.reasoning_delta": (ctx, data, payload) => {
     const reasoningId = pickString(data, ["reasoningId"]);
     const delta = pickString(data, [
       "deltaContent",
@@ -31,11 +31,11 @@ export const reasoningHandlers: Record<string, Handler> = {
       return;
     }
     const key = reasoningId || REASONING_SINGLETON_KEY;
-    const msg = ctx.upsertReasoning(key);
+    const msg = ctx.upsertReasoning(key, payload.eventId);
     if (msg.kind === "reasoning") msg.text += delta;
   },
 
-  "assistant.reasoning": (ctx, data) => {
+  "assistant.reasoning": (ctx, data, payload) => {
     const reasoningId = pickString(data, ["reasoningId"]);
     const content = pickString(data, [
       "content",
@@ -44,9 +44,6 @@ export const reasoningHandlers: Record<string, Handler> = {
       "reasoning_text",
     ]);
     if (!content) {
-      // OpenAI sometimes ships an opaque/empty reasoning blob. Only
-      // surface it if there's already a streaming item we can append
-      // to; otherwise drop entirely so the empty card doesn't render.
       const hasExistingItem =
         reasoningId &&
         ctx.items.some(
@@ -55,7 +52,7 @@ export const reasoningHandlers: Record<string, Handler> = {
       if (!hasExistingItem) return;
     }
     const key = reasoningId || REASONING_SINGLETON_KEY;
-    const msg = ctx.upsertReasoning(key);
+    const msg = ctx.upsertReasoning(key, payload.eventId);
     if (msg.kind === "reasoning") {
       msg.text = content || msg.text;
     }

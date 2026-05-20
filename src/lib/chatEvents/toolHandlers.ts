@@ -19,7 +19,7 @@ const onToolStart: Handler = (ctx, data, payload) => {
   const toolCallId = pickString(data, ["toolCallId"]);
   const toolName = pickString(data, ["toolName"]);
   if (!toolCallId) return;
-  const item = ctx.upsertTool(toolCallId, toolName || undefined);
+  const item = ctx.upsertTool(toolCallId, toolName || undefined, payload.eventId);
   if (item.kind !== "tool") return;
   if (toolName) item.toolName = toolName;
   const args = (data as Record<string, unknown>).arguments;

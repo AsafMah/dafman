@@ -40,6 +40,7 @@ import {
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
 } from "../lexical/plugins";
+import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
 import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 import type { DefaultSendMode } from "../stores/sessionsStore";
@@ -84,7 +85,44 @@ function focusComposer(): void {
   editor.focus();
 }
 
-defineExpose({ focus: focusComposer });
+/// Replace the composer's current text with `value`. Used by the
+/// message action bar's Edit action (load message text into the
+/// composer for amendment). Plain-text only — markdown features
+/// (mentions, code fences) round-trip via SubmitOnEnter's
+/// consumeComposerText pass that we don't shortcut here.
+function setText(value: string): void {
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor) return;
+  editor.update(() => {
+    const root = $getRoot();
+    root.clear();
+    const para = $createParagraphNode();
+    if (value.length > 0) para.append($createTextNode(value));
+    root.append(para);
+  });
+  // Move caret to the end so the user can keep typing.
+  setTimeout(() => editor.focus(), 0);
+}
+
+/// Append text to the current composer contents on a new line.
+/// Used by Quote (insert message text as a blockquote) and Retry-
+/// style flows that build up multi-line prompts.
+function appendText(value: string): void {
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor) return;
+  editor.update(() => {
+    const root = $getRoot();
+    const lines = value.split("\n");
+    for (const line of lines) {
+      const para = $createParagraphNode();
+      if (line.length > 0) para.append($createTextNode(line));
+      root.append(para);
+    }
+  });
+  setTimeout(() => editor.focus(), 0);
+}
+
+defineExpose({ focus: focusComposer, setText, appendText });
 
 const editable = computed(() => !props.disabled);
 const richText = computed(() => props.enableMarkdownShortcuts);
