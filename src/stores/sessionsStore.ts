@@ -822,11 +822,11 @@ export const useSessionsStore = defineStore("sessions", () => {
     return newId;
   }
 
-  /// Best-effort lookup for the session that matches a free-form name
-  /// (used by the fork-notice chip to resolve a CLI-supplied "name"
-  /// to a sessionId we can activate). Matches exact title first, then
-  /// title-startsWith, then id prefix — the CLI's default unnamed
-  /// fork names are "Session <8 hex>" so the latter handles those.
+  /// Best-effort lookup for the loaded session that matches a
+  /// free-form name. Used by the fork-notice chip to resolve a
+  /// CLI-supplied "name" to a sessionId we can activate. Matches
+  /// exact title, then title-startsWith, then short-id prefix
+  /// (CLI's default fork name format is `Session <8 hex>...`).
   function findSessionByName(name: string): SessionRecord | undefined {
     if (!name) return undefined;
     const trimmed = name.trim();

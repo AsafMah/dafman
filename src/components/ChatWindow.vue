@@ -23,6 +23,7 @@ import type {
   SessionEventPayload,
 } from "../ipc/types";
 import { useSessionsStore, type DefaultSendMode } from "../stores/sessionsStore";
+import { useSessionsListStore } from "../stores/sessionsListStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
@@ -54,6 +55,7 @@ const props = defineProps<{
 }>();
 
 const sessionsStore = useSessionsStore();
+const sessionsListStore = useSessionsListStore();
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const toasts = useToastStore();
@@ -381,22 +383,44 @@ async function onMessageFork(itemIndex: number) {
 }
 
 /// Fork-notice chip clicked → resolve the referenced session by
-/// name (best-effort) and surface it. If the session is open in a
-/// dockview panel we just activate it; otherwise add the panel
-/// first. Falls back to a toast when we can't find a match.
-function onForkNoticeClick(referenceName: string) {
-  const target = sessionsStore.findSessionByName(referenceName);
-  if (!target) {
-    toasts.warn(
-      "Session not loaded",
-      `No open session matches "${referenceName}". Open it from the sessions sidebar first.`,
-    );
+/// name (best-effort) and surface it. Three-tier lookup:
+/// 1. Already-loaded sessions (sessionsStore) → activate the panel.
+/// 2. Catalog (sessionsListStore) → restore + add panel + activate.
+///    Refreshes the catalog first if it hasn't loaded yet, since
+///    forks done before this app started won't be in the cache.
+/// 3. Nothing matched → toast hint to open via the sidebar.
+async function onForkNoticeClick(referenceName: string) {
+  const loaded = sessionsStore.findSessionByName(referenceName);
+  if (loaded) {
+    if (!layoutStore.isPanelOpen(loaded.id)) {
+      layoutStore.addPanel(loaded.id);
+    }
+    layoutStore.activatePanel(loaded.id);
     return;
   }
-  if (!layoutStore.isPanelOpen(target.id)) {
-    layoutStore.addPanel(target.id);
+
+  if (!sessionsListStore.hasLoaded) {
+    await sessionsListStore.refresh();
   }
-  layoutStore.activatePanel(target.id);
+  const catalogHit = sessionsListStore.findByName(referenceName);
+  if (catalogHit) {
+    try {
+      const restored = await sessionsStore.restoreSession(catalogHit.sessionId);
+      const id = restored?.id ?? catalogHit.sessionId;
+      if (!layoutStore.isPanelOpen(id)) {
+        layoutStore.addPanel(id);
+      }
+      layoutStore.activatePanel(id);
+    } catch {
+      // restoreSession surfaces its own toast on failure.
+    }
+    return;
+  }
+
+  toasts.warn(
+    "Couldn't find that session",
+    `No session matches "${referenceName}". Open it from the sessions sidebar.`,
+  );
 }
 
 /// Type-aware styling for the pending-request banner.Pulls the

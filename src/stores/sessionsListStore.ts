@@ -116,6 +116,34 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     return groups;
   });
 
+  /// Best-effort lookup over the catalog (closed sessions included).
+  /// Used by the fork-notice chip when the referenced session isn't
+  /// loaded yet — we resolve from the listSessions catalog and tell
+  /// the caller to restore it. Matches: summary exact / startsWith /
+  /// 4+ hex prefix on sessionId (covers default "Session <id8>" fork
+  /// names).
+  function findByName(name: string): SessionMetadataSummary | undefined {
+    if (!name) return undefined;
+    const trimmed = name.trim();
+    const lower = trimmed.toLowerCase();
+    const all = sessions.value;
+    const exact = all.find((s) => (s.summary ?? "").toLowerCase() === lower);
+    if (exact) return exact;
+    const starts = all.find((s) =>
+      (s.summary ?? "").toLowerCase().startsWith(lower),
+    );
+    if (starts) return starts;
+    const m = trimmed.match(/([0-9a-f]{4,})/i);
+    if (m && m[1]) {
+      const prefix = m[1].toLowerCase();
+      const byId = all.find((s) =>
+        s.sessionId.toLowerCase().startsWith(prefix),
+      );
+      if (byId) return byId;
+    }
+    return undefined;
+  }
+
   return {
     sessions,
     isLoading,
@@ -124,5 +152,6 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     grouped,
     refresh,
     deleteSession,
+    findByName,
   };
 });
