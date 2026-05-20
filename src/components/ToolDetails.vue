@@ -13,7 +13,7 @@ import PathChip from "./details/PathChip.vue";
 import CommandBlock from "./details/CommandBlock.vue";
 import UrlChip from "./details/UrlChip.vue";
 import ToolChip from "./details/ToolChip.vue";
-import DiffView from "./details/DiffView.vue";
+import DiffEditor from "./details/DiffEditor.vue";
 import ApplyPatchView from "./details/ApplyPatchView.vue";
 import GrepResults from "./details/GrepResults.vue";
 import GlobResults from "./details/GlobResults.vue";
@@ -209,6 +209,7 @@ const isStructuredResult = computed(() => {
         v-if="hasResult"
         :code="liveResult"
         :lang="fileExtension || 'text'"
+        :filename="filePath"
       />
     </template>
 
@@ -218,18 +219,19 @@ const isStructuredResult = computed(() => {
       <CommandBlock
         v-if="hasResult"
         :code="liveResult"
-        lang="text"
+        :lang="fileExtension || 'text'"
+        :filename="filePath"
       />
     </template>
 
     <!-- edit / str_replace -->
     <template v-else-if="kind === 'edit'">
       <PathChip v-if="filePath" :path="filePath" icon="pencil" />
-      <DiffView
+      <DiffEditor
         v-if="editOld !== undefined || editNew !== undefined"
         :old-text="editOld ?? ''"
         :new-text="editNew ?? ''"
-        :lang="fileExtension"
+        :filename="filePath"
       />
       <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
     </template>
@@ -278,6 +280,7 @@ const isStructuredResult = computed(() => {
         v-if="hasResult"
         :code="liveResult"
         :lang="fileExtension || 'text'"
+        :filename="filePath"
       />
     </template>
 

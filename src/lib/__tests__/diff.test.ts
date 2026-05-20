@@ -1,48 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lineDiff, parseApplyPatch } from "../diff";
-
-describe("lineDiff", () => {
-  test("identical text → all equal rows", () => {
-    const rows = lineDiff("a\nb\nc", "a\nb\nc");
-    expect(rows.every((r) => r.kind === "equal")).toBe(true);
-    expect(rows.length).toBe(3);
-  });
-
-  test("one-line replacement → removed + added", () => {
-    const rows = lineDiff("a\nb\nc", "a\nB\nc");
-    const kinds = rows.map((r) => r.kind);
-    expect(kinds).toContain("removed");
-    expect(kinds).toContain("added");
-    const removed = rows.find((r) => r.kind === "removed");
-    const added = rows.find((r) => r.kind === "added");
-    expect(removed?.text).toBe("b");
-    expect(added?.text).toBe("B");
-  });
-
-  test("addition at end → only added rows tail", () => {
-    const rows = lineDiff("a\nb", "a\nb\nc");
-    const tail = rows[rows.length - 1]!;
-    expect(tail.kind).toBe("added");
-    expect(tail.text).toBe("c");
-  });
-
-  test("removal at start → only removed rows head", () => {
-    const rows = lineDiff("a\nb\nc", "b\nc");
-    const head = rows[0]!;
-    expect(head.kind).toBe("removed");
-    expect(head.text).toBe("a");
-  });
-
-  test("preserves line numbers on kept lines", () => {
-    const rows = lineDiff("a\nb\nc", "a\nB\nc");
-    const equalA = rows.find((r) => r.kind === "equal" && r.text === "a");
-    const equalC = rows.find((r) => r.kind === "equal" && r.text === "c");
-    expect(equalA?.oldLine).toBe(1);
-    expect(equalA?.newLine).toBe(1);
-    expect(equalC?.oldLine).toBe(3);
-    expect(equalC?.newLine).toBe(3);
-  });
-});
+import { parseApplyPatch } from "../diff";
 
 describe("parseApplyPatch", () => {
   test("parses an Update File hunk", () => {
