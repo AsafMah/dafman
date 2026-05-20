@@ -13,6 +13,7 @@ import PathChip from "./details/PathChip.vue";
 import CommandBlock from "./details/CommandBlock.vue";
 import UrlChip from "./details/UrlChip.vue";
 import ToolChip from "./details/ToolChip.vue";
+import JsonValueView from "./JsonValueView.vue";
 
 const props = defineProps<{
   toolName: string;
@@ -154,6 +155,31 @@ const liveResult = computed(() => {
   return "";
 });
 const hasResult = computed(() => liveResult.value.length > 0);
+
+// Try parsing the result as JSON. When it shapes up as an object or
+// array, we render through JsonValueView; primitives or non-JSON
+// strings keep the CommandBlock path. Streaming partials are often
+// truncated JSON, so failure is expected and silent.
+const parsedResult = computed<unknown | undefined>(() => {
+  if (!hasResult.value) return undefined;
+  const trimmed = liveResult.value.trim();
+  if (trimmed.length === 0) return undefined;
+  const firstChar = trimmed[0];
+  if (firstChar !== "{" && firstChar !== "[") return undefined;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+});
+const isStructuredResult = computed(() => {
+  const v = parsedResult.value;
+  return (
+    v !== undefined &&
+    v !== null &&
+    (Array.isArray(v) || typeof v === "object")
+  );
+});
 </script>
 
 <template>
@@ -260,7 +286,11 @@ const hasResult = computed(() => liveResult.value.length > 0);
     <!-- fetch -->
     <template v-else-if="kind === 'fetch'">
       <UrlChip v-if="fetchUrl" :url="fetchUrl" />
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="json" />
+      <JsonValueView
+        v-if="isStructuredResult"
+        :value="parsedResult"
+      />
+      <CommandBlock v-else-if="hasResult" :code="liveResult" lang="json" />
     </template>
 
     <!-- todo_write -->
@@ -289,16 +319,24 @@ const hasResult = computed(() => liveResult.value.length > 0);
         <summary>Arguments</summary>
         <CommandBlock :code="argsJson" lang="json" />
       </details>
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="markdown" />
+      <JsonValueView
+        v-if="isStructuredResult"
+        :value="parsedResult"
+      />
+      <CommandBlock v-else-if="hasResult" :code="liveResult" lang="markdown" />
     </template>
 
-    <!-- generic fallback: JSON args + plain result -->
+    <!-- generic fallback: JSON args + JSON-aware result -->
     <template v-else>
       <details v-if="argsJson" class="tool-preview" open>
         <summary>Arguments</summary>
         <CommandBlock :code="argsJson" lang="json" />
       </details>
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
+      <JsonValueView
+        v-if="isStructuredResult"
+        :value="parsedResult"
+      />
+      <CommandBlock v-else-if="hasResult" :code="liveResult" lang="text" />
     </template>
   </div>
 </template>

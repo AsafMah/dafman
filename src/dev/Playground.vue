@@ -264,6 +264,45 @@ const SCRIPTS: Script[] = [
       },
     ],
   },
+  {
+    label: "Tool: MCP (structured JSON result)",
+    events: [
+      {
+        eventType: "tool.execution_start",
+        data: {
+          toolCallId: "call-mcp-struct-1",
+          toolName: "github_get_issue",
+          mcpServerName: "github",
+          mcpToolName: "get_issue",
+          arguments: { owner: "AsafMah", repo: "dafman", number: 42 },
+        },
+      },
+      {
+        eventType: "tool.execution_complete",
+        data: {
+          toolCallId: "call-mcp-struct-1",
+          success: true,
+          result: {
+            content: JSON.stringify(
+              {
+                number: 42,
+                title: "fix(chat): scrollback regression",
+                state: "open",
+                assignees: ["asafmah", "octocat"],
+                labels: ["bug", "regression", "p1"],
+                comments: 7,
+                createdAt: "2026-05-12T10:14:00Z",
+                metrics: { reactions: { thumbsUp: 4, heart: 1 }, watchers: 12 },
+                body: "Tracking down a scroll jump that occurs when streaming a long\nresponse. Repro is in the comments.",
+              },
+              null,
+              2,
+            ),
+          },
+        },
+      },
+    ],
+  },
   // ----- Additional tool variants -----------------------------------
   {
     label: "Tool: read (file contents)",
