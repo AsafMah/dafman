@@ -339,8 +339,10 @@ const SCRIPTS: Script[] = [
           toolName: "edit",
           arguments: {
             path: "src/lib/markdown.ts",
-            oldText: "html: false,",
-            newText: "html: true,",
+            oldText:
+              "const md = new MarkdownIt({\n  html: false,\n  linkify: true,\n  breaks: false,\n});\n\nexport function renderMarkdown(text: string) {\n  return md.render(text);\n}",
+            newText:
+              "const md = new MarkdownIt({\n  html: true,\n  linkify: true,\n  breaks: true,\n  typographer: true,\n});\n\nexport function renderMarkdown(text: string) {\n  const html = md.render(text);\n  return DOMPurify.sanitize(html);\n}",
           },
         },
       },
@@ -364,7 +366,23 @@ const SCRIPTS: Script[] = [
           toolName: "apply_patch",
           arguments: {
             input:
-              "*** Begin Patch\n*** Update File: src/App.vue\n@@\n-const isDark = false;\n+const isDark = true;\n*** End Patch\n",
+              "*** Begin Patch\n" +
+              "*** Update File: src/App.vue\n" +
+              "@@\n" +
+              " <script setup lang=\"ts\">\n" +
+              "-const isDark = false;\n" +
+              "+const isDark = true;\n" +
+              " const accent = computed(() => accentFor(sessionId));\n" +
+              "*** Add File: src/lib/theme.ts\n" +
+              "+export function isDarkMode(): boolean {\n" +
+              "+  return window.matchMedia(\"(prefers-color-scheme: dark)\").matches;\n" +
+              "+}\n" +
+              "*** Update File: src/main.ts\n" +
+              "@@\n" +
+              "-app.mount(\"#app\");\n" +
+              "+app.use(PrimeVue).mount(\"#app\");\n" +
+              "*** Delete File: src/lib/legacyTheme.ts\n" +
+              "*** End Patch\n",
           },
         },
       },
@@ -373,7 +391,7 @@ const SCRIPTS: Script[] = [
         data: {
           toolCallId: "call-patch-1",
           success: true,
-          result: { content: "Patched 1 file (src/App.vue)" },
+          result: { content: "Patched 4 files" },
         },
       },
     ],
@@ -396,7 +414,12 @@ const SCRIPTS: Script[] = [
           success: true,
           result: {
             content:
-              "src/App.vue:12: const sessionsStore = useSessionsStore();\nsrc/components/ChatTab.vue:34: const sessionsStore = useSessionsStore();\nsrc/components/SessionsManager.vue:21: const sessionsStore = useSessionsStore();\n",
+              "src/App.vue:12: const sessionsStore = useSessionsStore();\n" +
+              "src/components/ChatTab.vue:34: const sessionsStore = useSessionsStore();\n" +
+              "src/components/ChatTab.vue:88:   const events = useSessionsStore().events;\n" +
+              "src/components/SessionsManager.vue:21: const sessionsStore = useSessionsStore();\n" +
+              "src/dev/Playground.vue:144: const sessionsStore = useSessionsStore();\n" +
+              "src/stores/layoutStore.ts:67: const sessionsStore = useSessionsStore();\n",
           },
         },
       },
@@ -420,7 +443,15 @@ const SCRIPTS: Script[] = [
           success: true,
           result: {
             content:
-              "src/lib/__tests__/chatEvents.test.ts\nsrc/lib/__tests__/markdown.test.ts\nsrc/stores/__tests__/sessionsStore.restore.test.ts",
+              "src/lib/__tests__/chatEvents.test.ts\n" +
+              "src/lib/__tests__/markdown.test.ts\n" +
+              "src/lib/__tests__/diff.test.ts\n" +
+              "src/lib/__tests__/palette.test.ts\n" +
+              "src/stores/__tests__/sessionsStore.restore.test.ts\n" +
+              "src/stores/__tests__/layoutStore.addPanel.test.ts\n" +
+              "src/components/__tests__/CommandPalette.test.ts\n" +
+              "src/components/__tests__/JsonSchemaForm.test.ts\n" +
+              "src/components/__tests__/JsonValueView.test.ts",
           },
         },
       },

@@ -13,6 +13,10 @@ import PathChip from "./details/PathChip.vue";
 import CommandBlock from "./details/CommandBlock.vue";
 import UrlChip from "./details/UrlChip.vue";
 import ToolChip from "./details/ToolChip.vue";
+import DiffView from "./details/DiffView.vue";
+import ApplyPatchView from "./details/ApplyPatchView.vue";
+import GrepResults from "./details/GrepResults.vue";
+import GlobResults from "./details/GlobResults.vue";
 import JsonValueView from "./JsonValueView.vue";
 
 const props = defineProps<{
@@ -221,28 +225,18 @@ const isStructuredResult = computed(() => {
     <!-- edit / str_replace -->
     <template v-else-if="kind === 'edit'">
       <PathChip v-if="filePath" :path="filePath" icon="pencil" />
-      <details v-if="editOld || editNew" class="tool-preview">
-        <summary>Diff</summary>
-        <div class="tool-edit-diff">
-          <CommandBlock
-            v-if="editOld"
-            :code="editOld"
-            :lang="fileExtension || 'text'"
-          />
-          <div class="tool-edit-arrow" aria-hidden="true">↓</div>
-          <CommandBlock
-            v-if="editNew"
-            :code="editNew"
-            :lang="fileExtension || 'text'"
-          />
-        </div>
-      </details>
+      <DiffView
+        v-if="editOld !== undefined || editNew !== undefined"
+        :old-text="editOld ?? ''"
+        :new-text="editNew ?? ''"
+        :lang="fileExtension"
+      />
       <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
     </template>
 
     <!-- apply_patch -->
     <template v-else-if="kind === 'apply_patch'">
-      <CommandBlock v-if="patchInput" :code="patchInput" lang="diff" />
+      <ApplyPatchView v-if="patchInput" :patch="patchInput" />
       <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
     </template>
 
@@ -256,7 +250,11 @@ const isStructuredResult = computed(() => {
           <PathChip :path="grepPath" icon="folder" />
         </template>
       </div>
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
+      <GrepResults
+        v-if="hasResult"
+        :output="liveResult"
+        :pattern="grepPattern || undefined"
+      />
     </template>
 
     <!-- glob -->
@@ -265,7 +263,7 @@ const isStructuredResult = computed(() => {
         <span class="tool-meta-label">glob</span>
         <code class="tool-meta-code">{{ globPattern }}</code>
       </div>
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
+      <GlobResults v-if="hasResult" :output="liveResult" />
     </template>
 
     <!-- view -->
@@ -385,20 +383,6 @@ const isStructuredResult = computed(() => {
   user-select: none;
   color: var(--p-text-muted-color);
   padding: 0.1rem 0;
-}
-
-.tool-edit-diff {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  align-items: stretch;
-}
-
-.tool-edit-arrow {
-  align-self: center;
-  color: var(--p-text-muted-color);
-  font-size: 0.9rem;
-  user-select: none;
 }
 
 .tool-todos {
