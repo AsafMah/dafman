@@ -58,6 +58,51 @@ function indicatorFor(sessionId: string): NotificationStyle | null {
   return indicatorStyle(r.pendingRequests[0]?.kind, r.isThinking, r.unseenTurns);
 }
 
+/// Kind icon shown on every row, regardless of pending/thinking state.
+/// Picks the most specific class:
+///   - draft (open, no messages yet) → pencil
+///   - turn active                     → bolt (pulsed via indicator overlay)
+///   - has-conversation                → comments
+///   - closed (not in sessionsStore)   → comments-muted
+/// The `indicatorFor` state badge layers over this for state changes.
+function sessionKindIcon(sessionId: string): {
+  iconClass: string;
+  tooltip: string;
+  muted: boolean;
+} {
+  const open = openSessionIds.value.has(sessionId);
+  if (!open) {
+    return { iconClass: "pi-comments", tooltip: "Closed session", muted: true };
+  }
+  const r = recordsById.value.get(sessionId);
+  if (!r) {
+    return { iconClass: "pi-comments", tooltip: "Open session", muted: false };
+  }
+  // Heuristic: a session with zero user/assistant message events is
+  // still a "draft". We don't count tool/reasoning events because
+  // those can fire mid-creation before any user typing.
+  const hasUserOrAssistantMessage = r.events.some(
+    (e) => e.eventType === "user.message" || e.eventType === "assistant.message",
+  );
+  if (!hasUserOrAssistantMessage) {
+    return { iconClass: "pi-pencil", tooltip: "Draft — no messages yet", muted: false };
+  }
+  if (r.isThinking) {
+    return { iconClass: "pi-bolt", tooltip: "Turn active", muted: false };
+  }
+  return { iconClass: "pi-comments", tooltip: "Open session", muted: false };
+}
+
+/// Number of SDK-blocking pending requests beyond the first (the
+/// first one's already represented by the colored indicator
+/// icon/dot). Surfaces "queued questions" without making the row
+/// busy.
+function extraPendingCount(sessionId: string): number {
+  const r = recordsById.value.get(sessionId);
+  if (!r) return 0;
+  return Math.max(0, r.pendingRequests.length - 1);
+}
+
 /// Within a workspace group, push currently-open sessions to the top
 /// so the user can jump back to live conversations without scrolling
 /// past closed ones. Inside each subgroup, keep the existing MRU
@@ -494,17 +539,27 @@ void toasts; // referenced inside async handlers
               @click="onResume(session)"
             >
               <span class="session-label">
-                <i
-                  v-if="indicatorFor(session.sessionId)"
-                  class="pi session-icon"
-                  :class="[
-                    `pi-${indicatorFor(session.sessionId)!.iconSuffix}`,
-                    { 'session-icon-pulse': indicatorFor(session.sessionId)!.pulse },
-                  ]"
-                  :style="{ '--icon-color': indicatorFor(session.sessionId)!.color }"
-                  :aria-label="indicatorFor(session.sessionId)!.label"
-                  :title="indicatorFor(session.sessionId)!.label"
-                />
+                <span class="session-kind">
+                  <i
+                    class="pi session-kind-icon"
+                    :class="[
+                      sessionKindIcon(session.sessionId).iconClass,
+                      { 'is-muted': sessionKindIcon(session.sessionId).muted },
+                    ]"
+                    :title="sessionKindIcon(session.sessionId).tooltip"
+                    aria-hidden="true"
+                  />
+                  <span
+                    v-if="indicatorFor(session.sessionId)"
+                    class="session-state-dot"
+                    :class="{
+                      'session-state-dot-pulse': indicatorFor(session.sessionId)!.pulse,
+                    }"
+                    :style="{ '--dot-color': indicatorFor(session.sessionId)!.color }"
+                    :aria-label="indicatorFor(session.sessionId)!.label"
+                    :title="indicatorFor(session.sessionId)!.label"
+                  />
+                </span>
                 {{ sessionLabel(session) }}
               </span>
               <span class="session-meta">
@@ -517,6 +572,13 @@ void toasts; // referenced inside async handlers
                   Resuming…
                 </span>
                 <template v-else>
+                  <span
+                    v-if="extraPendingCount(session.sessionId) > 0"
+                    class="badge-pending"
+                    :title="`${extraPendingCount(session.sessionId)} additional request(s) waiting`"
+                  >
+                    +{{ extraPendingCount(session.sessionId) }}
+                  </span>
                   <span>{{ relativeTime(session.modifiedTime) }}</span>
                   <span
                     v-if="openSessionIds.has(session.sessionId)"
@@ -662,6 +724,14 @@ void toasts; // referenced inside async handlers
   align-items: stretch;
   gap: 0.1rem;
   border-radius: var(--p-border-radius-md);
+  /* Sticky to the top of the scrolling .manager-body so the folder
+   * name stays visible while you scroll a long session list. The
+   * background mask blends with the panel so rows that pass behind
+   * the header don't bleed through. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--p-content-background);
 }
 
 .group-header-row:hover {
@@ -726,7 +796,20 @@ void toasts; // referenced inside async handlers
 .group-count {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--p-text-muted-color);
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+}
+
+.session-list {
+  list-style: none;
+  padding: 0 0 0 0.7rem;
+  margin: 0;
+  border-left: 1px dotted color-mix(in srgb, var(--p-text-color) 15%, transparent);
+  margin-left: 0.85rem;
 }
 
 .group-preview {
@@ -754,12 +837,6 @@ void toasts; // referenced inside async handlers
 }
 
 /* ---- Session rows ---- */
-
-.session-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
 
 .session-row {
   display: flex;
@@ -824,34 +901,56 @@ void toasts; // referenced inside async handlers
   line-height: 1.25;
 }
 
-.session-icon {
-  display: inline-block;
-  vertical-align: middle;
+.session-kind {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   margin-right: 0.4rem;
-  font-size: 0.85rem;
-  color: var(--icon-color, var(--p-primary-color));
+  flex: 0 0 auto;
+}
+
+.session-kind-icon {
+  font-size: 0.9rem;
+  color: var(--p-text-color);
   /* Compositor layer — see ChatTab.vue::.chat-tab-icon for rationale.
    * Without this the pi-spin animation on the "thinking" indicator
    * freezes under main-thread load. */
   will-change: transform;
 }
 
-.session-icon.pi-spin {
-  animation: session-icon-spin 1s linear infinite !important;
+.session-kind-icon.is-muted {
+  color: var(--p-text-muted-color);
+  opacity: 0.55;
 }
 
-@keyframes session-icon-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.session-state-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--p-primary-color));
+  border: 2px solid var(--p-content-background);
+  box-sizing: content-box;
 }
 
-.session-icon.session-icon-pulse {
-  animation: session-icon-pulse 1.6s ease-in-out infinite;
+.session-state-dot-pulse {
+  animation: session-state-dot-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes session-icon-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+@keyframes session-state-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+.badge-pending {
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--p-orange-500) 22%, transparent);
+  color: var(--p-orange-700, var(--p-orange-500));
+  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .session-meta {

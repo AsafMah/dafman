@@ -423,13 +423,55 @@ async function onForkNoticeClick(referenceName: string) {
   );
 }
 
-/// Type-aware styling for the pending-request banner.Pulls the
+/// Session artifact summary derived from the message stream. Shown as
+/// pills above the composer so the user can scan "what's been done"
+/// without scrolling. Cheap to recompute — `items.value` is bounded
+/// by the chat scrollback we already render.
+const sessionArtifacts = computed(() => {
+  let filesModified = 0;
+  let commandsRun = 0;
+  const seenFiles = new Set<string>();
+  for (const it of items.value) {
+    if (it.kind !== "tool") continue;
+    const name = it.toolName.toLowerCase();
+    if (
+      name === "shell" ||
+      name === "bash" ||
+      name === "exec" ||
+      name === "execute"
+    ) {
+      commandsRun++;
+      continue;
+    }
+    if (
+      name === "edit" ||
+      name === "write" ||
+      name === "apply_patch" ||
+      name === "create" ||
+      name === "str_replace"
+    ) {
+      const path =
+        ((it.args ?? {})["path"] as string | undefined) ??
+        ((it.args ?? {})["filePath"] as string | undefined) ??
+        ((it.args ?? {})["fileName"] as string | undefined);
+      if (path && !seenFiles.has(path)) {
+        seenFiles.add(path);
+        filesModified++;
+      } else if (!path) {
+        filesModified++;
+      }
+    }
+  }
+  return { filesModified, commandsRun };
+});
+
+const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
+/// Type-aware styling for the pending-request banner. Pulls the
 /// color + icon + label from the shared `notificationStyles` so the
-/// banner matches the dot color on the tab + sidebar row. Reads
-/// the queue head: if more than one request is pending, the banner
+/// banner matches the dot color on the tab + sidebar. Reads the
+/// queue head: if more than one request is pending, the banner
 /// surfaces the oldest; additional requests are reflected in the
 /// global modal's queue count.
-const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
 const pendingStyle = computed(() => {
   const req = pendingHead.value;
   if (!req) return null;
@@ -608,10 +650,34 @@ const pendingStyle = computed(() => {
       </article>
     </div>
 
-    <footer v-if="ambient.usage" class="chat-usage">
-      <span class="usage-pill" :title="`${ambient.usage.currentTokens} / ${ambient.usage.tokenLimit} tokens`">
+    <footer
+      v-if="ambient.usage || sessionArtifacts.filesModified || sessionArtifacts.commandsRun"
+      class="chat-artifacts"
+    >
+      <span
+        v-if="sessionArtifacts.filesModified > 0"
+        class="artifact-pill"
+        :title="`${sessionArtifacts.filesModified} file(s) touched by edit/write/patch tools this session`"
+      >
+        <i class="pi pi-file-edit" aria-hidden="true" />
+        {{ sessionArtifacts.filesModified }} file{{ sessionArtifacts.filesModified === 1 ? "" : "s" }}
+      </span>
+      <span
+        v-if="sessionArtifacts.commandsRun > 0"
+        class="artifact-pill"
+        :title="`${sessionArtifacts.commandsRun} shell command(s) executed this session`"
+      >
+        <i class="pi pi-terminal" aria-hidden="true" />
+        {{ sessionArtifacts.commandsRun }} command{{ sessionArtifacts.commandsRun === 1 ? "" : "s" }}
+      </span>
+      <span
+        v-if="ambient.usage"
+        class="artifact-pill usage-pill"
+        :title="`${ambient.usage.currentTokens.toLocaleString()} / ${ambient.usage.tokenLimit.toLocaleString()} tokens`"
+      >
+        <i class="pi pi-chart-bar" aria-hidden="true" />
         {{ ambient.usage.currentTokens.toLocaleString() }} /
-        {{ ambient.usage.tokenLimit.toLocaleString() }} tokens
+        {{ ambient.usage.tokenLimit.toLocaleString() }}
       </span>
     </footer>
 
@@ -806,11 +872,30 @@ const pendingStyle = computed(() => {
   border-left-color: var(--p-red-500, #ef4444);
 }
 
-.chat-usage {
+.chat-artifacts {
   flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.3rem;
   padding: 0.25rem 0.75rem 0;
+}
+
+.artifact-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--p-content-hover-background);
+  color: var(--p-text-muted-color);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--p-surface-border);
+}
+
+.artifact-pill .pi {
+  font-size: 0.7rem;
 }
 
 .usage-pill {

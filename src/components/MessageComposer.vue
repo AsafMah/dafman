@@ -56,7 +56,7 @@ const props = withDefaults(
   }>(),
   {
     disabled: false,
-    placeholder: "Write your message...",
+    placeholder: "Ask anything. Ctrl+Enter to send.",
     enableMarkdownShortcuts: true,
     defaultMode: "steer",
   },
