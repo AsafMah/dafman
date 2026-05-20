@@ -44,6 +44,7 @@ import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
 import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 import type { DefaultSendMode } from "../stores/sessionsStore";
+import SlashCommandPlugin from "./SlashCommandPlugin.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -53,12 +54,16 @@ const props = withDefaults(
     /// Per-session default for the primary send button + Ctrl+Enter.
     /// Defaults to "steer".
     defaultMode?: DefaultSendMode;
+    /// SDK slash command list for the typeahead. Empty / undefined =
+    /// no slash menu (e.g. dev playground without a real session).
+    slashCommands?: { name: string; description?: string }[];
   }>(),
   {
     disabled: false,
     placeholder: "Ask anything. Ctrl+Enter to send.",
     enableMarkdownShortcuts: true,
     defaultMode: "steer",
+    slashCommands: () => [],
   },
 );
 
@@ -255,6 +260,10 @@ const SubmitButton = defineComponent({
       <EditableSync :editable="editable" />
       <SubmitOnEnter @submit="onSubmit" />
       <TypingDiagnostic v-if="diagEnabled" />
+      <SlashCommandPlugin
+        v-if="props.slashCommands.length > 0"
+        :commands="props.slashCommands"
+      />
       <!-- Optional leading content rendered inside the composer's flex
            row, before the input shell. Chat surfaces use this to host
            the run-mode segmented control so it shares the composer's

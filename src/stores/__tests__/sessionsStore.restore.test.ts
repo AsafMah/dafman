@@ -129,6 +129,35 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(record!.workingDirectory).toBe("/r");
   });
 
+  test("commands.changed populates record.commands for the slash typeahead", async () => {
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) =>
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+    setRpcBridge(bridge);
+
+    const store = useSessionsStore();
+    const record = await store.restoreSession("sess-cmds");
+    expect(record!.commands).toEqual([]);
+
+    fire(
+      event("sess-cmds", "commands.changed", {
+        commands: [
+          { name: "/help", description: "show help" },
+          { name: "/clear" },
+          // bogus entries should be filtered out
+          { description: "no name" },
+          "not-an-object",
+          null,
+        ],
+      }),
+    );
+
+    expect(record!.commands).toEqual([
+      { name: "/help", description: "show help" },
+      { name: "/clear" },
+    ]);
+  });
+
   test("events fired AFTER the RPC resolves are appended live", async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
