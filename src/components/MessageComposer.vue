@@ -54,16 +54,17 @@ const props = withDefaults(
     /// Per-session default for the primary send button + Ctrl+Enter.
     /// Defaults to "steer".
     defaultMode?: DefaultSendMode;
-    /// SDK slash command list for the typeahead. Empty / undefined =
-    /// no slash menu (e.g. dev playground without a real session).
-    slashCommands?: { name: string; description?: string }[];
+    /// When provided, mounts the slash-command typeahead bound to
+    /// this session. Omit on synthetic / playground composers that
+    /// shouldn't fire real session commands.
+    sessionId?: string;
   }>(),
   {
     disabled: false,
     placeholder: "Ask anything. Ctrl+Enter to send.",
     enableMarkdownShortcuts: true,
     defaultMode: "steer",
-    slashCommands: () => [],
+    sessionId: undefined,
   },
 );
 
@@ -261,8 +262,8 @@ const SubmitButton = defineComponent({
       <SubmitOnEnter @submit="onSubmit" />
       <TypingDiagnostic v-if="diagEnabled" />
       <SlashCommandPlugin
-        v-if="props.slashCommands.length > 0"
-        :commands="props.slashCommands"
+        v-if="props.sessionId"
+        :session-id="props.sessionId"
       />
       <!-- Optional leading content rendered inside the composer's flex
            row, before the input shell. Chat surfaces use this to host

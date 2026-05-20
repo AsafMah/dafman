@@ -21,7 +21,6 @@ import type {
   UserInputRequestData,
 } from "../ipc/types";
 import { accentForIndex } from "../lib/color";
-import { BUILTIN_SLASH_COMMANDS } from "../lib/slashCommands";
 import { useLayoutStore } from "./layoutStore";
 import { useNotificationsStore } from "./notificationsStore";
 import { useToastStore } from "./toastStore";
@@ -72,11 +71,6 @@ export type SessionRecord = {
   /// (Ctrl+Enter while a turn is running injects rather than queues
   /// behind it). Not persisted across reloads in v1.
   defaultSendMode: DefaultSendMode;
-  /// SDK slash commands available in this session. Driven by
-  /// `commands.changed` events; the SDK ships a baseline at session
-  /// start and re-emits as plugins / extensions register. Empty until
-  /// the first event arrives (typical first paint < 100ms).
-  commands: { name: string; description?: string }[];
   /// FIFO queue of SDK-blocking pending callbacks. New requests
   /// append; responses or matching `_completed` events remove by
   /// requestId. Mirrors the reducer's `ambient.pendingRequests` at
@@ -249,40 +243,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       if (typeof title === "string" && title.length > 0) {
         record.title = title;
       }
-    }
-    // SDK slash commands list — refreshed whenever extensions /
-    // plugins register or drop commands. Feeds the composer
-    // typeahead.
-    if (payload.eventType === "commands.changed") {
-      const cmds = (payload.data as { commands?: unknown }).commands;
-      if (Array.isArray(cmds)) {
-        const fromSdk = cmds
-          .filter(
-            (c): c is { name: string; description?: string } =>
-              typeof c === "object" &&
-              c !== null &&
-              typeof (c as { name?: unknown }).name === "string",
-          )
-          .map((c) => ({
-            name: c.name,
-            ...(typeof c.description === "string"
-              ? { description: c.description }
-              : {}),
-          }));
-        // Merge with the baseline: SDK list wins on name collision
-        // (description from SDK is more accurate). New commands from
-        // plugins / extensions append. Baseline keeps the typeahead
-        // populated for stock sessions where commands.changed never
-        // fires for built-ins.
-        const merged = new Map<string, { name: string; description?: string }>();
-        for (const c of BUILTIN_SLASH_COMMANDS) merged.set(c.name, c);
-        for (const c of fromSdk) merged.set(c.name, c);
-        record.commands = Array.from(merged.values()).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
-      }
-    }
-    // Both `session.start` (fresh create) and `session.resume` carry
+    }// Both `session.start` (fresh create) and `session.resume` carry
     // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
     // Resumed sessions don't fire `session.start` again, so we have
     // to listen on both — otherwise the workspace would only appear
@@ -501,7 +462,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningVisibilityOverride: "default",
         workingDirectory: wd && wd.length > 0 ? wd : null,
         defaultSendMode: "steer",
-        commands: [...BUILTIN_SLASH_COMMANDS],
+
         pendingRequests: [],
         unseenTurns: 0,
         isThinking: false,
@@ -576,7 +537,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         reasoningVisibilityOverride: "default",
         workingDirectory: response.cwd ?? null,
         defaultSendMode: "steer",
-        commands: [...BUILTIN_SLASH_COMMANDS],
+
         pendingRequests: [],
         unseenTurns: 0,
         isThinking: false,
@@ -975,3 +936,4 @@ export const useSessionsStore = defineStore("sessions", () => {
     respondToPending,
   };
 });
+

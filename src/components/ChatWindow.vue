@@ -140,15 +140,6 @@ const recordIsThinking = computed(() => {
   return isSending.value;
 });
 
-/// SDK-reported slash commands for this session (refreshed via the
-/// `commands.changed` event handler in sessionsStore). Pass-through
-/// to MessageComposer's slash typeahead. Empty until the first
-/// `commands.changed` event arrives.
-const sessionCommands = computed(() => {
-  const r = sessionsStore.sessions.find((s) => s.id === props.sessionId);
-  return r?.commands ?? [];
-});
-
 const reasoningVisibility = computed<ReasoningVisibility>(() =>
   props.reasoningVisibilityOverride === "default"
     ? settings.value.appearance.reasoningVisibility
@@ -723,7 +714,7 @@ const pendingStyle = computed(() => {
       <MessageComposer
         ref="composerRef"
         :default-mode="props.defaultSendMode"
-        :slash-commands="sessionCommands"
+        :session-id="props.sendHandler ? undefined : props.sessionId"
         @submit="sendMessage"
         @update:default-mode="onUpdateDefaultMode"
       >

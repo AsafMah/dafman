@@ -29,6 +29,7 @@ import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useModelsStore } from "../stores/modelsStore";
 import { useToastStore } from "../stores/toastStore";
+import { SESSION_COMMANDS } from "./sessionCommands";
 import type { SessionMode } from "../ipc/types";
 
 const SESSIONS_PANEL_ID = "sessions-manager";
@@ -184,6 +185,27 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   }
 
   for (const cmd of statics) registry.register(cmd);
+
+  // ---------- Session-scoped commands (shared with slash menu) ----------
+  // Each SESSION_COMMANDS entry is registered as a palette command
+  // gated on an active session. The slash typeahead uses the same
+  // list so Ctrl+K and "/" stay in sync.
+  for (const sc of SESSION_COMMANDS) {
+    registry.register({
+      id: `session.cmd.${sc.slash.replace(/^\//, "")}`,
+      label: sc.label,
+      hint: sc.slash,
+      group: sc.group,
+      icon: sc.icon ? `pi ${sc.icon}` : undefined,
+      keywords: [sc.slash, ...(sc.keywords ?? [])],
+      when: () => layoutStore.activeSessionId !== null,
+      run: async () => {
+        const id = layoutStore.activeSessionId;
+        if (!id) return;
+        await sc.run(id);
+      },
+    });
+  }
 
   // ---------- Dynamic: New Session in <workspace> (MRU) ----------
   const workspaceCommandIds = new Set<string>();

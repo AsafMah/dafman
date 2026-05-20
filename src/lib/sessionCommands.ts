@@ -1,0 +1,132 @@
+/// Session-scoped commands shared between the composer's slash-typeahead
+/// menu and the global command palette. Each entry knows how to execute
+/// against a target sessionId.
+///
+/// Why one shared list: typing `/clear` in the composer and running
+/// "Clear conversation" from Ctrl+K should be the same action. Keeping
+/// these in one place avoids drift between the two surfaces.
+///
+/// The SDK has its OWN built-in CLI commands (/agent, /model, /mcp,
+/// /skills, …) that are handled internally when the user sends a
+/// message starting with "/". We don't duplicate those here — if the
+/// slash menu doesn't match a typed prefix, the text just falls
+/// through to `sendMessage` and the SDK's command resolver picks it up.
+
+import { useLayoutStore } from "../stores/layoutStore";
+import { useSessionsStore } from "../stores/sessionsStore";
+import { useToastStore } from "../stores/toastStore";
+
+export interface SessionCommand {
+	/// Slash form (with leading "/"). What the user types in the
+	/// composer to trigger it via the typeahead.
+	slash: string;
+	/// Human label used by both the palette row and the slash menu's
+	/// item title fallback.
+	label: string;
+	/// Short description for the row's secondary line.
+	description: string;
+	/// PrimeIcons class (e.g. `pi-eraser`). Optional — the renderer
+	/// falls back to a generic glyph.
+	icon?: string;
+	/// Extra search corpus for the palette's fuzzy filter (the slash
+	/// name + label + description are always included; this is
+	/// additive). Typed synonyms go here.
+	keywords?: string[];
+	/// Group header in the palette.
+	group: string;
+	/// Execute the command against `sessionId`. May return a promise;
+	/// the palette closes optimistically.
+	run(sessionId: string): void | Promise<void>;
+}
+
+export const SESSION_COMMANDS: SessionCommand[] = [
+	{
+		slash: "/compact",
+		label: "Compact conversation history",
+		description: "Summarize older messages to free up the context window.",
+		icon: "pi-database",
+		group: "Session",
+		keywords: ["summarize", "history", "context", "tokens"],
+		run: async (sessionId) => {
+			const sessions = useSessionsStore();
+			await sessions.compactSessionHistory(sessionId);
+		},
+	},
+	{
+		slash: "/fork",
+		label: "Fork session here",
+		description: "Branch this conversation into a new session.",
+		icon: "pi-share-alt",
+		group: "Session",
+		keywords: ["branch", "copy", "split"],
+		run: async (sessionId) => {
+			const sessions = useSessionsStore();
+			const layout = useLayoutStore();
+			const newId = await sessions.forkSession(sessionId);
+			layout.addPanel(newId);
+			layout.activatePanel(newId);
+		},
+	},
+	{
+		slash: "/rename",
+		label: "Rename session",
+		description: "Set a custom title for this session.",
+		icon: "pi-pencil",
+		group: "Session",
+		keywords: ["title", "name"],
+		run: (sessionId) => {
+			// Surface the rename popover via a window event that
+			// SessionHeaderControls listens for.
+			window.dispatchEvent(
+				new CustomEvent("dafman:rename-session", { detail: { sessionId } }),
+			);
+		},
+	},
+	{
+		slash: "/cwd",
+		label: "Show working directory",
+		description: "Reveal the session's cwd in the OS file explorer.",
+		icon: "pi-folder-open",
+		group: "Session",
+		keywords: ["workspace", "directory", "path"],
+		run: async (sessionId) => {
+			const sessions = useSessionsStore();
+			const record = sessions.sessions.find((s) => s.id === sessionId);
+			const toasts = useToastStore();
+			if (!record?.workingDirectory) {
+				toasts.warn("No working directory", "This session has no cwd set.");
+				return;
+			}
+			const { invokeCommand } = await import("../ipc/invoke");
+			await invokeCommand("revealPath", { path: record.workingDirectory });
+		},
+	},
+	{
+		slash: "/close",
+		label: "Close this panel",
+		description: "Remove the session's panel from the workspace (keeps history).",
+		icon: "pi-times",
+		group: "Session",
+		keywords: ["hide", "panel", "tab"],
+		run: (sessionId) => {
+			const layout = useLayoutStore();
+			layout.closePanel(sessionId);
+		},
+	},
+	{
+		slash: "/help",
+		label: "Show available commands",
+		description: "List all slash commands this session understands.",
+		icon: "pi-question-circle",
+		group: "Session",
+		keywords: ["commands", "list", "guide"],
+		run: () => {
+			const toasts = useToastStore();
+			const names = SESSION_COMMANDS.map((c) => c.slash).join(", ");
+			toasts.info(
+				"dafman slash commands",
+				`${names}. Type "/" to autocomplete; or open the command palette with Ctrl+K.`,
+			);
+		},
+	},
+];
