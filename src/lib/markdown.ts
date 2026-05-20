@@ -233,6 +233,60 @@ export function renderMarkdown(source: string): string {
   return DOMPurify.sanitize(dirty, PURIFY_CONFIG);
 }
 
+/// Discriminated union of segments produced by `renderMarkdownSegments`.
+/// `html` segments are sanitized HTML for everything that isn't a
+/// top-level fenced code block; `code` segments carry the raw code +
+/// language for the renderer to mount a CodeMirror instance.
+export type MarkdownSegment =
+  | { kind: "html"; html: string }
+  | { kind: "code"; code: string; language: string };
+
+/// Split markdown into a list of segments so the Vue renderer can mount
+/// CodeMirror instances per top-level fenced code block while keeping
+/// the rest as plain v-html. Why this exists: top-level code blocks are
+/// the common case in assistant responses, and CM gives us per-language
+/// highlighting + a uniform "code surface" across the app. Splitting
+/// before render also lets Vue reuse the CodeEditor instance across
+/// streaming re-renders (so each new token dispatches a doc change to
+/// the existing editor rather than tearing down + remounting per chunk).
+///
+/// Fences inside list items / blockquotes (`token.level > 0`) stay in
+/// the html stream — splitting them out would unbalance the open/close
+/// tags of the surrounding block. Those keep the existing Prism-via-
+/// markdown-it highlighting path.
+export function renderMarkdownSegments(source: string): MarkdownSegment[] {
+  if (!source) return [];
+  ensurePurifyHook();
+  const tokens = md.parse(source, {});
+  const segments: MarkdownSegment[] = [];
+  let buffer: typeof tokens = [];
+
+  const flushHtml = () => {
+    if (buffer.length === 0) return;
+    const html = md.renderer.render(buffer, md.options, {});
+    const clean = DOMPurify.sanitize(html, PURIFY_CONFIG);
+    if (clean.trim().length > 0) {
+      segments.push({ kind: "html", html: clean });
+    }
+    buffer = [];
+  };
+
+  for (const token of tokens) {
+    if (token.type === "fence" && token.level === 0) {
+      flushHtml();
+      const language = (token.info || "").trim().toLowerCase();
+      // markdown-it appends a trailing newline to fence content; drop
+      // it so the editor doesn't show a phantom blank last line.
+      const code = token.content.replace(/\n$/, "");
+      segments.push({ kind: "code", code, language });
+    } else {
+      buffer.push(token);
+    }
+  }
+  flushHtml();
+  return segments;
+}
+
 /// Wraps a string in a fenced markdown code block. The outer fence is
 /// chosen dynamically so embedded ``` runs in `content` can't close the
 /// block early — tool output frequently contains markdown samples,

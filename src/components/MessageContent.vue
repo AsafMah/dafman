@@ -1,35 +1,21 @@
 <script setup lang="ts">
 // Read-only markdown renderer for assistant/user/reasoning/tool bubbles.
 //
-// History: previously rendered through Lexical so the same engine
-// powered both display and composition. The display side only needs
-// to render markdown, never edit, and Lexical's bundled
-// `@lexical/markdown` `TRANSFORMERS` set is intentionally minimal —
-// no GFM tables, no task lists, no images, no autolinks. Owning
-// custom transformers for each of those is more code than just
-// using a markdown parser that already supports them.
-//
-// markdown-it covers the GFM subset we want (tables, strikethrough,
-// fenced code, autolinks via linkify, task lists via plugin) and
-// `renderMarkdown` in `lib/markdown.ts` pipes its output through
-// DOMPurify before we hand the HTML to `v-html`. The composer
-// (MessageComposer.vue) still uses Lexical — see plan.md / AGENTS.md
-// for the rationale: read-only display and rich editing have
-// different needs, and Lexical's DecoratorNode + Typeahead primitives
-// are the right surface for upcoming features (@file mentions, slash
-// commands, attachments) on the composer side.
-//
-// Accessibility: the rendered HTML is wrapped in a `role="article"`
-// container with `aria-readonly` so screen readers treat each
-// message as a static document instead of an editable region.
+// Top-level fenced code blocks are extracted as separate segments and
+// rendered through CodeEditor (CodeMirror 6) so we get per-language
+// syntax highlighting + a uniform code surface. Everything else
+// (paragraphs, lists, tables, inline code, nested code blocks inside
+// lists/blockquotes, KaTeX math) stays on the markdown-it + Prism
+// path via v-html. See `renderMarkdownSegments` in lib/markdown.ts
+// for the split rationale + streaming notes.
 
 import { computed } from "vue";
-import { renderMarkdown } from "../lib/markdown";
-// Side-effect import: registers extra prism grammars (bash, json,
-// diff, yaml, toml, …) on the global Prism singleton so code fences
-// in tool output highlight correctly. See prismExtraLanguages.ts
-// for the language list + rationale on the load order.
+import { renderMarkdownSegments } from "../lib/markdown";
+// Side-effect import: registers extra prism grammars for the inline /
+// nested code path that still goes through markdown-it's highlight
+// hook. See prismExtraLanguages.ts for the language list.
 import "../lexical/prismExtraLanguages";
+import CodeEditor from "./CodeEditor.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -39,7 +25,7 @@ const props = withDefaults(
   { label: "Message content" },
 );
 
-const html = computed(() => renderMarkdown(props.text));
+const segments = computed(() => renderMarkdownSegments(props.text));
 </script>
 
 <template>
@@ -48,6 +34,41 @@ const html = computed(() => renderMarkdown(props.text));
     role="article"
     :aria-readonly="true"
     :aria-label="props.label"
-    v-html="html"
-  />
+  >
+    <template v-for="(seg, idx) in segments" :key="idx">
+      <div
+        v-if="seg.kind === 'html'"
+        class="md-html-segment"
+        v-html="seg.html"
+      />
+      <CodeEditor
+        v-else
+        class="md-code-segment"
+        :model-value="seg.code"
+        :language="seg.language || undefined"
+        :readonly="true"
+        :max-height="320"
+      />
+    </template>
+  </div>
 </template>
+
+<style scoped>
+.md-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.md-html-segment > :first-child {
+  margin-top: 0;
+}
+
+.md-html-segment > :last-child {
+  margin-bottom: 0;
+}
+
+.md-code-segment {
+  align-self: stretch;
+}
+</style>

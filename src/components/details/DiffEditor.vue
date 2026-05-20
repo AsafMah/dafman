@@ -2,17 +2,22 @@
 /// CodeMirror 6 `MergeView` wrapper.
 ///
 /// Modes:
-/// - "inline" (a / b): unified diff, single column with +/- markers
+/// - "inline": unified diff (a above b via CSS column-stack)
 /// - "side-by-side": two columns
 ///
-/// We toggle via a button in the header. State is local to the
-/// component (caller sets the initial mode via `initialMode`).
+/// Language is resolved BEFORE the MergeView is built so the
+/// LanguageSupport extension is present in the initial state. CM6's
+/// Compartment.reconfigure() works inside a single EditorView, but
+/// `MergeView` wraps its two halves in a way that makes the post-
+/// mount reconfigure unreliable for syntax highlighting — resolving
+/// up-front and rebuilding on prop change is simpler and always
+/// shows tokens correctly.
 
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { EditorView, lineNumbers } from "@codemirror/view";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
-import { MergeView } from "@codemirror/merge";
+import { MergeView, unifiedMergeView } from "@codemirror/merge";
 import { oneDark } from "@codemirror/theme-one-dark";
 import Button from "primevue/button";
 import {
@@ -38,7 +43,8 @@ const props = withDefaults(
 const host = ref<HTMLDivElement | null>(null);
 const mode = ref<Mode>(props.initialMode);
 let mergeView: MergeView | null = null;
-const langCompartment = new Compartment();
+let inlineView: EditorView | null = null;
+let resolvedLang: Extension | null = null;
 
 function commonExtensions(): Extension[] {
   return [
@@ -46,7 +52,7 @@ function commonExtensions(): Extension[] {
     EditorView.editable.of(false),
     EditorView.lineWrapping,
     lineNumbers(),
-    langCompartment.of([]),
+    ...(resolvedLang ? [resolvedLang] : []),
     oneDark,
     EditorView.theme({
       "&": {
@@ -67,8 +73,7 @@ function commonExtensions(): Extension[] {
   ];
 }
 
-async function loadLanguage(): Promise<void> {
-  if (!mergeView) return;
+async function resolveLang(): Promise<void> {
   let ext: Extension | null = null;
   if (props.language) {
     ext = await resolveLanguageExtension(props.language);
@@ -76,58 +81,79 @@ async function loadLanguage(): Promise<void> {
   if (!ext && props.filename) {
     ext = await resolveLanguageForFile(props.filename);
   }
-  if (!mergeView) return;
-  const effects = langCompartment.reconfigure(ext ?? []);
-  mergeView.a.dispatch({ effects });
-  mergeView.b.dispatch({ effects });
+  resolvedLang = ext;
 }
 
-function build(): void {
+function buildSync(): void {
   if (!host.value) return;
   if (mergeView) {
     mergeView.destroy();
     mergeView = null;
   }
-  // Clear any prior root DOM contents (MergeView appends children).
-  host.value.innerHTML = "";
-  mergeView = new MergeView({
-    a: { doc: props.oldText, extensions: commonExtensions() },
-    b: { doc: props.newText, extensions: commonExtensions() },
-    parent: host.value,
-    orientation: mode.value === "inline" ? "a-b" : "a-b",
-    revertControls: undefined,
-    highlightChanges: true,
-    gutter: true,
-    collapseUnchanged: { margin: 3, minSize: 6 },
-    // The renderRevertControl + diffConfig defaults are fine for a
-    // read-only viewer.
-  });
-  // CM6's MergeView always renders side-by-side. For "inline", we
-  // stack the two halves vertically via CSS by adding a class.
-  if (mode.value === "inline") {
-    host.value.classList.add("merge-inline");
-  } else {
-    host.value.classList.remove("merge-inline");
+  if (inlineView) {
+    inlineView.destroy();
+    inlineView = null;
   }
-  void loadLanguage();
+  host.value.innerHTML = "";
+  host.value.classList.remove("merge-inline");
+
+  if (mode.value === "side-by-side") {
+    mergeView = new MergeView({
+      a: { doc: props.oldText, extensions: commonExtensions() },
+      b: { doc: props.newText, extensions: commonExtensions() },
+      parent: host.value,
+      orientation: "a-b",
+      highlightChanges: true,
+      gutter: true,
+      collapseUnchanged: { margin: 3, minSize: 6 },
+    });
+  } else {
+    // Unified inline diff: a single EditorView whose doc is the NEW
+    // text, with `unifiedMergeView` decorating removed lines from
+    // `original` inline (deletion strikethrough + insertion bg).
+    inlineView = new EditorView({
+      doc: props.newText,
+      extensions: [
+        ...commonExtensions(),
+        unifiedMergeView({
+          original: props.oldText,
+          mergeControls: false,
+          highlightChanges: true,
+          gutter: true,
+          collapseUnchanged: { margin: 3, minSize: 6 },
+        }),
+      ],
+      parent: host.value,
+    });
+    host.value.classList.add("merge-inline");
+  }
 }
 
-onMounted(build);
+async function rebuild(): Promise<void> {
+  await resolveLang();
+  buildSync();
+}
+
+onMounted(() => {
+  void rebuild();
+});
 
 onUnmounted(() => {
   mergeView?.destroy();
+  inlineView?.destroy();
   mergeView = null;
+  inlineView = null;
 });
 
 watch(
   () => [props.oldText, props.newText, mode.value] as const,
-  () => build(),
+  () => buildSync(),
 );
 
 watch(
   () => [props.language, props.filename] as const,
   () => {
-    void loadLanguage();
+    void rebuild();
   },
 );
 
@@ -174,16 +200,9 @@ function toggleMode(): void {
   min-height: 60px;
 }
 
-/* CM6's MergeView is side-by-side by default. For "inline" we stack
- * vertically via CSS — both halves still render but each occupies
- * the full width. */
-.diff-editor-host.merge-inline :deep(.cm-mergeView) {
-  flex-direction: column;
-}
-
-.diff-editor-host.merge-inline :deep(.cm-mergeViewEditor) {
-  width: 100% !important;
-}
+/* Inline mode mounts a single EditorView with `unifiedMergeView`;
+ * side-by-side mounts MergeView (two columns). No CSS stacking
+ * trickery needed — both modes render the right shape natively. */
 
 .diff-editor-host :deep(.cm-mergeView) {
   background: transparent;
