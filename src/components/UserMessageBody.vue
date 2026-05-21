@@ -16,6 +16,7 @@ import { computed } from "vue";
 import MessageContent from "./MessageContent.vue";
 import type { SendMessageAttachment } from "../ipc/types";
 import { labelForAttachment } from "../lexical/AttachmentNode";
+import { openAttachment } from "../lib/openAttachment";
 
 const props = defineProps<{
   text: string;
@@ -70,9 +71,10 @@ function iconClass(a: SendMessageAttachment): string {
   <p v-else class="user-message-body" :aria-label="label">
     <template v-for="(seg, i) in segments" :key="i">
       <span v-if="seg.kind === 'text'" class="user-text-seg">{{ seg.value }}</span>
-      <span
+      <button
         v-else
-        class="composer-attachment-pill"
+        type="button"
+        class="composer-attachment-pill user-attachment-pill"
         :data-attachment-type="seg.attachment.type"
         :data-attachment-kind="
           seg.attachment.type === 'blob' && (seg.attachment.mimeType ?? '').startsWith('image/')
@@ -80,10 +82,12 @@ function iconClass(a: SendMessageAttachment): string {
             : undefined
         "
         :title="labelForAttachment(seg.attachment)"
+        :aria-label="`Open attachment ${labelForAttachment(seg.attachment)}`"
+        @click="openAttachment(seg.attachment)"
       >
         <i :class="`pi ${iconClass(seg.attachment)} composer-attachment-pill-icon`" aria-hidden="true" />
         <span class="composer-attachment-pill-label">{{ labelForAttachment(seg.attachment) }}</span>
-      </span>
+      </button>
     </template>
   </p>
 </template>
@@ -98,5 +102,15 @@ function iconClass(a: SendMessageAttachment): string {
 
 .user-text-seg {
   white-space: pre-wrap;
+}
+
+.user-attachment-pill {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.user-attachment-pill:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 1px;
 }
 </style>

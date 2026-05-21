@@ -243,6 +243,42 @@ describe("processEvents", () => {
     expect(second.items).toHaveLength(1);
     expect(second.items[0]?.kind).toBe("user");
   });
+
+  test("user.message restores attachments from the SDK echo (history replay)", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "sess-1",
+          eventType: "user.message",
+          data: {
+            content: "compare a.ts and b.ts",
+            attachments: [
+              { type: "file", path: "/abs/a.ts", displayName: "a.ts" },
+              { type: "file", path: "/abs/b.ts", displayName: "b.ts" },
+              { type: "blob", data: "Zm9v", mimeType: "image/png", displayName: "shot.png" },
+              // Unknown kinds are dropped silently.
+              { type: "github_reference", number: 42 },
+            ],
+          },
+          eventId: "evt-att-1",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    const item = result.items[0];
+    expect(item?.kind).toBe("user");
+    if (item?.kind === "user") {
+      expect(item.attachments).toEqual([
+        { type: "file", path: "/abs/a.ts", displayName: "a.ts" },
+        { type: "file", path: "/abs/b.ts", displayName: "b.ts" },
+        { type: "blob", data: "Zm9v", mimeType: "image/png", displayName: "shot.png" },
+      ]);
+    }
+  });
 });
 
 describe("processEvents — fork notices", () => {
