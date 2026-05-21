@@ -10,6 +10,50 @@
 
 ---
 
+## 2026-05-22 — Export conversation (Markdown + JSON)
+
+### Takeaway
+Per-session menu item exports the chat as Markdown or JSON. Renderer
+builds the document via a new `formatConversation` helper that reuses
+the same `processEvents` reducer the chat tile runs — no second source
+of truth. Bun writes the file under `<userData>/exports/` and we
+auto-reveal it. Output is good-enough for sharing in a GitHub issue
+(reasoning folded inside `<details>`, tool args/results in fenced code
+blocks).
+
+### Detail
+- `src/lib/exportConversation.ts` — `formatConversation(input, format)`
+  + `exportFilenameStem(title, format)`. Markdown ordering: title +
+  metadata header (model / workspace / exported / message count) → per
+  item: user (with attachments list), assistant, reasoning (folded in
+  `<details>`, encrypted variant shows privacy placeholder), tool
+  (args + progress + output + result + error), system (icon by
+  severity). PendingRequests are NOT exported (transient).
+- `src-bun/app/exports.ts` — `saveExportFile({outputRoot, fileName,
+  contents})` writes to `<outputRoot>/exports/<basename>`. Renderer-
+  side filename already sanitised; bun does defence-in-depth via
+  `basename(normalize(fileName))` so `..\..\Windows\System32` collapses
+  to `System32`. New `AppError.Io` already plumbed (Phase 1).
+- RPC `saveExportFile({fileName, contents}) → {path, bytes}`. Wire
+  snapshot added.
+- `SessionHeaderControls.vue` gear popover gains "Export Markdown" +
+  "Export JSON" buttons in the option-actions row. On click: imports
+  `processEvents` + `formatConversation` dynamically (no extra cost
+  for users who never export), builds the document, calls
+  `saveExportFile`, then `revealPath` on the result.
+- 12 markdown formatter tests + 1 JSON test + 3 filename-stem tests +
+  3 bun-side `saveExportFile` tests covering happy path, path
+  traversal defence, empty-filename rejection.
+
+### Receipts
+- `src/lib/exportConversation.ts`, `src-bun/app/exports.ts` (new).
+- `src/lib/__tests__/exportConversation.test.ts` (15 cases),
+  `src-bun/__tests__/exports.test.ts` (3 cases),
+  `src-bun/__tests__/wire-contract.test.ts` (+1 snapshot).
+- 341 `bun test` pass (was 325), lint clean, smoke green.
+
+---
+
 ## 2026-05-21 — Phase 1: observability tail (log viewer + redaction + diagnostics + CI matrix)
 
 ### Takeaway

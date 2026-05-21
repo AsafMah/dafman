@@ -5,6 +5,20 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added
 
+- **Export conversation (Markdown + JSON).** Per-session gear popover
+  gains "Export Markdown" / "Export JSON" buttons. The renderer builds
+  the document via the new `formatConversation` helper (Markdown
+  ordering: title + model + workspace + export timestamp + message
+  count → per item: user with attachments, assistant, reasoning folded
+  in `<details>`, tool with args/output/result/error, system bubbles
+  with severity icons; pending-request items deliberately skipped).
+  Bun-side `saveExportFile` RPC writes under `<userData>/exports/`
+  with `basename(normalize(...))` defence against path traversal, then
+  the file's folder auto-reveals in the OS file explorer. 15 markdown
+  + 3 JSON + 3 filename + 3 bun-side tests pin the behaviour. Reuses
+  the same `processEvents` reducer the chat tile runs so the export
+  is in lockstep with what's on screen.
+
 - **Phase 1 — Observability tail.** In-app log viewer (`LogViewer.vue`,
   reachable from the Activity Bar's bottom rail) tails the bun JSON
   log live. Header has three controls: Active level (mutates the

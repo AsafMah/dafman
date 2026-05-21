@@ -344,6 +344,10 @@ export type CommandMap = {
     args: Record<string, never>;
     result: { path: string; files: string[]; totalBytes: number };
   };
+  saveExportFile: {
+    args: { fileName: string; contents: string };
+    result: { path: string; bytes: number };
+  };
 };
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";

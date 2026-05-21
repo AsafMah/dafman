@@ -20,20 +20,17 @@ conversation, and the rough edges noted under "Observability tail" below.
 Picked from the **Open backlog** table below, ordered by ROI / unblocker
 value. Pick the next one when the previous lands.
 
-1. **Export conversation** (M2 close, ~1 d). Markdown + JSON exports off a
-   per-session menu item; the read path already produces the right shape
-   (events → `ChatItem[]`) via the reducer. Reuses the `revealPath` RPC to
-   open the file in the OS explorer.
-2. **Image generation** (M2 close, ~1 d). Surface `response_format = image`
-   in the composer's "send" menu; renderer for image messages already
-   half-built via the markdown-it image hook.
-3. **Per-session tool allow/exclude UI** (Phase 4 start, ~1 d). Mirrors the
-   existing skills toggle list in the gear popover; wires to SDK
-   `availableTools` / `excludedTools` at session create time + a
-   `setSessionTools` RPC for runtime adjustments (verify SDK supports).
-4. **Tier-2 E2E** (Phase 2 tail, ~1 d). Playwright CDP harness against the
+1. **Image generation** (M2 close, ~1 d). Surface `response_format = image`
+   in the composer's send menu; renderer for image messages half-built
+   via the markdown-it image hook.
+2. **Per-session tool allow/exclude UI** (Phase 4 start, ~1 d). Mirrors the
+   existing skills toggle list in the gear popover; wired to SDK
+   `availableTools` / `excludedTools`.
+3. **Tier-2 E2E** (Phase 2 tail, ~1 d). Playwright CDP harness against the
    real Electrobun binary (one or two flows). Tier-1 renderer smoke stays
    as-is.
+4. **Metrics counters / histograms in Settings** (Observability tail, ~1 d).
+   Bun-side counter primitives + a Settings → Diagnostics section.
 
 ---
 
@@ -104,7 +101,7 @@ TODO reflects current state against the M0–M7 ambitions in
 
 | Item | Status | Notes |
 |---|---|---|
-| Export conversation | TODO | Markdown + JSON. Read path exists (`ChatItem[]`). |
+| Export conversation | DONE | Per-session gear popover → "Export Markdown" / "Export JSON". Renderer builds the document via `formatConversation`; bun-side `saveExportFile` writes under `<userData>/exports/` with basename-only sanitisation; auto-reveals in OS file explorer. |
 | Image generation (response_format = image) | TODO | SDK supports; UI doesn't surface it. |
 
 ### M3 — Tools & permissions
@@ -200,10 +197,10 @@ estimates (1 d = ~1 working day of focused engineering).
 - Playwright CDP harness against the real Electrobun binary. ⏳ TODO
 
 ### Phase 3 — M2 closing (~2 d)
-- Export conversation (Markdown + JSON).
-- Image generation (response_format = image) end-to-end.
+- Export conversation (Markdown + JSON). ✅
+- Image generation (response_format = image) end-to-end. ⏳ TODO
 - Metrics counters + histograms exposed in Settings → Diagnostics
-  (depends on Phase 1's renderer plumbing).
+  (depends on Phase 1's renderer plumbing). ⏳ TODO
 
 ### Phase 4 — Tools & policies (~4 d)
 - Per-session tool allow/exclude UI in the gear popover (mirrors the
@@ -275,7 +272,7 @@ estimates (1 d = ~1 working day of focused engineering).
 | Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
 | Real binary E2E | not yet wired | 0 |
 
-Total: **325 `bun test`** passing as of 2026-05-21 (Phase 1); smoke green on both
+Total: **341 `bun test`** passing as of 2026-05-22; smoke green on both
 prod and HMR.
 
 ---
@@ -307,6 +304,10 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Export conversation: per-session gear popover →
+  Export Markdown / JSON. `src/lib/exportConversation.ts` builds the
+  document from `ChatItem[]`; bun-side `saveExportFile` writes under
+  `<userData>/exports/`; auto-reveals.
 - **2026-05-21** — Phase 1 done: in-app log viewer (`LogViewer.vue` edge
   panel) + live `logEvent` fan-out + `setLogLevel` runtime toggle +
   `exportDiagnostics` bundle (logs + redacted recent + settings + README)

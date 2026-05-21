@@ -366,3 +366,10 @@ exports[`IPC wire contracts — diagnostics exportDiagnostics result shape 1`] =
   "totalBytes": 12345,
 }
 `;
+
+exports[`IPC wire contracts — diagnostics saveExportFile result shape 1`] = `
+{
+  "bytes": 4242,
+  "path": "C:/Users/mahle/AppData/Local/Dafman/exports/refactor-session-2026-05-22-…md",
+}
+`;

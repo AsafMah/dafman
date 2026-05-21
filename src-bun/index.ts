@@ -28,6 +28,7 @@ import {
 	subscribeLogs,
 } from "./app/logging";
 import { exportDiagnostics } from "./app/diagnostics";
+import { saveExportFile } from "./app/exports";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
@@ -288,6 +289,13 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				return exportDiagnostics({
 					outputRoot: Utils.paths.userData,
 					settings: settings.get(),
+				});
+			}),
+			saveExportFile: rpcGuard(async ({ fileName, contents }) => {
+				return saveExportFile({
+					outputRoot: Utils.paths.userData,
+					fileName,
+					contents,
 				});
 			}),
 		},

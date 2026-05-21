@@ -28,6 +28,7 @@ import type {
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useToastStore } from "../stores/toastStore";
 import { basename } from "../stores/layoutStore";
 import { invokeCommand } from "../ipc/invoke";
 import {
@@ -37,6 +38,7 @@ import {
 const props = defineProps<{ sessionId: string }>();
 
 const sessionsStore = useSessionsStore();
+const toasts = useToastStore();
 const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
 
@@ -230,6 +232,47 @@ function onCompactNow() {
 
 function onResetApprovals() {
   void sessionsStore.resetSessionApprovals(props.sessionId);
+}
+
+/// Build a fresh ChatItem[] from the session's raw event log and
+/// shell it out as Markdown or JSON. Reusing `processEvents` here
+/// keeps the export in lockstep with what the chat tile renders —
+/// no second source of truth. Counter starts at 1; the export
+/// doesn't share ids with the live chat window so collisions are
+/// fine.
+async function onExport(format: "markdown" | "json"): Promise<void> {
+  const rec = record.value;
+  if (!rec) return;
+  try {
+    const { processEvents, defaultAmbient } = await import("../lib/chatEvents");
+    const { formatConversation, exportFilenameStem } = await import("../lib/exportConversation");
+    const counter = { next: 1 };
+    const result = processEvents([], defaultAmbient(), rec.events, counter, { live: false });
+    const title = rec.title?.trim() || `Session ${rec.id.slice(0, 8)}`;
+    const contents = formatConversation(
+      {
+        title,
+        workingDirectory: rec.workingDirectory,
+        model: rec.model,
+        exportedAt: new Date().toISOString(),
+        items: result.items,
+      },
+      format,
+    );
+    const fileName = exportFilenameStem(title, format);
+    const saved = await invokeCommand("saveExportFile", { fileName, contents });
+    toasts.success(
+      `Conversation exported (${format === "markdown" ? "MD" : "JSON"})`,
+      `${(saved.bytes / 1024).toFixed(1)} KiB`,
+    );
+    try {
+      await invokeCommand("revealPath", { path: saved.path });
+    } catch {
+      /* best-effort */
+    }
+  } catch (err) {
+    toasts.error("Export failed", err instanceof Error ? err.message : String(err));
+  }
 }
 
 const approveAll = computed(() => record.value?.approveAll ?? false);
@@ -578,6 +621,20 @@ function formatDurationMs(ms: number): string {
         </div>
 
         <div class="option-actions">
+          <Button
+            icon="pi pi-download"
+            label="Export Markdown"
+            size="small"
+            severity="secondary"
+            @click="onExport('markdown')"
+          />
+          <Button
+            icon="pi pi-file-export"
+            label="Export JSON"
+            size="small"
+            severity="secondary"
+            @click="onExport('json')"
+          />
           <Button
             icon="pi pi-compress"
             label="Compact history"

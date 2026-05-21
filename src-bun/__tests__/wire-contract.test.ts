@@ -304,4 +304,12 @@ describe("IPC wire contracts — diagnostics", () => {
 		};
 		expect(sample).toMatchSnapshot();
 	});
+
+	test("saveExportFile result shape", () => {
+		const sample = {
+			path: "C:/Users/mahle/AppData/Local/Dafman/exports/refactor-session-2026-05-22-…md",
+			bytes: 4242,
+		};
+		expect(sample).toMatchSnapshot();
+	});
 });

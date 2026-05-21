@@ -547,6 +547,16 @@ export type DafmanRPC = {
 					totalBytes: number;
 				};
 			};
+			/// Writes a conversation export (markdown or JSON) to
+			/// `<userData>/exports/<fileName>` and returns its path.
+			/// Filename is sanitised; the renderer is expected to
+			/// produce something like `my-session-2026-05-22-…md`.
+			/// Returns the absolute path so the renderer can call
+			/// `revealPath` afterwards.
+			saveExportFile: {
+				params: { fileName: string; contents: string };
+				response: { path: string; bytes: number };
+			};
 		};
 		messages: Record<string, never>;
 	}>;
