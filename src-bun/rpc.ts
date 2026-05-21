@@ -247,12 +247,26 @@ export type PendingRequestPayload =
 /// without an approval rule — best-effort; SDK may reject if it
 /// requires a rule, in which case the registry settles with
 /// `{ kind: "user-not-available" }` and surfaces a toast).
+export type PermissionApprovalRule =
+	| { kind: "commands"; commandIdentifiers: string[] }
+	| { kind: "read" }
+	| { kind: "write" }
+	| { kind: "mcp"; serverName: string; toolName: string | null }
+	| { kind: "mcp-sampling"; serverName: string }
+	| { kind: "memory" }
+	| { kind: "custom-tool"; toolName: string };
+
 export type RespondToRequestParams =
 	| {
 		sessionId: string;
 		requestId: string;
 		response:
-			| { kind: "permission"; decision: "approveOnce" | "approveForSession" | "reject" };
+			| {
+				kind: "permission";
+				decision: "approveOnce" | "approveForSession" | "reject";
+				approval?: PermissionApprovalRule;
+				domain?: string;
+			};
 	}
 	| {
 		sessionId: string;

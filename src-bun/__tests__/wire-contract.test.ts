@@ -218,6 +218,45 @@ describe("IPC wire contracts", () => {
 		expect(sample).toMatchSnapshot();
 	});
 
+	test("RespondToRequestParams — permission approve for session (commands rule)", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-1c",
+			response: {
+				kind: "permission",
+				decision: "approveForSession",
+				approval: { kind: "commands", commandIdentifiers: ["git"] },
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — permission approve for session (mcp tool)", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-1m",
+			response: {
+				kind: "permission",
+				decision: "approveForSession",
+				approval: { kind: "mcp", serverName: "github", toolName: "list_issues" },
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — permission approve for session (url domain)", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-1u",
+			response: {
+				kind: "permission",
+				decision: "approveForSession",
+				domain: "github.com",
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
 	test("RespondToRequestParams — userInput freeform", () => {
 		const sample: RespondToRequestParams = {
 			sessionId: "sess-1",

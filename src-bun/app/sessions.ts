@@ -348,17 +348,29 @@ export class SessionRegistry {
 		let sdkResult: unknown;
 		switch (params.response.kind) {
 			case "permission":
-				sdkResult =
-					params.response.decision === "approveOnce"
-						? { kind: "approve-once" }
-						: params.response.decision === "approveForSession"
-							// Best-effort: the SDK's full type includes an
-							// optional `approval` rule. We send the minimal
-							// shape and let the SDK either accept it or
-							// reject with a fallback we surface as a toast
-							// at the renderer.
-							? { kind: "approve-for-session" }
-							: { kind: "reject" };
+				if (params.response.decision === "approveOnce") {
+					sdkResult = { kind: "approve-once" };
+				} else if (params.response.decision === "reject") {
+					sdkResult = { kind: "reject" };
+				} else {
+					// approveForSession — assemble the full SDK shape.
+					// The `approval` field is per-kind:
+					//   - commands : { commandIdentifiers: string[] }
+					//   - read / write / memory : kind only
+					//   - mcp : { serverName, toolName | null }
+					//   - mcp-sampling : { serverName }
+					//   - custom-tool : { toolName }
+					// `domain` is exclusive to `url` permission requests and
+					// goes at the top level (not inside `approval`).
+					const out: Record<string, unknown> = { kind: "approve-for-session" };
+					if (params.response.approval) {
+						out.approval = params.response.approval;
+					}
+					if (params.response.domain) {
+						out.domain = params.response.domain;
+					}
+					sdkResult = out;
+				}
 				break;
 			case "userInput":
 				sdkResult = {

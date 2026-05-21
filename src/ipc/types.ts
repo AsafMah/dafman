@@ -159,6 +159,20 @@ export type PendingRequestPayload =
       request: ElicitationRequestData;
     };
 
+/// Approval scope sent with `approveForSession` decisions. Mirrors the
+/// SDK's `PermissionDecisionApproveForSessionApproval` union — see
+/// `node_modules/copilot-sdk-supercharged/dist/generated/rpc.d.ts`.
+/// `undefined` falls back to the SDK's default (kind-specific blanket
+/// approval); we only send a concrete rule when the user picks one.
+export type PermissionApprovalRule =
+  | { kind: "commands"; commandIdentifiers: string[] }
+  | { kind: "read" }
+  | { kind: "write" }
+  | { kind: "mcp"; serverName: string; toolName: string | null }
+  | { kind: "mcp-sampling"; serverName: string }
+  | { kind: "memory" }
+  | { kind: "custom-tool"; toolName: string };
+
 /// Renderer → bun response shape for `respondToRequest`.
 export type RespondToRequestParams =
   | {
@@ -167,6 +181,13 @@ export type RespondToRequestParams =
       response: {
         kind: "permission";
         decision: "approveOnce" | "approveForSession" | "reject";
+        /// Optional approval rule for `approveForSession` decisions.
+        /// When absent the SDK uses a kind-specific blanket approval.
+        approval?: PermissionApprovalRule;
+        /// Optional URL domain for `approveForSession` decisions on
+        /// `url` permission requests. Defaults to the host extracted
+        /// from the request URL when absent.
+        domain?: string;
       };
     }
   | {

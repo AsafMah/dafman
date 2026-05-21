@@ -272,3 +272,48 @@ exports[`IPC wire contracts setSessionWorkingDirectory request shape 1`] = `
   "workingDirectory": "..\\other",
 }
 `;
+
+exports[`IPC wire contracts RespondToRequestParams — permission approve for session (commands rule) 1`] = `
+{
+  "requestId": "req-uuid-1c",
+  "response": {
+    "approval": {
+      "commandIdentifiers": [
+        "git",
+      ],
+      "kind": "commands",
+    },
+    "decision": "approveForSession",
+    "kind": "permission",
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — permission approve for session (mcp tool) 1`] = `
+{
+  "requestId": "req-uuid-1m",
+  "response": {
+    "approval": {
+      "kind": "mcp",
+      "serverName": "github",
+      "toolName": "list_issues",
+    },
+    "decision": "approveForSession",
+    "kind": "permission",
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — permission approve for session (url domain) 1`] = `
+{
+  "requestId": "req-uuid-1u",
+  "response": {
+    "decision": "approveForSession",
+    "domain": "github.com",
+    "kind": "permission",
+  },
+  "sessionId": "sess-1",
+}
+`;

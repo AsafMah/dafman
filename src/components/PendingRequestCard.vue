@@ -32,6 +32,7 @@ import RadioButton from "primevue/radiobutton";
 import Textarea from "primevue/textarea";
 import type {
   ElicitationRequestData,
+  PermissionApprovalRule,
   PermissionRequestData,
   UserInputRequestData,
 } from "../ipc/types";
@@ -40,6 +41,7 @@ import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import { styleFor } from "../lib/notificationStyles";
 import PermissionDetails from "./PermissionDetails.vue";
+import PermissionRuleEditor from "./PermissionRuleEditor.vue";
 import JsonSchemaForm from "./JsonSchemaForm.vue";
 
 const props = defineProps<{
@@ -123,6 +125,29 @@ async function permissionAllowAndStopAsking(): Promise<void> {
     "Auto-approve enabled for this session",
     "Toggle it back from the session options gear if you want prompts again.",
   );
+}
+
+const showRuleEditor = ref(false);
+
+/// "Allow for session" with a concrete rule. The editor builds the
+/// SDK-shaped approval payload (or `domain` for URL); we forward it
+/// verbatim through respondToPending. The card is then dismissed by
+/// the SDK's resolve path (registry removes the entry).
+async function permissionAllowForSession(payload: {
+  approval?: PermissionApprovalRule;
+  domain?: string;
+}): Promise<void> {
+  showRuleEditor.value = false;
+  await sessionsStore.respondToPending({
+    sessionId: props.sessionId,
+    requestId: props.requestId,
+    response: {
+      kind: "permission",
+      decision: "approveForSession",
+      ...(payload.approval ? { approval: payload.approval } : {}),
+      ...(payload.domain ? { domain: payload.domain } : {}),
+    },
+  });
 }
 
 // User-input actions.
@@ -246,6 +271,14 @@ async function elicitationCancel(
           @click="permissionRespond('reject')"
         />
         <Button
+          v-if="!showRuleEditor"
+          label="Allow for session…"
+          severity="secondary"
+          size="small"
+          icon="pi pi-shield"
+          @click="showRuleEditor = true"
+        />
+        <Button
           label="Allow + don't ask again"
           severity="secondary"
           size="small"
@@ -259,6 +292,12 @@ async function elicitationCancel(
           @click="permissionRespond('approveOnce')"
         />
       </div>
+      <PermissionRuleEditor
+        v-if="showRuleEditor"
+        :request="asPermission"
+        @submit="permissionAllowForSession"
+        @cancel="showRuleEditor = false"
+      />
     </template>
 
     <!-- User input -->
