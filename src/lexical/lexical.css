@@ -272,26 +272,46 @@
   font-size: 0.9rem;
 }
 
-/* Inline attachment pills (AttachmentNode). Renders as part of the
- * text flow so users see  "text text (image.png) text"  literally
- * with the filename styled as a chip. */
+/* Inline attachment pills (AttachmentNode — DecoratorNode). Renders
+ * as part of the text flow so users see  "text text image.png text"
+ * with the filename styled as a chip. The pill is contenteditable=false
+ * so caret nav treats it as a single atomic symbol. */
 .composer-attachment-pill {
   display: inline-flex;
   align-items: center;
-  margin: 0 0.1rem;
-  padding: 0.05rem 0.45rem;
+  vertical-align: baseline;
+  margin: 0 0.15rem;
+  padding: 0.05rem 0.5rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 18%, transparent);
   color: var(--p-text-color);
   font-size: 0.78rem;
   line-height: 1.3;
   white-space: nowrap;
-  cursor: default;
+  user-select: none;
   border: 1px solid color-mix(in srgb, var(--accent, var(--p-primary-color)) 35%, transparent);
+}
+
+.composer-attachment-pill:hover {
+  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 28%, transparent);
 }
 
 .composer-attachment-pill[data-attachment-kind="image"] {
   background: color-mix(in srgb, var(--p-primary-color) 18%, transparent);
+}
+
+.composer-attachment-pill[data-attachment-kind="image"]:hover {
+  background: color-mix(in srgb, var(--p-primary-color) 28%, transparent);
+}
+
+.composer-attachment-pill-icon {
+  font-size: 0.72rem;
+  margin-right: 0.3rem;
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+
+.composer-attachment-pill-label {
+  display: inline-block;
 }
 
 /* Message display: editor root is non-interactive but still receives

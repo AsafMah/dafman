@@ -40,7 +40,7 @@ import {
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
 } from "../lexical/plugins";
-import { $getRoot, $getSelection, $isRangeSelection, $createParagraphNode, $createTextNode } from "lexical";
+import { $getRoot, $getSelection, $isElementNode, $isRangeSelection, $createParagraphNode, $createTextNode, type ElementNode } from "lexical";
 import { markdownNodes } from "../lexical/nodes";
 import { $createAttachmentNode } from "../lexical/AttachmentNode";
 import { lexicalTheme } from "../lexical/theme";
@@ -92,36 +92,27 @@ function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
   if (!editor) return;
   editor.update(() => {
-    const sel = $getSelection();
     const node = $createAttachmentNode(a);
+    const space = $createTextNode(" ");
+    const sel = $getSelection();
     if ($isRangeSelection(sel)) {
-      sel.insertNodes([node]);
+      sel.insertNodes([node, space]);
     } else {
-      // No active selection (e.g. drag-drop before the editor has focus
-      // taken). Append to the last paragraph, creating one if needed.
+      // No active selection (drag-drop before the editor has focus).
+      // Ensure there's a paragraph to append to, then append both nodes.
       const root = $getRoot();
       let last = root.getLastChild();
-      if (!last) {
+      if (!$isElementNode(last)) {
         last = $createParagraphNode();
         root.append(last);
       }
-      // last might be a paragraph or some block node; only append into
-      // it if it can have children. Otherwise add a new paragraph.
-      if ("append" in last && typeof (last as { append: unknown }).append === "function") {
-        (last as unknown as { append: (n: unknown) => void }).append(node);
-      } else {
-        const p = $createParagraphNode();
-        p.append(node);
-        root.append(p);
-      }
+      (last as ElementNode).append(node);
+      (last as ElementNode).append(space);
     }
-    // Trailing space so the caret lands AFTER the pill, ready for more text.
-    const space = $createTextNode(" ");
-    node.insertAfter(space);
+    // Place caret AFTER the trailing space so the next keystroke
+    // continues plain typing.
     space.selectEnd();
   });
-  // Bring focus to the editor so the next keystroke continues typing
-  // after the pill.
   editor.focus();
 }
 
