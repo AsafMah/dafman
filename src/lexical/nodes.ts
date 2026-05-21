@@ -13,6 +13,7 @@ import { ListItemNode, ListNode } from "@lexical/list";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { Klass, LexicalNode } from "lexical";
 import { HorizontalRuleNode } from "lexical-vue/LexicalHorizontalRuleNode";
+import { AttachmentNode } from "./AttachmentNode";
 
 export const markdownNodes: ReadonlyArray<Klass<LexicalNode>> = [
   HeadingNode,
@@ -23,5 +24,6 @@ export const markdownNodes: ReadonlyArray<Klass<LexicalNode>> = [
   CodeHighlightNode,
   LinkNode,
   HorizontalRuleNode,
+  AttachmentNode,
 ];
 

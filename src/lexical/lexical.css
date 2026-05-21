@@ -207,7 +207,7 @@
   min-width: 0;
   background: transparent;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.4rem;
 }
 
@@ -219,8 +219,8 @@
 
 .lex-composer-send {
   flex: 0 0 auto;
-  padding: 0.4rem 0.5rem 0.4rem 0;
-  align-self: flex-end;
+  padding: 0 0.5rem 0 0;
+  align-self: center;
 }
 
 /* Send button picks up the session accent inside a composer that lives
@@ -270,6 +270,28 @@
   pointer-events: none;
   user-select: none;
   font-size: 0.9rem;
+}
+
+/* Inline attachment pills (AttachmentNode). Renders as part of the
+ * text flow so users see  "text text (image.png) text"  literally
+ * with the filename styled as a chip. */
+.composer-attachment-pill {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 18%, transparent);
+  color: var(--p-text-color);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: default;
+  border: 1px solid color-mix(in srgb, var(--accent, var(--p-primary-color)) 35%, transparent);
+}
+
+.composer-attachment-pill[data-attachment-kind="image"] {
+  background: color-mix(in srgb, var(--p-primary-color) 18%, transparent);
 }
 
 /* Message display: editor root is non-interactive but still receives

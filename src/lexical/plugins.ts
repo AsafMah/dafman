@@ -16,14 +16,18 @@ import {
   $createTextNode,
   $getRoot,
   $getSelection,
+  $isElementNode,
   $isRangeSelection,
   COMMAND_PRIORITY_HIGH,
   KEY_ENTER_COMMAND,
   type LexicalEditor,
+  type LexicalNode,
 } from "lexical";
 import { defineComponent, onBeforeUnmount, onMounted, watch } from "vue";
 import { useLexicalComposer } from "lexical-vue/LexicalComposer";
 import { rendererLog } from "../ipc/rendererLog";
+import { $isAttachmentNode } from "./AttachmentNode";
+import type { SendMessageAttachment } from "../ipc/types";
 
 /// Extract the editor content as a markdown string, trim it, clear the
 /// editor, and return the result. Returns `null` when the buffer was
@@ -35,16 +39,36 @@ import { rendererLog } from "../ipc/rendererLog";
 /// (`**bold**`, `# heading`, fenced code, lists, links, etc.) survives
 /// the send and is rendered consistently by `MessageContent` on the
 /// other end.
-export function consumeComposerText(editor: LexicalEditor): string | null {
+export function consumeComposerText(
+  editor: LexicalEditor,
+): { text: string; attachments: SendMessageAttachment[] } | null {
   const state = editor.getEditorState();
   const plain = state.read(() => $getRoot().getTextContent());
   if (plain.trim().length === 0) return null;
   const markdown = state.read(() => $convertToMarkdownString(TRANSFORMERS));
+  // Walk in document order picking up every AttachmentNode payload.
+  // This is read OUTSIDE the editor.update() so the editor state is
+  // still intact when we walk; the clear() below then discards
+  // everything we already captured.
+  const attachments: SendMessageAttachment[] = [];
+  state.read(() => {
+    const visit = (node: LexicalNode): void => {
+      if ($isAttachmentNode(node)) {
+        attachments.push(node.getAttachment());
+        return;
+      }
+      if ($isElementNode(node)) {
+        for (const child of node.getChildren()) visit(child);
+      }
+    };
+    visit($getRoot());
+  });
   editor.update(() => {
     $getRoot().clear();
   });
   const trimmed = markdown.trim();
-  return trimmed.length === 0 ? plain.trim() : trimmed;
+  const text = trimmed.length === 0 ? plain.trim() : trimmed;
+  return { text, attachments };
 }
 
 /// Registers the built-in markdown keystroke shortcuts (`# `, `** **`,
@@ -104,6 +128,7 @@ export type ComposerSubmitMode = "default" | "queue" | "interrupt";
 export interface ComposerSubmitPayload {
   text: string;
   mode: ComposerSubmitMode;
+  attachments?: SendMessageAttachment[];
 }
 
 export const SubmitOnEnter = defineComponent({
@@ -130,9 +155,15 @@ export const SubmitOnEnter = defineComponent({
         else if (isAltEnter) mode = "queue";
         if (mode === null) return false;
         e.preventDefault();
-        const text = consumeComposerText(editor);
-        if (text !== null) {
-          const payload: ComposerSubmitPayload = { text, mode };
+        const result = consumeComposerText(editor);
+        if (result !== null) {
+          const payload: ComposerSubmitPayload = {
+            text: result.text,
+            mode,
+            ...(result.attachments.length > 0
+              ? { attachments: result.attachments }
+              : {}),
+          };
           emit("submit", payload);
         }
         return true;

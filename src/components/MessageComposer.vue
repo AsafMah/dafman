@@ -40,17 +40,16 @@ import {
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
 } from "../lexical/plugins";
-import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
+import { $getRoot, $getSelection, $isRangeSelection, $createParagraphNode, $createTextNode } from "lexical";
 import { markdownNodes } from "../lexical/nodes";
+import { $createAttachmentNode } from "../lexical/AttachmentNode";
 import { lexicalTheme } from "../lexical/theme";
 import type { DefaultSendMode } from "../stores/sessionsStore";
 import type { SendMessageAttachment } from "../ipc/types";
-import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "../stores/toastStore";
 import { runLocalSlashCommand } from "../lib/sessionCommands";
 import SlashCommandPlugin from "./SlashCommandPlugin.vue";
 import MentionPlugin from "./MentionPlugin.vue";
-import AttachmentStrip from "./AttachmentStrip.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
 
 const props = withDefaults(
@@ -81,36 +80,49 @@ const diagEnabled =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).has("diag");
 
-/// Pending attachments queued by the @file typeahead, drag/drop, and
-/// paste. Cleared on submit. Each entry is an SDK-shaped attachment
-/// the parent will pass through `sendMessage`.
-const attachments = ref<SendMessageAttachment[]>([]);
+/// Pending attachments are now stored INLINE in the editor itself —
+/// each chip is an `AttachmentNode` (a token-mode TextNode subclass)
+/// inserted at the cursor. We extract them in document order at submit
+/// time via `collectAttachments(editor)`. This keeps "pill position in
+/// text" === "attachment index in array" naturally without a parallel
+/// ref array drifting from the editor state.
 const toasts = useToastStore();
 
 function addAttachment(a: SendMessageAttachment): void {
-  // Dedup: file attachments by path, blobs/selections by displayName
-  // (good enough — exact-duplicate detection isn't worth a hash).
-  if (a.type === "file") {
-    if (attachments.value.some((x) => x.type === "file" && x.path === a.path)) {
-      return;
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor) return;
+  editor.update(() => {
+    const sel = $getSelection();
+    const node = $createAttachmentNode(a);
+    if ($isRangeSelection(sel)) {
+      sel.insertNodes([node]);
+    } else {
+      // No active selection (e.g. drag-drop before the editor has focus
+      // taken). Append to the last paragraph, creating one if needed.
+      const root = $getRoot();
+      let last = root.getLastChild();
+      if (!last) {
+        last = $createParagraphNode();
+        root.append(last);
+      }
+      // last might be a paragraph or some block node; only append into
+      // it if it can have children. Otherwise add a new paragraph.
+      if ("append" in last && typeof (last as { append: unknown }).append === "function") {
+        (last as unknown as { append: (n: unknown) => void }).append(node);
+      } else {
+        const p = $createParagraphNode();
+        p.append(node);
+        root.append(p);
+      }
     }
-  } else if (a.type === "blob") {
-    if (
-      attachments.value.some(
-        (x) =>
-          x.type === "blob" &&
-          x.displayName === a.displayName &&
-          x.data === a.data,
-      )
-    ) {
-      return;
-    }
-  }
-  attachments.value.push(a);
-}
-
-function removeAttachment(idx: number): void {
-  attachments.value.splice(idx, 1);
+    // Trailing space so the caret lands AFTER the pill, ready for more text.
+    const space = $createTextNode(" ");
+    node.insertAfter(space);
+    space.selectEnd();
+  });
+  // Bring focus to the editor so the next keystroke continues typing
+  // after the pill.
+  editor.focus();
 }
 
 const MAX_BLOB_BYTES = 8 * 1024 * 1024; // 8 MiB safety cap
@@ -245,33 +257,6 @@ async function onPickedFiles(event: Event): Promise<void> {
   input.value = "";
 }
 
-/// Open an attachment for inspection. File attachments reveal in
-/// the OS file explorer; blob attachments (pasted screenshots etc.)
-/// pop a viewer window via an object URL.
-function onOpenAttachment(idx: number): void {
-  const a = attachments.value[idx];
-  if (!a) return;
-  if (a.type === "file" || a.type === "directory") {
-    // Bun-side `revealPath` handles both files and directories.
-    void invokeCommand("revealPath", { path: a.path }).catch(() => {
-      toasts.warn("Couldn't open", a.path);
-    });
-  } else if (a.type === "blob") {
-    try {
-      const bin = atob(a.data);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const blob = new Blob([bytes], { type: a.mimeType });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      // Revoke shortly so the popup has time to claim it.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      toasts.warn("Couldn't preview attachment");
-    }
-  }
-}
-
 defineExpose({ focus: focusComposer, setText, appendText });
 
 const editable = computed(() => !props.disabled);
@@ -295,16 +280,7 @@ async function onSubmit(payload: ComposerSubmitPayload) {
   if (props.sessionId && await runLocalSlashCommand(props.sessionId, payload.text)) {
     return;
   }
-  const merged: ComposerSubmitPayload & {
-    attachments?: SendMessageAttachment[];
-  } = {
-    ...payload,
-    ...(attachments.value.length > 0
-      ? { attachments: [...attachments.value] }
-      : {}),
-  };
-  attachments.value = [];
-  emit("submit", merged);
+  emit("submit", payload);
 }
 
 /// Dropdown items for the SplitButton — let the user change the
@@ -338,9 +314,15 @@ const editorRef = ref<unknown>(null);
 function triggerSubmit(mode: ComposerSubmitMode) {
   const editor = editorRef.value as LexicalEditor | null;
   if (!editor || props.disabled) return;
-  const text = consumeComposerText(editor);
-  if (text === null) return;
-  emit("submit", { text, mode });
+  const result = consumeComposerText(editor);
+  if (result === null) return;
+  emit("submit", {
+    text: result.text,
+    mode,
+    ...(result.attachments.length > 0
+      ? { attachments: result.attachments }
+      : {}),
+  });
 }
 
 /// Captures the active editor instance so external menu items
@@ -357,9 +339,7 @@ const EditorRefCapture = defineComponent({
   },
 });
 
-const primaryLabel = computed(() =>
-  props.defaultMode === "queue" ? "Queue" : "Send",
-);
+const primaryLabel = computed(() => "");
 const primaryIcon = computed(() =>
   props.defaultMode === "queue" ? "pi pi-clock" : "pi pi-send",
 );
@@ -388,9 +368,15 @@ const SubmitButton = defineComponent({
     const editor = useLexicalComposer();
     function fire() {
       if (p.disabled) return;
-      const text = consumeComposerText(editor);
-      if (text !== null) {
-        const payload: ComposerSubmitPayload = { text, mode: "default" };
+      const result = consumeComposerText(editor);
+      if (result !== null) {
+        const payload: ComposerSubmitPayload = {
+          text: result.text,
+          mode: "default",
+          ...(result.attachments.length > 0
+            ? { attachments: result.attachments }
+            : {}),
+        };
         emitInner("submit", payload);
       }
     }
@@ -423,12 +409,6 @@ const SubmitButton = defineComponent({
       @change="onPickedFiles"
     />
     <div class="lex-composer-frame">
-      <AttachmentStrip
-        v-if="attachments.length > 0"
-        :attachments="attachments"
-        @remove="removeAttachment"
-        @open="onOpenAttachment"
-      />
       <LexicalComposer :initial-config="initialConfig">
         <EditableSync :editable="editable" />
         <SubmitOnEnter @submit="onSubmit" />
@@ -440,7 +420,6 @@ const SubmitButton = defineComponent({
         <MentionPlugin
           v-if="props.sessionId"
           :session-id="props.sessionId"
-          @attach="addAttachment"
         />
         <div class="lex-composer-shell" @paste="onPaste">
           <div class="lex-composer-editor">
@@ -595,22 +574,22 @@ const SubmitButton = defineComponent({
   font-size: 0.95rem;
 }
 
-/* SplitButton sizing override — the default PrimeVue "small" preset is
- * still taller than our 1.75rem toolbar row. Force the inner Buttons
- * to match. */
+/* Send button inside the editor row: icon-only, taller + narrower
+ * pill that vertically centers in the input shell. */
 .lex-submit-button :deep(.p-button) {
-  height: 1.75rem;
-  min-height: 1.75rem;
-  padding: 0 0.55rem;
-  font-size: 0.8rem;
-}
-
-.lex-submit-button :deep(.p-button .pi) {
+  height: 2.4rem;
+  min-height: 2.4rem;
+  padding: 0 0.45rem;
   font-size: 0.85rem;
 }
 
+.lex-submit-button :deep(.p-button .pi) {
+  font-size: 1rem;
+}
+
 .lex-submit-button :deep(.p-splitbutton-dropdown) {
-  padding: 0 0.3rem;
+  padding: 0 0.25rem;
+  min-width: 1.4rem;
 }
 
 /* Flatten the SessionHeaderControls inside the composer footer — drop

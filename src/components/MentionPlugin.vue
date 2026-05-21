@@ -10,7 +10,7 @@
 /// structured attachment — empirically the best signal.
 
 import { computed, onMounted, ref, watch } from "vue";
-import { TextNode, $isTextNode } from "lexical";
+import { TextNode, $createTextNode, $isTextNode } from "lexical";
 import {
   TypeaheadMenuPlugin,
   MenuOption,
@@ -18,6 +18,7 @@ import {
 } from "lexical-vue/LexicalTypeaheadMenuPlugin";
 import { useLexicalComposer } from "lexical-vue/LexicalComposer";
 import { invokeCommand } from "../ipc/invoke";
+import { $createAttachmentNode } from "../lexical/AttachmentNode";
 import type {
   WorkspaceFileMatch,
   SendMessageAttachment,
@@ -33,10 +34,6 @@ class FileOption extends MenuOption {
 
 const props = defineProps<{
   sessionId: string;
-}>();
-
-const emit = defineEmits<{
-  (e: "attach", attachment: SendMessageAttachment): void;
 }>();
 
 const editor = useLexicalComposer();
@@ -97,19 +94,25 @@ function onSelectOption(payload: {
   closeMenu: () => void;
 }) {
   const { option, textNodeContainingQuery, closeMenu } = payload;
-  // Replace the typed "@que" with "@path/to/file " (full relative
-  // path) so the LLM sees the explicit reference inline. The
-  // attachment chip carries the rest.
-  editor.update(() => {
-    if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
-      textNodeContainingQuery.setTextContent(`@${option.match.path} `);
-      textNodeContainingQuery.selectEnd();
-    }
-  });
-  emit("attach", {
+  // Replace the typed "@que" with an inline AttachmentNode pill so the
+  // file reference reads as `text text (path/to/file) text` instead of
+  // raw `@path/to/file `. The pill carries the structured attachment
+  // payload, and its text content (`(filename)`) flows through the
+  // standard markdown serializer.
+  const attachment: SendMessageAttachment = {
     type: "file",
     path: option.match.absolutePath,
     displayName: option.match.path,
+  };
+  editor.update(() => {
+    if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
+      const pill = $createAttachmentNode(attachment);
+      textNodeContainingQuery.replace(pill);
+      // Trailing space so the caret lands after the pill ready for more text.
+      const space = $createTextNode(" ");
+      pill.insertAfter(space);
+      space.selectEnd();
+    }
   });
   closeMenu();
 }
