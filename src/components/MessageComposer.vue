@@ -44,7 +44,11 @@ import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
 import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 import type { DefaultSendMode } from "../stores/sessionsStore";
+import type { SendMessageAttachment } from "../ipc/types";
+import { useToastStore } from "../stores/toastStore";
 import SlashCommandPlugin from "./SlashCommandPlugin.vue";
+import MentionPlugin from "./MentionPlugin.vue";
+import AttachmentStrip from "./AttachmentStrip.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -74,11 +78,96 @@ const diagEnabled =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).has("diag");
 
+/// Pending attachments queued by the @file typeahead, drag/drop, and
+/// paste. Cleared on submit. Each entry is an SDK-shaped attachment
+/// the parent will pass through `sendMessage`.
+const attachments = ref<SendMessageAttachment[]>([]);
+const toasts = useToastStore();
+
+function addAttachment(a: SendMessageAttachment): void {
+  // Dedup: file attachments by path, blobs/selections by displayName
+  // (good enough — exact-duplicate detection isn't worth a hash).
+  if (a.type === "file") {
+    if (attachments.value.some((x) => x.type === "file" && x.path === a.path)) {
+      return;
+    }
+  } else if (a.type === "blob") {
+    if (
+      attachments.value.some(
+        (x) =>
+          x.type === "blob" &&
+          x.displayName === a.displayName &&
+          x.data === a.data,
+      )
+    ) {
+      return;
+    }
+  }
+  attachments.value.push(a);
+}
+
+function removeAttachment(idx: number): void {
+  attachments.value.splice(idx, 1);
+}
+
+const MAX_BLOB_BYTES = 8 * 1024 * 1024; // 8 MiB safety cap
+
+/// Read a File/Blob into a base64 SDK blob attachment. Wraps the
+/// FileReader API in a promise so drag-drop / paste handlers stay
+/// flat.
+async function blobFromFile(file: File): Promise<SendMessageAttachment | null> {
+  if (file.size > MAX_BLOB_BYTES) {
+    toasts.warn(
+      "File too large",
+      `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MiB. Max is 8 MiB.`,
+    );
+    return null;
+  }
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  // Chunk to avoid stack overflows on String.fromCharCode(...big-array).
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  const data = btoa(bin);
+  return {
+    type: "blob",
+    data,
+    mimeType: file.type || "application/octet-stream",
+    displayName: file.name,
+  };
+}
+
+async function onDrop(event: DragEvent): Promise<void> {
+  event.preventDefault();
+  const files = event.dataTransfer?.files;
+  if (!files || files.length === 0) return;
+  for (const f of Array.from(files)) {
+    const a = await blobFromFile(f);
+    if (a) addAttachment(a);
+  }
+}
+
+async function onPaste(event: ClipboardEvent): Promise<void> {
+  const items = event.clipboardData?.items;
+  if (!items) return;
+  for (const item of Array.from(items)) {
+    if (item.kind !== "file") continue;
+    const f = item.getAsFile();
+    if (!f) continue;
+    event.preventDefault();
+    const a = await blobFromFile(f);
+    if (a) addAttachment(a);
+  }
+}
+
 /// Emits a discriminated submit payload identifying which send mode
 /// the user invoked. The parent (`ChatWindow`) maps it to the
 /// session-store action.
 const emit = defineEmits<{
-  (e: "submit", payload: ComposerSubmitPayload): void;
+  (e: "submit", payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }): void;
   (e: "update:defaultMode", mode: DefaultSendMode): void;
 }>();
 
@@ -148,7 +237,16 @@ const initialConfig = computed(() => ({
 }));
 
 function onSubmit(payload: ComposerSubmitPayload) {
-  emit("submit", payload);
+  const merged: ComposerSubmitPayload & {
+    attachments?: SendMessageAttachment[];
+  } = {
+    ...payload,
+    ...(attachments.value.length > 0
+      ? { attachments: [...attachments.value] }
+      : {}),
+  };
+  attachments.value = [];
+  emit("submit", merged);
 }
 
 /// Dropdown items for the SplitButton — let the user change the
@@ -256,7 +354,11 @@ const SubmitButton = defineComponent({
 </script>
 
 <template>
-  <div class="lex-composer">
+  <div class="lex-composer" @dragover.prevent @drop="onDrop">
+    <AttachmentStrip
+      :attachments="attachments"
+      @remove="removeAttachment"
+    />
     <LexicalComposer :initial-config="initialConfig">
       <EditableSync :editable="editable" />
       <SubmitOnEnter @submit="onSubmit" />
@@ -265,12 +367,17 @@ const SubmitButton = defineComponent({
         v-if="props.sessionId"
         :session-id="props.sessionId"
       />
+      <MentionPlugin
+        v-if="props.sessionId"
+        :session-id="props.sessionId"
+        @attach="addAttachment"
+      />
       <!-- Optional leading content rendered inside the composer's flex
            row, before the input shell. Chat surfaces use this to host
            the run-mode segmented control so it shares the composer's
            border-top, padding, and height alignment. -->
       <slot name="leading" />
-      <div class="lex-composer-shell">
+      <div class="lex-composer-shell" @paste="onPaste">
         <template v-if="richText">
           <RichTextPlugin>
             <template #contentEditable>

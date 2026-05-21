@@ -606,7 +606,9 @@ export const useSessionsStore = defineStore("sessions", () => {
     sessionId: string,
     text: string,
     mode: SendMode = "steer",
+    attachments?: import("../ipc/types").SendMessageAttachment[],
   ): Promise<void> {
+    const atts = attachments && attachments.length > 0 ? attachments : undefined;
     if (mode === "interrupt") {
       try {
         await invokeCommand("abortSession", { sessionId });
@@ -614,11 +616,20 @@ export const useSessionsStore = defineStore("sessions", () => {
         const message = err instanceof Error ? err.message : String(err);
         useToastStore().warn("Abort failed; sending anyway", message);
       }
-      await invokeCommand("sendMessage", { sessionId, text });
+      await invokeCommand("sendMessage", {
+        sessionId,
+        text,
+        ...(atts ? { attachments: atts } : {}),
+      });
       return;
     }
     const sdkMode = mode === "steer" ? "immediate" : "enqueue";
-    await invokeCommand("sendMessage", { sessionId, text, mode: sdkMode });
+    await invokeCommand("sendMessage", {
+      sessionId,
+      text,
+      mode: sdkMode,
+      ...(atts ? { attachments: atts } : {}),
+    });
   }
 
   async function abortSession(sessionId: string): Promise<void> {

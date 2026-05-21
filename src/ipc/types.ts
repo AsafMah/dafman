@@ -74,6 +74,30 @@ export interface SessionMetadataSummary {
   branch?: string;
 }
 
+/// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged.
+/// Mirrored here so the renderer can construct without importing the
+/// SDK types directly. Pass-through to bun → SDK at send time.
+export type SendMessageAttachment =
+  | { type: "file"; path: string; displayName?: string }
+  | { type: "directory"; path: string; displayName?: string }
+  | {
+      type: "selection";
+      filePath: string;
+      displayName: string;
+      selection?: {
+        start: { line: number; character: number };
+        end: { line: number; character: number };
+      };
+      text?: string;
+    }
+  | { type: "blob"; data: string; mimeType: string; displayName?: string };
+
+export interface WorkspaceFileMatch {
+  path: string;
+  absolutePath: string;
+  name: string;
+}
+
 export interface SessionEventPayload {
   sessionId: string;
   eventType: string;
@@ -187,8 +211,13 @@ export type CommandMap = {
       sessionId: string;
       text: string;
       mode?: "enqueue" | "immediate";
+      attachments?: SendMessageAttachment[];
     };
     result: string;
+  };
+  searchWorkspaceFiles: {
+    args: { sessionId: string; query: string; limit?: number };
+    result: WorkspaceFileMatch[];
   };
   abortSession: { args: { sessionId: string }; result: string };
   listModels: { args: Record<string, never>; result: ModelSummary[] };

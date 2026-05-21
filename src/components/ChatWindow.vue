@@ -223,7 +223,11 @@ watch(
 /// while a turn is in flight is the whole point of this feature.
 /// The optimistic user bubble still appears immediately; the SDK
 /// reconciles it with the eventual `user.message` echo.
-async function sendMessage(payload: ComposerSubmitPayload) {
+async function sendMessage(
+  payload: ComposerSubmitPayload & {
+    attachments?: import("../ipc/types").SendMessageAttachment[];
+  },
+) {
   if (!payload.text) return;
   const concreteMode =
     payload.mode === "default" ? props.defaultSendMode : payload.mode;
@@ -240,6 +244,7 @@ async function sendMessage(payload: ComposerSubmitPayload) {
         props.sessionId,
         payload.text,
         concreteMode,
+        payload.attachments,
       );
     }
   } catch (error) {

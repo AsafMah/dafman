@@ -28,13 +28,16 @@ import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
 import { buildBuiltInTools } from "./tools";
+import { searchWorkspaceFiles } from "./fileSearch";
 import type {
 	ElicitationRequestData,
 	PendingRequestPayload,
 	PermissionRequestData,
 	RespondToRequestParams,
+	SendMessageAttachment,
 	SessionEventPayload, SessionMetadataSummary, SessionHistoryCompactionResult, SessionMode,
 	UserInputRequestData,
+	WorkspaceFileMatch,
 } from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
@@ -593,6 +596,7 @@ export class SessionRegistry {
 		sessionId: string,
 		text: string,
 		mode?: "enqueue" | "immediate",
+		attachments?: SendMessageAttachment[],
 	): Promise<string> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);
@@ -600,10 +604,46 @@ export class SessionRegistry {
 			return await entry.session.send({
 				prompt: text,
 				...(mode ? { mode } : {}),
+				...(attachments && attachments.length > 0
+					? { attachments: attachments as Parameters<typeof entry.session.send>[0]["attachments"] }
+					: {}),
 			});
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
+	}
+
+	/// File-typeahead search backing the composer's `@file` mention
+	/// plugin. Resolves the session's working directory and delegates
+	/// to the shared workspace-files index (`app/fileSearch.ts`).
+	async searchWorkspaceFiles(
+		sessionId: string,
+		query: string,
+		limit = 40,
+	): Promise<WorkspaceFileMatch[]> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) return [];
+		const cwd = await this.cwdFor(sessionId);
+		if (!cwd) return [];
+		return searchWorkspaceFiles(cwd, query, limit);
+	}
+
+	/// Resolve the session's working directory. Tries the workspace
+	/// catalog first (cheap, in-memory), then falls back to
+	/// `session.getWorkingDirectory()` if the SDK exposes it. Returns
+	/// undefined when the session has no associated cwd (which is
+	/// rare — most sessions are created with one).
+	private async cwdFor(sessionId: string): Promise<string | undefined> {
+		const client = tryGetClient();
+		if (!client) return undefined;
+		try {
+			const summaries = await client.listSessions();
+			const summary = summaries.find((s) => s.sessionId === sessionId);
+			if (summary?.cwd) return summary.cwd;
+		} catch {
+			// Ignore catalog-read failures; the cwd is best-effort.
+		}
+		return undefined;
 	}
 
 	async abort(sessionId: string): Promise<string> {

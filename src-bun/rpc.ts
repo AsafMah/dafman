@@ -119,6 +119,35 @@ export interface SessionMetadataSummary {
 	branch?: string;
 }
 
+/// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged
+/// that the renderer can construct. Mirrors the SDK union so we can
+/// pass straight through `session.send({ attachments })` without
+/// re-shaping on the bun side.
+export type SendMessageAttachment =
+	| { type: "file"; path: string; displayName?: string }
+	| { type: "directory"; path: string; displayName?: string }
+	| {
+			type: "selection";
+			filePath: string;
+			displayName: string;
+			selection?: {
+				start: { line: number; character: number };
+				end: { line: number; character: number };
+			};
+			text?: string;
+	  }
+	| { type: "blob"; data: string; mimeType: string; displayName?: string };
+
+/// One file result from `searchWorkspaceFiles`. `path` is relative
+/// to the session's working directory so the renderer renders
+/// compactly; `absolutePath` is the resolved fs path bun uses to
+/// build SDK attachments at send-time.
+export interface WorkspaceFileMatch {
+	path: string;
+	absolutePath: string;
+	name: string;
+}
+
 /// Wire-format for a single SDK session event.
 /// `eventType` mirrors the SDK's discriminated-union `type` field; `data`
 /// carries the full event object verbatim so the frontend can pick out
@@ -274,8 +303,28 @@ export type DafmanRPC = {
 					/// in-flight turn; `"immediate"` injects into the
 					/// running turn (steer). Omitted → SDK default.
 					mode?: "enqueue" | "immediate";
+					/// Optional SDK attachments — files / directories /
+					/// selections / blobs (base64 data + mimeType for
+					/// pasted images). Mirrors `MessageOptions.attachments`
+					/// in copilot-sdk-supercharged.
+					attachments?: SendMessageAttachment[];
 				};
 				response: string;
+			};
+			/// Search files in a session's working directory by
+			/// fuzzy-substring match on the filename. Used by the
+			/// composer's `@file` typeahead. Returns relative paths
+			/// (to the session cwd) so the renderer can render them
+			/// compactly; bun resolves to absolute paths when
+			/// attaching on send.
+			searchWorkspaceFiles: {
+				params: {
+					sessionId: string;
+					query: string;
+					/// Hard cap on returned results. Default 40.
+					limit?: number;
+				};
+				response: WorkspaceFileMatch[];
 			};
 			/// Aborts the currently-running turn for this session. The
 			/// session remains valid; new sends after this point start a
