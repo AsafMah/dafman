@@ -41,6 +41,12 @@ export type SessionRecord = {
   /// visually distinct.
   accent: string;
   events: SessionEventPayload[];
+  /// Number of events dropped from the FRONT of `events` to keep the
+  /// per-session memory bounded. Consumers (ChatWindow) compute their
+  /// absolute progress as `droppedEventCount + events.length` so a
+  /// trim doesn't cause them to re-process or miss events. See
+  /// MAX_EVENTS_PER_SESSION below.
+  droppedEventCount: number;
   /// Currently-selected model id; `null` until the user picks one or a
   /// `session.model_change` event arrives.
   model: string | null;
@@ -140,6 +146,17 @@ const pendingEvents = new Map<string, SessionEventPayload[]>();
 const pendingRequestBuffer = new Map<string, PendingRequestPayload[]>();
 const MAX_PENDING_PER_SESSION = 5000;
 
+/// Per-session live-events cap. Every push above this trims the
+/// FRONT of `record.events` and bumps `record.droppedEventCount` by
+/// the same amount. Bounded so a long autopilot session can't grow
+/// the in-memory event log without limit (the cooked transcript in
+/// the chat reducer is independent of this — once an event is
+/// processed into `items`, the raw event isn't strictly needed).
+/// 5000 covers ~250 normal-turn sessions worth of events at typical
+/// ~20 events/turn — way more than any single window of recent
+/// activity a user would scroll, while still capping RAM.
+export const MAX_EVENTS_PER_SESSION = 5000;
+
 /// Sentinel session id used by `src/dev/Playground.vue` to exercise
 /// the PendingRequestModal without a real bun-side handler. The
 /// store's `respondToPending` short-circuits the RPC call when the
@@ -201,8 +218,23 @@ export const useSessionsStore = defineStore("sessions", () => {
     applyToRecord(record, payload);
   }
 
-  function applyToRecord(record: SessionRecord, payload: SessionEventPayload): void {
+  /// Push an event onto the record's event log, trimming the front
+  /// when it overflows MAX_EVENTS_PER_SESSION. `droppedEventCount`
+  /// tracks how many events have been discarded from the front since
+  /// session start so consumers (`ChatWindow.flush`) can compute their
+  /// absolute progress instead of an index that would shift with each
+  /// trim. Centralised so every push site bounds memory automatically.
+  function appendEvent(record: SessionRecord, payload: SessionEventPayload): void {
     record.events.push(payload);
+    if (record.events.length > MAX_EVENTS_PER_SESSION) {
+      const overflow = record.events.length - MAX_EVENTS_PER_SESSION;
+      record.events.splice(0, overflow);
+      record.droppedEventCount += overflow;
+    }
+  }
+
+  function applyToRecord(record: SessionRecord, payload: SessionEventPayload): void {
+    appendEvent(record, payload);
 
     if (import.meta.env.DEV) {
       console.debug("[session-event]", payload.eventType, payload.data);
@@ -386,7 +418,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     // Also push a synthetic `dafman.pending_request` event into the
     // record's event buffer so the reducer (which only sees the
     // event stream) builds the same queue inside `ChatAmbient`.
-    record.events.push({
+    appendEvent(record, {
       sessionId: record.id,
       eventType: "dafman.pending_request",
       data: payload as unknown as Record<string, unknown>,
@@ -454,6 +486,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         id,
         accent,
         events: [],
+        droppedEventCount: 0,
         model: null,
         reasoningEffort: null,
         title: null,
@@ -529,6 +562,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         id: actualId,
         accent,
         events: [],
+        droppedEventCount: 0,
         model: null,
         reasoningEffort: null,
         title: null,
@@ -752,7 +786,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       });
       if (record) {
         record.workingDirectory = next;
-        record.events.push({
+        appendEvent(record, {
           sessionId,
           eventType: "system.notification",
           data: { content: `Working directory changed to ${next}` },
@@ -942,7 +976,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         (p) => p.requestId === params.requestId,
       );
       if (idx >= 0) record.pendingRequests.splice(idx, 1);
-      record.events.push({
+      appendEvent(record, {
         sessionId: record.id,
         eventType: "dafman.pending_response",
         data: { requestId: params.requestId, kind: params.response.kind },
@@ -983,6 +1017,10 @@ export const useSessionsStore = defineStore("sessions", () => {
     setSessionName,
     setSessionReasoningOverride,
     respondToPending,
+    /// Exported so callers outside the store (e.g. slash-command
+    /// handlers in `lib/sessionCommands.ts`) can push synthetic
+    /// events while still bounding the per-session log.
+    appendEvent,
   };
 });
 

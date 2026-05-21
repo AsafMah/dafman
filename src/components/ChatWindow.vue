@@ -40,6 +40,12 @@ const props = defineProps<{
   sessionId: string;
   accent: string;
   events: SessionEventPayload[];
+  /// Monotonic count of events trimmed from the FRONT of `events`
+  /// since the session record was created. Required so we can compute
+  /// absolute progress (`droppedEventCount + events.length`) and
+  /// survive ring-buffer trims without re-processing or missing
+  /// events. Defaults to 0 (caller untouched by trims).
+  droppedEventCount?: number;
   /// Per-session override for reasoning visibility (`"default"` =
   /// inherit from app settings). Sourced from `SessionRecord` so the
   /// controls (rendered in the dockview tab strip) can mutate it from
@@ -120,7 +126,13 @@ onBeforeUnmount(() => {
 /// the first `assistant.turn_start` we trust `ambient.turnActive` exclusively.
 const isSendingFallback = ref(false);
 const idCounter: IdCounter = { next: 1 };
-let processedEvents = 0;
+/// Absolute position in the session's event stream that we've already
+/// reduced into `items`. Computed as `droppedEventCount + events.length`
+/// AFTER the reducer pass, so the next flush picks up only events
+/// that arrived since. Survives the store's ring-buffer trim (which
+/// bumps droppedEventCount and shifts `events`) without re-processing
+/// or skipping anything.
+let processedAbsolute = 0;
 
 const isSending = computed(() =>
   ambient.value.sawTurnBoundary ? ambient.value.turnActive : isSendingFallback.value,
@@ -178,10 +190,16 @@ function scheduleFlush(): void {
 }
 
 function flush(): void {
-  const len = props.events.length;
-  if (processedEvents >= len) return;
-  const fresh = props.events.slice(processedEvents);
-  processedEvents = len;
+  const dropped = props.droppedEventCount ?? 0;
+  const target = dropped + props.events.length;
+  if (processedAbsolute >= target) return;
+  // Slice index inside the (possibly trimmed) events array. clamped
+  // to 0 in case the ring buffer trimmed events we hadn't processed
+  // yet — those are lost, but the cap is high enough that this only
+  // happens for surfaces that mount very late in a long session.
+  const startIdx = Math.max(0, processedAbsolute - dropped);
+  const fresh = props.events.slice(startIdx);
+  processedAbsolute = target;
   const live = !isFirstBatch;
   isFirstBatch = false;
   const result = processEvents(items.value, ambient.value, fresh, idCounter, {
@@ -217,7 +235,11 @@ function flush(): void {
 }
 
 watch(
-  () => props.events.length,
+  // Watch the absolute target (dropped + length). Trimming the ring
+  // buffer leaves `events.length` unchanged but bumps
+  // droppedEventCount — without including it here we'd miss the
+  // flush for events that arrive once the buffer is at its cap.
+  () => (props.droppedEventCount ?? 0) + props.events.length,
   () => scheduleFlush(),
   { immediate: true },
 );
@@ -235,7 +257,7 @@ watch(
     items.value = [];
     ambient.value = defaultAmbient();
     isSendingFallback.value = false;
-    processedEvents = props.events.length;
+    processedAbsolute = (props.droppedEventCount ?? 0) + props.events.length;
   },
 );
 
@@ -319,7 +341,7 @@ async function onEditorSave(eventId: string, newText: string): Promise<void> {
     await sessionsStore.editUserMessage(props.sessionId, eventId, newText);
     items.value = [];
     ambient.value = defaultAmbient();
-    processedEvents = 0;
+    processedAbsolute = 0;
     isFirstBatch = true;
     isSendingFallback.value = true;
     await scrollToBottom();

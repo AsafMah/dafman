@@ -91,6 +91,7 @@ function dismissPanel() {
     :session-id="record.id"
     :accent="record.accent"
     :events="record.events"
+    :dropped-event-count="record.droppedEventCount"
     :reasoning-visibility-override="record.reasoningVisibilityOverride"
     :default-send-mode="record.defaultSendMode"
   />

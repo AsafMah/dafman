@@ -51,7 +51,7 @@ function pushLocalSystem(sessionId: string, text: string): void {
 	const sessions = useSessionsStore();
 	const record = sessions.sessions.find((s) => s.id === sessionId);
 	if (!record) return;
-	record.events.push({
+	sessions.appendEvent(record, {
 		sessionId,
 		eventType: "system.notification",
 		data: { content: text },

@@ -806,6 +806,7 @@ function ensurePlaygroundSession(): SessionRecord {
     id: PLAYGROUND_PENDING_SESSION_ID,
     accent: accentForIndex(99),
     events: [],
+    droppedEventCount: 0,
     model: null,
     reasoningEffort: null,
     title: "Playground",
