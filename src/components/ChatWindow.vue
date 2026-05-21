@@ -156,51 +156,78 @@ async function scrollToBottom() {
 
 let isFirstBatch = true;
 
+/// rAF-coalesced flush. Each event arrives as its own IPC frame —
+/// during session hydration that's 30-80+ frames in quick succession.
+/// Without coalescing we'd run processEvents O(N²) times (N=length on
+/// each push) and remount the whole CM6/Lexical tree per chunk. By
+/// gating the work behind requestAnimationFrame we collapse all
+/// events that landed in the same frame into a single reducer pass.
+let pendingFlush: number | null = null;
+function scheduleFlush(): void {
+  if (pendingFlush !== null) return;
+  if (typeof requestAnimationFrame === "undefined") {
+    // Test environments (jsdom etc.) — flush synchronously so the
+    // existing chatEvents tests don't have to wait for a frame.
+    flush();
+    return;
+  }
+  pendingFlush = requestAnimationFrame(() => {
+    pendingFlush = null;
+    flush();
+  });
+}
+
+function flush(): void {
+  const len = props.events.length;
+  if (processedEvents >= len) return;
+  const fresh = props.events.slice(processedEvents);
+  processedEvents = len;
+  const live = !isFirstBatch;
+  isFirstBatch = false;
+  const result = processEvents(items.value, ambient.value, fresh, idCounter, {
+    live,
+  });
+  items.value = result.items;
+  ambient.value = result.ambient;
+  if (result.idle || result.error) isSendingFallback.value = false;
+  for (const t of result.toasts) {
+    switch (t.severity) {
+      case "success":
+        toasts.success(t.summary, t.detail);
+        break;
+      case "warn":
+        toasts.warn(t.summary, t.detail);
+        break;
+      case "error":
+        toasts.error(t.summary, t.detail);
+        break;
+      default:
+        toasts.info(t.summary, t.detail);
+    }
+  }
+  if (result.error && live) {
+    const lastSystem = [...result.items]
+      .reverse()
+      .find((i) => i.kind === "system" && i.severity === "error");
+    if (lastSystem && lastSystem.kind === "system") {
+      toasts.error("Session error", lastSystem.text);
+    }
+  }
+  scrollToBottom();
+}
+
 watch(
   () => props.events.length,
-  (len) => {
-    if (processedEvents >= len) return;
-    const fresh = props.events.slice(processedEvents);
-    processedEvents = len;
-    // The very first batch is replay (history hydrated from
-    // `getMessages()` + any in-flight live events that already
-    // arrived). Skip "Model changed" toasts during it — they're
-    // already-happened changes, not actionable signal.
-    const live = !isFirstBatch;
-    isFirstBatch = false;
-    const result = processEvents(items.value, ambient.value, fresh, idCounter, {
-      live,
-    });
-    items.value = result.items;
-    ambient.value = result.ambient;
-    if (result.idle || result.error) isSendingFallback.value = false;
-    for (const t of result.toasts) {
-      switch (t.severity) {
-        case "success":
-          toasts.success(t.summary, t.detail);
-          break;
-        case "warn":
-          toasts.warn(t.summary, t.detail);
-          break;
-        case "error":
-          toasts.error(t.summary, t.detail);
-          break;
-        default:
-          toasts.info(t.summary, t.detail);
-      }
-    }
-    if (result.error && live) {
-      const lastSystem = [...result.items]
-        .reverse()
-        .find((i) => i.kind === "system" && i.severity === "error");
-      if (lastSystem && lastSystem.kind === "system") {
-        toasts.error("Session error", lastSystem.text);
-      }
-    }
-    scrollToBottom();
-  },
+  () => scheduleFlush(),
   { immediate: true },
 );
+
+onBeforeUnmount(() => {
+  if (pendingFlush !== null && typeof cancelAnimationFrame !== "undefined") {
+    cancelAnimationFrame(pendingFlush);
+    pendingFlush = null;
+  }
+});
 
 watch(
   () => props.sessionId,
