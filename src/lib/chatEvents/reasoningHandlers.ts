@@ -43,7 +43,8 @@ export const reasoningHandlers: Record<string, Handler> = {
       "reasoningText",
       "reasoning_text",
     ]);
-    if (!content) {
+    const opaque = pickString(data, ["reasoningOpaque", "reasoning_opaque"]);
+    if (!content && !opaque) {
       const hasExistingItem =
         reasoningId &&
         ctx.items.some(
@@ -54,7 +55,17 @@ export const reasoningHandlers: Record<string, Handler> = {
     const key = reasoningId || REASONING_SINGLETON_KEY;
     const msg = ctx.upsertReasoning(key, payload.eventId);
     if (msg.kind === "reasoning") {
-      msg.text = content || msg.text;
+      if (content) {
+        msg.text = content;
+        // A readable reasoning override clears the opaque flag — the
+        // model produced an actual text we can show.
+        if (msg.opaque) msg.opaque = false;
+      } else if (opaque && !msg.text) {
+        // Encrypted reasoning (GPT-5.x). Mark the item so
+        // ReasoningBlock can render the privacy placeholder instead
+        // of an empty "Thinking..." bubble that stays empty forever.
+        msg.opaque = true;
+      }
     }
   },
 };

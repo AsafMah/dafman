@@ -281,6 +281,89 @@ describe("processEvents", () => {
   });
 });
 
+describe("processEvents — reasoning_opaque (GPT-5.x encrypted reasoning)", () => {
+  test("assistant.reasoning with reasoningOpaque but no text marks item opaque", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.reasoning",
+          data: {
+            reasoningId: "r1",
+            reasoningOpaque: "encrypted-blob-base64",
+          },
+          eventId: "evt-r-1",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    const item = result.items[0];
+    expect(item?.kind).toBe("reasoning");
+    if (item?.kind === "reasoning") {
+      expect(item.opaque).toBe(true);
+      expect(item.text).toBe("");
+    }
+  });
+
+  test("readable reasoningText supersedes a prior opaque mark on the same id", () => {
+    const counter: IdCounter = { next: 1 };
+    const opaqueOnly = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.reasoning",
+          data: { reasoningId: "r1", reasoningOpaque: "encrypted" },
+          eventId: "evt-r-1",
+        },
+      ],
+      counter,
+    );
+    const withText = processEvents(
+      opaqueOnly.items,
+      opaqueOnly.ambient,
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.reasoning",
+          data: { reasoningId: "r1", reasoningText: "thinking visibly now" },
+          eventId: "evt-r-2",
+        },
+      ],
+      counter,
+    );
+    const item = withText.items[0];
+    expect(item?.kind).toBe("reasoning");
+    if (item?.kind === "reasoning") {
+      expect(item.text).toBe("thinking visibly now");
+      expect(item.opaque).toBe(false);
+    }
+  });
+
+  test("empty reasoning with neither text nor opaque is still ignored", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.reasoning",
+          data: { reasoningId: "r1" },
+          eventId: "evt-r-1",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(0);
+  });
+});
+
 describe("processEvents — fork notices", () => {
   test("session.info infoType=fork (source) parses into a forkNotice item", () => {
     const counter: IdCounter = { next: 1 };

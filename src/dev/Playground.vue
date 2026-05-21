@@ -1186,6 +1186,19 @@ const scriptsByGroup = computed(() => {
 });
 
 const activeTab = ref<"session" | "tools" | "pending" | "markdown" | "callouts" | "toasts" | "custom">("tools");
+
+/// Quick theme preview toggle. Flips the `.app-dark` class directly
+/// on `<html>` so we can preview both palettes without leaving the
+/// dev panel. Initialized from whatever applyThemeClass set so the
+/// toggle starts in sync with the user's chosen theme.
+const isDarkPreview = ref(
+  typeof document !== "undefined" &&
+    document.documentElement.classList.contains("app-dark"),
+);
+function toggleDarkPreview() {
+  isDarkPreview.value = !isDarkPreview.value;
+  document.documentElement.classList.toggle("app-dark", isDarkPreview.value);
+}
 </script>
 
 <template>
@@ -1193,6 +1206,17 @@ const activeTab = ref<"session" | "tools" | "pending" | "markdown" | "callouts" 
     <header class="playground-header">
       <div class="playground-title">
         <h1>Dev Playground</h1>
+        <Button
+          :icon="isDarkPreview ? 'pi pi-sun' : 'pi pi-moon'"
+          :label="isDarkPreview ? 'Light' : 'Dark'"
+          size="small"
+          severity="secondary"
+          text
+          rounded
+          aria-label="Toggle dark preview"
+          class="playground-theme-toggle"
+          @click="toggleDarkPreview"
+        />
       </div>
       <p class="muted">
         Dev-only surface for exercising chat components in isolation.

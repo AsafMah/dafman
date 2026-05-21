@@ -7,11 +7,20 @@ import MessageContent from "./MessageContent.vue";
 const props = defineProps<{
   text: string;
   visibility: ReasoningVisibility;
+  /// True when the SDK only supplied encrypted (`reasoningOpaque`)
+  /// reasoning — text is empty by design. Render a privacy placeholder
+  /// instead of an empty bubble or stuck "Thinking..." preview.
+  opaque?: boolean;
 }>();
 
 const expanded = ref(false);
 
+const OPAQUE_PREVIEW = "Reasoned privately (encrypted by the model)";
+const OPAQUE_BODY =
+  "This model used encrypted reasoning. The thinking happened — the SDK just doesn't expose it as readable text. Tokens are billed against your reasoning budget all the same.";
+
 const preview = computed(() => {
+  if (props.opaque) return OPAQUE_PREVIEW;
   const firstLine = props.text.split("\n", 1)[0] ?? "";
   return firstLine.length > 120 ? `${firstLine.slice(0, 120)}...` : firstLine;
 });
@@ -56,7 +65,7 @@ const showFull = computed(
     <MessageContent
       v-if="showFull"
       class="reasoning-body"
-      :text="props.text || 'Thinking...'"
+      :text="opaque ? OPAQUE_BODY : (props.text || 'Thinking...')"
       label="Reasoning content"
     />
   </div>

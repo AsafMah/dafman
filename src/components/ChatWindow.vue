@@ -523,6 +523,7 @@ const pendingStyle = computed(() => {
           <ReasoningBlock
             :text="item.text"
             :visibility="reasoningVisibility"
+            :opaque="item.kind === 'reasoning' && item.opaque === true"
           />
           <MessageActions
             kind="reasoning"

@@ -121,6 +121,15 @@ defineExpose({ sync: syncOpenState });
 <template>
   <nav class="activity-bar" aria-label="Activity bar">
     <div class="activity-stack">
+      <a
+        href="#"
+        class="activity-brand"
+        title="Dafman"
+        aria-label="Dafman"
+        @click.prevent
+      >
+        <img src="/dafman.svg" alt="" class="activity-brand-icon" />
+      </a>
       <button
         v-for="item in topItems"
         :key="item.id"
@@ -179,6 +188,26 @@ defineExpose({ sync: syncOpenState });
 .activity-stack-bottom {
   margin-top: auto;
   border-top: 1px solid color-mix(in srgb, var(--p-text-color) 8%, transparent);
+}
+
+.activity-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  margin: 0 0.175rem 0.3rem;
+  border-radius: var(--p-border-radius-md);
+  border-bottom: 1px solid color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  padding-bottom: 0.3rem;
+  text-decoration: none;
+  cursor: default;
+}
+
+.activity-brand-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: block;
 }
 
 .activity-button {

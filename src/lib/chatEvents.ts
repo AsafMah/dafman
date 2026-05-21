@@ -65,6 +65,12 @@ export type ChatItem =
       text: string;
       reasoningId: string;
       eventId?: string;
+      /// True when the SDK supplied `reasoningOpaque` (encrypted
+      /// reasoning content, GPT-5.x and similar models) without any
+      /// readable `reasoningText`/`content`. We can't decrypt the
+      /// payload, but we render a placeholder so the user sees that
+      /// reasoning DID happen, just privately.
+      opaque?: boolean;
     }
   | {
       id: number;

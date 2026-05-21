@@ -58,6 +58,13 @@ const streaming = computed<boolean>({
   },
 });
 
+const enableMermaid = computed<boolean>({
+  get: () => settings.value.appearance.enableMermaid,
+  set: (value) => {
+    void settingsStore.setEnableMermaid(value);
+  },
+});
+
 // ---------- Notifications ----------
 
 /// Two booleans bound to settings.notifications.{turnEnd,waitingForInput}.
@@ -239,6 +246,19 @@ function toggle(id: string) {
             turn. On: text streams in word-by-word (livelier, but can
             jitter under heavy load). Takes effect on the
             <strong>next</strong> session you create.
+          </p>
+        </div>
+        <div class="field field-inline">
+          <label class="field-inline-label">
+            <ToggleSwitch v-model="enableMermaid" />
+            <span>Render mermaid diagrams</span>
+          </label>
+          <p class="field-hint">
+            Off (default): <code>```mermaid</code> fences render as
+            plain code blocks. On: lazy-loads the mermaid library on
+            first use and renders the diagram inline. Adds ~800 KB to
+            the chunk fetched when you first open a chat with a
+            diagram.
           </p>
         </div>
       </div>

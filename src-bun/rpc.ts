@@ -40,6 +40,11 @@ export interface Appearance {
 	/// NEXT session created — existing sessions keep their original
 	/// mode for their lifetime.
 	streaming: boolean;
+	/// Lazy-load mermaid + render ```mermaid``` code fences as
+	/// diagrams. Default false to keep the main bundle slim; opt-in
+	/// via Settings -> Appearance. When false, mermaid fences fall
+	/// through to the standard syntax-highlighted code block.
+	enableMermaid: boolean;
 }
 
 export interface Settings {

@@ -25,7 +25,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 7;
+export const SETTINGS_VERSION = 8;
 /// Hard upper bound on the size of the workspace MRU. Anything beyond
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes
@@ -49,7 +49,7 @@ export function defaultSettings(): Settings {
 		// streaming — the agent's reply lands in one chunk per
 		// `assistant.message` event. Users can opt back in via
 		// Settings → Appearance.
-		appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
+		appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
 		layout: { dockview: null },
 		workspaces: { recent: [], defaultWorkspace: "" },
 		notifications: { turnEnd: false, waitingForInput: true },
@@ -68,7 +68,9 @@ function coerceAppearance(raw: unknown): Appearance {
 		: base.reasoningVisibility;
 	const streaming =
 		typeof obj.streaming === "boolean" ? obj.streaming : base.streaming;
-	return { theme, reasoningVisibility: rv, streaming };
+	const enableMermaid =
+		typeof obj.enableMermaid === "boolean" ? obj.enableMermaid : base.enableMermaid;
+	return { theme, reasoningVisibility: rv, streaming, enableMermaid };
 }
 
 /// Coerces a raw `layout` blob into the canonical shape. The dockview

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Rounded square backdrop with a soft accent gradient. The CSS
+       variables fall back to PrimeVue indigo tokens when the page
+       has no theme variables (e.g. the bare favicon). -->
+  <defs>
+    <linearGradient id="dafman-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#dafman-grad)" />
+  <!-- Stylized D: a vertical stem + half-circle bowl. Drawn flat in
+       SVG to keep the favicon crisp at 16/32 px. -->
+  <path
+    d="M19 18 H32 a14 14 0 0 1 0 28 H19 Z"
+    fill="white"
+  />
+  <rect x="19" y="18" width="6" height="28" fill="white" />
+  <!-- Inner negative-space rectangle so the D reads at small sizes -->
+  <rect x="25" y="24" width="7" height="16" rx="2" fill="url(#dafman-grad)" />
+</svg>

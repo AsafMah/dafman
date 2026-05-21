@@ -26,6 +26,9 @@ export interface Appearance {
   /// final `assistant.message` per turn. Takes effect on the NEXT
   /// session created — existing sessions keep their original mode.
   streaming: boolean;
+  /// Lazy-load mermaid and render ```mermaid``` code fences as
+  /// diagrams. Default false to keep the main bundle slim.
+  enableMermaid: boolean;
 }
 
 export interface Settings {

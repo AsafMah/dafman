@@ -49,7 +49,7 @@ describe("SettingsService", () => {
 			appearance: {
 				theme: "dark" as const,
 				reasoningVisibility: "compact" as const,
-				streaming: false,
+				streaming: false, enableMermaid: false,
 			},
 			layout: { dockview: null },
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
@@ -77,7 +77,7 @@ describe("SettingsService", () => {
 		};
 		await svc.update({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
 			layout: { dockview: blob },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
@@ -202,7 +202,7 @@ describe("SettingsService", () => {
 	test("streaming coercion: explicit true preserved, non-boolean drops to false", () => {
 		const yes = migrate({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact", streaming: true },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: true, enableMermaid: false },
 			layout: { dockview: null },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
@@ -222,7 +222,7 @@ describe("SettingsService", () => {
 	test("notifications coercion drops non-boolean fields", () => {
 		const settings = migrate({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
 			layout: { dockview: null },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: {
@@ -240,7 +240,7 @@ describe("SettingsService", () => {
 	test("notifications: partial overrides preserve missing fields", () => {
 		const settings = migrate({
 			version: SETTINGS_VERSION,
-			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
 			layout: { dockview: null },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: true },

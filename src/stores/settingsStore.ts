@@ -11,8 +11,8 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 7,
-    appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
+    version: 8,
+    appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
     layout: { dockview: null },
     workspaces: { recent: [], defaultWorkspace: "" },
     notifications: { turnEnd: false, waitingForInput: true },
@@ -79,6 +79,20 @@ export const useSettingsStore = defineStore("settings", () => {
       await update({
         ...settings.value,
         appearance: { ...settings.value.appearance, streaming },
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
+  }
+
+  /// Opt-in mermaid diagram rendering. Mermaid is ~800 KB minified;
+  /// keeping this default-off means users who don't need diagrams
+  /// never pay the bundle cost.
+  async function setEnableMermaid(enableMermaid: boolean): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        appearance: { ...settings.value.appearance, enableMermaid },
       });
     } catch {
       /* toast already shown by `update()` */
@@ -172,6 +186,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setTheme,
     setReasoningVisibility,
     setStreaming,
+    setEnableMermaid,
     setNotifications,
     persistLayout,
     recordWorkspaceUse,
