@@ -1,119 +1,323 @@
-# Dafman - Status
-> Live progress board. Update this file whenever you finish a milestone item or learn something that changes direction. Keep entries short; link to commits, issues, and `plans/` for detail.
-**Active milestone:** **M1.5 - Electrobun port** (mid-stream cutover from Tauri; M1 backlog resumes after).
-## How to use this file
-- Tick items in the milestone checklist as PRs land.
-- Add a short "Last completed" line so the next agent knows where to start.
-- Move items between sections; do not silently delete.
-- Prefer linking to commits / files / plans over re-writing rationale.
+# Dafman — Status
+
+> Live progress board. Updated whenever a milestone item ships or direction
+> changes. Move items between sections; **never silently delete history**.
+>
+> See [`DEVLOG.md`](DEVLOG.md) for the session-by-session running log,
+> [`CHANGELOG.md`](CHANGELOG.md) for release notes,
+> [`ARCHITECTURE.md`](ARCHITECTURE.md) for the live architecture snapshot,
+> and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
+> definition-of-done per milestone.
+
+**Active milestone:** **M2 — Messaging power-ups** (closing the tail).
+Most of M1 + M2 shipped; remaining tail is the in-app log viewer, export
+conversation, and the rough edges noted under "Observability tail" below.
+
 ---
-## Last completed
-- **Composer + tab strip alignment + self-review hardening pass.** Two design fixes first: (1) the active `ChatTab`'s 4 px accent rail now lines up with `.chat-tile`'s 4 px left rail (dropped `margin: 0 2px`; inactive tabs add 2 px of left padding so their content x-position stays consistent with active); (2) `ModeButtonGroup` moved off `.composer-row` into a new `#leading` slot on `MessageComposer` so it shares the composer's `border-top` + padding + flex row, and was restyled to use the session accent (idle 8 % tint, selected full accent fill — mirrors SubmitButton). Then a self-review pass executed 5 small/medium findings: defensive guard on `SessionRegistry.forward` against malformed `event.data` (+ 1 regression test), rAF-coalesced `ResizeObserver` in `ChatWindow` with frame cancel on unmount, global `app.config.errorHandler` routing Vue errors through the existing `console.error` interceptor (no double-log), dead `_workingDirectory` param removed from `composePanelTitle` + 3 call sites, and `fenced()` extracted to `src/lib/markdown.ts` with dynamic fence length so tool output containing ``` no longer closes the block early (+ 6 unit tests). `bun run lint` + `bun test` (98 pass) green; full `bun run check` electrobun build blocked only by a `build/dev-win-x64` file lock from a still-running `electrobun dev` process, unrelated to the diff.
-- **Two papercut fixes.** (1) **Empty "..." Assistant card before tool calls.** `assistant.message_start` creates an empty item in the reducer before any deltas; when the turn went straight to a tool call, the renderer fell back to `"..."`. `ChatWindow.vue` now skips assistant items whose `text === ""`, and the pending "Thinking…" spinner stays visible until a non-empty assistant exists. (2) **`[CLI subprocess] AttachConsole failed` stack-trace spam on Windows.** node-pty's `conpty_console_list_agent.js` crashes during module init when bun (under Electrobun GUI) has no Windows console; the SDK relayed the multi-line trace to our stderr on every run. New `src-bun/app/stderrFilter.ts` patches `process.stderr.write` to drop the known noise lines and route the rest of `[CLI subprocess] *` into `log.debug` (preserved in the JSON log file for diagnostics). Installed in `src-bun/index.ts` right after `initLogger`, before the SDK spawns the CLI. Tested.
-- **Per-session workspace (cwd) — inline + persisted MRU.** Topbar now has an inline PrimeVue `AutoComplete` (path input) next to the folder picker + "New Session" button — no modal. Chosen path → `createSession` → SDK `SessionConfig.workingDirectory`; empty falls back to bun process cwd. Native folder picker via Electrobun `Utils.openFileDialog({ canChooseDirectory: true })`, surfaced as `pickFolder` RPC. `SessionRecord.workingDirectory` is also backfilled from `session.start` `data.context.cwd`, so resumed sessions display the path the CLI remembers; shown in the options popover (`SessionHeaderControls.vue`). MRU is persisted across runs: Settings bumped v3 → v4 with `workspaces: { recent: string[] }` (cap 10, deduped, trimmed). `settingsStore.recordWorkspaceUse(path)` bumps the entry to the head on every successful create. Tests cover v2 → v4 and v3 → v4 migrations (empty MRU), coercion (non-string/whitespace dropped, dedupe, cap), and the pre-existing `SessionRegistry > create forwards workingDirectory` case verifying empty/whitespace inputs aren't forwarded.
-- **Dockview shell hardening pass.** Three follow-ups to the dockview body that landed together: (1) Startup-restore race — `<DockviewVue @ready>` fires on the *child's* `onMounted` (before parent), so `pendingRestoreLayout` was always null at the point `onDockReady` checked it; `restoreFromLayout` now applies the layout immediately when `layoutStore.api` is up, else stashes for the fallback path. (2) Killed the "Session not loaded" blank pane — we no longer prune the persisted layout JSON when resume fails; `ChatPanel.vue` instead renders a friendly orphan UI (`pi-inbox` + truncated id + "Start new session here" / "Close tab" buttons) backed by a new `layoutStore.replaceMissingPanel(orphanId, newSessionId)` that adds the new session as a tab in the orphan's group and removes the orphan. (3) Normalized the dockview-vue prop-shape gotcha in `ChatPanel.vue`: dockview-vue re-wraps panel props into a single `params` prop after the first `update()` (so user params is at `props.params.params`, panel api at `props.params.api`, and the top-level `api` prop is missing), and that update fires before our component reads — every restored panel was rendering the orphan UI even though the session had resumed cleanly. The component now resolves `userParams = props.params.params ?? props.params` and `panelApi = props.api ?? props.params.api`. Memory stored so future panel components don't trip the same wire.
-- **New sessions tile by default.** `layoutStore.addPanel(sessionId, opts?)` drops new sessions as a new group to the right of the active one (`direction: "right"`), with a new `targetGroupId` option for the orphan-replacement path (`direction: "within"`). First-panel falls back to dockview's default.
-- **Dockview chrome matches the app shell.** `src/style.css` bridges `--dv-*` to PrimeVue tokens (`--p-content-background` / `--p-surface-*` / `--p-text-color` / `--p-text-muted-color` / `--p-content-border-color`) for both `.dockview-theme-light` and `.dockview-theme-dark`.
-- **Per-session SDK options popover** (PR #1, merged into this branch). New gear button in the chat header opens a Popover with: Run mode (interactive / plan / autopilot), Reasoning view (default / hidden / compact / expanded), Rename session, Compact history, Reset approvals. Backend gains `getSessionMode` / `setSessionMode` / `getSessionName` / `setSessionName` / `compactSessionHistory` / `setSessionApproveAll` / `resetSessionApprovals` RPCs (all in `SessionRegistry` + `src-bun/index.ts`); sessionsStore tracks per-session `mode` and `approveAll`, syncs from `session.mode_changed`. Auto-approve toggle deliberately omitted from the UI because the local `onPermissionRequest: approveAll` shim short-circuits every request anyway (the SDK-side state would have no observable effect) — the prop + setApproveAll action are retained for when real permission UX lands. Validation: `getMode` rejects non-`"interactive" \| "plan" \| "autopilot"` SDK values as `AppError.sdk`; `getName` returns `null` for nullish, rejects non-string. Integrated cleanly with dockview + persistence — ChatWindow now takes `:mode` and `:approve-all` props from the SessionRecord; restoreSession on startup fires `getSessionMode` post-resume to fill the dropdown.
-- **Dockview-vue is the layout primitive.** Replaced the CSS-grid `.session-grid` in `App.vue` with a single `<DockviewVue>` body covering the whole viewport below a slim app-chrome topbar. Sessions are panels (`addPanel({ id: sessionId, component: "chat", … })`); the in-pane close button is hidden in favor of dockview's tab X (one close path → `onDidRemovePanel` → `sessionsStore.closeSession`). New `src/stores/layoutStore.ts` owns the DockviewApi and exposes `addPanel` / `removePanel` / `renamePanel` / `openEdgePanel(position, options)` / `toggleEdgeGroup` / `snapshot` / `restore`. The convention is documented in `AGENTS.md` and the new `plans/plan-frontend-shell.prompt.md`: any new persistent surface (recent-sessions picker, permission queue, log viewer, MCP status) lands as a dockview edge group, not new chrome. PrimeVue Splitter rejected (static children don't survive `v-for`); see chat in this session for the survey of alternatives (splitpanes, vue3-grid-layout, golden-layout). Bundle cost: +61 KB gzipped — worth it.
-- **Layout persistence + startup resume.** Settings schema bumped v2 → v3 with `layout: { dockview: unknown | null }`. `settingsStore.persistLayout(blob)` writes the opaque dockview JSON on every `onDidLayoutChange` (debounced 300 ms). On startup, after `clientStore.createClient()`, `App.vue` extracts panel ids from the persisted layout, calls the new `resumeSession` RPC for each (which replays history via `session.getMessages()`), prunes any that failed, then hands the pruned layout to `layoutStore.restore()` before subscribing to change events. Failed restores surface as info toasts (not errors — the common case is "user `/clear`'d via CLI"). New backend RPCs: `resumeSession({ sessionId, model, reasoningEffort })`, `listSessions()` (for the upcoming recent-sessions picker, no UI yet). New SessionRegistry tests: hydrate-on-resume, idempotent-resume, SDK-failure-as-AppError, list mapping. New v2 → v3 migration + opaque-layout round-trip tests. New wire snapshot for `SessionMetadataSummary` + layout-bearing `Settings`.
-- **Tool-call visibility.** Every SDK tool invocation now renders inline in the chat stream as a collapsible `ToolCallBlock`, driven by a new `kind: "tool"` `ChatItem` in `src/lib/chatEvents.ts`. State machine keyed by `toolCallId` consumes the five SDK tool events (`tool.user_requested`, `tool.execution_start`, `tool.execution_partial_result`, `tool.execution_progress`, `tool.execution_complete`) with monotonic status transitions, 64 KB output caps, and `result.detailedContent ?? result.content` priority. The backend now also lifts envelope-level `agentId` / `eventId` / `timestamp` onto `SessionEventPayload` so sub-agent tool calls are attributable. No permission UX yet — `approveAll` still in place — but the events are visible end-to-end. 10 new reducer tests + new wire-shape snapshot.
-- **Copilot client failed to start under Node < 24** (`ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite`). `src-bun/app/client.ts` now resolves the prebuilt `@github/copilot-${platform}-${arch}` binary and hands its path to `CopilotClient({ cliPath })`, bypassing the JS entrypoint that requires Node 24 for `node:sqlite`. Logged a warning when the platform binary isn't available so the failure mode is obvious. See CHANGELOG and the SDK-gotcha section in `plans/plan-frontend-shell.prompt.md`.
-- **`bun run dev:hmr` ensures `dist/` exists** before starting `electrobun dev --watch` (was crashing with `ENOENT` because Vite serves from memory in HMR mode and never created `dist/`). New `tools/prep-dist.ts` writes a stub `dist/index.html` (HTTP-refresh to `http://localhost:5173/`) and an empty `dist/assets/`; a real `vite build` overwrites the stubs.
-- **Markdown shortcut composer is back on.** Re-enabled `RichTextPlugin` + `ListPlugin` + `LinkPlugin` + `registerMarkdownShortcuts` in `MessageComposer`. The previous "typing broken under WebView2" symptom did not reproduce against the rebuilt stack — diagnostic confirms the editor mounts with `contenteditable="true"`, `data-lexical-editor="true"`, accepts programmatic `insertText`, and registers Lexical's beforeinput pipeline. Added a renderer→bun log bridge (`src/ipc/rendererLog.ts`) and an opt-in `TypingDiagnostic` plugin behind `?diag=1` so future regressions surface in the bun JSON log without needing WebView2 devtools. Composer parent restructured from `display: flex` to `display: block` per Lexical's contenteditable-parent guidance to avoid Chrome focus quirks.
-- **Composer typing fix + playground tile sizing.** Composer plugin set was reduced to a safe baseline in the previous iteration; this iteration brings the markdown shortcut stack back after diagnostics. `.chat-tile` now uses `height: 100%` so it fills both grid cells and plain block containers.
-- **Lexical-backed chat surface** (M1 markdown rendering). Composer and assistant/reasoning/user message display run through Lexical. Sends are markdown; assistant markdown (`# heading`, fenced code, lists, links, etc.) renders via `@lexical/markdown` `TRANSFORMERS`. New `src/lexical/{theme,plugins,nodes}.ts` + `lexical.css`; new components `src/components/{MessageComposer,MessageContent}.vue`; `ChatWindow.vue` and `ReasoningBlock.vue` now delegate body rendering. Pinned `lexical@0.38.1` and matching `@lexical/*` packages to align with `lexical-vue@0.14.1`. Streaming deltas reparse via rAF throttle to keep the reconciler smooth.
-- **Initial-window clipping fix** (Windows). The WebView2 surface is created at the outer window size, so the renderer ships ~16px clipped until the first WM_SIZE. We now nudge the frame ±1px on a staggered schedule (0/150/400/900ms after dom-ready plus belt-and-suspenders fallbacks) so a single resize event always lands after the renderer has painted.
-- **Composer auto-grow.** A `ResizeObserver` on `.chat-tile` publishes `--tile-height`; the composer input caps at `calc(var(--tile-height) * 0.6)` so it grows up to ~60 % of the tile before scrolling.
-- **Toast UX.** Click anywhere on a toast to dismiss; non-error toasts auto-dismiss at 2.5s, errors at 5s. Model-change toasts are deduped and include the reasoning effort transition.
-- Branch port: Tauri (Rust + Vue) → Electrobun (Bun + Vue). `src-tauri/` removed. New `src-bun/` main process + `tools/bun-vue-loader.ts` Bun plugin for Vue SFC tests. One test runner (`bun test`). See `CHANGELOG.md` → Unreleased → "Port from Tauri → Electrobun".
 
-## Next concrete step
-**File / image attachments + `@file` mentions.** Composer-side feature. Lexical's `DecoratorBlockNode` + `TypeaheadMenuPlugin` (both in `lexical-vue@0.14.1`) cover the chip + autocomplete primitives. Needs: backend file-search RPC, a `MentionChip.vue` decorator component, drag/drop / paste handling for attachments, and the wire surface to send attached payloads through `sendMessage`. Per AGENTS.md the composer stays on Lexical (markdown-it is for display only).
+## Next concrete steps
 
-## Last completed
-- **Real elicitation UX — accept/deny / respond / open-URL modal.** The notifications PR shipped indicators + OS toasts for `permission`/`user_input`/`elicitation` + `assistant.turn_end` but the SDK was still on `approveAll` so the response path was a stub. This PR wires the actual handlers. (1) `SessionRegistry` installs typed `onPermissionRequest` / `onUserInputRequest` / `onElicitationRequest` that capture the Promise resolver into a per-session `pendingHandlers` Map (keyed by a bun-generated `requestId`), then push a new `pendingRequest` IPC message to the renderer. (2) New `respondToRequest({ sessionId, requestId, response })` RPC resolves the awaiting Promise with the typed SDK shape; idempotent — double-submit returns `false` instead of throwing. (3) Lifecycle settlement: `disconnect()`, `deleteCliSession()`, `shutdownAll()` cancel every pending handler for the session with a typed cancellation (`{ kind: "user-not-available" }` for permission, `{ answer: "", wasFreeform: false }` for user input, `{ action: "cancel" }` for elicitation) so the SDK never hangs. (4) Registry-owned `approveAllBySession` short-circuits the permission handler with `{ kind: "approve-once" }` — and `setSessionApproveAll` now mirrors the toggle into both the SDK RPC (legacy) AND registry state (authoritative for the dafman handler path). (5) Reducer + `SessionRecord` switched from a singular `pendingRequest` to a FIFO `pendingRequests[]` queue per session — multiple in-flight callbacks no longer overwrite each other. SDK `*.requested` events become no-ops; the canonical add path is the synthetic `dafman.pending_request` the sessionsStore pushes through the reducer. SDK `*.completed` events keep their stale-cleanup role. (6) New `PendingRequestModal.vue` mounted at `App.vue` level (NOT inside ChatWindow) reads `sessionsStore.firstPending` — prefers the active session's queue head, falls back to any session with pending work. Auto-activates the owning panel when a request fires for a non-active session. Three layouts: **permission** = Allow once / Allow for session / Reject with collapsible details (`raw` JSON); **userInput** = question + optional radio choices + textarea (when `allowFreeform`) with Ctrl+Enter submit + Cancel; **elicitation url-mode** = URL pill + "Open in browser" → switches to "I'm done" → resolves accept; **elicitation form-mode** = explicit "not yet supported" message + Cancel (form schema renderer deferred per plan). (7) New `openUrl` RPC (`http://`/`https://` allowlist via regex, refuses other schemes) backed by `Utils.openExternal`. (8) Bun-side `summarizePermission` probes runtime extras on the SDK request object (`command`/`path`/`url`/etc.) to produce a one-line summary the modal shows. (9) 10 new tests (5 registry covering pending+settle+approveAll+idempotency, 5 reducer covering queue+FIFO+id-scoped cleanup) + 6 new wire-shape snapshots (PendingRequestPayload × 3 kinds, RespondToRequestParams × 3 responses). **Notifications now fire end-to-end against real callbacks**, not just `user_input`/`elicitation` — permissions were stubbed before because of approveAll, that's gone. **Defensively scoped:** approve-for-session sends the SDK's minimal shape (no rule editor — that's the next ticket); form-mode elicitation is Cancel-only (next ticket). 220 tests pass · lint clean · smoke green on both prod (`vite preview`) AND hmr (`vite dev`) per anti-regression rule 3a.
-- **Notifications — inner indicators + OS notifications for input + turn_end.** Both halves of the notifications ticket shipped in one PR. (1) Reducer family `notificationHandlers.ts` handles `permission.requested`/`completed`, `user_input.requested`/`completed`, `elicitation.requested`/`completed`, setting/clearing `ambient.pendingRequest: { type, message } | null` with channel-scoped clearing. (2) `SessionRecord` extended with `pendingRequest` + `unseenTurns`; `sessionsStore.handleEvent` mirrors the 6 events into the record, bumps `unseenTurns` on `assistant.turn_end` for non-active sessions, and fires OS notifications via `notificationsStore` when the session isn't the dock-active panel and the app window isn't focused. `layoutStore.activeSessionId` watch clears `unseenTurns` on focus. (3) `notificationsStore` wraps the browser `Notification` API; gates on settings toggle + permission state; click handler dispatches `dafman:focus-session` → App.vue activates the matching panel. (4) Settings v5 → v6 with `notifications: { turnEnd: false, waitingForInput: true }` defaults. (5) UI: ChatTab dot (amber-pulsing for pending, accent for unseen), Sessions sidebar row dot, ChatWindow composer banner ("Permission requested" / "Input requested" / "Awaiting response" + SDK message), SettingsPanel notifications section with two `ToggleSwitch` controls + browser-permission status row + "Request permission" button. **Notifications fire for ALL THREE pending-request channels AND turn_end** — not just permission. Permission events themselves don't fire today because the SDK still uses the `approveAll` shim (next ticket); `user_input` / `elicitation` / `turn_end` fire end-to-end against the live SDK. 21 new tests including an explicit "fires for every channel + turn_end (not just permission)" pin. Commit `e96b040`.
-- **Layout regression fix + command palette switched to `vue-command-palette`.** Previous "first session fills body" fix had been WRONG in a worse way: removing the explicit position relied on dockview's default placement, which when only edge groups exist lands the new panel inside the active group (the Sessions sidebar). Symptoms: chat panels opened at ~240 px with no tab bar (`.dv-edge-group .dv-tabs-and-actions-container { display: none }`), sometimes literally inside the sidebar. Correct fix: when we just created the body group ourselves, drop the panel `direction: "within"` it instead of `"right"`. New `src/stores/__tests__/layoutStore.addPanel.test.ts` pins all four placement cases against a minimal fake `DockviewApi` so this can't recur silently. Same commit also swapped the command palette implementation from "PrimeVue Dialog + fuse.js by hand" to `vue-command-palette` (the library originally agreed in the plan): library handles fuzzy search, keyboard nav, grouping; we just bind the Ctrl/Cmd+K hotkey, the Escape-to-close, and the registry mapping. Drops ~250 LOC of custom palette code.
-- **Command palette (Ctrl/Cmd+K).** New `src/components/CommandPalette.vue` overlay built on PrimeVue `Dialog` + `fuse.js` (no `vue-command-palette` dep — PrimeVue handles z-index/theme/focus-trap, the list + keyboard nav are ~50 LOC of custom code). Strict-chord listener (`Ctrl+K` / `Cmd+K`, no Shift/Alt) is suppressed while a PrimeVue confirm or modal dialog is open so it can't steal focus from a destructive prompt. Snapshots `document.activeElement` on open and restores it on close (falls back to a `dafman:focus-composer` event for the active session). New `src/stores/commandRegistry.ts` Pinia store: `register(cmd)` returns a disposer + replaces by id (HMR-safe + re-register-on-dep-change-safe), `visibleCommands` is a computed that lazily calls each `when()` predicate on every read (so `when: () => layoutStore.activeSessionId !== null` reacts when the user switches tabs), `when()` failures are caught so a broken predicate can't blank the whole palette. 6 new unit tests. Seed contributions in `src/lib/registerBuiltinCommands.ts`: Sessions panel toggle, New Session (default), New Session in `<workspace>…` (one per MRU, kept in sync via `watch(deep)`), Open Settings, Open Log Folder, Toggle Dark Mode, dev-only Open Playground, Switch Model: `<model>` (one per `modelsStore.models`, gated on active session, preserves the current `reasoningEffort`), Run Mode: Interactive / Plan / Autopilot (gated on active session). `layoutStore` gained `activeSessionId: Ref<string | null>` driven by `onDidActiveGroupChange` / `onDidActivePanelChange` / `onDidRemovePanel` subscriptions established in `setApi` (and torn down on a new api / null).
-- **Three steering UX fixes + Sessions Manager polish.** (1) `closePanel` tears down the parent edge group when removing the panel leaves it empty, and `openEdgePanel` defensively recreates if the existing group's width/height is below `initialSize/2` — fixes "panel becomes a tiny strip after close+reopen". (2) Sessions panel opens by default on first launch; explicit user closes survive a reload (we only auto-open when the persisted dockview JSON didn't reference the panel). (3) Blank-screen-on-startup regression from a `prismjs/components/*` side-effect import — reverted. Languages currently highlight via the `@lexical/code` bundled set (clike, js/ts, markup, markdown, c, css, objc, sql, powershell, python, rust, swift, java, cpp). bash/json/diff/yaml/toml etc. remain uncoloured until we wire Shiki.
-- **Sessions Manager edge panel — resume, delete, grouped by workspace.** Dockview left edge-group hosts the CLI session catalog. Groups by workspace (basename label, full path tooltip), most-recently-modified first, with a "No workspace" fallback bucket. Per-row resume (drops a `chat` panel) + delete (PrimeVue `ConfirmPopup`, danger). Open-in-app sessions get an "open" badge and have resume disabled. Auto-refreshes when the in-app session count changes; manual refresh in the header. New backend `deleteSession` RPC backed by `client.deleteSession` (disconnects first if open). New `sessionsListStore` + layout-store helpers `isPanelOpen` / `closePanel`. Toolbar toggle (`pi pi-list`) tracks open state via `onDidLayoutChange`.
-- **Per-tool rendering — summaries + per-tool language hints.** New `src/lib/toolRenderers.ts` registry maps each known tool (shell, read/write/edit, apply_patch, grep, glob, view, fetch, todo_write + aliases) to `{ summary, argsLanguage, resultLanguage }`. Header preview leads with `shell ls -la /tmp` instead of the generic "running" placeholder. `ToolCallBlock` now renders args/partial/result through `MessageContent` wrapping fenced code blocks, so `@lexical/code`'s `registerCodeHighlighting` paints whatever languages it knows about. `lexicalTheme` gained a full prism-token→CSS class map and `lexical.css` got a PrimeVue-tokens colour palette with `.app-dark` overrides. 9 renderer tests pass. **Caveat:** highlighting only works for languages in the `@lexical/code` bundle (see Next concrete step's "swap in Shiki" item).
-- **Steering, queueing, interrupt — composer with explicit shortcuts.** Plain `Enter` reserved for Lexical's paragraph-break command so markdown blocks reach the transcript. Shortcuts: `Ctrl+Enter` = session-default send (Steer by default), `Ctrl+Shift+Enter` = interrupt+send (`abortSession` + `sendMessage`), `Alt+Enter` = force queue. PrimeVue `SplitButton` picks default; dropdown also exposes explicit "Send & interrupt". Composer no longer disables while a turn is in flight. Backend: `sendMessage` accepts `mode?`, new `abortSession` RPC. `SessionRecord.defaultSendMode` (in-memory). Phase 2 (queue strip, abort-then-idle wait, verified `mode: "immediate"` spike) deferred.
+Picked from the **Open backlog** table below, ordered by ROI / unblocker
+value. Pick the next one when the previous lands.
 
-Carried-over M1 backlog (full detail in `plans/plan-roadmap.prompt.md` → "Backlog"):
-1. ~~**Markdown + code-block rendering** for assistant/reasoning content.~~ Done via Lexical.
-2. **Real elicitation UX** — accept/deny modal that responds to `permission.requested` / `user_input.requested` / `elicitation.requested`. Replaces `approveAll` shim. The inner indicators + OS notifications are wired (commit `e96b040`); only the interactive accept/deny surface is missing. **(P0 — see "Next concrete step" above.)**
-3. ~~**URL elicitation card** (basic visibility).~~ Banner above composer surfaces the URL; the actual "open URL" button is part of item #2.
-4. Steering & message queueing. _(SDK-ready: `session.send({ mode: "immediate" | "enqueue" })`.)_
-5. File / image attachments. _(SDK-ready: `session.send({ attachments: [...] })`.)_
-6. More session settings exposed (compaction, reasoning summary, system prompt modes).
-7. ~~**Make the dev playground a discoverable button (currently `?dev`).**~~ Done — wrench button in topbar (dev builds only) + "Back to app" in the playground.
-8. Markdown + message QoL (copy/retry/edit-and-resend).
-9. GPT-5.5 `reasoning_opaque` mystery — CLI shows it, our UI gets `content: ""`.
-10. **Real binary E2E**: Electrobun doesn't have a `tauri-driver` equivalent yet; investigate spawning the dev binary + driving the webview through the existing RPC bridge.
-11. ~~**Tool-call visibility** — render `tool.execution_*` events in the chat stream.~~ Done — see `ToolCallBlock.vue` + reducer.
-12. ~~**Pane resize / move / persist sessions across launches.**~~ Done — dockview-vue body + layout JSON in settings v3 + `resumeSession` RPC.
-13. ~~**Recent sessions picker** (use the new `listSessions` RPC).~~ Done — Sessions Manager edge panel.
-14. ~~**Notifications** — per-session indicators + OS-native fire on background sessions.~~ Done in `e96b040`.
+1. **In-app log viewer** (Observability M1 tail). Tail the bun JSON log file
+   live, with level filter + search; add "Export diagnostics bundle" button.
+   Surfaces the data we already structure into `<userData>/logs/dafman.*.log`
+   so users can submit bug reports without us asking "can you grep…".
+2. **Runtime log-level toggle** in Settings → Diagnostics. Trivial follow-on
+   to #1 — the bun-side `setLogLevel` plumbing exists; only the renderer
+   control is missing.
+3. **Log redaction snapshot tests.** Pin that structured logs in `src-bun/`
+   never record prompts / tool args / token bodies. Cheap insurance against
+   accidental leaks.
+4. **Cross-platform CI matrix** for `electrobun build`. Currently Linux-only
+   in `.github/workflows/ci.yml`. Add Windows + macOS jobs.
+5. **Export conversation** (M2 tail). Markdown + JSON exports off a
+   per-session menu item; the read path already produces the right shape
+   (events → `ChatItem[]`) via the reducer.
 
-Other M1 items still open:
-1. **Tracing/log redaction** snapshot tests; runtime log level toggle in Settings → Diagnostics.
-2. **Cross-platform CI matrix** for `electrobun build` (Linux only today).
-3. **Dark-mode in the Playground.** The dev playground (`src/dev/Playground.vue`) doesn't honour the `theme.darkModeSelector` (`.app-dark` on `<html>`). Add a manual theme toggle button to its toolbar so we can preview both palettes without leaving dev mode; also flip `applyThemeClass` so the playground respects the OS / settings theme on first mount.
+---
 
-## M0 - Foundations (DONE)
-- [x] Tauri 2 + Vue 3 + PrimeVue scaffold. _(Now Electrobun + Vue 3 + PrimeVue.)_
-- [x] Single SDK Client lifecycle.
-- [x] Multi-session create / disconnect.
-- [x] Streaming chat (per-session deltas).
-- [x] Responsive grid with per-session accent color.
+## Audit snapshot (2026-05-21)
 
-## M1 - Make it solid (IN PROGRESS, post-port)
-Definition of done lives in `plans/plan-roadmap.prompt.md`.
-- [x] **SDK swap** to `copilot-sdk-supercharged` (npm, v2.1.2).
-- [x] **Observability baseline** - JSON-lines logger under `Utils.paths.userLogs`, daily rotation, `DAFMAN_LOG` env filter. Module: `src-bun/app/logging.ts`.
-- [x] **Testing baseline** - `bun test` everywhere; happy-dom registered via Bun plugin loader at `tools/bun-vue-loader.ts`. Wire-shape snapshots in `src-bun/__tests__/wire-contract.test.ts`. CI runs `bun run check`.
-- [x] **Centralized scripts** in `package.json` (`bun test`, `bun run lint`, `bun run check`).
-- [x] **AGENTS.md** at repo root per the agents.md standard (rewritten for the Bun stack).
-- [x] **Backend module layout** in `src-bun/app/{errors,settings,logging,models,client,sessions}.ts` + RPC schema in `src-bun/rpc.ts`. `AppError` discriminated union persists across the bridge unchanged.
-- [x] **RPC bridge** (`BrowserView.defineRPC<DafmanRPC>`) returned from `src-bun/index.ts`; the bun→webview `sessionEvent` message fans every SDK event out keyed by `sessionId`. `SessionEventPayload` is hand-mirrored in `src/ipc/types.ts`.
-- [x] **Pinia stores** (`clientStore`, `sessionsStore`, `toastStore`, `permissionsStore` stub) survive the port; centralized IPC behind `src/ipc/invoke.ts` (typed via `CommandMap`), Electrobun bridge injected from `src/main.ts`.
-- [x] **Typed IPC** - hand-mirror in `src/ipc/types.ts` (`SessionEventPayload`, `Settings`, `AppErrorPayload`, `CommandMap`); single source of truth lives in `src-bun/rpc.ts`.
-- [x] **Settings store** on disk (`Utils.paths.userData/settings.json`, versioned with `migrate`).
-- [x] **Dark mode** persisted via settings store; resolved through `resolveIsDark(theme, prefersDark)`.
-- [x] **Auto-create client on mount** - no "Create Client" button; `App.vue` calls `clientStore.createClient()` after settings load.
-- [x] **Reasoning visibility** (Settings `Appearance.reasoningVisibility` hidden/compact/expanded, default compact) + per-session header override + `ReasoningBlock.vue`.
-- [x] **Per-session model + reasoning effort selectors** in chat header.
-- [x] **High-value event types rendered** (title change, model change, usage, turn start/end, intent, info/warning, system notification, model.call_failure, truncation, compaction, **tool.user_requested / execution_start / partial_result / progress / complete**).
-- [x] **Open log folder** button in Settings → General (`openLogFolder` RPC + `Utils.showItemInFolder`).
-- [ ] **Real permission UX** - replace `approveAll` with a webview-side modal driven through the RPC bridge.
-- [ ] **URL elicitation card + URL opener**.
-- [ ] **Log redaction** snapshot tests; runtime log level toggle in Settings → Diagnostics.
-- [x] **Frontend store + component tests** to follow the refactor (will be re-added post-port; see `frontend-tests` follow-up).
-- [ ] **Cross-platform `electrobun build` CI matrix.**
+Authoritative map of what's in the code, grouped by area. DONE / PARTIAL /
+TODO reflects current state against the M0–M7 ambitions in
+`plans/plan-roadmap.prompt.md`.
+
+### Foundations (M0–M1)
+
+| Area | Status | Notes |
+|---|---|---|
+| Tauri → Electrobun port | DONE | `src-tauri/` deleted; one TS+Bun stack. |
+| SDK pinned to `copilot-sdk-supercharged` | DONE | npm; prebuilt platform binary resolved in `src-bun/app/client.ts` to dodge the Node 24 floor. |
+| Single Client lifecycle | DONE | `clientStore` + bun `client.ts`. |
+| Multi-session create / resume / disconnect / delete | DONE | `SessionRegistry`; layout-driven resume on startup. |
+| Streaming chat | DONE | rAF-coalesced; reducer in `src/lib/chatEvents.ts`. |
+| Per-session accent color | DONE | `accentForIndex`. |
+| Pinia stores | DONE | 11 stores. |
+| Settings store on disk + migration | DONE | Versioned (current: **v8**). |
+| Dark mode | DONE | PrimeVue tokens; `.app-dark` selector; auto-flips dockview chrome + code blocks. |
+| Boot splash + phased startup | DONE | `bootStore` + `BootSplash.vue`. |
+| Reasoning visibility (hidden / compact / expanded) | DONE | Global setting + per-session override; opaque-reasoning placeholder for GPT-5.x / Claude. |
+| Per-session model + reasoning effort picker | DONE | `SessionHeaderControls.vue`. |
+| Tool-call visibility | DONE | `ToolCallBlock.vue` + per-tool renderers + language map; 64 KB output cap. |
+| Real permission UX | DONE | `PendingRequestCard.vue` + `PermissionRuleEditor.vue` with per-kind rule shapes (commands / read / write / mcp / mcp-sampling / memory / custom-tool / url-domain). |
+| URL elicitation card + `openUrl` RPC | DONE | http(s) allowlist. |
+| Layout persistence + startup resume | DONE | dockview JSON in settings; debounced 300 ms. |
+| Workspace MRU + native folder picker | DONE | Settings v3 → v4 migration; `pickFolder` RPC. |
+| Sessions Manager edge panel | DONE | resume / delete; grouped by workspace. |
+| Command palette (Cmd/Ctrl+K) | DONE | `vue-command-palette`; live `visibleCommands` predicate. |
+| Notifications (turn-end + waiting input) | DONE | Browser Notification API; gated by settings + pane focus. |
+| Markdown rendering | DONE | markdown-it + Prism + DOMPurify + KaTeX; footnotes / deflists / emoji / task lists / safe HTML subset. |
+| Mermaid diagrams (opt-in, lazy) | DONE | `MermaidBlock.vue`; Settings → Appearance toggle. |
+| File / image attachments (composer) | DONE | Inline `AttachmentNode` (DecoratorNode); icon by type; click-to-open; round-trip in user-message bubbles. |
+| `@file` mentions | DONE | `MentionPlugin.vue` + `searchWorkspaceFiles` RPC. |
+| Slash commands (local) | DONE | `SlashCommandPlugin.vue` + `lib/sessionCommands.ts` for `/cd`. |
+| Steering / queue / interrupt sends | DONE | `Ctrl+Enter` / `Alt+Enter` / `Ctrl+Shift+Enter` + SplitButton; per-session `defaultSendMode`. |
+| Message actions (copy / quote / retry / edit / fork) | DONE | `MessageActions.vue`. |
+| Per-session gear popover | DONE | Name, mode, reasoning view, workspace, skills toggle, usage metrics, compact, reset. |
+| Bounded `record.events` ring buffer | DONE | 5000-cap; consumers track absolute progress. |
+| Reasoning on `assistant.message` (CLI wire) | DONE | Reducer harvests `reasoningText` / `reasoningOpaque` / `encryptedContent` into a synthesised reasoning ChatItem. |
+| Brand favicon + activity-bar mark | DONE | `public/dafman.svg`. |
+| Dev playground (`?dev` / wrench) | DONE | Synthetic event harness; dark-mode preview toggle. |
+| Playwright renderer smoke (prod + HMR) | DONE | `bun run smoke`. |
+
+### Observability tail (M1, open)
+
+| Item | Status | Notes |
+|---|---|---|
+| JSON-lines logger + daily rotation | DONE | `src-bun/app/logging.ts`; `DAFMAN_LOG` env filter. |
+| In-app log viewer | TODO | Tail + level filter + search; "Export diagnostics bundle". |
+| Runtime log-level toggle (Settings → Diagnostics) | TODO | Bun-side handle exists; renderer control missing. |
+| Log redaction snapshot tests | TODO | Pin that structured logs never record prompts / tool args. |
+| Bench harness (`bench_event_dispatch`, …) | TODO | None wired. |
+| Metrics counters / histograms exposed in Settings | TODO | M2 definition-of-done item. |
+
+### M2 tail (open)
+
+| Item | Status | Notes |
+|---|---|---|
+| Export conversation | TODO | Markdown + JSON. Read path exists (`ChatItem[]`). |
+| Image generation (response_format = image) | TODO | SDK supports; UI doesn't surface it. |
+
+### M3 — Tools & permissions
+
+| Item | Status | Notes |
+|---|---|---|
+| Permission UX with rule editor | DONE | (Cross-link to M1.) |
+| Permission audit log | TODO | Separate JSONL file under `<userData>/audit/`. |
+| URL policy editor | TODO | Today: allowlist regex baked in; no rule UI. |
+| Built-in tool registry (fs / shell / http) | TODO | We rely entirely on the SDK's built-ins; no Dafman-native tools. |
+| Per-session tool allow/exclude list | TODO | SDK supports `availableTools` / `excludedTools`; UI doesn't expose. |
+| Diff viewer for `fs.edit` / `apply_patch` | TODO | M7-coded item but valuable earlier. |
+
+### M4 — Projects, accounts, resumability
+
+| Item | Status | Notes |
+|---|---|---|
+| Resume sessions across restart | DONE | Layout-driven. |
+| Workspace path per session (cwd) | DONE | MRU + native picker. |
+| Sessions list / Sessions Manager panel | DONE | (Supersedes "Recent sessions sidebar".) |
+| Project picker / Project model | TODO | We have workspaces; no Project entity with overlay settings yet. |
+| Per-project settings overlay | TODO | (Depends on Project model.) |
+| Multi-account auth | TODO | One account; no OS-keyring integration; no per-session pin. |
+| Idle timeout configurable per session | TODO | SDK supports. |
+| `SessionFsProvider` impl writing under `<app-data>` | TODO | Today the SDK uses its own default location. |
+
+### M5 — Integrations: skills, MCP, agents
+
+| Item | Status | Notes |
+|---|---|---|
+| Skills enable/disable per session | DONE | Gear popover; SDK `rpc.skills.*`. |
+| Skill library (CRUD + scope) | TODO | No library UI; only the SDK-discovered list. |
+| Slash command UI (composer typeahead) | DONE | `SlashCommandPlugin.vue`. Wired to local commands; SDK `CommandDefinition` not yet surfaced. |
+| MCP server registry UI | TODO | No install / start / stop UI; no per-server settings; SDK `rpc.mcp.*` exists. |
+| MCP OAuth via URL flow | PARTIAL | URL elicitation path handles ad-hoc URL prompts; MCP-specific toast not built. |
+| Agents / fleets UI | TODO | SDK `rpc.fleet.*` + `rpc.agent.*` exist; no UI. |
+| Custom system message transforms | TODO | SDK supports `customize` mode; no editor. |
+| Plans API surface | TODO | SDK `rpc.plan.*`; no rendering. |
+| Memory backend | TODO | M5+. |
+
+### M6 — Automations & notifications
+
+| Item | Status | Notes |
+|---|---|---|
+| OS notifications + per-channel toggles | DONE | turn-end + waiting-input. (Cross-link to M1.) |
+| Scheduled prompts (cron) | TODO | None. |
+| File / time / manual / webhook triggers | TODO | None. |
+| Activity feed (Settings → Activity) | TODO | None. |
+| Quiet hours / batching / digest | TODO | None. |
+
+### M7 — Editor & power UX
+
+| Item | Status | Notes |
+|---|---|---|
+| Code blocks via CodeMirror 6 | DONE | `CodeEditor.vue`. |
+| Markdown rendering (read-only) | DONE | (Cross-link.) |
+| Monaco file viewer / editor | TODO | We use CodeMirror; user may prefer Monaco for diffs. |
+| Diff viewer for fs.edit / write results | TODO | (Reuse `@codemirror/merge` available.) |
+| Inline accept/reject hunks | TODO | None. |
+| Workspace search panel (cross-session) | TODO | None. |
+| Headless `browser.*` tool | TODO | None. |
+| `self.*` tool surface | TODO | None. |
+| Plugin / theme system | TODO | (Future.) |
+
+### Cross-cutting
+
+| Item | Status | Notes |
+|---|---|---|
+| A11y review pass | TODO | Components have aria-labels but no axe-core integration. |
+| Perf benches | TODO | None. |
+| Telemetry (OTel) opt-in | TODO | Settings field reserved; not wired. |
+| End-user docs site | TODO | None. |
+| Tier-2 E2E (Playwright CDP → Electrobun binary) | TODO | Smoke test runs against `vite preview`/`vite dev` only. |
+| Cross-platform CI matrix | TODO | Linux-only today. |
+
+---
+
+## Re-organised phases (replaces M-numbered roadmap going forward)
+
+The old M1–M7 milestones in `plans/plan-roadmap.prompt.md` are kept as
+historical reference. Going forward we organise by **Phase** — coherent
+chunks scoped to a single PR-ish unit of work, each with rough effort
+estimates (1 d = ~1 working day of focused engineering).
+
+### Phase 1 — Close M1's observability tail (~2 d)
+- In-app log viewer (tail + filter + search).
+- Runtime log-level toggle in Settings → Diagnostics.
+- Diagnostics bundle export (zip of logs + redacted settings).
+- Log redaction snapshot tests.
+
+### Phase 2 — Cross-platform CI + Tier-2 E2E (~2 d)
+- CI matrix: Windows + macOS jobs for `electrobun build`.
+- Playwright CDP harness against the real Electrobun binary (one or two
+  smoke flows). Tier-1 renderer smoke stays as-is.
+
+### Phase 3 — M2 closing (~2 d)
+- Export conversation (Markdown + JSON).
+- Image generation (response_format = image) end-to-end.
+- Metrics counters + histograms exposed in Settings → Diagnostics
+  (depends on Phase 1's renderer plumbing).
+
+### Phase 4 — Tools & policies (~4 d)
+- Per-session tool allow/exclude UI in the gear popover (mirrors the
+  existing skills section; wired to SDK `availableTools`/`excludedTools`).
+- URL policy editor (Settings → URL Policy).
+- Permission + URL audit log (`<userData>/audit/*.jsonl`) with Activity
+  view.
+
+### Phase 5 — Projects + multi-account (~5 d)
+- Project model + folder-picker promotion to "Open Project".
+- Per-project settings overlay (model, system prompt, tool allow-list,
+  MCP overlay, default account).
+- Project sidebar in the Activity Bar; project chip in the chat header.
+- Multi-account auth: Accounts UI + OS-keyring storage + per-session pin
+  via OAuth (uses the existing URL elicitation path).
+
+### Phase 6 — MCP UI (~5 d)
+- MCP registry: install / start / stop / per-server settings.
+- stdio vs HTTP config split.
+- MCP OAuth toast (top-right) with status-update on `mcp_status_changed`.
+- Per-project MCP overlay.
+- Tools list grouped by source (built-in / MCP server / custom).
+
+### Phase 7 — Skills library + agents (~4 d)
+- Skill library UI: list / create / edit / delete + dry-run.
+- `/skill <name>` invocation via the composer slash typeahead (already wired
+  to local commands; extend to SDK skills).
+- Agents / fleets: per-session agent picker (SDK `rpc.agent.*`) + sub-agent
+  pane.
+- Custom system message transforms toggle list.
+
+### Phase 8 — Plans + Memory + self.* (~3 d)
+- Plans API rendering (collapsible panel inside the pane).
+- Memory backend (SQLite-vec or LanceDB) + `memory.*` tools.
+- `self.*` tool surface (open file, switch project, run skill) — gated
+  through the existing permission flow.
+
+### Phase 9 — Automations (~5 d)
+- Scheduler (cron-like) + manual triggers.
+- File-change trigger.
+- Activity feed (Settings → Activity).
+- Quiet hours + batching + summary digest.
+- Optional: webhook trigger.
+
+### Phase 10 — Editor power-ups (M7) (~5 d)
+- Diff viewer for `apply_patch` results (CodeMirror 6 `@codemirror/merge`).
+- Inline accept/reject hunks.
+- Workspace search panel (cross-session).
+- Optional: Monaco evaluation if CodeMirror diff UX falls short.
+
+### Phase 11 — Browser tool + telemetry + docs (~5 d)
+- Headless browser tool (evaluate `mcp-server-playwright` vs embedded
+  BrowserView; pick one).
+- OTel telemetry opt-in (Settings → Privacy).
+- End-user docs site (mdbook / vitepress).
+- A11y pass with axe-core integration.
+- Perf benches (`bench_event_dispatch`, render perf budgets in Playwright).
+
+---
 
 ## Tests at a glance
-| Surface | Runner | Status |
+
+| Surface | Runner | Count |
 |---|---|---|
-| Backend (`src-bun/__tests__/`) | `bun test` | 32 tests passing (settings v3 + migration, errors, models, sessions registry incl. resume/list, wire contracts incl. tool envelopes + SessionMetadataSummary + persisted layout) |
-| Vue SFC loader smoke (`tools/__tests__/`) | `bun test` + `tools/bun-vue-loader.ts` | 1 test (currently failing — pre-existing, unrelated to layout work; tracked) |
-| Frontend pure reducers (`src/lib/__tests__/`) | `bun test` | 10 tests passing (reducer model-change + tool-call state machine) |
-| Vue component/store tests | `bun test` | _to be re-added post-port_ |
-| E2E (real Electrobun binary) | _not yet wired_ | - |
+| Bun-side domain modules | `bun test` | ~50 |
+| IPC wire-shape snapshots | `bun test` (`toMatchSnapshot`) | 23 snapshots |
+| Pure renderer reducers / helpers | `bun test` | ~120 |
+| Vue SFCs + Lexical custom nodes | `bun test` + `tools/bun-vue-loader.ts` | ~110 |
+| Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
+| Real binary E2E | not yet wired | 0 |
+
+Total: **308 `bun test`** passing as of 2026-05-21; smoke green on both
+prod and HMR.
+
+---
 
 ## Conventions for agents
-Agent contract lives in [`AGENTS.md`](AGENTS.md) at the repo root (per the [agents.md](https://agents.md/) standard). Highlights:
-- Read `plans/plan-overview.prompt.md` first; it indexes everything else.
-- No hardcoded hex colors - use `var(--p-*)` PrimeVue tokens. Per-session accent (`accentForSession` from `src/lib/color.ts`) is the only exception.
-- Domain modules under `src-bun/app/` do not import `electrobun/bun`; only `src-bun/index.ts` may.
-- Every new RPC handler: wrap with `rpcGuard` from `src-bun/app/errors.ts`.
-- Every new wire type: add it to `src-bun/rpc.ts`, mirror in `src/ipc/types.ts`, snapshot in `src-bun/__tests__/wire-contract.test.ts`.
-- Run `bun run check` before committing.
-- Update this file when you finish a milestone item or change direction.
+
+See [`AGENTS.md`](AGENTS.md). Highlights:
+- Required reading on every session: `STATUS.md` → `DEVLOG.md` →
+  `ARCHITECTURE.md` → the relevant `plans/*.prompt.md`.
+- Anti-laziness rules are binding, not aspirational.
+- `bun run check` is the gate before any push.
+- Update `STATUS.md` / `DEVLOG.md` / `CHANGELOG.md` per session.
+
+---
 
 ## Open questions / decisions to make
-- Product name (still `dafman`).
-- Editor: Monaco vs CodeMirror 6 for the M7 diff viewer.
-- MCP scope per release (full vs minimal).
-- Whether to ship a per-session WebSocket (Bun.serve) if the global `sessionEvent` fan-out becomes a back-pressure problem with multiple noisy panes.
+
+- Project name (still `dafman`; no rename planned).
+- Editor: CodeMirror vs Monaco for M7 diff (current preference: CodeMirror;
+  re-evaluate during Phase 10).
+- MCP scope per release (full vs minimal — bias to ship minimal first in
+  Phase 6, expand based on usage).
+- Telemetry endpoint default (OTLP HTTP vs gRPC — Phase 11).
+
+---
+
+## Historical log (last completed items, newest first)
+
+Kept here so the next agent can quickly orient on what shipped recently
+without grepping `DEVLOG.md`. One-liner per item.
+
+- **2026-05-21** — Audit pass: ARCHITECTURE.md + DEVLOG.md added; AGENTS.md
+  rewritten with anti-laziness rules; STATUS.md re-organised into Phases.
+- **2026-05-21** — Session popover gains skills toggle list + usage
+  metrics (`a0a3886`).
+- **2026-05-21** — Permission rule editor (per-kind: commands / read /
+  write / mcp / url-domain / …) (`b015d68`).
+- **2026-05-21** — Reasoning harvested from `assistant.message`
+  (`reasoningText` / `reasoningOpaque` / `encryptedContent`) — proper fix
+  for the `reasoning_opaque` "empty bubble" regression (`0812f9a`).
+- **2026-05-21** — Bounded `record.events` ring buffer; consumers track
+  absolute progress; centralised `appendEvent` helper (`38d42ca`).
+- **2026-05-21** — Quick-win backlog: playground dark toggle, lazy mermaid
+  (Settings v7 → v8), dafman brand mark + favicon (`52a2956`).
+- **2026-05-21** — Composer attachments survive into the sent message;
+  transcript pills clickable; SDK-history attachment restore (`7df0254`).
+- **2026-05-21** — `AttachmentNode` rebuilt as DecoratorNode (atomic,
+  clickable, icon-by-type); fixed Lexical proxy crash on click (`0d271ca`).
+- **2026-05-21** — Inline attachment pills in the composer; send button
+  repositioned to editor row (`323a305`, `92f772b`, `8957ca9`, `66dabb1`).
+- Prior session log retained in [`DEVLOG.md`](DEVLOG.md) and git history.

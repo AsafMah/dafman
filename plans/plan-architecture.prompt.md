@@ -1,4 +1,4 @@
-> **Stack note (post-Electrobun port, 2026-05-17):** This document still references the old Tauri (Rust) backend in places. The runtime is now Electrobun + Bun + TypeScript everywhere; src-tauri/ is gone, replaced by src-bun/. 	racing is replaced by `src-bun/app/logging.ts`, `cargo test`/`insta` are replaced by `bun test`/`toMatchSnapshot`, and Tauri's per-session `Channel<T>` is replaced by a single `sessionEvent` RPC message keyed by `sessionId`. The architecture in spirit (domain modules don't touch the shell, single typed IPC surface, JSON-RPC under the hood) is unchanged. Full diff lives in `CHANGELOG.md` under `## [Unreleased]`. Plan rewrites are tracked as follow-up tasks.
+> **Stack note (audited 2026-05-21):** The runtime is **Electrobun + Bun + TypeScript everywhere**. References below to Tauri / Rust / `cargo` / `tauri-specta` are historical context only — design intent maps onto the TS stack. For current reality see [`ARCHITECTURE.md`](../ARCHITECTURE.md). Plan rewrites tracked as follow-up tasks.
 # Dafman — Architecture
 ## Goals
 - Replace today''s single-file `src-tauri/src/lib.rs` with a layered, module-per-concern backend.
