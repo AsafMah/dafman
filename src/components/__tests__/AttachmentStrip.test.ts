@@ -51,39 +51,39 @@ describe("AttachmentStrip", () => {
   });
 
   test("clicking the chip body emits 'open' with the index", async () => {
-    let opened: number | null = null;
+    const opened: { value: number | null } = { value: null };
     const { container } = mount(
       [
         { type: "file", path: "/abs/a.ts", displayName: "a.ts" },
         { type: "file", path: "/abs/b.ts", displayName: "b.ts" },
       ],
-      { onOpen: (idx) => (opened = idx) },
+      { onOpen: (idx) => (opened.value = idx) },
     );
     const mainButtons = container.querySelectorAll(".attachment-chip-main");
     await fireEvent.click(mainButtons[1]!);
     await nextTick();
-    expect(opened).toBe(1);
+    expect(opened.value).toBe(1);
     cleanup();
   });
 
   test("clicking the ✕ button emits 'remove' with the index (and NOT 'open')", async () => {
-    let opened: number | null = null;
-    let removed: number | null = null;
+    const opened: { value: number | null } = { value: null };
+    const removed: { value: number | null } = { value: null };
     const { container } = mount(
       [
         { type: "file", path: "/abs/a.ts", displayName: "a.ts" },
         { type: "file", path: "/abs/b.ts", displayName: "b.ts" },
       ],
       {
-        onOpen: (idx) => (opened = idx),
-        onRemove: (idx) => (removed = idx),
+        onOpen: (idx) => (opened.value = idx),
+        onRemove: (idx) => (removed.value = idx),
       },
     );
     const removeButtons = container.querySelectorAll(".attachment-chip-remove");
     await fireEvent.click(removeButtons[0]!);
     await nextTick();
-    expect(removed).toBe(0);
-    expect(opened).toBe(null);
+    expect(removed.value).toBe(0);
+    expect(opened.value).toBe(null);
     cleanup();
   });
 

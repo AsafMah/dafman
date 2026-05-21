@@ -64,38 +64,37 @@ const modeChoice = computed<SessionMode | null>({
   flex: 0 0 auto;
   display: inline-flex;
   align-items: stretch;
-  align-self: flex-start;
+  align-self: center;
 }
 .mode-button-group :deep(.p-selectbutton) {
   display: inline-flex;
   align-items: stretch;
+  border-radius: var(--p-border-radius-sm, 4px);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--p-text-color) 6%, transparent);
 }
 .mode-button-group :deep(.p-selectbutton .p-button) {
-  /* Match SplitButton (send) size on the right so the row reads as
-   * three equal-height chrome blocks. */
-  height: auto;
-  min-height: 2.25rem;
-  padding: 0 0.6rem;
-  font-size: 0.9rem;
-  /* Idle: subtle accent tint so the control still reads as part of the
-   * session, but doesn't compete with the input. */
-  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 8%, var(--p-content-background));
-  border-color: color-mix(in srgb, var(--accent, var(--p-primary-color)) 35%, var(--p-content-border-color));
-  color: var(--p-text-color);
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.45rem;
+  font-size: 0.8rem;
+  background: transparent;
+  border: 0;
+  color: var(--p-text-muted-color);
+  border-radius: 0;
+  transition: background 120ms ease, color 120ms ease;
 }
 .mode-button-group :deep(.p-selectbutton .p-button:not(.p-togglebutton-checked):hover) {
-  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 18%, var(--p-content-background));
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  color: var(--p-text-color);
 }
-/* Selected button picks up the full accent — mirrors the SubmitButton
- * styling in `lexical.css` so the row's two accented actions match. */
 .mode-button-group :deep(.p-selectbutton .p-button.p-togglebutton-checked) {
-  background: var(--accent, var(--p-primary-color));
-  border-color: var(--accent, var(--p-primary-color));
-  color: var(--p-primary-contrast-color, white);
+  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 22%, transparent);
+  color: var(--p-text-color);
+  border: 0;
 }
 .mode-button-group :deep(.p-selectbutton .p-button .pi) {
-  font-size: 0.95rem;
+  font-size: 0.78rem;
 }
 
 .sr-only {

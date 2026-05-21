@@ -402,6 +402,8 @@ const SubmitButton = defineComponent({
         "aria-label": p.tooltip,
         disabled: p.disabled,
         model: p.model,
+        size: "small",
+        class: "lex-submit-button",
         onClick: fire,
         // Keep focus in the editor after primary-button click so the
         // next keystroke after a send still routes to it.
@@ -539,32 +541,39 @@ const SubmitButton = defineComponent({
 .lex-composer-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.4rem;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  min-height: 2.3rem;
   border-top: 1px solid color-mix(in srgb, var(--p-content-border-color) 60%, transparent);
   background: color-mix(in srgb, var(--p-content-background) 95%, var(--p-text-color));
   /* SessionHeaderControls uses container queries to shrink its
    * children. Give it a container context here so it reacts to the
    * toolbar's width, not the page width. */
   container-type: inline-size;
-  flex-wrap: wrap;
+  /* No wrap — keep everything on one row. Inner elements use overflow
+   * + ellipsis on their own labels (model picker etc.) to absorb tight
+   * widths instead of pushing controls onto a second line. */
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .lex-toolbar-spacer {
   flex: 1 1 auto;
+  min-width: 0.5rem;
 }
 
 .lex-toolbar-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: var(--p-border-radius-sm, 4px);
   border: 0;
   background: transparent;
   color: var(--p-text-muted-color);
   cursor: pointer;
+  flex: 0 0 auto;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
@@ -579,6 +588,66 @@ const SubmitButton = defineComponent({
 }
 
 .lex-toolbar-btn .pi {
-  font-size: 1rem;
+  font-size: 0.95rem;
+}
+
+/* SplitButton sizing override — the default PrimeVue "small" preset is
+ * still taller than our 1.75rem toolbar row. Force the inner Buttons
+ * to match. */
+.lex-submit-button :deep(.p-button) {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.55rem;
+  font-size: 0.8rem;
+}
+
+.lex-submit-button :deep(.p-button .pi) {
+  font-size: 0.85rem;
+}
+
+.lex-submit-button :deep(.p-splitbutton-dropdown) {
+  padding: 0 0.3rem;
+}
+
+/* Flatten the SessionHeaderControls inside the composer footer — drop
+ * the workspace chip + inline reasoning visibility (already lives in
+ * the gear popover) and remove visible select borders so picker labels
+ * read as chevron-text buttons à la Copilot's composer. */
+.lex-composer-toolbar :deep(.session-header-controls) {
+  gap: 0.2rem;
+  padding: 0;
+  height: 1.75rem;
+}
+
+.lex-composer-toolbar :deep(.session-header-controls .workspace-chip),
+.lex-composer-toolbar :deep(.compact-select-reasoning) {
+  display: none;
+}
+
+.lex-composer-toolbar :deep(.compact-select .p-select),
+.lex-composer-toolbar :deep(.compact-select .p-treeselect) {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.lex-composer-toolbar :deep(.compact-select .p-select:hover),
+.lex-composer-toolbar :deep(.compact-select .p-treeselect:hover) {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+}
+
+.lex-composer-toolbar :deep(.compact-select .p-select-label),
+.lex-composer-toolbar :deep(.compact-select .p-treeselect-label) {
+  padding: 0 0.45rem;
+  font-size: 0.78rem;
+  color: var(--p-text-color);
+}
+
+.lex-composer-toolbar :deep(.compact-select .p-select-dropdown),
+.lex-composer-toolbar :deep(.compact-select .p-treeselect-dropdown) {
+  width: 1.1rem;
+  color: var(--p-text-muted-color);
 }
 </style>
