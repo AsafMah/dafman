@@ -44,6 +44,11 @@ export type ChatItem =
       /// actions. Populated from the first `user.message` event the
       /// reducer sees for this item.
       eventId?: string;
+      /// Attachments inserted INLINE in the composer. Rendered as pills
+      /// in the transcript bubble by `UserMessageBody.vue`; pill order
+      /// in the text matches array order (the composer's
+      /// document-order extraction in `consumeComposerText`).
+      attachments?: import("../ipc/types").SendMessageAttachment[];
     }
   | {
       id: number;
@@ -400,8 +405,17 @@ export function appendUserMessage(
   current: ChatItem[],
   text: string,
   counter: IdCounter,
+  attachments?: import("../ipc/types").SendMessageAttachment[],
 ): ChatItem[] {
-  return [...current, { id: counter.next++, kind: "user", text }];
+  return [
+    ...current,
+    {
+      id: counter.next++,
+      kind: "user",
+      text,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    },
+  ];
 }
 
 export function appendSystemMessage(

@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { storeToRefs } from "pinia";
 import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
+import UserMessageBody from "./UserMessageBody.vue";
 import MessageActions from "./MessageActions.vue";
 import MessageEditor from "./MessageEditor.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
@@ -258,7 +259,7 @@ async function sendMessage(
   const concreteMode =
     payload.mode === "default" ? props.defaultSendMode : payload.mode;
 
-  items.value = appendUserMessage(items.value, payload.text, idCounter);
+  items.value = appendUserMessage(items.value, payload.text, idCounter, payload.attachments);
   isSendingFallback.value = true;
   await scrollToBottom();
 
@@ -629,10 +630,16 @@ const pendingStyle = computed(() => {
                           : "Info"
                 }}
               </header>
-              <MessageContent
-                v-if="item.kind === 'assistant' || item.kind === 'user'"
+              <UserMessageBody
+                v-if="item.kind === 'user'"
                 :text="item.text"
-                :label="item.kind === 'assistant' ? 'Assistant message' : 'Your message'"
+                label="Your message"
+                :attachments="item.attachments"
+              />
+              <MessageContent
+                v-else-if="item.kind === 'assistant'"
+                :text="item.text"
+                label="Assistant message"
               />
               <p v-else class="message-body">{{ item.text }}</p>
             </article>

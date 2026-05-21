@@ -91,29 +91,40 @@ const toasts = useToastStore();
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
   if (!editor) return;
-  editor.update(() => {
-    const node = $createAttachmentNode(a);
-    const space = $createTextNode(" ");
-    const sel = $getSelection();
-    if ($isRangeSelection(sel)) {
-      sel.insertNodes([node, space]);
-    } else {
-      // No active selection (drag-drop before the editor has focus).
-      // Ensure there's a paragraph to append to, then append both nodes.
-      const root = $getRoot();
-      let last = root.getLastChild();
-      if (!$isElementNode(last)) {
-        last = $createParagraphNode();
-        root.append(last);
+  editor.update(
+    () => {
+      const node = $createAttachmentNode(a);
+      const space = $createTextNode(" ");
+      const sel = $getSelection();
+      if ($isRangeSelection(sel)) {
+        sel.insertNodes([node, space]);
+      } else {
+        // No active selection (drag-drop before the editor has focus).
+        // Ensure there's a paragraph to append to, then append both nodes.
+        const root = $getRoot();
+        let last = root.getLastChild();
+        if (!$isElementNode(last)) {
+          last = $createParagraphNode();
+          root.append(last);
+        }
+        (last as ElementNode).append(node);
+        (last as ElementNode).append(space);
       }
-      (last as ElementNode).append(node);
-      (last as ElementNode).append(space);
-    }
-    // Place caret AFTER the trailing space so the next keystroke
-    // continues plain typing.
-    space.selectEnd();
-  });
-  editor.focus();
+      // Place caret AFTER the trailing space so the next keystroke
+      // continues plain typing.
+      space.selectEnd();
+    },
+    {
+      // Focus AFTER the reconcile so the contenteditable DOM exists
+      // and the caret-from-space-selectEnd is mounted. Plain
+      // `editor.focus()` outside the update can race with reconcile
+      // (especially on drag-drop where the drag source had focus and
+      // we need to claim it back).
+      onUpdate: () => {
+        editor.focus(undefined, { defaultSelection: "rootEnd" });
+      },
+    },
+  );
 }
 
 const MAX_BLOB_BYTES = 8 * 1024 * 1024; // 8 MiB safety cap

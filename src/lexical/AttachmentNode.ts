@@ -65,19 +65,27 @@ export class AttachmentNode extends DecoratorNode<null> {
   }
 
   createDOM(_config: EditorConfig): HTMLElement {
+    // Capture the payload + derived values up-front. Lexical wraps
+    // nodes in a read-only proxy after createDOM; reading
+    // `this.__attachment` from event listeners later throws
+    // "'get' on proxy: property '__attachment' is a read-only and
+    // non-configurable data property...". Local-variable captures
+    // sidestep the proxy entirely.
+    const attachment = this.__attachment;
+    const isImage =
+      attachment.type === "blob" &&
+      (attachment.mimeType ?? "").startsWith("image/");
+    const label = labelForAttachment(attachment);
+
     const dom = document.createElement("span");
     dom.className = "composer-attachment-pill";
-    dom.dataset.attachmentType = this.__attachment.type;
-    const isImage =
-      this.__attachment.type === "blob" &&
-      (this.__attachment.mimeType ?? "").startsWith("image/");
+    dom.dataset.attachmentType = attachment.type;
     if (isImage) {
       dom.dataset.attachmentKind = "image";
     }
     const icon = document.createElement("i");
-    icon.className = `pi ${iconClassForAttachment(this.__attachment, isImage)} composer-attachment-pill-icon`;
+    icon.className = `pi ${iconClassForAttachment(attachment, isImage)} composer-attachment-pill-icon`;
     icon.setAttribute("aria-hidden", "true");
-    const label = labelForAttachment(this.__attachment);
     const text = document.createElement("span");
     text.className = "composer-attachment-pill-label";
     text.textContent = label;
@@ -98,7 +106,7 @@ export class AttachmentNode extends DecoratorNode<null> {
     dom.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      void openAttachment(this.__attachment);
+      void openAttachment(attachment);
     });
     return dom;
   }
