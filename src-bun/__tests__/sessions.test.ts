@@ -379,6 +379,10 @@ describe("SessionRegistry", () => {
 		await reg.create({ workingDirectory: "C:\\repo" });
 		expect(client.createdConfigs[0]).toMatchObject({
 			workingDirectory: "C:\\repo",
+			// Workspace-level MCP + skill discovery is always on — flipping
+			// it off would silently break any `.mcp.json` in the user's
+			// repo. Pinned by this test.
+			enableConfigDiscovery: true,
 		});
 		// Empty / whitespace-only paths must NOT be forwarded — the SDK
 		// would treat them literally instead of falling back to its

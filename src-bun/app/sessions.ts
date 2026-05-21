@@ -192,6 +192,15 @@ export class SessionRegistry {
 	/// because handlers close over `this` (registry state).
 	private baseSessionConfig(sessionId: () => string) {
 		return {
+			// Auto-discover workspace-level MCP server configs (.mcp.json,
+			// .vscode/mcp.json) and skill directories. Defaults to false
+			// in the SDK, which meant a user dropping an .mcp.json in
+			// their repo saw nothing. Custom instruction files
+			// (.github/copilot-instructions.md, AGENTS.md, etc.) are
+			// loaded regardless. Explicit `mcpServers` / `skillDirectories`
+			// would take precedence on collision — we don't supply any
+			// yet, so discovery is the only source.
+			enableConfigDiscovery: true,
 			tools: buildBuiltInTools(this),
 			onPermissionRequest: (request: PermissionRequest): Promise<PermissionRequestResult> => {
 				const sid = sessionId();
