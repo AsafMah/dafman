@@ -4,7 +4,27 @@
 // differently and never confused with model output.
 
 import { pickNumber, pickString } from "../chatEvents";
+import type { ChatItem } from "../chatEvents";
 import type { Handler } from "./context";
+
+const COMPACTION_START = "Compacting conversation...";
+const COMPACTION_COMPLETE = "Compaction complete.";
+const COMPACTION_FAILED_PREFIX = "Compaction failed:";
+
+function lastCompactionItem(items: ChatItem[]): ChatItem | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item?.kind !== "system") continue;
+    if (
+      item.text === COMPACTION_START ||
+      item.text === COMPACTION_COMPLETE ||
+      item.text.startsWith(COMPACTION_FAILED_PREFIX)
+    ) {
+      return item;
+    }
+  }
+  return null;
+}
 
 /// Parse the CLI's two fork-info wording variants:
 ///   "Forked this session into <name>." → into
@@ -76,15 +96,17 @@ export const calloutHandlers: Record<string, Handler> = {
   },
 
   "session.compaction_start": (ctx) => {
-    ctx.pushSystem("Compacting conversation...", "info");
+    const last = lastCompactionItem(ctx.items);
+    if (last?.kind === "system" && last.text === COMPACTION_START) return;
+    ctx.pushSystem(COMPACTION_START, "info");
   },
 
   "session.compaction_complete": (ctx, data) => {
     const err = pickString(data, ["errorMessage"]);
-    ctx.pushSystem(
-      err ? `Compaction failed: ${err}` : "Compaction complete.",
-      err ? "warn" : "info",
-    );
+    const text = err ? `Compaction failed: ${err}` : COMPACTION_COMPLETE;
+    const last = lastCompactionItem(ctx.items);
+    if (last?.kind === "system" && last.text === text) return;
+    ctx.pushSystem(text, err ? "warn" : "info");
   },
 
   "model.call_failure": (ctx, data) => {

@@ -36,7 +36,44 @@ export interface SessionCommand {
 	group: string;
 	/// Execute the command against `sessionId`. May return a promise;
 	/// the palette closes optimistically.
-	run(sessionId: string): void | Promise<void>;
+	run(sessionId: string, args?: string): void | Promise<void>;
+}
+
+function parseSlashCommand(text: string): { slash: string; args: string } | null {
+	const trimmed = text.trim();
+	if (!trimmed.startsWith("/")) return null;
+	const match = trimmed.match(/^(\/\S+)(?:\s+([\s\S]*))?$/);
+	if (!match) return null;
+	return { slash: match[1].toLowerCase(), args: (match[2] ?? "").trim() };
+}
+
+function pushLocalSystem(sessionId: string, text: string): void {
+	const sessions = useSessionsStore();
+	const record = sessions.sessions.find((s) => s.id === sessionId);
+	if (!record) return;
+	record.events.push({
+		sessionId,
+		eventType: "system.notification",
+		data: { content: text },
+	});
+}
+
+/// Runs Dafman's local slash command when the typed text is one of
+/// our registered session commands. `/cd` is handled locally because
+/// Dafman owns the visible workspace chip and can resume the SDK
+/// session with a new `workingDirectory`.
+export async function runLocalSlashCommand(
+	sessionId: string,
+	text: string,
+): Promise<boolean> {
+	const parsed = parseSlashCommand(text);
+	if (!parsed) return false;
+	const cmd = SESSION_COMMANDS.find(
+		(c) => c.slash.toLowerCase() === parsed.slash,
+	);
+	if (!cmd) return false;
+	await cmd.run(sessionId, parsed.args);
+	return true;
 }
 
 export const SESSION_COMMANDS: SessionCommand[] = [
@@ -83,22 +120,26 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 		},
 	},
 	{
-		slash: "/cwd",
-		label: "Show working directory",
-		description: "Reveal the session's cwd in the OS file explorer.",
+		slash: "/cd",
+		label: "Change working directory",
+		description: "Display this session's cwd. Type /cd <path> to change it.",
 		icon: "pi-folder-open",
 		group: "Session",
-		keywords: ["workspace", "directory", "path"],
-		run: async (sessionId) => {
+		keywords: ["workspace", "directory", "path", "change", "cwd"],
+		run: async (sessionId, args = "") => {
 			const sessions = useSessionsStore();
-			const record = sessions.sessions.find((s) => s.id === sessionId);
-			const toasts = useToastStore();
-			if (!record?.workingDirectory) {
-				toasts.warn("No working directory", "This session has no cwd set.");
+			const trimmed = args.trim();
+			if (!trimmed) {
+				const record = sessions.sessions.find((s) => s.id === sessionId);
+				pushLocalSystem(
+					sessionId,
+					record?.workingDirectory
+						? `Current working directory: ${record.workingDirectory}`
+						: "Current working directory: default Copilot CLI process cwd",
+				);
 				return;
 			}
-			const { invokeCommand } = await import("../ipc/invoke");
-			await invokeCommand("revealPath", { path: record.workingDirectory });
+			await sessions.setSessionWorkingDirectory(sessionId, trimmed);
 		},
 	},
 	{

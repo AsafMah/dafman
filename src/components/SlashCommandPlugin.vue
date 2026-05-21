@@ -102,35 +102,39 @@ async function onSelectOption(payload: {
     @select-option="onSelectOption"
   >
     <template #default="{ anchorElementRef, itemProps }">
-      <div
+      <Teleport
         v-if="itemProps.options.length > 0 && anchorElementRef"
-        class="slash-menu"
-        role="listbox"
+        :to="anchorElementRef"
       >
-        <button
-          v-for="(opt, i) in (itemProps.options as SlashOption[])"
-          :key="opt.cmd.slash"
-          type="button"
-          class="slash-item"
-          :class="{ 'is-selected': i === itemProps.selectedIndex }"
-          role="option"
-          :aria-selected="i === itemProps.selectedIndex"
-          @mousedown.prevent
-          @click="itemProps.selectOptionAndCleanUp(opt)"
-          @mouseenter="itemProps.setHighlightedIndex(i)"
+        <div
+          class="slash-menu"
+          role="listbox"
         >
-          <i
-            v-if="opt.cmd.icon"
-            class="pi slash-item-icon"
-            :class="opt.cmd.icon"
-            aria-hidden="true"
-          />
-          <span class="slash-item-text">
-            <span class="slash-item-name">{{ opt.cmd.slash }}</span>
-            <span class="slash-item-desc">{{ opt.cmd.description }}</span>
-          </span>
-        </button>
-      </div>
+          <button
+            v-for="(opt, i) in (itemProps.options as SlashOption[])"
+            :key="opt.cmd.slash"
+            type="button"
+            class="slash-item"
+            :class="{ 'is-selected': i === itemProps.selectedIndex }"
+            role="option"
+            :aria-selected="i === itemProps.selectedIndex"
+            @mousedown.prevent
+            @click="itemProps.selectOptionAndCleanUp(opt)"
+            @mouseenter="itemProps.setHighlightedIndex(i)"
+          >
+            <i
+              v-if="opt.cmd.icon"
+              class="pi slash-item-icon"
+              :class="opt.cmd.icon"
+              aria-hidden="true"
+            />
+            <span class="slash-item-text">
+              <span class="slash-item-name">{{ opt.cmd.slash }}</span>
+              <span class="slash-item-desc">{{ opt.cmd.description }}</span>
+            </span>
+          </button>
+        </div>
+      </Teleport>
     </template>
   </TypeaheadMenuPlugin>
 </template>
@@ -138,7 +142,8 @@ async function onSelectOption(payload: {
 <style scoped>
 /* CSS-only "pop above the caret" — the lexical-vue anchor positions
  * absolutely at the caret line; transform: translateY(-100%) lifts
- * the menu by its own height, then -12px adds breathing room. No
+ * the menu by its own height, then another line-height lifts it clear
+ * of the typed trigger line. No
  * JS measurement, no race with first render. */
 .slash-menu {
   display: flex;
@@ -151,7 +156,7 @@ async function onSelectOption(payload: {
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
-  transform: translateY(calc(-100% - 12px));
+  transform: translateY(calc(-100% - 2rem));
   z-index: 100;
 }
 

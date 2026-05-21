@@ -45,7 +45,7 @@ export function createElectrobunBridge(): {
   const pendingListeners = new Set<PendingRequestListener>();
 
   const rpc = Electroview.defineRPC<ElectrobunRpcType>({
-    maxRequestTime: 30000,
+    maxRequestTime: 120000,
     handlers: {
       requests: {},
       messages: {

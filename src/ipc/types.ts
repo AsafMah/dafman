@@ -249,6 +249,14 @@ export type CommandMap = {
     args: { sessionId: string; name: string };
     result: string;
   };
+  setSessionWorkingDirectory: {
+    args: {
+      sessionId: string;
+      workingDirectory: string;
+      baseWorkingDirectory?: string | null;
+    };
+    result: string;
+  };
   compactSessionHistory: {
     args: { sessionId: string };
     result: SessionHistoryCompactionResult;

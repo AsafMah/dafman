@@ -45,10 +45,13 @@ import { markdownNodes } from "../lexical/nodes";
 import { lexicalTheme } from "../lexical/theme";
 import type { DefaultSendMode } from "../stores/sessionsStore";
 import type { SendMessageAttachment } from "../ipc/types";
+import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "../stores/toastStore";
+import { runLocalSlashCommand } from "../lib/sessionCommands";
 import SlashCommandPlugin from "./SlashCommandPlugin.vue";
 import MentionPlugin from "./MentionPlugin.vue";
 import AttachmentStrip from "./AttachmentStrip.vue";
+import ModeButtonGroup from "./ModeButtonGroup.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -65,7 +68,7 @@ const props = withDefaults(
   }>(),
   {
     disabled: false,
-    placeholder: "Ask anything. Ctrl+Enter to send.",
+    placeholder: "Ask anything — use @ to attach files, / for commands.",
     enableMarkdownShortcuts: true,
     defaultMode: "steer",
     sessionId: undefined,
@@ -217,6 +220,58 @@ function appendText(value: string): void {
   setTimeout(() => editor.focus(), 0);
 }
 
+/// Imperative file-picker trigger for the attach button. The hidden
+/// `<input type="file" multiple>` is the standard cross-browser way
+/// to open a native file chooser; we forward the chosen File objects
+/// to the same `blobFromFile` path that drag-drop + paste use. For
+/// `<input type="file">` (no path access in WebView2 / browsers) we
+/// can only ship the file as a blob — the SDK's `file` attachment
+/// kind needs an absolute filesystem path, which isn't exposed here.
+const fileInput = ref<HTMLInputElement | null>(null);
+
+function pickFiles() {
+  fileInput.value?.click();
+}
+
+async function onPickedFiles(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = input.files;
+  if (!files) return;
+  for (const f of Array.from(files)) {
+    const a = await blobFromFile(f);
+    if (a) addAttachment(a);
+  }
+  // Reset so the same file can be re-picked after removal.
+  input.value = "";
+}
+
+/// Open an attachment for inspection. File attachments reveal in
+/// the OS file explorer; blob attachments (pasted screenshots etc.)
+/// pop a viewer window via an object URL.
+function onOpenAttachment(idx: number): void {
+  const a = attachments.value[idx];
+  if (!a) return;
+  if (a.type === "file" || a.type === "directory") {
+    // Bun-side `revealPath` handles both files and directories.
+    void invokeCommand("revealPath", { path: a.path }).catch(() => {
+      toasts.warn("Couldn't open", a.path);
+    });
+  } else if (a.type === "blob") {
+    try {
+      const bin = atob(a.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: a.mimeType });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      // Revoke shortly so the popup has time to claim it.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toasts.warn("Couldn't preview attachment");
+    }
+  }
+}
+
 defineExpose({ focus: focusComposer, setText, appendText });
 
 const editable = computed(() => !props.disabled);
@@ -236,7 +291,10 @@ const initialConfig = computed(() => ({
   },
 }));
 
-function onSubmit(payload: ComposerSubmitPayload) {
+async function onSubmit(payload: ComposerSubmitPayload) {
+  if (props.sessionId && await runLocalSlashCommand(props.sessionId, payload.text)) {
+    return;
+  }
   const merged: ComposerSubmitPayload & {
     attachments?: SendMessageAttachment[];
   } = {
@@ -355,77 +413,172 @@ const SubmitButton = defineComponent({
 
 <template>
   <div class="lex-composer" @dragover.prevent @drop="onDrop">
-    <AttachmentStrip
-      :attachments="attachments"
-      @remove="removeAttachment"
+    <input
+      ref="fileInput"
+      type="file"
+      class="lex-file-input"
+      multiple
+      @change="onPickedFiles"
     />
-    <LexicalComposer :initial-config="initialConfig">
-      <EditableSync :editable="editable" />
-      <SubmitOnEnter @submit="onSubmit" />
-      <TypingDiagnostic v-if="diagEnabled" />
-      <SlashCommandPlugin
-        v-if="props.sessionId"
-        :session-id="props.sessionId"
+    <div class="lex-composer-frame">
+      <AttachmentStrip
+        v-if="attachments.length > 0"
+        :attachments="attachments"
+        @remove="removeAttachment"
+        @open="onOpenAttachment"
       />
-      <MentionPlugin
-        v-if="props.sessionId"
-        :session-id="props.sessionId"
-        @attach="addAttachment"
-      />
-      <!-- Optional leading content rendered inside the composer's flex
-           row, before the input shell. Chat surfaces use this to host
-           the run-mode segmented control so it shares the composer's
-           border-top, padding, and height alignment. -->
-      <slot name="leading" />
-      <div class="lex-composer-shell" @paste="onPaste">
-        <template v-if="richText">
-          <RichTextPlugin>
-            <template #contentEditable>
-              <ContentEditable
-                class="lex-content lex-composer-input"
-                role="textbox"
-                :aria-multiline="true"
-                :aria-disabled="props.disabled"
-                :aria-label="placeholder"
-              />
-            </template>
-            <template #placeholder>
-              <div class="lex-composer-placeholder">{{ placeholder }}</div>
-            </template>
-          </RichTextPlugin>
-          <ListPlugin />
-          <LinkPlugin />
-          <RegisterMarkdownShortcuts />
-        </template>
-        <template v-else>
-          <PlainTextPlugin>
-            <template #contentEditable>
-              <ContentEditable
-                class="lex-content lex-composer-input"
-                role="textbox"
-                :aria-multiline="true"
-                :aria-disabled="props.disabled"
-                :aria-label="placeholder"
-              />
-            </template>
-            <template #placeholder>
-              <div class="lex-composer-placeholder">{{ placeholder }}</div>
-            </template>
-          </PlainTextPlugin>
-        </template>
-        <HistoryPlugin />
-        <AutoFocusPlugin />
-      </div>
-      <SubmitButton
-        :disabled="props.disabled"
-        :label="primaryLabel"
-        :icon="primaryIcon"
-        :tooltip="primaryTooltip"
-        :model="defaultModeItems"
-        @submit="onSubmit"
-      />
-      <EditorRefCapture />
-    </LexicalComposer>
+      <LexicalComposer :initial-config="initialConfig">
+        <EditableSync :editable="editable" />
+        <SubmitOnEnter @submit="onSubmit" />
+        <TypingDiagnostic v-if="diagEnabled" />
+        <SlashCommandPlugin
+          v-if="props.sessionId"
+          :session-id="props.sessionId"
+        />
+        <MentionPlugin
+          v-if="props.sessionId"
+          :session-id="props.sessionId"
+          @attach="addAttachment"
+        />
+        <div class="lex-composer-shell" @paste="onPaste">
+          <template v-if="richText">
+            <RichTextPlugin>
+              <template #contentEditable>
+                <ContentEditable
+                  class="lex-content lex-composer-input"
+                  role="textbox"
+                  :aria-multiline="true"
+                  :aria-disabled="props.disabled"
+                  :aria-label="placeholder"
+                />
+              </template>
+              <template #placeholder>
+                <div class="lex-composer-placeholder">{{ placeholder }}</div>
+              </template>
+            </RichTextPlugin>
+            <ListPlugin />
+            <LinkPlugin />
+            <RegisterMarkdownShortcuts />
+          </template>
+          <template v-else>
+            <PlainTextPlugin>
+              <template #contentEditable>
+                <ContentEditable
+                  class="lex-content lex-composer-input"
+                  role="textbox"
+                  :aria-multiline="true"
+                  :aria-disabled="props.disabled"
+                  :aria-label="placeholder"
+                />
+              </template>
+              <template #placeholder>
+                <div class="lex-composer-placeholder">{{ placeholder }}</div>
+              </template>
+            </PlainTextPlugin>
+          </template>
+          <HistoryPlugin />
+          <AutoFocusPlugin />
+        </div>
+        <footer class="lex-composer-toolbar">
+          <button
+            type="button"
+            class="lex-toolbar-btn"
+            title="Attach files"
+            aria-label="Attach files"
+            :disabled="props.disabled"
+            @click="pickFiles"
+          >
+            <i class="pi pi-paperclip" aria-hidden="true" />
+          </button>
+          <ModeButtonGroup
+            v-if="props.sessionId"
+            :session-id="props.sessionId"
+          />
+          <!-- Slot for per-session controls (model picker, reasoning
+               effort, options gear). ChatWindow plugs SessionHeaderControls
+               here so the chat tile no longer needs its own header strip. -->
+          <slot name="session-controls" />
+          <div class="lex-toolbar-spacer" />
+          <SubmitButton
+            :disabled="props.disabled"
+            :label="primaryLabel"
+            :icon="primaryIcon"
+            :tooltip="primaryTooltip"
+            :model="defaultModeItems"
+            @submit="onSubmit"
+          />
+        </footer>
+        <EditorRefCapture />
+      </LexicalComposer>
+    </div>
   </div>
 </template>
 
+
+<style scoped>
+.lex-file-input {
+  display: none;
+}
+
+.lex-composer-frame {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--accent, var(--p-content-border-color)) 50%, var(--p-content-border-color));
+  border-radius: var(--p-border-radius-md, 8px);
+  background: var(--p-content-background);
+  overflow: hidden;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  margin: 0.5rem;
+}
+
+.lex-composer-frame:focus-within {
+  border-color: var(--accent, var(--p-primary-color));
+  box-shadow: 0 0 0 1px var(--accent, var(--p-primary-color));
+}
+
+.lex-composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border-top: 1px solid color-mix(in srgb, var(--p-content-border-color) 60%, transparent);
+  background: color-mix(in srgb, var(--p-content-background) 95%, var(--p-text-color));
+  /* SessionHeaderControls uses container queries to shrink its
+   * children. Give it a container context here so it reacts to the
+   * toolbar's width, not the page width. */
+  container-type: inline-size;
+  flex-wrap: wrap;
+}
+
+.lex-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.lex-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: var(--p-border-radius-sm, 4px);
+  border: 0;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.lex-toolbar-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  color: var(--p-text-color);
+}
+
+.lex-toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lex-toolbar-btn .pi {
+  font-size: 1rem;
+}
+</style>

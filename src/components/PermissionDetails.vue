@@ -74,6 +74,11 @@ const toolArgsJson = computed(() => {
 const memoryContent = computed(() => pickStr("content", "text", "memory"));
 const hookName = computed(() => pickStr("hookName", "name", "hook"));
 
+/// Human-readable reason the agent provided. Present on read / write
+/// / url permission requests per the SDK shape. Surfaced above the
+/// per-kind chip so the user sees *why* before *what*.
+const intention = computed(() => pickStr("intention"));
+
 // Raw fallback ------------------------------------------------------
 const rawJsonHtml = computed(() => {
   try {
@@ -107,6 +112,7 @@ const hasFocusedView = computed(() => {
 
 <template>
   <div class="perm-details">
+    <p v-if="intention" class="perm-intention">{{ intention }}</p>
     <!-- shell -->
     <template v-if="request.kind === 'shell' && hasFocusedView">
       <CommandBlock :code="shellCommand!" lang="bash" />
@@ -191,6 +197,13 @@ const hasFocusedView = computed(() => {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.4rem;
+}
+
+.perm-intention {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+  line-height: 1.4;
 }
 
 .perm-meta {

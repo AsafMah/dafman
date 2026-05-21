@@ -329,4 +329,72 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(calls.find((c) => c.body === "your name?")).toBeTruthy();
     expect(calls.find((c) => c.body === "https://oauth.example")).toBeTruthy();
   });
+
+  test("sendMessage forwards attachments and deep-clones reactive payloads", async () => {
+    const { bridge, handlers, calls } = makeFakeBridge();
+    handlers.resumeSession = async (args) =>
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+    handlers.sendMessage = async () => "msg-1";
+    setRpcBridge(bridge);
+
+    const store = useSessionsStore();
+    await store.restoreSession("sess-att");
+
+    const { reactive } = await import("vue");
+    // Wrap in a reactive proxy to simulate the composer's actual
+    // attachments ref — Vue's reactive proxies have historically
+    // failed structured-clone through some IPC bridges. The store's
+    // JSON deep-clone defends against that.
+    const atts = reactive([
+      {
+        type: "file" as const,
+        path: "/abs/src/main.ts",
+        displayName: "src/main.ts",
+      },
+      {
+        type: "blob" as const,
+        data: "AAAA",
+        mimeType: "image/png",
+        displayName: "shot.png",
+      },
+    ]);
+
+    await store.sendMessage("sess-att", "look at this", "steer", atts);
+
+    const sendCall = calls.find((c) => c.name === "sendMessage");
+    expect(sendCall).toBeTruthy();
+    const args = sendCall!.args as {
+      sessionId: string;
+      text: string;
+      mode?: string;
+      attachments?: unknown[];
+    };
+    expect(args.sessionId).toBe("sess-att");
+    expect(args.text).toBe("look at this");
+    expect(args.mode).toBe("immediate");
+    expect(args.attachments).toHaveLength(2);
+    // Plain-object after deep-clone — not a Vue proxy.
+    expect(JSON.stringify(args.attachments)).toBe(
+      JSON.stringify([
+        { type: "file", path: "/abs/src/main.ts", displayName: "src/main.ts" },
+        { type: "blob", data: "AAAA", mimeType: "image/png", displayName: "shot.png" },
+      ]),
+    );
+  });
+
+  test("sendMessage omits the attachments field when none are queued", async () => {
+    const { bridge, handlers, calls } = makeFakeBridge();
+    handlers.resumeSession = async (args) =>
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+    handlers.sendMessage = async () => "msg-2";
+    setRpcBridge(bridge);
+
+    const store = useSessionsStore();
+    await store.restoreSession("sess-noatt");
+    await store.sendMessage("sess-noatt", "hi");
+
+    const sendCall = calls.find((c) => c.name === "sendMessage");
+    expect(sendCall).toBeTruthy();
+    expect("attachments" in (sendCall!.args as object)).toBe(false);
+  });
 });

@@ -24,6 +24,8 @@ import {
 	type UserInputResponse,
 } from "copilot-sdk-supercharged";
 import { randomUUID } from "node:crypto";
+import { stat } from "node:fs/promises";
+import { isAbsolute, resolve } from "node:path";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
@@ -422,7 +424,7 @@ export class SessionRegistry {
 	/// no-op (returns the same id).
 	async resume(
 		sessionId: string,
-		opts: { model?: string; reasoningEffort?: string } = {},
+		opts: { model?: string; reasoningEffort?: string; workingDirectory?: string } = {},
 	): Promise<string> {
 		if (this.entries.has(sessionId)) {
 			log.debug("resume on already-registered session, returning id", {
@@ -444,6 +446,7 @@ export class SessionRegistry {
 				...(opts.reasoningEffort
 					? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
 					: {}),
+				...(opts.workingDirectory ? { workingDirectory: opts.workingDirectory } : {}),
 			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -470,6 +473,61 @@ export class SessionRegistry {
 			});
 		}
 		return actualId;
+	}
+
+	async setWorkingDirectory(
+		sessionId: string,
+		workingDirectory: string,
+		baseWorkingDirectory?: string | null,
+	): Promise<string> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		const requested = workingDirectory.trim();
+		if (!requested) throw AppError.sdk("workingDirectory is required");
+		const base = baseWorkingDirectory?.trim() || process.cwd();
+		const next = isAbsolute(requested) ? requested : resolve(base, requested);
+		let info: Awaited<ReturnType<typeof stat>>;
+		try {
+			info = await stat(next);
+		} catch {
+			throw AppError.sdk(`workingDirectory does not exist: ${next}`);
+		}
+		if (!info.isDirectory()) {
+			throw AppError.sdk(`workingDirectory is not a directory: ${next}`);
+		}
+
+		this.settlePendingForSession(sessionId, "session working directory changed");
+		this.entries.delete(sessionId);
+		entry.unsubscribe();
+		try {
+			await entry.session.disconnect();
+		} catch (err) {
+			log.warn("disconnect-before-cwd-change threw", {
+				sessionId,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
+
+		const client = tryGetClient();
+		let resumed: CopilotSession;
+		try {
+			resumed = await client.resumeSession(sessionId, {
+				...this.baseSessionConfig(() => sessionId),
+				workingDirectory: next,
+			});
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+		const actualId = resumed.sessionId;
+		const unsubscribe = resumed.on((event) => {
+			this.forward(actualId, event);
+		});
+		this.entries.set(actualId, { session: resumed, unsubscribe });
+		log.info("session working directory changed", {
+			sessionId: actualId,
+			workingDirectory: next,
+		});
+		return next;
 	}
 
 	async list(): Promise<SessionMetadataSummary[]> {
@@ -600,6 +658,18 @@ export class SessionRegistry {
 	): Promise<string> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);
+		if (attachments && attachments.length > 0) {
+			log.info("session.send with attachments", {
+				sessionId,
+				attachmentCount: attachments.length,
+				kinds: attachments.map((a) => a.type),
+				// Log just the type+displayName so we don't dump base64
+				// blobs into the log file.
+				names: attachments.map((a) =>
+					"displayName" in a ? a.displayName : null,
+				),
+			});
+		}
 		try {
 			return await entry.session.send({
 				prompt: text,

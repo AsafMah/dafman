@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	_setClientForTest,
 } from "../app/client";
@@ -124,6 +127,7 @@ class FakeClient {
 	createdSessions: FakeSession[] = [];
 	createdConfigs: Array<Record<string, unknown>> = [];
 	resumedSessions: FakeSession[] = [];
+	resumedConfigs: Array<Record<string, unknown>> = [];
 	listed: Array<{
 		sessionId: string;
 		startTime: Date;
@@ -141,7 +145,11 @@ class FakeClient {
 		this.createdSessions.push(s);
 		return s;
 	}
-	async resumeSession(sessionId: string): Promise<FakeSession> {
+	async resumeSession(
+		sessionId: string,
+		config: Record<string, unknown> = {},
+	): Promise<FakeSession> {
+		this.resumedConfigs.push(config);
 		const s = makeFakeSession(sessionId, this.nextResumeHistory);
 		this.nextResumeHistory = [];
 		this.resumedSessions.push(s);
@@ -379,6 +387,22 @@ describe("SessionRegistry", () => {
 		expect(client.createdConfigs[1]).not.toHaveProperty("workingDirectory");
 		await reg.create();
 		expect(client.createdConfigs[2]).not.toHaveProperty("workingDirectory");
+	});
+
+	test("setWorkingDirectory resumes the same session with a validated directory", async () => {
+		const client = new FakeClient();
+		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create({ workingDirectory: "C:\\repo" });
+		const dir = mkdtempSync(join(tmpdir(), "dafman-cwd-"));
+
+		const next = await reg.setWorkingDirectory(id, dir);
+
+		expect(next).toBe(dir);
+		expect(client.resumedSessions[0]?.sessionId).toBe(id);
+		expect(client.resumedConfigs[0]).toMatchObject({
+			workingDirectory: dir,
+		});
 	});
 
 	test("getName returns null for nullish/missing and rejects non-string", async () => {

@@ -264,3 +264,11 @@ exports[`IPC wire contracts RespondToRequestParams — elicitation accept 1`] = 
   "sessionId": "sess-1",
 }
 `;
+
+exports[`IPC wire contracts setSessionWorkingDirectory request shape 1`] = `
+{
+  "baseWorkingDirectory": "C:\\repo\\dafman",
+  "sessionId": "sess-1",
+  "workingDirectory": "..\\other",
+}
+`;

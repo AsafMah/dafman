@@ -608,7 +608,13 @@ export const useSessionsStore = defineStore("sessions", () => {
     mode: SendMode = "steer",
     attachments?: import("../ipc/types").SendMessageAttachment[],
   ): Promise<void> {
-    const atts = attachments && attachments.length > 0 ? attachments : undefined;
+    // Vue reactive proxies don't always survive structured-clone /
+    // JSON serialization through the Electrobun bridge — fields can
+    // be silently dropped on the bun side. Deep-clone via JSON to
+    // strip the proxy wrappers and guarantee plain-object payloads.
+    const atts = attachments && attachments.length > 0
+      ? (JSON.parse(JSON.stringify(attachments)) as import("../ipc/types").SendMessageAttachment[])
+      : undefined;
     if (mode === "interrupt") {
       try {
         await invokeCommand("abortSession", { sessionId });
@@ -726,6 +732,37 @@ export const useSessionsStore = defineStore("sessions", () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       toasts.error("Failed to reset approvals", message);
+      throw err;
+    }
+  }
+
+  async function setSessionWorkingDirectory(
+    sessionId: string,
+    workingDirectory: string,
+  ): Promise<string> {
+    const record = sessions.value.find((s) => s.id === sessionId);
+    const toasts = useToastStore();
+    try {
+      const next = await invokeCommand("setSessionWorkingDirectory", {
+        sessionId,
+        workingDirectory,
+        ...(record?.workingDirectory
+          ? { baseWorkingDirectory: record.workingDirectory }
+          : {}),
+      });
+      if (record) {
+        record.workingDirectory = next;
+        record.events.push({
+          sessionId,
+          eventType: "system.notification",
+          data: { content: `Working directory changed to ${next}` },
+        });
+      }
+      toasts.success("Working directory changed", next);
+      return next;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toasts.error("Failed to change working directory", message);
       throw err;
     }
   }
@@ -936,6 +973,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     setSessionMode,
     setSessionApproveAll,
     resetSessionApprovals,
+    setSessionWorkingDirectory,
     compactSessionHistory,
     editUserMessage,
     retryFromEvent,

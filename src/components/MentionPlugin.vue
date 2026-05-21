@@ -125,30 +125,34 @@ function onSelectOption(payload: {
     @select-option="onSelectOption"
   >
     <template #default="{ anchorElementRef, itemProps }">
-      <div
+      <Teleport
         v-if="itemProps.options.length > 0 && anchorElementRef"
-        class="mention-menu"
-        role="listbox"
+        :to="anchorElementRef"
       >
-        <button
-          v-for="(opt, i) in (itemProps.options as FileOption[])"
-          :key="opt.match.absolutePath"
-          type="button"
-          class="mention-item"
-          :class="{ 'is-selected': i === itemProps.selectedIndex }"
-          role="option"
-          :aria-selected="i === itemProps.selectedIndex"
-          @mousedown.prevent
-          @click="itemProps.selectOptionAndCleanUp(opt)"
-          @mouseenter="itemProps.setHighlightedIndex(i)"
+        <div
+          class="mention-menu"
+          role="listbox"
         >
-          <i class="pi pi-file mention-item-icon" aria-hidden="true" />
-          <span class="mention-item-text">
-            <span class="mention-item-name">{{ opt.match.name }}</span>
-            <span class="mention-item-path">{{ opt.match.path }}</span>
-          </span>
-        </button>
-      </div>
+          <button
+            v-for="(opt, i) in (itemProps.options as FileOption[])"
+            :key="opt.match.absolutePath"
+            type="button"
+            class="mention-item"
+            :class="{ 'is-selected': i === itemProps.selectedIndex }"
+            role="option"
+            :aria-selected="i === itemProps.selectedIndex"
+            @mousedown.prevent
+            @click="itemProps.selectOptionAndCleanUp(opt)"
+            @mouseenter="itemProps.setHighlightedIndex(i)"
+          >
+            <i class="pi pi-file mention-item-icon" aria-hidden="true" />
+            <span class="mention-item-text">
+              <span class="mention-item-name">{{ opt.match.name }}</span>
+              <span class="mention-item-path">{{ opt.match.path }}</span>
+            </span>
+          </button>
+        </div>
+      </Teleport>
     </template>
   </TypeaheadMenuPlugin>
 </template>
@@ -165,7 +169,7 @@ function onSelectOption(payload: {
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
-  transform: translateY(calc(-100% - 12px));
+  transform: translateY(calc(-100% - 2rem));
   z-index: 100;
 }
 

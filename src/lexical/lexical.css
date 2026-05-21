@@ -183,56 +183,48 @@
   color: var(--p-red-300, #fca5a5);
 }
 
-/* Composer-specific layout. The composer's contenteditable sits inside
- * an `InputGroup`-like flex row alongside the submit button. */
+/* Composer-specific layout.
+ *
+ * The new (modern AI-app) layout:
+ *
+ *   .lex-composer                <- outer flex container (column)
+ *     .lex-composer-frame        <- bordered card, owns radius + accent ring
+ *       .attachment-strip        <- inline pills above the input
+ *       .lex-composer-shell      <- the editable region (no border now)
+ *       .lex-composer-toolbar    <- docked controls (attach + mode + send)
+ *
+ * The accent ring lives on `.lex-composer-frame` so it surrounds
+ * pills, input, and toolbar as one cohesive widget. The old per-shell
+ * border + send-button-outside-frame styles are gone.
+ */
 .lex-composer {
   display: flex;
-  align-items: stretch;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border-top: 1px solid var(--p-content-border-color);
+  flex-direction: column;
 }
 
 .lex-composer-shell {
-  flex: 1 1 auto;
   position: relative;
   min-width: 0;
-  /* Use the session accent (inherited from `.chat-tile`) as the
-   * composer's idle border so the per-session identity reaches the
-   * input chrome too. Fall back to the neutral border token when
-   * mounted outside a session tile (dev playground, tests). */
-  border: 1px solid color-mix(in srgb, var(--accent, var(--p-content-border-color)) 50%, var(--p-content-border-color));
-  border-radius: var(--p-border-radius-md);
-  background: var(--p-content-background);
-  /* Block (not flex) — Lexical warns that `display: flex` on the
-   * contenteditable's parent causes unwanted focusing behaviour in
-   * Chrome/WebView2 when clicking outside the editable region. The shell
-   * only has one visible child (the contenteditable) plus an absolutely
-   * positioned placeholder, so block layout is sufficient. */
+  background: transparent;
   display: block;
-}
-
-.lex-composer-shell:focus-within {
-  border-color: var(--accent, var(--p-primary-color));
-  box-shadow: 0 0 0 1px var(--accent, var(--p-primary-color));
 }
 
 /* Send button picks up the session accent inside a composer that lives
  * inside a session tile. Targets the PrimeVue Button by class so the
  * dev playground composer (no `--accent` set) falls back to PrimeVue's
  * default primary colour. */
-.lex-composer .p-button {
+.lex-composer .p-splitbutton .p-button {
   background: var(--accent, var(--p-primary-color));
   border-color: var(--accent, var(--p-primary-color));
   color: var(--p-primary-contrast-color, white);
 }
 
-.lex-composer .p-button:not(:disabled):hover {
+.lex-composer .p-splitbutton .p-button:not(:disabled):hover {
   background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 85%, black);
   border-color: color-mix(in srgb, var(--accent, var(--p-primary-color)) 85%, black);
 }
 
-.lex-composer .p-button:not(:disabled):focus-visible {
+.lex-composer .p-splitbutton .p-button:not(:disabled):focus-visible {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, var(--p-primary-color)) 40%, transparent);
 }
 
@@ -240,16 +232,15 @@
   display: block;
   width: 100%;
   min-width: 0;
-  padding: 0.5rem 0.75rem;
-  min-height: 1.5rem;
-  /* Cap at 60% of the chat tile's height. `--tile-height` is published by
-   * a `ResizeObserver` on `.chat-tile` (`src/components/ChatWindow.vue`).
-   * When the var is missing — e.g. when the composer is mounted outside a
-   * chat tile (dev playground, tests) — fall back to a generous viewport
-   * cap so the textarea never runs away. */
+  padding: 0.6rem 0.75rem;
+  /* Multi-line composer — give the user 2 lines minimum so it reads as
+   * "compose a thought" rather than "tap to type". Caps at 60% of the
+   * chat tile so it never dominates the panel. */
+  min-height: 3rem;
   max-height: calc(var(--tile-height, 100dvh) * 0.6);
   overflow-y: auto;
   color: var(--p-text-color);
+  outline: none;
 }
 
 .lex-composer-input[aria-disabled="true"] {
@@ -259,11 +250,12 @@
 
 .lex-composer-placeholder {
   position: absolute;
-  top: 0.5rem;
+  top: 0.65rem;
   left: 0.75rem;
   color: var(--p-text-muted-color);
   pointer-events: none;
   user-select: none;
+  font-size: 0.9rem;
 }
 
 /* Message display: editor root is non-interactive but still receives

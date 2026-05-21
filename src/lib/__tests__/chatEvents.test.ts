@@ -104,6 +104,52 @@ describe("processEvents", () => {
     expect(result.toasts).toEqual([]);
   });
 
+  test("dedupes repeated compaction status events", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "sess-1",
+          eventType: "session.compaction_start",
+          data: {},
+        },
+        {
+          sessionId: "sess-1",
+          eventType: "session.compaction_start",
+          data: {},
+        },
+        {
+          sessionId: "sess-1",
+          eventType: "session.compaction_complete",
+          data: {},
+        },
+        {
+          sessionId: "sess-1",
+          eventType: "session.compaction_complete",
+          data: {},
+        },
+      ],
+      counter,
+    );
+
+    expect(result.items).toEqual([
+      {
+        id: 1,
+        kind: "system",
+        text: "Compacting conversation...",
+        severity: "info",
+      },
+      {
+        id: 2,
+        kind: "system",
+        text: "Compaction complete.",
+        severity: "info",
+      },
+    ]);
+  });
+
   test("user.message from history replay appends a user item", () => {
     const counter: IdCounter = { next: 1 };
     const result = processEvents(

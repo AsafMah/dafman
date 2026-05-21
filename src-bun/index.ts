@@ -87,7 +87,7 @@ const sessions = new SessionRegistry(
 );
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
-	maxRequestTime: 30000,
+	maxRequestTime: 120000,
 	handlers: {
 		requests: {
 			createClient: rpcGuard(async () => {
@@ -166,6 +166,14 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			),
 			setSessionName: rpcGuard(async ({ sessionId, name }) =>
 				sessions.setName(sessionId, name),
+			),
+			setSessionWorkingDirectory: rpcGuard(
+				async ({ sessionId, workingDirectory, baseWorkingDirectory }) =>
+					sessions.setWorkingDirectory(
+						sessionId,
+						workingDirectory,
+						baseWorkingDirectory,
+					),
 			),
 			compactSessionHistory: rpcGuard(async ({ sessionId }) =>
 				sessions.compactHistory(sessionId),

@@ -5,7 +5,6 @@ import MessageComposer from "./MessageComposer.vue";
 import MessageContent from "./MessageContent.vue";
 import MessageActions from "./MessageActions.vue";
 import MessageEditor from "./MessageEditor.vue";
-import ModeButtonGroup from "./ModeButtonGroup.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
 import PendingRequestCard from "./PendingRequestCard.vue";
@@ -513,16 +512,6 @@ const pendingStyle = computed(() => {
 
 <template>
   <section ref="tileEl" class="chat-tile" :style="{ '--accent': accentColor }">
-    <!-- Per-session controls (model, effort, options gear with run
-         mode / reasoning view / rename / compact / reset) — moved back
-         inside the chat tile because the dockview right-header-actions
-         slot was cramped and ended up rendering empty in some layouts.
-         The strip uses the same `SessionHeaderControls` component the
-         tab strip previously hosted; layout is responsive via the
-         container queries already in that component. -->
-    <header class="chat-tile-header">
-      <SessionHeaderControls :session-id="props.sessionId" />
-    </header>
     <div ref="messagesEl" class="chat-messages">
       <p v-if="items.length === 0" class="empty-message">
         Start typing below to send a message.
@@ -750,8 +739,8 @@ const pendingStyle = computed(() => {
         @submit="sendMessage"
         @update:default-mode="onUpdateDefaultMode"
       >
-        <template #leading>
-          <ModeButtonGroup :session-id="props.sessionId" />
+        <template #session-controls>
+          <SessionHeaderControls :session-id="props.sessionId" />
         </template>
       </MessageComposer>
     </form>
@@ -837,23 +826,6 @@ const pendingStyle = computed(() => {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-}
-
-/* In-tile per-session header strip — hosts SessionHeaderControls
- * (model / effort selects, options gear). Aligns with the chat
- * messages padding so the content reads as one column. */
-.chat-tile-header {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 2.25rem;
-  padding: 0.25rem 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--p-text-color) 8%, transparent);
-  /* SessionHeaderControls uses container queries to shrink its
-   * children. Give it a container context here so it reacts to the
-   * tile width, not the page width. */
-  container-type: inline-size;
 }
 
 .empty-message {

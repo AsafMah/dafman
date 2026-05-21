@@ -387,6 +387,14 @@ export type DafmanRPC = {
 				params: { sessionId: string; name: string };
 				response: string;
 			};
+			setSessionWorkingDirectory: {
+				params: {
+					sessionId: string;
+					workingDirectory: string;
+					baseWorkingDirectory?: string | null;
+				};
+				response: string;
+			};
 			compactSessionHistory: {
 				params: { sessionId: string };
 				response: SessionHistoryCompactionResult;

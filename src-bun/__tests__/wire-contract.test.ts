@@ -155,6 +155,15 @@ describe("IPC wire contracts", () => {
 		expect(sample).toMatchSnapshot();
 	});
 
+	test("setSessionWorkingDirectory request shape", () => {
+		const sample = {
+			sessionId: "sess-1",
+			workingDirectory: "..\\other",
+			baseWorkingDirectory: "C:\\repo\\dafman",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
 	test("PendingRequestPayload — permission", () => {
 		const permission: PermissionRequestData = {
 			kind: "shell",
