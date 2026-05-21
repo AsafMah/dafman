@@ -443,43 +443,55 @@ const SubmitButton = defineComponent({
           @attach="addAttachment"
         />
         <div class="lex-composer-shell" @paste="onPaste">
-          <template v-if="richText">
-            <RichTextPlugin>
-              <template #contentEditable>
-                <ContentEditable
-                  class="lex-content lex-composer-input"
-                  role="textbox"
-                  :aria-multiline="true"
-                  :aria-disabled="props.disabled"
-                  :aria-label="placeholder"
-                />
-              </template>
-              <template #placeholder>
-                <div class="lex-composer-placeholder">{{ placeholder }}</div>
-              </template>
-            </RichTextPlugin>
-            <ListPlugin />
-            <LinkPlugin />
-            <RegisterMarkdownShortcuts />
-          </template>
-          <template v-else>
-            <PlainTextPlugin>
-              <template #contentEditable>
-                <ContentEditable
-                  class="lex-content lex-composer-input"
-                  role="textbox"
-                  :aria-multiline="true"
-                  :aria-disabled="props.disabled"
-                  :aria-label="placeholder"
-                />
-              </template>
-              <template #placeholder>
-                <div class="lex-composer-placeholder">{{ placeholder }}</div>
-              </template>
-            </PlainTextPlugin>
-          </template>
-          <HistoryPlugin />
-          <AutoFocusPlugin />
+          <div class="lex-composer-editor">
+            <template v-if="richText">
+              <RichTextPlugin>
+                <template #contentEditable>
+                  <ContentEditable
+                    class="lex-content lex-composer-input"
+                    role="textbox"
+                    :aria-multiline="true"
+                    :aria-disabled="props.disabled"
+                    :aria-label="placeholder"
+                  />
+                </template>
+                <template #placeholder>
+                  <div class="lex-composer-placeholder">{{ placeholder }}</div>
+                </template>
+              </RichTextPlugin>
+              <ListPlugin />
+              <LinkPlugin />
+              <RegisterMarkdownShortcuts />
+            </template>
+            <template v-else>
+              <PlainTextPlugin>
+                <template #contentEditable>
+                  <ContentEditable
+                    class="lex-content lex-composer-input"
+                    role="textbox"
+                    :aria-multiline="true"
+                    :aria-disabled="props.disabled"
+                    :aria-label="placeholder"
+                  />
+                </template>
+                <template #placeholder>
+                  <div class="lex-composer-placeholder">{{ placeholder }}</div>
+                </template>
+              </PlainTextPlugin>
+            </template>
+            <HistoryPlugin />
+            <AutoFocusPlugin />
+          </div>
+          <div class="lex-composer-send">
+            <SubmitButton
+              :disabled="props.disabled"
+              :label="primaryLabel"
+              :icon="primaryIcon"
+              :tooltip="primaryTooltip"
+              :model="defaultModeItems"
+              @submit="onSubmit"
+            />
+          </div>
         </div>
         <footer class="lex-composer-toolbar">
           <button
@@ -501,14 +513,6 @@ const SubmitButton = defineComponent({
                here so the chat tile no longer needs its own header strip. -->
           <slot name="session-controls" />
           <div class="lex-toolbar-spacer" />
-          <SubmitButton
-            :disabled="props.disabled"
-            :label="primaryLabel"
-            :icon="primaryIcon"
-            :tooltip="primaryTooltip"
-            :model="defaultModeItems"
-            @submit="onSubmit"
-          />
         </footer>
         <EditorRefCapture />
       </LexicalComposer>
@@ -619,7 +623,13 @@ const SubmitButton = defineComponent({
   height: 1.75rem;
 }
 
-.lex-composer-toolbar :deep(.session-header-controls .workspace-chip),
+.lex-composer-toolbar :deep(.session-header-controls .workspace-chip) {
+  /* keep it, but tighten — composer toolbar is shorter than the old tab strip */
+  height: 1.5rem;
+  font-size: 0.72rem;
+  padding: 0 0.45rem;
+}
+
 .lex-composer-toolbar :deep(.compact-select-reasoning) {
   display: none;
 }

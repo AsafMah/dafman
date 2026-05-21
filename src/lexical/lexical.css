@@ -206,7 +206,21 @@
   position: relative;
   min-width: 0;
   background: transparent;
-  display: block;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.lex-composer-editor {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lex-composer-send {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.5rem 0.4rem 0;
+  align-self: flex-end;
 }
 
 /* Send button picks up the session accent inside a composer that lives
