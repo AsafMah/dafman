@@ -364,6 +364,162 @@ describe("processEvents — reasoning_opaque (GPT-5.x encrypted reasoning)", () 
   });
 });
 
+describe("processEvents — reasoning carried on assistant.message", () => {
+  // Verified against the bundled Copilot CLI (node_modules/@github/copilot/app.js):
+  // the CLI emits reasoning as `data.reasoningText` / `data.reasoningOpaque` /
+  // `data.encryptedContent` on the `assistant.message` event itself, NOT on a
+  // separate `assistant.reasoning_delta` stream. That's why the Copilot CLI
+  // terminal renders reasoning while a naive consumer that only listens on
+  // `assistant.reasoning*` sees nothing.
+
+  test("assistant.message with reasoningText synthesizes a reasoning item before the message", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.message",
+          data: {
+            messageId: "m1",
+            content: "Here is the answer.",
+            reasoningText: "Let me think step by step.",
+          },
+          eventId: "evt-m-1",
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(2);
+    const [reasoningItem, assistantItem] = result.items;
+    expect(reasoningItem?.kind).toBe("reasoning");
+    if (reasoningItem?.kind === "reasoning") {
+      expect(reasoningItem.text).toBe("Let me think step by step.");
+      expect(reasoningItem.opaque).toBeFalsy();
+    }
+    expect(assistantItem?.kind).toBe("assistant");
+    if (assistantItem?.kind === "assistant") {
+      expect(assistantItem.text).toBe("Here is the answer.");
+    }
+  });
+
+  test("assistant.message with only encryptedContent (OpenAI) marks the reasoning item opaque", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.message",
+          data: {
+            messageId: "m1",
+            content: "Done.",
+            encryptedContent: "openai-base64-blob",
+          },
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(2);
+    const reasoning = result.items[0];
+    expect(reasoning?.kind).toBe("reasoning");
+    if (reasoning?.kind === "reasoning") {
+      expect(reasoning.opaque).toBe(true);
+      expect(reasoning.text).toBe("");
+    }
+  });
+
+  test("assistant.message with only reasoningOpaque (Anthropic) marks the reasoning item opaque", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.message",
+          data: {
+            messageId: "m1",
+            content: "Done.",
+            reasoningOpaque: "anthropic-encrypted-blob",
+          },
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]?.kind).toBe("reasoning");
+    if (result.items[0]?.kind === "reasoning") {
+      expect(result.items[0].opaque).toBe(true);
+    }
+  });
+
+  test("assistant.message with neither reasoning field skips the reasoning item entirely", () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.message",
+          data: { messageId: "m1", content: "plain answer" },
+        },
+      ],
+      counter,
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.kind).toBe("assistant");
+  });
+
+  test("subsequent assistant.message echoes for the same messageId don't duplicate the reasoning item", () => {
+    const counter: IdCounter = { next: 1 };
+    const first = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.message",
+          data: {
+            messageId: "m1",
+            content: "v1",
+            reasoningText: "thought v1",
+          },
+        },
+      ],
+      counter,
+    );
+    const second = processEvents(
+      first.items,
+      first.ambient,
+      [
+        {
+          sessionId: "s1",
+          eventType: "assistant.message",
+          data: {
+            messageId: "m1",
+            content: "v2",
+            reasoningText: "thought v2",
+          },
+        },
+      ],
+      counter,
+    );
+    expect(second.items).toHaveLength(2);
+    expect(second.items[0]?.kind).toBe("reasoning");
+    if (second.items[0]?.kind === "reasoning") {
+      expect(second.items[0].text).toBe("thought v2");
+    }
+    expect(second.items[1]?.kind).toBe("assistant");
+    if (second.items[1]?.kind === "assistant") {
+      expect(second.items[1].text).toBe("v2");
+    }
+  });
+});
+
 describe("processEvents — fork notices", () => {
   test("session.info infoType=fork (source) parses into a forkNotice item", () => {
     const counter: IdCounter = { next: 1 };

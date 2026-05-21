@@ -30,6 +30,38 @@ export const messageHandlers: Record<string, Handler> = {
     const messageId = pickString(data, ["messageId"]);
     const content = pickString(data, ["content", "text", "message"]);
     if (!messageId) return;
+    // The CLI delivers reasoning AS PART of `assistant.message`, not on
+    // a separate `assistant.reasoning` event. Verified in the bundled
+    // CLI's app.js: it emits `assistant.message` with `reasoningText`
+    // (readable) + `reasoningOpaque` (Anthropic encrypted) +
+    // `encryptedContent` (OpenAI GPT-5.x encrypted) on `data`. No
+    // `assistant.reasoning*` events are emitted from these model
+    // paths at all — the SDK's schema declares them for forward-compat
+    // (and sub-agents may use them), but for the main message stream
+    // the reasoning rides this event. So we harvest it here and
+    // synthesize a reasoning ChatItem keyed to the messageId so it
+    // sits in document order ABOVE the assistant message.
+    const reasoningText = pickString(data, ["reasoningText", "reasoning_text"]);
+    const reasoningOpaque = pickString(data, [
+      "reasoningOpaque",
+      "reasoning_opaque",
+      "encryptedContent",
+      "encrypted_content",
+    ]);
+    if (reasoningText || reasoningOpaque) {
+      // Tie reasoning to its assistant message with a stable id so
+      // repeated emits don't dupe and history replay coalesces.
+      const reasoningKey = `msg:${messageId}`;
+      const reasoningMsg = ctx.upsertReasoning(reasoningKey, payload.eventId);
+      if (reasoningMsg.kind === "reasoning") {
+        if (reasoningText) {
+          reasoningMsg.text = reasoningText;
+          if (reasoningMsg.opaque) reasoningMsg.opaque = false;
+        } else if (reasoningOpaque && !reasoningMsg.text) {
+          reasoningMsg.opaque = true;
+        }
+      }
+    }
     const msg = ctx.upsertAssistant(messageId, payload.eventId);
     if (msg.kind === "assistant") msg.text = content;
   },
