@@ -30,6 +30,7 @@ import App from "./App.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import ChatTab from "./components/ChatTab.vue";
 import ChatTabActions from "./components/ChatTabActions.vue";
+import LogViewer from "./components/LogViewer.vue";
 import SessionsManager from "./components/SessionsManager.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
 import SidebarTab from "./components/SidebarTab.vue";
@@ -122,6 +123,7 @@ async function mountWith(Root: typeof App) {
   app.component("chat", ChatPanel);
   app.component("sessionsManager", SessionsManager);
   app.component("settingsPanel", SettingsPanel);
+  app.component("logViewer", LogViewer);
   app.component("watermark", Watermark);
   app.component("chatTabActions", ChatTabActions);
   app.component("chatTab", ChatTab);

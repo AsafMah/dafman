@@ -11,6 +11,7 @@ import type {
   AppErrorPayload,
   CommandMap,
   CommandName,
+  LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
 } from "./types";
@@ -36,6 +37,8 @@ function formatAppError(payload: AppErrorPayload): string {
       return `Settings error: ${payload.data}`;
     case "Sdk":
       return `SDK error: ${payload.data}`;
+    case "Io":
+      return `I/O error: ${payload.data}`;
   }
 }
 
@@ -46,12 +49,14 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
     kind === "ClientNotStarted" ||
     kind === "SessionNotFound" ||
     kind === "Settings" ||
-    kind === "Sdk"
+    kind === "Sdk" ||
+    kind === "Io"
   );
 }
 
 export type SessionEventListener = (event: SessionEventPayload) => void;
 export type PendingRequestListener = (payload: PendingRequestPayload) => void;
+export type LogEventListener = (record: LogRecord) => void;
 
 /// Minimal surface that the IPC bridge has to implement. Both the real
 /// Electrobun bridge and unit-test fakes match this shape; tests inject a
@@ -63,11 +68,13 @@ export interface RpcBridge {
   ): Promise<InvokeResult<N>>;
   onSessionEvent(listener: SessionEventListener): () => void;
   onPendingRequest(listener: PendingRequestListener): () => void;
+  onLogEvent(listener: LogEventListener): () => void;
 }
 
 let bridge: RpcBridge | null = null;
 const pendingSessionListeners = new Set<SessionEventListener>();
 const pendingPendingRequestListeners = new Set<PendingRequestListener>();
+const pendingLogListeners = new Set<LogEventListener>();
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
@@ -80,6 +87,10 @@ export function setRpcBridge(next: RpcBridge | null): void {
     next.onPendingRequest(listener);
   }
   pendingPendingRequestListeners.clear();
+  for (const listener of pendingLogListeners) {
+    next.onLogEvent(listener);
+  }
+  pendingLogListeners.clear();
 }
 
 export async function invokeCommand<N extends CommandName>(
@@ -110,4 +121,10 @@ export function onPendingRequest(listener: PendingRequestListener): () => void {
   if (bridge) return bridge.onPendingRequest(listener);
   pendingPendingRequestListeners.add(listener);
   return () => pendingPendingRequestListeners.delete(listener);
+}
+
+export function onLogEvent(listener: LogEventListener): () => void {
+  if (bridge) return bridge.onLogEvent(listener);
+  pendingLogListeners.add(listener);
+  return () => pendingLogListeners.delete(listener);
 }

@@ -1,0 +1,16 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`redactFields — sensitive keys nested sensitive keys are caught at every depth 1`] = `
+{
+  "request": {
+    "body": {
+      "_redacted": "content",
+      "_type": "object",
+    },
+    "headers": {
+      "authorization": "***",
+      "x-github-token": "***",
+    },
+  },
+}
+`;

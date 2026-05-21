@@ -88,7 +88,9 @@ src-bun/
     ├── directoryBrowser.ts   ← path autocomplete for the workspace input
     ├── stderrFilter.ts       ← drops known noise from the CLI subprocess
     ├── errors.ts             ← AppError discriminated union + rpcGuard wrapper
-    └── logging.ts            ← JSON-lines daily-rotated log under Utils.paths.userLogs
+    ├── redact.ts             ← shape-only redaction for sensitive/content fields
+    ├── diagnostics.ts        ← bundle export (logs + recent.json + settings + README)
+    └── logging.ts            ← JSON-lines daily-rotated log + live subscribers + ring buffer
 ```
 
 ### Hard rules
@@ -164,6 +166,7 @@ src/
 |--------------------|-----------------------------------------------------------------------------------|
 | `bootStore`        | startup phase (`loading-settings`, `creating-client`, `resuming`, `ready`, `error`) |
 | `clientStore`      | singleton SDK client lifecycle (`createClient` + status)                          |
+| `logStore`         | live log tail + display filter + bun-level mutation                                |
 | `sessionsStore`    | `SessionRecord[]` — events, model, mode, title, working dir, pending requests, FIFO callback queue, ring-buffer cap |
 | `sessionsListStore`| CLI-side session catalog (for the Sessions Manager edge panel)                    |
 | `modelsStore`      | `listModels()` cache + reasoning effort capabilities                              |
@@ -203,6 +206,7 @@ src/
 | `MermaidBlock.vue`         | Lazy mermaid renderer (opt-in via Settings)                       |
 | `CodeEditor.vue`           | CodeMirror 6 wrapper for code-fenced segments                     |
 | `BootSplash.vue`           | Boot-phase status overlay                                         |
+| `LogViewer.vue`            | Live log tail with level + display filter + search + diagnostics export |
 | `Watermark.vue`            | Empty-state body watermark                                        |
 
 ### Hard rules
@@ -256,6 +260,8 @@ memory / custom-tool) or a `domain` for url permissions.
 
 **Diagnostics**
 `rendererLog` — renderer mirrors `console.error` into the bun JSON log.
+`getLogState`, `setLogLevel`, `exportDiagnostics` — back the in-app log
+viewer (`LogViewer.vue`) and the diagnostics bundle export.
 
 ### Webview messages (bun → renderer)
 
@@ -264,6 +270,9 @@ memory / custom-tool) or a `domain` for url permissions.
   attribution.
 - `pendingRequest` — pushed when an SDK callback fires (permission /
   userInput / elicitation). Renderer enqueues on the session's FIFO queue.
+- `logEvent` — fanned out by `subscribeLogs()` for every emitted log record
+  (irrespective of the configured level). The in-app log viewer subscribes
+  and applies its own display filter.
 
 ### Reducer (`src/lib/chatEvents.ts`)
 

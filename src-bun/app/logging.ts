@@ -1,21 +1,22 @@
-// Tiny JSON-lines logger.
+// JSON-lines logger with redaction + live subscribers.
 //
-// Replaces the Rust `tracing` + daily-rotating file appender. Levels
-// match the old crate (`error`/`warn`/`info`/`debug`/`trace`). Output
-// goes to:
-//   - stderr in dev (level >= debug by default)
-//   - `<logDir>/dafman-YYYY-MM-DD.log` (newline-delimited JSON)
+// Output is two-pronged:
+//   * stderr mirror in dev (always; for warn/error always).
+//   * `<logDir>/dafman-YYYY-MM-DD.log` file (newline-delimited JSON).
+//   * Live in-process subscribers (the in-app log viewer).
 //
-// The log directory is resolved at app start (typically
-// `Utils.paths.userLogs`) and threaded into `init`. Until `init` is
-// called the logger writes to stderr only — handy for unit tests under
-// `bun test` where filesystem side-effects are unwanted.
+// Levels: trace / debug / info / warn / error. `setLevel` mutates at
+// runtime so Settings → Diagnostics can switch verbosity without a
+// restart. Subscribers receive every emitted record regardless of the
+// filter level — gating happens client-side in the viewer so the user
+// can flip the filter without missing data.
 //
 // Domain modules import `log` directly; no Tauri-style instrumentation
 // macros to maintain.
 
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { redactFields } from "./redact";
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
 
@@ -27,6 +28,14 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
 	error: 50,
 };
 
+/// One emitted log record. Stable shape for the wire contract.
+export interface LogRecord {
+	ts: string;          // ISO-8601 UTC
+	level: LogLevel;
+	message: string;
+	[key: string]: unknown; // structured fields (already redacted)
+}
+
 interface LoggerConfig {
 	level: LogLevel;
 	logDir: string | null;
@@ -36,6 +45,16 @@ const config: LoggerConfig = {
 	level: parseLevel(process.env.DAFMAN_LOG) ?? "info",
 	logDir: null,
 };
+
+type Subscriber = (record: LogRecord) => void;
+const subscribers = new Set<Subscriber>();
+
+/// Ring buffer of recent records, for the in-app log viewer's initial
+/// fill. The renderer subscribes via `subscribeLogs()` for live tail,
+/// but a fresh subscription needs prior context (e.g. an error that
+/// happened at startup before the panel was opened).
+const RECENT_CAP = 1000;
+const recent: LogRecord[] = [];
 
 function parseLevel(raw: string | undefined): LogLevel | null {
 	if (!raw) return null;
@@ -59,20 +78,46 @@ function pad(n: number): string {
 	return n < 10 ? `0${n}` : String(n);
 }
 
+/// Build a record. Fields run through `redactFields` so secrets / large
+/// payloads / prompts never reach disk or subscribers. The exported
+/// function is also reusable in tests that want to verify the redaction
+/// pipeline directly.
+export function buildRecord(
+	level: LogLevel,
+	message: string,
+	fields?: Record<string, unknown>,
+): LogRecord {
+	const redacted = fields ? redactFields(fields) : undefined;
+	return {
+		ts: new Date().toISOString(),
+		level,
+		message,
+		...(redacted ?? {}),
+	};
+}
+
 async function emit(
 	level: LogLevel,
 	message: string,
 	fields?: Record<string, unknown>,
 ): Promise<void> {
+	const record = buildRecord(level, message, fields);
+	// Fan-out happens irrespective of the configured level so subscribers
+	// (in-app log viewer) see everything. The viewer applies its own
+	// filter.
+	pushRecent(record);
+	for (const sub of subscribers) {
+		try {
+			sub(record);
+		} catch {
+			// Subscriber errors are not logger's problem.
+		}
+	}
+	// Below-level records skip stderr + file IO but DO still feed
+	// subscribers + the ring buffer (so a user who flips the filter to
+	// debug sees recent debug context).
 	if (!shouldEmit(level)) return;
-	const record = {
-		ts: new Date().toISOString(),
-		level,
-		message,
-		...(fields ?? {}),
-	};
 	const line = `${JSON.stringify(record)}\n`;
-	// Stderr mirror for dev visibility. Errors and warnings always echo.
 	if (level === "error" || level === "warn" || isDev()) {
 		process.stderr.write(line);
 	}
@@ -82,6 +127,13 @@ async function emit(
 		await appendFile(file, line);
 	} catch {
 		// Best-effort; never let logging crash the host.
+	}
+}
+
+function pushRecent(record: LogRecord) {
+	recent.push(record);
+	if (recent.length > RECENT_CAP) {
+		recent.splice(0, recent.length - RECENT_CAP);
 	}
 }
 
@@ -121,8 +173,39 @@ export function getLogDir(): string {
 	return config.logDir ?? "";
 }
 
+export function getLogLevel(): LogLevel {
+	return config.level;
+}
+
+/// Mutate the level at runtime. Used by Settings → Diagnostics.
+export function setLogLevel(level: LogLevel): LogLevel {
+	config.level = level;
+	return level;
+}
+
+/// Subscribe to live log records. Returns an unsubscribe callback.
+/// Subscribers get EVERY emitted record (no level filter) so the
+/// in-app viewer can switch its filter without losing history.
+export function subscribeLogs(fn: Subscriber): () => void {
+	subscribers.add(fn);
+	return () => {
+		subscribers.delete(fn);
+	};
+}
+
+/// Snapshot of recent records (most recent last). Used by the in-app
+/// viewer to fill on open. Capped at RECENT_CAP (1000) entries.
+export function recentLogs(limit?: number): LogRecord[] {
+	if (limit === undefined || limit >= recent.length) {
+		return recent.slice();
+	}
+	return recent.slice(recent.length - limit);
+}
+
 /// Test-only: reset internal state.
 export function _resetLogger(): void {
 	config.logDir = null;
 	config.level = parseLevel(process.env.DAFMAN_LOG) ?? "info";
+	subscribers.clear();
+	recent.length = 0;
 }

@@ -6,8 +6,10 @@ on:
     branches: [main]
 
 jobs:
+  # Tier-1 gate: lint, test, vite build, Playwright renderer smoke.
+  # Linux-only because none of these need a real Electrobun bundle.
   check:
-    name: Lint + test + build
+    name: Lint + test + smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +18,7 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Lint (vue-tsc -b)
+      - name: Lint (vue-tsc)
         run: bun run lint
       - name: Test (bun test)
         run: bun test
@@ -25,11 +27,9 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install chromium --with-deps
       - name: Renderer smoke (Playwright)
-        # Required check — must pass for the PR to merge.
-        # `bun run smoke:run` reuses the dist/ Vite already built above,
-        # launches `vite preview` via Playwright's webServer config,
-        # asserts the boot splash mounts and the bundle reaches "ready"
-        # without console errors.
+        # Required check — must pass for the PR to merge. Asserts the
+        # bundle reaches "ready" without console errors on both the
+        # prod (`vite preview`) and HMR (`vite dev`) entry points.
         run: bun run smoke:run
       - name: Upload Playwright report on failure
         if: failure()
@@ -38,5 +38,42 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
-      # NOTE: cross-platform `electrobun build` matrix lands as a follow-up;
-      # this job validates the Vue bundle on Linux only.
+
+  # Tier-2 gate: real `electrobun build` per-platform. Catches native
+  # bundler regressions (signing, copy steps, dist layout) the Linux
+  # smoke can't see. Non-blocking for now (continue-on-error) so a
+  # transient native-toolchain failure on macOS/Windows runners doesn't
+  # block merges; flip to required once it's been green for a week.
+  build-matrix:
+    name: electrobun build (${{ matrix.os }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Vite build
+        run: bunx vite build
+      - name: Electrobun build
+        # Electrobun's CLI handles per-OS bundling; we don't pass any
+        # signing certs in CI so the macOS step produces an unsigned
+        # `.app`. That's fine for a regression-detection smoke — we're
+        # checking that the bundler completes, not shipping artefacts.
+        run: bunx electrobun build
+      - name: Upload build artefacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electrobun-build-${{ matrix.os }}
+          path: |
+            build/
+            dist/
+          retention-days: 7

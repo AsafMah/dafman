@@ -20,21 +20,20 @@ conversation, and the rough edges noted under "Observability tail" below.
 Picked from the **Open backlog** table below, ordered by ROI / unblocker
 value. Pick the next one when the previous lands.
 
-1. **In-app log viewer** (Observability M1 tail). Tail the bun JSON log file
-   live, with level filter + search; add "Export diagnostics bundle" button.
-   Surfaces the data we already structure into `<userData>/logs/dafman.*.log`
-   so users can submit bug reports without us asking "can you grep…".
-2. **Runtime log-level toggle** in Settings → Diagnostics. Trivial follow-on
-   to #1 — the bun-side `setLogLevel` plumbing exists; only the renderer
-   control is missing.
-3. **Log redaction snapshot tests.** Pin that structured logs in `src-bun/`
-   never record prompts / tool args / token bodies. Cheap insurance against
-   accidental leaks.
-4. **Cross-platform CI matrix** for `electrobun build`. Currently Linux-only
-   in `.github/workflows/ci.yml`. Add Windows + macOS jobs.
-5. **Export conversation** (M2 tail). Markdown + JSON exports off a
+1. **Export conversation** (M2 close, ~1 d). Markdown + JSON exports off a
    per-session menu item; the read path already produces the right shape
-   (events → `ChatItem[]`) via the reducer.
+   (events → `ChatItem[]`) via the reducer. Reuses the `revealPath` RPC to
+   open the file in the OS explorer.
+2. **Image generation** (M2 close, ~1 d). Surface `response_format = image`
+   in the composer's "send" menu; renderer for image messages already
+   half-built via the markdown-it image hook.
+3. **Per-session tool allow/exclude UI** (Phase 4 start, ~1 d). Mirrors the
+   existing skills toggle list in the gear popover; wires to SDK
+   `availableTools` / `excludedTools` at session create time + a
+   `setSessionTools` RPC for runtime adjustments (verify SDK supports).
+4. **Tier-2 E2E** (Phase 2 tail, ~1 d). Playwright CDP harness against the
+   real Electrobun binary (one or two flows). Tier-1 renderer smoke stays
+   as-is.
 
 ---
 
@@ -82,16 +81,24 @@ TODO reflects current state against the M0–M7 ambitions in
 | Dev playground (`?dev` / wrench) | DONE | Synthetic event harness; dark-mode preview toggle. |
 | Playwright renderer smoke (prod + HMR) | DONE | `bun run smoke`. |
 
-### Observability tail (M1, open)
+### Observability tail (M1, open → CLOSING)
 
 | Item | Status | Notes |
 |---|---|---|
 | JSON-lines logger + daily rotation | DONE | `src-bun/app/logging.ts`; `DAFMAN_LOG` env filter. |
-| In-app log viewer | TODO | Tail + level filter + search; "Export diagnostics bundle". |
-| Runtime log-level toggle (Settings → Diagnostics) | TODO | Bun-side handle exists; renderer control missing. |
-| Log redaction snapshot tests | TODO | Pin that structured logs never record prompts / tool args. |
+| Log redaction (token / prompt / attachment shape-only) | DONE | `src-bun/app/redact.ts`; 12 snapshot tests pin per-rule behavior; sensitive keys → `***`, content keys → `{len, prefix}`. |
+| In-app log viewer | DONE | `LogViewer.vue` edge panel (activity-bar bottom rail); live tail via `logEvent` webview message; level + display + search filters; pause-on-scroll auto-detect. |
+| Runtime log-level toggle | DONE | `setLogLevel` RPC; in the LogViewer panel header ("Active level" dropdown). |
+| Diagnostics bundle export | DONE | `exportDiagnostics` RPC → `<userData>/dafman-diagnostics-YYYY-MM-DD-HHMM/` with logs + redacted recent.json + settings + README; reveals in OS file explorer. |
 | Bench harness (`bench_event_dispatch`, …) | TODO | None wired. |
 | Metrics counters / histograms exposed in Settings | TODO | M2 definition-of-done item. |
+
+### Cross-platform CI (DONE)
+
+| Item | Status | Notes |
+|---|---|---|
+| Tier-1 gate (Linux) | DONE | lint + bun test + vite build + Playwright smoke. |
+| Tier-2 `electrobun build` matrix | DONE | Ubuntu + macOS + Windows runners; `continue-on-error: true` for now — flip to required once green for a week. |
 
 ### M2 tail (open)
 
@@ -170,8 +177,8 @@ TODO reflects current state against the M0–M7 ambitions in
 | Perf benches | TODO | None. |
 | Telemetry (OTel) opt-in | TODO | Settings field reserved; not wired. |
 | End-user docs site | TODO | None. |
-| Tier-2 E2E (Playwright CDP → Electrobun binary) | TODO | Smoke test runs against `vite preview`/`vite dev` only. |
-| Cross-platform CI matrix | TODO | Linux-only today. |
+| Tier-2 E2E (Playwright CDP → Electrobun binary) | TODO | Smoke test runs against `vite preview`/`vite dev` only. Tier-2 build matrix now runs but doesn't drive the binary. |
+| Cross-platform CI matrix | DONE | electrobun build runs on Ubuntu + macOS + Windows (continue-on-error initially). |
 
 ---
 
@@ -182,16 +189,15 @@ historical reference. Going forward we organise by **Phase** — coherent
 chunks scoped to a single PR-ish unit of work, each with rough effort
 estimates (1 d = ~1 working day of focused engineering).
 
-### Phase 1 — Close M1's observability tail (~2 d)
-- In-app log viewer (tail + filter + search).
-- Runtime log-level toggle in Settings → Diagnostics.
-- Diagnostics bundle export (zip of logs + redacted settings).
-- Log redaction snapshot tests.
+### Phase 1 — Close M1's observability tail (~2 d) — DONE
+- In-app log viewer (tail + filter + search). ✅
+- Runtime log-level toggle (Active-level dropdown in the panel). ✅
+- Diagnostics bundle export (logs + redacted recent + settings + README). ✅
+- Log redaction snapshot tests (12 cases). ✅
 
 ### Phase 2 — Cross-platform CI + Tier-2 E2E (~2 d)
-- CI matrix: Windows + macOS jobs for `electrobun build`.
-- Playwright CDP harness against the real Electrobun binary (one or two
-  smoke flows). Tier-1 renderer smoke stays as-is.
+- CI matrix: Windows + macOS + Ubuntu jobs for `electrobun build`. ✅ (continue-on-error)
+- Playwright CDP harness against the real Electrobun binary. ⏳ TODO
 
 ### Phase 3 — M2 closing (~2 d)
 - Export conversation (Markdown + JSON).
@@ -269,7 +275,7 @@ estimates (1 d = ~1 working day of focused engineering).
 | Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
 | Real binary E2E | not yet wired | 0 |
 
-Total: **308 `bun test`** passing as of 2026-05-21; smoke green on both
+Total: **325 `bun test`** passing as of 2026-05-21 (Phase 1); smoke green on both
 prod and HMR.
 
 ---
@@ -301,6 +307,11 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-21** — Phase 1 done: in-app log viewer (`LogViewer.vue` edge
+  panel) + live `logEvent` fan-out + `setLogLevel` runtime toggle +
+  `exportDiagnostics` bundle (logs + redacted recent + settings + README)
+  + 12 redaction snapshot tests + cross-platform CI matrix (Ubuntu /
+  macOS / Windows continue-on-error).
 - **2026-05-21** — Audit pass: ARCHITECTURE.md + DEVLOG.md added; AGENTS.md
   rewritten with anti-laziness rules; STATUS.md re-organised into Phases.
 - **2026-05-21** — Session popover gains skills toggle list + usage

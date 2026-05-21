@@ -18,13 +18,22 @@ import {
 import { ensureClient, shutdownClient } from "./app/client";
 import { browseDirectorySync } from "./app/directoryBrowser";
 import { rpcGuard } from "./app/errors";
-import { getLogDir as currentLogDir, initLogger, log } from "./app/logging";
+import {
+	getLogDir as currentLogDir,
+	getLogLevel,
+	initLogger,
+	log,
+	recentLogs,
+	setLogLevel,
+	subscribeLogs,
+} from "./app/logging";
+import { exportDiagnostics } from "./app/diagnostics";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
-import type { DafmanRPC, SessionEventPayload } from "./rpc";
+import type { DafmanRPC, LogRecord, SessionEventPayload } from "./rpc";
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -270,6 +279,17 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 						break;
 				}
 			}),
+			getLogState: rpcGuard(async ({ recentLimit }) => ({
+				level: getLogLevel(),
+				recent: recentLogs(recentLimit),
+			})),
+			setLogLevel: rpcGuard(async ({ level }) => setLogLevel(level)),
+			exportDiagnostics: rpcGuard(async () => {
+				return exportDiagnostics({
+					outputRoot: Utils.paths.userData,
+					settings: settings.get(),
+				});
+			}),
 		},
 		messages: {},
 	},
@@ -351,6 +371,15 @@ emitPending = (payload) => {
 		send: { pendingRequest: (p: import("./rpc").PendingRequestPayload) => void };
 	}).send.pendingRequest(payload);
 };
+
+// Live log fan-out to the renderer. The in-app log viewer subscribes
+// via the `logEvent` webview message and applies its own level filter
+// so users can flip verbosity without losing history.
+subscribeLogs((record) => {
+	(mainWindow.webview.rpc as unknown as {
+		send: { logEvent: (p: LogRecord) => void };
+	}).send.logEvent(record);
+});
 
 log.info("dafman started", { version: "0.1.0" });
 

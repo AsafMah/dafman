@@ -74,6 +74,7 @@ function makeFakeBridge(): {
       pendingListeners.add(l);
       return () => pendingListeners.delete(l);
     },
+    onLogEvent: () => () => {},
   };
   return { bridge, fire, firePending, calls, handlers };
 }

@@ -59,6 +59,9 @@ describe("sessionCommands", () => {
       onPendingRequest() {
         return () => {};
       },
+      onLogEvent() {
+        return () => {};
+      },
     } as RpcBridge);
     const sessions = useSessionsStore();
     sessions.sessions.push({

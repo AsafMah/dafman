@@ -317,3 +317,52 @@ exports[`IPC wire contracts RespondToRequestParams — permission approve for se
   "sessionId": "sess-1",
 }
 `;
+
+exports[`IPC wire contracts — diagnostics LogRecord shape (info + warn + error variants) 1`] = `
+[
+  {
+    "level": "info",
+    "message": "session resumed",
+    "sessionId": "sess-1",
+    "ts": "2026-05-21T20:00:00.000Z",
+  },
+  {
+    "level": "warn",
+    "message": "ratelimited",
+    "retryMs": 1200,
+    "ts": "2026-05-21T20:00:01.123Z",
+  },
+  {
+    "error": "spawn ENOENT",
+    "level": "error",
+    "message": "boot failed",
+    "ts": "2026-05-21T20:00:02.456Z",
+  },
+]
+`;
+
+exports[`IPC wire contracts — diagnostics getLogState response shape 1`] = `
+{
+  "level": "info",
+  "recent": [
+    {
+      "level": "info",
+      "message": "ready",
+      "ts": "2026-05-21T20:00:00.000Z",
+    },
+  ],
+}
+`;
+
+exports[`IPC wire contracts — diagnostics exportDiagnostics result shape 1`] = `
+{
+  "files": [
+    "logs/dafman-2026-05-21.log",
+    "logs/recent.json",
+    "settings.json",
+    "README.md",
+  ],
+  "path": "C:/Users/mahle/AppData/Local/Dafman/dafman-diagnostics-2026-05-21-2030",
+  "totalBytes": 12345,
+}
+`;

@@ -9,10 +9,12 @@ import { Electroview } from "electrobun/view";
 import type {
   CommandMap,
   CommandName,
+  LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
 } from "./types";
 import type {
+  LogEventListener,
   PendingRequestListener,
   RpcBridge,
   SessionEventListener,
@@ -33,6 +35,7 @@ interface ElectrobunRpcType {
     messages: {
       sessionEvent: SessionEventPayload;
       pendingRequest: PendingRequestPayload;
+      logEvent: LogRecord;
     };
   };
 }
@@ -43,6 +46,7 @@ export function createElectrobunBridge(): {
 } {
   const sessionListeners = new Set<SessionEventListener>();
   const pendingListeners = new Set<PendingRequestListener>();
+  const logListeners = new Set<LogEventListener>();
 
   const rpc = Electroview.defineRPC<ElectrobunRpcType>({
     maxRequestTime: 120000,
@@ -67,6 +71,15 @@ export function createElectrobunBridge(): {
             }
           }
         },
+        logEvent: (payload) => {
+          for (const listener of logListeners) {
+            try {
+              listener(payload);
+            } catch (err) {
+              console.error("[logEvent listener threw]", err);
+            }
+          }
+        },
       },
     },
   });
@@ -87,6 +100,10 @@ export function createElectrobunBridge(): {
     onPendingRequest(listener) {
       pendingListeners.add(listener);
       return () => pendingListeners.delete(listener);
+    },
+    onLogEvent(listener) {
+      logListeners.add(listener);
+      return () => logListeners.delete(listener);
     },
   };
 

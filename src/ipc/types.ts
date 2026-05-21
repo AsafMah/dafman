@@ -211,7 +211,8 @@ export type AppErrorPayload =
   | { kind: "ClientNotStarted" }
   | { kind: "SessionNotFound"; data: string }
   | { kind: "Settings"; data: string }
-  | { kind: "Sdk"; data: string };
+  | { kind: "Sdk"; data: string }
+  | { kind: "Io"; data: string };
 
 /// Single source of truth for the request surface. Adding a new RPC?
 /// Add it here, then implement on the bun side in `src-bun/index.ts`.
@@ -331,6 +332,26 @@ export type CommandMap = {
     };
     result: void;
   };
+  getLogState: {
+    args: { recentLimit?: number };
+    result: {
+      level: LogLevel;
+      recent: LogRecord[];
+    };
+  };
+  setLogLevel: { args: { level: LogLevel }; result: LogLevel };
+  exportDiagnostics: {
+    args: Record<string, never>;
+    result: { path: string; files: string[]; totalBytes: number };
+  };
 };
+
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+export interface LogRecord {
+  ts: string;
+  level: LogLevel;
+  message: string;
+  [key: string]: unknown;
+}
 
 export type CommandName = keyof CommandMap;

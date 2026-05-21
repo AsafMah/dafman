@@ -275,3 +275,33 @@ describe("IPC wire contracts", () => {
 		expect(sample).toMatchSnapshot();
 	});
 });
+
+describe("IPC wire contracts — diagnostics", () => {
+	test("LogRecord shape (info + warn + error variants)", () => {
+		const samples: import("../rpc").LogRecord[] = [
+			{ ts: "2026-05-21T20:00:00.000Z", level: "info", message: "session resumed", sessionId: "sess-1" },
+			{ ts: "2026-05-21T20:00:01.123Z", level: "warn", message: "ratelimited", retryMs: 1200 },
+			{ ts: "2026-05-21T20:00:02.456Z", level: "error", message: "boot failed", error: "spawn ENOENT" },
+		];
+		expect(samples).toMatchSnapshot();
+	});
+
+	test("getLogState response shape", () => {
+		const sample = {
+			level: "info" as import("../rpc").LogLevel,
+			recent: [
+				{ ts: "2026-05-21T20:00:00.000Z", level: "info" as import("../rpc").LogLevel, message: "ready" },
+			],
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("exportDiagnostics result shape", () => {
+		const sample = {
+			path: "C:/Users/mahle/AppData/Local/Dafman/dafman-diagnostics-2026-05-21-2030",
+			files: ["logs/dafman-2026-05-21.log", "logs/recent.json", "settings.json", "README.md"],
+			totalBytes: 12345,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+});

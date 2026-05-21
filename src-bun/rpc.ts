@@ -517,6 +517,36 @@ export type DafmanRPC = {
 				};
 				response: void;
 			};
+			/// Returns the configured log level + the last N recent
+			/// log records (capped at 1000). The renderer uses this
+			/// to fill the log viewer on first open; afterwards it
+			/// receives live records via the `logEvent` webview
+			/// message.
+			getLogState: {
+				params: { recentLimit?: number };
+				response: {
+					level: LogLevel;
+					recent: Array<LogRecord>;
+				};
+			};
+			/// Mutates the configured level. Returns the new level for
+			/// confirmation. Renderer also flips its local filter.
+			setLogLevel: {
+				params: { level: LogLevel };
+				response: LogLevel;
+			};
+			/// Builds a redacted diagnostics bundle (logs + settings
+			/// snapshot + README) under <userData>. Returns the
+			/// directory path so the renderer can offer a "Reveal in
+			/// file explorer" button.
+			exportDiagnostics: {
+				params: Record<string, never>;
+				response: {
+					path: string;
+					files: string[];
+					totalBytes: number;
+				};
+			};
 		};
 		messages: Record<string, never>;
 	}>;
@@ -534,8 +564,21 @@ export type DafmanRPC = {
 			/// completion event from the bun side because the SDK
 			/// already emits `*.completed` after the handler returns.
 			pendingRequest: PendingRequestPayload;
+			/// Live log record. Fanned out by `subscribeLogs()` for
+			/// every emitted log line (subscribers receive EVERY
+			/// record, irrespective of the configured level — the
+			/// renderer applies its own client-side filter).
+			logEvent: LogRecord;
 		};
 	}>;
 };
+
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+export interface LogRecord {
+	ts: string;
+	level: LogLevel;
+	message: string;
+	[key: string]: unknown;
+}
 
 export type { AppErrorPayload };

@@ -5,6 +5,70 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added
 
+- **Phase 1 — Observability tail.** In-app log viewer (`LogViewer.vue`,
+  reachable from the Activity Bar's bottom rail) tails the bun JSON
+  log live. Header has three controls: Active level (mutates the
+  bun-side configured level via the new `setLogLevel` RPC — controls
+  what reaches the daily file + stderr), Display level (renderer-only
+  display filter — flip it without losing buffered records),
+  full-text search across the serialised record. Records use CSS
+  grid (timestamp / level / message + fields below) with per-level
+  color hints and warn/error row tinting. Pause-on-scroll
+  auto-detects so a user reading history isn't yanked back to the
+  tail; a "paused" indicator surfaces in the count row. Buffered
+  ring is 4000 records renderer-side, 1000 records bun-side (the
+  initial fill comes from a `getLogState` RPC that returns the
+  bun-side ring). Subscribers receive **every** emitted record
+  irrespective of level so flipping the display filter reveals
+  buffered context without re-fetching.
+
+- **Diagnostics bundle export.** New "Export bundle" button in the log
+  viewer header calls `exportDiagnostics` which writes
+  `<userData>/dafman-diagnostics-YYYY-MM-DD-HHMM/` containing:
+  - All `dafman-*.log` files from the configured log dir.
+  - `logs/recent.json` — JSON dump of the in-memory ring (covers
+    records that haven't flushed to file yet, including pre-init
+    records).
+  - `settings.json` — snapshot of the live settings.
+  - `README.md` — describes the redaction posture so the recipient
+    knows what to expect before sharing.
+  Result is revealed in the OS file explorer afterwards via
+  `revealPath` so the user can zip and attach to a bug report.
+
+- **Structured-log redaction (`src-bun/app/redact.ts`).** Logger fields
+  pass through two redaction rules before they reach disk OR
+  subscribers:
+  - **Sensitive keys** (matched by regex: `token`, `secret`, `password`,
+    `apiKey`, `authorization`, `cookie`, `credential`, `bearer`,
+    `private_key`, `PAT`, `x-github-token`) → replaced with `***`.
+  - **Content keys** (`prompt`, `content`, `text`, `message`, `body`,
+    `answer`, `data`, `reasoningText`, `reasoningOpaque`,
+    `encryptedContent`, `delta`) → replaced with a shape descriptor
+    `{ len, prefix }` (first 16 chars). Non-string content fields
+    (objects/arrays under one of these keys) → `{ _redacted: "content",
+    _type }`.
+  - Long strings under unfamiliar keys (> 256 chars) → shape descriptor
+    with `elided: true`.
+  - Recursion depth budget (6) + array item cap (32 with `_truncated`
+    tail marker) so a pathological payload can't stall the logger.
+  12 snapshot/expect tests in `src-bun/__tests__/redact.test.ts` pin
+  each rule individually plus an end-to-end test that asserts a
+  realistic record never contains the full token or prompt in its
+  serialised form.
+
+- **`setLogLevel` RPC + `getLogState` RPC + `logEvent` webview message.**
+  Bridge gains `onLogEvent(listener)`; smoke + tests stubs updated.
+
+- **`AppError.Io` variant** for the diagnostics file operations. Mirrored
+  in `src/ipc/types.ts`; formatter updated in `src/ipc/invoke.ts`.
+
+- **Cross-platform CI matrix.** New `.github/workflows/ci.yml` Tier-2 job
+  runs `bunx electrobun build` on `ubuntu-latest` + `macos-latest` +
+  `windows-latest` after the Tier-1 lint/test/smoke gate. Marked
+  `continue-on-error: true` for now so a transient native-toolchain
+  failure doesn't block merges; flip to required once green for a week.
+  Build artifacts upload on failure with 7-day retention.
+
 - **Real elicitation UX — accept/deny/respond/open-URL modal for SDK callbacks.** Replaces the `approveAll` shim that has gated permissions since M1. `SessionRegistry` now installs typed handlers for `onPermissionRequest`, `onUserInputRequest`, and `onElicitationRequest`; the agent's `ask_user` tool and elicitation surface (URL OAuth handoffs, MCP form requests) now actually reach the user. Architecture: handler captures the SDK Promise resolver into a per-session `pendingHandlers` Map keyed by a bun-generated `requestId`, pushes a `pendingRequest` IPC message to the renderer; new `respondToRequest({ sessionId, requestId, response })` RPC resolves the awaiting Promise with the typed SDK shape. Idempotent (double-submit returns `false`). Lifecycle settlement on `disconnect()` / `deleteCliSession()` / `shutdownAll()` cancels every pending handler with a typed cancellation (`{ kind: "user-not-available" }` for permission, `{ answer: "", wasFreeform: false }` for user input, `{ action: "cancel" }` for elicitation) so the SDK never hangs. Reducer + `SessionRecord` switched from singular `pendingRequest` to FIFO `pendingRequests[]` queue per session — multiple in-flight callbacks no longer overwrite each other. Modal lives at `App.vue` level (NOT inside `ChatWindow`) so requests on non-active panels can still be answered; opening auto-activates the owning panel via new `layoutStore.activatePanel`. Three layouts: **permission** = Allow once / Allow for session / Reject + collapsible request details (raw JSON of `command`/`path`/`url`/etc.); **userInput** = question + optional choice radios + textarea (when `allowFreeform`) with Ctrl+Enter submit + Cancel; **elicitation url-mode** = URL pill + "Open in browser" (via new `openUrl` RPC) → switches to "I'm done" → resolves accept; **elicitation form-mode** = explicit "form-based input isn't supported yet" message + Cancel (full JSON-Schema form renderer deferred — separate ticket). Per-session `approveAll` toggle short-circuits the permission handler with `{ kind: "approve-once" }`; `setSessionApproveAll` mirrors the toggle into registry state so the dafman handler honors it (previously only updated the SDK's own flag, which our handler bypassed). 10 new tests (5 registry: pending+settle+approveAll+idempotency, 5 reducer: queue+FIFO+id-scoped cleanup) + 6 wire-shape snapshots (PendingRequestPayload × 3 kinds, RespondToRequestParams × 3 responses). 220 tests pass · lint clean · smoke green on both prod (`vite preview`) and hmr (`vite dev`) per anti-regression rule 3a.
 
 - **`openUrl` RPC** (`http://` / `https://` allowlist via regex, refuses other schemes; backed by `Utils.openExternal`). Used by the elicitation url-mode dialog; any future "open in browser" affordance routes through here so the scheme check stays centralized.

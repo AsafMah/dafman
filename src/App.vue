@@ -404,6 +404,7 @@ function scheduleLayoutSave() {
 // activity-item config below and with the open-by-default path.
 const SESSIONS_PANEL_ID = "sessions-manager";
 const SETTINGS_PANEL_ID = "settings-panel";
+const LOG_VIEWER_PANEL_ID = "log-viewer";
 
 /// ActivityBar items.
 /// - Top stack (default `group: "top"`): panel toggles. Sessions today;
@@ -433,6 +434,16 @@ const activityItems = computed<ActivityItem[]>(() => {
       onClick: openPlayground,
     });
   }
+  items.push({
+    kind: "panel",
+    id: LOG_VIEWER_PANEL_ID,
+    component: "logViewer",
+    icon: "pi-bars",
+    title: "Diagnostics — live log + bundle export",
+    group: "bottom",
+    initialSize: 480,
+    minimumSize: 320,
+  });
   items.push({
     kind: "panel",
     id: SETTINGS_PANEL_ID,

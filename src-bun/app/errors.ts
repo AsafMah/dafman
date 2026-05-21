@@ -10,7 +10,8 @@ export type AppErrorPayload =
 	| { kind: "ClientNotStarted" }
 	| { kind: "SessionNotFound"; data: string }
 	| { kind: "Settings"; data: string }
-	| { kind: "Sdk"; data: string };
+	| { kind: "Sdk"; data: string }
+	| { kind: "Io"; data: string };
 
 export class AppError extends Error {
 	readonly payload: AppErrorPayload;
@@ -33,6 +34,9 @@ export class AppError extends Error {
 	static sdk(detail: string): AppError {
 		return new AppError({ kind: "Sdk", data: detail });
 	}
+	static io(detail: string): AppError {
+		return new AppError({ kind: "Io", data: detail });
+	}
 }
 
 function formatPayload(p: AppErrorPayload): string {
@@ -45,6 +49,8 @@ function formatPayload(p: AppErrorPayload): string {
 			return `settings: ${p.data}`;
 		case "Sdk":
 			return `sdk: ${p.data}`;
+		case "Io":
+			return `io: ${p.data}`;
 	}
 }
 

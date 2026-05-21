@@ -90,6 +90,11 @@ async function installRpcStub(page: Page): Promise<void> {
         // required by the typed bridge contract.
         return () => undefined;
       },
+      onLogEvent(): () => void {
+        // No live log fan-out in the smoke; the renderer's log viewer
+        // will simply receive no entries.
+        return () => undefined;
+      },
     };
   });
 }
