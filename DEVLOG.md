@@ -10,6 +10,57 @@
 
 ---
 
+## 2026-05-22 — SDK + CLI deep audit deliverable
+
+### Takeaway
+
+User asked for an exhaustive audit of `copilot-sdk-supercharged` + the
+bundled `@github/copilot` CLI to find features missed in our plans.
+Earlier session attempted a shallow pass; user pushed back ("I know you
+like to be lazy but don't"). This session reads the SDK README
+end-to-end (1135 lines), the full `dist/generated/rpc.d.ts` server +
+session RPC surface (~2400 lines), and every `added` changelog entry
+across 212 versions of `@github/copilot` (436 entries from v0.0.329 to
+v1.0.48).
+
+Deliverable: **`plans/plan-sdk-audit.prompt.md`** — categorised
+findings (Wire-ready RPCs / Unset config knobs / CLI features /
+Truly-new surfaces / Re-evaluated deferrals / Proposed Phases 18–23 /
+Open questions). STATUS.md "Next concrete steps" replaced with the new
+ordering.
+
+### Why image gen comes back
+
+Earlier I deferred image generation citing "no `responseFormat`
+strings in CLI's `app.js`". That was misleading evidence — the SDK
+README documents `assistant.image` events and `assistant.content`
+mixed content blocks; the format is driven by the model and the
+session config, not by string-matching in the CLI source. Re-listed
+as Phase 21.
+
+### Why MCP registry promoted ahead of Projects
+
+Highest user-value per day of work; doesn't depend on any other
+Phase landing. CLI shipped `copilot mcp` CLI command in 1.0.21
+(matching scope on the terminal side); our gap was purely UI.
+
+### Reading order captured for next agent
+
+§I of `plan-sdk-audit.prompt.md` enumerates the exact files + line
+ranges so the next session can pick up the cross-reference work
+without re-discovering the same sources.
+
+### Receipts
+
+- Audit doc: `plans/plan-sdk-audit.prompt.md` (~520 lines, 9 sections).
+- STATUS.md "Next concrete steps" rewritten + new historical-log
+  bullet pointing at the audit.
+- No code changes this session; the audit *is* the deliverable.
+- Methodology + sources listed in §I so the conclusions are
+  reproducible.
+
+---
+
 ## 2026-05-22 — Export conversation + permission audit log (Phase 3 + Phase 4 start)
 
 ### Takeaway

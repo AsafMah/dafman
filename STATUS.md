@@ -17,20 +17,32 @@ conversation, and the rough edges noted under "Observability tail" below.
 
 ## Next concrete steps
 
-Picked from the **Open backlog** table below, ordered by ROI / unblocker
-value. Pick the next one when the previous lands.
+After the 2026-05-22 SDK + CLI audit (see
+**[`plans/plan-sdk-audit.prompt.md`](plans/plan-sdk-audit.prompt.md)** —
+exhaustive cross-reference of every `copilot-sdk-supercharged` RPC +
+every `@github/copilot` 1.0.48 changelog entry against what we ship),
+the ordering changed. Picked from the new Phase 18–23 ordering in the
+audit doc.
 
-1. **Image generation** (M2 close, ~1 d). Surface `response_format = image`
-   in the composer's send menu; renderer for image messages half-built
-   via the markdown-it image hook.
-2. **Per-session tool allow/exclude UI** (Phase 4 start, ~1 d). Mirrors the
-   existing skills toggle list in the gear popover; wired to SDK
-   `availableTools` / `excludedTools`.
-3. **Tier-2 E2E** (Phase 2 tail, ~1 d). Playwright CDP harness against the
-   real Electrobun binary (one or two flows). Tier-1 renderer smoke stays
-   as-is.
-4. **Metrics counters / histograms in Settings** (Observability tail, ~1 d).
-   Bun-side counter primitives + a Settings → Diagnostics section.
+1. **Phase 18 — Skills library + MCP registry MVP** (~3 d).
+   `rpc.skills.list/enable/disable/reload` + `rpc.mcp.config.*` +
+   per-session `rpc.mcp.enable/disable/reload`. Settings panes for
+   each. MCP OAuth status toast wired into the existing URL
+   elicitation path.
+2. **Phase 19 — Custom agents + tasks/fleet** (~3 d).
+   `rpc.agent.*` picker; `rpc.tasks.*` panel; `rpc.fleet.start`
+   runner.
+3. **Phase 20 — Power UX** (~2 d). Tool allow/exclude UI +
+   `rpc.tools.list`; plans panel via `rpc.plan.*`; usage dashboard +
+   `rpc.account.getQuota`; fork session via `rpc.sessions.fork`.
+4. **Phase 21 — Image generation + remembered permissions** (~2 d).
+   Image gen un-deferred per audit §E — `responseFormat: "image"` +
+   `assistant.image` event renderer. Settings → Remembered Permissions
+   via `rpc.permissions.setApproveAll` / `resetSessionApprovals`.
+
+Older candidates (Tier-2 E2E, metrics counters / histograms) stay in
+the backlog but get displaced by the higher-ROI items the audit
+surfaced.
 
 ---
 
@@ -304,6 +316,20 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — SDK + CLI deep audit: `plans/plan-sdk-audit.prompt.md`
+  cross-references every supercharged RPC (`createServerRpc` +
+  `createSessionRpc`), every config knob on `SessionConfig`, every CLI
+  changelog "added" entry (436 across 212 versions), against current
+  STATUS. Surfaces ~20 wire-ready RPCs we don't expose (skills /
+  MCP / agents / tasks / fleet / plan / usage / quota / tools list /
+  shell exec / workspace files / session metadata / fork / history
+  truncate); ~14 unset `baseSessionConfig` knobs (system message
+  customize mode, custom provider/BYOK, `gitHubToken`, idle timeout,
+  infinite-sessions thresholds, OTel telemetry, hooks); 12 CLI-shipped
+  features we haven't surfaced (fork / rewind / undo / diff / usage
+  contribution graph / `#issue` autocomplete / background-task
+  notifications / research / init / review / delegate / cross-session
+  memory). Re-orders next four sessions into Phases 18–21.
 - **2026-05-22** — Permission + URL audit log: append-only JSONL under
   `<userData>/audit/` + live tail in Diagnostics → Activity tab.
   Records permission decisions + scope; URL audits cover the
