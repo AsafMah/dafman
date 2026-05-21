@@ -109,7 +109,7 @@ TODO reflects current state against the M0–M7 ambitions in
 | Item | Status | Notes |
 |---|---|---|
 | Permission UX with rule editor | DONE | (Cross-link to M1.) |
-| Permission audit log | TODO | Separate JSONL file under `<userData>/audit/`. |
+| Permission audit log | DONE | `<userData>/audit/permissions.jsonl` + `urls.jsonl`. Append-only JSONL; live tail visible in Diagnostics → Activity tab. Records permission decision + permissionKind + summary + approval scope; URL audits record allow/block + reason. |
 | URL policy editor | TODO | Today: allowlist regex baked in; no rule UI. |
 | Built-in tool registry (fs / shell / http) | TODO | We rely entirely on the SDK's built-ins; no Dafman-native tools. |
 | Per-session tool allow/exclude list | TODO | SDK supports `availableTools` / `excludedTools`; UI doesn't expose. |
@@ -207,7 +207,7 @@ estimates (1 d = ~1 working day of focused engineering).
   existing skills section; wired to SDK `availableTools`/`excludedTools`).
 - URL policy editor (Settings → URL Policy).
 - Permission + URL audit log (`<userData>/audit/*.jsonl`) with Activity
-  view.
+  view. ✅
 
 ### Phase 5 — Projects + multi-account (~5 d)
 - Project model + folder-picker promotion to "Open Project".
@@ -272,7 +272,7 @@ estimates (1 d = ~1 working day of focused engineering).
 | Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
 | Real binary E2E | not yet wired | 0 |
 
-Total: **341 `bun test`** passing as of 2026-05-22; smoke green on both
+Total: **347 `bun test`** passing as of 2026-05-22; smoke green on both
 prod and HMR.
 
 ---
@@ -304,6 +304,10 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Permission + URL audit log: append-only JSONL under
+  `<userData>/audit/` + live tail in Diagnostics → Activity tab.
+  Records permission decisions + scope; URL audits cover the
+  scheme-allowlist gate.
 - **2026-05-22** — Export conversation: per-session gear popover →
   Export Markdown / JSON. `src/lib/exportConversation.ts` builds the
   document from `ChatItem[]`; bun-side `saveExportFile` writes under

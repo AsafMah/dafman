@@ -95,6 +95,9 @@ async function installRpcStub(page: Page): Promise<void> {
         // will simply receive no entries.
         return () => undefined;
       },
+      onAuditEvent(): () => void {
+        return () => undefined;
+      },
     };
   });
 }

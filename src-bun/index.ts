@@ -29,6 +29,8 @@ import {
 } from "./app/logging";
 import { exportDiagnostics } from "./app/diagnostics";
 import { saveExportFile } from "./app/exports";
+import { initAudit, recentAudit, recordUrl, subscribeAudit } from "./app/audit";
+import type { AuditEntry } from "./app/audit";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
@@ -40,6 +42,7 @@ const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 
 await initLogger({ logDir: Utils.paths.userLogs });
+await initAudit({ dir: join(Utils.paths.userData, "audit") });
 
 // Install the stderr filter *after* the logger is up (so dropped lines
 // are routed to the JSON log) but *before* the SDK starts the CLI
@@ -240,14 +243,26 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				// custom protocol handlers like ms-windows-store:, etc.).
 				if (!/^https?:\/\//i.test(trimmed)) {
 					log.warn("openUrl rejected non-http scheme", { url: trimmed });
+					recordUrl({ url: trimmed, allowed: false, reason: "scheme-blocked" });
 					return false;
 				}
 				try {
-					return Utils.openExternal(trimmed);
+					const opened = Utils.openExternal(trimmed);
+					recordUrl({
+						url: trimmed,
+						allowed: opened !== false,
+						reason: opened !== false ? "ok" : "openExternal-returned-false",
+					});
+					return opened;
 				} catch (err) {
 					log.warn("openUrl threw", {
 						url: trimmed,
 						error: err instanceof Error ? err.message : String(err),
+					});
+					recordUrl({
+						url: trimmed,
+						allowed: false,
+						reason: `openExternal-threw: ${err instanceof Error ? err.message : String(err)}`,
 					});
 					return false;
 				}
@@ -298,6 +313,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 					contents,
 				});
 			}),
+			getAuditState: rpcGuard(async ({ recentLimit }) => ({
+				recent: recentAudit(recentLimit),
+			})),
 		},
 		messages: {},
 	},
@@ -387,6 +405,13 @@ subscribeLogs((record) => {
 	(mainWindow.webview.rpc as unknown as {
 		send: { logEvent: (p: LogRecord) => void };
 	}).send.logEvent(record);
+});
+
+// Live audit fan-out — same fire-and-forget pattern as logs.
+subscribeAudit((entry) => {
+	(mainWindow.webview.rpc as unknown as {
+		send: { auditEvent: (p: AuditEntry) => void };
+	}).send.auditEvent(entry);
 });
 
 log.info("dafman started", { version: "0.1.0" });

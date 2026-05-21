@@ -492,6 +492,55 @@ describe("SessionRegistry", () => {
 		await expect(sdkPromise).resolves.toEqual({ kind: "reject" });
 	});
 
+	test("respondToRequest records an audit entry with the right kind + decision + summary", async () => {
+		const { _resetAudit, recentAudit, initAudit } = await import("../app/audit");
+		_resetAudit();
+		const { tmpdir } = await import("node:os");
+		const { mkdtemp } = await import("node:fs/promises");
+		const { join } = await import("node:path");
+		await initAudit({ dir: await mkdtemp(join(tmpdir(), "dafman-audit-sess-")) });
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const pendingEmitted: unknown[] = [];
+		const reg = new SessionRegistry(
+			() => {},
+			(p) => pendingEmitted.push(p),
+		);
+		const id = await reg.create();
+		const config = client.createdConfigs[0] as {
+			onPermissionRequest: (req: { kind: string; command?: string }) => Promise<unknown>;
+		};
+		const sdkPromise = config.onPermissionRequest({ kind: "shell", command: "ls -la" });
+		const reqId = (pendingEmitted[0] as { requestId: string }).requestId;
+		await reg.respondToRequest({
+			sessionId: id,
+			requestId: reqId,
+			response: {
+				kind: "permission",
+				decision: "approveForSession",
+				approval: { kind: "commands", commandIdentifiers: ["ls"] },
+			},
+		});
+		await sdkPromise;
+		const audit = recentAudit();
+		// May contain entries from prior tests in this same test file if
+		// _resetAudit isn't called between them — filter by sessionId.
+		const ours = audit.filter(
+			(e) => e.kind === "permission" && e.sessionId === id,
+		);
+		expect(ours).toHaveLength(1);
+		const first = ours[0];
+		expect(first?.kind).toBe("permission");
+		if (first?.kind === "permission") {
+			expect(first.permissionKind).toBe("shell");
+			expect(first.decision).toBe("approveForSession");
+			expect(first.approvalKind).toBe("commands");
+			expect(first.summary).toBe("Run a shell command");
+		}
+	});
+
 	test("disconnect settles every pending callback for the session with a typed cancellation", async () => {
 		const client = new FakeClient();
 		_setClientForTest(

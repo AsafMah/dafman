@@ -9,6 +9,7 @@
 
 import type {
   AppErrorPayload,
+  AuditEntry,
   CommandMap,
   CommandName,
   LogRecord,
@@ -57,6 +58,7 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
 export type SessionEventListener = (event: SessionEventPayload) => void;
 export type PendingRequestListener = (payload: PendingRequestPayload) => void;
 export type LogEventListener = (record: LogRecord) => void;
+export type AuditEventListener = (entry: AuditEntry) => void;
 
 /// Minimal surface that the IPC bridge has to implement. Both the real
 /// Electrobun bridge and unit-test fakes match this shape; tests inject a
@@ -69,12 +71,14 @@ export interface RpcBridge {
   onSessionEvent(listener: SessionEventListener): () => void;
   onPendingRequest(listener: PendingRequestListener): () => void;
   onLogEvent(listener: LogEventListener): () => void;
+  onAuditEvent(listener: AuditEventListener): () => void;
 }
 
 let bridge: RpcBridge | null = null;
 const pendingSessionListeners = new Set<SessionEventListener>();
 const pendingPendingRequestListeners = new Set<PendingRequestListener>();
 const pendingLogListeners = new Set<LogEventListener>();
+const pendingAuditListeners = new Set<AuditEventListener>();
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
@@ -91,6 +95,10 @@ export function setRpcBridge(next: RpcBridge | null): void {
     next.onLogEvent(listener);
   }
   pendingLogListeners.clear();
+  for (const listener of pendingAuditListeners) {
+    next.onAuditEvent(listener);
+  }
+  pendingAuditListeners.clear();
 }
 
 export async function invokeCommand<N extends CommandName>(
@@ -127,4 +135,10 @@ export function onLogEvent(listener: LogEventListener): () => void {
   if (bridge) return bridge.onLogEvent(listener);
   pendingLogListeners.add(listener);
   return () => pendingLogListeners.delete(listener);
+}
+
+export function onAuditEvent(listener: AuditEventListener): () => void {
+  if (bridge) return bridge.onAuditEvent(listener);
+  pendingAuditListeners.add(listener);
+  return () => pendingAuditListeners.delete(listener);
 }

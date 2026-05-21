@@ -10,47 +10,89 @@
 
 ---
 
-## 2026-05-22 — Export conversation (Markdown + JSON)
+## 2026-05-22 — Export conversation + permission audit log (Phase 3 + Phase 4 start)
 
 ### Takeaway
-Per-session menu item exports the chat as Markdown or JSON. Renderer
-builds the document via a new `formatConversation` helper that reuses
-the same `processEvents` reducer the chat tile runs — no second source
-of truth. Bun writes the file under `<userData>/exports/` and we
-auto-reveal it. Output is good-enough for sharing in a GitHub issue
-(reasoning folded inside `<details>`, tool args/results in fenced code
-blocks).
+Two clean wins, both ship end-to-end with tests:
 
-### Detail
+**Export conversation.** Per-session gear popover → Export Markdown /
+JSON. Renderer builds via `formatConversation` (reuses `processEvents`
+so the export tracks what's on screen); bun writes under
+`<userData>/exports/<basename(normalize(name))>` with path-traversal
+defence; auto-reveals.
+
+**Permission + URL audit log.** `<userData>/audit/permissions.jsonl` +
+`urls.jsonl`. Append-only. Records permission decisions (kind,
+decision, summary, approval scope/domain) + URL opens
+(allowed/blocked + reason). Live tail visible in a new "Activity" tab
+of the Diagnostics edge panel — sits alongside the existing logs tab,
+same UI primitives. Decision pivot during the session: image gen was
+on the next-steps list but isn't safely shippable today (CLI app.js
+has no responseFormat handling; no model capability flag surfaces
+support), and Tier-2 E2E was 1d-undersized (cross-platform
+WebView debugging is its own project). Audit logging was a 1-d
+slot that genuinely complements Phase 1's diagnostics work.
+
+### Detail (export)
 - `src/lib/exportConversation.ts` — `formatConversation(input, format)`
-  + `exportFilenameStem(title, format)`. Markdown ordering: title +
-  metadata header (model / workspace / exported / message count) → per
-  item: user (with attachments list), assistant, reasoning (folded in
-  `<details>`, encrypted variant shows privacy placeholder), tool
-  (args + progress + output + result + error), system (icon by
-  severity). PendingRequests are NOT exported (transient).
-- `src-bun/app/exports.ts` — `saveExportFile({outputRoot, fileName,
-  contents})` writes to `<outputRoot>/exports/<basename>`. Renderer-
-  side filename already sanitised; bun does defence-in-depth via
-  `basename(normalize(fileName))` so `..\..\Windows\System32` collapses
-  to `System32`. New `AppError.Io` already plumbed (Phase 1).
-- RPC `saveExportFile({fileName, contents}) → {path, bytes}`. Wire
-  snapshot added.
-- `SessionHeaderControls.vue` gear popover gains "Export Markdown" +
-  "Export JSON" buttons in the option-actions row. On click: imports
-  `processEvents` + `formatConversation` dynamically (no extra cost
-  for users who never export), builds the document, calls
-  `saveExportFile`, then `revealPath` on the result.
-- 12 markdown formatter tests + 1 JSON test + 3 filename-stem tests +
-  3 bun-side `saveExportFile` tests covering happy path, path
-  traversal defence, empty-filename rejection.
+  + `exportFilenameStem`. Markdown ordering: title + metadata + per
+  item (user with attachments, assistant skipping empties, reasoning
+  folded inside `<details>` with encrypted variant, tool with
+  args/output/result/error, system bubbles with icons). pendingRequest
+  items deliberately skipped.
+- `src-bun/app/exports.ts` — `saveExportFile` with basename+normalize
+  sanitisation. New RPC + 1 wire-shape snapshot.
+- `SessionHeaderControls.vue` popover gains the two buttons; dynamic
+  imports keep the bundle cost gated.
+- 15 markdown + 3 JSON + 3 filename + 3 bun-side tests.
+
+### Detail (audit)
+- `src-bun/app/audit.ts` — append-only JSONL writers split by category.
+  Per-process ring buffer (500) + subscriber API for live fan-out;
+  pattern mirrors `src-bun/app/logging.ts`. `recordPermission` +
+  `recordUrl` return `Promise<void>` so tests can deterministically
+  await side-effects.
+- `SessionRegistry.enqueuePending` extended with optional
+  `{ permissionKind, summary }` carried on the entry; recorded on
+  every `respondToRequest` decision.
+- `index.ts` openUrl handler records the allow/block + reason.
+- `getAuditState` RPC + `auditEvent` webview message + bridge.
+- `LogViewer.vue` gains a Logs/Activity SelectButton tab; Activity
+  view reuses the same row primitives with per-decision colors.
+- 4 bun-side tests (perm append + subs + ring; url append + separate
+  files; 500 cap; no commingling) + 1 sessions.test integration that
+  drives the full SDK→handler→respondToRequest→audit flow + 1 wire
+  snapshot.
+
+### Decision pivots logged
+- **Image generation deferred.** SDK accepts `responseFormat` +
+  `imageOptions` on session.send, but the bundled CLI's `app.js` has
+  zero references to either, no model in the catalog exposes a
+  capability flag indicating image support, and shipping a
+  "Generate image" UI affordance that may always no-op violates
+  anti-laziness rule #1 (no half-work). Re-evaluate when a confirmed
+  working image-gen model lands.
+- **Tier-2 E2E deferred.** Real Electrobun binary E2E requires
+  cross-platform WebView debugging ports (WebView2 args on Windows,
+  WKWebView remote inspect on macOS, GTK WebKit on Linux) — meaningful
+  project, not a 1-d slot. Keeping Tier-1 renderer smoke + the
+  Tier-2 build matrix (Phase 1) as the gate for now.
+- **Per-session tool toggle deferred.** SDK exposes `availableTools` /
+  `excludedTools` only at session create time + a read-only
+  `tools.list` RPC. Mid-session mutation isn't documented. Building
+  this properly needs a "default excluded tools" Settings panel +
+  per-session view with "restart to apply" hint — bigger than 1 d.
+  Stays in Phase 4.
 
 ### Receipts
-- `src/lib/exportConversation.ts`, `src-bun/app/exports.ts` (new).
-- `src/lib/__tests__/exportConversation.test.ts` (15 cases),
-  `src-bun/__tests__/exports.test.ts` (3 cases),
-  `src-bun/__tests__/wire-contract.test.ts` (+1 snapshot).
-- 341 `bun test` pass (was 325), lint clean, smoke green.
+- `src/lib/exportConversation.ts`, `src-bun/app/exports.ts`,
+  `src-bun/app/audit.ts`, `src/stores/auditStore.ts` (new).
+- `src/lib/__tests__/exportConversation.test.ts` (15),
+  `src-bun/__tests__/exports.test.ts` (3),
+  `src-bun/__tests__/audit.test.ts` (4),
+  `src-bun/__tests__/sessions.test.ts` (+1 integration),
+  `src-bun/__tests__/wire-contract.test.ts` (+2 snapshots).
+- 347 `bun test` pass (was 325), lint clean, smoke green prod + hmr.
 
 ---
 

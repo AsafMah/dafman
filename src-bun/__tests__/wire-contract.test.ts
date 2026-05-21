@@ -312,4 +312,35 @@ describe("IPC wire contracts — diagnostics", () => {
 		};
 		expect(sample).toMatchSnapshot();
 	});
+
+	test("AuditEntry permission + url shapes", () => {
+		const samples: import("../rpc").AuditEntry[] = [
+			{
+				ts: "2026-05-22T00:00:00.000Z",
+				kind: "permission",
+				sessionId: "sess-1",
+				requestId: "req-1",
+				permissionKind: "shell",
+				decision: "approveOnce",
+				summary: "shell: git status",
+			},
+			{
+				ts: "2026-05-22T00:00:01.000Z",
+				kind: "permission",
+				sessionId: "sess-1",
+				requestId: "req-2",
+				permissionKind: "url",
+				decision: "approveForSession",
+				approvalDomain: "github.com",
+			},
+			{
+				ts: "2026-05-22T00:00:02.000Z",
+				kind: "url",
+				url: "https://github.com/login",
+				allowed: true,
+				reason: "ok",
+			},
+		];
+		expect(samples).toMatchSnapshot();
+	});
 });

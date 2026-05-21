@@ -373,3 +373,33 @@ exports[`IPC wire contracts — diagnostics saveExportFile result shape 1`] = `
   "path": "C:/Users/mahle/AppData/Local/Dafman/exports/refactor-session-2026-05-22-…md",
 }
 `;
+
+exports[`IPC wire contracts — diagnostics AuditEntry permission + url shapes 1`] = `
+[
+  {
+    "decision": "approveOnce",
+    "kind": "permission",
+    "permissionKind": "shell",
+    "requestId": "req-1",
+    "sessionId": "sess-1",
+    "summary": "shell: git status",
+    "ts": "2026-05-22T00:00:00.000Z",
+  },
+  {
+    "approvalDomain": "github.com",
+    "decision": "approveForSession",
+    "kind": "permission",
+    "permissionKind": "url",
+    "requestId": "req-2",
+    "sessionId": "sess-1",
+    "ts": "2026-05-22T00:00:01.000Z",
+  },
+  {
+    "allowed": true,
+    "kind": "url",
+    "reason": "ok",
+    "ts": "2026-05-22T00:00:02.000Z",
+    "url": "https://github.com/login",
+  },
+]
+`;

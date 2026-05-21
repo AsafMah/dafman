@@ -348,6 +348,10 @@ export type CommandMap = {
     args: { fileName: string; contents: string };
     result: { path: string; bytes: number };
   };
+  getAuditState: {
+    args: { recentLimit?: number };
+    result: { recent: AuditEntry[] };
+  };
 };
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
@@ -357,5 +361,25 @@ export interface LogRecord {
   message: string;
   [key: string]: unknown;
 }
+
+export type AuditEntry =
+  | {
+      ts: string;
+      kind: "permission";
+      sessionId: string;
+      requestId: string;
+      permissionKind: string;
+      decision: "approveOnce" | "approveForSession" | "reject";
+      summary?: string;
+      approvalKind?: string;
+      approvalDomain?: string;
+    }
+  | {
+      ts: string;
+      kind: "url";
+      url: string;
+      allowed: boolean;
+      reason: string;
+    };
 
 export type CommandName = keyof CommandMap;

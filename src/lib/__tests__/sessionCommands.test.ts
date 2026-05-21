@@ -62,6 +62,9 @@ describe("sessionCommands", () => {
       onLogEvent() {
         return () => {};
       },
+      onAuditEvent() {
+        return () => {};
+      },
     } as RpcBridge);
     const sessions = useSessionsStore();
     sessions.sessions.push({

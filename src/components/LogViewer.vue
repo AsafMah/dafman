@@ -13,13 +13,23 @@ import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from "vue"
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
+import SelectButton from "primevue/selectbutton";
 import { useLogStore, LEVEL_NAMES } from "../stores/logStore";
+import { useAuditStore } from "../stores/auditStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
-import type { LogLevel, LogRecord } from "../ipc/types";
+import type { AuditEntry, LogLevel, LogRecord } from "../ipc/types";
 
 const logStore = useLogStore();
+const auditStore = useAuditStore();
 const toasts = useToastStore();
+
+type Tab = "logs" | "activity";
+const tab = ref<Tab>("logs");
+const tabOptions = [
+  { label: "Logs", value: "logs" as Tab },
+  { label: "Activity", value: "activity" as Tab },
+];
 
 const listEl = ref<HTMLElement | null>(null);
 const followTail = ref(true);
@@ -50,6 +60,7 @@ const filtered = computed<LogRecord[]>(() => logStore.filtered);
 
 onMounted(() => {
   void logStore.ensureInitialised();
+  void auditStore.ensureInitialised();
   // Tail-on-mount: scroll to bottom once the initial fill renders.
   void nextTick(() => scrollToBottom());
 });
@@ -96,7 +107,23 @@ async function exportNow(): Promise<void> {
 }
 
 function clearAll(): void {
-  logStore.clear();
+  if (tab.value === "logs") logStore.clear();
+  else auditStore.clear();
+}
+
+function fmtTime(ts: string): string {
+  const t = ts.slice(11, 23);
+  return t || ts;
+}
+
+function auditLabel(entry: AuditEntry): string {
+  if (entry.kind === "permission") {
+    const verb = entry.decision === "reject" ? "rejected" : entry.decision === "approveOnce" ? "approved once" : "approved for session";
+    const scope = entry.approvalDomain ? `domain ${entry.approvalDomain}` : entry.approvalKind ?? "";
+    const tail = scope ? ` · ${scope}` : "";
+    return `${entry.permissionKind} ${verb}${tail}`;
+  }
+  return `${entry.allowed ? "opened" : "blocked"} · ${entry.url}`;
 }
 
 function formatTime(ts: string): string {
@@ -124,43 +151,59 @@ function formatFields(fields: Record<string, unknown>): string {
 <template>
   <div class="logviewer">
     <header class="logviewer-header">
-      <div class="logviewer-row">
-        <label class="logviewer-field">
-          <span class="logviewer-label">Active level</span>
-          <Select
-            v-model="bunLevel"
-            :options="levelOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            aria-label="Bun-side log level"
-          />
-        </label>
-        <label class="logviewer-field">
-          <span class="logviewer-label">Display</span>
-          <Select
-            v-model="displayLevel"
-            :options="levelOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            aria-label="Display filter"
-          />
-        </label>
-        <label class="logviewer-field logviewer-field-search">
-          <span class="logviewer-label">Search</span>
-          <InputText
-            v-model="searchModel"
-            size="small"
-            placeholder="Filter (substring; matches JSON)…"
-            aria-label="Filter log records"
-          />
-        </label>
+      <div class="logviewer-row logviewer-row-tabs">
+        <SelectButton
+          v-model="tab"
+          :options="tabOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          size="small"
+          aria-label="Diagnostics tab"
+        />
       </div>
+      <template v-if="tab === 'logs'">
+        <div class="logviewer-row">
+          <label class="logviewer-field">
+            <span class="logviewer-label">Active level</span>
+            <Select
+              v-model="bunLevel"
+              :options="levelOptions"
+              option-label="label"
+              option-value="value"
+              size="small"
+              aria-label="Bun-side log level"
+            />
+          </label>
+          <label class="logviewer-field">
+            <span class="logviewer-label">Display</span>
+            <Select
+              v-model="displayLevel"
+              :options="levelOptions"
+              option-label="label"
+              option-value="value"
+              size="small"
+              aria-label="Display filter"
+            />
+          </label>
+          <label class="logviewer-field logviewer-field-search">
+            <span class="logviewer-label">Search</span>
+            <InputText
+              v-model="searchModel"
+              size="small"
+              placeholder="Filter (substring; matches JSON)…"
+              aria-label="Filter log records"
+            />
+          </label>
+        </div>
+      </template>
       <div class="logviewer-row logviewer-row-actions">
-        <span class="logviewer-count">
+        <span v-if="tab === 'logs'" class="logviewer-count">
           {{ filtered.length }} shown / {{ logStore.records.length }} buffered
           <span v-if="!followTail" class="logviewer-not-tailing">· paused</span>
+        </span>
+        <span v-else class="logviewer-count">
+          {{ auditStore.entries.length }} audit entr{{ auditStore.entries.length === 1 ? 'y' : 'ies' }}
         </span>
         <Button
           icon="pi pi-trash"
@@ -170,6 +213,7 @@ function formatFields(fields: Record<string, unknown>): string {
           @click="clearAll"
         />
         <Button
+          v-if="tab === 'logs'"
           icon="pi pi-download"
           label="Export bundle"
           size="small"
@@ -178,6 +222,7 @@ function formatFields(fields: Record<string, unknown>): string {
       </div>
     </header>
     <div
+      v-if="tab === 'logs'"
       ref="listEl"
       class="logviewer-list"
       tabindex="0"
@@ -203,6 +248,27 @@ function formatFields(fields: Record<string, unknown>): string {
           class="logviewer-fields"
         >
           {{ formatFields(fieldsFor(record)) }}
+        </span>
+      </article>
+    </div>
+    <div v-else class="logviewer-list" tabindex="0" role="log" aria-live="polite">
+      <div v-if="auditStore.entries.length === 0" class="logviewer-empty">
+        No audit entries yet. Permission decisions and URL opens land here as they happen.
+      </div>
+      <article
+        v-for="(entry, idx) in auditStore.entries"
+        :key="`${entry.ts}-${idx}`"
+        class="logviewer-row-record"
+        :class="entry.kind === 'permission'
+          ? `audit-perm-${entry.decision}`
+          : entry.allowed ? 'audit-url-ok' : 'audit-url-blocked'"
+        :title="entry.ts"
+      >
+        <span class="logviewer-ts">{{ fmtTime(entry.ts) }}</span>
+        <span class="logviewer-level">{{ entry.kind.toUpperCase() }}</span>
+        <span class="logviewer-message">{{ auditLabel(entry) }}</span>
+        <span v-if="entry.kind === 'permission' && entry.summary" class="logviewer-fields">
+          {{ entry.summary }}
         </span>
       </article>
     </div>
@@ -321,6 +387,16 @@ function formatFields(fields: Record<string, unknown>): string {
 
 .logviewer-row-record.logviewer-record-warn  { background: color-mix(in srgb, var(--p-yellow-500, #d97706) 7%, transparent); }
 .logviewer-row-record.logviewer-record-error { background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent); }
+
+.logviewer-row-record.audit-perm-reject       { background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent); }
+.logviewer-row-record.audit-perm-approveOnce  { background: color-mix(in srgb, var(--p-text-color) 3%, transparent); }
+.logviewer-row-record.audit-perm-approveForSession { background: color-mix(in srgb, var(--p-primary-color) 8%, transparent); }
+.logviewer-row-record.audit-url-blocked       { background: color-mix(in srgb, var(--p-red-500, #ef4444) 7%, transparent); }
+.logviewer-row-record.audit-url-ok            { background: color-mix(in srgb, var(--p-text-color) 3%, transparent); }
+
+.logviewer-row-tabs {
+  padding-bottom: 0.25rem;
+}
 
 .logviewer-message {
   grid-column: 3 / 4;

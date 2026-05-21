@@ -29,6 +29,7 @@ import { isAbsolute, resolve } from "node:path";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { recordPermission } from "./audit";
 import { buildBuiltInTools } from "./tools";
 import { searchWorkspaceFiles } from "./fileSearch";
 import type {
@@ -70,6 +71,16 @@ interface PendingEntry {
 	/// Set to `true` by `respondToRequest` / teardown paths so a
 	/// second response is a benign no-op instead of double-resolving.
 	settled: boolean;
+	/// For permission entries: the SDK's `kind` (shell / write / read /
+	/// mcp / url / custom-tool / memory / hook). Lifted off the
+	/// PendingRequest payload at construction time so the audit log
+	/// can record it without re-parsing the SDK shape later.
+	permissionKind?: string;
+	/// For permission entries: the one-line UI summary the modal
+	/// shows. Also recorded in the audit log so an operator can
+	/// later see "user denied shell `git push origin master`"
+	/// instead of just "permission rejected".
+	summary?: string;
 }
 
 /// Build a one-line human-readable summary of a permission request
@@ -189,20 +200,28 @@ export class SessionRegistry {
 				if (this.approveAllBySession.get(sid) === true) {
 					return Promise.resolve({ kind: "approve-once" });
 				}
-				return this.enqueuePending(sid, "permission", (requestId) => {
-					const data: PermissionRequestData = {
-						kind: request.kind,
-						...(request.toolCallId ? { toolCallId: request.toolCallId } : {}),
+				return this.enqueuePending(
+					sid,
+					"permission",
+					(requestId) => {
+						const data: PermissionRequestData = {
+							kind: request.kind,
+							...(request.toolCallId ? { toolCallId: request.toolCallId } : {}),
+							summary: summarizePermission(request),
+							raw: toPlainObject(request),
+						};
+						this.emitPending({
+							sessionId: sid,
+							requestId,
+							kind: "permission",
+							request: data,
+						});
+					},
+					{
+						permissionKind: request.kind,
 						summary: summarizePermission(request),
-						raw: toPlainObject(request),
-					};
-					this.emitPending({
-						sessionId: sid,
-						requestId,
-						kind: "permission",
-						request: data,
-					});
-				}) as Promise<PermissionRequestResult>;
+					},
+				) as Promise<PermissionRequestResult>;
 			},
 			onUserInputRequest: (request: UserInputRequest): Promise<UserInputResponse> => {
 				const sid = sessionId();
@@ -253,6 +272,7 @@ export class SessionRegistry {
 		sessionId: string,
 		kind: PendingEntry["kind"],
 		emit: (requestId: string) => void,
+		extras?: { permissionKind?: string; summary?: string },
 	): Promise<unknown> {
 		const requestId = randomUUID();
 		const promise = new Promise<unknown>((resolve, reject) => {
@@ -262,6 +282,8 @@ export class SessionRegistry {
 				resolve,
 				reject,
 				settled: false,
+				...(extras?.permissionKind ? { permissionKind: extras.permissionKind } : {}),
+				...(extras?.summary ? { summary: extras.summary } : {}),
 			});
 		});
 		try {
@@ -346,6 +368,8 @@ export class SessionRegistry {
 		entry.settled = true;
 		this.pendingHandlers.delete(params.requestId);
 		let sdkResult: unknown;
+		let approvalKind: string | undefined;
+		let approvalDomain: string | undefined;
 		switch (params.response.kind) {
 			case "permission":
 				if (params.response.decision === "approveOnce") {
@@ -365,12 +389,27 @@ export class SessionRegistry {
 					const out: Record<string, unknown> = { kind: "approve-for-session" };
 					if (params.response.approval) {
 						out.approval = params.response.approval;
+						approvalKind = params.response.approval.kind;
 					}
 					if (params.response.domain) {
 						out.domain = params.response.domain;
+						approvalDomain = params.response.domain;
 					}
 					sdkResult = out;
 				}
+				// Audit log: every permission decision recorded as one
+				// line in <userData>/audit/permissions.jsonl. Captures
+				// what + when + who + scope without leaking command
+				// bodies or paths beyond the bun-derived summary.
+				recordPermission({
+					sessionId: params.sessionId,
+					requestId: params.requestId,
+					permissionKind: entry.permissionKind ?? "unknown",
+					decision: params.response.decision,
+					...(entry.summary ? { summary: entry.summary } : {}),
+					...(approvalKind ? { approvalKind } : {}),
+					...(approvalDomain ? { approvalDomain } : {}),
+				});
 				break;
 			case "userInput":
 				sdkResult = {

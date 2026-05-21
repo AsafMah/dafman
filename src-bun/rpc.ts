@@ -557,6 +557,16 @@ export type DafmanRPC = {
 				params: { fileName: string; contents: string };
 				response: { path: string; bytes: number };
 			};
+			/// Returns the recent audit entries (capped at 500) so the
+			/// renderer can fill an Activity view on first open.
+			/// Live updates flow through the `auditEvent` webview
+			/// message.
+			getAuditState: {
+				params: { recentLimit?: number };
+				response: {
+					recent: Array<AuditEntry>;
+				};
+			};
 		};
 		messages: Record<string, never>;
 	}>;
@@ -579,6 +589,10 @@ export type DafmanRPC = {
 			/// record, irrespective of the configured level — the
 			/// renderer applies its own client-side filter).
 			logEvent: LogRecord;
+			/// Live audit-log entry. Fanned out by `subscribeAudit()`
+			/// for every recordPermission / recordUrl call. The
+			/// in-app Activity view (Diagnostics panel) subscribes.
+			auditEvent: AuditEntry;
 		};
 	}>;
 };
@@ -590,5 +604,25 @@ export interface LogRecord {
 	message: string;
 	[key: string]: unknown;
 }
+
+export type AuditEntry =
+	| {
+		ts: string;
+		kind: "permission";
+		sessionId: string;
+		requestId: string;
+		permissionKind: string;
+		decision: "approveOnce" | "approveForSession" | "reject";
+		summary?: string;
+		approvalKind?: string;
+		approvalDomain?: string;
+	}
+	| {
+		ts: string;
+		kind: "url";
+		url: string;
+		allowed: boolean;
+		reason: string;
+	};
 
 export type { AppErrorPayload };

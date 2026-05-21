@@ -5,6 +5,21 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added
 
+- **Permission + URL audit log.** Append-only JSONL under
+  `<userData>/audit/permissions.jsonl` and `urls.jsonl`. Every
+  `respondToRequest` permission decision records `permissionKind`,
+  decision, summary, and (for `approveForSession`) the approval scope
+  or URL domain. Every `openUrl` records the URL + allowed flag +
+  reason ("ok" / "scheme-blocked" / "openExternal-threw: …"). Live
+  tail via a new `auditEvent` webview message; visible in a new
+  Activity tab on the Diagnostics edge panel (sits alongside the
+  Logs tab, same SelectButton primitive). Per-decision row tinting
+  in the UI (reject = red, approveForSession = primary accent). Ring
+  buffer caps at 500 in-memory; on-disk files are never auto-deleted
+  (separate posture from the diagnostic JSON log). 4 bun-side audit
+  tests + 1 integration test driving the full SDK → handler →
+  `respondToRequest` → audit pipeline + 1 wire-shape snapshot.
+
 - **Export conversation (Markdown + JSON).** Per-session gear popover
   gains "Export Markdown" / "Export JSON" buttons. The renderer builds
   the document via the new `formatConversation` helper (Markdown
