@@ -904,6 +904,80 @@ export class SessionRegistry {
 		}
 	}
 
+	/// Lists session skills (name, description, enabled, source).
+	/// The popover renders a toggle per skill so the user can flip
+	/// any skill on/off mid-session. Errors are wrapped — skill APIs
+	/// are @experimental in the SDK; if they aren't wired the renderer
+	/// surfaces a toast and falls back to an empty list.
+	async listSkills(sessionId: string): Promise<Array<{
+		name: string;
+		description: string;
+		source: string;
+		enabled: boolean;
+		userInvocable: boolean;
+	}>> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.skills.list()) as {
+				skills?: Array<{
+					name?: unknown;
+					description?: unknown;
+					source?: unknown;
+					enabled?: unknown;
+					userInvocable?: unknown;
+				}>;
+			};
+			const skills = result.skills ?? [];
+			return skills
+				.filter((s) => typeof s.name === "string")
+				.map((s) => ({
+					name: String(s.name),
+					description: typeof s.description === "string" ? s.description : "",
+					source: typeof s.source === "string" ? s.source : "",
+					enabled: s.enabled === true,
+					userInvocable: s.userInvocable === true,
+				}));
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setSkillEnabled(
+		sessionId: string,
+		name: string,
+		enabled: boolean,
+	): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			if (enabled) {
+				await entry.session.rpc.skills.enable({ name });
+			} else {
+				await entry.session.rpc.skills.disable({ name });
+			}
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	/// Per-session usage metrics. Returns the raw SDK response shape
+	/// (totals + per-model + token details) without filtering — the
+	/// renderer cherry-picks what to display.
+	async getUsageMetrics(sessionId: string): Promise<Record<string, unknown>> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			return (await entry.session.rpc.usage.getMetrics()) as Record<
+				string,
+				unknown
+			>;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
 	async resetApprovals(sessionId: string): Promise<boolean> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);

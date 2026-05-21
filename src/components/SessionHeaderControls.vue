@@ -211,6 +211,10 @@ function toggleOptions(event: Event) {
   // late `session.title_changed` echo while the popover is open.
   nameDraft.value = record.value?.title ?? "";
   optionsMenu.value?.toggle(event);
+  // Refresh skills + usage every popover-open. Cheap RPCs; gives the
+  // user always-current data without a separate refresh button.
+  void loadSkills();
+  void loadUsage();
 }
 
 function onRenameSubmit() {
@@ -241,6 +245,100 @@ function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
   if (!path) return;
   void invokeCommand("revealPath", { path });
+}
+
+// ---------- Skills & usage (popover-only) ----------
+
+/// SDK skill list for this session. Empty until the user opens the
+/// popover (we don't fetch eagerly because the popover is the only
+/// surface that uses it). The result is cached on the component until
+/// the next popover-open so toggling a row isn't followed by a
+/// flicker-refetch.
+type SessionSkill = {
+  name: string;
+  description: string;
+  source: string;
+  enabled: boolean;
+  userInvocable: boolean;
+};
+const sessionSkills = ref<SessionSkill[]>([]);
+const skillsLoaded = ref(false);
+const skillsError = ref<string | null>(null);
+
+async function loadSkills() {
+  skillsError.value = null;
+  try {
+    sessionSkills.value = await invokeCommand("listSessionSkills", {
+      sessionId: props.sessionId,
+    });
+    skillsLoaded.value = true;
+  } catch (err) {
+    skillsError.value = err instanceof Error ? err.message : String(err);
+    skillsLoaded.value = true;
+  }
+}
+
+async function toggleSkill(skill: SessionSkill) {
+  const next = !skill.enabled;
+  // Optimistic flip so the toggle is responsive; revert on RPC failure.
+  skill.enabled = next;
+  try {
+    await invokeCommand("setSessionSkillEnabled", {
+      sessionId: props.sessionId,
+      name: skill.name,
+      enabled: next,
+    });
+  } catch {
+    skill.enabled = !next;
+  }
+}
+
+/// Usage metrics (token + request counts + per-model). Fetched the
+/// same way as skills — lazy on popover-open. The SDK returns a rich
+/// shape; we cherry-pick the fields the popover needs.
+const usage = ref<{
+  totalUserRequests: number;
+  totalPremiumRequestCost: number;
+  totalApiDurationMs: number;
+  lastCallInputTokens: number;
+  lastCallOutputTokens: number;
+} | null>(null);
+const usageError = ref<string | null>(null);
+
+async function loadUsage() {
+  usageError.value = null;
+  try {
+    const raw = await invokeCommand("getSessionUsageMetrics", {
+      sessionId: props.sessionId,
+    });
+    usage.value = {
+      totalUserRequests:
+        typeof raw.totalUserRequests === "number" ? raw.totalUserRequests : 0,
+      totalPremiumRequestCost:
+        typeof raw.totalPremiumRequestCost === "number"
+          ? raw.totalPremiumRequestCost
+          : 0,
+      totalApiDurationMs:
+        typeof raw.totalApiDurationMs === "number" ? raw.totalApiDurationMs : 0,
+      lastCallInputTokens:
+        typeof raw.lastCallInputTokens === "number" ? raw.lastCallInputTokens : 0,
+      lastCallOutputTokens:
+        typeof raw.lastCallOutputTokens === "number"
+          ? raw.lastCallOutputTokens
+          : 0,
+    };
+  } catch (err) {
+    usageError.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+function formatDurationMs(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)} s`;
+  const min = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return `${min}m ${sec}s`;
 }
 </script>
 
@@ -415,6 +513,70 @@ function onWorkspaceClick() {
             @update:model-value="onToggleApproveAll"
           />
         </div>
+        <!-- Skills section. Lazy-loaded on popover-open. Empty state
+             when the SDK returns no skills for this session (most
+             common today — skills are M5 territory). -->
+        <div class="option-row option-row-stack">
+          <span class="option-label">Skills</span>
+          <div v-if="!skillsLoaded" class="popover-empty-hint">Loading…</div>
+          <div v-else-if="skillsError" class="popover-empty-hint popover-error">
+            {{ skillsError }}
+          </div>
+          <div v-else-if="sessionSkills.length === 0" class="popover-empty-hint">
+            No skills configured for this session.
+          </div>
+          <ul v-else class="popover-skill-list">
+            <li
+              v-for="skill in sessionSkills"
+              :key="skill.name"
+              class="popover-skill-row"
+            >
+              <div class="popover-skill-text">
+                <div class="popover-skill-name">
+                  <span>{{ skill.name }}</span>
+                  <small v-if="skill.userInvocable" class="popover-skill-tag">/</small>
+                </div>
+                <div v-if="skill.description" class="popover-skill-desc">
+                  {{ skill.description }}
+                </div>
+              </div>
+              <ToggleSwitch
+                :model-value="skill.enabled"
+                @update:model-value="() => toggleSkill(skill)"
+              />
+            </li>
+          </ul>
+        </div>
+
+        <!-- Usage metrics. Cherry-picked from SDK usage.getMetrics. -->
+        <div v-if="usage || usageError" class="option-row option-row-stack">
+          <span class="option-label">Usage</span>
+          <div v-if="usageError" class="popover-empty-hint popover-error">
+            {{ usageError }}
+          </div>
+          <dl v-else-if="usage" class="popover-usage">
+            <div class="popover-usage-row">
+              <dt>Requests</dt>
+              <dd>{{ usage.totalUserRequests }}</dd>
+            </div>
+            <div class="popover-usage-row">
+              <dt>Premium cost</dt>
+              <dd>{{ usage.totalPremiumRequestCost.toFixed(2) }}</dd>
+            </div>
+            <div class="popover-usage-row">
+              <dt>API time</dt>
+              <dd>{{ formatDurationMs(usage.totalApiDurationMs) }}</dd>
+            </div>
+            <div class="popover-usage-row">
+              <dt>Last in / out tokens</dt>
+              <dd>
+                {{ usage.lastCallInputTokens.toLocaleString() }} /
+                {{ usage.lastCallOutputTokens.toLocaleString() }}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
         <div class="option-actions">
           <Button
             icon="pi pi-compress"
@@ -684,6 +846,96 @@ function onWorkspaceClick() {
   justify-content: flex-end;
   padding-top: 0.25rem;
   border-top: 1px solid var(--p-content-border-color);
+}
+
+.popover-empty-hint {
+  color: var(--p-text-muted-color);
+  font-size: 0.78rem;
+  padding: 0.2rem 0;
+}
+
+.popover-error {
+  color: var(--p-red-500, #ef4444);
+  word-break: break-word;
+}
+
+.popover-skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.popover-skill-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--p-content-border-color) 60%, transparent);
+}
+
+.popover-skill-row:last-child {
+  border-bottom: none;
+}
+
+.popover-skill-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.popover-skill-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+  font-weight: 500;
+}
+
+.popover-skill-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  background: color-mix(in srgb, var(--p-primary-color) 14%, transparent);
+  color: var(--p-primary-color);
+  padding: 0 0.3rem;
+  border-radius: var(--p-border-radius-sm, 3px);
+}
+
+.popover-skill-desc {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.1rem;
+  line-height: 1.3;
+}
+
+.popover-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.popover-usage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.popover-usage-row dt {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
+
+.popover-usage-row dd {
+  margin: 0;
+  color: var(--p-text-color);
+  font-variant-numeric: tabular-nums;
 }
 
 .option-row-toggle {

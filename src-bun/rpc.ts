@@ -444,6 +444,31 @@ export type DafmanRPC = {
 				params: { sessionId: string };
 				response: boolean;
 			};
+			/// SDK skill list for the session. Returns the SDK's
+			/// `Skill[]` shape normalised: name + description + source
+			/// + enabled + userInvocable. Slash-invocation surfaces in
+			/// the composer use `userInvocable`.
+			listSessionSkills: {
+				params: { sessionId: string };
+				response: Array<{
+					name: string;
+					description: string;
+					source: string;
+					enabled: boolean;
+					userInvocable: boolean;
+				}>;
+			};
+			setSessionSkillEnabled: {
+				params: { sessionId: string; name: string; enabled: boolean };
+				response: boolean;
+			};
+			/// Raw SDK `usage.getMetrics` shape. Opaque to bun — the
+			/// renderer cherry-picks `totalUserRequests` / token-detail
+			/// counts / per-model breakdowns for display.
+			getSessionUsageMetrics: {
+				params: { sessionId: string };
+				response: Record<string, unknown>;
+			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };
 			getLogDir: { params: Record<string, never>; response: string };

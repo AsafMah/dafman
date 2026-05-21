@@ -298,6 +298,24 @@ export type CommandMap = {
     result: boolean;
   };
   resetSessionApprovals: { args: { sessionId: string }; result: boolean };
+  listSessionSkills: {
+    args: { sessionId: string };
+    result: Array<{
+      name: string;
+      description: string;
+      source: string;
+      enabled: boolean;
+      userInvocable: boolean;
+    }>;
+  };
+  setSessionSkillEnabled: {
+    args: { sessionId: string; name: string; enabled: boolean };
+    result: boolean;
+  };
+  getSessionUsageMetrics: {
+    args: { sessionId: string };
+    result: Record<string, unknown>;
+  };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };
