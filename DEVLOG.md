@@ -10,6 +10,62 @@
 
 ---
 
+## 2026-05-22 — Backlog audit: 14 major themes missing from Phase plan
+
+### Takeaway
+
+User: "figure out first where all the missing stuff is — terminal
+integration, automations, more tools and tons more". Walked every
+plan-*.prompt.md doc end-to-end and compiled `plans/plan-backlog-audit.prompt.md`.
+
+Categorised every documented feature/idea NOT in the current STATUS
+Phase plan into:
+
+- **§A — 14 major themes** missing from the phased ordering:
+  - A1 Terminal integration (Bun.spawn PTY + xterm.js, per-session pane)
+  - A2 App shell redesign (sidebar + status bar)
+  - A3 Layout Groups (workspace-of-pane-trees switcher)
+  - A4 Server mode (dafman over the browser, leveraging wsBridge)
+  - A5 Long jobs registry (cross-cutting infra for autopilot/automations)
+  - A6 Composer toolbar (WYSIWYG + slash picker + attachments)
+  - A7 Autopilot UI (sanity checks + goal entry + halt + diff summary)
+  - A8 Library panel (Skills + MCP + Instructions + Agents in one place)
+  - A9 M365 integration (WorkIQ, Graph, SharePoint, Outlook, Loop, Office)
+  - A10 Teams bot (depends on A4 Server mode)
+  - A11 Tool: Desktop Control (screen + keyboard automation via MCP)
+  - A12 Tool: Bun shell / script runner
+  - A13 Tool: Browser control (MCP server vs embedded BrowserView)
+  - A14 Per-session settings as a right-rail panel (user explicitly asked)
+- **§B — Smaller items** across 10 sub-categories: steering/queueing,
+  inline session.ui variants, time-travel, clipboard/notify/lsp/task
+  tools, slash commands, plans editor, memory, self.*, system prompt
+  customize editor, custom request headers, sub-agent streaming toggle,
+  MCP OAuth toast, all 14 un-set baseSessionConfig knobs, ~20 CLI
+  features worth wiring (`/fork`, `/rewind`, `/undo`, `/diff`,
+  `/share html`, `#issue` autocomplete, etc.), 11 SDK hooks/surfaces
+  we haven't touched.
+- **§C — Proposed Phase 18–40 ordering** that bundles related work,
+  starts with Power UX (user's pick), includes A14 right-rail panel
+  in Phase 18, layers App shell in Phase 22, Terminal in 24, M365
+  v1 in 37, Teams in 39.
+- **§D — 7 critical open questions** that need user input before the
+  dependent phase starts: Projects-vs-Groups; Library tab strategy;
+  Server-mode auth; Terminal xterm vs ghostty; Browser MCP vs
+  BrowserView; Memory backend SQLite-vec vs LanceDB; Desktop-control
+  library.
+
+### Files
+
+- `plans/plan-backlog-audit.prompt.md` (new, ~520 lines).
+- `STATUS.md` — pointer + 10-line summary up top.
+- `DEVLOG.md` — this entry.
+
+### Nothing shipped yet
+
+This is planning/audit work only. User to pick which Phase next.
+
+---
+
 ## 2026-05-22 — Bug bash #2: every ❌ from MANUAL_TESTS fixed + locked
 
 ### Takeaway

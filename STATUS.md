@@ -8,6 +8,8 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md) for the live architecture snapshot,
 > [`MANUAL_TESTS.md`](MANUAL_TESTS.md) for the manual-test backlog
 > (per-feature checklists the user runs to sign off),
+> [`plans/plan-backlog-audit.prompt.md`](plans/plan-backlog-audit.prompt.md)
+> for the comprehensive feature gap list across all plans/,
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
@@ -18,6 +20,25 @@ conversation, and the rough edges noted under "Observability tail" below.
 ---
 
 ## Next concrete steps
+
+**2026-05-22:** wrote a full backlog audit covering every feature documented
+across plans/ that's NOT in the current Phase plan — see
+**[`plans/plan-backlog-audit.prompt.md`](plans/plan-backlog-audit.prompt.md)**.
+14 major themes were missing from the phased ordering:
+
+- Terminal integration (`Bun.spawn` PTY + xterm.js panes)
+- App shell redesign (sidebar + status bar)
+- Layout groups (workspace-of-pane-trees switcher)
+- Server mode (dafman over the browser)
+- Long jobs registry + Autopilot UI
+- Composer toolbar (WYSIWYG + slash picker)
+- Library panel (Skills + MCP + Instructions + Agents)
+- M365 + Teams bot
+- Desktop control / Bun shell / Browser-control tools
+- Per-session settings as right-rail panel (user explicitly asked for it)
+
+A fresh Phase 18–40 ordering is proposed in §C of the audit doc. Awaiting
+user pick.
 
 After the 2026-05-22 SDK + CLI audit (see
 **[`plans/plan-sdk-audit.prompt.md`](plans/plan-sdk-audit.prompt.md)** —
