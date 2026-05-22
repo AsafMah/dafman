@@ -178,7 +178,6 @@ onMounted(async () => {
   console.info("[boot] starting restoreFromLayout");
   try {
     await restoreFromLayout();
-    console.info("[boot] restoreFromLayout returned");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // eslint-disable-next-line no-console
@@ -268,22 +267,15 @@ async function restoreFromLayout() {
     return;
   }
   bootStore.beginSessions(sessionIds.length);
+  // Parallel resumes — safe again now that rpcGuard throws a real
+  // Error (encoded AppErrorPayload). Previously this hung because
+  // Electrobun's bridge drops non-Error throws (see src-bun/app/
+  // errors.ts comment).
   await Promise.all(
     sessionIds.map((id) =>
       sessionsStore
         .restoreSession(id)
-        .then((r) => {
-          console.info(`[boot] restoreSession(${id.slice(0, 8)}) resolved → ${r ? "record" : "null"}`);
-          return r;
-        })
-        .catch((err) => {
-          console.error(`[boot] restoreSession(${id.slice(0, 8)}) THREW`, err);
-          return null;
-        })
-        .finally(() => {
-          console.info(`[boot] markSessionRestored(${id.slice(0, 8)})`);
-          bootStore.markSessionRestored();
-        }),
+        .finally(() => bootStore.markSessionRestored()),
     ),
   );
   console.info("[boot] restoreFromLayout: all resumes settled, applying layout");

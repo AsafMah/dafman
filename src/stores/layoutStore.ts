@@ -263,7 +263,7 @@ export const useLayoutStore = defineStore("layout", () => {
       tabComponent: "sidebarTab",
       title: "Session",
       initialSize: 360,
-      minimumSize: 320,
+      minimumSize: 200,
     });
   }
 

@@ -55,6 +55,22 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
   );
 }
 
+/// The bun side encodes `AppErrorPayload` into the `Error.message` as
+/// `AppErrorPayload:{json}` — Electrobun's bridge only forwards
+/// `error.message` (and silently drops non-Error throws — see
+/// node_modules/electrobun/dist/api/shared/rpc.ts:398). Decode here.
+const APP_ERROR_PREFIX = "AppErrorPayload:";
+
+function tryDecodeAppErrorMessage(message: string): AppErrorPayload | null {
+  if (!message.startsWith(APP_ERROR_PREFIX)) return null;
+  try {
+    const payload = JSON.parse(message.slice(APP_ERROR_PREFIX.length));
+    return isAppErrorPayload(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
 export type SessionEventListener = (event: SessionEventPayload) => void;
 export type PendingRequestListener = (payload: PendingRequestPayload) => void;
 export type LogEventListener = (record: LogRecord) => void;
@@ -114,7 +130,11 @@ export async function invokeCommand<N extends CommandName>(
     return await bridge.request(name, args);
   } catch (raw) {
     if (isAppErrorPayload(raw)) throw new AppError(raw);
-    if (raw instanceof Error) throw raw;
+    if (raw instanceof Error) {
+      const decoded = tryDecodeAppErrorMessage(raw.message);
+      if (decoded) throw new AppError(decoded);
+      throw raw;
+    }
     throw new Error(String(raw));
   }
 }

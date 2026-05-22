@@ -29,23 +29,33 @@ describe("rpcGuard", () => {
 		expect(await handler(21)).toBe(42);
 	});
 
-	test("rethrows AppError payload as-is", async () => {
+	test("rethrows AppError payload as a real Error (JSON-encoded message)", async () => {
 		const handler = rpcGuard(async () => {
 			throw AppError.sessionNotFound("missing");
 		});
-		await expect(handler(undefined as never)).rejects.toEqual({
-			kind: "SessionNotFound",
-			data: "missing",
-		});
+		try {
+			await handler(undefined as never);
+			throw new Error("should have thrown");
+		} catch (e) {
+			expect(e).toBeInstanceOf(Error);
+			expect((e as Error).message).toBe(
+				`AppErrorPayload:${JSON.stringify({ kind: "SessionNotFound", data: "missing" })}`,
+			);
+		}
 	});
 
-	test("coerces unknown errors into Sdk", async () => {
+	test("coerces unknown errors into Sdk (JSON-encoded Error)", async () => {
 		const handler = rpcGuard(async () => {
 			throw new Error("kaboom");
 		});
-		await expect(handler(undefined as never)).rejects.toEqual({
-			kind: "Sdk",
-			data: "kaboom",
-		});
+		try {
+			await handler(undefined as never);
+			throw new Error("should have thrown");
+		} catch (e) {
+			expect(e).toBeInstanceOf(Error);
+			expect((e as Error).message).toBe(
+				`AppErrorPayload:${JSON.stringify({ kind: "Sdk", data: "kaboom" })}`,
+			);
+		}
 	});
 });

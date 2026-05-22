@@ -56,8 +56,14 @@ function formatPayload(p: AppErrorPayload): string {
 
 /// Wrap an RPC handler so any thrown `AppError` is serialized as its
 /// payload, and any other thrown value is coerced into `Sdk(message)`.
-/// The Electrobun bridge serializes thrown values via JSON; we want
-/// callers to see a stable discriminated union, never a JS Error.
+/// The Electrobun bridge serializes errors via `error.message` only and
+/// will *drop non-Error throws on the floor* (unhandled rejection in
+/// worker, request promise on renderer never settles —
+/// see node_modules/electrobun/dist/api/shared/rpc.ts:398). So we
+/// always throw a real `Error` whose message is a JSON-encoded
+/// `AppErrorPayload`; the renderer's `invokeCommand` decodes it.
+export const APP_ERROR_PREFIX = "AppErrorPayload:";
+
 export function rpcGuard<TArgs, TResult>(
 	fn: (args: TArgs) => Promise<TResult> | TResult,
 ): (args: TArgs) => Promise<TResult> {
@@ -65,11 +71,14 @@ export function rpcGuard<TArgs, TResult>(
 		try {
 			return await fn(args);
 		} catch (err) {
+			let payload: AppErrorPayload;
 			if (err instanceof AppError) {
-				throw err.payload;
+				payload = err.payload;
+			} else {
+				const message = err instanceof Error ? err.message : String(err);
+				payload = { kind: "Sdk", data: message };
 			}
-			const message = err instanceof Error ? err.message : String(err);
-			throw { kind: "Sdk", data: message } satisfies AppErrorPayload;
+			throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);
 		}
 	};
 }
