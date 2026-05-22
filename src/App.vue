@@ -90,20 +90,26 @@ onMounted(async () => {
 
   // Splash watchdog. Whatever happens below — uncaught rejection,
   // dockview throw, infinite await on a hung RPC — the splash MUST
-  // dismiss within 20 s so the user can actually use the app. A
-  // half-restored UI with a toast is always better than a permanent
-  // "Restoring sessions…" lock-out (the regression that prompted
-  // this guard — see DEVLOG 2026-05-22).
+  // dismiss quickly so the user can actually use the app. Normal
+  // boot completes in <2 s; anything past 6 s is a bug, not a
+  // legitimate slow load. Pushed down from 20 → 6 s because users
+  // hit it repeatedly on commits that broke restoreFromLayout in
+  // ways the catch arm couldn't cover (e.g. fromJSON throw
+  // recovery still left the splash up because a downstream async
+  // never settled).
+  const SPLASH_WATCHDOG_MS = 6_000;
   const splashWatchdog = window.setTimeout(() => {
     if (bootStore.isBooting && bootStore.phase !== "failed") {
-      console.error("[boot] watchdog: splash still up after 20s, forcing ready");
+      console.error(
+        `[boot] watchdog: splash still up after ${SPLASH_WATCHDOG_MS}ms, forcing ready`,
+      );
       toastStore.warn(
         "Startup took too long",
         "The app loaded but something didn't finish. Try Reload Layout from the command palette if anything looks wrong.",
       );
       bootStore.markReady();
     }
-  }, 20_000);
+  }, SPLASH_WATCHDOG_MS);
 
   // Settings + client load in parallel — they don't depend on each
   // other. Previously these were sequential, costing ~50-200 ms of
@@ -169,8 +175,10 @@ onMounted(async () => {
   // "Restoring sessions…" / "Applying layout…" forever. We log,
   // toast, and continue to `markReady` — better to surface a
   // half-restored app the user can fix than to lock them out.
+  console.info("[boot] starting restoreFromLayout");
   try {
     await restoreFromLayout();
+    console.info("[boot] restoreFromLayout returned");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // eslint-disable-next-line no-console
@@ -238,14 +246,18 @@ onMounted(async () => {
 const pendingRestoreLayout = ref<unknown | null>(null);
 
 async function restoreFromLayout() {
+  console.info("[boot] restoreFromLayout: reading layout");
   const layout = settingsStore.settings.layout?.dockview;
-  if (!layout || typeof layout !== "object") return;
-  // Strip the legacy `session-details-${sessionId}` panels first —
-  // Phase 18b shipped per-session rail panels; the singleton refactor
-  // makes those orphan ids that fromJSON would dutifully restore.
+  if (!layout || typeof layout !== "object") {
+    console.info("[boot] restoreFromLayout: no layout to restore");
+    return;
+  }
   const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
   const sanitized = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
   const sessionIds = extractChatPanelIds(sanitized);
+  console.info(
+    `[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`,
+  );
   if (sessionIds.length === 0) {
     if (layoutStore.api) {
       const ok = layoutStore.restore(sanitized);
@@ -255,9 +267,6 @@ async function restoreFromLayout() {
     }
     return;
   }
-  // Flip the boot store into "sessions" phase so the splash status
-  // text becomes "Restoring sessions… N of M". Each restoreSession
-  // bumps the counter when it settles (success or failure).
   bootStore.beginSessions(sessionIds.length);
   await Promise.all(
     sessionIds.map((id) =>
@@ -266,25 +275,18 @@ async function restoreFromLayout() {
         .finally(() => bootStore.markSessionRestored()),
     ),
   );
-  // Yield a frame so the splash can paint "N of N" before we
-  // start the heavy `dockview.fromJSON` + panel mount work — that
-  // single synchronous burst can take hundreds of milliseconds and
-  // would otherwise look like a freeze on top of "0 of N".
+  console.info("[boot] restoreFromLayout: all resumes settled, applying layout");
   await new Promise<void>((resolve) =>
     requestAnimationFrame(() => resolve()),
   );
   bootStore.beginApplying();
-  // Yield once more so the "Applying layout…" status paints before
-  // the synchronous block.
   await new Promise<void>((resolve) =>
     requestAnimationFrame(() => resolve()),
   );
-  // Always apply the full layout, even when no sessions resumed —
-  // preserving the user's grid layout is more important than hiding
-  // dead panels (and the orphan UI gives them a one-click recovery
-  // path). See `ChatPanel.vue`.
   if (layoutStore.api) {
+    console.info("[boot] restoreFromLayout: calling dock.fromJSON");
     const ok = layoutStore.restore(sanitized);
+    console.info(`[boot] restoreFromLayout: fromJSON returned ok=${ok}`);
     if (!ok) {
       // fromJSON threw — toast and fall back to a default layout
       // so the user has something to work with instead of a blank
@@ -296,6 +298,7 @@ async function restoreFromLayout() {
       layoutStore.resetToDefault();
     }
   } else {
+    console.info("[boot] restoreFromLayout: api not ready, deferring");
     pendingRestoreLayout.value = sanitized;
   }
 }
@@ -340,6 +343,7 @@ watch(
 );
 
 function onDockReady(event: DockviewReadyEvent) {
+  console.info("[boot] onDockReady fired");
   layoutStore.setApi(event.api);
   // Whenever the user closes a tab via dockview's own X (we hide the
   // in-pane close button to keep a single source of truth), tear down
