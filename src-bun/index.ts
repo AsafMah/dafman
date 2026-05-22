@@ -261,31 +261,45 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				const trimmed = path.trim();
 				if (!trimmed) return false;
 				try {
+					const { stat } = await import("node:fs/promises");
+					let isDir = false;
+					try {
+						const st = await stat(trimmed);
+						isDir = st.isDirectory();
+					} catch {
+						// Path missing — let the OS show whatever default
+						// it does for an absent path (usually a benign error
+						// dialog). We log and continue rather than silently
+						// no-op'ing.
+					}
 					if (process.platform === "win32") {
-						// Behavior depends on file vs folder:
-						//   File: explorer.exe /select,<file> opens
-						//     parent + highlights file.
-						//   Folder: explorer.exe <folder> opens it.
-						//     (/select,<folder> would open the parent
-						//     — that was the v1 diagnostics-bundle bug:
-						//     the reveal landed on userData/ instead
-						//     of inside the dafman-diagnostics-*/ dir.)
 						const { spawn } = await import("node:child_process");
-						const { stat } = await import("node:fs/promises");
-						let isDir = false;
-						try {
-							const st = await stat(trimmed);
-							isDir = st.isDirectory();
-						} catch {
-							/* path missing — fall through with isDir=false;
-							 * /select,<missing> is a benign no-op rather
-							 * than misleading. */
+						if (isDir) {
+							// Folder → open it in Explorer.
+							spawn("explorer.exe", [trimmed], { detached: true, stdio: "ignore" }).unref();
+						} else {
+							// File → open with the default app (what
+							// Explorer would do on double-click). `cmd /c
+							// start "" "<path>"` is the standard shell
+							// recipe — the empty title arg is required so
+							// `start` doesn't treat a quoted path as the
+							// title. Previously we used `explorer /select`
+							// which opened the parent folder + highlighted
+							// the file; user feedback (2026-05-22) made
+							// clear that "open the file" is what's actually
+							// wanted everywhere we call this.
+							spawn("cmd.exe", ["/c", "start", "", trimmed], {
+								detached: true,
+								stdio: "ignore",
+							}).unref();
 						}
-						const args = isDir ? [trimmed] : [`/select,${trimmed}`];
-						spawn("explorer.exe", args, { detached: true, stdio: "ignore" }).unref();
 						return true;
 					}
-					Utils.showItemInFolder(trimmed);
+					// macOS / Linux: openExternal delegates to the OS
+					// (open / xdg-open), which opens both files and folders
+					// with their default handler — exactly the behaviour
+					// we want.
+					Utils.openExternal(trimmed);
 					return true;
 				} catch (err) {
 					log.warn("revealPath failed", {

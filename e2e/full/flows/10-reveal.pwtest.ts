@@ -1,10 +1,13 @@
-/// F10 — revealPath uses file-vs-folder strategy correctly.
+/// F10 — revealPath opens files vs folders with the right handler.
 ///
-/// Bug class: explorer was opening the parent folder for diagnostics
-/// (which passes a folder path) AND for export reveals (which pass a
-/// file path). Fix: on Windows, use `explorer /select,<file>` for
-/// files and `explorer <dir>` for directories. The test-server
-/// records each call via a spyReveal control.
+/// History: this used to be `explorer /select,<file>` for files
+/// (open parent + highlight) and `explorer <folder>` for folders.
+/// User feedback (2026-05-22) made clear that the select-in-parent
+/// semantics is never what's wanted — every caller (export reveal,
+/// workspace chip, attachment open) means "actually open the
+/// thing". Now: files open with the OS default app, folders open
+/// in Explorer. The test-server's spy still records `{isDir, path}`
+/// so the renderer's stat distinction is observable.
 
 import { test, expect } from "@playwright/test";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
@@ -27,7 +30,7 @@ test.afterEach(async () => {
   scratch = null;
 });
 
-test("revealPath: file path → file reveal; folder path → folder reveal", async ({ page }) => {
+test("revealPath: stats file vs folder so production can open vs reveal accordingly", async ({ page }) => {
   // Create a real file + folder so the bun-side stat distinguishes.
   scratch = mkdtempSync(join(tmpdir(), "dafman-reveal-"));
   const file = join(scratch, "thing.txt");
