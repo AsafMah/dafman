@@ -175,6 +175,15 @@ async function revealDefaultWorkspace() {
   }
 }
 
+/// 22c: Bound to settings.permissions.defaultApproveAll.
+/// Drives the global default for new-session approve-all.
+const defaultApproveAll = computed<boolean>({
+  get: () => settings.value.permissions?.defaultApproveAll ?? false,
+  set: (value) => {
+    void settingsStore.setDefaultApproveAll(value);
+  },
+});
+
 /// Collapse state per section id. In-memory only — defaults to all
 /// expanded so a fresh open shows every option, matching how a
 /// search UI will eventually surface them.
@@ -374,6 +383,49 @@ function toggle(id: string) {
             size="small"
             @click="askPermission"
           />
+        </div>
+      </div>
+    </section>
+
+    <!-- Permissions (Phase 22c) -->
+    <section class="settings-group">
+      <button
+        type="button"
+        class="group-header"
+        :aria-expanded="!collapsed.permissions"
+        @click="toggle('permissions')"
+      >
+        <i
+          class="pi group-chevron"
+          :class="
+            collapsed.permissions ? 'pi-chevron-right' : 'pi-chevron-down'
+          "
+          aria-hidden="true"
+        />
+        <i class="pi pi-shield group-icon" aria-hidden="true" />
+        <span class="group-label">Permissions</span>
+      </button>
+
+      <div v-show="!collapsed.permissions" class="group-body">
+        <div class="field field-inline">
+          <label class="field-inline-label">
+            <ToggleSwitch v-model="defaultApproveAll" />
+            <span>Default to approve all for new sessions</span>
+          </label>
+          <p class="field-hint">
+            When ON, brand-new sessions automatically approve every
+            privileged tool call (file write, shell, network, etc.)
+            without prompting. Off by default — explicit user choice.
+            The per-session toggle in the session rail continues to
+            drive runtime state; this only sets the starting value.
+          </p>
+        </div>
+        <div class="field">
+          <p class="field-hint">
+            To reset remembered approvals for an open session, use
+            "Reset approvals" in the session's right-rail Session
+            section.
+          </p>
         </div>
       </div>
     </section>

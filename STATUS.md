@@ -345,6 +345,20 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-25** — Phase 22c shipped: **Remembered Permissions
+  Settings tab**. New "Permissions" section in the Settings panel
+  with a single toggle: "Default to approve all for new sessions"
+  (off by default — explicit user opt-in). When ON, brand-new
+  sessions start with the per-session approve-all toggle on. The
+  per-session rail toggle continues to drive runtime state; existing
+  sessions are unaffected by changes to the default. Settings schema
+  bumped v9 → v10 with `permissions.defaultApproveAll`; existing
+  users migrate cleanly (default falls back to false). The SDK
+  doesn't expose a list-approvals RPC, so this is the only knob we
+  can meaningfully surface globally — "reset approvals" lives in
+  the per-session right rail. **478 bun tests** (was 476), lint
+  clean.
+
 - **2026-05-25** — Phase 22a shipped: **MCP OAuth toast**.
   `mcp.oauth_required` and `mcp.oauth_completed` events were
   previously in `IGNORED_EVENTS` and silently dropped, leaving users

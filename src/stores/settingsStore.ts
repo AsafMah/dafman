@@ -11,12 +11,13 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 9,
+    version: 10,
     appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
     layout: { dockview: null },
     workspaces: { recent: [], defaultWorkspace: "" },
     notifications: { turnEnd: false, waitingForInput: true },
     tools: { defaultExcluded: [] },
+    permissions: { defaultApproveAll: false },
   };
 }
 
@@ -178,6 +179,23 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  /// 22c: persists the global default for `approveAll` on new sessions.
+  /// The per-session toggle in the rail continues to drive the runtime
+  /// state; this only affects what NEW sessions start with.
+  async function setDefaultApproveAll(value: boolean): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        permissions: {
+          ...settings.value.permissions,
+          defaultApproveAll: value,
+        },
+      });
+    } catch {
+      /* toast already shown */
+    }
+  }
+
   return {
     settings,
     loaded,
@@ -192,5 +210,6 @@ export const useSettingsStore = defineStore("settings", () => {
     persistLayout,
     recordWorkspaceUse,
     setDefaultWorkspace,
+    setDefaultApproveAll,
   };
 });

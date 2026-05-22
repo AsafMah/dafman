@@ -24,6 +24,7 @@ import type {
 import { accentForIndex } from "../lib/color";
 import { useLayoutStore } from "./layoutStore";
 import { useNotificationsStore } from "./notificationsStore";
+import { useSettingsStore } from "./settingsStore";
 import { useToastStore } from "./toastStore";
 
 /// User-facing send modes. Maps to SDK message delivery via
@@ -615,6 +616,19 @@ export const useSessionsStore = defineStore("sessions", () => {
       sessions.value.push(record);
       drainPending(id, record);
       toasts.success("Session created", id);
+      // 22c: apply the global `defaultApproveAll` setting to brand-new
+      // sessions. The flag lives in the renderer's settings store so
+      // we don't need a backend RPC change — just call the existing
+      // per-session setter. Skipped when false (default) so we don't
+      // emit a spurious approve-all flip on every session create.
+      const settingsStore = useSettingsStore();
+      const defaultApprove =
+        settingsStore.settings.permissions?.defaultApproveAll === true;
+      if (defaultApprove) {
+        void setSessionApproveAll(id, true).catch(() => {
+          /* toast already surfaced by the setter */
+        });
+      }
       // Fire-and-forget: get the current run mode so the UI shows it.
       // Re-look up the record by id when the RPC resolves — if the
       // session was closed in the meantime it's no longer in

@@ -851,3 +851,22 @@ The picker only lets you pick a folder, no files visible.
     - **Steps:** trigger an oauth_required event, see the toast, but DON'T complete the flow. Close + restart the session.
     - **Expected:** on resume, no duplicate toast pops (the same requestId is in the de-dup set). After actually completing OAuth, the success toast appears once.
     - **Why not automated:** requires resume+replay against a real SDK event log.
+
+## Phase 22c — Permissions Settings tab
+
+- [ ] ⏳ **Permissions section renders in Settings**
+    - **Steps:** open Settings (left rail). Scroll to / expand the Permissions section.
+    - **Expected:** new section appears after Notifications, before Diagnostics. Single toggle: "Default to approve all for new sessions". Off by default. Description text explains it sets the starting value only.
+    - **Why not automated:** visual-only check; covered by tests at the data layer.
+- [ ] ⏳ **defaultApproveAll persists across restart**
+    - **Steps:** flip the Permissions toggle ON, restart the app.
+    - **Expected:** toggle still ON after restart (v10 settings file on disk).
+    - **Why not automated:** disk persistence + restart.
+- [ ] ⏳ **defaultApproveAll applies to NEW sessions only**
+    - **Steps:** with defaultApproveAll ON, create a new session.
+    - **Expected:** the session's rail shows "approve-all" toggle already ON. Tool calls auto-approve without a prompt.
+    - **Why not automated:** real SDK + permission gate exercise.
+- [ ] ⏳ **defaultApproveAll OFF does not turn off existing sessions**
+    - **Steps:** with defaultApproveAll ON, create a session (approve-all ON). Then flip defaultApproveAll OFF. Existing session's approve-all should stay ON until explicitly toggled.
+    - **Expected:** existing session unaffected; only newly-created sessions start with the new default.
+    - **Why not automated:** real per-session lifecycle.

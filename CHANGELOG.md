@@ -3,6 +3,21 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 22c — Remembered Permissions Settings tab)
+
+- **New "Permissions" section in Settings panel.** Single toggle:
+  "Default to approve all for new sessions". Off by default —
+  explicit user opt-in. When ON, brand-new sessions automatically
+  approve every privileged tool call (file write, shell, network,
+  etc.) without prompting. The per-session rail toggle continues to
+  drive runtime state; this setting only affects what NEW sessions
+  start with. The SDK doesn't expose a list-approvals RPC, so we
+  can't show what's been remembered — this is the only knob we can
+  surface globally.
+- **Settings schema bumped v9 → v10**: new `permissions.defaultApproveAll`
+  field. v9 documents migrate cleanly with the default value (false)
+  so existing users never silently flip approve-all on.
+
 ### Added (Phase 22a — MCP OAuth toast)
 
 - **MCP OAuth lifecycle toasts.** `mcp.oauth_required` from the SDK

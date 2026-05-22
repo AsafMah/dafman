@@ -38,10 +38,17 @@ export interface Settings {
   workspaces: Workspaces;
   notifications: NotificationPrefs;
   tools: ToolsPrefs;
+  permissions: PermissionsPrefs;
 }
 
 export interface ToolsPrefs {
   defaultExcluded: string[];
+}
+
+export interface PermissionsPrefs {
+  /// 22c: when true, new sessions start with approve-all on.
+  /// Default false — explicit user opt-in.
+  defaultApproveAll: boolean;
 }
 
 export interface Layout {

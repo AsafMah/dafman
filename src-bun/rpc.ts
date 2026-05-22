@@ -71,6 +71,21 @@ export interface Settings {
 	/// sessions. The renderer surfaces a "Restart session to apply"
 	/// hint when a per-session toggle changes.
 	tools: ToolsPrefs;
+	/// Permission defaults. Currently just `defaultApproveAll`:
+	/// when true, new sessions start with the per-session approve-all
+	/// toggle on (every privileged tool call is auto-approved without
+	/// a permission prompt). Off by default — explicit user choice.
+	/// The SDK doesn't expose a list-approvals RPC, so we can't show
+	/// what's been remembered; this is the only knob we can surface.
+	permissions: PermissionsPrefs;
+}
+
+export interface PermissionsPrefs {
+	/// New sessions default approve-all to this value. Mirrored
+	/// per-session via `setSessionApproveAll` immediately after
+	/// `createSession` returns; the rail's toggle continues to drive
+	/// the per-session state thereafter.
+	defaultApproveAll: boolean;
 }
 
 export interface ToolsPrefs {

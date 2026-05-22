@@ -10,6 +10,44 @@
 
 ---
 
+## 2026-05-25 — Phase 22c: Permissions Settings tab
+
+### Takeaway
+
+Added a global default for new-session approve-all. The SDK doesn't
+expose a list-approvals RPC (only `setApproveAll`,
+`resetSessionApprovals`, `handlePendingPermissionRequest`), so this
+is the only meaningful surface we can expose at the Settings level —
+"reset approvals" is per-session and lives in the right rail.
+Settings schema bumped v9 → v10 with `permissions.defaultApproveAll`.
+
+### Receipts
+
+- Wiring: applied in `sessionsStore.createSession` after the new
+  session id materializes, by calling the existing
+  `setSessionApproveAll(id, true)` path when the setting is true.
+  Skipped on false so we don't emit a spurious flip on every create.
+  Avoids the alternative (passing approveAll into the create RPC) —
+  that would have added wire surface for no real gain.
+- Existing sessions are unaffected by toggling the default. Per the
+  hard rule: setting the default later should not retroactively
+  approve tools in already-open sessions. Verified by the manual
+  test checklist (real SDK only; not automated).
+- Settings v9 → v10 migration: `coercePermissions` falls back to
+  `{ defaultApproveAll: false }` when the field is missing or
+  non-boolean. Existing users never silently flip approve-all on.
+- 2 new settings tests: v9→v10 migration + coercion of non-boolean
+  values. Updated the round-trip + dockview-blob tests to include
+  the new `permissions` field in their literals (otherwise
+  `toEqual(written)` would fail post-migrate).
+
+### Gates
+
+- `bun run lint` clean.
+- 478 bun tests pass (+2 new).
+
+---
+
 ## 2026-05-25 — Phase 22a: MCP OAuth toast
 
 ### Takeaway

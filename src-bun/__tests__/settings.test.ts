@@ -55,6 +55,7 @@ describe("SettingsService", () => {
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
 			tools: { defaultExcluded: [] },
+			permissions: { defaultApproveAll: false },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);
@@ -82,6 +83,8 @@ describe("SettingsService", () => {
 			layout: { dockview: blob },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
+			tools: { defaultExcluded: [] },
+			permissions: { defaultApproveAll: false },
 		});
 		const reloaded = SettingsService.loadOrDefault(path);
 		expect(reloaded.get().layout.dockview).toEqual(blob);
@@ -313,6 +316,55 @@ describe("SettingsService", () => {
 			layout: { dockview: [] },
 		});
 		expect(settings.layout).toEqual({ dockview: null });
+	});
+
+	test("v9 document migrates to v10 with default permissions", () => {
+		// 22c: v10 adds `permissions: { defaultApproveAll }`. Older
+		// settings docs missing the field must fall back to the
+		// default (off) so we never silently flip approve-all on for
+		// existing users.
+		const dir = newTempDir();
+		const path = join(dir, "settings.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				version: 9,
+				appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
+				layout: { dockview: null },
+				workspaces: { recent: [], defaultWorkspace: "" },
+				notifications: { turnEnd: false, waitingForInput: true },
+				tools: { defaultExcluded: ["bash"] },
+			}),
+		);
+		const svc = SettingsService.loadOrDefault(path);
+		const settings = svc.get();
+		expect(settings.version).toBe(SETTINGS_VERSION);
+		expect(settings.permissions).toEqual({ defaultApproveAll: false });
+		// Existing fields untouched.
+		expect(settings.tools.defaultExcluded).toEqual(["bash"]);
+		expect(settings.appearance.theme).toBe("system");
+	});
+
+	test("permissions coercion: explicit true preserved, non-boolean falls back to default", () => {
+		const yes = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
+			permissions: { defaultApproveAll: true },
+		});
+		expect(yes.permissions.defaultApproveAll).toBe(true);
+
+		const bogus = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
+			permissions: { defaultApproveAll: "yes" as unknown as boolean },
+		});
+		expect(bogus.permissions.defaultApproveAll).toBe(false);
 	});
 
 	test("migrate rejects bogus fields", () => {

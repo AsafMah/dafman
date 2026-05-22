@@ -17,6 +17,7 @@ import type {
 	Appearance,
 	Layout,
 	NotificationPrefs,
+	PermissionsPrefs,
 	ReasoningVisibility,
 	Settings,
 	ThemeChoice,
@@ -26,7 +27,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 9;
+export const SETTINGS_VERSION = 10;
 
 /// One-time backfill: returns `<homedir>/dafman` (created on demand),
 /// or `""` on failure. Used by `src-bun/index.ts` to populate the
@@ -77,6 +78,7 @@ export function defaultSettings(): Settings {
 		workspaces: { recent: [], defaultWorkspace: "" },
 		notifications: { turnEnd: false, waitingForInput: true },
 		tools: { defaultExcluded: [] },
+		permissions: { defaultApproveAll: false },
 	};
 }
 
@@ -169,6 +171,20 @@ function coerceNotifications(raw: unknown): NotificationPrefs {
 	return { turnEnd, waitingForInput };
 }
 
+/// 22c: coerces the `permissions` blob. Single boolean knob; older
+/// settings files (v9 and earlier) lack the field entirely so we
+/// fall back to the default (off).
+function coercePermissions(raw: unknown): PermissionsPrefs {
+	const base = defaultSettings().permissions;
+	if (!raw || typeof raw !== "object") return base;
+	const obj = raw as Record<string, unknown>;
+	const defaultApproveAll =
+		typeof obj.defaultApproveAll === "boolean"
+			? obj.defaultApproveAll
+			: base.defaultApproveAll;
+	return { defaultApproveAll };
+}
+
 export function migrate(input: unknown): Settings {
 	const defaults = defaultSettings();
 	if (!input || typeof input !== "object") return defaults;
@@ -180,6 +196,7 @@ export function migrate(input: unknown): Settings {
 		workspaces: coerceWorkspaces(raw.workspaces),
 		notifications: coerceNotifications(raw.notifications),
 		tools: coerceTools(raw.tools),
+		permissions: coercePermissions(raw.permissions),
 	};
 }
 
