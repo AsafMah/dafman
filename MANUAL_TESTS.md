@@ -36,7 +36,7 @@ post-hoc.
      covering the ring math, but the rendered-window behavior under
      real streaming (with rAF coalescing) needs a human eye.
 
-2. ⏳ **Absolute-progress consumer (notifications + composer focus).**
+2. ✅ **Absolute-progress consumer (notifications + composer focus).**
    - **Steps:** start a turn, switch away from the panel, let the turn
      end while a different panel is foreground.
    - **Expected:** turn-end notification fires exactly once. Switching
@@ -48,7 +48,7 @@ post-hoc.
 
 ### `0812f9a` fix(reasoning): harvest reasoning from `assistant.message`
 
-1. ⏳ **Reasoning bubble with GPT-5.x / Claude (opaque variant).**
+1. ✅ **Reasoning bubble with GPT-5.x / Claude (opaque variant).**
    - **Steps:** open a session, pick `gpt-5` or `claude-opus-4.7`, set
      Reasoning view = "Compact", send a prompt that triggers reasoning
      ("solve this puzzle step by step…").
@@ -58,17 +58,19 @@ post-hoc.
    - **Why not automated:** depends on the live CLI's reasoning-event
      shape; unit tests fake the events but the wire shape can drift.
 
-2. ⏳ **Reasoning hidden (default).**
+2. ❌ **Reasoning hidden (default).**
    - **Steps:** Settings → Reasoning view = "Hidden", send a prompt.
    - **Expected:** no reasoning bubble appears.
    - **Why not automated:** depends on global setting + per-session
      override resolution + reducer behavior together.
+Failed: when reasoning is hidden, the bottom menu of copy/fork is still
+visible.
 
 ---
 
 ### `b015d68` feat(permissions): real Allow-for-session rule editor
 
-1. ⏳ **Each permission kind opens the right rule editor.**
+1. ❌ **Each permission kind opens the right rule editor.**
    - **Steps:** trigger one of each via prompts that would invoke
      them — shell (`run \`ls\``), read (`cat package.json`), write
      (`create new file foo.txt`), mcp tool, url.
@@ -78,6 +80,8 @@ post-hoc.
    - **Why not automated:** each path requires the CLI to emit that
      specific PermissionRequest variant, which means a real CLI
      subprocess + tool-call.
+Shell: This exact command shows empty.
+
 
 2. ⏳ **Rule survives the rest of the session.**
    - **Steps:** approve once with a rule like `git *`; later in same
@@ -286,7 +290,84 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ---
 
-## 2026-05-22 — `FilePicker.vue` + `@`-picker + paperclip rebuild
+## 2026-05-22 — `FilePicker.vue` v2 (fixed: cwd resolution, path-nav trigger, split toggles, persistence, border)
+
+Supersedes the 2026-05-22 v1 entry above — those items still apply for
+the surfaces they cover, but the deeper bug fixes shipped today:
+
+1. ⏳ **`@` shows files immediately, not "No matches."**
+   - **Steps:** open the app, focus the composer, type `@`.
+   - **Expected:** popup shows real workspace files (`README.md`,
+     `package.json`, `src/`, …) ranked with directories first.
+   - **Why not automated:** depends on `cwdFor()` reading the
+     session's actual working directory at runtime — only meaningful
+     against a live SDK session, not the fake bridge tests use.
+
+2. ⏳ **`@.` does not exit the picker.**
+   - **Steps:** open the picker, type `@.`. Continue typing `gitig`.
+   - **Expected:** menu stays open. With "Hidden" toggle ON the
+     `.gitignore` file appears.
+   - **Why not automated:** Lexical TypeaheadMenuPlugin's match regex
+     is exercised against real DOM contenteditable behavior; jsdom
+     can't drive it accurately.
+
+3. ⏳ **`@/abs`, `@~/foo`, `@../path` all keep the picker open.**
+   - **Steps:** type `@C:/Users/` (Windows) or `@~/D`.
+   - **Expected:** picker stays open, lists children of the resolved
+     directory, leaf-prefix filter applies.
+   - **Why not automated:** same as #2 — Lexical trigger + real fs.
+
+4. ⏳ **Hidden toggle (Alt+H) flips dotfile visibility only.**
+   - **Steps:** open picker. Press Alt+H. Look at results.
+   - **Expected:** `.env`, `.gitignore`, etc. appear. `node_modules`
+     and `.git` (both dotfile AND ignored) do NOT.
+   - **Why not automated:** wiring is unit-tested via fake RPC; the
+     keyboard-event-while-editor-has-focus path is real-DOM only.
+
+5. ⏳ **Ignored toggle (Alt+I) flips IGNORED_DIRS visibility only.**
+   - **Steps:** open picker. Press Alt+I.
+   - **Expected:** `node_modules`, `dist`, etc. appear. Dotfiles
+     stay hidden unless Hidden is also on.
+   - **Why not automated:** same as #4.
+
+6. ⏳ **Both toggles persist across app restart.**
+   - **Steps:** flip both toggles ON. Restart the app
+     (`bun run dev`). Open the picker.
+   - **Expected:** both toggles are still ON. localStorage keys
+     `dafman.filePicker.showHidden` and
+     `dafman.filePicker.showIgnored` are `"1"`.
+   - **Why not automated:** restart cycle.
+
+7. ⏳ **No border bleeds over the popup.**
+   - **Steps:** open the @-picker. Inspect the bottom edge.
+   - **Expected:** no red/accent line cuts across the popup. Popup
+     sits cleanly above the composer.
+   - **Why not automated:** stacking-context interaction between
+     Lexical's document.body anchor + the composer's :focus-within
+     accent border; jsdom doesn't paint.
+
+8. ⏳ **Paperclip popover also shows real files.**
+   - **Steps:** click the paperclip. Confirm results match what the
+     @-picker shows.
+   - **Expected:** same list, same toggles, same Browse… escape.
+     Search input is auto-focused.
+   - **Why not automated:** PrimeVue Popover positioning + focus is
+     fragile in jsdom.
+
+9. ⏳ **Picking a file inserts a pill with the real absolute path.**
+   - **Steps:** pick a file. Inspect the bun log JSON for the next
+     send.
+   - **Expected:** `attachment.path` is the absolute fs path (e.g.
+     `C:/repo/dafman/src/main.ts`), `attachment.type = "file"`.
+   - **Why not automated:** SDK round-trip; need real log inspection.
+
+10. ⏳ **Picking a directory carries `type: "directory"`.**
+    - **Steps:** open picker, pick a folder (e.g. `src/`).
+    - **Expected:** pill shows folder icon. Bun log shows
+      `attachment.type = "directory"`.
+    - **Why not automated:** same as #9.
+
+---
 
 ### `@`-trigger flow
 

@@ -10,6 +10,110 @@
 
 ---
 
+## 2026-05-22 — File picker v2: the real fixes (cwd, trigger, toggles, border)
+
+### Takeaway
+
+The v1 file-picker rebuild earlier today shipped with **three critical
+bugs the test suite missed entirely**:
+
+1. **"No matches" for every session.** `cwdFor()` only checked
+   `client.listSessions()`, which doesn't always contain an active
+   session or carry a `cwd` field. The session's working directory
+   was never stored on the registry's own `Entry`, so the lookup
+   silently returned `undefined` → empty result set → "No matches".
+2. **`@.` (and any other path-nav char) exited the popup.** Lexical's
+   `useBasicTypeaheadTriggerMatch` default `punctuation` regex
+   excludes `.`, `/`, `~`, `\`, `:`, `-` from the match — so the
+   moment a user typed any path-nav char after `@`, the trigger
+   ended and the popup closed. Path-nav ergonomics were spec'd but
+   the trigger didn't allow them.
+3. **Single combined toggle** instead of two separate (Hidden vs
+   Ignored) toggles with persistence + keyboard shortcuts.
+
+Plus a visual bug — accent-color border bleeding over the popup's
+bottom edge.
+
+### Why tests didn't catch any of these
+
+- Bug #1: FilePicker tests use a fake `RpcBridge` that returns canned
+  results. They never exercised the `searchWorkspaceFiles` →
+  `cwdFor()` path. The bun-side `fileSearch.ts` unit tests gave a
+  cwd directly. No integration test ran the whole
+  renderer→bun→cwd→walk chain.
+- Bug #2: Lexical's TypeaheadMenuPlugin trigger regex runs against
+  real contenteditable selection. jsdom + happy-dom both have
+  incomplete selection models. The plugin was never exercised
+  programmatically in tests.
+- Bug #3: The spec interview (rule #9) explicitly asked about the
+  toggle; user said "default-filtered, with a toggle in the popup".
+  I read that as one toggle; the user clarified later they meant
+  two (Hidden + Ignored separately). Spec interview should have
+  asked "one or two toggles?" — added that question shape to my
+  internal heuristic.
+
+### Fixes
+
+**`src-bun/app/sessions.ts`**:
+- `Entry` interface gains `workingDirectory?: string`. Both `create`
+  and `resume` paths cache it at registration time.
+- `cwdFor()` reads from the entry first; falls back to
+  `client.listSessions()`; final fallback is `process.cwd()`.
+- `searchWorkspaceFiles` now takes
+  `{ includeHidden?, includeIgnored? }` options object.
+
+**`src-bun/app/fileSearch.ts`**:
+- `IGNORED_DIRS` and dotfile filters are now two independent gates.
+- Cache key extended to `(cwd, includeHidden, includeIgnored)`.
+- `FileSearchOptions` type exported for callers.
+
+**`src/components/MentionPlugin.vue`**:
+- Trigger `punctuation: ""` so any non-whitespace, non-`@` char
+  extends the match — path-nav now works.
+
+**`src/components/FilePicker.vue`** (full rewrite of the v1 toolbar):
+- Two checkboxes (Hidden / Ignored) with Alt+H / Alt+I shortcuts
+  bound at window level (so the editor-has-focus @-trigger case
+  works too).
+- Both prefs persist via `localStorage` (`dafman.filePicker.show{Hidden,Ignored}`).
+- Each label shows its shortcut hint in a small kbd-style chip.
+- `z-index: 1200` + explicit `position: relative` on the picker
+  root forces a stacking context above the composer's
+  `:focus-within` accent border. Lexical's `useMenuAnchorRef`
+  appends the anchor to `document.body` with no z-index, which
+  let the composer's accent border paint over the popup's bottom
+  edge — fix is on the popup side, not the anchor side.
+
+### Tests added
+
+- fileSearch: 13 unit tests (was 11). New cases: each toggle in
+  isolation, both together, the cache-key split.
+- FilePicker: 11 tests (was 7). New cases: Ignored toggle
+  separately, Alt+H / Alt+I shortcuts, localStorage persistence.
+
+### Gate
+
+- `bun run lint`: clean.
+- `bun test`: **366 pass** (was 360).
+- `bun run smoke`: prod + HMR green.
+
+### Process lessons (logged here so I actually internalise them)
+
+- **Don't ship without a single live test of the happy path** for a
+  rebuild that crosses the IPC boundary. The `cwdFor()` bug would
+  have shown up in 30 seconds of `bun run dev` smoke. Rule #4 covers
+  this in spirit but not in letter — I'll add a per-feature smoke
+  step to my own pre-push checklist.
+- **Spec interview needs to probe granularity.** "Filter toggle"
+  could mean one or many. Should default to "ask: how many toggles,
+  what do they control" when there's more than one filter dimension.
+- **Manual test list must be run before the user gets the build**
+  where possible. Three of today's 10 v1 items would have caught
+  bugs 1+2+border. I closed `task_complete` before any of them had a
+  chance to fail.
+
+---
+
 ## 2026-05-22 — File picker rebuild (@, paperclip, native dialog)
 
 ### Takeaway

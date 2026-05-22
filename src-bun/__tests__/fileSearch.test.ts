@@ -9,8 +9,8 @@ import {
 } from "../app/fileSearch";
 
 /// fileSearch tests build a temp workspace, then exercise the two
-/// modes (fuzzy + path-nav), the `includeHidden` toggle, and the
-/// directory-aware result shape.
+/// modes (fuzzy + path-nav), the two split toggles (`includeHidden`
+/// + `includeIgnored`), and the directory-aware result shape.
 
 let workspace: string;
 
@@ -77,9 +77,32 @@ describe("fuzzy mode", () => {
 		expect(all.find((r) => r.path === ".env")).toBeUndefined();
 	});
 
-	test("includeHidden=true surfaces dotfiles + ignored dirs", async () => {
+	test("includeHidden only surfaces dotfiles (not ignored dirs)", async () => {
 		_resetForTest();
-		const all = await searchWorkspaceFiles(workspace, "", 200, true);
+		const r = await searchWorkspaceFiles(workspace, "", 200, { includeHidden: true });
+		const paths = r.map((x) => x.path);
+		expect(paths).toContain(".env");
+		// .git is BOTH a dotfile AND an IGNORED_DIRS member — should
+		// require BOTH flags to surface.
+		expect(paths.some((p) => p.startsWith(".git"))).toBe(false);
+		expect(paths.some((p) => p.startsWith("node_modules"))).toBe(false);
+	});
+
+	test("includeIgnored only surfaces ignored dirs (not dotfiles)", async () => {
+		_resetForTest();
+		const r = await searchWorkspaceFiles(workspace, "", 200, { includeIgnored: true });
+		const paths = r.map((x) => x.path);
+		expect(paths).toContain("node_modules");
+		expect(paths).not.toContain(".env");
+		expect(paths.some((p) => p.startsWith(".git"))).toBe(false);
+	});
+
+	test("both flags surface dotfiles + ignored dirs", async () => {
+		_resetForTest();
+		const all = await searchWorkspaceFiles(workspace, "", 200, {
+			includeHidden: true,
+			includeIgnored: true,
+		});
 		const paths = all.map((r) => r.path);
 		expect(paths).toContain(".env");
 		expect(paths.some((p) => p.startsWith("node_modules"))).toBe(true);
@@ -135,11 +158,11 @@ describe("path-nav mode", () => {
 		expect(results).toEqual([]);
 	});
 
-	test("path-nav hides dotfiles by default, exposes them with includeHidden", async () => {
+	test("path-nav hides dotfiles by default; includeHidden exposes them", async () => {
 		_resetForTest();
 		const defaulted = await searchWorkspaceFiles(workspace, "./", 200);
 		expect(defaulted.find((r) => r.path === "./.env")).toBeUndefined();
-		const hidden = await searchWorkspaceFiles(workspace, "./", 200, true);
+		const hidden = await searchWorkspaceFiles(workspace, "./", 200, { includeHidden: true });
 		expect(hidden.find((r) => r.path === "./.env")).toBeDefined();
 	});
 });

@@ -54,6 +54,11 @@ let bridge: FakeBridge;
 beforeEach(() => {
   bridge = makeBridge();
   setRpcBridge(bridge);
+  try {
+    localStorage.clear();
+  } catch {
+    // ignore
+  }
 });
 
 afterEach(() => {
@@ -99,7 +104,7 @@ describe("FilePicker", () => {
     });
   });
 
-  test("Show hidden toggle re-issues the RPC with includeHidden=true", async () => {
+  test("Hidden toggle re-issues the RPC with includeHidden=true", async () => {
     bridge.setNext("searchWorkspaceFiles", sample);
     const utils = render(FilePicker, {
       props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
@@ -107,7 +112,7 @@ describe("FilePicker", () => {
     await waitFor(() => expect(utils.getAllByRole("option")).toHaveLength(2));
     bridge.calls.length = 0;
     bridge.setNext("searchWorkspaceFiles", sample);
-    await fireEvent.click(utils.getByLabelText("Include hidden files and ignored directories"));
+    await fireEvent.click(utils.getByLabelText("Show hidden (dotfiles)"));
     await nextTick();
     await waitFor(() =>
       expect(
@@ -117,6 +122,80 @@ describe("FilePicker", () => {
         ),
       ).toBe(true),
     );
+  });
+
+  test("Ignored toggle re-issues the RPC with includeIgnored=true", async () => {
+    bridge.setNext("searchWorkspaceFiles", sample);
+    const utils = render(FilePicker, {
+      props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
+    });
+    await waitFor(() => expect(utils.getAllByRole("option")).toHaveLength(2));
+    bridge.calls.length = 0;
+    bridge.setNext("searchWorkspaceFiles", sample);
+    await fireEvent.click(utils.getByLabelText("Show ignored (node_modules, dist, …)"));
+    await nextTick();
+    await waitFor(() =>
+      expect(
+        bridge.calls.some(
+          (c) => c.name === "searchWorkspaceFiles" &&
+            (c.args as { includeIgnored?: boolean }).includeIgnored === true,
+        ),
+      ).toBe(true),
+    );
+  });
+
+  test("Alt+H window shortcut flips hidden", async () => {
+    bridge.setNext("searchWorkspaceFiles", sample);
+    const utils = render(FilePicker, {
+      props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
+    });
+    await waitFor(() => expect(utils.getAllByRole("option")).toHaveLength(2));
+    bridge.calls.length = 0;
+    bridge.setNext("searchWorkspaceFiles", sample);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "h", altKey: true, bubbles: true }));
+    await nextTick();
+    await waitFor(() =>
+      expect(
+        bridge.calls.some(
+          (c) => c.name === "searchWorkspaceFiles" &&
+            (c.args as { includeHidden?: boolean }).includeHidden === true,
+        ),
+      ).toBe(true),
+    );
+  });
+
+  test("Alt+I window shortcut flips ignored", async () => {
+    bridge.setNext("searchWorkspaceFiles", sample);
+    const utils = render(FilePicker, {
+      props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
+    });
+    await waitFor(() => expect(utils.getAllByRole("option")).toHaveLength(2));
+    bridge.calls.length = 0;
+    bridge.setNext("searchWorkspaceFiles", sample);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "i", altKey: true, bubbles: true }));
+    await nextTick();
+    await waitFor(() =>
+      expect(
+        bridge.calls.some(
+          (c) => c.name === "searchWorkspaceFiles" &&
+            (c.args as { includeIgnored?: boolean }).includeIgnored === true,
+        ),
+      ).toBe(true),
+    );
+  });
+
+  test("toggle prefs persist in localStorage", async () => {
+    bridge.setNext("searchWorkspaceFiles", sample);
+    const utils = render(FilePicker, {
+      props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
+    });
+    await waitFor(() => expect(utils.getAllByRole("option")).toHaveLength(2));
+    await fireEvent.click(utils.getByLabelText("Show hidden (dotfiles)"));
+    await nextTick();
+    expect(localStorage.getItem("dafman.filePicker.showHidden")).toBe("1");
+    await fireEvent.click(utils.getByLabelText("Show ignored (node_modules, dist, …)"));
+    await nextTick();
+    expect(localStorage.getItem("dafman.filePicker.showIgnored")).toBe("1");
   });
 
   test("Browse… invokes pickAttachment and emits on the result", async () => {

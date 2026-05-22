@@ -348,9 +348,11 @@ export type DafmanRPC = {
 					query: string;
 					/// Hard cap on returned results. Default 40.
 					limit?: number;
-					/// Include dotfiles + IGNORED_DIRS (node_modules,
-					/// dist, target, …). Default false.
+					/// Include dotfiles (names starting with `.`).
 					includeHidden?: boolean;
+					/// Include entries in IGNORED_DIRS (`node_modules`,
+					/// `dist`, `target`, …).
+					includeIgnored?: boolean;
 				};
 				response: WorkspaceFileMatch[];
 			};

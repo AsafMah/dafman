@@ -61,6 +61,12 @@ const sentinelOptions = computed(() => [new SentinelOption()]);
 const triggerFn = useBasicTypeaheadTriggerMatch("@", {
   minLength: 0,
   allowWhitespace: false,
+  // Default `punctuation` excludes `.`, `/`, `~`, `\`, `-`, `:` from
+  // the match — which means typing `@.` or `@/abs` or `@~/foo` would
+  // exit the menu instantly. We need path-nav chars allowed; passing
+  // an empty string lets any non-whitespace, non-`@` char extend the
+  // match. fileSearch.ts handles whatever the user types from there.
+  punctuation: "",
 });
 
 function onQueryChange(q: string | null) {

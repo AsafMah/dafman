@@ -54,6 +54,13 @@ type EmitPending = (payload: PendingRequestPayload) => void;
 interface Entry {
 	session: CopilotSession;
 	unsubscribe: () => void;
+	/// Absolute working directory passed to `createSession` /
+	/// `resumeSession`. Cached here because the SDK doesn't expose
+	/// `session.workingDirectory` or a getter — and the workspace
+	/// catalog (`client.listSessions()`) doesn't always contain a
+	/// freshly-created session or its `cwd` field. The composer's
+	/// @file picker needs this to resolve relative paths.
+	workingDirectory?: string;
 }
 
 /// A single in-flight SDK callback. The handler returns the Promise
@@ -468,7 +475,7 @@ export class SessionRegistry {
 		const unsubscribe = session.on((event) => {
 			this.forward(sessionId, event);
 		});
-		this.entries.set(sessionId, { session, unsubscribe });
+		this.entries.set(sessionId, { session, unsubscribe, ...(wd ? { workingDirectory: wd } : {}) });
 		log.info("session created", { sessionId, workingDirectory: wd ?? null });
 		return sessionId;
 	}
@@ -518,7 +525,11 @@ export class SessionRegistry {
 		const unsubscribe = session.on((event) => {
 			this.forward(actualId, event);
 		});
-		this.entries.set(actualId, { session, unsubscribe });
+		this.entries.set(actualId, {
+			session,
+			unsubscribe,
+			...(opts.workingDirectory ? { workingDirectory: opts.workingDirectory } : {}),
+		});
 		// Hydrate transcript. Failures here aren't fatal — the session is
 		// connected and will receive live events; we just won't have the
 		// scrollback.
@@ -582,7 +593,7 @@ export class SessionRegistry {
 		const unsubscribe = resumed.on((event) => {
 			this.forward(actualId, event);
 		});
-		this.entries.set(actualId, { session: resumed, unsubscribe });
+		this.entries.set(actualId, { session: resumed, unsubscribe, workingDirectory: next });
 		log.info("session working directory changed", {
 			sessionId: actualId,
 			workingDirectory: next,
@@ -750,21 +761,28 @@ export class SessionRegistry {
 		sessionId: string,
 		query: string,
 		limit = 40,
-		includeHidden = false,
+		options: { includeHidden?: boolean; includeIgnored?: boolean } = {},
 	): Promise<WorkspaceFileMatch[]> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) return [];
 		const cwd = await this.cwdFor(sessionId);
-		if (!cwd) return [];
-		return searchWorkspaceFiles(cwd, query, limit, includeHidden);
+		if (!cwd) {
+			log.warn("searchWorkspaceFiles: cwd unresolved", { sessionId });
+			return [];
+		}
+		return searchWorkspaceFiles(cwd, query, limit, options);
 	}
 
-	/// Resolve the session's working directory. Tries the workspace
-	/// catalog first (cheap, in-memory), then falls back to
-	/// `session.getWorkingDirectory()` if the SDK exposes it. Returns
-	/// undefined when the session has no associated cwd (which is
-	/// rare — most sessions are created with one).
+	/// Resolve the session's working directory. Reads from our entry
+	/// (set at create/resume time) first — this is the authoritative
+	/// source because the SDK doesn't expose `session.workingDirectory`
+	/// and `client.listSessions()` doesn't always include a freshly-
+	/// created session. Falls back to the catalog only when the entry
+	/// is missing one (e.g. a session created without an explicit
+	/// `workingDirectory` so the SDK used its own default).
 	private async cwdFor(sessionId: string): Promise<string | undefined> {
+		const entry = this.entries.get(sessionId);
+		if (entry?.workingDirectory) return entry.workingDirectory;
 		const client = tryGetClient();
 		if (!client) return undefined;
 		try {
@@ -774,7 +792,9 @@ export class SessionRegistry {
 		} catch {
 			// Ignore catalog-read failures; the cwd is best-effort.
 		}
-		return undefined;
+		// Final fallback: the bun process's cwd — same fallback the SDK
+		// uses internally when `workingDirectory` is omitted.
+		return process.cwd();
 	}
 
 	async abort(sessionId: string): Promise<string> {

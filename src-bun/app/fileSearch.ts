@@ -58,25 +58,34 @@ export interface FileSearchEntry {
 	kind: FileSearchKind;
 }
 
+export interface FileSearchOptions {
+	/// Surface dotfiles (names starting with `.`).
+	includeHidden?: boolean;
+	/// Surface entries in IGNORED_DIRS (`node_modules`, `dist`, …).
+	includeIgnored?: boolean;
+}
+
 interface WorkspaceCache {
 	cwd: string;
 	includeHidden: boolean;
+	includeIgnored: boolean;
 	entries: FileSearchEntry[];
 	indexedAt: number;
 }
 
-/// Separate caches per `(cwd, includeHidden)` so flipping the popup
-/// toggle doesn't trigger a re-walk.
+/// Caches per `(cwd, includeHidden, includeIgnored)` triple so toggling
+/// either flag in the UI doesn't trigger a re-walk.
 const cache = new Map<string, WorkspaceCache>();
 
-function cacheKey(cwd: string, includeHidden: boolean): string {
-	return `${cwd}::${includeHidden ? "all" : "default"}`;
+function cacheKey(cwd: string, includeHidden: boolean, includeIgnored: boolean): string {
+	return `${cwd}::h=${includeHidden ? 1 : 0}::i=${includeIgnored ? 1 : 0}`;
 }
 
 async function walk(
 	root: string,
 	out: FileSearchEntry[],
 	includeHidden: boolean,
+	includeIgnored: boolean,
 	current: string = root,
 	depth = 0,
 ): Promise<void> {
@@ -90,24 +99,25 @@ async function walk(
 	for (const entry of entries) {
 		if (out.length >= MAX_FILES_PER_WORKSPACE) return;
 		const isHidden = entry.name.startsWith(".");
-		const isBlacklisted = entry.isDirectory() && IGNORED_DIRS.has(entry.name);
-		if (!includeHidden && (isHidden || isBlacklisted)) continue;
+		const isIgnored = entry.isDirectory() && IGNORED_DIRS.has(entry.name);
+		if (isHidden && !includeHidden) continue;
+		if (isIgnored && !includeIgnored) continue;
 		const abs = join(current, entry.name);
 		const rel = relative(root, abs).replace(/\\/g, "/");
 		if (entry.isDirectory()) {
 			out.push({ path: rel, absolutePath: abs, name: entry.name, kind: "directory" });
-			await walk(root, out, includeHidden, abs, depth + 1);
+			await walk(root, out, includeHidden, includeIgnored, abs, depth + 1);
 		} else if (entry.isFile()) {
 			out.push({ path: rel, absolutePath: abs, name: entry.name, kind: "file" });
 		}
 	}
 }
 
-async function index(cwd: string, includeHidden: boolean): Promise<WorkspaceCache> {
+async function index(cwd: string, includeHidden: boolean, includeIgnored: boolean): Promise<WorkspaceCache> {
 	const entries: FileSearchEntry[] = [];
-	await walk(cwd, entries, includeHidden);
-	const c: WorkspaceCache = { cwd, includeHidden, entries, indexedAt: Date.now() };
-	cache.set(cacheKey(cwd, includeHidden), c);
+	await walk(cwd, entries, includeHidden, includeIgnored);
+	const c: WorkspaceCache = { cwd, includeHidden, includeIgnored, entries, indexedAt: Date.now() };
+	cache.set(cacheKey(cwd, includeHidden, includeIgnored), c);
 	return c;
 }
 
@@ -163,6 +173,7 @@ async function resolveNavQuery(cwd: string, query: string): Promise<ResolvedNav 
 async function listDirectory(
 	resolved: ResolvedNav,
 	includeHidden: boolean,
+	includeIgnored: boolean,
 	limit: number,
 ): Promise<FileSearchEntry[]> {
 	let entries: import("node:fs").Dirent[];
@@ -174,8 +185,8 @@ async function listDirectory(
 	const lp = resolved.leafPrefix.toLowerCase();
 	const out: FileSearchEntry[] = [];
 	for (const e of entries) {
-		if (!includeHidden && e.name.startsWith(".")) continue;
-		if (!includeHidden && e.isDirectory() && IGNORED_DIRS.has(e.name)) continue;
+		if (e.name.startsWith(".") && !includeHidden) continue;
+		if (e.isDirectory() && IGNORED_DIRS.has(e.name) && !includeIgnored) continue;
 		if (lp.length > 0 && !e.name.toLowerCase().startsWith(lp)) continue;
 		const abs = join(resolved.baseDir, e.name);
 		const kind: FileSearchKind = e.isDirectory() ? "directory" : "file";
@@ -197,14 +208,18 @@ export async function searchWorkspaceFiles(
 	cwd: string,
 	query: string,
 	limit = 40,
-	includeHidden = false,
+	options: FileSearchOptions = {},
 ): Promise<FileSearchEntry[]> {
+	const includeHidden = options.includeHidden ?? false;
+	const includeIgnored = options.includeIgnored ?? false;
 	if (isPathNav(query)) {
 		const resolved = await resolveNavQuery(cwd, query);
 		if (!resolved) return [];
-		return listDirectory(resolved, includeHidden, limit);
+		return listDirectory(resolved, includeHidden, includeIgnored, limit);
 	}
-	const entry = cache.get(cacheKey(cwd, includeHidden)) ?? (await index(cwd, includeHidden));
+	const entry =
+		cache.get(cacheKey(cwd, includeHidden, includeIgnored)) ??
+		(await index(cwd, includeHidden, includeIgnored));
 	const q = query.trim().toLowerCase();
 	if (q.length === 0) {
 		return [...entry.entries]
@@ -240,8 +255,9 @@ export async function searchWorkspaceFiles(
 }
 
 export function invalidate(cwd: string): void {
-	cache.delete(cacheKey(cwd, false));
-	cache.delete(cacheKey(cwd, true));
+	for (const key of [...cache.keys()]) {
+		if (key.startsWith(`${cwd}::`)) cache.delete(key);
+	}
 }
 
 export function _resetForTest(): void {

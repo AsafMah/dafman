@@ -251,6 +251,7 @@ export type CommandMap = {
       query: string;
       limit?: number;
       includeHidden?: boolean;
+      includeIgnored?: boolean;
     };
     result: WorkspaceFileMatch[];
   };

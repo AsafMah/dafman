@@ -1,24 +1,28 @@
 <script setup lang="ts">
 /// Pure popup body for the composer's @file / paperclip picker.
 ///
-/// Owns: search input (optional), filter toggle, results list,
-/// native-dialog escape hatch, keyboard nav.
+/// Owns: search input (optional), TWO independent toggles (show
+/// dotfiles, show ignored dirs), results list, native-dialog escape
+/// hatch, keyboard navigation + shortcuts.
 ///
-/// Doesn't own: positioning / anchoring (parent renders this inside
-/// a Teleport or Popover). Doesn't know about Lexical (parent listens
+/// Doesn't own: positioning (parent renders this inside a Teleport
+/// or PrimeVue Popover). Doesn't know about Lexical (parent listens
 /// for `select` + inserts the AttachmentNode).
 ///
-/// Two surfaces consume this:
-///   1. MentionPlugin (the @-trigger path) — `:showSearchInput="false"`,
-///      query comes from props (the text after the @).
-///   2. The paperclip button — `:showSearchInput="true"`, picker
-///      owns its own focused input.
+/// Persistence: toggle prefs live in localStorage so they survive
+/// app restart. Falls back gracefully when localStorage isn't
+/// available (e.g. SSR / restricted contexts).
 ///
-/// Single-pick per spec: select dismisses the popup. Multi-select can
-/// be re-opened. Directories attach as `directory` pills (matches the
-/// existing AttachmentNode kind + folder icon).
+/// Two surfaces consume this:
+///   1. MentionPlugin (the @-trigger path) — `showSearchInput=false`,
+///      query comes from props (the text after the @).
+///   2. The paperclip button — `showSearchInput=true`, picker owns
+///      its own focused input.
+///
+/// Single-pick per spec: select dismisses the popup. Multi-select
+/// can be re-opened. Directories attach as `directory` pills.
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { invokeCommand } from "../ipc/invoke";
 import type { WorkspaceFileMatch, SendMessageAttachment } from "../ipc/types";
 
@@ -32,9 +36,8 @@ const props = withDefaults(
     /// When false, the parent (TypeaheadMenuPlugin) drives the query
     /// via `externalQuery` and the user types in the editor.
     showSearchInput?: boolean;
-    /// Initial focus: where to send focus on mount. The paperclip
-    /// path wants `"input"`; the @-trigger path wants `"none"` (the
-    /// editor keeps focus).
+    /// Where to send initial focus on mount. Paperclip path wants
+    /// `"input"`; the @-trigger path wants `"none"`.
     initialFocus?: "input" | "none";
   }>(),
   {
@@ -49,8 +52,31 @@ const emit = defineEmits<{
   (e: "dismiss"): void;
 }>();
 
+const LS_HIDDEN = "dafman.filePicker.showHidden";
+const LS_IGNORED = "dafman.filePicker.showIgnored";
+
+function readPref(key: string): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writePref(key: string, value: boolean): void {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(key, value ? "1" : "0");
+    }
+  } catch {
+    // Storage may be disabled in restricted contexts — keep the
+    // in-memory state regardless.
+  }
+}
+
 const internalQuery = ref("");
-const includeHidden = ref(false);
+const showHidden = ref(readPref(LS_HIDDEN));
+const showIgnored = ref(readPref(LS_IGNORED));
 const results = ref<WorkspaceFileMatch[]>([]);
 const highlightedIndex = ref(0);
 const searchInputRef = ref<HTMLInputElement | null>(null);
@@ -60,8 +86,8 @@ const effectiveQuery = computed(() =>
   props.showSearchInput ? internalQuery.value : props.externalQuery,
 );
 
-/// Debounce-free; the bun-side index is cached so calls are sub-ms.
-/// We do guard against stale responses by tagging each fetch.
+/// Stale-fetch guard via incrementing tag. The bun-side index is
+/// cached so calls are sub-ms in steady state.
 let fetchTag = 0;
 async function fetchResults(): Promise<void> {
   const tag = ++fetchTag;
@@ -70,9 +96,10 @@ async function fetchResults(): Promise<void> {
       sessionId: props.sessionId,
       query: effectiveQuery.value,
       limit: 40,
-      includeHidden: includeHidden.value,
+      includeHidden: showHidden.value,
+      includeIgnored: showIgnored.value,
     });
-    if (tag !== fetchTag) return; // stale
+    if (tag !== fetchTag) return;
     results.value = r;
     highlightedIndex.value = 0;
   } catch {
@@ -83,11 +110,17 @@ async function fetchResults(): Promise<void> {
 }
 
 watch(effectiveQuery, fetchResults, { immediate: true });
-watch(includeHidden, fetchResults);
+watch(showHidden, (v) => {
+  writePref(LS_HIDDEN, v);
+  fetchResults();
+});
+watch(showIgnored, (v) => {
+  writePref(LS_IGNORED, v);
+  fetchResults();
+});
 
 onMounted(() => {
   if (props.initialFocus === "input") {
-    // Defer to next tick so the input is mounted under teleport.
     setTimeout(() => searchInputRef.value?.focus(), 0);
   }
 });
@@ -125,9 +158,27 @@ function onInputKey(e: KeyboardEvent): void {
   }
 }
 
+/// Window-level keyboard shortcuts (work even when editor has focus,
+/// which is the @-trigger case). Alt+H / Alt+I flip the two
+/// toggles; we suppress them outside the open lifecycle to avoid
+/// fighting other surfaces.
+function onWindowKey(e: KeyboardEvent): void {
+  if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "h") {
+    e.preventDefault();
+    showHidden.value = !showHidden.value;
+  } else if (k === "i") {
+    e.preventDefault();
+    showIgnored.value = !showIgnored.value;
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onWindowKey, true));
+onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
+
 /// Exposed so the @-trigger surface can forward keystrokes from the
-/// editor (where focus actually lives) without us re-implementing the
-/// nav logic.
+/// editor (where focus actually lives) without re-implementing nav.
 defineExpose({
   moveHighlight(direction: 1 | -1): void {
     if (results.value.length === 0) return;
@@ -180,20 +231,32 @@ async function browse(): Promise<void> {
         v-model="internalQuery"
         class="file-picker-search-input"
         type="text"
-        placeholder="Search files / dirs, or type ~ /abs ./rel"
+        placeholder="Search files / dirs, or type / ~ ./ ../"
         aria-label="Search workspace"
         @keydown="onInputKey"
       />
     </div>
     <div class="file-picker-toolbar">
-      <label class="file-picker-toggle">
-        <input
-          v-model="includeHidden"
-          type="checkbox"
-          aria-label="Include hidden files and ignored directories"
-        />
-        <span>Show hidden / ignored</span>
-      </label>
+      <div class="file-picker-toggles">
+        <label class="file-picker-toggle" title="Alt+H">
+          <input
+            v-model="showHidden"
+            type="checkbox"
+            aria-label="Show hidden (dotfiles)"
+          />
+          <span>Hidden</span>
+          <span class="file-picker-shortcut">Alt+H</span>
+        </label>
+        <label class="file-picker-toggle" title="Alt+I">
+          <input
+            v-model="showIgnored"
+            type="checkbox"
+            aria-label="Show ignored (node_modules, dist, …)"
+          />
+          <span>Ignored</span>
+          <span class="file-picker-shortcut">Alt+I</span>
+        </label>
+      </div>
       <button
         type="button"
         class="file-picker-browse"
@@ -247,7 +310,7 @@ async function browse(): Promise<void> {
 .file-picker {
   display: flex;
   flex-direction: column;
-  min-width: 26rem;
+  min-width: 28rem;
   max-width: 36rem;
   max-height: 22rem;
   background: var(--p-content-background);
@@ -255,7 +318,13 @@ async function browse(): Promise<void> {
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
   overflow: hidden;
-  z-index: 100;
+  /* Lexical's typeahead container is appended to document.body with
+   * no z-index, which can let positioned ancestors of the editor
+   * (composer frame's focus border, dockview tab strip, etc.) paint
+   * over the popup. Force a stacking context above the standard
+   * PrimeVue overlay layer (1100). */
+  position: relative;
+  z-index: 1200;
 }
 
 .file-picker-search {
@@ -288,17 +357,19 @@ async function browse(): Promise<void> {
   gap: 0.4rem;
   padding: 0.35rem 0.6rem;
   border-bottom: 1px solid var(--p-surface-border);
-  /* Mild differentiation from the body — must use a dark-mode-aware
-   * token. `--p-surface-50` is light-only in our PrimeVue preset; we
-   * use a translucent layer of `--p-content-hover-background` so the
-   * toolbar reads as a subtle band in both themes. */
   background: color-mix(in srgb, var(--p-content-hover-background) 35%, transparent);
+}
+
+.file-picker-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
 }
 
 .file-picker-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   font-size: 0.75rem;
   color: var(--p-text-muted-color);
   cursor: pointer;
@@ -307,6 +378,16 @@ async function browse(): Promise<void> {
 
 .file-picker-toggle input {
   accent-color: var(--p-primary-color);
+  margin: 0;
+}
+
+.file-picker-shortcut {
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  font-size: 0.65rem;
+  padding: 0.05rem 0.3rem;
+  background: color-mix(in srgb, var(--p-text-muted-color) 18%, transparent);
+  border-radius: 3px;
+  color: var(--p-text-muted-color);
 }
 
 .file-picker-browse {

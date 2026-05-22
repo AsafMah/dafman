@@ -154,8 +154,11 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			sendMessage: rpcGuard(async ({ sessionId, text, mode, attachments }) =>
 				sessions.send(sessionId, text, mode, attachments),
 			),
-			searchWorkspaceFiles: rpcGuard(async ({ sessionId, query, limit, includeHidden }) =>
-				sessions.searchWorkspaceFiles(sessionId, query, limit ?? 40, includeHidden ?? false),
+			searchWorkspaceFiles: rpcGuard(async ({ sessionId, query, limit, includeHidden, includeIgnored }) =>
+				sessions.searchWorkspaceFiles(sessionId, query, limit ?? 40, {
+					includeHidden: includeHidden ?? false,
+					includeIgnored: includeIgnored ?? false,
+				}),
 			),
 			abortSession: rpcGuard(async ({ sessionId }) =>
 				sessions.abort(sessionId),
