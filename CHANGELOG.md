@@ -3,6 +3,31 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (Phase 21a — architectural extractions out of sessions.ts)
+
+- **`PendingRequestQueue` extracted** to `src-bun/app/pendingRequests.ts`.
+  The SDK callback queue (permission / userInput / elicitation
+  multiplexer + typed cancellations + audit hand-off) lives behind a
+  focused class. `SessionRegistry.respondToRequest` is now a one-line
+  delegate. New `removeEntry` helper on the registry centralizes the
+  teardown contract (`pending.settleForSession` runs before
+  `entries.delete`).
+- **`McpRegistry` extracted** to `src-bun/app/mcpRegistry.ts`. The 7
+  server-scoped MCP methods (`listConfigs`, `addConfig`,
+  `updateConfig`, `removeConfig`, `enable`, `disable`, `discover`)
+  moved out. Session-scoped MCP methods (which need entries-Map
+  lookup) stay on `SessionRegistry`.
+- **`SkillsRegistry` extracted** to `src-bun/app/skillsRegistry.ts`.
+  `discover` + `setGloballyDisabled` mirror the MCP registry shape.
+- Each registry takes a constructor-injected `getClient` so tests
+  can pass a fake client without going through the global
+  `_setClientForTest` seam. A private `withClient` helper lets
+  `AppError.clientNotStarted` escape unwrapped while wrapping
+  everything else as `AppError.sdk`.
+- `src-bun/app/sessions.ts` shrank from 1451 → ~1100 LoC; clearer
+  module boundaries for the 21b correctness work (shutdown(),
+  create() race, history-replay cap, etc.).
+
 ### Fixed (Phase 20c — code review surgical fixes)
 
 - **`respondToPending` no longer appends a phantom response event

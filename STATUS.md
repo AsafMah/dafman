@@ -345,6 +345,30 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 21a shipped: **architectural extractions out
+  of `sessions.ts`**. Three rubber-duck'd extractions in three
+  separate commits (650acfb / 83335c4 / now):
+  - **21a.1** `PendingRequestQueue` (`src-bun/app/pendingRequests.ts`,
+    ~200 LoC). The SDK callback queue (enqueue / cancel / settle for
+    session / settleAll / respond) now lives behind a focused class.
+    Constructor-injected `recordPermission` for testability. Added
+    `removeEntry` helper in `SessionRegistry` that always calls
+    `pending.settleForSession` BEFORE deleting the entry (sets up
+    21b's S3/S4 ordering fixes). 12 new unit tests.
+  - **21a.2** `McpRegistry` (`src-bun/app/mcpRegistry.ts`). The 7
+    server-scoped MCP methods (`listConfigs`, `addConfig`,
+    `updateConfig`, `removeConfig`, `enable`, `disable`, `discover`)
+    moved out. Constructor-injected `getClient` + a private
+    `withClient` helper that lets `ClientNotStarted` escape unwrapped
+    while wrapping everything else as `AppError.sdk`. 10 new unit
+    tests.
+  - **21a.3** `SkillsRegistry` (`src-bun/app/skillsRegistry.ts`).
+    `discover` + `setGloballyDisabled` mirror the McpRegistry shape.
+    7 new unit tests.
+  Session-scoped methods (3 MCP + 2 skills) remain on `SessionRegistry`
+  because they need entries-Map lookup. `sessions.ts` shrank from
+  1451 → ~1100 LoC; clearer module boundaries for 21b correctness
+  work. **425 bun tests (was 397), 70/70 E2E.**
 - **2026-05-22** — Phase 20c shipped: **code review + dep audit +
   tech-debt doc**. Three `code-review` subagents covered
   `src-bun/app/sessions.ts`, the `chatEvents` reducer family, and

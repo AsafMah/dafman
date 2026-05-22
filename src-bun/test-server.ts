@@ -31,6 +31,7 @@ import { browseDirectorySync } from "./app/directoryBrowser";
 import { tryGetClient, setClientForTest } from "./app/client";
 import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
+import { SkillsRegistry } from "./app/skillsRegistry";
 import { SettingsService } from "./app/settings";
 import { toModelSummary } from "./app/models";
 import { FakeCopilotClient } from "./app/fakeClient";
@@ -112,6 +113,7 @@ const sessions = new SessionRegistry(
 	() => settings.get().tools.defaultExcluded,
 );
 const mcp = new McpRegistry();
+const skills = new SkillsRegistry();
 
 subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
 subscribeAudit((entry: AuditEntry) => broadcast("auditEvent", entry));
@@ -344,11 +346,11 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 	}),
 	discoverSkills: rpcGuard(async (args) => {
 		const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
-		return sessions.discoverSkills(workingDirectory);
+		return skills.discover(workingDirectory);
 	}),
 	setGloballyDisabledSkills: rpcGuard(async (args) => {
 		const { disabledSkills } = args as { disabledSkills: string[] };
-		return sessions.setGloballyDisabledSkills(disabledSkills);
+		return skills.setGloballyDisabled(disabledSkills);
 	}),
 };
 

@@ -1158,60 +1158,10 @@ export class SessionRegistry {
 	}
 
 	// ---------- Skills registry (server-scoped, Phase 19b) ----------
-
-	async discoverSkills(workingDirectory?: string): Promise<
-		Array<{
-			name: string;
-			description: string;
-			source: string;
-			userInvocable: boolean;
-			enabled: boolean;
-			path?: string;
-			projectPath?: string;
-		}>
-	> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			const args = workingDirectory ? { projectPaths: [workingDirectory] } : {};
-			const result = (await client.rpc.skills.discover(args)) as {
-				skills?: Array<{
-					name?: unknown;
-					description?: unknown;
-					source?: unknown;
-					userInvocable?: unknown;
-					enabled?: unknown;
-					path?: unknown;
-					projectPath?: unknown;
-				}>;
-			};
-			const skills = result.skills ?? [];
-			return skills
-				.filter((s) => typeof s.name === "string")
-				.map((s) => ({
-					name: String(s.name),
-					description: typeof s.description === "string" ? s.description : "",
-					source: typeof s.source === "string" ? s.source : "unknown",
-					userInvocable: s.userInvocable === true,
-					enabled: s.enabled === true,
-					...(typeof s.path === "string" ? { path: s.path } : {}),
-					...(typeof s.projectPath === "string" ? { projectPath: s.projectPath } : {}),
-				}));
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async setGloballyDisabledSkills(disabledSkills: string[]): Promise<boolean> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			await client.rpc.skills.config.setDisabledSkills({ disabledSkills });
-			return true;
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
+	//
+	// Moved to `./skillsRegistry.ts` (21a.3). The 2 session-scoped
+	// skill methods (listSkills, setSkillEnabled) remain above in this
+	// file because they need entries Map lookup.
 
 	async resetApprovals(sessionId: string): Promise<boolean> {
 		const entry = this.entries.get(sessionId);

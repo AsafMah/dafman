@@ -10,6 +10,93 @@
 
 ---
 
+## 2026-05-22 — Phase 21a: architectural extractions out of sessions.ts
+
+### Takeaway
+
+The first sub-phase of the tech-debt burn-down. Three rubber-duck'd
+extractions out of `src-bun/app/sessions.ts` (1451 LoC) into three
+focused modules:
+
+- `src-bun/app/pendingRequests.ts` — `PendingRequestQueue`
+- `src-bun/app/mcpRegistry.ts` — `McpRegistry` (server-scoped MCP)
+- `src-bun/app/skillsRegistry.ts` — `SkillsRegistry` (server-scoped skills)
+
+After the three commits (650acfb / 83335c4 / this one), `sessions.ts`
+is back under ~1100 LoC and the module boundaries are aligned with
+ownership: the registry owns live sessions + per-session lifecycle;
+the queue owns SDK callbacks + audit hand-off; mcp/skills own the
+singleton-CLI-client calls. Setup for the 21b correctness fixes
+(shutdown(), create() race, history replay cap) is now trivial
+because they no longer compete for the same module.
+
+### Rubber-duck adoptions
+
+For each extraction I gave the rubber-duck the proposed class
+signature + caller migration plan + 4-5 specific questions before
+writing code. Across the three reviews, ~17 findings were surfaced;
+notable ones I adopted:
+
+- **PendingRequestQueue**: keep `respondToRequest` as the public
+  registry API (delegate to the queue) so the RPC layer doesn't
+  reach into private state. Move the `recordPermission` audit call
+  into the queue with a constructor-injected callback so tests
+  capture without disk I/O. Approve-all stays on the registry (the
+  handler short-circuits before reaching the queue). Add a
+  `removeEntry(sessionId)` helper on the registry that always calls
+  `pending.settleForSession` BEFORE `entries.delete` + `unsubscribe`
+  — sets up the S3/S4 ordering fixes in 21b.
+- **McpRegistry**: constructor-inject `getClient: () => CopilotClient`
+  (not `() => CopilotClient | null` — `tryGetClient` throws, never
+  returns null). Centralize the SDK error-wrapping in a private
+  `withClient<T>` helper that lets `AppError.clientNotStarted` escape
+  unwrapped (rethrowing `instanceof AppError` is critical — wrapping
+  it as `AppError.sdk` would give the renderer the wrong error kind).
+  Keep server-vs-session split: session-scoped MCP methods stay on
+  `SessionRegistry`. Wire BOTH composition roots (`src-bun/index.ts`
+  + `src-bun/test-server.ts`).
+- **SkillsRegistry**: mirror McpRegistry exactly; same constructor
+  shape, same `withClient` helper, same composition. Don't add a
+  shared normalizer between `listSkills` (session-scoped) and
+  `discover` (server-scoped) because their field sets and defaults
+  differ — easier to keep inline than to make a generic one.
+
+### Test coverage added
+
+- `src-bun/__tests__/pendingRequests.test.ts` — 12 tests:
+  enqueue + emit-throw cancellation per kind shape, respond mismatch
+  cases (unknown id / sessionId / kind), permission audit fields,
+  idempotent double-respond, `settleForSession` only drains matches,
+  `settleAll` drains everything.
+- `src-bun/__tests__/mcpRegistry.test.ts` — 10 tests: empty-result
+  default, SDK rejection → `AppError.sdk`, `ClientNotStarted` passes
+  through unwrapped, arg forwarding per method, discover() shape
+  normalization + workingDirectory threading.
+- `src-bun/__tests__/skillsRegistry.test.ts` — 7 tests: same shape
+  as MCP.
+
+Plus all 19 pre-existing `sessions.test.ts` tests still pass — none
+of the moves changed observable behavior.
+
+### Why this matters for 21b
+
+The S3 and S4 correctness fixes (delete-before-disconnect, unsubscribe-
+before-settle ordering) drop in as one-liners now because
+`removeEntry` is the single chokepoint. S1 (shutdown()) can call
+`pending.settleAll` + `entries.forEach(removeEntry)` instead of
+duplicating the teardown sequence. S5 (history replay cap) is a
+local change in `SessionRegistry.resume()` that no longer fights
+for space in a 1500-line file.
+
+### Receipts
+
+- 21a.1 commit: `650acfb`
+- 21a.2 commit: `83335c4`
+- 21a.3 commit: this one
+- Tests: 425 bun (was 397), 70/70 E2E smoke, all green.
+
+---
+
 ## 2026-05-22 — Phase 20c: code review + dep audit + tech-debt doc
 
 ### Takeaway

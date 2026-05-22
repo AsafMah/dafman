@@ -34,6 +34,7 @@ import type { AuditEntry } from "./app/audit";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
+import { SkillsRegistry } from "./app/skillsRegistry";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
@@ -101,6 +102,7 @@ const sessions = new SessionRegistry(
 	() => settings.get().tools.defaultExcluded,
 );
 const mcp = new McpRegistry();
+const skills = new SkillsRegistry();
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
 	maxRequestTime: 120000,
@@ -279,10 +281,10 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				}),
 			),
 			discoverSkills: rpcGuard(async ({ workingDirectory }) =>
-				sessions.discoverSkills(workingDirectory),
+				skills.discover(workingDirectory),
 			),
 			setGloballyDisabledSkills: rpcGuard(async ({ disabledSkills }) =>
-				sessions.setGloballyDisabledSkills(disabledSkills),
+				skills.setGloballyDisabled(disabledSkills),
 			),
 			getSettings: rpcGuard(async () => settings.get()),
 			updateSettings: rpcGuard(async ({ next }) => settings.update(next)),
