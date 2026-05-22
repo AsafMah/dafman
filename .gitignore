@@ -66,3 +66,5 @@ coverage/
 playwright-report/
 test-results/
 e2e/.cache/
+.commit-msg.tmp
+
