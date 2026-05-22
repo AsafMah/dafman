@@ -54,7 +54,7 @@ session-store action. Sorted by approximate user-visible value.
 | **Triggerable elicitation (already shipped)** | `session.ui.elicitation` | DONE | Phase 15. |
 | **Plan-mode + autopilot toggle** | CLI 0.0.387 (plan mode), 0.0.400 (autopilot), 0.0.411 (SDK APIs for plan mode/autopilot/fleet) | 1 d | We have a mode pill in the composer (`ModeButtonGroup`) — does it actually wire to `rpc.mode.set` for plan/autopilot/yolo? **Audit action**: verify; if not, wire it. |
 | **`session.shell.exec` + `kill` streaming** | `rpc.shell.exec/kill` | 1 d | We don't run shell from the renderer side; could power a built-in terminal panel (cf. the new Copilot app's "Terminal" tab from Phase 17). |
-| **Workspace files** (read/list/create scoped to session workspace) | `rpc.workspaces.getWorkspace/listFiles/readFile/createFile` | 1 d | Power a per-session "files this session has touched" panel — Phase 17 anti-takeaway item E becomes cheap. |
+| **Session workspace files API** (session-state scratch dir, NOT user repo) | `rpc.workspaces.getWorkspace/listFiles/readFile/createFile` + `rpc.plan.*` | 1 d | Scoped to `~/.copilot/session-state/{sessionId}/` — checkpoints, `plan.md`, agent-generated `files/`, paste-overflow spills (CLI 0.0.397). **Not a permission gate** (fs access against the user's repo is gated by `onPermissionRequest` → `PermissionRuleEditor`, which we already consume). See Phase 24 below. |
 | **Session metadata fetch** | `client.getSessionMetadata(id)` | 0.5 d | Today we only know what's in our own store. Refreshing model/title/createdAt from disk on resume is more correct. |
 | **`client.on()` lifecycle events** | `session.created` / `deleted` / `updated` / `foreground` / `background`, `capabilities.changed` | 0.5 d | Live-update Sessions Manager without polling. Also: react to capabilities changes (e.g. another client connects with elicitation). |
 | **Resume with `continuePendingWork: true`** | `client.resumeSession({ continuePendingWork })` | 0.5 d | When resuming a session that ended mid-turn, automatically continue. |
@@ -98,8 +98,9 @@ RPC or by implementing them in our renderer.
   `rpc.history.truncate`. Right-click a message → "Rewind to here".
 - **`/undo` last turn + revert file changes** (CLI 1.0.10).
 - **`/diff` session changes** (CLI 0.0.389, syntax-highlighted in 1.0.5).
-  Phase 10 in STATUS but the SDK has `rpc.workspaces.listFiles` we can
-  use today.
+  Phase 10 in STATUS. Note: this is *workspace-cwd diff* (the user's
+  repo), NOT `rpc.workspaces.*` which targets the session state dir.
+  Implementation needs a separate git-aware change tracker.
 - **`/usage` with contribution graph** (CLI 1.0.35) — read from
   `rpc.usage.getMetrics`.
 - **`/share html` self-contained HTML export** (CLI 1.0.15) —
@@ -266,11 +267,39 @@ Each item is a single PR-ish chunk. Effort = focused engineering days.
 4. **Session metadata refresh on resume** via `getSessionMetadata`
    (0.5 d).
 
+### Phase 24 — Session workspace files surface (~2 d)
+
+**Scope clarification (investigated 2026-05-22, see DEVLOG entry):**
+`rpc.workspaces.*` targets the session's **infinite-sessions state
+directory** at `~/.copilot/session-state/{sessionId}/` — NOT the
+user's repo cwd. Subdirs: `checkpoints/`, `files/` (agent-generated +
+paste-overflow spills per CLI 0.0.397), `plan.md`. Access is
+relative-path-only inside that dir; no enforcement of "files agent
+can touch in the user's repo" — that's the **permission system's**
+job (and our `PermissionRuleEditor` already owns it).
+
+Phase 24 surfaces these dirs in the UI:
+
+1. **Plan panel** inside the chat tab (collapsible right rail) — read
+   + render `<workspacePath>/plan.md` via `rpc.plan.read`; markdown
+   render; auto-refresh on `plan.changed` events. (0.5 d)
+2. **Generated-files tab** — list `<workspacePath>/files/` via
+   `rpc.workspaces.listFiles`; click to read content via
+   `rpc.workspaces.readFile`; "Export to disk" button copies to
+   user-chosen location. Useful for paste-overflow recovery + agent-
+   authored artifacts. (1 d)
+3. **Checkpoint browser** — list `checkpoints/` (auto-snapshots
+   from CLI 0.0.389+); pair with `rpc.history.truncate` for
+   point-in-time rewind. (0.5 d)
+
+Out of scope for Phase 24: anything claiming to "show what files the
+agent is allowed to touch in your repo." That doesn't exist as an SDK
+surface — it's deny-by-default permission prompts, full stop.
+
 ### Later (defer)
 - Phase 9 automations (scheduler, webhooks, HTTP hooks).
 - Phase 10 editor (diff viewer + accept/reject hunks).
 - Phase 11 browser + telemetry + docs.
-- Workspace files surface (Phase 24 candidate).
 - Memory backend (Phase 25).
 - Plugin / extension UI (Phase 26).
 
@@ -306,6 +335,13 @@ Each item is a single PR-ish chunk. Effort = focused engineering days.
   Agents work surfaces enough plugin chrome to design around.
 - **Per-session GitHub token + custom providers grouped together** —
   both are auth/identity per-session; one Settings → Accounts pane.
+- **`rpc.workspaces.*` scoped to Phase 24, NOT a permission gate.**
+  Investigated 2026-05-22 — it targets the session's
+  infinite-sessions state dir (`~/.copilot/session-state/{id}/`),
+  not the user's repo. Filesystem access against the user's cwd is
+  gated by `onPermissionRequest`, already consumed via
+  `PermissionRuleEditor`. Use workspaces for plan.md panel +
+  generated-files tab + checkpoint browser — nothing more.
 
 ---
 
