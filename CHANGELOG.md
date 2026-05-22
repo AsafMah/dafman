@@ -3,6 +3,31 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (Phase 21b — SessionRegistry correctness)
+
+- **S1: bounded shutdown.** `shutdownAll()` now races each
+  `session.disconnect()` against a 2s timeout per session
+  (`SHUTDOWN_TIMEOUT_MS`). A hung SDK can't deadlock app exit. Also
+  drains the pending queue with `settleAll` up front and handles
+  `SIGTERM` (window close) in addition to `SIGINT`.
+- **S2: `create()` race fix.** Events fired by the SDK BEFORE
+  `createSession` resolves used to forward under the literal
+  `"pending"` placeholder, orphaning them on the renderer side
+  (renderer keys its pending-events buffer by real sessionId). Now
+  buffered locally and drained under the resolved id after the
+  session object is in hand.
+- **S3: entries.delete moved after `await session.disconnect()`** in
+  all three teardown paths (`disconnect`, `deleteCliSession`,
+  `setWorkingDirectory`). Concurrent RPCs see the entry as live
+  during the disconnect window and fail predictably with
+  `SessionNotFound` AFTER, instead of mid-teardown.
+- **S5: history-replay cap on resume.** `getMessages()` returns the
+  full transcript; long-lived sessions can produce thousands of
+  events. Now caps at the last `HISTORY_REPLAY_CAP` (500) events
+  and replays in `HISTORY_REPLAY_BATCH` (50)-sized chunks with
+  `queueMicrotask` yields between them, so the renderer can paint
+  between batches instead of receiving one giant IPC flood.
+
 ### Changed (Phase 21a — architectural extractions out of sessions.ts)
 
 - **`PendingRequestQueue` extracted** to `src-bun/app/pendingRequests.ts`.

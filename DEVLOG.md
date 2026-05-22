@@ -10,6 +10,88 @@
 
 ---
 
+## 2026-05-22 — Phase 21b: SessionRegistry correctness pass
+
+### Takeaway
+
+Five lifecycle bugs in `src-bun/app/sessions.ts` flagged by the
+20c code review (S1-S5 in `plans/plan-tech-debt.prompt.md`).
+Surgical fixes, all in one commit because they share the
+SessionRegistry lifecycle surface.
+
+### Fixes
+
+- **S1: bounded shutdown** (`SessionRegistry.shutdownAll`). The
+  pre-fix version called `disconnect()` per session sequentially
+  with no timeout. If the SDK's `session.disconnect()` hung — e.g.
+  the CLI binary crashed mid-flight — shutdown blocked forever and
+  the app couldn't exit cleanly. Fix: `Promise.race` against
+  `SHUTDOWN_TIMEOUT_MS` (2s) per session; force-clear the entry on
+  timeout. Also drain the pending queue up front with `settleAll`
+  as a belt-and-suspenders, and wire `SIGTERM` (window close on
+  most platforms) alongside the existing `SIGINT` handler.
+- **S2: `create()` race**. The SDK can fire events through
+  `config.onEvent` BEFORE `createSession` resolves (e.g.
+  `session.start`). Pre-fix: those events forwarded under the
+  literal `"pending"` string. The renderer keys its
+  `pendingEvents` buffer by real sessionId, so they were
+  orphaned. Fix: buffer locally in `earlyEventBuffer`; once the
+  real session resolves, drain through `forward` under the
+  resolved id.
+- **S3: `entries.delete` after `await disconnect`**. All three
+  teardown paths (`disconnect`, `deleteCliSession`,
+  `setWorkingDirectory`) used to delete the entry first and then
+  await disconnect. During the disconnect window, concurrent RPCs
+  on the same id (e.g. a renderer race) would see SessionNotFound
+  mid-teardown. Fix: delete only after disconnect resolves; the
+  entry stays live (unsubscribed, but in the map) until the SDK
+  side has fully released it.
+- **S4**: already addressed in 21a.1's `removeEntry` ordering and
+  the manual teardown paths now follow the same settle→unsubscribe→
+  await disconnect→delete order.
+- **S5: history-replay cap**. `session.getMessages()` returns the
+  full transcript, unpaginated. Long-lived sessions easily produce
+  1000+ events. Pre-fix: `resume()` forwarded every event
+  synchronously through `forward` in a tight loop, blocking the
+  event loop and flooding IPC. Fix: cap at last
+  `HISTORY_REPLAY_CAP` (500) events; replay in
+  `HISTORY_REPLAY_BATCH` (50)-sized chunks separated by
+  `queueMicrotask` yields so the renderer can paint between
+  batches. Older events still on disk; could be re-fetched on
+  scrollback if we add that surface later.
+
+### Tests added
+
+Three new regression tests in `src-bun/__tests__/sessions.test.ts`:
+
+- **S1**: a fake whose `disconnect()` returns a never-resolving
+  Promise; assert `shutdownAll()` completes within < 4s (well
+  under the 2s timeout + some slack) and a follow-up call is a
+  no-op (entries map cleared).
+- **S2**: a `RacingFakeClient` whose `createSession` calls
+  `config.onEvent({ type: "session.start", data })` BEFORE
+  returning; assert the emitted event has the resolved sessionId,
+  not "pending".
+- **S5**: a 1500-event seeded history; assert exactly 500 events
+  replay through emit, all under the resolved sessionId, with
+  the most-recent event present (cap takes the trailing slice).
+
+### Why this matters
+
+S1 is a real user-visible defect (app exit hangs on a crashed CLI).
+S2 is a low-probability but real correctness bug (early SDK events
+sometimes get dropped on session creation). S3 closes a small
+concurrent-RPC window. S5 is a perf cliff — a 5000-event session
+resumed today would hang the renderer for a second or two; now
+the resume is paint-friendly.
+
+### Receipts
+
+- Commit: this one. 428 bun tests (was 425), 70/70 E2E smoke, all
+  green.
+
+---
+
 ## 2026-05-22 — Phase 21a: architectural extractions out of sessions.ts
 
 ### Takeaway

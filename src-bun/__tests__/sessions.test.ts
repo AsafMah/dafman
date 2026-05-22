@@ -598,4 +598,98 @@ describe("SessionRegistry", () => {
 		expect(decision).toEqual({ kind: "approve-once" });
 		expect(pendingEmitted).toHaveLength(0);
 	});
+
+	test("S2: create() buffers events fired during createSession await + drains under the real sessionId", async () => {
+		// Reproduces the original bug: SDK can fire `session.start`
+		// (or similar) through `config.onEvent` BEFORE returning the
+		// session object. Pre-fix: those events forwarded under the
+		// literal "pending" id and were dropped by the renderer.
+		// Post-fix: they buffer + drain under the real sessionId.
+		class RacingFakeClient extends FakeClient {
+			override async createSession(
+				config: Record<string, unknown> = {},
+			): Promise<FakeSession> {
+				const s = makeFakeSession(`raced-${this.createdSessions.length + 1}`);
+				this.createdSessions.push(s);
+				this.createdConfigs.push(config);
+				// Fire BEFORE returning, simulating the SDK's race.
+				const onEvent = config.onEvent as
+					| ((e: { type: string; data: Record<string, unknown> }) => void)
+					| undefined;
+				onEvent?.({ type: "session.start", data: { early: true } });
+				return s;
+			}
+		}
+		const client = new RacingFakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const emitted: SessionEventPayload[] = [];
+		const reg = new SessionRegistry((p) => emitted.push(p));
+		const id = await reg.create();
+		// The early "session.start" event must have been delivered
+		// under the real sessionId, not "pending".
+		expect(emitted).toHaveLength(1);
+		expect(emitted[0]?.sessionId).toBe(id);
+		expect(emitted[0]?.sessionId).not.toBe("pending");
+		expect(emitted[0]?.eventType).toBe("session.start");
+	});
+
+	test("S1: shutdownAll completes within the timeout even if session.disconnect hangs", async () => {
+		// Builds a fake whose disconnect() never resolves. Pre-fix:
+		// shutdownAll() would hang forever. Post-fix: each session's
+		// disconnect is raced against SHUTDOWN_TIMEOUT_MS (2s) and
+		// the entry is force-cleared on timeout.
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		await reg.create();
+		const fake = client.createdSessions[0]!;
+		// Replace disconnect with a never-resolving Promise.
+		let disconnectStarted = false;
+		fake.disconnect = () =>
+			new Promise<void>(() => {
+				disconnectStarted = true;
+			});
+		const t0 = Date.now();
+		await reg.shutdownAll();
+		const elapsed = Date.now() - t0;
+		expect(disconnectStarted).toBe(true);
+		// Should complete close to the 2s timeout, definitely under 4s.
+		expect(elapsed).toBeLessThan(4000);
+		// Entry must be cleared so a follow-up shutdownAll is a no-op.
+		const t1 = Date.now();
+		await reg.shutdownAll();
+		expect(Date.now() - t1).toBeLessThan(200);
+	}, 8000);
+
+	test("S5: resume caps history replay at HISTORY_REPLAY_CAP and forwards all under sessionId", async () => {
+		// Builds a 1500-event history. Pre-fix: all 1500 events would
+		// fire synchronously through `forward`, blocking the event
+		// loop for the duration. Post-fix: at most HISTORY_REPLAY_CAP
+		// (500) replay through `forward`, batched via queueMicrotask.
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const history: Array<{ type: string; [k: string]: unknown }> = [];
+		for (let i = 0; i < 1500; i++) {
+			history.push({ type: "assistant.message", data: { messageId: `m-${i}` } });
+		}
+		client.nextResumeHistory = history;
+		const emitted: SessionEventPayload[] = [];
+		const reg = new SessionRegistry((p) => emitted.push(p));
+		const id = await reg.resume("sess-history");
+		expect(id).toBe("sess-history");
+		// Capped at 500 (HISTORY_REPLAY_CAP); the last 500 of 1500 are
+		// the most-recent slice.
+		expect(emitted).toHaveLength(500);
+		// All replayed events tagged with the resumed sessionId.
+		for (const p of emitted) expect(p.sessionId).toBe(id);
+		// Most-recent event present.
+		const last = emitted[emitted.length - 1];
+		expect((last?.data as { messageId?: string }).messageId).toBe("m-1499");
+	});
 });

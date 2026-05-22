@@ -528,9 +528,30 @@ subscribeAudit((entry) => {
 
 log.info("dafman started", { version: "0.1.0" });
 
-process.on("SIGINT", async () => {
-	log.info("SIGINT received, shutting down");
-	await sessions.shutdownAll();
-	await shutdownClient();
+// S1: bounded shutdown on either SIGINT (Ctrl+C / docker stop) or
+// SIGTERM (window-close in Electrobun on most platforms). Both invoke
+// `sessions.shutdownAll()` which races each `session.disconnect()`
+// against a 2s timeout per session, so a hung SDK can't deadlock app
+// exit.
+const handleShutdownSignal = async (signal: string): Promise<void> => {
+	log.info("shutdown signal received", { signal });
+	try {
+		await sessions.shutdownAll();
+	} catch (err) {
+		log.warn("sessions.shutdownAll threw during signal handler", {
+			signal,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+	try {
+		await shutdownClient();
+	} catch (err) {
+		log.warn("shutdownClient threw during signal handler", {
+			signal,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
 	process.exit(0);
-});
+};
+process.on("SIGINT", () => void handleShutdownSignal("SIGINT"));
+process.on("SIGTERM", () => void handleShutdownSignal("SIGTERM"));

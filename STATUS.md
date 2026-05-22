@@ -345,8 +345,23 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 21b shipped: **SessionRegistry correctness
+  pass**. Five lifecycle fixes in `src-bun/app/sessions.ts`: (S1)
+  bounded `shutdownAll` with 2s per-session timeout + SIGTERM
+  handler so a hung SDK can't deadlock app exit; (S2) `create()`
+  early-event buffer so SDK events that fire during `createSession`
+  await get forwarded under the resolved id, not the literal
+  "pending" placeholder; (S3) `entries.delete` moved AFTER
+  `await session.disconnect()` in all three teardown paths so
+  concurrent RPCs see the entry as live during the disconnect
+  window; (S4) was already in place post-21a.1; (S5) history-replay
+  cap at last 500 events, batched 50 at a time via `queueMicrotask`
+  yields, so resume of a long-lived session doesn't flood IPC or
+  block the event loop. 4 new regression tests (S1 hang + S2 race +
+  S5 cap, plus the existing teardown tests still pass). **428 bun
+  tests, 70/70 E2E, boot verified.**
 - **2026-05-22** — Phase 21a shipped: **architectural extractions out
-  of `sessions.ts`**. Three rubber-duck'd extractions in three
+  of `sessions.ts`**.Three rubber-duck'd extractions in three
   separate commits (650acfb / 83335c4 / now):
   - **21a.1** `PendingRequestQueue` (`src-bun/app/pendingRequests.ts`,
     ~200 LoC). The SDK callback queue (enqueue / cancel / settle for

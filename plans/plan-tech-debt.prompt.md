@@ -6,7 +6,9 @@ Comprehensive deferred-fix list from the 2026-05-22 code-review sweep
 `src/App.vue` / `src/components/SessionDetailsPanel.vue`.
 
 Items marked **fixed in 20c** were addressed in `cf0970e` (20a) or
-the 20c commit. Everything else lives here as a tracked backlog.
+the 20c commit. Items marked **fixed in 21a / 21b** were addressed
+in the Phase 21 burn-down. Everything else lives here as a tracked
+backlog.
 
 ---
 
@@ -14,7 +16,7 @@ the 20c commit. Everything else lives here as a tracked backlog.
 
 The biggest file in the codebase. Three natural seams identified:
 
-### A1. Extract `PendingRequestQueue` (`high` payoff)
+### A1. Extract `PendingRequestQueue` (`high` payoff) — ✅ **fixed in 21a.1** (`650acfb`)
 **Where**: `src-bun/app/sessions.ts:73-469` — `PendingEntry`,
 `enqueuePending`, `cancelPending`, `settlePendingForSession`,
 `respondToRequest`, `summarizePermission`, plus the three
@@ -24,7 +26,7 @@ The biggest file in the codebase. Three natural seams identified:
 **Win**: makes the queue independently testable; drops `sessions.ts`
 to ~1050 lines.
 
-### A2. Extract `McpRegistry` (`medium` payoff)
+### A2. Extract `McpRegistry` (`medium` payoff) — ✅ **fixed in 21a.2** (`83335c4`)
 **Where**: `src-bun/app/sessions.ts:1291-1389` — 9 server-scoped MCP
 methods (`listMcpConfigs`, `addMcpConfig`, etc.) that don't touch
 session state. Already inconsistent: session-scoped
@@ -34,7 +36,7 @@ session-scoped `setSessionMcpEnabled` stays in `SessionRegistry`.
 **Win**: clearer ownership; lets the future Library panel work
 even when no session is open.
 
-### A3. Extract `SkillsRegistry` (`medium` payoff)
+### A3. Extract `SkillsRegistry` (`medium` payoff) — ✅ **fixed in 21a.3** (`075bb09`)
 **Where**: server-scoped `discoverSkills`/`setGloballyDisabledSkills`
 (lines 1417-1451) + session-scoped `listSkills`/`setSkillEnabled`
 (lines 1036-1087).
@@ -45,46 +47,48 @@ even when no session is open.
 
 ## Correctness / safety — defer to a dedicated audit
 
-### S1. Missing `shutdown()` on SessionRegistry (`high`)
+### S1. Missing `shutdown()` on SessionRegistry (`high`) — ✅ **fixed in 21b**
 **Where**: `src-bun/app/sessions.ts` — no method to tear down every
 session on app quit. Today each session's pending callbacks would
 hang until process exit; the SDK never gets a clean disconnect.
-**Fix**: add `async shutdown(): Promise<void>` that walks
-`this.entries`, calls `settlePendingForSession` +
-`entry.unsubscribe()` + `entry.session.disconnect()` for each, then
-clears the map. Wire from Electrobun's `app.beforeQuit` hook.
+**Fix**: `shutdownAll()` races each `session.disconnect()` against
+a 2s `SHUTDOWN_TIMEOUT_MS` per session. Drains the pending queue
+up front with `settleAll`. Wired from `SIGTERM` + `SIGINT` in
+`src-bun/index.ts`.
 
-### S2. Race in `create()` `earlyForward` (`high`)
+### S2. Race in `create()` `earlyForward` (`high`) — ✅ **fixed in 21b**
 **Where**: `src-bun/app/sessions.ts:478-495`. `resolvedSessionId`
 starts null; if the SDK fires `session.start` before `createSession`
 resolves and we set the id, `earlyForward` forwards events with
 `"pending"` as the session id. The renderer drops them.
-**Fix**: pre-generate a `tempId = randomUUID()`, register the entry
-under `tempId`, swap to the real id after `createSession` resolves.
-Renderer's pending-events buffer (`pendingEvents` Map in
-`sessionsStore`) needs to learn about the rebind.
+**Fix**: `earlyEventBuffer` collects events until `resolvedSessionId`
+is set, then drains through `forward` under the real id.
 
-### S3. Entry deletion before disconnect in `setWorkingDirectory` (`medium`)
+### S3. Entry deletion before disconnect in `setWorkingDirectory` (`medium`) — ✅ **fixed in 21b**
 **Where**: `src-bun/app/sessions.ts:605-608`. `entries.delete(sessionId)`
 fires before the awaited `disconnect()`. SDK events during the
 disconnect window (`session.end`) get lost because `forward()`
 can't find the entry.
-**Fix**: delete the entry AFTER the disconnect+catch block.
+**Fix**: delete moved after `await disconnect` in all three teardown
+paths (`disconnect`, `deleteCliSession`, `setWorkingDirectory`).
 
-### S4. `unsubscribe()` ordering bug in disconnect paths (`medium`)
+### S4. `unsubscribe()` ordering bug in disconnect paths (`medium`) — ✅ **fixed in 21a.1**
 **Where**: `src-bun/app/sessions.ts:606, 670`. `entry.unsubscribe()`
 fires before `settlePendingForSession`. If the SDK callback
 triggers a new pending request during unsubscribe, it's never
 settled.
-**Fix**: always call `settlePendingForSession` first.
+**Fix**: `removeEntry` helper added in 21a.1 enforces
+settle→unsubscribe→delete order; manual teardown paths in 21b also
+follow this contract.
 
-### S5. History replay floods renderer IPC (`medium`)
+### S5. History replay floods renderer IPC (`medium`) — ✅ **fixed in 21b**
 **Where**: `src-bun/app/sessions.ts:568` — `getMessages()` returns
 the full transcript and replays synchronously through `forward()`.
 For a session with thousands of events, blocks the event loop and
 floods Electrobun's IPC queue.
-**Fix**: cap replay at N events (e.g. last 200) or batch the emits
-to coalesce in `requestIdleCallback`-style microtasks.
+**Fix**: cap at `HISTORY_REPLAY_CAP` (500) trailing events; replay
+in `HISTORY_REPLAY_BATCH` (50)-sized chunks with `queueMicrotask`
+yields between batches.
 
 ### S6. `respondToPending` event rollback **FIXED in 20c**
 **Where**: `src/stores/sessionsStore.ts:respondToPending`. 20a fix

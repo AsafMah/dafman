@@ -47,6 +47,25 @@ import type {
 /// here. Mismatched values are rejected by the SDK at call time.
 type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
+/// S5: cap replay of `session.getMessages()` history at this many
+/// events. The SDK returns the full transcript without pagination —
+/// long-lived sessions can produce thousands of events. The renderer
+/// reducer reconstructs the visible state from this slice; events
+/// older than the cap are still on disk and could be re-fetched later
+/// if needed.
+const HISTORY_REPLAY_CAP = 500;
+
+/// S5: yield to the event loop between batches of this size while
+/// replaying. Avoids blocking IPC and lets the renderer paint between
+/// chunks.
+const HISTORY_REPLAY_BATCH = 50;
+
+/// S1: per-session disconnect timeout during `shutdownAll`. If the
+/// SDK's `session.disconnect()` doesn't resolve in this window we
+/// force-clear the entry and move on — the OS process exit handles
+/// the rest.
+const SHUTDOWN_TIMEOUT_MS = 2000;
+
 type Emit = (payload: SessionEventPayload) => void;
 type EmitPending = (payload: PendingRequestPayload) => void;
 
@@ -306,13 +325,19 @@ export class SessionRegistry {
 
 	async create(opts: { workingDirectory?: string } = {}): Promise<string> {
 		const client = tryGetClient();
-		// Capture a placeholder sessionId for early events that fire before
-		// `client.createSession` resolves. We rebind once we know the real
-		// id (a few microseconds later, since the SDK's `session.start`
-		// event fires during creation).
+		// S2: buffer events that fire BEFORE `createSession` resolves
+		// (the SDK's `session.start` event can fire during creation).
+		// Forwarding under a literal "pending" placeholder would orphan
+		// those events on the renderer side, which keys its pending-
+		// events buffer by sessionId. Drain to the real id after.
 		let resolvedSessionId: string | null = null;
+		const earlyEventBuffer: SessionEvent[] = [];
 		const earlyForward = (event: SessionEvent) => {
-			this.forward(resolvedSessionId ?? "pending", event);
+			if (resolvedSessionId !== null) {
+				this.forward(resolvedSessionId, event);
+			} else {
+				earlyEventBuffer.push(event);
+			}
 		};
 		const wd = opts.workingDirectory?.trim();
 		const session = await client.createSession({
@@ -328,6 +353,8 @@ export class SessionRegistry {
 			this.forward(sessionId, event);
 		});
 		this.entries.set(sessionId, { session, unsubscribe, ...(wd ? { workingDirectory: wd } : {}) });
+		// Drain anything that fired during the createSession await.
+		for (const event of earlyEventBuffer) this.forward(sessionId, event);
 		log.info("session created", { sessionId, workingDirectory: wd ?? null });
 		return sessionId;
 	}
@@ -399,12 +426,24 @@ export class SessionRegistry {
 		// Hydrate transcript. Failures here aren't fatal — the session is
 		// connected and will receive live events; we just won't have the
 		// scrollback.
+		//
+		// S5: cap history at the last `HISTORY_REPLAY_CAP` events to
+		// avoid blocking the event loop on long-lived sessions. Replay
+		// in `HISTORY_REPLAY_BATCH`-sized chunks separated by
+		// `queueMicrotask` yields so the renderer can paint between
+		// batches instead of receiving one giant IPC flood.
 		try {
 			const history = await session.getMessages();
-			for (const event of history) this.forward(actualId, event);
+			const total = history.length;
+			const capped =
+				total > HISTORY_REPLAY_CAP
+					? history.slice(total - HISTORY_REPLAY_CAP)
+					: history;
+			await this.replayHistory(actualId, capped);
 			log.info("session resumed", {
 				sessionId: actualId,
-				historyCount: history.length,
+				historyCount: total,
+				replayedCount: capped.length,
 				workingDirectory: effectiveCwd ?? null,
 			});
 		} catch (err) {
@@ -414,6 +453,23 @@ export class SessionRegistry {
 			});
 		}
 		return actualId;
+	}
+
+	/// S5 helper: replays history events to `forward` in
+	/// HISTORY_REPLAY_BATCH-sized batches separated by microtasks so the
+	/// event loop yields between chunks. Returns when every event has
+	/// been forwarded.
+	private async replayHistory(
+		sessionId: string,
+		events: ReadonlyArray<SessionEvent>,
+	): Promise<void> {
+		for (let i = 0; i < events.length; i += HISTORY_REPLAY_BATCH) {
+			const chunk = events.slice(i, i + HISTORY_REPLAY_BATCH);
+			for (const event of chunk) this.forward(sessionId, event);
+			if (i + HISTORY_REPLAY_BATCH < events.length) {
+				await new Promise<void>((r) => queueMicrotask(r));
+			}
+		}
 	}
 
 	async setWorkingDirectory(
@@ -437,8 +493,11 @@ export class SessionRegistry {
 			throw AppError.sdk(`workingDirectory is not a directory: ${next}`);
 		}
 
+		// S3: settle pending FIRST, unsubscribe FIRST, but keep the entry
+		// in the map until disconnect resolves. Concurrent RPCs see the
+		// entry as live during the disconnect window and get a
+		// predictable SessionNotFound after, instead of mid-teardown.
 		this.pending.settleForSession(sessionId, "session working directory changed");
-		this.entries.delete(sessionId);
 		entry.unsubscribe();
 		try {
 			await entry.session.disconnect();
@@ -448,6 +507,7 @@ export class SessionRegistry {
 				error: err instanceof Error ? err.message : String(err),
 			});
 		}
+		this.entries.delete(sessionId);
 
 		const client = tryGetClient();
 		let resumed: CopilotSession;
@@ -502,7 +562,6 @@ export class SessionRegistry {
 		this.pending.settleForSession(sessionId, "session deleted");
 		const entry = this.entries.get(sessionId);
 		if (entry) {
-			this.entries.delete(sessionId);
 			entry.unsubscribe();
 			try {
 				await entry.session.disconnect();
@@ -512,6 +571,11 @@ export class SessionRegistry {
 					error: err instanceof Error ? err.message : String(err),
 				});
 			}
+			// S3: delete AFTER disconnect resolves. Concurrent RPCs see
+			// the entry as live during the disconnect window so they
+			// can fail predictably with SessionNotFound after, rather
+			// than mid-teardown.
+			this.entries.delete(sessionId);
 		}
 		this.approveAllBySession.delete(sessionId);
 		const client = tryGetClient();
@@ -1182,7 +1246,6 @@ export class SessionRegistry {
 		// Settle pending callbacks BEFORE tearing down the session so
 		// the SDK never sees a hung onPermissionRequest / etc.
 		this.pending.settleForSession(sessionId, "session disconnected");
-		this.entries.delete(sessionId);
 		this.approveAllBySession.delete(sessionId);
 		entry.unsubscribe();
 		try {
@@ -1193,18 +1256,52 @@ export class SessionRegistry {
 				error: err instanceof Error ? err.message : String(err),
 			});
 		}
+		// S3: delete AFTER disconnect so concurrent RPCs see the entry
+		// as live during the disconnect window.
+		this.entries.delete(sessionId);
 		log.info("session closed", { sessionId });
 		return "Session closed successfully";
 	}
 
+	/// S1: bounded teardown for app quit. Settles every pending callback
+	/// across all sessions first (so the SDK doesn't sit on hung
+	/// handlers), then disconnects each session with a 2s timeout per.
+	/// On timeout we force-clear the entry; the OS process exit handles
+	/// the rest. Best-effort: errors are logged, never thrown — the
+	/// caller is on the way out anyway.
 	async shutdownAll(): Promise<void> {
+		// Settle every pending callback first as a belt-and-suspenders.
+		// Each per-session disconnect below also settles, but doing it
+		// up-front ensures even sessions whose disconnect hangs (and
+		// gets force-cleared below) don't leave dangling Promises.
+		this.pending.settleAll("app shutdown");
 		const ids = [...this.entries.keys()];
 		for (const id of ids) {
+			const entry = this.entries.get(id);
+			if (!entry) continue;
 			try {
-				await this.disconnect(id);
+				entry.unsubscribe();
 			} catch {
 				/* best-effort */
 			}
+			try {
+				await Promise.race([
+					entry.session.disconnect(),
+					new Promise<void>((_, reject) =>
+						setTimeout(
+							() => reject(new Error("disconnect timeout")),
+							SHUTDOWN_TIMEOUT_MS,
+						),
+					),
+				]);
+			} catch (err) {
+				log.warn("shutdown disconnect timed out or threw", {
+					sessionId: id,
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+			this.entries.delete(id);
+			this.approveAllBySession.delete(id);
 		}
 	}
 }
