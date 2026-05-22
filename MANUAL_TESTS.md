@@ -870,3 +870,30 @@ The picker only lets you pick a folder, no files visible.
     - **Steps:** with defaultApproveAll ON, create a session (approve-all ON). Then flip defaultApproveAll OFF. Existing session's approve-all should stay ON until explicitly toggled.
     - **Expected:** existing session unaffected; only newly-created sessions start with the new default.
     - **Why not automated:** real per-session lifecycle.
+
+## Phase 22b — Tools tri-state + grouped view
+
+- [ ] ⏳ **Tools section groups by source**
+    - **Steps:** open the right rail's Tools section.
+    - **Expected:** "Built-in" group header appears first, then alphabetically-sorted namespace headers (one per MCP server prefix, etc.). Each header shows a count.
+    - **Why not automated:** real SDK + real MCP servers needed for multi-group view.
+- [ ] ⏳ **Tri-state SelectButton per tool**
+    - **Steps:** click each segment of the tool tri-state (Default / Only allow / Forbid) on the same tool.
+    - **Expected:** clicking "Forbid" puts the tool in defaultExcluded; clicking "Only allow" moves it to defaultAllowed (removed from defaultExcluded); clicking "Default" removes it from both. Toast appears each time.
+    - **Why not automated:** covered at the test layer; visual cycle is a manual check.
+- [ ] ⏳ **Allowlist banner appears when allowlist is non-empty**
+    - **Steps:** mark any tool as "Only allow".
+    - **Expected:** info-banner appears in the Tools section: "Allowlist active — sessions are restricted to the tools marked 'Only allow'. The exclude list is ignored when allowlist is non-empty."
+    - **Why not automated:** visual-only check.
+- [ ] ⏳ **Allowlist actually restricts new sessions**
+    - **Steps:** mark only "bash" as "Only allow". Create a NEW session. Try to use file-edit / write tools.
+    - **Expected:** SDK rejects everything except bash. Audit log shows the rejections.
+    - **Why not automated:** real SDK + tool exercise.
+- [ ] ⏳ **Critical-tool warning badge**
+    - **Steps:** mark "bash" or "str_replace_editor" as "Forbid".
+    - **Expected:** small yellow exclamation icon appears next to the name (not blocked — warning only).
+    - **Why not automated:** visual-only check.
+- [ ] ⏳ **Settings v9/v10 → v11 migration preserves existing exclude list**
+    - **Steps:** start with a v10 settings file (defaultExcluded: ["bash"], no defaultAllowed). Launch the app.
+    - **Expected:** settings load cleanly; "bash" still shows "Forbid"; defaultAllowed initializes to empty.
+    - **Why not automated:** disk persistence + restart.

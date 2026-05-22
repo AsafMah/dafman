@@ -27,7 +27,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 10;
+export const SETTINGS_VERSION = 11;
 
 /// One-time backfill: returns `<homedir>/dafman` (created on demand),
 /// or `""` on failure. Used by `src-bun/index.ts` to populate the
@@ -77,25 +77,32 @@ export function defaultSettings(): Settings {
 		layout: { dockview: null },
 		workspaces: { recent: [], defaultWorkspace: "" },
 		notifications: { turnEnd: false, waitingForInput: true },
-		tools: { defaultExcluded: [] },
+		tools: { defaultExcluded: [], defaultAllowed: [] },
 		permissions: { defaultApproveAll: false },
 	};
 }
 
 function coerceTools(raw: unknown): ToolsPrefs {
-	if (!raw || typeof raw !== "object") return { defaultExcluded: [] };
-	const list = (raw as { defaultExcluded?: unknown }).defaultExcluded;
-	if (!Array.isArray(list)) return { defaultExcluded: [] };
-	const out: string[] = [];
-	const seen = new Set<string>();
-	for (const entry of list) {
-		if (typeof entry !== "string") continue;
-		const trimmed = entry.trim();
-		if (!trimmed || seen.has(trimmed)) continue;
-		seen.add(trimmed);
-		out.push(trimmed);
-	}
-	return { defaultExcluded: out };
+	if (!raw || typeof raw !== "object")
+		return { defaultExcluded: [], defaultAllowed: [] };
+	const obj = raw as { defaultExcluded?: unknown; defaultAllowed?: unknown };
+	const dedupeStringList = (input: unknown): string[] => {
+		if (!Array.isArray(input)) return [];
+		const out: string[] = [];
+		const seen = new Set<string>();
+		for (const entry of input) {
+			if (typeof entry !== "string") continue;
+			const trimmed = entry.trim();
+			if (!trimmed || seen.has(trimmed)) continue;
+			seen.add(trimmed);
+			out.push(trimmed);
+		}
+		return out;
+	};
+	return {
+		defaultExcluded: dedupeStringList(obj.defaultExcluded),
+		defaultAllowed: dedupeStringList(obj.defaultAllowed),
+	};
 }
 
 function coerceAppearance(raw: unknown): Appearance {

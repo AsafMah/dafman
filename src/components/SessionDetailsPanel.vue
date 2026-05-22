@@ -626,23 +626,99 @@ function mcpEnabled(s: McpItem): boolean {
   return s.status !== "disabled";
 }
 
-function isExcluded(name: string): boolean {
-  return settings.value.tools?.defaultExcluded?.includes(name) ?? false;
+/// 22b: canonical tool key. SDK filters use `namespacedName` when
+/// present (e.g. `playwright/navigate`); fall back to `name` for
+/// built-in tools. ALL persistence and SDK config uses this key.
+function toolKey(t: ToolItem): string {
+  return t.namespacedName ?? t.name;
 }
-async function setToolExcluded(name: string, excluded: boolean) {
-  const current = settings.value.tools?.defaultExcluded ?? [];
-  const next = excluded
-    ? Array.from(new Set([...current, name]))
-    : current.filter((n) => n !== name);
+
+/// 22b: tri-state per tool. "default" = neither list mentions it.
+/// "forbidden" = in `defaultExcluded`. "only-allow" = in
+/// `defaultAllowed`. Mutually exclusive — setting one removes the
+/// other so the persisted state stays clean.
+type ToolState = "default" | "forbidden" | "only-allow";
+function toolState(t: ToolItem): ToolState {
+  const key = toolKey(t);
+  if (settings.value.tools?.defaultExcluded?.includes(key)) return "forbidden";
+  if (settings.value.tools?.defaultAllowed?.includes(key)) return "only-allow";
+  return "default";
+}
+async function setToolState(t: ToolItem, next: ToolState) {
+  const key = toolKey(t);
+  const excluded = (settings.value.tools?.defaultExcluded ?? []).filter(
+    (n) => n !== key,
+  );
+  const allowed = (settings.value.tools?.defaultAllowed ?? []).filter(
+    (n) => n !== key,
+  );
+  if (next === "forbidden") excluded.push(key);
+  if (next === "only-allow") allowed.push(key);
   await settingsStore.update({
     ...settings.value,
-    tools: { defaultExcluded: next },
+    tools: { defaultExcluded: excluded, defaultAllowed: allowed },
   });
   toasts.info(
     "Tool change recorded",
-    "Restart the session to apply (SDK does not support runtime tool mutation).",
+    "Restart or recreate the session to apply (SDK does not support runtime tool mutation).",
   );
 }
+
+/// 22b: critical built-in tools — disabling these makes the agent
+/// effectively unusable. Surface a warning badge, don't block.
+const CRITICAL_TOOLS: ReadonlySet<string> = new Set([
+  "bash",
+  "shell",
+  "str_replace_editor",
+  "write_file",
+  "create_file",
+  "edit_file",
+]);
+function isCriticalTool(t: ToolItem): boolean {
+  return CRITICAL_TOOLS.has(t.name);
+}
+
+/// 22b: group tools by namespace. Returns `[ ['Built-in', [...]],
+/// ['playwright', [...]], ... ]`. Built-in (no `namespacedName`) is
+/// always first, then namespaced groups sorted alphabetically.
+type ToolGroup = { label: string; items: ToolItem[]; isBuiltin: boolean };
+const toolGroups = computed<ToolGroup[]>(() => {
+  const byPrefix = new Map<string, ToolItem[]>();
+  const builtins: ToolItem[] = [];
+  for (const t of builtinTools.value) {
+    if (!t.namespacedName) {
+      builtins.push(t);
+      continue;
+    }
+    const prefix = t.namespacedName.split("/")[0] || "namespaced";
+    const list = byPrefix.get(prefix) ?? [];
+    list.push(t);
+    byPrefix.set(prefix, list);
+  }
+  const groups: ToolGroup[] = [];
+  if (builtins.length > 0)
+    groups.push({ label: "Built-in", items: builtins, isBuiltin: true });
+  for (const prefix of Array.from(byPrefix.keys()).sort()) {
+    groups.push({
+      label: prefix,
+      items: byPrefix.get(prefix) ?? [],
+      isBuiltin: false,
+    });
+  }
+  return groups;
+});
+
+const allowlistActive = computed(
+  () => (settings.value.tools?.defaultAllowed ?? []).length > 0,
+);
+
+/// 22b: tri-state SelectButton options. Order matches the visual
+/// left→right of the segmented control.
+const toolStateOptions: { label: string; value: ToolState }[] = [
+  { label: "Default", value: "default" },
+  { label: "Only allow", value: "only-allow" },
+  { label: "Forbid", value: "forbidden" },
+];
 
 // ---------- Plan (18b) ----------
 const planExists = ref(false);
@@ -1174,43 +1250,72 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         <div v-else-if="toolsError" class="empty-hint error">{{ toolsError }}</div>
         <template v-else>
           <div class="row-hint">
-            Excluded tools take effect on next session create. Restart this
-            session to apply changes here.
+            Per-tool restriction applies to NEW sessions only. Restart
+            or recreate the session to apply changes here.
           </div>
-          <ul class="tool-list compact-list">
-            <li
-              v-for="t in builtinTools"
-              :key="`builtin-${t.name}`"
-              class="compact-row"
-            >
-              <button
-                type="button"
-                class="compact-name-button"
-                :title="t.description || t.name"
-                :aria-expanded="!!t.description && isItemExpanded('tool', t.name)"
-                @click="t.description && toggleItemExpansion('tool', t.name)"
+          <div
+            v-if="allowlistActive"
+            class="row-hint allowlist-banner"
+            role="status"
+          >
+            <i class="pi pi-info-circle" aria-hidden="true" />
+            Allowlist active — sessions are restricted to the tools
+            marked "Only allow". The exclude list is ignored when
+            allowlist is non-empty.
+          </div>
+          <template v-for="group in toolGroups" :key="`group-${group.label}`">
+            <div class="tool-group-header">
+              <span>{{ group.label }}</span>
+              <span class="section-count">{{ group.items.length }}</span>
+            </div>
+            <ul class="tool-list compact-list">
+              <li
+                v-for="t in group.items"
+                :key="`tool-${toolKey(t)}`"
+                class="compact-row tool-row"
               >
-                <i
-                  v-if="t.description"
-                  class="pi compact-chevron"
-                  :class="isItemExpanded('tool', t.name) ? 'pi-chevron-down' : 'pi-chevron-right'"
-                  aria-hidden="true"
+                <button
+                  type="button"
+                  class="compact-name-button"
+                  :title="t.description || t.name"
+                  :aria-expanded="!!t.description && isItemExpanded('tool', toolKey(t))"
+                  @click="t.description && toggleItemExpansion('tool', toolKey(t))"
+                >
+                  <i
+                    v-if="t.description"
+                    class="pi compact-chevron"
+                    :class="isItemExpanded('tool', toolKey(t)) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                    aria-hidden="true"
+                  />
+                  <span class="compact-name">{{ t.name }}</span>
+                  <span
+                    v-if="isCriticalTool(t) && toolState(t) === 'forbidden'"
+                    class="critical-warning"
+                    title="Disabling this tool makes the agent unable to perform core actions."
+                  >
+                    <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+                  </span>
+                </button>
+                <SelectButton
+                  :model-value="toolState(t)"
+                  :options="toolStateOptions"
+                  option-label="label"
+                  option-value="value"
+                  :allow-empty="false"
+                  size="small"
+                  class="tool-state-button"
+                  :aria-label="`Restriction for ${t.name}`"
+                  @update:model-value="(v: ToolState) => setToolState(t, v)"
                 />
-                <span class="compact-name">{{ t.name }}</span>
-              </button>
-              <ToggleSwitch
-                :model-value="!isExcluded(t.name)"
-                :aria-label="`Enable tool ${t.name}`"
-                @update:model-value="(v) => setToolExcluded(t.name, !v)"
-              />
-              <div
-                v-if="t.description && isItemExpanded('tool', t.name)"
-                class="compact-desc"
-              >
-                {{ t.description }}
-              </div>
-            </li>
-          </ul>
+                <div
+                  v-if="t.description && isItemExpanded('tool', toolKey(t))"
+                  class="compact-desc"
+                >
+                  {{ t.description }}
+                </div>
+              </li>
+            </ul>
+          </template>
         </template>
       </div>
     </section>
@@ -1923,6 +2028,77 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
 .compact-row :deep(.p-toggleswitch) {
   flex-shrink: 0;
   justify-self: end;
+}
+
+/* 22b: tools section additions */
+.tool-row {
+  /* Override the grid layout used by compact-row — the
+     SelectButton can exceed available width on narrow rails,
+     collapsing the name column to 0 and tripping Playwright's
+     visibility checks. Flex-wrap drops the SelectButton onto a
+     second line when needed instead. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  grid-template-columns: unset;
+}
+
+.tool-row .compact-name-button {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tool-state-button {
+  flex: 0 0 auto;
+  justify-self: end;
+  /* PrimeVue's segmented control buttons are tall by default;
+     small-size pulls them in line with rail row height. */
+  font-size: 0.75rem;
+}
+
+.tool-state-button :deep(.p-togglebutton),
+.tool-state-button :deep(.p-button) {
+  padding: 0.15rem 0.5rem;
+  min-width: 0;
+}
+
+.tool-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--p-text-muted-color);
+  margin: 0.5rem 0 0.2rem;
+  padding: 0 0.35rem;
+}
+
+.tool-group-header:first-child {
+  margin-top: 0;
+}
+
+.allowlist-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  background: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
+  border-left: 2px solid var(--p-primary-color);
+  border-radius: var(--p-border-radius-sm);
+  font-size: 0.78rem;
+  color: var(--p-text-color);
+  margin-bottom: 0.35rem;
+}
+
+.critical-warning {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.3rem;
+  color: var(--p-warning-color);
+  font-size: 0.75rem;
 }
 
 .compact-name-button {

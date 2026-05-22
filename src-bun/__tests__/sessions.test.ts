@@ -1039,4 +1039,72 @@ describe("SessionRegistry", () => {
 		const reg = new SessionRegistry(() => {});
 		await expect(reg.startFleet("ghost")).rejects.toBeInstanceOf(AppError);
 	});
+
+	// ---------- 22b: tools allow/deny precedence ----------
+	//
+	// SDK semantics: `availableTools` (allowlist) takes precedence over
+	// `excludedTools` (denylist). When the allowlist is non-empty, the
+	// SDK ignores `excludedTools` entirely, so we omit it from the
+	// config to keep the wire shape honest. When the allowlist is
+	// empty, we MUST NOT pass `availableTools: []` — the SDK would
+	// interpret that as "allow no tools" rather than "no restriction".
+
+	test("22b: empty allowlist omits availableTools entirely", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(
+			() => {},
+			() => {},
+			() => false,
+			() => ["bash"],
+			() => [], // empty allowlist
+		);
+		await reg.create();
+		const cfg = client.createdConfigs[0] as Record<string, unknown>;
+		expect(cfg.availableTools).toBeUndefined();
+		expect(cfg.excludedTools).toEqual(["bash"]);
+	});
+
+	test("22b: non-empty allowlist wins over excludedTools (excludedTools omitted)", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(
+			() => {},
+			() => {},
+			() => false,
+			() => ["bash"], // denylist
+			() => ["str_replace_editor", "playwright/navigate"], // allowlist wins
+		);
+		await reg.create();
+		const cfg = client.createdConfigs[0] as Record<string, unknown>;
+		expect(cfg.availableTools).toEqual([
+			"str_replace_editor",
+			"playwright/navigate",
+		]);
+		// excludedTools must be absent — passing both would lead callers
+		// to think the SDK is honoring the denylist when it isn't.
+		expect(cfg.excludedTools).toBeUndefined();
+	});
+
+	test("22b: both lists empty -> no tool config in SDK call", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(
+			() => {},
+			() => {},
+			() => false,
+			() => [],
+			() => [],
+		);
+		await reg.create();
+		const cfg = client.createdConfigs[0] as Record<string, unknown>;
+		expect(cfg.availableTools).toBeUndefined();
+		expect(cfg.excludedTools).toBeUndefined();
+	});
 });

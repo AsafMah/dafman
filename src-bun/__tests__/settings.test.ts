@@ -54,7 +54,7 @@ describe("SettingsService", () => {
 			layout: { dockview: null },
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
-			tools: { defaultExcluded: [] },
+			tools: { defaultExcluded: [], defaultAllowed: [] },
 			permissions: { defaultApproveAll: false },
 		};
 		const written = await svc.update(next);
@@ -83,7 +83,7 @@ describe("SettingsService", () => {
 			layout: { dockview: blob },
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
-			tools: { defaultExcluded: [] },
+			tools: { defaultExcluded: [], defaultAllowed: [] },
 			permissions: { defaultApproveAll: false },
 		});
 		const reloaded = SettingsService.loadOrDefault(path);
@@ -318,11 +318,12 @@ describe("SettingsService", () => {
 		expect(settings.layout).toEqual({ dockview: null });
 	});
 
-	test("v9 document migrates to v10 with default permissions", () => {
-		// 22c: v10 adds `permissions: { defaultApproveAll }`. Older
-		// settings docs missing the field must fall back to the
-		// default (off) so we never silently flip approve-all on for
-		// existing users.
+	test("v9/v10 document migrates to current with default permissions + tools.defaultAllowed", () => {
+		// 22c added permissions; 22b added tools.defaultAllowed.
+		// A document missing both fields must fall back to safe
+		// defaults (approve-all off, empty allowlist = no
+		// restriction) so existing users never silently flip
+		// approve-all on or have their toolset narrowed.
 		const dir = newTempDir();
 		const path = join(dir, "settings.json");
 		writeFileSync(
@@ -340,9 +341,39 @@ describe("SettingsService", () => {
 		const settings = svc.get();
 		expect(settings.version).toBe(SETTINGS_VERSION);
 		expect(settings.permissions).toEqual({ defaultApproveAll: false });
+		expect(settings.tools.defaultAllowed).toEqual([]);
 		// Existing fields untouched.
 		expect(settings.tools.defaultExcluded).toEqual(["bash"]);
 		expect(settings.appearance.theme).toBe("system");
+	});
+
+	test("tools.defaultAllowed coercion: drops non-strings, trims, dedupes", () => {
+		// 22b: allowlist gets the same coercion as defaultExcluded.
+		// Real-world bad data: stray nulls, numeric entries, leading
+		// whitespace, dupes. All must be cleaned.
+		const settings = migrate({
+			version: SETTINGS_VERSION,
+			appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
+			layout: { dockview: null },
+			workspaces: { recent: [], defaultWorkspace: "" },
+			notifications: { turnEnd: false, waitingForInput: true },
+			tools: {
+				defaultExcluded: [],
+				defaultAllowed: [
+					"  bash  ",
+					"bash", // duplicate post-trim
+					42, // non-string
+					null,
+					"",
+					"   ",
+					"playwright/navigate",
+				],
+			},
+		});
+		expect(settings.tools.defaultAllowed).toEqual([
+			"bash",
+			"playwright/navigate",
+		]);
 	});
 
 	test("permissions coercion: explicit true preserved, non-boolean falls back to default", () => {

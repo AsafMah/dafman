@@ -10,6 +10,74 @@
 
 ---
 
+## 2026-05-25 — Phase 22b: Tools tri-state + grouped view
+
+### Takeaway
+
+Rubber-duck flagged three SDK semantics that would have produced
+silent bugs if I'd shipped my first design (two independent toggles):
+
+1. **`availableTools` takes precedence over `excludedTools`** —
+   confirmed in `node_modules/copilot-sdk-supercharged/dist/types.d.ts:985-988`.
+   Showing both a "forbid" and "allow" toggle would have been
+   misleading; flipping forbid while allowlist was non-empty would
+   have appeared to do nothing.
+2. **Never pass `availableTools: []`** — empty array tells the SDK
+   "allow no tools at all", not "no restriction". The registry now
+   omits the field entirely when the allowlist is empty.
+3. **Use `namespacedName ?? name` as the canonical key** — MCP
+   tools share `name` across servers; only `namespacedName`
+   (e.g. `playwright/navigate`) is reliably unique. Previous code
+   used `name` only, which would have silently mis-targeted in
+   multi-MCP setups.
+
+So shipped tri-state (Default / Only allow / Forbid) with mutual
+exclusion in code, grouped-by-prefix display, and a banner when the
+allowlist is active. Settings schema bumped v10 → v11 with
+`tools.defaultAllowed`.
+
+### Receipts
+
+- **Layout regression caught by smoke**: first cut used
+  `grid-template-columns: 1fr auto` on the tool row. The
+  SelectButton (3 segments, ~200px wide) exceeded available rail
+  width and collapsed the name column to 0, tripping Playwright's
+  visibility checks on `compact-name-button`. Switched to
+  `display: flex; flex-wrap: wrap` so the SelectButton drops to a
+  second line on narrow rails. Fixed locally without changing the
+  scope.
+- **No skill-source detection**: the SDK's `Tool` shape has only
+  `name`, `namespacedName`, `description`, `parameters`,
+  `instructions` — no `source` field. Grouping by
+  `namespacedName.split("/")[0]` is the only reliable signal, so
+  skills (if any) just appear under their namespace prefix rather
+  than a dedicated group. Rubber-duck recommended this; saves us
+  from inventing classifications that could be wrong.
+- **Critical-tool warning is a badge, not a block**: rubber-duck
+  pointed out users may intentionally want a restricted /
+  no-shell mode (e.g. for read-only assistants). Disabling `bash`
+  or `str_replace_editor` shows a yellow warning icon next to the
+  name; doesn't prevent the action.
+- **E2E tests updated**: `15-tools-toggle.pwtest.ts` rewritten for
+  the SelectButton "Forbid" segment click. `20-details-singleton.pwtest.ts`
+  selector updated to `.tool-row` (was `.compact-row`).
+- **Toast copy updated**: "Restart or recreate the session to
+  apply (SDK does not support runtime tool mutation)" — rubber-duck
+  flagged that "restart" alone implied the SDK would re-read the
+  config, which it won't.
+
+### Gates
+
+- `bun run lint` clean.
+- 482 bun tests pass (+4 since 22c: 2 settings + 3 session config
+  — but only 4 net new because the existing v9→v10 test was
+  collapsed into a more comprehensive v9/v10→current migration
+  test).
+- 68/70 smoke after layout fix — pre-existing `08-audit-rehydrate`
+  flake on both prod and HMR (also fails on plain main).
+
+---
+
 ## 2026-05-25 — Phase 22c: Permissions Settings tab
 
 ### Takeaway

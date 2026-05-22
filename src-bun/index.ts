@@ -100,6 +100,7 @@ const sessions = new SessionRegistry(
 	(payload) => emitPending(payload),
 	() => settings.get().appearance.streaming,
 	() => settings.get().tools.defaultExcluded,
+	() => settings.get().tools.defaultAllowed,
 );
 const mcp = new McpRegistry();
 const skills = new SkillsRegistry();

@@ -90,9 +90,18 @@ export interface PermissionsPrefs {
 
 export interface ToolsPrefs {
 	/// Tool names that should be excluded by default for new
-	/// sessions. Matches by `Tool.name` or `Tool.namespacedName`
-	/// (the renderer normalizes before sending to the SDK).
+	/// sessions. Matches by `Tool.namespacedName` when present,
+	/// otherwise by `Tool.name` (renderer normalizes via
+	/// `tool.namespacedName ?? tool.name`). Ignored at session-
+	/// create time if `defaultAllowed` is non-empty (the SDK's
+	/// `availableTools` takes precedence over `excludedTools`).
 	defaultExcluded: string[];
+	/// 22b: tool names to restrict the session to (allowlist).
+	/// When non-empty, ONLY these tools are available — everything
+	/// else is forbidden. Empty means "no restriction" (all tools
+	/// allowed, modulo `defaultExcluded`). Same key format as
+	/// `defaultExcluded` (`namespacedName ?? name`).
+	defaultAllowed: string[];
 }
 
 export interface NotificationPrefs {

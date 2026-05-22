@@ -345,6 +345,26 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-25** — Phase 22b shipped: **Tools section grouped view
+  + per-tool allowlist**. Rail Tools section now groups by source
+  (built-in first, then namespace prefixes from `namespacedName`)
+  and replaces the on/off toggle with a tri-state SelectButton
+  (Default / Only allow / Forbid). Backed by mutually-exclusive
+  `tools.defaultAllowed` (new) + `tools.defaultExcluded` (existing)
+  lists. The SDK's `availableTools` takes precedence over
+  `excludedTools` — rubber-duck flagged this, so when the allowlist
+  is non-empty the rail shows a banner and the registry omits
+  `excludedTools` from the SDK config. Empty allowlist intentionally
+  OMITS `availableTools` (passing `[]` would tell the SDK to allow
+  no tools at all). Canonical key is `namespacedName ?? name` so
+  multi-MCP setups don't collide on tool name. Critical built-ins
+  (bash, shell, str_replace_editor, write_file, create_file,
+  edit_file) get a warning badge — not blocked. Settings schema
+  bumped v10 → v11. **482 bun tests** (was 478), 68/70 smoke (the
+  pre-existing 08-audit-rehydrate flake also fails on plain main).
+  Phase 22 complete; closes out Phases 18, 20, 21 in the audit's
+  roadmap labelling.
+
 - **2026-05-25** — Phase 22c shipped: **Remembered Permissions
   Settings tab**. New "Permissions" section in the Settings panel
   with a single toggle: "Default to approve all for new sessions"

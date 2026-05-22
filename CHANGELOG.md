@@ -3,6 +3,42 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 22b — Tools section grouped view + allowlist)
+
+- **Grouped tools view** in the session details rail. Tools are
+  split by source: built-in (no `namespacedName`) first, then
+  alphabetically-sorted namespace groups (MCP servers, skills,
+  etc.) derived from `namespacedName.split("/")[0]`. Avoids the
+  flat ~30-tool list that obscured which tool came from where.
+- **Per-tool tri-state control** (SelectButton: Default / Only
+  allow / Forbid) replaces the previous on/off toggle. Backed by
+  two settings lists — `tools.defaultExcluded` (denylist) and the
+  new `tools.defaultAllowed` (allowlist) — that are mutually
+  exclusive per tool. The SDK's `availableTools` allowlist takes
+  precedence over `excludedTools`, so when the allowlist is
+  non-empty the rail surfaces a banner ("Allowlist active —
+  sessions are restricted to the tools marked 'Only allow'") and
+  the registry omits `excludedTools` from the session config.
+- **Critical-tool warning badge** on built-ins whose removal makes
+  the agent effectively unusable (`bash`, `shell`,
+  `str_replace_editor`, `write_file`, `create_file`, `edit_file`).
+  Warning, not block — users may intentionally want a restricted
+  / no-shell mode.
+- **Canonical tool key**: settings now store and the SDK is
+  configured with `tool.namespacedName ?? tool.name`. The previous
+  code used `name` only, which would have been ambiguous for MCP
+  tools with the same `name` from different servers.
+- **Settings schema bumped v10 → v11** with
+  `tools.defaultAllowed: string[]`. v10 documents migrate cleanly
+  with an empty allowlist (= no restriction). Empty allowlist
+  intentionally **omits** `availableTools` from the SDK config —
+  passing `availableTools: []` would tell the SDK to allow no
+  tools at all.
+- 6 new tests: 2 settings (v10→v11 migration + allowlist
+  coercion) + 3 session-config (empty allowlist omits
+  `availableTools`; non-empty allowlist wins over `excludedTools`;
+  both-empty omits both) + 1 manual-test checklist.
+
 ### Added (Phase 22c — Remembered Permissions Settings tab)
 
 - **New "Permissions" section in Settings panel.** Single toggle:

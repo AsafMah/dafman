@@ -75,10 +75,13 @@ test("expanding a tool row reveals its description", async ({ page }) => {
   const detailsPanel = page.locator(".session-details").first();
   // Expand Tools (collapsed by default).
   await detailsPanel.getByRole("button", { name: /^Tools/i }).first().click();
-  const firstRow = detailsPanel.locator(".compact-row").first();
+  const firstRow = detailsPanel.locator(".tool-row").first();
   await firstRow.waitFor({ state: "visible", timeout: 5_000 });
 
   // Description hidden by default — clicking the name reveals it.
+  // 22b: rows are now `.tool-row` (grouped layout) instead of bare
+  // `.compact-row`, but `.compact-desc` still marks the description
+  // panel since it's shared with other compact lists in the rail.
   await expect(detailsPanel.locator(".compact-desc")).toHaveCount(0);
   await firstRow.locator(".compact-name-button").click();
   await expect(detailsPanel.locator(".compact-desc").first()).toBeVisible({ timeout: 3_000 });

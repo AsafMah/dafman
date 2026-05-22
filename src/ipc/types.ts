@@ -43,6 +43,10 @@ export interface Settings {
 
 export interface ToolsPrefs {
   defaultExcluded: string[];
+  /// 22b: allowlist applied at session create. Empty = no
+  /// restriction. Non-empty = ONLY these tools available (SDK's
+  /// `availableTools` takes precedence over `excludedTools`).
+  defaultAllowed: string[];
 }
 
 export interface PermissionsPrefs {

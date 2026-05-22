@@ -256,6 +256,11 @@ export class SessionRegistry {
 		private readonly emitPending: EmitPending = () => {},
 		private readonly streamingResolver: () => boolean = () => true,
 		private readonly excludedToolsResolver: () => string[] = () => [],
+		/// 22b: per-session allowlist source. Empty array means "no
+		/// restriction" — we omit `availableTools` from the SDK config
+		/// entirely in that case (passing an empty array would tell
+		/// the SDK to allow no tools at all, per the SDK docs).
+		private readonly allowedToolsResolver: () => string[] = () => [],
 	) {}
 
 	/// Returns the live `CopilotSession` for an id, or undefined if the
@@ -351,7 +356,16 @@ export class SessionRegistry {
 			},
 			streaming: this.streamingResolver(),
 			...((() => {
+				// 22b: SDK semantics — `availableTools` (allowlist)
+				// takes precedence over `excludedTools`. When the
+				// allowlist is non-empty, the exclude list is
+				// ignored by the SDK so we omit it entirely to keep
+				// the wire shape honest. When the allowlist is
+				// empty, NEVER pass `availableTools: []` (the SDK
+				// would interpret that as "allow no tools").
+				const allowed = this.allowedToolsResolver();
 				const excluded = this.excludedToolsResolver();
+				if (allowed.length > 0) return { availableTools: allowed };
 				return excluded.length > 0 ? { excludedTools: excluded } : {};
 			})()),
 		};
