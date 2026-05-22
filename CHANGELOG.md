@@ -3,6 +3,37 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (Phase 21d — dependency bumps)
+
+- **Lexical 0.38.1 → 0.44.0** (6-minor jump across the 5 direct
+  `@lexical/*` packages + core). `lexical-vue@0.14.1` hard-pins
+  every transitive `@lexical/*` to 0.38.1, so the bump required a
+  `package.json` `overrides` block to force the entire dep tree to
+  0.44.0. lexical-vue's compiled JS calls the lexical core API
+  which is backwards-compatible across 0.38 → 0.44 (verified at
+  runtime via dev + smoke).
+- **Katex 0.16.47 → 0.17.0**. The only breaking change in 0.17 is
+  the internal `__defineFunction` API (private, underscore-prefix);
+  we use only the public `katex.render()` surface via
+  markdown-it-texmath.
+
+### Fixed (Phase 21d — adjacent bugs surfaced during the bump)
+
+- **20b dead-code regression: `ensureDefaultWorkspace` restored.**
+  knip flagged it as unused; the consumer in `src-bun/index.ts`
+  was missed because knip's reachability graph doesn't trace
+  through electrobun's bun-side build entry. Caused
+  `electrobun dev --watch` to fail to start on a fresh checkout.
+- **Typeahead z-index regression: file/slash menus appearing
+  behind dockview's left sidebar.** Pre-existing CSS stacking-
+  context bug exposed by the Lexical bump's slightly shifted
+  geometry. `.mention-menu-anchor` and `.slash-menu` use
+  `transform: translateY(...)` which creates a new stacking
+  context — the `z-index: 1200` we'd set on `.file-picker`
+  (inside) was confined to the local context. Set `z-index: 1200`
+  on the stacking-context root (anchor) instead; same fix for
+  `.slash-menu` (was at z-index 100, below dockview's 999).
+
 ### Changed (Phase 21c — type / UX / perf nits)
 
 - **U1: per-session vs global RPC split in SessionDetailsPanel.**

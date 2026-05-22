@@ -10,6 +10,94 @@
 
 ---
 
+## 2026-05-22 — Phase 21d: D2 + D3 dep bumps
+
+### Takeaway
+
+Lexical 0.38 → 0.44 (6 minors) and Katex 0.16 → 0.17 (1 major)
+shipped on the `phase-21d-lexical` branch, then merged to main.
+Two adjacent bugs surfaced and got fixed in the same PR:
+
+1. `ensureDefaultWorkspace` had been wrongly removed in 20b's
+   knip-driven sweep — the consumer in `src-bun/index.ts` (one-time
+   default workspace backfill on first launch) was missed because
+   knip doesn't trace through electrobun's bun-side build entry.
+   `electrobun dev --watch` failed to start, but `bun run check`
+   passed in 20b (electrobun build was apparently more lenient on
+   this kind of resolution failure than dev mode). Restored
+   verbatim, with a comment explaining why knip can't see it.
+
+2. Typeahead picker rendering behind dockview's left sidebar —
+   pre-existing CSS bug. `.mention-menu-anchor` (the Teleport
+   target Lexical positions over the editor) uses
+   `transform: translateY(calc(-100% - 2rem))` to lift the picker
+   above the caret. `transform` creates a NEW stacking context, so
+   the `z-index: 1200` we'd set on `.file-picker` INSIDE the anchor
+   was confined to that local context, leaving the anchor itself
+   competing at "auto" against dockview's edge groups (z-index:
+   999). Fix: set `z-index: 1200` on the stacking-context root
+   (the anchor). Same pattern was lurking in
+   `SlashCommandPlugin`'s `.slash-menu` (was at z-index 100 —
+   below dockview's 999, so it would have hit the same bug if
+   slash menus were ever wide enough to overlap the sidebar).
+
+### How the Lexical bump worked
+
+The blocker was that `lexical-vue@0.14.1` hard-pins every
+transitive `@lexical/*` to `0.38.1`. Bumping our direct deps alone
+would produce two lexical cores in the bundle → identity mismatch
+on node-class instanceof checks → composer broken at runtime.
+
+Solution: `package.json` `overrides` block that forces the entire
+dep tree (17 transitive packages) to 0.44.0. lexical-vue's
+compiled JS uses lexical core APIs that are forwards-compatible
+across 0.38 → 0.44 (verified: smoke + 428 unit tests green; user
+manually confirmed composer typing, @-mentions, /-slash, markdown
+shortcuts, edit-in-place, code blocks all work).
+
+Notable changes 0.39 → 0.44 from upstream changelog, none breaking
+our code: 0.42 extracted prism highlighting to `@lexical/code-prism`
+(0.44 `@lexical/code` is now a backwards-compat shim that
+re-exports `CodeNode` + `CodeHighlightNode` from
+`@lexical/code-core` and the prism utils — deprecated but still
+exported — from `@lexical/code-prism`). Our `nodes.ts` import is
+unchanged.
+
+`@lexical/offset` is the one orphan still at 0.38.1 — it was
+deprecated in 0.44 and not published past 0.38.1. Harmless;
+nothing in our tree imports it.
+
+### Katex bump
+
+0.17.0 has exactly one breaking change in the changelog: the
+internal `__defineFunction` API (private — underscore prefix).
+We use only `katex.render()` / `katex.renderToString()` via
+`markdown-it-texmath`. Inline + block math unit tests already
+exist (`src/lib/__tests__/markdown.test.ts:153,160`) and pass.
+
+### Receipts
+
+- Branch: `phase-21d-lexical`
+- Commits: `02806ba` (Lexical bump) → `abda079` (ensureDefaultWorkspace) → `2f5b2de` (cleanup) → `ae81794` (z-index) → `883aca5` (Katex)
+- Merged to main, 5-commit non-fast-forward merge
+- 428 bun tests, 70/70 E2E smoke, lint clean throughout
+
+### What's left in the tech-debt backlog
+
+All catalogued items in `plans/plan-tech-debt.prompt.md` are now
+either ✅ shipped or ⏸️ deferred with explicit rationale (T2, U4,
+U5, G1-G3). Phase 21 series is done.
+
+A new queued item from the 20b regression discovery:
+**`future-bun-side-lint-gate`** — investigate why `bun run check`
+didn't catch the dead `ensureDefaultWorkspace` import. Likely
+options: (a) add a `bun build --target=bun src-bun/index.ts`
+dry-run step to `check`, (b) configure electrobun build to
+fail-fast on unresolved imports, (c) ship a knip config that
+traces src-bun entries explicitly.
+
+---
+
 ## 2026-05-22 — Phase 21c: type / UX / perf nits
 
 ### Takeaway

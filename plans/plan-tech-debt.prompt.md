@@ -191,15 +191,15 @@ fake timers.
 - `vue` 3.5.13 → 3.5.34
 - `vue-tsc` 2.1.10 → 2.2.12
 
-### D2. Deferred dep bumps — ⏸️ **deferred again in 21c**
-- **Lexical 0.38 → 0.44** (6 minors). High risk of breaking the
-  editor; requires a manual smoke checklist (typing, @-mentions,
-  /-slash, markdown shortcuts, edit-in-place, code blocks,
-  attachments) that an agent session can't perform end-to-end.
-  Defer to a dedicated user-driven PR.
-- **Katex 0.16 → 0.17**. One major bump; could break math rendering
-  in MessageContent. Manual smoke = render a math fence and
-  inspect. Defer.
+### D2. Deferred dep bumps — ✅ **shipped in 21d**
+- **Lexical 0.38 → 0.44** (6 minors). Required a `package.json`
+  `overrides` block to force `lexical-vue@0.14.1`'s pinned
+  transitive `@lexical/*` to 0.44.0. Verified clean: 428 unit
+  tests + 70/70 E2E + manual composer smoke walked by user.
+  Commits `02806ba` → `883aca5` on branch `phase-21d-lexical`,
+  merged to main.
+- **Katex 0.16.47 → 0.17.0**. The only breaking change is the
+  private `__defineFunction` API which we don't consume.
 
 ### D3. Dev-only suspicious deps (no action — flag for future)
 - `@types/bun` is on `latest` — npm-check-updates errored trying

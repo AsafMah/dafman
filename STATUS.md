@@ -345,6 +345,24 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 21d shipped: **D2 + D3 dep bumps** (Lexical
+  0.38 → 0.44 and Katex 0.16 → 0.17). Lexical bump required a
+  `package.json` `overrides` block because lexical-vue@0.14.1
+  hard-pins transitive `@lexical/*` to 0.38.1; overrides force the
+  entire tree to 0.44 and lexical-vue's compiled JS uses lexical
+  core APIs that are backwards-compat. Katex 0.17's only breaking
+  change is the private `__defineFunction` API which we don't
+  consume. Also picked up: (a) restored `ensureDefaultWorkspace`
+  in `src-bun/app/settings.ts` (knip flagged it as unused in 20b
+  but missed the consumer in `index.ts`, broke
+  `electrobun dev --watch`); (b) fixed a long-standing z-index
+  regression where the typeahead file/slash menus appeared behind
+  dockview's left sidebar — `transform` creates a new stacking
+  context so the inner `z-index` was confined; moved it to the
+  context root. Manual smoke walked by the user. **428 bun tests,
+  70/70 E2E, lint clean.** Phase 21 is now fully closed (24 of 24
+  catalogued items addressed; only 4 explicitly deferred with
+  rationale: T2, U4, U5, G1-G3).
 - **2026-05-22** — **Phase 21 closed (5 commits, 21a+21b+21c)**.
   Tech-debt burn-down across `sessions.ts` and the renderer hot
   paths. 5 PRs, 17 of 24 catalogued items shipped. Deferred:
