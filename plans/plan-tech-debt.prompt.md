@@ -205,6 +205,27 @@ fake timers.
 - `@types/bun` is on `latest` — npm-check-updates errored trying
   to compare. Tracked: pin to a specific version.
 
+### D4. Native Go type-checker (TypeScript 7 / typescript-go)
+**Future experiment**, not urgent. `vue-tsc` currently runs in
+~3.6s on our 49 .vue + 88 .ts files — not a pain point yet.
+
+When to revisit:
+- TypeScript 7 ships an officially npm-published `tsgo` binary.
+- [vue-tsgo](https://github.com/NikhilVerma/vue-tsgo) ships a
+  prebuilt npm package (today you build from a Go submodule +
+  patches — too much toolchain weight for the speed-up at our
+  size).
+- Lint time crosses ~30 s.
+
+If we want to try it early, a 2-hour spike could add an
+experimental parallel CI job that runs `vue-tsgo` alongside
+`vue-tsc` (vue-tsc stays source-of-truth). Real benefit shows up
+in CI cycle times more than local dev. Skipped for now.
+
+Confirmed compatibility: we don't use any vue-tsgo "In Progress"
+features — no `<script setup generic="T">`, no `<style v-bind()>`,
+no Pug templates. So the upgrade path is clean when we want it.
+
 ---
 
 ## Ordering note (historical)
