@@ -31,6 +31,13 @@ jobs:
         # bundle reaches "ready" without console errors on both the
         # prod (`vite preview`) and HMR (`vite dev`) entry points.
         run: bun run smoke:run
+      - name: Full E2E (Playwright + bun subprocess + fake SDK)
+        # Real E2E tier — spawns the bun test-server with mocked
+        # Copilot SDK per test, drives chromium via the WebSocket
+        # bridge. Covers: @-picker happy + path-nav + `.` trigger,
+        # toggle persistence across reload, permission flow with
+        # audit log assertion. See plans/plan-e2e.prompt.md.
+        run: bun run e2e:run
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

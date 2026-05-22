@@ -17,6 +17,8 @@
     "test:coverage": "bun test --coverage",
     "smoke": "vite build && playwright test --config=e2e/playwright.config.ts",
     "smoke:run": "playwright test --config=e2e/playwright.config.ts",
+    "e2e": "vite build && playwright test --config=e2e/full/playwright.config.ts",
+    "e2e:run": "playwright test --config=e2e/full/playwright.config.ts",
     "lint": "vue-tsc --noEmit",
     "check": "bun run lint && bun run test && bun run build && bun run smoke:run"
   },

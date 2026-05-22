@@ -111,7 +111,7 @@ command with same prefix required re-approval.
      honored by the live CLI — we can't validate the SDK call's
      effect without a real session.
 
-2. ⏳ **Usage metrics refresh.**
+2. ✅ **Usage metrics refresh.**
    - **Steps:** open the popover; note the request count. Send a
      prompt. Reopen the popover.
    - **Expected:** request count incremented.
@@ -126,7 +126,7 @@ command with same prefix required re-approval.
 
 ### `027df35` feat(observability): in-app log viewer + redaction + diagnostics bundle
 
-1. ⏳ **Log viewer opens from activity bar and tails live.**
+1. ✅ **Log viewer opens from activity bar and tails live.**
    - **Steps:** open the bottom-rail activity bar, click "Logs".
      Trigger something that logs (send a prompt, open a session).
    - **Expected:** the viewer panel appears, new log lines stream
@@ -135,21 +135,21 @@ command with same prefix required re-approval.
      live SSE-like channel; Playwright would need a full Electrobun
      binary harness.
 
-2. ⏳ **Auto-scroll pause on manual scroll up.**
+2. ✅ **Auto-scroll pause on manual scroll up.**
    - **Steps:** with logs streaming, scroll the panel up.
    - **Expected:** auto-scroll stops; a "resume tail" hint appears or
      the panel just stays put until you scroll back to the bottom.
    - **Why not automated:** depends on real scroll event timing under
      the WebView2 layout engine; jsdom can't fake it accurately.
 
-3. ⏳ **Level / display / search filters compose.**
+3. ✅ **Level / display / search filters compose.**
    - **Steps:** filter to `info+`, then type "session" in search.
    - **Expected:** only `info`-and-above rows matching "session" show.
    - **Why not automated:** SelectButton + reactive filter
      composition is unit-tested, but full UI shape under real CSS
      theme variants isn't.
 
-4. ⏳ **Runtime log-level toggle takes effect immediately.**
+4. ✅ **Runtime log-level toggle takes effect immediately.**
    - **Steps:** Active level dropdown in panel header → switch
      from `info` to `debug`. Trigger logged actions.
    - **Expected:** new lines now include `debug` rows that
@@ -157,13 +157,14 @@ command with same prefix required re-approval.
    - **Why not automated:** requires running bun-side logger
      filtering against the active level flag through the IPC.
 
-5. ⏳ **Diagnostics bundle export → reveals folder.**
+5. ❌ **Diagnostics bundle export → reveals folder.**
    - **Steps:** Settings → Diagnostics → Export bundle.
    - **Expected:** OS file explorer opens at
      `<userData>/dafman-diagnostics-YYYY-MM-DD-HHMM/`. Contains
      `logs/`, `recent.json` (redacted), `settings.json`, `README.md`.
    - **Why not automated:** `revealPath` calls the OS shell;
      Playwright can't observe a file-explorer window.
+Opens the parent folder isntead.
 
 6. ⏳ **Redaction visually correct in `recent.json`.**
    - **Steps:** after export, open `recent.json`. Look at any token /
@@ -174,13 +175,13 @@ command with same prefix required re-approval.
      human eyeball on a real run catches anything the snapshots
      missed.
 
-7. ⏳ **CI Tier-2 (electrobun build) jobs run on PR.**
+7. ❌ **CI Tier-2 (electrobun build) jobs run on PR.**
    - **Steps:** push a PR, observe the GitHub Actions matrix.
    - **Expected:** Ubuntu + macOS + Windows jobs run
      `electrobun build`; `continue-on-error: true` so they don't
      block.
    - **Why not automated:** the CI run itself is the test.
-
+WTF? why are they failing?
 ---
 
 ### `a135432` feat(export): conversation export to Markdown / JSON
@@ -193,21 +194,30 @@ command with same prefix required re-approval.
      opens in your default Markdown viewer cleanly.
    - **Why not automated:** `revealPath` + native file association.
 
-2. ⏳ **Reasoning folds into `<details>` blocks.**
+2. ❌ **Reasoning folds into `<details>` blocks.**
    - **Steps:** export a session that had reasoning bubbles.
    - **Expected:** `<details><summary>Reasoning</summary>…</details>`
      blocks per turn; opens correctly in GitHub markdown preview.
    - **Why not automated:** 15 unit tests assert the string output;
      verify cross-renderer rendering by eye.
+Nope, opens parent folder instead of file.
 
-3. ⏳ **JSON export preserves the ChatItem shape end-to-end.**
+3. ❌ **JSON export preserves the ChatItem shape end-to-end.**
    - **Steps:** export JSON; pipe through `jq` or open in an editor.
    - **Expected:** Each item has its `kind`, `id`, content, and
      attachment shape preserved.
    - **Why not automated:** unit tests cover the formatter; the
      export-then-readback round-trip needs human verification.
+Nope, that's all that's exported:
+     {
+     "title": "Session 54a6367f",
+     "workingDirectory": "C:\\Users\\mahle\\programming\\dafman\\build\\dev-win-x64\\dafman-dev\\bin",
+     "model": null,
+     "exportedAt": "2026-05-22T04:20:07.729Z",
+     "items": []
+     }
 
-4. ⏳ **Filename sanitisation doesn't break weird session names.**
+4. ✅ **Filename sanitisation doesn't break weird session names.**
    - **Steps:** rename a session to something with slashes / colons /
      emoji in the name. Export.
    - **Expected:** file lands at a safe filename under
@@ -221,7 +231,7 @@ command with same prefix required re-approval.
 
 ### `952fad1` feat(audit): permission + URL audit log + Activity view
 
-1. ⏳ **Activity tab tails permission decisions live.**
+1. ✅ **Activity tab tails permission decisions live.**
    - **Steps:** Log viewer → Activity tab. Trigger a tool requiring
      permission; approve / reject / approve-for-session.
    - **Expected:** new audit row appears in the panel within ~1 s.
@@ -230,7 +240,7 @@ command with same prefix required re-approval.
    - **Why not automated:** depends on real permission-flow round-
      trip through bun → audit → renderer.
 
-2. ⏳ **URL audit records allow/block.**
+2. ✅ **URL audit records allow/block.**
    - **Steps:** trigger a URL elicitation; once with an http(s) URL
      (should allow), once with a `file://` (should block).
    - **Expected:** both appear in Activity tab with the right
@@ -238,7 +248,7 @@ command with same prefix required re-approval.
    - **Why not automated:** depends on the URL-scheme allowlist path
      end-to-end.
 
-3. ⏳ **JSONL files persist across restart.**
+3. ❌ **JSONL files persist across restart.**
    - **Steps:** check `<userData>/audit/permissions.jsonl` and
      `urls.jsonl` after a session that exercised both. Restart app,
      check files still present and append continues.
@@ -246,12 +256,12 @@ command with same prefix required re-approval.
      JSON per line.
    - **Why not automated:** 4 bun-side writer tests cover the
      mechanics; a human verifies persistence semantics.
-
+List gone after restart
 ---
 
 ### `0b2f96f` feat(sessions): enable workspace-level MCP + skill discovery
 
-1. ⏳ **`.mcp.json` in workspace root is picked up.**
+1. ✅ **`.mcp.json` in workspace root is picked up.**
    - **Steps:** drop a valid `.mcp.json` into a workspace, open a
      session against that workspace.
    - **Expected:** the listed MCP server appears in the session's
@@ -261,14 +271,14 @@ command with same prefix required re-approval.
      flag taking effect in the live SDK; we can't unit-test the
      discovery walker.
 
-2. ⏳ **`.vscode/mcp.json` also picked up.**
+2. ✅ **`.vscode/mcp.json` also picked up.**
    - **Steps:** drop a valid `.vscode/mcp.json` (no top-level
      `mcpServers` wrapper) into a workspace; open a session.
    - **Expected:** server loads. CLI 0.0.407 + 0.0.401 added the
      two formats — both should work.
    - **Why not automated:** same — SDK discovery, no unit hook.
 
-3. ⏳ **Workspace skill directories load.**
+3. ✅ **Workspace skill directories load.**
    - **Steps:** drop a skill markdown file into `.agents/skills/`
      under the workspace; open a session; type `/` in the composer.
    - **Expected:** the workspace skill appears in the slash-command
@@ -294,10 +304,17 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ## 2026-05-22 — `FilePicker.vue` v2 (fixed: cwd resolution, path-nav trigger, split toggles, persistence, border)
 
+> **Items 1-6 are now also covered by automated E2E tests** in
+> `e2e/full/flows/02-at-picker.pwtest.ts` (cwd resolution + `@.`
+> trigger + path-nav) and `04-toggle-persist.pwtest.ts` (Alt+H +
+> Alt+I persistence). The manual items remain as confidence checks
+> against real WebView2 (E2E uses Playwright's chromium, not WebView2);
+> they're optional but useful for new-release sign-off.
+
 Supersedes the 2026-05-22 v1 entry above — those items still apply for
 the surfaces they cover, but the deeper bug fixes shipped today:
 
-1. ⏳ **`@` shows files immediately, not "No matches."**
+1. ✅ **`@` shows files immediately, not "No matches."**
    - **Steps:** open the app, focus the composer, type `@`.
    - **Expected:** popup shows real workspace files (`README.md`,
      `package.json`, `src/`, …) ranked with directories first.
@@ -305,7 +322,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      session's actual working directory at runtime — only meaningful
      against a live SDK session, not the fake bridge tests use.
 
-2. ⏳ **`@.` does not exit the picker.**
+2. ✅ **`@.` does not exit the picker.**
    - **Steps:** open the picker, type `@.`. Continue typing `gitig`.
    - **Expected:** menu stays open. With "Hidden" toggle ON the
      `.gitignore` file appears.
@@ -313,26 +330,26 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      is exercised against real DOM contenteditable behavior; jsdom
      can't drive it accurately.
 
-3. ⏳ **`@/abs`, `@~/foo`, `@../path` all keep the picker open.**
+3. ✅ **`@/abs`, `@~/foo`, `@../path` all keep the picker open.**
    - **Steps:** type `@C:/Users/` (Windows) or `@~/D`.
    - **Expected:** picker stays open, lists children of the resolved
      directory, leaf-prefix filter applies.
    - **Why not automated:** same as #2 — Lexical trigger + real fs.
 
-4. ⏳ **Hidden toggle (Alt+H) flips dotfile visibility only.**
+4. ✅ **Hidden toggle (Alt+H) flips dotfile visibility only.**
    - **Steps:** open picker. Press Alt+H. Look at results.
    - **Expected:** `.env`, `.gitignore`, etc. appear. `node_modules`
      and `.git` (both dotfile AND ignored) do NOT.
    - **Why not automated:** wiring is unit-tested via fake RPC; the
      keyboard-event-while-editor-has-focus path is real-DOM only.
 
-5. ⏳ **Ignored toggle (Alt+I) flips IGNORED_DIRS visibility only.**
+5. ✅ **Ignored toggle (Alt+I) flips IGNORED_DIRS visibility only.**
    - **Steps:** open picker. Press Alt+I.
    - **Expected:** `node_modules`, `dist`, etc. appear. Dotfiles
      stay hidden unless Hidden is also on.
    - **Why not automated:** same as #4.
 
-6. ⏳ **Both toggles persist across app restart.**
+6. ✅ **Both toggles persist across app restart.**
    - **Steps:** flip both toggles ON. Restart the app
      (`bun run dev`). Open the picker.
    - **Expected:** both toggles are still ON. localStorage keys
@@ -340,7 +357,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      `dafman.filePicker.showIgnored` are `"1"`.
    - **Why not automated:** restart cycle.
 
-7. ⏳ **No border bleeds over the popup.**
+7. ✅ **No border bleeds over the popup.**
    - **Steps:** open the @-picker. Inspect the bottom edge.
    - **Expected:** no red/accent line cuts across the popup. Popup
      sits cleanly above the composer.
@@ -348,7 +365,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      Lexical's document.body anchor + the composer's :focus-within
      accent border; jsdom doesn't paint.
 
-8. ⏳ **Paperclip popover also shows real files.**
+8. ✅ **Paperclip popover also shows real files.**
    - **Steps:** click the paperclip. Confirm results match what the
      @-picker shows.
    - **Expected:** same list, same toggles, same Browse… escape.
@@ -356,12 +373,13 @@ the surfaces they cover, but the deeper bug fixes shipped today:
    - **Why not automated:** PrimeVue Popover positioning + focus is
      fragile in jsdom.
 
-9. ⏳ **Picking a file inserts a pill with the real absolute path.**
+9.  ❌ **Picking a file inserts a pill with the real absolute path.**
    - **Steps:** pick a file. Inspect the bun log JSON for the next
      send.
    - **Expected:** `attachment.path` is the absolute fs path (e.g.
      `C:/repo/dafman/src/main.ts`), `attachment.type = "file"`.
    - **Why not automated:** SDK round-trip; need real log inspection.
+     {"sessionId":"87707b46-ecd0-48cb-a555-ef78310714ca","attachmentCount":1,"kinds":["file"],"names":["../Resources/version.json"]}
 
 10. ⏳ **Picking a directory carries `type: "directory"`.**
     - **Steps:** open picker, pick a folder (e.g. `src/`).

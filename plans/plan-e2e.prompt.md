@@ -1,5 +1,10 @@
 # Plan — Real E2E test tier (2026-05-22)
 
+> **STATUS:** Option A **SHIPPED** in commits this session.
+> `bun run e2e` is live with 6 baseline flows. Architecture details
+> below remain accurate; "until this lands" rule #4a in AGENTS.md
+> still applies for surfaces not covered by E2E.
+
 > User asked: "why don't we have actual for real end-to-end tests?"
 > after MANUAL_TESTS.md filled up with items tagged "can't be
 > automated without spawning a real CLI / changing settings / etc."

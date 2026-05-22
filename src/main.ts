@@ -37,6 +37,7 @@ import SidebarTab from "./components/SidebarTab.vue";
 import Watermark from "./components/Watermark.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
+import { createWebSocketBridge } from "./ipc/wsBridge";
 import { installRendererLogBridge } from "./ipc/rendererLog";
 
 const GreenAura = definePreset(Aura, {
@@ -60,11 +61,9 @@ const GreenAura = definePreset(Aura, {
 // Wire the Electrobun RPC bridge before any store/component invokes an
 // IPC. Tests inject their own bridge via `setRpcBridge` before mount,
 // OR by pre-setting `window.__DAFMAN_TEST_RPC__` before the bundle
-// evaluates (used by the Playwright smoke harness in `e2e/`). The
-// global-hook path is necessary because the bundle constructs the
-// Electrobun bridge eagerly at module load, and constructing it
-// outside of an Electrobun host throws on the missing
-// `window.__electrobun` global.
+// evaluates (used by the Playwright smoke harness in `e2e/`), OR by
+// loading with `?testBridge=ws://host:port` which switches to the
+// WebSocket transport (used by the real-E2E harness in `e2e/full/`).
 type TestBridgeWindow = Window & {
   __DAFMAN_TEST_RPC__?: import("./ipc/invoke").RpcBridge;
 };
@@ -72,10 +71,18 @@ const testBridge =
   typeof window !== "undefined"
     ? (window as TestBridgeWindow).__DAFMAN_TEST_RPC__
     : undefined;
-const { bridge } = testBridge
-  ? { bridge: testBridge }
-  : createElectrobunBridge();
-setRpcBridge(bridge);
+
+function pickBridge(): import("./ipc/invoke").RpcBridge {
+  if (testBridge) return testBridge;
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    const wsUrl = params.get("testBridge");
+    if (wsUrl) return createWebSocketBridge(wsUrl);
+  }
+  return createElectrobunBridge().bridge;
+}
+
+setRpcBridge(pickBridge());
 
 // Install the renderer→bun log bridge so console.error and uncaught
 // exceptions surface in the bun JSON log, not just WebView2 devtools.

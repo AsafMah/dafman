@@ -5,6 +5,18 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added
 
+- **Real E2E test tier.** `bun run e2e` (and `bun run e2e:run` for
+  the build-skipping variant). Architecture: Playwright + chromium +
+  bun subprocess (`src-bun/test-server.ts`) + mocked Copilot SDK
+  (`src-bun/app/fakeClient.ts`) + real temp-fs workspace per test.
+  Renderer picks the WebSocket bridge (`src/ipc/wsBridge.ts`) when
+  loaded with `?testBridge=ws://host:port`. Six baseline flows
+  (`e2e/full/flows/`): create+send smoke, @-picker happy path,
+  `@.` trigger (doesn't exit), `@./src/` path-nav, Alt+H/Alt+I
+  toggle persistence across reload, shell permission with audit
+  log assertion. 12 s wall, all green. CI integrated on
+  ubuntu-latest. See `plans/plan-e2e.prompt.md`.
+
 - **`@file` / `@folder` picker rebuild.** The composer's `@`-trigger
   and the paperclip button now both open the same `FilePicker.vue`
   popup. Two modes:

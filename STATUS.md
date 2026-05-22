@@ -194,7 +194,7 @@ TODO reflects current state against the M0–M7 ambitions in
 | Perf benches | TODO | None. |
 | Telemetry (OTel) opt-in | TODO | Settings field reserved; not wired. |
 | End-user docs site | TODO | None. |
-| Tier-2 E2E (Playwright CDP → Electrobun binary) | TODO | Smoke runs against `vite preview`/`vite dev` only. Tier-2 build matrix runs but doesn't drive the binary. **Real-E2E proposal lives in [`plans/plan-e2e.prompt.md`](plans/plan-e2e.prompt.md)** — three options (mocked-SDK harness / + real-CLI / status quo) with a concrete breakdown of what each automated test class catches. Awaiting user approval. |
+| Tier-2 E2E (Playwright + bun + fake SDK) | DONE | `bun run e2e` — 6 baseline flows over real chromium + real bun subprocess + mocked Copilot SDK + real temp-fs. Covers create+send, @-picker (happy / `@.` / path-nav), toggle persistence, permission flow with audit assertion. Architecture in [`plans/plan-e2e.prompt.md`](plans/plan-e2e.prompt.md). Runs on ubuntu-latest in CI. **Layout-restore + settings round-trip flows still TODO** — second pass. |
 | Cross-platform CI matrix | DONE | electrobun build runs on Ubuntu + macOS + Windows (continue-on-error initially). |
 
 ---
@@ -324,6 +324,14 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Real E2E tier shipped: `bun run e2e` spawns the
+  bun test-server with mocked Copilot SDK + real temp-fs per test,
+  drives chromium via the new `wsBridge`. **6 baseline flows green
+  in 12 s wall** (create+send, @-picker happy / `@.` trigger /
+  path-nav, toggle persistence across reload, permission with
+  audit log assertion). CI integrated on ubuntu-latest. Covers the
+  v1 file-picker bug class. Architecture in
+  [`plans/plan-e2e.prompt.md`](plans/plan-e2e.prompt.md).
 - **2026-05-22** — File picker rebuild: `FilePicker.vue` powers both
   the `@`-trigger and the paperclip button. Fuzzy mode + CLI-style
   path-nav (`@/abs`, `@~/foo`, `@../path`); Show hidden / ignored

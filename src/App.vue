@@ -171,11 +171,13 @@ onMounted(async () => {
     panel?.api.setActive();
   });
 
-  // Dev-only: auto-create a session when none exist and the URL
-  // carries `?autosession=1`. One-shot per page load; will not loop
-  // on HMR refreshes.
+  // Auto-create a session when none exist and the URL carries
+  // `?autosession=1`. One-shot per page load; will not loop on HMR
+  // refreshes. Available in prod too so the E2E harness can use it
+  // without needing a separate `?dev` switch (the param is opt-in,
+  // so production users never trigger it).
   if (
-    import.meta.env.DEV &&
+    typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("autosession")
   ) {
     setTimeout(() => {

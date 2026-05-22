@@ -1,0 +1,340 @@
+/// E2E test server — same RPC surface as src-bun/index.ts but over
+/// WebSocket instead of Electrobun's webview FFI.
+///
+/// Usage:
+///   bun src-bun/test-server.ts --port=4810 --workspace=/tmp/wsx [--user-data=/tmp/ud]
+///
+/// Wire contract identical to the production bridge: requests are
+/// `{type:"request", id, name, args}` → replies are
+/// `{type:"response", id, result}` or `{type:"error", id, error}`.
+/// Server-pushed events are `{type:"message", name, payload}`.
+///
+/// The fake CopilotClient (`./app/fakeClient.ts`) is injected as the
+/// singleton; production index.ts never imports this module so there's
+/// zero risk of leaking into a real run.
+
+import { join } from "node:path";
+import { mkdirSync, existsSync } from "node:fs";
+import { rpcGuard } from "./app/errors";
+import {
+	initLogger,
+	getLogLevel,
+	setLogLevel,
+	recentLogs,
+	subscribeLogs,
+	log,
+} from "./app/logging";
+import { initAudit, recentAudit, recordUrl, subscribeAudit } from "./app/audit";
+import { saveExportFile } from "./app/exports";
+import { exportDiagnostics } from "./app/diagnostics";
+import { browseDirectorySync } from "./app/directoryBrowser";
+import { tryGetClient, setClientForTest } from "./app/client";
+import { SessionRegistry } from "./app/sessions";
+import { SettingsService } from "./app/settings";
+import { toModelSummary } from "./app/models";
+import { FakeCopilotClient } from "./app/fakeClient";
+import type { AuditEntry } from "./app/audit";
+import type { LogRecord, SessionEventPayload, PendingRequestPayload } from "./rpc";
+
+interface CliFlags {
+	port: number;
+	workspace: string;
+	userData: string;
+	stubPickerPath?: string;
+}
+
+function parseFlags(argv: string[]): CliFlags {
+	const out: Partial<CliFlags> = {};
+	for (const arg of argv) {
+		const [k, v] = arg.replace(/^--/, "").split("=");
+		if (!k) continue;
+		if (k === "port") out.port = Number(v);
+		else if (k === "workspace") out.workspace = v;
+		else if (k === "user-data") out.userData = v;
+		else if (k === "stub-picker") out.stubPickerPath = v;
+	}
+	if (!out.port) throw new Error("--port=NNN required");
+	if (!out.workspace) throw new Error("--workspace=/abs/path required");
+	if (!out.userData) {
+		out.userData = join(out.workspace, ".dafman-userdata");
+	}
+	if (out.stubPickerPath === undefined && process.env.DAFMAN_TEST_PICKER_PATH) {
+		out.stubPickerPath = process.env.DAFMAN_TEST_PICKER_PATH;
+	}
+	return out as CliFlags;
+}
+
+const flags = parseFlags(process.argv.slice(2));
+mkdirSync(flags.userData, { recursive: true });
+mkdirSync(flags.workspace, { recursive: true });
+
+const logDir = join(flags.userData, "logs");
+mkdirSync(logDir, { recursive: true });
+await initLogger({ logDir });
+await initAudit({ dir: join(flags.userData, "audit") });
+
+// Inject the fake SDK BEFORE any session work.
+const fakeClient = new FakeCopilotClient();
+setClientForTest(fakeClient);
+
+const settingsPath = join(flags.userData, "settings.json");
+const settings = SettingsService.loadOrDefault(settingsPath);
+
+// Hold open sockets so we can broadcast events to all connected
+// renderers. Practically there's only ever one Playwright page, but
+// the shape mirrors production.
+type Sock = { send: (s: string) => void };
+const sockets = new Set<Sock>();
+
+function broadcast(name: string, payload: unknown): void {
+	const json = JSON.stringify({ type: "message", name, payload });
+	for (const s of sockets) {
+		try {
+			s.send(json);
+		} catch {
+			/* socket gone; cleanup happens in close handler */
+		}
+	}
+}
+
+const emitEvent = (payload: SessionEventPayload) =>
+	broadcast("sessionEvent", payload);
+const emitPending = (payload: PendingRequestPayload) =>
+	broadcast("pendingRequest", payload);
+
+const sessions = new SessionRegistry(
+	emitEvent,
+	emitPending,
+	() => settings.get().appearance.streaming,
+);
+
+subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
+subscribeAudit((entry: AuditEntry) => broadcast("auditEvent", entry));
+
+// Handler table — same signatures as production index.ts, just
+// returning plain promises so the ws dispatcher can `await` them.
+const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
+	createClient: rpcGuard(async () => "ok"),
+	createSession: rpcGuard(async (args) => {
+		const { workingDirectory } = args as { workingDirectory?: string };
+		const cwd = workingDirectory ?? flags.workspace;
+		return sessions.create({ workingDirectory: cwd });
+	}),
+	pickFolder: rpcGuard(async () => flags.stubPickerPath ?? null),
+	pickAttachment: rpcGuard(async () => {
+		if (!flags.stubPickerPath) return null;
+		try {
+			const { stat } = await import("node:fs/promises");
+			const st = await stat(flags.stubPickerPath);
+			return { path: flags.stubPickerPath, kind: st.isDirectory() ? "directory" : "file" };
+		} catch {
+			return null;
+		}
+	}),
+	disconnectSession: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.disconnect(sessionId);
+	}),
+	sendMessage: rpcGuard(async (args) => {
+		const { sessionId, text, mode, attachments } = args as {
+			sessionId: string;
+			text: string;
+			mode?: "enqueue" | "immediate";
+			attachments?: unknown[];
+		};
+		return sessions.send(
+			sessionId,
+			text,
+			mode,
+			attachments as Parameters<typeof sessions.send>[3],
+		);
+	}),
+	searchWorkspaceFiles: rpcGuard(async (args) => {
+		const { sessionId, query, limit, includeHidden, includeIgnored } = args as {
+			sessionId: string;
+			query: string;
+			limit?: number;
+			includeHidden?: boolean;
+			includeIgnored?: boolean;
+		};
+		return sessions.searchWorkspaceFiles(sessionId, query, limit ?? 40, {
+			includeHidden: includeHidden ?? false,
+			includeIgnored: includeIgnored ?? false,
+		});
+	}),
+	abortSession: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.abort(sessionId);
+	}),
+	listModels: rpcGuard(async () => {
+		const models = await tryGetClient().listModels();
+		return models.map(toModelSummary);
+	}),
+	setSessionModel: rpcGuard(async (args) => {
+		const { sessionId, model, reasoningEffort } = args as {
+			sessionId: string;
+			model: string;
+			reasoningEffort?: string;
+		};
+		return sessions.setModel(sessionId, model, reasoningEffort);
+	}),
+	resumeSession: rpcGuard(async (args) => {
+		const { sessionId, model, reasoningEffort } = args as {
+			sessionId: string;
+			model?: string;
+			reasoningEffort?: string;
+		};
+		return sessions.resume(sessionId, {
+			...(model ? { model } : {}),
+			...(reasoningEffort ? { reasoningEffort } : {}),
+		});
+	}),
+	getSettings: rpcGuard(async () => settings.get()),
+	updateSettings: rpcGuard(async (args) => {
+		const { settings: next } = args as { settings: ReturnType<typeof settings.get> };
+		await settings.update(next);
+		return settings.get();
+	}),
+	listSessions: rpcGuard(async () => sessions.list()),
+	deleteSession: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.delete(sessionId);
+	}),
+	getSessionMetadata: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.getMetadata(sessionId);
+	}),
+	openUrl: rpcGuard(async (args) => {
+		const { url } = args as { url: string };
+		recordUrl({ url, allowed: false, reason: "stubbed-test-server" });
+		return false;
+	}),
+	respondToRequest: rpcGuard(async (args) => sessions.respondToRequest(args as Parameters<typeof sessions.respondToRequest>[0])),
+	browseDirectory: rpcGuard(async (args) => {
+		const { prefix } = args as { prefix: string };
+		return browseDirectorySync(prefix);
+	}),
+	rendererLog: rpcGuard(async (args) => {
+		const { level, message, extra } = args as {
+			level: "debug" | "info" | "warn" | "error";
+			message: string;
+			extra?: Record<string, unknown>;
+		};
+		log[level](`[renderer] ${message}`, extra ?? {});
+	}),
+	getLogState: rpcGuard(async (args) => {
+		const { recentLimit } = (args ?? {}) as { recentLimit?: number };
+		return { level: getLogLevel(), recent: recentLogs(recentLimit) };
+	}),
+	setLogLevel: rpcGuard(async (args) => {
+		const { level } = args as { level: "debug" | "info" | "warn" | "error" };
+		setLogLevel(level);
+	}),
+	exportDiagnostics: rpcGuard(async () =>
+		exportDiagnostics({ outputRoot: flags.userData, settings: settings.get() }),
+	),
+	saveExportFile: rpcGuard(async (args) => {
+		const { fileName, contents } = args as { fileName: string; contents: string };
+		return saveExportFile({ outputRoot: flags.userData, fileName, contents });
+	}),
+	getAuditState: rpcGuard(async (args) => {
+		const { recentLimit } = (args ?? {}) as { recentLimit?: number };
+		return { recent: recentAudit(recentLimit) };
+	}),
+};
+
+// Test-server-only control RPCs. Test code uses these to drive the
+// fake SDK from outside the renderer (e.g. push a permission
+// request, swap the send script).
+const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
+	"__test.setSendScript": async (args) => {
+		const { script } = args as { script: string };
+		const fn = new Function("sendArgs", "push", "state", script);
+		fakeClient.setSendScript(async (sendArgs, push, state) => {
+			await fn(sendArgs, push, state);
+		});
+		return "ok";
+	},
+	"__test.resetSendScript": async () => {
+		fakeClient.resetSendScript();
+		return "ok";
+	},
+	"__test.triggerPermission": async (args) => {
+		const { sessionId, request } = args as { sessionId: string; request: unknown };
+		return fakeClient.triggerPermission(sessionId, request);
+	},
+	"__test.ready": async () => "ok",
+};
+
+const server = Bun.serve({
+	port: flags.port,
+	fetch(req, srv) {
+		if (srv.upgrade(req)) return;
+		return new Response("dafman test-server", { status: 200 });
+	},
+	websocket: {
+		open(ws) {
+			sockets.add(ws as unknown as Sock);
+			log.info("test-server: ws client connected");
+		},
+		close(ws) {
+			sockets.delete(ws as unknown as Sock);
+			log.info("test-server: ws client disconnected");
+		},
+		async message(ws, raw) {
+			let msg: { type: string; id?: number; name?: string; args?: unknown };
+			try {
+				msg = JSON.parse(String(raw));
+			} catch {
+				return;
+			}
+			if (msg.type !== "request" || !msg.name) return;
+			const handler = handlers[msg.name] ?? controlHandlers[msg.name];
+			const id = msg.id;
+			if (!handler) {
+				ws.send(
+					JSON.stringify({
+						type: "error",
+						id,
+						error: { kind: "unknown", message: `unknown rpc: ${msg.name}` },
+					}),
+				);
+				return;
+			}
+			try {
+				const result = await handler(msg.args ?? {});
+				ws.send(JSON.stringify({ type: "response", id, result }));
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				ws.send(
+					JSON.stringify({
+						type: "error",
+						id,
+						error: { kind: "runtime", message },
+					}),
+				);
+			}
+		},
+	},
+});
+
+log.info("dafman test-server listening", {
+	port: server.port,
+	workspace: flags.workspace,
+	userData: flags.userData,
+	stubPickerPath: flags.stubPickerPath ?? null,
+});
+// Print marker on stdout so the Playwright harness can await "ready".
+console.log(`__TEST_SERVER_READY__::port=${server.port}`);
+
+process.on("SIGINT", async () => {
+	await sessions.shutdownAll();
+	process.exit(0);
+});
+process.on("SIGTERM", async () => {
+	await sessions.shutdownAll();
+	process.exit(0);
+});
+
+// keep existsSync import alive (used implicitly by mkdirSync recursive)
+void existsSync;

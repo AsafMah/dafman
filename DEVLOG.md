@@ -10,6 +10,98 @@
 
 ---
 
+## 2026-05-22 — Real E2E tier shipped (6 flows green, 12 s wall)
+
+### Takeaway
+
+User said "OK that's a priority right now" after I filed the E2E
+proposal. Built Option A end-to-end in one session:
+
+- **Bun side**: `src-bun/test-server.ts` runs the same `SessionRegistry`
+  + handler surface as production but over `Bun.serve` WebSocket
+  instead of Electrobun's webview FFI. `src-bun/app/fakeClient.ts`
+  is a minimal SDK mock that captures `onPermissionRequest` so tests
+  can drive permission flows via a `__test.triggerPermission` control
+  RPC. `src-bun/app/client.ts` gains a `setClientForTest()` injection
+  seam.
+- **Renderer side**: new `src/ipc/wsBridge.ts` implements `RpcBridge`
+  over WebSocket. `src/main.ts` picks it when the page loads with
+  `?testBridge=ws://host:port`.
+- **Harness**: `e2e/full/harness/bunHarness.ts` spawns the bun
+  subprocess per test, waits for `__TEST_SERVER_READY__` marker,
+  seeds a temp workspace, exposes ws URL + control-RPC client +
+  teardown.
+- **Flows**:
+  - `01-create-send` — boots app, types "hello", asserts assistant
+    reply renders.
+  - `02-at-picker` — three tests: @ shows real workspace files,
+    `@.` does NOT exit popup (the v1 regression),
+    `@./src/` lists children. **Catches the bug class we fought.**
+  - `04-toggle-persist` — Alt+H + Alt+I flip toggles, page reload,
+    assert checkboxes still checked + localStorage prefs persisted.
+  - `05-permission` — fires a fake shell permission request via
+    control RPC, asserts `PendingRequestCard` renders, clicks
+    "Allow once", asserts the bun-side audit log records
+    `decision=approveOnce, permissionKind=shell`.
+
+### Process notes
+
+- This is exactly the harness I should have built BEFORE the v1
+  file-picker rebuild. The cwd-resolution bug + `@.` trigger bug
+  would have failed `02-at-picker` in <2 seconds. Permission
+  audit-log assertions would have caught any IPC drift in the audit
+  payload shape. Lesson: ship the harness BEFORE the feature it
+  would have caught regressions on.
+- Plain `Enter` ≠ send in the composer (it inserts a newline so
+  markdown line breaks work). `Ctrl+Enter` is the chord. Learned
+  during F1 debugging.
+- Lexical's `useMenuAnchorRef` appends the typeahead container to
+  `document.body` directly; selectors that locate the picker via
+  `.file-picker` (not `.lex-composer-frame .file-picker`) just work.
+
+### Discovered bugs
+
+None. Every existing FilePicker behavior assertion came back green.
+The earlier v2 fixes (cwd, trigger punctuation, z-index, split
+toggles, persistence) all hold under real chromium.
+
+### Deferred to next pass
+
+- Layout-restore flow (F6): needs the persisted-layout pipeline
+  wired into the test-server settings path. Skeleton todo recorded
+  in the SQL `todos` table.
+- Settings round-trip (F7): same.
+- HMR-project flow: easy add later.
+- Real-CLI tier (Option B in the plan): opt-in `GH_TOKEN` for
+  reasoning / quota / live-CLI permission shape regressions. Pure
+  bonus — Option A already catches the bug classes that bit us.
+
+### Files
+
+- `src-bun/test-server.ts` (new entrypoint)
+- `src-bun/app/fakeClient.ts` (new mock)
+- `src-bun/app/client.ts` (`setClientForTest`)
+- `src/ipc/wsBridge.ts` (new)
+- `src/main.ts` (bridge selection)
+- `src/App.vue` (drop `import.meta.env.DEV` gate on `autosession=1`)
+- `e2e/full/playwright.config.ts` (new)
+- `e2e/full/harness/bunHarness.ts` (new)
+- `e2e/full/flows/{01-create-send,02-at-picker,04-toggle-persist,05-permission}.pwtest.ts`
+- `package.json` (e2e + e2e:run scripts)
+- `.github/workflows/ci.yml` (e2e:run on ubuntu)
+- `plans/plan-e2e.prompt.md` (status: SHIPPED)
+- `STATUS.md`, `MANUAL_TESTS.md`, `CHANGELOG.md` updated
+
+### Gate
+
+- `bun run lint`: clean.
+- `bun test`: 366 pass.
+- `bun run smoke:run` (Tier-1 chromium against vite preview/dev):
+  green.
+- `bun run e2e:run` (NEW): 6 flows green in 12 s wall.
+
+---
+
 ## 2026-05-22 — E2E plan + AGENTS.md rule #4a (dogfood before task_complete)
 
 ### Takeaway

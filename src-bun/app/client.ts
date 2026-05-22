@@ -13,6 +13,15 @@ import { log } from "./logging";
 let instance: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 
+/// Test-mode override: inject a fake client (typed `unknown` because
+/// the SDK class has private members we can't reconstruct). Caller's
+/// responsibility to provide every method `sessions.ts` actually
+/// invokes. Set to `null` to clear.
+export function setClientForTest(c: unknown): void {
+	instance = c as CopilotClient | null;
+	starting = null;
+}
+
 /// Resolves the prebuilt platform-native `copilot` binary shipped by
 /// `@github/copilot-<platform>-<arch>` (an optional dependency of
 /// `@github/copilot`). When present we hand its path to the SDK via
