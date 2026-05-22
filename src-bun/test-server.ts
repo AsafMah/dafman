@@ -108,6 +108,7 @@ const sessions = new SessionRegistry(
 	emitEvent,
 	emitPending,
 	() => settings.get().appearance.streaming,
+	() => settings.get().tools.defaultExcluded,
 );
 
 subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
@@ -275,6 +276,24 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 	getAuditState: rpcGuard(async (args) => {
 		const { recentLimit } = (args ?? {}) as { recentLimit?: number };
 		return { recent: recentAudit(recentLimit) };
+	}),
+	listBuiltinTools: rpcGuard(async () => sessions.listBuiltinTools()),
+	listSessionMcpServers: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.listSessionMcpServers(sessionId);
+	}),
+	getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
+	readSessionPlan: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.readPlan(sessionId);
+	}),
+	writeSessionPlan: rpcGuard(async (args) => {
+		const { sessionId, content } = args as { sessionId: string; content: string };
+		return sessions.writePlan(sessionId, content);
+	}),
+	deleteSessionPlan: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.deletePlan(sessionId);
 	}),
 };
 

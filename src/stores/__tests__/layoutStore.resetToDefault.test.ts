@@ -136,6 +136,7 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
     },
     onDidActiveGroupChange: () => ({ dispose: () => {} }),
     onDidActivePanelChange: () => ({ dispose: () => {} }),
+    onDidAddPanel: () => ({ dispose: () => {} }),
     onDidRemovePanel: () => ({ dispose: () => {} }),
   } as unknown as DockviewApi;
 

@@ -10,6 +10,80 @@
 
 ---
 
+## 2026-05-22 — Phase 18b: tools / plan / quota in the right-rail
+
+### Takeaway
+
+Finished the second half of the Power UX phase. The right-rail panel
+now has three new sections built on six new RPCs: a built-in tool
+checklist that edits the global `defaultExcluded` setting (the SDK
+has no runtime mutation, so a "Restart session to apply" toast is the
+honest UX); a plan reader/editor on top of `rpc.plan.*`; and an
+account quota dashboard that fires 75/90% warning toasts per quota
+type. Settings bumped to v9 to persist `tools.defaultExcluded`.
+
+### What shipped
+
+- **Bun-side**: `SessionRegistry.listBuiltinTools()` /
+  `listSessionMcpServers()` / `getAccountQuota()` / `readPlan()` /
+  `writePlan()` / `deletePlan()`. Six new RPC entries in
+  `src-bun/rpc.ts` mirrored to `src/ipc/types.ts` and the test
+  server. `excludedToolsResolver` ctor arg threaded through
+  `baseSessionConfig` so `client.createSession({ excludedTools })`
+  picks up the persisted list.
+- **Settings v9**: `tools.defaultExcluded: string[]`. `coerceTools()`
+  strips non-strings, trims, dedupes. Existing v8 files migrate
+  transparently to `{ defaultExcluded: [] }`.
+- **Renderer**: `SessionDetailsPanel.vue` adds three sections + ~150
+  lines of styles. Per-tool ToggleSwitches call
+  `settingsStore.update()` with the next `defaultExcluded` list and
+  fire an info toast. Plan section uses a plain `<textarea>` for the
+  editor; saved content shows in a `.plan-preview` block. Quota bars
+  shade `warn` at 75% used and `danger` at 90%.
+- **fakeClient**: stubbed `rpc.tools.list` (returns 3 built-ins),
+  `rpc.account.getQuota` (returns one healthy + one near-quota
+  snapshot), and per-session `rpc.plan.*` + `rpc.mcp.list`.
+- **E2E**: F15 toggles a tool and asserts the restart toast, F16 round-
+  trips a plan from empty → editor → save → preview, F17 asserts the
+  quota dashboard renders both types and the 90% warning toast fires.
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ 367 pass, 0 fail
+- `bun run smoke` (full E2E in prod + HMR) ✅ **52/52 in 72 s**
+
+### Decisions
+
+- **Tool toggle stores in global settings, not per-session.** Investigated
+  the SDK and confirmed `createSessionRpc.tools` only exposes
+  `handlePendingToolCall` — there is no runtime mutation hook for
+  `availableTools`/`excludedTools`. Per-session state would require
+  storing a Set on `SessionRecord` + a settings v10 migration, all to
+  give the user a UI that *still* requires a session restart. Decided
+  the honest UX is one global default list + restart hint. If users
+  request per-session overrides later, the storage layer adds easily.
+- **MCP per-server tool lists are not surfaced.** `rpc.mcp.list`
+  returns `McpServer { name, status, source?, error? }` without
+  tools. Showing server names + status is enough for v1; we can add
+  per-server tool drilldown when the SDK exposes it.
+- **Quota polling: load-on-mount only, no interval.** Avoids a
+  background timer that fights with the toast dedupe set across
+  session changes. Refreshes when the user clicks the cog to re-open.
+- **Plan editor is plain textarea, not a markdown renderer.** Keeps
+  the panel small. Future: render with `vue-markdown` if we want
+  preview/edit split (Phase 19+).
+
+### Followups
+
+- Settings → Tools page (global editor for `defaultExcluded` outside
+  of any open session). Currently you can only edit via a session
+  panel; opening fresh sessions before any exist requires editing the
+  JSON file by hand. Tracked for a Settings polish phase.
+- Per-server MCP tool listing when SDK exposes it.
+
+---
+
 ## 2026-05-22 — Phase 18a: session details right-rail panel
 
 ### Takeaway

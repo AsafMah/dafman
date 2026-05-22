@@ -310,6 +310,56 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ---
 
+## 2026-05-22 — Phase 18b tools / plan / quota (right-rail)
+
+1. ⏳ **Tool toggle hint actually requires restart to apply.**
+   - **Steps:** in the details panel Tools section, disable `bash`.
+     Without restarting, ask the agent to run a shell command.
+   - **Expected:** the agent still receives `bash` (because the SDK
+     doesn't allow runtime mutation), but the toast already told you
+     to restart. After `Restart session` (compact + reset is fine;
+     true restart = close the panel + create a new session), the
+     tool is no longer offered. F15 covers the toast surface; this
+     test confirms the SDK behaviour.
+   - **Why not automated:** real SDK reaction to `excludedTools` only
+     visible end-to-end with the real CLI.
+
+2. ⏳ **MCP server status accurately reflects connection state.**
+   - **Steps:** add an `.mcp.json` to your workspace with a deliberately
+     broken server (e.g. command path that doesn't exist), spin a
+     fresh session in that workspace.
+   - **Expected:** the MCP servers subsection in Tools lists the
+     server with an `error` status and the error message inline.
+   - **Why not automated:** fakeClient returns `servers: []`.
+
+3. ⏳ **Plan editor round-trips a real `plan.md` file on disk.**
+   - **Steps:** in the details panel Plan section, click "Create
+     plan", type some content, Save. Open `<workspace>/plan.md` in
+     an external editor.
+   - **Expected:** file exists with exactly the saved content;
+     re-opening the panel re-reads it via `rpc.plan.read`.
+   - **Why not automated:** filesystem assertion requires a real
+     working directory (fakeClient's plan rpc is a stub).
+
+4. ⏳ **Account quota warning toasts are dedup'd across panel
+   re-opens.**
+   - **Steps:** open the panel, observe the 90% warn toast (if
+     applicable to your account). Close + re-open the panel.
+   - **Expected:** the toast does NOT fire again (the threshold-set
+     persists for the component lifetime).
+   - **Why not automated:** F17 covers single-fire; the dedup state
+     is per component instance which auto-resets on real-app
+     navigation but persists for a session in dev.
+
+5. ⏳ **`settings.tools.defaultExcluded` persists across restart.**
+   - **Steps:** toggle off `bash`. Quit + restart the app. Open the
+     same session's details panel.
+   - **Expected:** `bash` is still off; new sessions created after
+     restart inherit the exclusion.
+   - **Why not automated:** full restart cycle.
+
+---
+
 ## 2026-05-22 — Phase 18a session details right-rail panel
 
 1. ⏳ **Cog button toggles the right-rail panel.**

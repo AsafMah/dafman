@@ -37,6 +37,11 @@ export interface Settings {
   layout: Layout;
   workspaces: Workspaces;
   notifications: NotificationPrefs;
+  tools: ToolsPrefs;
+}
+
+export interface ToolsPrefs {
+  defaultExcluded: string[];
 }
 
 export interface Layout {
@@ -327,6 +332,46 @@ export type CommandMap = {
   getSessionUsageMetrics: {
     args: { sessionId: string };
     result: Record<string, unknown>;
+  };
+  listBuiltinTools: {
+    args: Record<string, never>;
+    result: Array<{
+      name: string;
+      namespacedName?: string;
+      description: string;
+    }>;
+  };
+  listSessionMcpServers: {
+    args: { sessionId: string };
+    result: Array<{
+      name: string;
+      status: string;
+      source?: string;
+      error?: string;
+    }>;
+  };
+  getAccountQuota: {
+    args: Record<string, never>;
+    result: Record<string, {
+      isUnlimitedEntitlement: boolean;
+      entitlementRequests: number;
+      usedRequests: number;
+      remainingPercentage: number;
+      overage: number;
+      resetDate?: string;
+    }>;
+  };
+  readSessionPlan: {
+    args: { sessionId: string };
+    result: { exists: boolean; content: string | null; path: string | null };
+  };
+  writeSessionPlan: {
+    args: { sessionId: string; content: string };
+    result: boolean;
+  };
+  deleteSessionPlan: {
+    args: { sessionId: string };
+    result: boolean;
   };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };

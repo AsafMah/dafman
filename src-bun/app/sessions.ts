@@ -195,6 +195,7 @@ export class SessionRegistry {
 		private readonly emit: Emit,
 		private readonly emitPending: EmitPending = () => {},
 		private readonly streamingResolver: () => boolean = () => true,
+		private readonly excludedToolsResolver: () => string[] = () => [],
 	) {}
 
 	/// Returns the live `CopilotSession` for an id, or undefined if the
@@ -289,6 +290,10 @@ export class SessionRegistry {
 				}) as Promise<ElicitationResult>;
 			},
 			streaming: this.streamingResolver(),
+			...((() => {
+				const excluded = this.excludedToolsResolver();
+				return excluded.length > 0 ? { excludedTools: excluded } : {};
+			})()),
 		};
 	}
 
@@ -1092,6 +1097,169 @@ export class SessionRegistry {
 				string,
 				unknown
 			>;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	/// Server-scoped: built-in tool catalog. Returns a trimmed
+	/// view (name + namespacedName + description) — the renderer
+	/// doesn't need the full JSON schema.
+	async listBuiltinTools(): Promise<
+		Array<{ name: string; namespacedName?: string; description: string }>
+	> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			const result = (await client.rpc.tools.list({})) as {
+				tools?: Array<{
+					name?: unknown;
+					namespacedName?: unknown;
+					description?: unknown;
+				}>;
+			};
+			const tools = result.tools ?? [];
+			return tools
+				.filter((t) => typeof t.name === "string")
+				.map((t) => ({
+					name: String(t.name),
+					...(typeof t.namespacedName === "string"
+						? { namespacedName: t.namespacedName }
+						: {}),
+					description:
+						typeof t.description === "string" ? t.description : "",
+				}));
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	/// Session-scoped: MCP server list. Per-server tool lists are
+	/// not yet surfaced by the SDK — only name/status/source/error.
+	async listSessionMcpServers(
+		sessionId: string,
+	): Promise<
+		Array<{ name: string; status: string; source?: string; error?: string }>
+	> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.mcp.list()) as {
+				servers?: Array<{
+					name?: unknown;
+					status?: unknown;
+					source?: unknown;
+					error?: unknown;
+				}>;
+			};
+			const servers = result.servers ?? [];
+			return servers
+				.filter((s) => typeof s.name === "string")
+				.map((s) => ({
+					name: String(s.name),
+					status: typeof s.status === "string" ? s.status : "unknown",
+					...(typeof s.source === "string" ? { source: s.source } : {}),
+					...(typeof s.error === "string" ? { error: s.error } : {}),
+				}));
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async getAccountQuota(): Promise<
+		Record<
+			string,
+			{
+				isUnlimitedEntitlement: boolean;
+				entitlementRequests: number;
+				usedRequests: number;
+				remainingPercentage: number;
+				overage: number;
+				resetDate?: string;
+			}
+		>
+	> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			const result = (await client.rpc.account.getQuota()) as {
+				quotaSnapshots?: Record<string, Record<string, unknown>>;
+			};
+			const snaps = result.quotaSnapshots ?? {};
+			const out: Record<
+				string,
+				{
+					isUnlimitedEntitlement: boolean;
+					entitlementRequests: number;
+					usedRequests: number;
+					remainingPercentage: number;
+					overage: number;
+					resetDate?: string;
+				}
+			> = {};
+			for (const [key, snap] of Object.entries(snaps)) {
+				out[key] = {
+					isUnlimitedEntitlement: snap.isUnlimitedEntitlement === true,
+					entitlementRequests:
+						typeof snap.entitlementRequests === "number"
+							? snap.entitlementRequests
+							: 0,
+					usedRequests:
+						typeof snap.usedRequests === "number" ? snap.usedRequests : 0,
+					remainingPercentage:
+						typeof snap.remainingPercentage === "number"
+							? snap.remainingPercentage
+							: 0,
+					overage: typeof snap.overage === "number" ? snap.overage : 0,
+					...(typeof snap.resetDate === "string"
+						? { resetDate: snap.resetDate }
+						: {}),
+				};
+			}
+			return out;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async readPlan(
+		sessionId: string,
+	): Promise<{ exists: boolean; content: string | null; path: string | null }> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.plan.read()) as {
+				exists?: unknown;
+				content?: unknown;
+				path?: unknown;
+			};
+			return {
+				exists: result.exists === true,
+				content: typeof result.content === "string" ? result.content : null,
+				path: typeof result.path === "string" ? result.path : null,
+			};
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async writePlan(sessionId: string, content: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.plan.update({ content });
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async deletePlan(sessionId: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.plan.delete();
+			return true;
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}

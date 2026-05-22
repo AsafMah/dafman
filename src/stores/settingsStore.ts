@@ -11,11 +11,12 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 8,
+    version: 9,
     appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
     layout: { dockview: null },
     workspaces: { recent: [], defaultWorkspace: "" },
     notifications: { turnEnd: false, waitingForInput: true },
+    tools: { defaultExcluded: [] },
   };
 }
 

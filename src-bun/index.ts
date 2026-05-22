@@ -97,6 +97,7 @@ const sessions = new SessionRegistry(
 	(payload) => emitEvent(payload),
 	(payload) => emitPending(payload),
 	() => settings.get().appearance.streaming,
+	() => settings.get().tools.defaultExcluded,
 );
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
@@ -232,6 +233,20 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			),
 			getSessionUsageMetrics: rpcGuard(async ({ sessionId }) =>
 				sessions.getUsageMetrics(sessionId),
+			),
+			listBuiltinTools: rpcGuard(async () => sessions.listBuiltinTools()),
+			listSessionMcpServers: rpcGuard(async ({ sessionId }) =>
+				sessions.listSessionMcpServers(sessionId),
+			),
+			getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
+			readSessionPlan: rpcGuard(async ({ sessionId }) =>
+				sessions.readPlan(sessionId),
+			),
+			writeSessionPlan: rpcGuard(async ({ sessionId, content }) =>
+				sessions.writePlan(sessionId, content),
+			),
+			deleteSessionPlan: rpcGuard(async ({ sessionId }) =>
+				sessions.deletePlan(sessionId),
 			),
 			getSettings: rpcGuard(async () => settings.get()),
 			updateSettings: rpcGuard(async ({ next }) => settings.update(next)),

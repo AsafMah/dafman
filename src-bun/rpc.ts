@@ -65,6 +65,19 @@ export interface Settings {
 	/// — these toggles only gate when we actually call
 	/// `new Notification()`.
 	notifications: NotificationPrefs;
+	/// Tool gating. `defaultExcluded` is applied at session create
+	/// via `excludedTools` — the SDK does not support runtime
+	/// mutation, so changes only take effect for newly created
+	/// sessions. The renderer surfaces a "Restart session to apply"
+	/// hint when a per-session toggle changes.
+	tools: ToolsPrefs;
+}
+
+export interface ToolsPrefs {
+	/// Tool names that should be excluded by default for new
+	/// sessions. Matches by `Tool.name` or `Tool.namespacedName`
+	/// (the renderer normalizes before sending to the SDK).
+	defaultExcluded: string[];
 }
 
 export interface NotificationPrefs {
@@ -491,6 +504,64 @@ export type DafmanRPC = {
 			getSessionUsageMetrics: {
 				params: { sessionId: string };
 				response: Record<string, unknown>;
+			};
+			/// Server-scoped list of built-in tools. Mirrors
+			/// `rpc.tools.list` on `createServerRpc`. Returns the
+			/// raw SDK shape ({ name, namespacedName?, description,
+			/// parameters?, instructions? }[]).
+			listBuiltinTools: {
+				params: Record<string, never>;
+				response: Array<{
+					name: string;
+					namespacedName?: string;
+					description: string;
+				}>;
+			};
+			/// Session-scoped list of MCP servers (with status).
+			/// Backed by `session.rpc.mcp.list`. Used by Phase 18b's
+			/// tool toggle UI to show MCP groups; per-server tool
+			/// lists are not yet surfaced by the SDK.
+			listSessionMcpServers: {
+				params: { sessionId: string };
+				response: Array<{
+					name: string;
+					status: string;
+					source?: string;
+					error?: string;
+				}>;
+			};
+			/// Server-scoped account quota snapshot. Returns the SDK
+			/// `quotaSnapshots` map verbatim — the renderer cherry-
+			/// picks fields for display + warning thresholds.
+			getAccountQuota: {
+				params: Record<string, never>;
+				response: Record<string, {
+					isUnlimitedEntitlement: boolean;
+					entitlementRequests: number;
+					usedRequests: number;
+					remainingPercentage: number;
+					overage: number;
+					resetDate?: string;
+				}>;
+			};
+			/// Session-scoped plan read. Returns `{ exists, content,
+			/// path? }`. When `exists=false` the panel renders an
+			/// empty state.
+			readSessionPlan: {
+				params: { sessionId: string };
+				response: { exists: boolean; content: string | null; path: string | null };
+			};
+			/// Session-scoped plan write. `content` overwrites the
+			/// plan.md file. Returns void; the panel re-reads via
+			/// `readSessionPlan` after a successful write.
+			writeSessionPlan: {
+				params: { sessionId: string; content: string };
+				response: boolean;
+			};
+			/// Session-scoped plan delete. Returns void.
+			deleteSessionPlan: {
+				params: { sessionId: string };
+				response: boolean;
 			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };

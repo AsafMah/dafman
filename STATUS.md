@@ -345,6 +345,14 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 18b shipped: Tools / Plan / Account quota
+  sections added to the right-rail. Built-in tool checklist edits
+  `settings.tools.defaultExcluded` (SDK has no runtime mutation, so
+  changes apply on next session create with a "Restart to apply" toast).
+  Plan section reads/writes `rpc.plan.*`. Quota dashboard polls
+  `rpc.account.getQuota` and fires 75/90% warning toasts (CLI 1.0.32
+  parity). 6 new bun RPCs + settings v9. E2E F15/F16/F17.
+  **52/52 E2E green** in 72 s, 367 bun tests.
 - **2026-05-22** — Phase 18a shipped: per-session settings moved from
   gear popover into a dockview right-edge panel
   (`SessionDetailsPanel.vue`). Auto-opens with each session; cog

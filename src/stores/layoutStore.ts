@@ -105,7 +105,18 @@ export const useLayoutStore = defineStore("layout", () => {
     const next = new Set<string>();
     for (const group of dock.groups) {
       for (const panel of group.panels) {
-        const id = panel.api.id;
+        // Dockview's IDockviewPanel exposes id via `panel.api.id` at
+        // runtime, but our addPanel test fake uses plain `{ id }`
+        // objects in groups[].panels — guard with optional chaining
+        // so the rescan works in both environments.
+        const rawApi = (panel as { api?: { id?: unknown } }).api;
+        const id =
+          typeof rawApi?.id === "string"
+            ? rawApi.id
+            : typeof (panel as { id?: unknown }).id === "string"
+              ? ((panel as { id: string }).id)
+              : null;
+        if (!id) continue;
         if (id.startsWith("session-details-")) {
           next.add(id.slice("session-details-".length));
         }

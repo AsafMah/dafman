@@ -54,6 +54,7 @@ describe("SettingsService", () => {
 			layout: { dockview: null },
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },
 			notifications: { turnEnd: false, waitingForInput: true },
+			tools: { defaultExcluded: [] },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);

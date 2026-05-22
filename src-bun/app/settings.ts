@@ -20,12 +20,13 @@ import type {
 	ReasoningVisibility,
 	Settings,
 	ThemeChoice,
+	ToolsPrefs,
 	Workspaces,
 } from "../rpc";
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 8;
+export const SETTINGS_VERSION = 9;
 /// Hard upper bound on the size of the workspace MRU. Anything beyond
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes
@@ -53,7 +54,24 @@ export function defaultSettings(): Settings {
 		layout: { dockview: null },
 		workspaces: { recent: [], defaultWorkspace: "" },
 		notifications: { turnEnd: false, waitingForInput: true },
+		tools: { defaultExcluded: [] },
 	};
+}
+
+function coerceTools(raw: unknown): ToolsPrefs {
+	if (!raw || typeof raw !== "object") return { defaultExcluded: [] };
+	const list = (raw as { defaultExcluded?: unknown }).defaultExcluded;
+	if (!Array.isArray(list)) return { defaultExcluded: [] };
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const entry of list) {
+		if (typeof entry !== "string") continue;
+		const trimmed = entry.trim();
+		if (!trimmed || seen.has(trimmed)) continue;
+		seen.add(trimmed);
+		out.push(trimmed);
+	}
+	return { defaultExcluded: out };
 }
 
 function coerceAppearance(raw: unknown): Appearance {
@@ -160,6 +178,7 @@ export function migrate(input: unknown): Settings {
 		layout: coerceLayout(raw.layout),
 		workspaces: coerceWorkspaces(raw.workspaces),
 		notifications: coerceNotifications(raw.notifications),
+		tools: coerceTools(raw.tools),
 	};
 }
 

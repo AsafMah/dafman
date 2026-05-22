@@ -119,6 +119,17 @@ class FakeCopilotSession {
 			usage: {
 				getMetrics: async () => ({ requests: 0, totalTokens: 0 }),
 			},
+			plan: {
+				read: async () => ({ exists: false, content: null, path: null }),
+				update: async () => undefined,
+				delete: async () => undefined,
+			},
+			mcp: {
+				list: async () => ({ servers: [] }),
+				enable: async () => undefined,
+				disable: async () => undefined,
+				reload: async () => undefined,
+			},
 			sessions: {
 				fork: async () => ({ sessionId: `fake-session-${Date.now()}` }),
 			},
@@ -345,6 +356,37 @@ export class FakeCopilotClient {
 					});
 					return { sessionId: newId };
 				},
+			},
+			tools: {
+				list: async () => ({
+					tools: [
+						{ name: "bash", description: "Run shell commands" },
+						{ name: "str_replace_editor", description: "Edit files" },
+						{ name: "grep", description: "Search file contents" },
+					],
+				}),
+			},
+			account: {
+				getQuota: async () => ({
+					quotaSnapshots: {
+						chat: {
+							isUnlimitedEntitlement: false,
+							entitlementRequests: 300,
+							usedRequests: 42,
+							remainingPercentage: 86,
+							overage: 0,
+							resetDate: "2026-06-01T00:00:00.000Z",
+						},
+						premium_interactions: {
+							isUnlimitedEntitlement: false,
+							entitlementRequests: 50,
+							usedRequests: 47,
+							remainingPercentage: 6,
+							overage: 0,
+							resetDate: "2026-06-01T00:00:00.000Z",
+						},
+					},
+				}),
 			},
 		};
 	}

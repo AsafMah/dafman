@@ -213,10 +213,13 @@ function formatDurationMs(ms: number): string {
   return `${min}m ${sec}s`;
 }
 
-// Lazy-load skills + usage on mount + when session changes.
+// Lazy-load skills + usage + tools + plan + quota on mount + when session changes.
 onMounted(() => {
   void loadSkills();
   void loadUsage();
+  void loadTools();
+  void loadPlan();
+  void loadQuota();
 });
 watch(
   () => sessionId.value,
@@ -226,8 +229,23 @@ watch(
     skillsError.value = null;
     usage.value = null;
     usageError.value = null;
+    builtinTools.value = [];
+    mcpServers.value = [];
+    toolsLoaded.value = false;
+    toolsError.value = null;
+    planExists.value = false;
+    planContent.value = "";
+    planEditing.value = false;
+    planError.value = null;
+    planLoaded.value = false;
+    quota.value = [];
+    quotaError.value = null;
+    warnedThresholds.clear();
     void loadSkills();
     void loadUsage();
+    void loadTools();
+    void loadPlan();
+    void loadQuota();
   },
 );
 
@@ -281,6 +299,148 @@ async function onForkSession() {
     toasts.success("Session forked", `New session: ${newId.slice(0, 8)}`);
   } catch (err) {
     toasts.error("Fork failed", err instanceof Error ? err.message : String(err));
+  }
+}
+
+// ---------- Tools (18b) ----------
+//
+// Built-in tools + MCP servers. Toggles edit the global
+// `settings.tools.defaultExcluded` list (the SDK does not support
+// runtime mutation, so changes only take effect for newly-created
+// sessions — we surface a "Restart session to apply" toast).
+type ToolItem = { name: string; description: string; namespacedName?: string };
+type McpItem = { name: string; status: string; error?: string };
+const builtinTools = ref<ToolItem[]>([]);
+const mcpServers = ref<McpItem[]>([]);
+const toolsLoaded = ref(false);
+const toolsError = ref<string | null>(null);
+const settingsStore = useSettingsStore();
+async function loadTools() {
+  toolsError.value = null;
+  try {
+    const [tools, servers] = await Promise.all([
+      invokeCommand("listBuiltinTools", {}),
+      invokeCommand("listSessionMcpServers", { sessionId: sessionId.value }),
+    ]);
+    builtinTools.value = tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      ...(t.namespacedName ? { namespacedName: t.namespacedName } : {}),
+    }));
+    mcpServers.value = servers.map((s) => ({
+      name: s.name,
+      status: s.status,
+      ...(s.error ? { error: s.error } : {}),
+    }));
+    toolsLoaded.value = true;
+  } catch (err) {
+    toolsError.value = err instanceof Error ? err.message : String(err);
+    toolsLoaded.value = true;
+  }
+}
+function isExcluded(name: string): boolean {
+  return settings.value.tools?.defaultExcluded?.includes(name) ?? false;
+}
+async function setToolExcluded(name: string, excluded: boolean) {
+  const current = settings.value.tools?.defaultExcluded ?? [];
+  const next = excluded
+    ? Array.from(new Set([...current, name]))
+    : current.filter((n) => n !== name);
+  await settingsStore.update({
+    ...settings.value,
+    tools: { defaultExcluded: next },
+  });
+  toasts.info(
+    "Tool change recorded",
+    "Restart the session to apply (SDK does not support runtime tool mutation).",
+  );
+}
+
+// ---------- Plan (18b) ----------
+const planExists = ref(false);
+const planContent = ref<string>("");
+const planEditing = ref(false);
+const planDraft = ref<string>("");
+const planError = ref<string | null>(null);
+const planLoaded = ref(false);
+async function loadPlan() {
+  planError.value = null;
+  try {
+    const result = await invokeCommand("readSessionPlan", {
+      sessionId: sessionId.value,
+    });
+    planExists.value = result.exists;
+    planContent.value = result.content ?? "";
+    planLoaded.value = true;
+  } catch (err) {
+    planError.value = err instanceof Error ? err.message : String(err);
+    planLoaded.value = true;
+  }
+}
+function startEditPlan() {
+  planDraft.value = planContent.value;
+  planEditing.value = true;
+}
+async function savePlan() {
+  try {
+    await invokeCommand("writeSessionPlan", {
+      sessionId: sessionId.value,
+      content: planDraft.value,
+    });
+    planContent.value = planDraft.value;
+    planExists.value = true;
+    planEditing.value = false;
+    toasts.success("Plan saved");
+  } catch (err) {
+    toasts.error("Plan save failed", err instanceof Error ? err.message : String(err));
+  }
+}
+function cancelEditPlan() {
+  planEditing.value = false;
+}
+
+// ---------- Quota (18b) ----------
+type QuotaSnapshot = {
+  type: string;
+  isUnlimitedEntitlement: boolean;
+  entitlementRequests: number;
+  usedRequests: number;
+  remainingPercentage: number;
+  overage: number;
+  resetDate?: string;
+};
+const quota = ref<QuotaSnapshot[]>([]);
+const quotaError = ref<string | null>(null);
+const warnedThresholds = new Set<string>();
+async function loadQuota() {
+  quotaError.value = null;
+  try {
+    const raw = await invokeCommand("getAccountQuota", {});
+    const snapshots: QuotaSnapshot[] = Object.entries(raw).map(([type, snap]) => ({
+      type,
+      ...snap,
+    }));
+    quota.value = snapshots;
+    // Threshold warning toasts at 75% + 90% used (= 25% / 10% remaining).
+    // Dedup per (type:threshold) so a poll-refresh doesn't re-fire.
+    for (const snap of snapshots) {
+      if (snap.isUnlimitedEntitlement) continue;
+      const usedPct = 100 - snap.remainingPercentage;
+      for (const threshold of [90, 75]) {
+        const key = `${snap.type}:${threshold}`;
+        if (usedPct >= threshold && !warnedThresholds.has(key)) {
+          warnedThresholds.add(key);
+          const severity = threshold === 90 ? "warn" : "info";
+          toasts[severity](
+            `Quota at ${usedPct.toFixed(0)}%`,
+            `${snap.type}: ${snap.usedRequests}/${snap.entitlementRequests} used`,
+          );
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    quotaError.value = err instanceof Error ? err.message : String(err);
   }
 }
 </script>
@@ -417,6 +577,96 @@ async function onForkSession() {
       </ul>
     </section>
 
+    <!-- Tools (18b) ----------------------------------------------- -->
+    <section class="row row-stack">
+      <span class="row-label">Tools</span>
+      <div v-if="!toolsLoaded" class="empty-hint">Loading…</div>
+      <div v-else-if="toolsError" class="empty-hint error">{{ toolsError }}</div>
+      <template v-else>
+        <div class="row-hint">
+          Excluded tools take effect on next session create. Restart this
+          session to apply changes here.
+        </div>
+        <ul class="tool-list">
+          <li
+            v-for="t in builtinTools"
+            :key="`builtin-${t.name}`"
+            class="tool-row"
+          >
+            <div class="tool-text">
+              <div class="tool-name">{{ t.name }}</div>
+              <div v-if="t.description" class="tool-desc">
+                {{ t.description }}
+              </div>
+            </div>
+            <ToggleSwitch
+              :model-value="!isExcluded(t.name)"
+              :aria-label="`Enable tool ${t.name}`"
+              @update:model-value="(v) => setToolExcluded(t.name, !v)"
+            />
+          </li>
+        </ul>
+        <div v-if="mcpServers.length > 0" class="mcp-group">
+          <div class="row-label mcp-heading">MCP servers</div>
+          <ul class="tool-list">
+            <li
+              v-for="s in mcpServers"
+              :key="`mcp-${s.name}`"
+              class="tool-row"
+            >
+              <div class="tool-text">
+                <div class="tool-name">
+                  {{ s.name }}
+                  <small class="tool-tag">{{ s.status }}</small>
+                </div>
+                <div v-if="s.error" class="tool-desc error">{{ s.error }}</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </template>
+    </section>
+
+    <!-- Plan (18b) ------------------------------------------------ -->
+    <section class="row row-stack">
+      <span class="row-label">Plan</span>
+      <div v-if="!planLoaded" class="empty-hint">Loading…</div>
+      <div v-else-if="planError" class="empty-hint error">{{ planError }}</div>
+      <template v-else>
+        <template v-if="planEditing">
+          <textarea
+            v-model="planDraft"
+            rows="8"
+            class="plan-editor"
+            aria-label="Plan content (markdown)"
+          ></textarea>
+          <div class="plan-actions">
+            <Button label="Save" size="small" @click="savePlan" />
+            <Button
+              label="Cancel"
+              size="small"
+              severity="secondary"
+              text
+              @click="cancelEditPlan"
+            />
+          </div>
+        </template>
+        <template v-else>
+          <div v-if="planExists && planContent" class="plan-preview">
+            {{ planContent }}
+          </div>
+          <div v-else class="empty-hint">No plan yet.</div>
+          <Button
+            :label="planExists ? 'Edit plan' : 'Create plan'"
+            icon="pi pi-pencil"
+            size="small"
+            severity="secondary"
+            @click="startEditPlan"
+          />
+        </template>
+      </template>
+    </section>
+
     <!-- Usage ----------------------------------------------------- -->
     <section v-if="usage || usageError" class="row row-stack">
       <span class="row-label">Usage</span>
@@ -442,6 +692,39 @@ async function onForkSession() {
           </dd>
         </div>
       </dl>
+    </section>
+
+    <!-- Quota (18b) ---------------------------------------------- -->
+    <section v-if="quota.length > 0 || quotaError" class="row row-stack">
+      <span class="row-label">Account quota</span>
+      <div v-if="quotaError" class="empty-hint error">{{ quotaError }}</div>
+      <ul v-else class="quota-list">
+        <li v-for="q in quota" :key="q.type" class="quota-row">
+          <div class="quota-name">
+            {{ q.type }}
+            <small v-if="q.isUnlimitedEntitlement" class="quota-tag">
+              unlimited
+            </small>
+          </div>
+          <template v-if="!q.isUnlimitedEntitlement">
+            <div class="quota-bar" :class="{
+              warn: 100 - q.remainingPercentage >= 75,
+              danger: 100 - q.remainingPercentage >= 90,
+            }">
+              <div
+                class="quota-fill"
+                :style="{ width: `${100 - q.remainingPercentage}%` }"
+              />
+            </div>
+            <div class="quota-meta">
+              {{ q.usedRequests }} / {{ q.entitlementRequests }}
+              <span v-if="q.resetDate" class="quota-reset">
+                · resets {{ new Date(q.resetDate).toLocaleDateString() }}
+              </span>
+            </div>
+          </template>
+        </li>
+      </ul>
     </section>
 
     <!-- Actions --------------------------------------------------- -->
@@ -656,6 +939,154 @@ async function onForkSession() {
 .skill-desc {
   font-size: 0.7rem;
   color: var(--p-text-muted-color);
+}
+
+/* ---------- Tools (18b) ---------- */
+.tool-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tool-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--p-surface-border);
+  border-radius: var(--p-border-radius-sm);
+}
+
+.tool-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tool-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.tool-desc {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.15rem;
+}
+
+.tool-desc.error {
+  color: var(--p-message-error-color);
+}
+
+.tool-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+  background: var(--p-content-hover-background);
+  padding: 0.1rem 0.3rem;
+  border-radius: var(--p-border-radius-sm);
+}
+
+.mcp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.mcp-heading {
+  margin-bottom: 0.2rem;
+}
+
+/* ---------- Plan (18b) ---------- */
+.plan-editor {
+  width: 100%;
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid var(--p-surface-border);
+  border-radius: var(--p-border-radius-sm);
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.plan-preview {
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  padding: 0.4rem 0.5rem;
+  background: var(--p-content-hover-background);
+  border-radius: var(--p-border-radius-sm);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.plan-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* ---------- Quota (18b) ---------- */
+.quota-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quota-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.quota-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.quota-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+}
+
+.quota-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--p-content-hover-background);
+  overflow: hidden;
+}
+
+.quota-fill {
+  height: 100%;
+  background: var(--p-primary-color);
+}
+
+.quota-bar.warn .quota-fill {
+  background: var(--p-message-warn-color, #d97706);
+}
+
+.quota-bar.danger .quota-fill {
+  background: var(--p-message-error-color, #dc2626);
+}
+
+.quota-meta {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+}
+
+.quota-reset {
+  margin-left: 0.2rem;
 }
 
 .usage {

@@ -152,6 +152,7 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
     isEdgeGroupVisible() { return true; },
     onDidActiveGroupChange: () => ({ dispose: () => {} }),
     onDidActivePanelChange: () => ({ dispose: () => {} }),
+    onDidAddPanel: () => ({ dispose: () => {} }),
     onDidRemovePanel: () => ({ dispose: () => {} }),
   } as unknown as DockviewApi;
 

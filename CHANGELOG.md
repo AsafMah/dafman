@@ -3,6 +3,29 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- **Tool toggle UI in the right-rail details panel (Phase 18b).** Lists
+  built-in tools from `rpc.tools.list` and MCP servers from
+  `rpc.mcp.list`; per-tool ToggleSwitches edit the new global
+  `settings.tools.defaultExcluded`. The SDK has no runtime mutation API
+  for tool gating, so every toggle surfaces a "Restart session to
+  apply" info toast — changes take effect on the next session create.
+- **Plan section in the right-rail details panel (Phase 18b).** Reads
+  and writes `rpc.plan.*` for the session. Empty state shows "Create
+  plan"; existing plans render as a scrollable markdown preview with
+  an inline "Edit" textarea + Save/Cancel actions.
+- **Account quota dashboard in the right-rail details panel (Phase
+  18b).** Polls `rpc.account.getQuota` on mount and renders per-type
+  usage bars (chat, premium_interactions, …). Fires a single
+  `info` toast at 75% used and a `warn` toast at 90% used per type
+  (CLI 1.0.32 parity). Dedupes per (type, threshold) so a refresh
+  doesn't re-fire.
+- **`settings.tools.defaultExcluded` (settings v9).** New string-array
+  field consumed at session create via `client.createSession({
+  excludedTools })`. Existing settings migrate transparently with an
+  empty list.
+
 ### Changed
 
 - **Per-session settings moved from gear popover to right-rail panel.**
