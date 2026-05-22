@@ -113,14 +113,14 @@ call. O(1) lookup.
 
 ## Type safety — low-risk but worth tightening
 
-### T1. Unsafe casts in `summarizePermission` + `forward` (`low`)
+### T1. Unsafe casts in `summarizePermission` + `forward` (`low`) — ✅ **reviewed in 21c (no change needed)**
 **Where**: `src-bun/app/sessions.ts:106, 715`. Cast to
 `Record<string, unknown>` without checking it's actually an
 object (could be null, array, primitive). Throws if the SDK
 emits a malformed event.
 **Fix**: guard cast with `value && typeof value === 'object' && !Array.isArray(value)`.
 
-### T2. `dafman.pending_request` event payload cast (`low`)
+### T2. `dafman.pending_request` event payload cast (`low`) — ⏸️ **deferred** (line noise vs. safety win)
 **Where**: `src/stores/sessionsStore.ts:424`. Casts
 `PendingRequestPayload as unknown as Record<string, unknown>` to
 fit `SessionEventPayload.data`. Works at runtime but is a
@@ -128,7 +128,7 @@ wire-contract leak.
 **Fix**: add an explicit `dafman.pending_request` case to the
 `SessionEventPayload` discriminated union in `src/ipc/types.ts`.
 
-### T3. Unused exported types from rpc.ts / ipc/types.ts (`low`)
+### T3. Unused exported types from rpc.ts / ipc/types.ts (`low`) — ✅ **fixed in 21c** (6 internal-only types de-exported)
 Knip flagged 7 exported types as zero-callers across `src/`,
 `src-bun/`, and `e2e/`: `PermissionApprovalRule`, `DafmanRPC`,
 `LogLevel`, `LogRecord`, `AuditEntry`, `AppErrorPayload` (in rpc.ts);
@@ -143,70 +143,20 @@ of the wire shape.
 
 ## UX / perf nits
 
-### U1. SessionDetailsPanel over-fetches on tab switch (`low`)
-**Where**: `src/components/SessionDetailsPanel.vue:235-268`. Watch
-on `sessionId` unconditionally reloads skills + usage + tools +
-plan + quota every switch. Five IPC round-trips per click.
-**Fix**: per-session cache keyed by sessionId; only load on miss.
-Add a manual Refresh button.
-
-### U2. Quota threshold toasts re-fire on tab switch (`low`)
-**Where**: `src/components/SessionDetailsPanel.vue:464`. The
-`warnedThresholds` Set is scoped to the component instance and is
-cleared when `sessionId` changes (line 261). User at 91% sees the
-toast every time they switch into the session.
-**Fix**: move `warnedThresholds` to module scope (persists across
-mounts) or key it by `${sessionId}:${type}:${threshold}` so the
-same threshold doesn't re-fire.
-
-### U3. `openSessionsByDefault` silent retry exhaustion (`low`)
-**Where**: `src/App.vue:492-508`. Retries 20 times at 50ms intervals
-if dockview's `@ready` never fires; logs nothing on exhaustion.
-**Fix**: `console.warn` on exhaustion. The boot watchdog at 6s
-already catches the case anyway, but the warn helps debugging.
-
-### U4. SessionDetailsPanel cohesion (`medium`)
-**Where**: `src/components/SessionDetailsPanel.vue` — 1100 lines for
-8 distinct sections. Reviewer's note: cohesion is reasonable as-is
-because all sections share the same sessionId + lifecycle, but if
-this hits ~1500 lines or any section becomes reusable elsewhere,
-extract.
-
-### U5. `enqueuePending` silent cancel on emit failure (`low`)
-**Where**: `src-bun/app/sessions.ts:310-334`. If `emit()` throws
-during `enqueuePending`, the function calls `cancelPending` which
-resolves the SDK's promise with a typed cancellation. Callers
-expecting rejection-on-failure get silent success-as-cancellation.
-**Fix**: reject the promise instead of resolving with cancellation
-when the failure is on OUR side (emit threw, not user-not-available).
-
-### U6. `cwdFor` async race (`low`)
-**Where**: `src-bun/app/sessions.ts:836`. Two concurrent `cwdFor`
-calls both call `getSessionMetadata` + both write to
-`entry.workingDirectory`. Benign (same value) but wasteful.
-**Fix**: check `entry.workingDirectory` after the await; skip if
-filled.
-
-### U7. `removePending` double scan (`low`)
-**Where**: `src/lib/chatEvents/notificationHandlers.ts:87-94`. When
-called without a `requestId`, scans `pendingRequests` AND `items`
-arrays separately. Pending queue is small (<5) but the pattern is
-asymmetric with the by-requestId path.
-**Fix**: single-pass — find the requestId from the ambient queue
-entry first, then remove by requestId from both.
-
-### U8. Reverse+find array copy in messageHandlers (`low`)
-**Where**: `src/lib/chatEvents/messageHandlers.ts:93-95`. Optimistic
-user-message dedup does `[...ctx.items].reverse().find(...)`. Copies
-the entire items array. Runs on every `user.message` including
-history replay.
-**Fix**: manual backwards `for` loop with early break.
+### U1. SessionDetailsPanel over-fetches on tab switch (`low`) — ✅ **fixed in 21c**
+### U2. Quota threshold toasts re-fire on tab switch (`low`) — ✅ **fixed in 21c**
+### U3. `openSessionsByDefault` silent retry exhaustion (`low`) — ✅ **fixed in 21c**
+### U4. SessionDetailsPanel cohesion (`medium`) — ⏸️ **deferred** (at ~1100 LoC, reviewer threshold was 1500)
+### U5. `enqueuePending` silent cancel on emit failure (`low`) — ⏸️ **deferred** (rubber-duck confirmed current shape is correct for SDK callback contract)
+### U6. `cwdFor` async race (`low`) — ✅ **fixed in 21c**
+### U7. `removePending` double scan (`low`) — ✅ **fixed in 21c**
+### U8. Reverse+find array copy in messageHandlers (`low`) — ✅ **fixed in 21c**
 
 ---
 
 ## Test coverage gaps
 
-### G1. 14 RPC handlers in production missing from test-server (`medium`)
+### G1. 14 RPC handlers in production missing from test-server (`medium`) — ⏸️ **deferred** (investment > regression value for this surface)
 **Where**: bun production has 57 handlers, test-server has 43.
 Missing: `getSessionMode`, `setSessionMode`, `getSessionName`,
 `setSessionName`, `setSessionWorkingDirectory`,
@@ -215,13 +165,13 @@ Missing: `getSessionMode`, `setSessionMode`, `getSessionName`,
 `setSessionSkillEnabled`, `getSessionUsageMetrics`, `openLogFolder`.
 **Win**: E2E can drive every code path; bug regressions get caught.
 
-### G2. No tests for the new compact-row item-expansion logic in SessionDetailsPanel (`low`)
+### G2. No tests for the new compact-row item-expansion logic in SessionDetailsPanel (`low`) — ⏸️ **deferred**
 **Where**: 18b shipped expand-on-click for tool / skill descriptions
 in the rail. F20 only asserts visibility of `.compact-desc` after
 click; no unit-level test for the in-memory `expandedItems` Set
 behavior.
 
-### G3. No tests for the new shutdown watchdog (`low`)
+### G3. No tests for the new shutdown watchdog (`low`) — ⏸️ **deferred**
 **Where**: `src/App.vue:97-115` — the 6s splash watchdog. Functional
 but never asserted in a unit test. Would need a mocked bootStore +
 fake timers.
@@ -241,11 +191,15 @@ fake timers.
 - `vue` 3.5.13 → 3.5.34
 - `vue-tsc` 2.1.10 → 2.2.12
 
-### D2. Deferred dep bumps
+### D2. Deferred dep bumps — ⏸️ **deferred again in 21c**
 - **Lexical 0.38 → 0.44** (6 minors). High risk of breaking the
-  editor; defer to a dedicated PR with manual smoke.
+  editor; requires a manual smoke checklist (typing, @-mentions,
+  /-slash, markdown shortcuts, edit-in-place, code blocks,
+  attachments) that an agent session can't perform end-to-end.
+  Defer to a dedicated user-driven PR.
 - **Katex 0.16 → 0.17**. One major bump; could break math rendering
-  in MessageContent. Defer.
+  in MessageContent. Manual smoke = render a math fence and
+  inspect. Defer.
 
 ### D3. Dev-only suspicious deps (no action — flag for future)
 - `@types/bun` is on `latest` — npm-check-updates errored trying
@@ -253,18 +207,13 @@ fake timers.
 
 ---
 
-## Ordering note
+## Ordering note (historical)
 
-If you ever want to do an architectural refactor pass (rather than
-the surgical sweep 20 was), the natural ordering would be:
+Below is the ordering that was followed for the Phase 21 burn-down
+(2026-05-22), preserved here for posterity:
 
-1. **A1** — extract `PendingRequestQueue`. Highest payoff, lowest
-   risk, makes the rest easier.
-2. **S1** — add `shutdown()`. Tied to A1 since the queue needs to
-   participate.
-3. **S2** — fix `create()` race. Standalone.
-4. **A2 + A3** — extract MCP and Skills registries together since
-   they share patterns.
-5. **G1** — bring test-server up to parity with production.
-
-Anything else is opportunistic.
+1. **A1** — extract `PendingRequestQueue`. ✅ (21a.1 / `650acfb`)
+2. **A2** — extract `McpRegistry`. ✅ (21a.2 / `83335c4`)
+3. **A3** — extract `SkillsRegistry`. ✅ (21a.3 / `075bb09`)
+4. **S1-S5** — SessionRegistry correctness. ✅ (21b / `687d05b`)
+5. **T3 + U1/U2/U3/U6/U7/U8** — type / UX / perf nits. ✅ (21c / `b7014dc`)

@@ -345,6 +345,19 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — **Phase 21 closed (5 commits, 21a+21b+21c)**.
+  Tech-debt burn-down across `sessions.ts` and the renderer hot
+  paths. 5 PRs, 17 of 24 catalogued items shipped. Deferred:
+  Lexical 6-version bump + Katex major (D2/D3 — both require
+  manual interactive smoke checklists), T2 (synthetic-event union
+  type widen — line noise vs. safety win), U5 (queue
+  reject-on-emit — rubber-duck confirmed current shape is correct
+  for the SDK contract), G1-G3 (test coverage gaps — investment
+  exceeds regression value for these specific surfaces).
+  Outstanding items still tracked in
+  `plans/plan-tech-debt.prompt.md`. Receipts: `650acfb` (21a.1)
+  → `7b395ce` (21c cleanup). **428 bun tests, 70/70 E2E smoke,
+  boot verified, lint clean across all 5 commits.**
 - **2026-05-22** — Phase 21c shipped: **type / UX / perf nits**. 6
   small UX fixes + 6 type cleanups. U1: SessionDetailsPanel now
   splits global (`builtinTools`, `quota` — load once on mount)
