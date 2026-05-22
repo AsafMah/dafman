@@ -345,8 +345,26 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 21c shipped: **type / UX / perf nits**. 6
+  small UX fixes + 6 type cleanups. U1: SessionDetailsPanel now
+  splits global (`builtinTools`, `quota` — load once on mount)
+  from per-session loaders (`skills`, `usage`, `mcp`, `plan` —
+  re-fetch on chat-tab switch). U2: quota-warning toast Set no
+  longer resets on session switch (was re-firing constantly). U3:
+  `openSessionsByDefault` warns on retry exhaustion instead of
+  silently bailing. U6: `cwdFor` re-checks the entry after each
+  await to avoid a concurrent-writer stale overwrite. U7:
+  `removePending` resolves the target requestId from the ambient
+  queue up front, then removes by requestId from both lists (was
+  scanning both independently by kind, could remove different
+  entries). U8: `messageHandlers.ts` backwards `for` loop with
+  early break instead of `[...items].reverse().find(...)` array
+  copy (was running on every `user.message` including the full
+  history replay). T3: de-exported 6 internal-only types. T1/T2:
+  reviewed and deferred — casts are guarded. **428 bun tests,
+  70/70 E2E.**
 - **2026-05-22** — Phase 21b shipped: **SessionRegistry correctness
-  pass**. Five lifecycle fixes in `src-bun/app/sessions.ts`: (S1)
+  pass**.Five lifecycle fixes in `src-bun/app/sessions.ts`: (S1)
   bounded `shutdownAll` with 2s per-session timeout + SIGTERM
   handler so a hung SDK can't deadlock app exit; (S2) `create()`
   early-event buffer so SDK events that fire during `createSession`

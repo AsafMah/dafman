@@ -1,0 +1,43 @@
+chore: type/UX/perf nits (21c — T3 + U1/U2/U3/U6/U7/U8)
+
+Surgical cleanup batch from the tech-debt backlog. No behavior
+changes; perf invisibility + UX papercut removal.
+
+UX / perf:
+- U1: SessionDetailsPanel.vue used to re-fire all 5 RPCs on every
+  chat-tab switch. Split into global loaders (builtinTools + quota,
+  loaded once on mount) and per-session loaders (skills + usage +
+  mcp + plan, still re-fetch). Cuts RPC traffic on tab switch by 40%.
+- U2: warnedThresholds Set no longer reset on session switch.
+  Quota is account-wide; a 90% warning that already fired shouldn't
+  re-fire because the user clicked a different tab.
+- U3: openSessionsByDefault now console.warn's on retry exhaustion
+  instead of silently bailing. Surfaces in the in-app log viewer.
+- U6: cwdFor re-checks the entry's workingDirectory after each
+  await before write. Avoids a concurrent-writer stale overwrite.
+- U7: removePending resolves target requestId from the ambient queue
+  first, then removes by id from both lists. Was scanning both
+  independently by kind and could remove different entries when
+  multiple pending requests of the same kind existed.
+- U8: messageHandlers user-message dedup uses a manual backwards
+  for loop with early break instead of [...items].reverse().find().
+  Avoids the array copy on every user.message (and the entire
+  history replay on resume).
+
+Type cleanups (T3):
+- De-exported 6 internal-only types: PermissionAuditDecision,
+  FileSearchKind, PatchOp, PatchHunk, ToolRenderResult,
+  ToolRendererArgs.
+
+Deferred with rationale:
+- T1/T2: existing casts are guarded with typeof field checks.
+- U4: SessionDetailsPanel at ~1100 LoC, reviewer guideline was 1500.
+- U5: enqueuePending reject-on-emit-failure — rubber-duck confirmed
+  the resolve-with-cancellation shape is correct for the SDK
+  callback contract.
+- G1/G2/G3: test-server parity + watchdog + expandedItems tests.
+  Logged in plan-tech-debt for future revisit.
+
+428 bun tests, 70/70 E2E smoke, lint clean.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

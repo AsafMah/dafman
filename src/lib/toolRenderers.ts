@@ -16,7 +16,7 @@
 // Unknown tools / MCP tools without an explicit renderer fall through
 // to a safe default: JSON args, plain-text result.
 
-export interface ToolRenderResult {
+interface ToolRenderResult {
   summary?: string;
   /// Language identifier for the **arguments** code block — must match
   /// a prismjs grammar name. Use "text" for plain text fallback.
@@ -26,7 +26,7 @@ export interface ToolRenderResult {
   resultLanguage: string;
 }
 
-export interface ToolRendererArgs {
+interface ToolRendererArgs {
   args?: Record<string, unknown>;
   result?: string;
   partialOutput?: string;

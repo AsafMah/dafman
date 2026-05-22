@@ -731,9 +731,13 @@ export class SessionRegistry {
 		if (!client) return undefined;
 		try {
 			const meta = await client.getSessionMetadata(sessionId);
+			// U6: re-check after the await — a concurrent cwdFor call
+			// (or a setWorkingDirectory) may have backfilled while we
+			// awaited. Skip the write to avoid a stale overwrite.
+			const current = this.entries.get(sessionId);
+			if (current?.workingDirectory) return current.workingDirectory;
 			if (meta?.context?.cwd) {
-				// Backfill the entry so future calls hit it directly.
-				if (entry) entry.workingDirectory = meta.context.cwd;
+				if (current) current.workingDirectory = meta.context.cwd;
 				return meta.context.cwd;
 			}
 		} catch {
@@ -741,9 +745,11 @@ export class SessionRegistry {
 		}
 		try {
 			const summaries = await client.listSessions();
+			const current = this.entries.get(sessionId);
+			if (current?.workingDirectory) return current.workingDirectory;
 			const summary = summaries.find((s) => s.sessionId === sessionId);
 			if (summary?.context?.cwd) {
-				if (entry) entry.workingDirectory = summary.context.cwd;
+				if (current) current.workingDirectory = summary.context.cwd;
 				return summary.context.cwd;
 			}
 		} catch {

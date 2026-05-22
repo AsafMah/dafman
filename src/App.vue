@@ -493,6 +493,14 @@ function openSessionsByDefault(attempt = 0) {
   if (!layoutStore.api) {
     if (attempt < 20) {
       setTimeout(() => openSessionsByDefault(attempt + 1), 50);
+    } else {
+      // U3: don't silently bail. If dockview's @ready never fires
+      // after 20 * 50ms = 1s, the user gets a chrome-free renderer
+      // with no Sessions panel. Surface the issue in the log so we
+      // can diagnose from the in-app log viewer.
+      console.warn(
+        "[boot] openSessionsByDefault: dockview api never became ready after 20 retries; Sessions panel will not auto-open",
+      );
     }
     return;
   }

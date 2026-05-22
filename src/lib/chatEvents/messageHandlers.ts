@@ -90,9 +90,23 @@ export const messageHandlers: Record<string, Handler> = {
         return;
       }
     }
-    const optimistic = [...ctx.items]
-      .reverse()
-      .find((i) => i.kind === "user" && !i.messageId && i.text === content);
+    // U8: backwards loop avoids the [...items].reverse() array copy
+    // (which runs on every user.message including the full history
+    // replay on resume). Early-break on the most-recent optimistic
+    // user message with matching text.
+    let optimistic: typeof ctx.items[number] | undefined;
+    for (let i = ctx.items.length - 1; i >= 0; i--) {
+      const item = ctx.items[i];
+      if (
+        item &&
+        item.kind === "user" &&
+        !item.messageId &&
+        item.text === content
+      ) {
+        optimistic = item;
+        break;
+      }
+    }
     if (optimistic && optimistic.kind === "user") {
       optimistic.messageId = eventId;
       if (payload.eventId) optimistic.eventId = payload.eventId;

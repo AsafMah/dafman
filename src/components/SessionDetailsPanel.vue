@@ -232,12 +232,20 @@ function formatDurationMs(ms: number): string {
 }
 
 // Lazy-load skills + usage + tools + plan + quota on mount + when session changes.
+//
+// U1: split into per-session vs global loaders. `builtinTools` is the
+// SDK's static built-in tool list (never changes); `quota` is the
+// user's account-wide quota (poll-refresh, not session-scoped). Both
+// load ONCE on mount and shouldn't re-fire on every session tab
+// switch. The per-session fetches (`skills`, `usage`, `mcp`, `plan`)
+// still re-fetch.
 onMounted(() => {
+  void loadBuiltinTools();
+  void loadQuota();
   void loadSkills();
   void loadUsage();
-  void loadTools();
+  void loadMcpServers();
   void loadPlan();
-  void loadQuota();
 });
 watch(
   () => sessionId.value,
@@ -247,23 +255,21 @@ watch(
     skillsError.value = null;
     usage.value = null;
     usageError.value = null;
-    builtinTools.value = [];
     mcpServers.value = [];
-    toolsLoaded.value = false;
-    toolsError.value = null;
     planExists.value = false;
     planContent.value = "";
     planEditing.value = false;
     planError.value = null;
     planLoaded.value = false;
-    quota.value = [];
-    quotaError.value = null;
-    warnedThresholds.clear();
+    // U2: don't reset `warnedThresholds` on session switch — the
+    // quota is account-wide, so a 90%-used warning that already
+    // fired shouldn't re-fire just because the user clicked a
+    // different session tab. The Set persists for the whole
+    // component lifetime (i.e. as long as the rail is mounted).
     void loadSkills();
     void loadUsage();
-    void loadTools();
+    void loadMcpServers();
     void loadPlan();
-    void loadQuota();
   },
 );
 
@@ -322,10 +328,13 @@ async function onForkSession() {
 
 // ---------- Tools (18b) ----------
 //
-// Built-in tools + MCP servers. Toggles edit the global
-// `settings.tools.defaultExcluded` list (the SDK does not support
-// runtime mutation, so changes only take effect for newly-created
-// sessions — we surface a "Restart session to apply" toast).
+// Built-in tools (global, never changes) + MCP servers (per-session
+// status). Split into two loaders so a session-tab switch only re-
+// fetches the per-session MCP list, not the static built-in list.
+// Toggles edit the global `settings.tools.defaultExcluded` list (the
+// SDK does not support runtime mutation, so changes only take effect
+// for newly-created sessions — we surface a "Restart session to apply"
+// toast).
 type ToolItem = { name: string; description: string; namespacedName?: string };
 type McpItem = { name: string; status: string; error?: string };
 const builtinTools = ref<ToolItem[]>([]);
@@ -333,28 +342,34 @@ const mcpServers = ref<McpItem[]>([]);
 const toolsLoaded = ref(false);
 const toolsError = ref<string | null>(null);
 const settingsStore = useSettingsStore();
-async function loadTools() {
-  if (!sessionId.value) return;
+async function loadBuiltinTools() {
   toolsError.value = null;
   try {
-    const [tools, servers] = await Promise.all([
-      invokeCommand("listBuiltinTools", {}),
-      invokeCommand("listSessionMcpServers", { sessionId: sessionId.value }),
-    ]);
+    const tools = await invokeCommand("listBuiltinTools", {});
     builtinTools.value = tools.map((t) => ({
       name: t.name,
       description: t.description,
       ...(t.namespacedName ? { namespacedName: t.namespacedName } : {}),
     }));
+    toolsLoaded.value = true;
+  } catch (err) {
+    toolsError.value = err instanceof Error ? err.message : String(err);
+    toolsLoaded.value = true;
+  }
+}
+async function loadMcpServers() {
+  if (!sessionId.value) return;
+  try {
+    const servers = await invokeCommand("listSessionMcpServers", {
+      sessionId: sessionId.value,
+    });
     mcpServers.value = servers.map((s) => ({
       name: s.name,
       status: s.status,
       ...(s.error ? { error: s.error } : {}),
     }));
-    toolsLoaded.value = true;
   } catch (err) {
     toolsError.value = err instanceof Error ? err.message : String(err);
-    toolsLoaded.value = true;
   }
 }
 async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
@@ -369,8 +384,9 @@ async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
       enabled,
     });
     // Re-fetch to surface the real status (might be "connecting"
-    // or an error).
-    await loadTools();
+    // or an error). Only re-fetch the per-session MCP list, not
+    // the static built-in tools.
+    await loadMcpServers();
   } catch (err) {
     toasts.error(
       "Failed to toggle MCP server",

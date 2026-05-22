@@ -10,6 +10,81 @@
 
 ---
 
+## 2026-05-22 — Phase 21c: type / UX / perf nits
+
+### Takeaway
+
+Surgical cleanup batch from the tech-debt backlog. 6 small UX
+fixes + 6 type-export cleanups. No behavior changes that any user
+test would catch; the wins are perf invisibility (no more
+unnecessary RPC re-fires) and removing UX papercuts (no more
+duplicate quota warning toasts).
+
+### UX / perf nits
+
+- **U1**: SessionDetailsPanel.vue used to re-fire ALL 5 RPCs on
+  every chat-tab switch. The static `builtinTools` list and the
+  account-wide `quota` snapshot don't change between sessions; now
+  they load once on mount and stay. Per-session loaders (`skills`,
+  `usage`, `mcp`, `plan`) still re-fetch.
+- **U2**: `warnedThresholds` (the Set that dedups 75% / 90%
+  quota-warning toasts) used to be `.clear()`-ed on every session
+  switch. The quota is account-wide, so a 90% warning that already
+  fired shouldn't re-fire just because the user clicked a
+  different tab. Now persists for the full rail lifetime.
+- **U3**: `openSessionsByDefault` (App.vue) silently gave up after
+  20 retries × 50ms if dockview's `@ready` never fired. Now logs
+  to `console.warn` so the issue surfaces in the in-app log
+  viewer instead of going invisible.
+- **U6**: `cwdFor` (sessions.ts) double-checks the entry's
+  `workingDirectory` after each await. A concurrent caller (or a
+  `setWorkingDirectory`) could backfill while we awaited
+  `getSessionMetadata` / `listSessions`; the second writer now
+  skips its write to avoid a stale overwrite of the fresher value.
+- **U7**: `removePending` (notificationHandlers.ts) used to scan
+  the ambient queue AND the items list independently when called
+  by kind (no requestId). For a session with two pending requests
+  of the same kind, the two scans could pick different entries
+  and leave the lists inconsistent. Now resolves the target
+  requestId from the ambient queue first, then removes by id from
+  both.
+- **U8**: `messageHandlers.ts` user-message dedup used
+  `[...ctx.items].reverse().find(...)` — copies the entire items
+  array on every `user.message`, including the full history replay
+  on resume. Now a manual backwards `for` loop with early break.
+
+### Type cleanups (T3)
+
+- De-exported 6 types that were only used within their defining
+  file: `PermissionAuditDecision` (audit.ts), `FileSearchKind`
+  (fileSearch.ts), `PatchOp` + `PatchHunk` (diff.ts),
+  `ToolRenderResult` + `ToolRendererArgs` (toolRenderers.ts).
+
+### Deferred
+
+- **T1 / T2**: the `as Record<string, unknown>` casts in
+  `summarizePermission` + `forward()` + `applyPendingToRecord` are
+  structurally guarded by `typeof` field checks. Adding more
+  ceremony (widening `SessionEventPayload.data` to a discriminated
+  union for a synthetic event we always construct ourselves) would
+  be more line noise than safety win.
+- **G1 / G2 / G3**: test-server-parity gaps + watchdog + expandedItems
+  tests. Each is more line investment than regression value for
+  these specific surfaces. Logged in plan-tech-debt for future
+  revisit.
+- **U4**: SessionDetailsPanel extraction — left at ~1100 LoC.
+  Reviewer's guideline was 1500; not worth splitting yet.
+- **U5**: `enqueuePending` reject-on-emit-failure — the rubber-duck
+  in 21a.1 confirmed that resolving with cancellation is the
+  correct shape for the SDK callback contract. Rejecting would
+  crash the SDK callback chain.
+
+### Receipts
+
+- Commit: this one. 428 bun tests, 70/70 E2E smoke.
+
+---
+
 ## 2026-05-22 — Phase 21b: SessionRegistry correctness pass
 
 ### Takeaway

@@ -70,27 +70,25 @@ function removePending(
   kind: PendingRequest["kind"],
   requestId?: string,
 ): void {
-  // Ambient queue.
-  if (requestId) {
-    ctx.ambient.pendingRequests = ctx.ambient.pendingRequests.filter(
-      (p) => p.requestId !== requestId,
-    );
-  } else {
-    const idx = ctx.ambient.pendingRequests.findIndex((p) => p.kind === kind);
-    if (idx >= 0) {
-      const next = ctx.ambient.pendingRequests.slice();
-      next.splice(idx, 1);
-      ctx.ambient.pendingRequests = next;
-    }
+  // U7: resolve the target requestId up front. If the caller already
+  // gave us one, use it; otherwise find the oldest matching kind in
+  // the ambient queue and use that id to remove from both lists. This
+  // makes the by-kind path symmetric with the by-requestId path and
+  // ensures we remove the SAME entry from each list (no risk of
+  // removing oldest-by-kind from ambient and oldest-by-kind from
+  // items, where they could legitimately differ).
+  let targetId = requestId;
+  if (!targetId) {
+    const found = ctx.ambient.pendingRequests.find((p) => p.kind === kind);
+    targetId = found?.requestId;
   }
-  // Items list — the inline cards.
-  const itemIdx = requestId
-    ? ctx.items.findIndex(
-        (i) => i.kind === "pendingRequest" && i.requestId === requestId,
-      )
-    : ctx.items.findIndex(
-        (i) => i.kind === "pendingRequest" && i.pendingKind === kind,
-      );
+  if (!targetId) return;
+  ctx.ambient.pendingRequests = ctx.ambient.pendingRequests.filter(
+    (p) => p.requestId !== targetId,
+  );
+  const itemIdx = ctx.items.findIndex(
+    (i) => i.kind === "pendingRequest" && i.requestId === targetId,
+  );
   if (itemIdx >= 0) ctx.items.splice(itemIdx, 1);
 }
 

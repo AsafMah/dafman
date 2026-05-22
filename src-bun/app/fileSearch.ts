@@ -49,7 +49,7 @@ const IGNORED_DIRS = new Set([
 const MAX_FILES_PER_WORKSPACE = 20_000;
 const MAX_DEPTH = 12;
 
-export type FileSearchKind = "file" | "directory";
+type FileSearchKind = "file" | "directory";
 
 export interface FileSearchEntry {
 	path: string;

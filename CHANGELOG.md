@@ -3,6 +3,46 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (Phase 21c — type / UX / perf nits)
+
+- **U1: per-session vs global RPC split in SessionDetailsPanel.**
+  `builtinTools` (static SDK built-in tool list) and `quota`
+  (account-wide) now load ONCE on mount instead of re-firing on
+  every chat-tab switch. Per-session loaders (`skills`, `usage`,
+  `mcp`, `plan`) still re-fetch on switch.
+- **U2: don't reset `warnedThresholds` on session switch.** Quota
+  warning toasts (75% / 90%) used to re-fire every time the user
+  clicked a different chat tab because the rail's debounce Set
+  was being cleared. Now persists for the full rail lifetime.
+- **U3: warn on `openSessionsByDefault` retry exhaustion.** Was
+  silently giving up after 20 retries × 50ms; now logs to
+  `console.warn` so the issue surfaces in the in-app log viewer.
+- **U6: re-check `cwdFor` after each await before write.** A
+  concurrent `cwdFor` call could backfill the entry while we
+  were waiting on `getSessionMetadata` / `listSessions`; the
+  second writer now skips the write to avoid a stale overwrite.
+- **U7: `removePending` single-pass.** Was scanning both
+  `pendingRequests` AND `items` independently by `kind` when no
+  `requestId` was supplied — could remove different entries from
+  each list if there was more than one pending of the same kind.
+  Now resolves the target requestId from the ambient queue first
+  and removes by requestId from both lists.
+- **U8: `messageHandlers.ts` backwards loop.** Was
+  `[...ctx.items].reverse().find(...)` — copies the entire items
+  array on every `user.message`, including the full history
+  replay on resume. Now a manual backwards `for` loop with
+  early break.
+- **T3: de-export 6 internal-only types.** `PermissionAuditDecision`
+  (audit.ts), `FileSearchKind` (fileSearch.ts), `PatchOp` +
+  `PatchHunk` (diff.ts), `ToolRenderResult` + `ToolRendererArgs`
+  (toolRenderers.ts). All only used within their defining file.
+- **T1 / T2: cast safety review.** Existing `as Record<string, unknown>`
+  casts in `summarizePermission` and `forward()` are already guarded
+  by `typeof` field checks; no change. The renderer-side
+  `payload as unknown as Record<string, unknown>` in
+  `applyPendingToRecord` is structurally equivalent at runtime and
+  doesn't warrant a SessionEventPayload type widen.
+
 ### Fixed (Phase 21b — SessionRegistry correctness)
 
 - **S1: bounded shutdown.** `shutdownAll()` now races each

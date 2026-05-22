@@ -20,7 +20,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { log } from "./logging";
 
-export type PermissionAuditDecision = "approveOnce" | "approveForSession" | "reject";
+type PermissionAuditDecision = "approveOnce" | "approveForSession" | "reject";
 
 export interface PermissionAuditEntry {
 	ts: string;

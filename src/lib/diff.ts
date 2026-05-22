@@ -17,9 +17,9 @@
 /// body. Hunks are split on `@@` markers; if a file has no `@@` and
 /// is an Update, we still keep the body as a single hunk.
 
-export type PatchOp = "update" | "add" | "delete";
+type PatchOp = "update" | "add" | "delete";
 
-export type PatchHunk = {
+type PatchHunk = {
   /// Lines as they appear in the patch — prefix `+`, `-`, or ` `
   /// (space). The renderer strips the prefix and styles by kind.
   lines: Array<{ kind: "added" | "removed" | "context"; text: string }>;
