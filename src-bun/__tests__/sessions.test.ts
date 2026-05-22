@@ -1107,4 +1107,24 @@ describe("SessionRegistry", () => {
 		expect(cfg.availableTools).toBeUndefined();
 		expect(cfg.excludedTools).toBeUndefined();
 	});
+
+	test("23: registers non-colliding library SDK slash command", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const emitted: SessionEventPayload[] = [];
+		const reg = new SessionRegistry((p) => emitted.push(p));
+		await reg.create();
+		const cfg = client.createdConfigs[0] as {
+			commands?: Array<{ name: string; handler: (ctx: { args: string }) => void }>;
+		};
+		expect(cfg.commands?.map((c) => c.name)).toEqual(["library"]);
+		expect(cfg.commands?.some((c) => c.name === "mcp" || c.name === "skills")).toBe(false);
+		cfg.commands?.[0]?.handler({ args: "instructions" });
+		expect(emitted[0]).toMatchObject({
+			eventType: "system.notification",
+		});
+		expect(String(emitted[0]?.data.content ?? "")).toContain("instructions");
+	});
 });

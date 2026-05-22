@@ -3,6 +3,24 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 23a — Library Instructions + command wiring)
+
+- **Library → Instructions tab** with read-only inventory of global
+  and project instruction sources. Global candidates include common
+  Copilot user-instruction locations; project candidates include
+  root `AGENTS.md`, `.github/copilot-instructions.md`, and nested
+  `AGENTS.md` files (skipping heavy/generated folders such as
+  `node_modules`, `.git`, `dist`, `build`). Existing files can be
+  expanded inline and revealed in the OS file manager; missing
+  candidates stay visible as guidance.
+- **`/library [mcp|skills|agents|instructions]` local slash command**
+  opens the Library sidebar and switches tabs. It deliberately does
+  **not** claim `/mcp` or `/skills`, which remain SDK passthrough
+  commands.
+- **SDK `CommandDefinition` infrastructure** now registers a
+  non-colliding `library` command in each session config. This gives
+  the SDK/TUI a safe hook without shadowing built-in CLI commands.
+
 ### Added (Phase 22b — Tools section grouped view + allowlist)
 
 - **Grouped tools view** in the session details rail. Tools are

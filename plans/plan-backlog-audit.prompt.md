@@ -385,6 +385,13 @@ Add the Instructions + Custom agents tabs to A8; wire SDK
 `CommandDefinition` slash commands (Phase 7 carryover + audit §A); SDK
 hooks (`onUserPromptSubmitted`, `onSessionStart`) (audit §B).
 
+**2026-05-22 status:** initial slice shipped. Library already had MCP,
+Skills, and Agents tabs; added read-only Instructions tab (global +
+project instruction sources), local `/library [tab]` command, and a
+non-colliding SDK `CommandDefinition` named `library`. Remaining
+optional work: unified item grid, permissioned instruction editor, and
+concrete hook-backed features.
+
 ### Phase 22 — App shell redesign (sidebar + status bar) (~2 d)
 A2. Makes Phases 18/19/20's panels feel native instead of bolted on. Also
 hosts Jobs pill (A5).

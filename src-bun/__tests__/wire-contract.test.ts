@@ -8,6 +8,7 @@ import type {
 	SessionMode,
 	Settings,
 	SessionEventPayload,
+	InstructionSource,
 } from "../rpc";
 import type { AppErrorPayload } from "../app/errors";
 
@@ -349,6 +350,30 @@ describe("IPC wire contracts — diagnostics", () => {
 			{ path: "README.md", absolutePath: "/r/README.md", name: "README.md", kind: "file" },
 			{ path: "src", absolutePath: "/r/src", name: "src", kind: "directory" },
 			{ path: "~/Documents", absolutePath: "/home/u/Documents", name: "Documents", kind: "directory" },
+		];
+		expect(samples).toMatchSnapshot();
+	});
+
+	test("InstructionSource shape", () => {
+		const samples: InstructionSource[] = [
+			{
+				name: "AGENTS.md",
+				scope: "project",
+				path: "C:\\repo\\dafman\\AGENTS.md",
+				relativePath: "AGENTS.md",
+				exists: true,
+				content: "# Rules",
+				sizeBytes: 7,
+			},
+			{
+				name: "Copilot user instructions",
+				scope: "global",
+				path: "C:\\Users\\me\\.copilot\\instructions.md",
+				relativePath: "C:\\Users\\me\\.copilot\\instructions.md",
+				exists: false,
+				content: null,
+				sizeBytes: null,
+			},
 		];
 		expect(samples).toMatchSnapshot();
 	});

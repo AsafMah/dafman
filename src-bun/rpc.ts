@@ -210,6 +210,18 @@ export interface AgentFileEntry {
 	canonical: boolean;
 }
 
+export type InstructionScope = "global" | "project";
+
+export interface InstructionSource {
+	name: string;
+	scope: InstructionScope;
+	path: string;
+	relativePath: string;
+	exists: boolean;
+	content: string | null;
+	sizeBytes: number | null;
+}
+
 /// 19b.2: spec the renderer passes to `writeAgentFile`. Mirrors
 /// `src-bun/app/agentFiles.ts:AgentFileSpec`. Only the simpler
 /// frontmatter keys are exposed; advanced ones (`mcp-servers`,
@@ -793,6 +805,13 @@ export type DafmanRPC = {
 			setGloballyDisabledSkills: {
 				params: { disabledSkills: string[] };
 				response: boolean;
+			};
+			/// Phase 23: read-only instruction-file inventory for
+			/// Library → Instructions. Includes global/user candidates
+			/// plus project candidates for the active workspace.
+			listInstructionSources: {
+				params: { workingDirectory?: string };
+				response: InstructionSource[];
 			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };

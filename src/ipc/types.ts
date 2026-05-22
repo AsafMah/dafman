@@ -137,6 +137,18 @@ export interface AgentFileEntry {
   canonical: boolean;
 }
 
+export type InstructionScope = "global" | "project";
+
+export interface InstructionSource {
+  name: string;
+  scope: InstructionScope;
+  path: string;
+  relativePath: string;
+  exists: boolean;
+  content: string | null;
+  sizeBytes: number | null;
+}
+
 /// Mirror of `src-bun/rpc.ts:AgentFileSpec`. The renderer-supplied
 /// spec for `writeAgentFile`. v1 surface only — `mcp-servers` and
 /// `github` keys are deferred to direct file edits.
@@ -558,6 +570,10 @@ export type CommandMap = {
   setGloballyDisabledSkills: {
     args: { disabledSkills: string[] };
     result: boolean;
+  };
+  listInstructionSources: {
+    args: { workingDirectory?: string };
+    result: InstructionSource[];
   };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };

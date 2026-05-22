@@ -33,35 +33,11 @@ test("audit entries from a prior bun session re-load into the recent ring on res
   workspace = mkdtempSync(join(tmpdir(), "dafman-e2e-audit-"));
   const sharedUserData = mkdtempSync(join(tmpdir(), "dafman-e2e-audit-ud-"));
 
-  // bun#1: create a session, fire a permission, approve it.
+  // bun#1: create a session and write a representative audit entry.
   first = await spawnBunHarness({ workspace, userData: sharedUserData });
   const sessionId = await first.invokeControl<string>("createSession", {
     workingDirectory: workspace,
   });
-  const decisionPromise = first.invokeControl<{ kind: string }>("__test.triggerPermission", {
-    sessionId,
-    request: { kind: "shell", toolCallId: "call-1", fullCommandText: "git status" },
-  });
-  // Discover the pending requestId via getAuditState polling isn't
-  // worth the effort; just respond directly with the SDK shape.
-  // The bun side uses an internal requestId — easiest path: respond
-  // through the renderer-facing respondToRequest RPC after the
-  // pending payload comes back. But we don't have a renderer here.
-  // Simpler: let the handler return user-not-available by NOT
-  // responding from the renderer; the audit still records nothing
-  // because handler hasn't been resolved.
-  //
-  // The cleanest way to record an audit entry without a renderer is
-  // to call recordPermission directly via a control RPC. We don't
-  // have one for that. Use respondToRequest with the requestId we
-  // can extract from getAuditState? Actually the test-server
-  // exposes respondToRequest — and the bun side enqueues the
-  // pending entry. Lookup the requestId via the pendingHandlers
-  // would require an additional control RPC.
-  //
-  // Simpler still: write our own audit entry via a fresh control
-  // RPC. Add one.
-  void decisionPromise;
   await first.invokeControl<string>("__test.recordAudit", {
     entry: {
       kind: "permission",

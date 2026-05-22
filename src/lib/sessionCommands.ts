@@ -59,6 +59,30 @@ function pushLocalSystem(sessionId: string, text: string): void {
 	});
 }
 
+const LIBRARY_TABS = new Set(["mcp", "skills", "agents", "instructions"]);
+
+function openLibraryTab(tab = "mcp"): void {
+	const normalized = LIBRARY_TABS.has(tab) ? tab : "mcp";
+	try {
+		localStorage.setItem("dafman.library.activeTab", normalized);
+	} catch {
+		/* private mode — ignore */
+	}
+	window.dispatchEvent(
+		new CustomEvent("dafman:library-activate-tab", {
+			detail: { tab: normalized },
+		}),
+	);
+	useLayoutStore().openEdgePanel("left", {
+		id: "library",
+		component: "library",
+		tabComponent: "sidebarTab",
+		title: "Library — MCP servers + Skills + Agents + Instructions",
+		initialSize: 360,
+		minimumSize: 280,
+	});
+}
+
 /// Runs Dafman's local slash command when the typed text is one of
 /// our registered session commands. `/cd` is handled locally because
 /// Dafman owns the visible workspace chip and can resume the SDK
@@ -184,6 +208,19 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 					err instanceof Error ? err.message : String(err),
 				);
 			}
+		},
+	},
+	{
+		slash: "/library",
+		label: "Open Library",
+		description:
+			"Open Library. Optional tab: /library mcp|skills|agents|instructions.",
+		icon: "pi-book",
+		group: "Navigation",
+		keywords: ["mcp", "skills", "agents", "instructions", "sidebar"],
+		run: (_sessionId, args = "") => {
+			const tab = args.trim().split(/\s+/)[0]?.toLowerCase() || "mcp";
+			openLibraryTab(tab);
 		},
 	},
 	{

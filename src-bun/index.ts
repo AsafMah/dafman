@@ -35,6 +35,7 @@ import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
 import { SkillsRegistry } from "./app/skillsRegistry";
+import { listInstructionSources } from "./app/instructions";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
@@ -325,6 +326,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			),
 			setGloballyDisabledSkills: rpcGuard(async ({ disabledSkills }) =>
 				skills.setGloballyDisabled(disabledSkills),
+			),
+			listInstructionSources: rpcGuard(async ({ workingDirectory }) =>
+				listInstructionSources({ workingDirectory }),
 			),
 			getSettings: rpcGuard(async () => settings.get()),
 			updateSettings: rpcGuard(async ({ next }) => settings.update(next)),

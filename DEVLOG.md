@@ -10,6 +10,51 @@
 
 ---
 
+## 2026-05-22 — Phase 23a: Library Instructions + command wiring
+
+### Takeaway
+
+After re-reading the plan files and cross-checking code, the true next
+unshipped item was not image generation/log viewer/export. Image
+generation is deferred by user choice, and log viewer/export already
+exist. The next useful slice is the audit's Library consolidation
+work: Library now has an **Instructions** tab and command wiring has a
+safe `/library` namespace.
+
+### Receipts
+
+- `LibraryPanel.vue` already had MCP, Skills, and Agents tabs; the
+  stale header still called Agents "future". Cleaned that while adding
+  `LibraryInstructionsTab.vue`.
+- New read-only backend module: `src-bun/app/instructions.ts`.
+  It lists global Copilot-instruction candidates and project files
+  (`AGENTS.md`, `.github/copilot-instructions.md`, nested `AGENTS.md`)
+  with an 80 KB content cap. It skips heavy/generated folders while
+  walking nested AGENTS files.
+- The UI is intentionally read-only. Editing instruction files is a
+  project file write and should get a separate permissioned editor
+  flow, not a silent Library save button.
+- Local command: `/library [mcp|skills|agents|instructions]` opens the
+  Library edge panel and switches tabs. It deliberately avoids `/mcp`
+  and `/skills` because those are SDK passthrough commands today.
+- SDK command infra: `SessionRegistry.baseSessionConfig` now registers
+  one `CommandDefinition` named `library`; tests assert it does not
+  register/steal `mcp` or `skills`.
+- While validating this slice, fixed the long-standing
+  `08-audit-rehydrate` smoke failure: the spec opened a fake
+  permission request and intentionally never resolved it, so teardown
+  closed the control socket under a pending RPC. The test already uses
+  `__test.recordAudit`, so the dangling request was removed.
+
+### Gates
+
+- `bun run lint` clean.
+- 487 bun tests pass (+5 from Phase 22 close).
+- `bun run check` green.
+- `bun run smoke` green — 70/70 across prod + HMR.
+
+---
+
 ## 2026-05-25 — Phase 22b: Tools tri-state + grouped view
 
 ### Takeaway

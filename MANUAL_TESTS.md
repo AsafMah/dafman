@@ -905,3 +905,26 @@ The picker only lets you pick a folder, no files visible.
     - **Steps:** with a real MCP server configured (e.g. playwright), open the rail Tools section and mark `playwright/navigate` as "Only allow".
     - **Expected:** settings.json shows `defaultAllowed: ["playwright/navigate"]`, NOT `["navigate"]`. This is what makes multi-server setups correct — same `name` across servers won't collide.
     - **Why not automated:** real MCP server needed.
+
+## Phase 23a — Library Instructions + command wiring
+
+- [ ] ⏳ **Library has Instructions tab**
+    - **Steps:** open the Library activity-bar item.
+    - **Expected:** tabs are MCP, Skills, Agents, Instructions. The title mentions Instructions. The stale "future agents" copy is gone.
+    - **Why not automated:** visual/tab integration check.
+- [ ] ⏳ **Project instructions are listed for the active workspace**
+    - **Steps:** open a session in a repo containing `AGENTS.md` and `.github/copilot-instructions.md`, then open Library → Instructions.
+    - **Expected:** Project group lists `AGENTS.md`, `.github/copilot-instructions.md`, and any nested `AGENTS.md` (excluding `node_modules` / `.git` / build dirs). Existing rows expand inline.
+    - **Why not automated:** real workspace + local instruction content.
+- [ ] ⏳ **Global instruction candidates are visible**
+    - **Steps:** open Library → Instructions with and without an active session.
+    - **Expected:** Global group always appears with common user-instruction candidate paths. Existing files expand inline; missing candidates are greyed as "missing".
+    - **Why not automated:** depends on the user's machine-level config.
+- [ ] ⏳ **Reveal opens the instruction file**
+    - **Steps:** click the reveal icon on an existing instruction file.
+    - **Expected:** OS opens the file (or file manager/default app, depending on platform) via the existing `revealPath` behavior.
+    - **Why not automated:** OS integration.
+- [ ] ⏳ **/library slash command opens the requested tab**
+    - **Steps:** in a session composer, run `/library instructions`, `/library skills`, `/library agents`, `/library mcp`.
+    - **Expected:** Library sidebar opens and switches to the requested tab. `/mcp` and `/skills` still pass through to the SDK if typed directly.
+    - **Why not automated:** end-to-end composer + dockview interaction; unit test covers SDK command registration non-collision.

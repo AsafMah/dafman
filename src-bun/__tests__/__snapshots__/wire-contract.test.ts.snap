@@ -440,3 +440,26 @@ exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
   },
 }
 `;
+
+exports[`IPC wire contracts — diagnostics InstructionSource shape 1`] = `
+[
+  {
+    "content": "# Rules",
+    "exists": true,
+    "name": "AGENTS.md",
+    "path": "C:\\repo\\dafman\\AGENTS.md",
+    "relativePath": "AGENTS.md",
+    "scope": "project",
+    "sizeBytes": 7,
+  },
+  {
+    "content": null,
+    "exists": false,
+    "name": "Copilot user instructions",
+    "path": "C:\\Users\\me\\.copilot\\instructions.md",
+    "relativePath": "C:\\Users\\me\\.copilot\\instructions.md",
+    "scope": "global",
+    "sizeBytes": null,
+  },
+]
+`;

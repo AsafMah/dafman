@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /// Phase 19 — Library panel.
 ///
-/// Hosts global cross-session configuration: MCP servers (19a) and
-/// Skills (19b). Opens from the ActivityBar as a left-edge sidebar
-/// like Sessions / Settings. Future tabs: Custom agents (Phase 20),
-/// Instructions (Phase 21).
+/// Hosts cross-session configuration and project/user instruction
+/// discovery: MCP servers, Skills, Agents, and read-only Instructions.
+/// Opens from the ActivityBar as a left-edge sidebar like Sessions /
+/// Settings.
 ///
 /// Each tab body is its own component so loading / state stays
 /// scoped — switching tabs doesn't re-fetch the other tab's data.
@@ -18,6 +18,7 @@ import TabPanel from "primevue/tabpanel";
 import LibraryMcpTab from "./LibraryMcpTab.vue";
 import LibrarySkillsTab from "./LibrarySkillsTab.vue";
 import LibraryAgentsTab from "./LibraryAgentsTab.vue";
+import LibraryInstructionsTab from "./LibraryInstructionsTab.vue";
 
 // Persist the last-active tab across panel re-mounts so toggling the
 // activity bar doesn't lose the user's place.
@@ -68,6 +69,7 @@ onBeforeUnmount(() => {
         <Tab value="mcp">MCP</Tab>
         <Tab value="skills">Skills</Tab>
         <Tab value="agents">Agents</Tab>
+        <Tab value="instructions">Instructions</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="mcp">
@@ -78,6 +80,9 @@ onBeforeUnmount(() => {
         </TabPanel>
         <TabPanel value="agents">
           <LibraryAgentsTab />
+        </TabPanel>
+        <TabPanel value="instructions">
+          <LibraryInstructionsTab />
         </TabPanel>
       </TabPanels>
     </Tabs>

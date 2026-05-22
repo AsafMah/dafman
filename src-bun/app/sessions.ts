@@ -15,6 +15,7 @@
 
 import {
 	type CopilotSession,
+	type CommandDefinition,
 	type ElicitationContext,
 	type ElicitationResult,
 	type PermissionRequest,
@@ -286,6 +287,7 @@ export class SessionRegistry {
 			// yet, so discovery is the only source.
 			enableConfigDiscovery: true,
 			tools: buildBuiltInTools(this),
+			commands: this.buildRegisteredCommands(sessionId),
 			onPermissionRequest: (request: PermissionRequest): Promise<PermissionRequestResult> => {
 				const sid = sessionId();
 				// Per-session approveAll short-circuit. Returns the SDK's
@@ -369,6 +371,26 @@ export class SessionRegistry {
 				return excluded.length > 0 ? { excludedTools: excluded } : {};
 			})()),
 		};
+	}
+
+	private buildRegisteredCommands(sessionId: () => string): CommandDefinition[] {
+		return [
+			{
+				name: "library",
+				description:
+					"Open Dafman's Library panel. In Dafman UI, use /library [mcp|skills|agents|instructions].",
+				handler: (context) => {
+					const tab = context.args.trim().split(/\s+/)[0] || "mcp";
+					this.emit({
+						sessionId: sessionId(),
+						eventType: "system.notification",
+						data: {
+							content: `Library command received (${tab}). In Dafman, /library opens the Library sidebar; from the CLI TUI use the app's Library activity-bar item.`,
+						},
+					});
+				},
+			},
+		];
 	}
 
 	/// Renderer → bun: respond to a pending callback. Idempotent: a

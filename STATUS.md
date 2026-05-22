@@ -13,12 +13,13 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **M2 — Messaging power-ups** essentially closed.
+**Active milestone:** **Post-M2 audit burn-down**.
 M1 + M2 shipped (including in-app log viewer, export conversation,
-permissions tab, tools allowlist, MCP OAuth toast). Active direction
-is now post-M2 work from the audit's Phase 18–40 ordering — Library
-tab consolidation, App shell redesign, and Long-jobs / Autopilot UI
-are the top-of-queue candidates.
+permissions tab, tools allowlist, MCP OAuth toast). Current work is
+the audit's Phase 21/23 local slice: Library consolidation + command
+wiring. Library now has MCP, Skills, Agents, and read-only
+Instructions; remaining Library work is a richer unified item grid /
+editing flows if desired.
 
 ---
 
@@ -31,10 +32,12 @@ used" call — we will not pursue it speculatively.
 
 Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` §C):
 
-1. **Library tab consolidation + slash commands** (audit P21, ~2 d).
-   Skills + MCP + Agents + Instructions currently live in separate
-   places; consolidate behind a single Library panel with a unified
-   item grid. Needs scope interview — "consolidation" is ambiguous.
+1. **Library tab consolidation follow-up** (audit P21, remaining).
+   Initial slice shipped: Instructions tab + `/library ...` command
+   wiring + SDK `CommandDefinition` registration. Remaining optional
+   work: unified Library item grid, in-app instruction editor (must be
+   permissioned), or deeper SDK hook features (`onUserPromptSubmitted`,
+   `onSessionStart`) once there is a concrete use case.
 2. **App shell redesign — sidebar + status bar** (audit P22, ~2 d).
    Replaces the topbar-only chrome with a left activity bar + bottom
    status bar; affects every screen so it's a larger structural lift.
@@ -293,8 +296,8 @@ estimates (1 d = ~1 working day of focused engineering).
 | Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
 | Real binary E2E | not yet wired | 0 |
 
-Total: **347 `bun test`** passing as of 2026-05-22; smoke green on both
-prod and HMR.
+Total: **487 `bun test`** passing as of 2026-05-22; **70/70 smoke**
+green across prod + HMR.
 
 ---
 
@@ -324,6 +327,19 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
+
+- **2026-05-22** — Phase 23a shipped: **Library Instructions +
+  command wiring**. Library panel now includes a read-only
+  Instructions tab listing global Copilot-instruction candidates plus
+  active-workspace project sources (`AGENTS.md`,
+  `.github/copilot-instructions.md`, nested `AGENTS.md` with heavy
+  dirs skipped). Existing files expand inline and can be revealed in
+  the OS file manager. Added local `/library [mcp|skills|agents|instructions]`
+  command without shadowing SDK `/mcp` or `/skills`, and registered a
+  non-colliding SDK `CommandDefinition` named `library` in session
+  config. Fixed the stale `08-audit-rehydrate` smoke spec by removing
+  a dangling fake permission request. **487 bun tests** (was 482),
+  **70/70 smoke**.
 
 - **2026-05-25** — Phase 22b shipped: **Tools section grouped view
   + per-tool allowlist**. Rail Tools section now groups by source

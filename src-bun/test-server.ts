@@ -33,6 +33,7 @@ import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
 import { SkillsRegistry } from "./app/skillsRegistry";
 import { SettingsService } from "./app/settings";
+import { listInstructionSources } from "./app/instructions";
 import { toModelSummary } from "./app/models";
 import { FakeCopilotClient } from "./app/fakeClient";
 import type { AuditEntry } from "./app/audit";
@@ -407,6 +408,10 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 	setGloballyDisabledSkills: rpcGuard(async (args) => {
 		const { disabledSkills } = args as { disabledSkills: string[] };
 		return skills.setGloballyDisabled(disabledSkills);
+	}),
+	listInstructionSources: rpcGuard(async (args) => {
+		const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
+		return listInstructionSources({ workingDirectory });
 	}),
 };
 
