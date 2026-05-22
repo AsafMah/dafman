@@ -11,8 +11,15 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 11,
-    appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
+    version: 12,
+    appearance: {
+      theme: "system",
+      reasoningVisibility: "compact",
+      defaultModelId: "auto",
+      defaultReasoningEffort: null,
+      streaming: false,
+      enableMermaid: false,
+    },
     layout: { dockview: null },
     workspaces: { recent: [], defaultWorkspace: "" },
     notifications: { turnEnd: false, waitingForInput: true },
@@ -71,6 +78,20 @@ export const useSettingsStore = defineStore("settings", () => {
     return update({
       ...settings.value,
       appearance: { ...settings.value.appearance, reasoningVisibility },
+    });
+  }
+
+  async function setDefaultModel(
+    defaultModelId: string,
+    defaultReasoningEffort: string | null,
+  ): Promise<Settings> {
+    return update({
+      ...settings.value,
+      appearance: {
+        ...settings.value.appearance,
+        defaultModelId,
+        defaultReasoningEffort,
+      },
     });
   }
 
@@ -204,6 +225,7 @@ export const useSettingsStore = defineStore("settings", () => {
     update,
     setTheme,
     setReasoningVisibility,
+    setDefaultModel,
     setStreaming,
     setEnableMermaid,
     setNotifications,

@@ -16,10 +16,12 @@
 **Active milestone:** **Post-M2 audit burn-down**.
 M1 + M2 shipped (including in-app log viewer, export conversation,
 permissions tab, tools allowlist, MCP OAuth toast). Current work is
-the audit's Phase 23 local slice: Copilot CLI mode parity before the
-larger long-jobs/fleet UI. The three-way mode toggle now has native
-plan/autopilot lifecycle handling, `/plan <prompt>` bootstrap behavior,
-exit-plan approval UI, and autopilot unavailable-user semantics.
+the audit's Phase 23 local slice: Copilot CLI mode parity plus the
+2026-05-22 UI problem sweep before the larger long-jobs/fleet UI. The
+three-way mode toggle now has native plan/autopilot lifecycle handling,
+`/plan <prompt>` bootstrap behavior, exit-plan approval UI, autopilot
+unavailable-user semantics, and polished composer/details/library
+surfaces from `problems.md`.
 
 ---
 

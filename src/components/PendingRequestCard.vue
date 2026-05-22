@@ -39,6 +39,7 @@ import type {
   UserInputRequestData,
 } from "../ipc/types";
 import { useSessionsStore } from "../stores/sessionsStore";
+import MessageContent from "./MessageContent.vue";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import { styleFor } from "../lib/notificationStyles";
@@ -483,10 +484,12 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
       <p class="pending-card-source">
         Recommended: {{ asExitPlanMode.recommendedAction }}
       </p>
-      <pre
+      <div
         v-if="asExitPlanMode.planContent"
         class="pending-card-plan"
-      >{{ asExitPlanMode.planContent }}</pre>
+      >
+        <MessageContent :text="asExitPlanMode.planContent" label="Plan markdown" />
+      </div>
       <div class="pending-card-input">
         <label class="pending-card-input-label">Feedback / requested changes:</label>
         <Textarea v-model="exitPlanFeedback" rows="3" />
@@ -652,9 +655,11 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
   padding: 0.6rem 0.75rem;
   border-radius: var(--p-border-radius-sm);
   background: var(--p-content-hover-background);
-  white-space: pre-wrap;
-  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+}
+
+.pending-card-plan :deep(.md-html-segment) {
   font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .pending-card-source {

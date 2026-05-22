@@ -21,6 +21,12 @@ export interface SessionHistoryCompactionResult {
 export interface Appearance {
   theme: ThemeChoice;
   reasoningVisibility: ReasoningVisibility;
+  /// Default model id for newly-created sessions. Empty means let the
+  /// SDK/CLI pick its own default.
+  defaultModelId: string;
+  /// Default reasoning effort for newly-created sessions. Null means
+  /// use the selected model's default effort.
+  defaultReasoningEffort: string | null;
   /// Whether the SDK streams `assistant.message_delta` events for
   /// the assistant's reply. `false` (default) renders only the
   /// final `assistant.message` per turn. Takes effect on the NEXT
@@ -346,7 +352,11 @@ export type AppErrorPayload =
 export type CommandMap = {
   createClient: { args: Record<string, never>; result: string };
   createSession: {
-    args: { workingDirectory?: string };
+    args: {
+      workingDirectory?: string;
+      model?: string | null;
+      reasoningEffort?: string | null;
+    };
     result: string;
   };
   pickFolder: {
@@ -397,7 +407,7 @@ export type CommandMap = {
       model: string | null;
       reasoningEffort: string | null;
     };
-    result: { sessionId: string; cwd: string | null };
+    result: { sessionId: string; cwd: string | null; model: string | null };
   };
   listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
   deleteSession: { args: { sessionId: string }; result: string };

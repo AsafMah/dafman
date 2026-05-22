@@ -11,6 +11,7 @@ import Button from "primevue/button";
 import ToggleSwitch from "primevue/toggleswitch";
 import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "../stores/toastStore";
+import MessageContent from "./MessageContent.vue";
 
 type Skill = {
   name: string;
@@ -157,7 +158,7 @@ onMounted(() => {
               v-if="skill.description && isExpanded(skill.name)"
               class="skill-desc"
             >
-              {{ skill.description }}
+              <MessageContent :text="skill.description" label="Skill description" />
             </div>
           </li>
         </ul>
@@ -266,11 +267,14 @@ onMounted(() => {
 
 .skill-desc {
   grid-column: 1 / -1;
-  font-size: 0.72rem;
   color: var(--p-text-muted-color);
   padding: 0.25rem 0.25rem 0.15rem 0.95rem;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.skill-desc :deep(.md-html-segment) {
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .empty-hint {

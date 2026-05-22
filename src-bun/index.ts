@@ -114,9 +114,11 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				await ensureClient();
 				return "Copilot client created";
 			}),
-			createSession: rpcGuard(async ({ workingDirectory }) =>
+			createSession: rpcGuard(async ({ workingDirectory, model, reasoningEffort }) =>
 				sessions.create({
 					...(workingDirectory ? { workingDirectory } : {}),
+					...(model ? { model } : {}),
+					...(reasoningEffort ? { reasoningEffort } : {}),
 				}),
 			),
 			pickFolder: rpcGuard(async ({ startingFolder }) => {
@@ -190,7 +192,8 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				// has a real cwd, so the renderer doesn't silently
 				// display the exe folder as the workspace.
 				const cwd = (await sessions.getCwd(actualId)) ?? null;
-				return { sessionId: actualId, cwd };
+				const currentModel = await sessions.getCurrentModel(actualId).catch(() => null);
+				return { sessionId: actualId, cwd, model: currentModel };
 			}),
 			listSessions: rpcGuard(async () => sessions.list()),
 			deleteSession: rpcGuard(async ({ sessionId }) =>

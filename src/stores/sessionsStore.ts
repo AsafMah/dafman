@@ -124,11 +124,16 @@ export type SessionRecord = {
   /// Bumped on SDK `session.plan_changed` so plan.md edits made by the
   /// agent or CLI callbacks refresh the preview without remounting.
   planRefreshCounter: number;
+  /// Monotonic artifacts touched by this session. Unlike the chat
+  /// footer's derived items, this survives the raw event ring-buffer cap.
+  touchedFiles: string[];
+  commandsRun: number;
   /// 22a: requestIds of MCP OAuth required-events we've toasted, so a
   /// resume / replay doesn't duplicate the notification, and so we
   /// can pair `_completed` events with their `_required`. Internal —
   /// renderer surfaces never read this directly.
   _toastedOauthRequests: Set<string>;
+  _artifactToolCallIds: Set<string>;
 };
 
 /// Per-record mirror of a single pending request. Matches the
@@ -279,6 +284,8 @@ export const useSessionsStore = defineStore("sessions", () => {
     if (import.meta.env.DEV) {
       console.debug("[session-event]", payload.eventType, payload.data);
     }
+
+    trackSessionArtifact(record, payload);
 
     // Keep model + reasoning effort in sync with backend-initiated changes
     // (rate-limit auto-switch, /model commands, etc.). The session.model_change
@@ -486,6 +493,49 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
   }
 
+  function trackSessionArtifact(
+    record: SessionRecord,
+    payload: SessionEventPayload,
+  ): void {
+    if (
+      payload.eventType !== "tool.user_requested" &&
+      payload.eventType !== "tool.execution_start"
+    ) {
+      return;
+    }
+    const d = payload.data as {
+      toolCallId?: unknown;
+      toolName?: unknown;
+      arguments?: unknown;
+    };
+    const toolCallId = typeof d.toolCallId === "string" ? d.toolCallId : null;
+    if (toolCallId && record._artifactToolCallIds.has(toolCallId)) return;
+    if (toolCallId) record._artifactToolCallIds.add(toolCallId);
+
+    const toolName = typeof d.toolName === "string" ? d.toolName.toLowerCase() : "";
+    if (["shell", "bash", "exec", "execute"].includes(toolName)) {
+      record.commandsRun += 1;
+      return;
+    }
+    if (
+      !["edit", "write", "apply_patch", "create", "str_replace"].some((needle) =>
+        toolName.includes(needle),
+      )
+    ) {
+      return;
+    }
+    const args = d.arguments;
+    if (!args || typeof args !== "object") return;
+    const obj = args as Record<string, unknown>;
+    const path =
+      obj.path ?? obj.filePath ?? obj.fileName ?? obj.filename ?? obj.targetFile;
+    if (typeof path !== "string" || !path.trim()) return;
+    const trimmed = path.trim();
+    if (!record.touchedFiles.includes(trimmed)) {
+      record.touchedFiles.push(trimmed);
+    }
+  }
+
   /// True when the user can't see this session right now — either
   /// because their dockview focus is elsewhere, OR because the app
   /// window is hidden / blurred. The OS-notification call sites
@@ -631,15 +681,30 @@ export const useSessionsStore = defineStore("sessions", () => {
     );
   }
 
-  async function createSession(opts: { workingDirectory?: string } = {}): Promise<SessionRecord | null> {
+  async function createSession(
+    opts: {
+      workingDirectory?: string;
+      model?: string | null;
+      reasoningEffort?: string | null;
+    } = {},
+  ): Promise<SessionRecord | null> {
     if (isCreating.value) return null;
     ensureSubscription();
     const toasts = useToastStore();
     isCreating.value = true;
     try {
       const wd = opts.workingDirectory?.trim();
+      const settingsStore = useSettingsStore();
+      const defaultModel =
+        opts.model ?? settingsStore.settings.appearance.defaultModelId?.trim() ?? "";
+      const defaultReasoning =
+        opts.reasoningEffort ??
+        settingsStore.settings.appearance.defaultReasoningEffort ??
+        null;
       const id = await invokeCommand("createSession", {
         ...(wd ? { workingDirectory: wd } : {}),
+        ...(defaultModel ? { model: defaultModel } : {}),
+        ...(defaultReasoning ? { reasoningEffort: defaultReasoning } : {}),
       });
       const accent = accentForIndex(creationCount++);
       const record: SessionRecord = reactive({
@@ -647,8 +712,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         accent,
         events: [],
         droppedEventCount: 0,
-        model: null,
-        reasoningEffort: null,
+        model: defaultModel || null,
+        reasoningEffort: defaultReasoning,
         title: null,
         mode: null,
         approveAll: false, // dafman handler now drives permissions; default is interactive
@@ -663,8 +728,11 @@ export const useSessionsStore = defineStore("sessions", () => {
         currentAgent: null,
         tasksRefreshCounter: 0,
         planRefreshCounter: 0,
+        touchedFiles: [],
+        commandsRun: 0,
 
         _toastedOauthRequests: new Set<string>(),
+        _artifactToolCallIds: new Set<string>(),
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -674,7 +742,6 @@ export const useSessionsStore = defineStore("sessions", () => {
       // we don't need a backend RPC change — just call the existing
       // per-session setter. Skipped when false (default) so we don't
       // emit a spurious approve-all flip on every session create.
-      const settingsStore = useSettingsStore();
       const defaultApprove =
         settingsStore.settings.permissions?.defaultApproveAll === true;
       if (defaultApprove) {
@@ -742,9 +809,8 @@ export const useSessionsStore = defineStore("sessions", () => {
       const existing = sessions.value.find((s) => s.id === actualId);
       if (existing) {
         // Still backfill cwd if the existing record is missing it.
-        if (!existing.workingDirectory && response.cwd) {
-          existing.workingDirectory = response.cwd;
-        }
+        if (!existing.workingDirectory && response.cwd) existing.workingDirectory = response.cwd;
+        if (!existing.model && response.model) existing.model = response.model;
         return existing;
       }
       const accent = accentForIndex(creationCount++);
@@ -753,7 +819,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         accent,
         events: [],
         droppedEventCount: 0,
-        model: null,
+        model: response.model,
         reasoningEffort: null,
         title: null,
         mode: null,
@@ -769,8 +835,11 @@ export const useSessionsStore = defineStore("sessions", () => {
         currentAgent: null,
         tasksRefreshCounter: 0,
         planRefreshCounter: 0,
+        touchedFiles: [],
+        commandsRun: 0,
 
         _toastedOauthRequests: new Set<string>(),
+        _artifactToolCallIds: new Set<string>(),
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and

@@ -49,7 +49,10 @@ describe("SettingsService", () => {
 			appearance: {
 				theme: "dark" as const,
 				reasoningVisibility: "compact" as const,
-				streaming: false, enableMermaid: false,
+				defaultModelId: "auto",
+				defaultReasoningEffort: null,
+				streaming: false,
+				enableMermaid: false,
 			},
 			layout: { dockview: null },
 			workspaces: { recent: ["D:\\repo\\dafman"], defaultWorkspace: "" },

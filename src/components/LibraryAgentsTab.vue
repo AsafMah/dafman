@@ -437,9 +437,6 @@ async function reveal(path: string) {
   flex-direction: column;
   gap: 0.6rem;
   min-width: 0;
-  /* Required so the new-agent form overlay (position: absolute) anchors
-   * to the tab body, not the document. */
-  position: relative;
   min-height: 100%;
 }
 
@@ -565,21 +562,20 @@ async function reveal(path: string) {
   text-align: center;
 }
 
-/* Form overlay covers the tab. Single-column layout works in the
- * narrow Library panel; no horizontal scroll. */
+/* Form card stays in the tab flow so narrow sidebars don't stack the
+ * fields on top of each other or hide the footer behind an overlay. */
 .agent-form-wrap {
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--p-content-background) 92%, transparent);
-  display: flex;
-  flex-direction: column;
-  z-index: 2;
+  position: static;
+  display: block;
+  border: 1px solid var(--p-surface-border);
+  border-radius: var(--p-border-radius-md);
+  background: var(--p-content-background);
+  overflow: hidden;
 }
 
 .agent-form {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -597,8 +593,6 @@ async function reveal(path: string) {
 }
 
 .form-body {
-  flex: 1 1 auto;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;

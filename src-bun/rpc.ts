@@ -32,6 +32,12 @@ export interface SessionHistoryCompactionResult {
 export interface Appearance {
 	theme: ThemeChoice;
 	reasoningVisibility: ReasoningVisibility;
+	/// Default model id for newly-created sessions. Empty means let the
+	/// SDK/CLI pick its own default.
+	defaultModelId: string;
+	/// Default reasoning effort for newly-created sessions. Null means
+	/// use the selected model's default effort.
+	defaultReasoningEffort: string | null;
 	/// Whether the SDK streams `assistant.message_delta` events for
 	/// the assistant's reply. `false` (default) renders only the
 	/// final `assistant.message` per turn — feels less "live" but
@@ -444,7 +450,11 @@ export type DafmanRPC = {
 				/// SDK uses as `cwd` for all tool invocations in this
 				/// session. Empty / omitted falls back to the bun
 				/// process's cwd (the SDK's own default).
-				params: { workingDirectory?: string };
+				params: {
+					workingDirectory?: string;
+					model?: string | null;
+					reasoningEffort?: string | null;
+				};
 				response: string;
 			};
 			/// Native folder picker. Returns the absolute path of the
@@ -552,7 +562,7 @@ export type DafmanRPC = {
 				/// surface it here because `getMessages()` history doesn't
 				/// include `session.resume`, so the renderer otherwise has
 				/// no chance to learn the workspace path on restore.
-				response: { sessionId: string; cwd: string | null };
+				response: { sessionId: string; cwd: string | null; model: string | null };
 			};
 			listSessions: {
 				params: Record<string, never>;

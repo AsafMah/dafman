@@ -7,8 +7,9 @@
 ///   - For Claude, an extra "type" level groups by capability tier:
 ///       Opus > Sonnet > Haiku. Anything else falls through under
 ///       provider directly.
-///   - Version label is whatever's left after stripping
-///     provider + type.
+///   - Leaf labels keep the full model name, even inside provider/type
+///     groups, so the closed picker never collapses to an ambiguous
+///     version like "5.5".
 ///   - Versions sort descending so the newest is on top.
 ///
 /// The function is deterministic and pure: no Date.now(), no Math.random.
@@ -67,20 +68,6 @@ function claudeType(name: string): string {
   return "";
 }
 
-/// Returns the version label — what's shown in the leaf row. For GPT
-/// it's the part after the first dash (e.g. "5.5" from "GPT-5.5").
-/// For Claude it's the part after the type word
-/// (e.g. "4.7 (1M context)" from "Claude Opus 4.7 (1M context)").
-/// Falls back to the full name when neither pattern matches.
-function versionLabel(name: string): string {
-  const trimmed = name.trim();
-  const gptMatch = trimmed.match(/^gpt[-\s]+(.+)$/i);
-  if (gptMatch) return gptMatch[1].trim();
-  const claudeMatch = trimmed.match(/^claude\s+\S+\s+(.+)$/i);
-  if (claudeMatch) return claudeMatch[1].trim();
-  return trimmed;
-}
-
 /// Natural-order comparator on version-ish strings: splits on
 /// non-alphanumerics and compares numeric runs as numbers so "4.10"
 /// sorts after "4.9". Returns DESC order (newest first) — flip the
@@ -126,7 +113,7 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
     const typeBucket = provBucket.get(typeKey) ?? [];
     typeBucket.push({
       key: m.id,
-      label: versionLabel(m.name),
+      label: m.name,
       data: m.id,
       model: m,
     });

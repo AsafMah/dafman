@@ -35,7 +35,10 @@ describe("sessionCommands", () => {
       currentAgent: null,
       tasksRefreshCounter: 0,
       planRefreshCounter: 0,
+      touchedFiles: [],
+      commandsRun: 0,
       _toastedOauthRequests: new Set<string>(),
+      _artifactToolCallIds: new Set<string>(),
     });
 
     const handled = await runLocalSlashCommand("s1", "/cd");
@@ -91,7 +94,10 @@ describe("sessionCommands", () => {
       currentAgent: null,
       tasksRefreshCounter: 0,
       planRefreshCounter: 0,
+      touchedFiles: [],
+      commandsRun: 0,
       _toastedOauthRequests: new Set<string>(),
+      _artifactToolCallIds: new Set<string>(),
     });
 
     const handled = await runLocalSlashCommand("s1", "/cd C:\\other");
@@ -158,7 +164,10 @@ describe("sessionCommands", () => {
       currentAgent: null,
       tasksRefreshCounter: 0,
       planRefreshCounter: 0,
+      touchedFiles: [],
+      commandsRun: 0,
       _toastedOauthRequests: new Set<string>(),
+      _artifactToolCallIds: new Set<string>(),
     });
 
     const handled = await runLocalSlashCommand("s1", "/plan build mode parity");

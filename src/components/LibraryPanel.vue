@@ -16,6 +16,7 @@ import Tab from "primevue/tab";
 import TabPanels from "primevue/tabpanels";
 import TabPanel from "primevue/tabpanel";
 import LibraryMcpTab from "./LibraryMcpTab.vue";
+import LibraryToolsTab from "./LibraryToolsTab.vue";
 import LibrarySkillsTab from "./LibrarySkillsTab.vue";
 import LibraryAgentsTab from "./LibraryAgentsTab.vue";
 import LibraryInstructionsTab from "./LibraryInstructionsTab.vue";
@@ -67,6 +68,7 @@ onBeforeUnmount(() => {
     <Tabs :value="activeTab" @update:value="onTabChange" class="library-tabs">
       <TabList>
         <Tab value="mcp">MCP</Tab>
+        <Tab value="tools">Tools</Tab>
         <Tab value="skills">Skills</Tab>
         <Tab value="agents">Agents</Tab>
         <Tab value="instructions">Instructions</Tab>
@@ -74,6 +76,9 @@ onBeforeUnmount(() => {
       <TabPanels>
         <TabPanel value="mcp">
           <LibraryMcpTab />
+        </TabPanel>
+        <TabPanel value="tools">
+          <LibraryToolsTab />
         </TabPanel>
         <TabPanel value="skills">
           <LibrarySkillsTab />

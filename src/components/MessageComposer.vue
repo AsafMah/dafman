@@ -484,11 +484,11 @@ const SubmitButton = defineComponent({
             v-if="props.sessionId"
             :session-id="props.sessionId"
           />
-          <!-- Slot for per-session controls (model picker, reasoning
-               effort, options gear). ChatWindow plugs SessionHeaderControls
-               here so the chat tile no longer needs its own header strip. -->
-          <slot name="session-controls" />
           <div class="lex-toolbar-spacer" />
+          <!-- Slot for per-session controls (model picker, reasoning
+               effort, options gear). Kept after the spacer so these
+               controls stay right-aligned like the CLI composer. -->
+          <slot name="session-controls" />
         </footer>
         <EditorRefCapture />
       </LexicalComposer>

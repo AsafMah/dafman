@@ -33,6 +33,8 @@ const modeChoice = computed<SessionMode | null>({
     void sessionsStore.setSessionMode(props.sessionId, value);
   },
 });
+
+const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
 </script>
 
 <template>
@@ -46,6 +48,7 @@ const modeChoice = computed<SessionMode | null>({
     size="small"
     aria-label="Agent run mode"
     class="mode-button-group"
+    :class="modeClass"
   >
     <template #option="slotProps">
       <i :class="slotProps.option.icon" :title="slotProps.option.label" />
@@ -89,9 +92,18 @@ const modeChoice = computed<SessionMode | null>({
   color: var(--p-text-color);
 }
 .mode-button-group :deep(.p-selectbutton .p-button.p-togglebutton-checked) {
-  background: color-mix(in srgb, var(--accent, var(--p-primary-color)) 22%, transparent);
-  color: var(--p-text-color);
+  background: color-mix(in srgb, var(--mode-color, var(--accent, var(--p-primary-color))) 22%, transparent);
+  color: var(--mode-color, var(--p-text-color));
   border: 0;
+}
+.mode-button-group.mode-interactive {
+  --mode-color: var(--p-blue-500);
+}
+.mode-button-group.mode-plan {
+  --mode-color: var(--p-amber-500);
+}
+.mode-button-group.mode-autopilot {
+  --mode-color: var(--p-purple-500);
 }
 .mode-button-group :deep(.p-selectbutton .p-button .pi) {
   font-size: 0.78rem;

@@ -96,6 +96,7 @@ function activate(item: ActivityItem) {
       tabComponent: "sidebarTab",
       title: item.title,
       initialSize: item.initialSize,
+      exclusive: true,
       ...(item.minimumSize !== undefined
         ? { minimumSize: item.minimumSize }
         : {}),

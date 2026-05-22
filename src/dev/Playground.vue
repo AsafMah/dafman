@@ -822,7 +822,10 @@ function ensurePlaygroundSession(): SessionRecord {
     currentAgent: null,
     tasksRefreshCounter: 0,
     planRefreshCounter: 0,
+    touchedFiles: [],
+    commandsRun: 0,
     _toastedOauthRequests: new Set<string>(),
+    _artifactToolCallIds: new Set<string>(),
   });
   sessionsStore.sessions.push(fresh);
   return fresh;

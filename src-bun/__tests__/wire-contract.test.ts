@@ -20,22 +20,38 @@ import type { AppErrorPayload } from "../app/errors";
 describe("IPC wire contracts", () => {
 	test("Settings shape", () => {
 		const sample: Settings = {
-			version: 7,
-			appearance: { theme: "dark", reasoningVisibility: "compact", streaming: false },
+			version: 12,
+			appearance: {
+				theme: "dark",
+				reasoningVisibility: "compact",
+				defaultModelId: "auto",
+				defaultReasoningEffort: null,
+				streaming: false,
+				enableMermaid: false,
+			},
 			layout: { dockview: null },
 			workspaces: {
 				recent: ["D:\\repo\\dafman", "C:\\code\\demo"],
 				defaultWorkspace: "D:\\repo\\dafman",
 			},
 			notifications: { turnEnd: false, waitingForInput: true },
+			tools: { defaultExcluded: [], defaultAllowed: [] },
+			permissions: { defaultApproveAll: false },
 		};
 		expect(sample).toMatchSnapshot();
 	});
 
 	test("Settings with persisted layout", () => {
 		const sample: Settings = {
-			version: 7,
-			appearance: { theme: "dark", reasoningVisibility: "compact", streaming: true },
+			version: 12,
+			appearance: {
+				theme: "dark",
+				reasoningVisibility: "compact",
+				defaultModelId: "gpt-5.5",
+				defaultReasoningEffort: "medium",
+				streaming: true,
+				enableMermaid: false,
+			},
 			layout: {
 				dockview: {
 					grid: {
@@ -50,6 +66,8 @@ describe("IPC wire contracts", () => {
 			},
 			workspaces: { recent: [], defaultWorkspace: "" },
 			notifications: { turnEnd: true, waitingForInput: true },
+			tools: { defaultExcluded: ["bash"], defaultAllowed: [] },
+			permissions: { defaultApproveAll: true },
 		};
 		expect(sample).toMatchSnapshot();
 	});
@@ -138,6 +156,24 @@ describe("IPC wire contracts", () => {
 			sessionId: "sess-1",
 			text: "steer this",
 			mode: "immediate" as const,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("createSession request — model defaults", () => {
+		const sample = {
+			workingDirectory: "D:\\repo\\dafman",
+			model: "gpt-5.5",
+			reasoningEffort: "medium",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("resumeSession response — cwd and current model", () => {
+		const sample = {
+			sessionId: "sess-1",
+			cwd: "D:\\repo\\dafman",
+			model: "gpt-5.5",
 		};
 		expect(sample).toMatchSnapshot();
 	});

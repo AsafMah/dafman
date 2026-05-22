@@ -77,9 +77,10 @@ function openLibraryTab(tab = "mcp"): void {
 		id: "library",
 		component: "library",
 		tabComponent: "sidebarTab",
-		title: "Library — MCP servers + Skills + Agents + Instructions",
+		title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
 		initialSize: 360,
 		minimumSize: 280,
+		exclusive: true,
 	});
 }
 

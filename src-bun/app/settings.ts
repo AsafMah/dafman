@@ -27,7 +27,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 11;
+export const SETTINGS_VERSION = 12;
 
 /// One-time backfill: returns `<homedir>/dafman` (created on demand),
 /// or `""` on failure. Used by `src-bun/index.ts` to populate the
@@ -73,7 +73,14 @@ export function defaultSettings(): Settings {
 		// streaming — the agent's reply lands in one chunk per
 		// `assistant.message` event. Users can opt back in via
 		// Settings → Appearance.
-		appearance: { theme: "system", reasoningVisibility: "compact", streaming: false, enableMermaid: false },
+		appearance: {
+			theme: "system",
+			reasoningVisibility: "compact",
+			defaultModelId: "auto",
+			defaultReasoningEffort: null,
+			streaming: false,
+			enableMermaid: false,
+		},
 		layout: { dockview: null },
 		workspaces: { recent: [], defaultWorkspace: "" },
 		notifications: { turnEnd: false, waitingForInput: true },
@@ -119,7 +126,23 @@ function coerceAppearance(raw: unknown): Appearance {
 		typeof obj.streaming === "boolean" ? obj.streaming : base.streaming;
 	const enableMermaid =
 		typeof obj.enableMermaid === "boolean" ? obj.enableMermaid : base.enableMermaid;
-	return { theme, reasoningVisibility: rv, streaming, enableMermaid };
+	const defaultModelId =
+		typeof obj.defaultModelId === "string"
+			? obj.defaultModelId.trim()
+			: base.defaultModelId;
+	const defaultReasoningEffort =
+		typeof obj.defaultReasoningEffort === "string" &&
+		obj.defaultReasoningEffort.trim()
+			? obj.defaultReasoningEffort.trim()
+			: null;
+	return {
+		theme,
+		reasoningVisibility: rv,
+		defaultModelId,
+		defaultReasoningEffort,
+		streaming,
+		enableMermaid,
+	};
 }
 
 /// Coerces a raw `layout` blob into the canonical shape. The dockview

@@ -15,6 +15,39 @@
 
 ---
 
+## 2026-05-22 — UI problem sweep
+
+1. ⏳ **Composer controls alignment + indicators.**
+   - **Steps:** open a session, resize the window from wide to narrow,
+     switch between Interactive / Plan / Autopilot, and toggle the
+     shield auto-approve button.
+   - **Expected:** model/reasoning/settings stay right-aligned; each
+     mode has a distinct color; the shield turns green only when
+     auto-approve is on.
+   - **Why not automated:** visual alignment and color affordances are
+     easiest to validate in the live WebView layout.
+
+2. ⏳ **Library MCP/Tools/Agent form.**
+   - **Steps:** open Library, check MCP discovered rows, Tools, and New
+     agent. Toggle one discovered MCP row and one tool, then cancel New
+     agent.
+   - **Expected:** MCP rows use switches, Tools has global/per-tool
+     toggles, and the New agent form stays readable without overlap.
+   - **Why not automated:** depends on live SDK-discovered MCP/tool data
+     and sidebar dimensions.
+
+3. ⏳ **Details rail width/files/settings.**
+   - **Steps:** resize the right details rail, switch between session
+     tabs, open Session settings, and expand Files touched after a file
+     write/edit tool has run.
+   - **Expected:** rail width stays stable, duplicate settings are
+     collapsed by default, and touched file paths appear in the files
+     section rather than as a footer chip.
+   - **Why not automated:** dockview sash sizing and live tool artifacts
+     need runtime observation.
+
+---
+
 ## Phase 23b — Copilot CLI mode parity
 
 1. ⏳ **Plan mode approval flow.**

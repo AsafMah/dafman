@@ -9,7 +9,7 @@
 // New settings categories slot in as additional <section> blocks; the
 // existing collapsedGroups reactive map keys them by id.
 
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -19,11 +19,20 @@ import { useNotificationsStore } from "../stores/notificationsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
-import type { ReasoningVisibility, ThemeChoice } from "../ipc/types";
+import type { ModelSummary, ReasoningVisibility, ThemeChoice } from "../ipc/types";
+import { useModelsStore } from "../stores/modelsStore";
 
 const settingsStore = useSettingsStore();
+const modelsStore = useModelsStore();
 const notificationsStore = useNotificationsStore();
 const { settings, isSaving } = storeToRefs(settingsStore);
+const { models } = storeToRefs(modelsStore);
+
+onMounted(() => {
+  void modelsStore.load().catch(() => {
+    /* toast already shown by the store */
+  });
+});
 
 const themeOptions: { label: string; value: ThemeChoice }[] = [
   { label: "System", value: "system" },
@@ -36,6 +45,40 @@ const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
   { label: "Compact", value: "compact" },
   { label: "Expanded", value: "expanded" },
 ];
+
+const defaultModelOptions = computed<Array<ModelSummary | { id: ""; name: string }>>(
+  () => [{ id: "", name: "CLI default" }, ...models.value],
+);
+
+const defaultModel = computed<string>({
+  get: () => settings.value.appearance.defaultModelId ?? "",
+  set: (value) => {
+    const model = models.value.find((m) => m.id === value);
+    const effort = model?.supportsReasoningEffort
+      ? settings.value.appearance.defaultReasoningEffort ?? model.defaultReasoningEffort
+      : null;
+    void settingsStore.setDefaultModel(value, effort);
+  },
+});
+
+const selectedDefaultModel = computed(() =>
+  models.value.find((m) => m.id === defaultModel.value),
+);
+
+const defaultReasoningOptions = computed(() => [
+  { label: "Model default", value: null as string | null },
+  ...(selectedDefaultModel.value?.supportedReasoningEfforts ?? []).map((effort) => ({
+    label: effort,
+    value: effort,
+  })),
+]);
+
+const defaultReasoning = computed<string | null>({
+  get: () => settings.value.appearance.defaultReasoningEffort ?? null,
+  set: (value) => {
+    void settingsStore.setDefaultModel(defaultModel.value, value);
+  },
+});
 
 const theme = computed<ThemeChoice>({
   get: () => settings.value.appearance.theme,
@@ -244,6 +287,38 @@ function toggle(id: string) {
           <p class="field-hint">
             Default for new chats. Each session can override this from its header.
           </p>
+        </label>
+        <label class="field" for="default-model-select">
+          <span class="field-label">Default model</span>
+          <Select
+            id="default-model-select"
+            v-model="defaultModel"
+            :options="defaultModelOptions"
+            option-label="name"
+            option-value="id"
+            size="small"
+            filter
+            class="field-control"
+          />
+          <p class="field-hint">
+            Used for newly-created sessions. Existing sessions keep their current model.
+          </p>
+        </label>
+        <label
+          v-if="selectedDefaultModel?.supportsReasoningEffort"
+          class="field"
+          for="default-reasoning-select"
+        >
+          <span class="field-label">Default reasoning effort</span>
+          <Select
+            id="default-reasoning-select"
+            v-model="defaultReasoning"
+            :options="defaultReasoningOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            class="field-control"
+          />
         </label>
         <div class="field field-inline">
           <label class="field-inline-label">

@@ -92,6 +92,7 @@ function dismissPanel() {
     :accent="record.accent"
     :events="record.events"
     :dropped-event-count="record.droppedEventCount"
+    :commands-run="record.commandsRun"
     :reasoning-visibility-override="record.reasoningVisibilityOverride"
     :default-send-mode="record.defaultSendMode"
   />

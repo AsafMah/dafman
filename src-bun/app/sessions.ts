@@ -484,7 +484,13 @@ export class SessionRegistry {
 		this.modeBySession.delete(sessionId);
 	}
 
-	async create(opts: { workingDirectory?: string } = {}): Promise<string> {
+	async create(
+		opts: {
+			workingDirectory?: string;
+			model?: string;
+			reasoningEffort?: string;
+		} = {},
+	): Promise<string> {
 		const client = tryGetClient();
 		// S2: buffer events that fire BEFORE `createSession` resolves
 		// (the SDK's `session.start` event can fire during creation).
@@ -505,6 +511,10 @@ export class SessionRegistry {
 			...this.baseSessionConfig(() => resolvedSessionId ?? "pending"),
 			onEvent: earlyForward,
 			...(wd ? { workingDirectory: wd } : {}),
+			...(opts.model ? { model: opts.model } : {}),
+			...(opts.reasoningEffort
+				? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
+				: {}),
 		});
 		const sessionId = session.sessionId;
 		resolvedSessionId = sessionId;
@@ -616,6 +626,21 @@ export class SessionRegistry {
 			});
 		}
 		return actualId;
+	}
+
+	async getCurrentModel(sessionId: string): Promise<string | null> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const current = (await entry.session.rpc.model.getCurrent()) as {
+				modelId?: unknown;
+			};
+			return typeof current.modelId === "string" && current.modelId.trim()
+				? current.modelId
+				: null;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
 	}
 
 	/// S5 helper: replays history events to `forward` in

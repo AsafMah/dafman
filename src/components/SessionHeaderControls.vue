@@ -36,6 +36,7 @@ const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
+const settings = storeToRefs(useSettingsStore()).settings;
 
 onMounted(() => {
   modelsStore.load().catch(() => {
@@ -47,8 +48,12 @@ const record = computed(() =>
   sessionsStore.sessions.find((s) => s.id === props.sessionId),
 );
 
+const effectiveModelId = computed(() =>
+  record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
+);
+
 const selectedModel = computed<ModelSummary | undefined>(() => {
-  const id = record.value?.model;
+  const id = effectiveModelId.value;
   return id ? models.value.find((m) => m.id === id) : undefined;
 });
 
@@ -118,7 +123,7 @@ function toggleGroupExpansion(key: string) {
 /// string the store actually persists.
 const modelTreeChoice = computed<Record<string, unknown> | null>({
   get: () => {
-    const id = record.value?.model;
+    const id = effectiveModelId.value;
     if (!id) return null;
     return { [id]: true };
   },
@@ -143,7 +148,11 @@ const effortOptions = computed(() =>
 );
 
 const effortChoice = computed<string | null>({
-  get: () => record.value?.reasoningEffort ?? null,
+  get: () =>
+    record.value?.reasoningEffort ??
+    settings.value.appearance.defaultReasoningEffort ??
+    selectedModel.value?.defaultReasoningEffort ??
+    null,
   set: (value) => {
     if (!value || !record.value?.model) return;
     void sessionsStore.setSessionModel(props.sessionId, record.value.model, value);
@@ -161,8 +170,6 @@ const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
 /// the concrete app-wide value so the picker shows a real option
 /// rather than a meaningless "Default". Writes always store a
 /// concrete value — there's no path back to "default".
-const settings = storeToRefs(useSettingsStore()).settings;
-
 const reasoningChoice = computed<ReasoningVisibility>({
   get: () => {
     const v = record.value?.reasoningVisibilityOverride;
@@ -173,6 +180,12 @@ const reasoningChoice = computed<ReasoningVisibility>({
     sessionsStore.setSessionReasoningOverride(props.sessionId, value);
   },
 });
+
+const approveAll = computed(() => record.value?.approveAll ?? false);
+function toggleApproveAll() {
+  if (!record.value) return;
+  void sessionsStore.setSessionApproveAll(props.sessionId, !approveAll.value);
+}
 
 /// Cog button toggles the per-session details rail (right-edge
 /// dockview panel). Replaces the gear popover that previously hung
@@ -286,6 +299,17 @@ function onAgentChipClick() {
       placeholder="Reasoning"
       aria-label="Reasoning visibility for this session"
       class="compact-select compact-select-reasoning"
+    />
+    <Button
+      icon="pi pi-shield"
+      text
+      rounded
+      size="small"
+      :aria-label="approveAll ? 'Disable auto-approve all tools' : 'Enable auto-approve all tools'"
+      :aria-pressed="approveAll"
+      :title="approveAll ? 'Auto-approve all tools is ON' : 'Auto-approve all tools is OFF'"
+      :class="{ 'approve-all-active': approveAll }"
+      @click="toggleApproveAll"
     />
     <Button
       icon="pi pi-cog"
@@ -443,6 +467,11 @@ function onAgentChipClick() {
 :deep(.cog-active) {
   background: color-mix(in srgb, var(--p-primary-color) 20%, transparent);
   color: var(--p-primary-color);
+}
+
+:deep(.approve-all-active) {
+  background: color-mix(in srgb, var(--p-green-500) 20%, transparent);
+  color: var(--p-green-500);
 }
 
 /* Non-leaf tree rows (provider / type). We render the label inside a

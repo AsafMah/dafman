@@ -98,6 +98,20 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     _resetSessionsStoreForTest();
   });
 
+  test("createSession forwards default model settings and seeds record model", async () => {
+    const { bridge, calls, handlers } = makeFakeBridge();
+    handlers.createSession = async () => "created-1";
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+
+    const rec = await store.createSession();
+
+    expect(rec?.model).toBe("auto");
+    expect(calls.find((c) => c.name === "createSession")?.args).toEqual({
+      model: "auto",
+    });
+  });
+
   test("events fired DURING the resumeSession RPC end up on the record", async () => {
     const { bridge, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args, fire) => {
@@ -116,7 +130,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
           deltaContent: "world",
         }),
       );
-      return { sessionId, cwd: null };
+      return { sessionId, cwd: null, model: null };
     };
     setRpcBridge(bridge);
 
@@ -134,7 +148,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
   test("events fired AFTER the RPC resolves are appended live", async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
@@ -149,7 +163,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
   test("events for unknown sessions buffer indefinitely then drain on a later restore", async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
     setRpcBridge(bridge);
     const store = useSessionsStore();
 
@@ -169,6 +183,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
+      model: null,
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -194,6 +209,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
+      model: null,
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -226,6 +242,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
+      model: null,
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -245,6 +262,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
+      model: null,
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -265,6 +283,42 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     expect(record!.isThinking).toBe(true);
     fire(event("s1", "session.idle", {}));
     expect(record!.isThinking).toBe(false);
+  });
+
+  test("file and command artifacts are tracked across restored history", async () => {
+    const { bridge, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args, fire) => {
+      const { sessionId } = args as { sessionId: string };
+      fire(
+        event(sessionId, "tool.execution_start", {
+          toolCallId: "cmd-1",
+          toolName: "shell",
+          arguments: { command: "bun test" },
+        }),
+      );
+      fire(
+        event(sessionId, "tool.execution_start", {
+          toolCallId: "edit-1",
+          toolName: "apply_patch",
+          arguments: { path: "src/App.vue" },
+        }),
+      );
+      fire(
+        event(sessionId, "tool.user_requested", {
+          toolCallId: "edit-1",
+          toolName: "apply_patch",
+          arguments: { path: "src/App.vue" },
+        }),
+      );
+      return { sessionId, cwd: null, model: null };
+    };
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+
+    const rec = await store.restoreSession("s1");
+
+    expect(rec?.commandsRun).toBe(1);
+    expect(rec?.touchedFiles).toEqual(["src/App.vue"]);
   });
 
   test("OS notification fires for every pending-request channel AND turn_end (not just permission)", async () => {
@@ -292,6 +346,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
+      model: null,
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -335,7 +390,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
   test("sendMessage forwards attachments and deep-clones reactive payloads", async () => {
     const { bridge, handlers, calls } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
     handlers.sendMessage = async () => "msg-1";
     setRpcBridge(bridge);
 
@@ -387,7 +442,7 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
   test("sendMessage omits the attachments field when none are queued", async () => {
     const { bridge, handlers, calls } = makeFakeBridge();
     handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null });
+      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
     handlers.sendMessage = async () => "msg-2";
     setRpcBridge(bridge);
 

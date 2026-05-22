@@ -55,6 +55,7 @@ const props = defineProps<{
   /// Per-session default mode for the composer's primary send action.
   /// "steer" maps to SDK `mode: "immediate"`; "queue" to `"enqueue"`.
   defaultSendMode: "steer" | "queue";
+  commandsRun?: number;
   /// Optional override for the send action. When provided, ChatWindow
   /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
   /// playground to keep the chat self-contained (echo-only, no SDK).
@@ -478,14 +479,11 @@ async function onForkNoticeClick(referenceName: string) {
   );
 }
 
-/// Session artifact summary derived from the message stream. Shown as
-/// pills above the composer so the user can scan "what's been done"
-/// without scrolling. Cheap to recompute — `items.value` is bounded
-/// by the chat scrollback we already render.
-const sessionArtifacts = computed(() => {
-  let filesModified = 0;
-  let commandsRun = 0;
-  const seenFiles = new Set<string>();
+/// Session command summary. File details moved to the right rail where
+/// the paths are actually useful and expandable.
+const commandsRun = computed(() => {
+  if (typeof props.commandsRun === "number") return props.commandsRun;
+  let total = 0;
   for (const it of items.value) {
     if (it.kind !== "tool") continue;
     const name = it.toolName.toLowerCase();
@@ -495,29 +493,10 @@ const sessionArtifacts = computed(() => {
       name === "exec" ||
       name === "execute"
     ) {
-      commandsRun++;
-      continue;
-    }
-    if (
-      name === "edit" ||
-      name === "write" ||
-      name === "apply_patch" ||
-      name === "create" ||
-      name === "str_replace"
-    ) {
-      const path =
-        ((it.args ?? {})["path"] as string | undefined) ??
-        ((it.args ?? {})["filePath"] as string | undefined) ??
-        ((it.args ?? {})["fileName"] as string | undefined);
-      if (path && !seenFiles.has(path)) {
-        seenFiles.add(path);
-        filesModified++;
-      } else if (!path) {
-        filesModified++;
-      }
+      total++;
     }
   }
-  return { filesModified, commandsRun };
+  return total;
 });
 
 const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
@@ -717,24 +696,16 @@ const pendingStyle = computed(() => {
     </div>
 
     <footer
-      v-if="ambient.usage || sessionArtifacts.filesModified || sessionArtifacts.commandsRun"
+      v-if="ambient.usage || commandsRun"
       class="chat-artifacts"
     >
       <span
-        v-if="sessionArtifacts.filesModified > 0"
+        v-if="commandsRun > 0"
         class="artifact-pill"
-        :title="`${sessionArtifacts.filesModified} file(s) touched by edit/write/patch tools this session`"
-      >
-        <i class="pi pi-file-edit" aria-hidden="true" />
-        {{ sessionArtifacts.filesModified }} file{{ sessionArtifacts.filesModified === 1 ? "" : "s" }}
-      </span>
-      <span
-        v-if="sessionArtifacts.commandsRun > 0"
-        class="artifact-pill"
-        :title="`${sessionArtifacts.commandsRun} shell command(s) executed this session`"
+        :title="`${commandsRun} shell command(s) executed this session`"
       >
         <i class="pi pi-terminal" aria-hidden="true" />
-        {{ sessionArtifacts.commandsRun }} command{{ sessionArtifacts.commandsRun === 1 ? "" : "s" }}
+        {{ commandsRun }} command{{ commandsRun === 1 ? "" : "s" }}
       </span>
       <span
         v-if="ambient.usage"

@@ -196,14 +196,21 @@ async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
   }
 }
 
-// ---------- Discovered → Enable ----------
-async function enableDiscovered(entry: DiscoveredEntry) {
+// ---------- Discovered enable / disable ----------
+async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
   try {
-    await invokeCommand("enableMcpServers", { names: [entry.name] });
+    if (enabled) {
+      await invokeCommand("enableMcpServers", { names: [entry.name] });
+    } else {
+      await invokeCommand("disableMcpServers", { names: [entry.name] });
+    }
     await loadAll();
-    toasts.success("MCP server enabled", entry.name);
+    toasts.success(
+      enabled ? "MCP server enabled" : "MCP server disabled",
+      entry.name,
+    );
   } catch (err) {
-    toasts.error("Enable failed", err instanceof Error ? err.message : String(err));
+    toasts.error("MCP toggle failed", err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -321,12 +328,10 @@ onMounted(() => {
               <span class="mcp-tag">{{ entry.source }}</span>
             </div>
             <div class="mcp-row-actions">
-              <Button
-                icon="pi pi-plus"
-                label="Enable"
-                size="small"
-                severity="secondary"
-                @click="enableDiscovered(entry)"
+              <ToggleSwitch
+                :model-value="entry.enabled"
+                :aria-label="`Enable discovered MCP server ${entry.name}`"
+                @update:model-value="(enabled: boolean) => setDiscoveredEnabled(entry, enabled)"
               />
             </div>
           </li>

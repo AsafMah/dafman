@@ -50,10 +50,10 @@ describe("buildModelTree", () => {
     expect(types).toEqual(["Opus", "Sonnet", "Haiku"]);
     const opus = claude.children[0] as ModelTreeGroup;
     const opusVersions = opus.children.map((l) => (l as ModelTreeLeaf).label);
-    expect(opusVersions).toEqual(["4.7", "4.6"]);
+    expect(opusVersions).toEqual(["Claude Opus 4.7", "Claude Opus 4.6"]);
   });
 
-  it("flattens GPT under its provider (no type level), version after the dash", () => {
+  it("flattens GPT under its provider (no type level), preserving full names", () => {
     const tree = buildModelTree([
       model("gpt-5.5", "GPT-5.5"),
       model("gpt-5.3-codex", "GPT-5.3-Codex"),
@@ -64,18 +64,18 @@ describe("buildModelTree", () => {
     ) as ModelTreeGroup;
     expect(gpt.children.every(isLeaf)).toBe(true);
     const labels = gpt.children.map((l) => (l as ModelTreeLeaf).label);
-    expect(labels[0]).toBe("5.5");
-    expect(labels[labels.length - 1]).toBe("4.1");
+    expect(labels[0]).toBe("GPT-5.5");
+    expect(labels[labels.length - 1]).toBe("GPT-4.1");
   });
 
-  it("preserves parenthetical suffixes in the version label", () => {
+  it("preserves parenthetical suffixes in the full leaf label", () => {
     const tree = buildModelTree([
       model("claude-opus-4.7-1m", "Claude Opus 4.7 (1M context)"),
     ]);
     const claude = tree[0] as ModelTreeGroup;
     const opus = claude.children[0] as ModelTreeGroup;
     expect((opus.children[0] as ModelTreeLeaf).label).toBe(
-      "4.7 (1M context)",
+      "Claude Opus 4.7 (1M context)",
     );
   });
 

@@ -76,6 +76,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             title: "Sessions",
             initialSize: 240,
             minimumSize: 160,
+            exclusive: true,
           });
         }
       },
@@ -99,6 +100,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           // width when opened via different surfaces.
           initialSize: 340,
           minimumSize: 300,
+          exclusive: true,
         });
       },
     },

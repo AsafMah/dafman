@@ -3,6 +3,26 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (2026-05-22 — UI problem sweep)
+
+- **Composer/session controls polish:** model controls now stay
+  right-aligned, model picker labels keep full model names, run modes
+  are color-coded, and the composer bar includes a color-coded
+  auto-approve toggle.
+- **Default model settings:** Settings → Appearance can choose the
+  default model and reasoning effort for new sessions; new sessions
+  start with those defaults visible instead of waiting for the first
+  model-change event.
+- **Library and details cleanup:** Library now has a Tools tab with
+  global enable/disable toggles, discovered MCP rows use the same switch
+  UI as configured servers, the new-agent form is an in-flow card, and
+  markdown descriptions render as markdown.
+- **Side rails and artifacts:** left activity panels are exclusive, the
+  dev playground button closes an open playground tab, the right details
+  rail preserves width across session switches, duplicated session
+  settings are collapsed by default, and touched files moved from the
+  useless footer chip into a collapsible details section.
+
 ### Added (Phase 23b — Copilot CLI mode parity)
 
 - **Native plan/autopilot lifecycle wiring.** Dafman now uses the

@@ -17,7 +17,7 @@
 /// `toJSON()`/`fromJSON()` in `layoutStore.snapshot/restore`, so no
 /// settings v9 bump is required.
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -35,6 +35,7 @@ import { useLayoutStore } from "../stores/layoutStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
+import MessageContent from "./MessageContent.vue";
 
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
@@ -89,6 +90,7 @@ const modeChoice = computed<SessionMode | null>({
     void sessionsStore.setSessionMode(sessionId.value, value);
   },
 });
+const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
 
 // ---------- Reasoning visibility override ----------
 const settings = storeToRefs(useSettingsStore()).settings;
@@ -115,6 +117,15 @@ function onWorkspaceClick() {
   invokeCommand("revealPath", { path }).catch((err: unknown) => {
     toasts.error(
       "Couldn't open workspace",
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+}
+
+function revealFile(path: string) {
+  invokeCommand("revealPath", { path }).catch((err: unknown) => {
+    toasts.error(
+      "Couldn't open file",
       err instanceof Error ? err.message : String(err),
     );
   });
@@ -380,9 +391,10 @@ function openSkillsLibrary() {
     id: "library",
     component: "library",
     tabComponent: "sidebarTab",
-    title: "Library — MCP servers + Skills + Agents + Instructions",
+    title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
     initialSize: 360,
     minimumSize: 280,
+    exclusive: true,
   });
 }
 
@@ -402,7 +414,7 @@ async function loadUsage() {
     const raw = await invokeCommand("getSessionUsageMetrics", {
       sessionId: sessionId.value,
     });
-    usage.value = {
+    const fromRpc = {
       totalUserRequests:
         typeof raw.totalUserRequests === "number" ? raw.totalUserRequests : 0,
       totalPremiumRequestCost:
@@ -418,9 +430,46 @@ async function loadUsage() {
           ? raw.lastCallOutputTokens
           : 0,
     };
+    const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
+    usage.value =
+      fromRpc.totalUserRequests > 0 || fromRpc.lastCallInputTokens > 0
+        ? fromRpc
+        : fromEvents;
   } catch (err) {
+    const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
+    if (fromEvents.totalUserRequests > 0) {
+      usage.value = fromEvents;
+      return;
+    }
     usageError.value = err instanceof Error ? err.message : String(err);
   }
+}
+function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<string, unknown> }>) {
+  let totalUserRequests = 0;
+  let totalPremiumRequestCost = 0;
+  let totalApiDurationMs = 0;
+  let lastCallInputTokens = 0;
+  let lastCallOutputTokens = 0;
+  for (const event of events) {
+    if (event.eventType !== "assistant.usage") continue;
+    const data = event.data;
+    totalUserRequests += 1;
+    const cost = data.cost;
+    if (typeof cost === "number") totalPremiumRequestCost += cost;
+    const duration = data.duration;
+    if (typeof duration === "number") totalApiDurationMs += duration;
+    const input = data.inputTokens;
+    if (typeof input === "number") lastCallInputTokens = input;
+    const output = data.outputTokens;
+    if (typeof output === "number") lastCallOutputTokens = output;
+  }
+  return {
+    totalUserRequests,
+    totalPremiumRequestCost,
+    totalApiDurationMs,
+    lastCallInputTokens,
+    lastCallOutputTokens,
+  };
 }
 function formatDurationMs(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
@@ -452,6 +501,7 @@ onMounted(() => {
 watch(
   () => sessionId.value,
   () => {
+    void nextTick(() => layoutStore.restoreSessionDetailsWidth());
     sessionAgents.value = [];
     agentsLoaded.value = false;
     agentsError.value = null;
@@ -821,8 +871,10 @@ async function loadQuota() {
 // key. Defaults: tools collapsed (long); skills + mcp + plan + usage +
 // quota expanded. Toggling persists immediately.
 type SectionKey =
+  | "settings"
   | "agents"
   | "tasks"
+  | "files"
   | "skills"
   | "tools"
   | "mcp"
@@ -831,8 +883,10 @@ type SectionKey =
   | "quota";
 
 const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
+  settings: false,
   agents: true,
   tasks: false,
+  files: false,
   skills: true,
   tools: false,
   mcp: true,
@@ -853,8 +907,10 @@ function readSectionState(key: SectionKey): boolean {
 }
 
 const sectionOpen = ref<Record<SectionKey, boolean>>({
+  settings: readSectionState("settings"),
   agents: readSectionState("agents"),
   tasks: readSectionState("tasks"),
+  files: readSectionState("files"),
   skills: readSectionState("skills"),
   tools: readSectionState("tools"),
   mcp: readSectionState("mcp"),
@@ -911,91 +967,104 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
       />
     </header>
 
-    <!-- Name ------------------------------------------------------ -->
-    <section class="row row-stack">
-      <label class="row-label" :for="`details-name-${sessionId}`">
-        Session name
-      </label>
-      <form class="rename-form" @submit.prevent="onRenameSubmit">
-        <InputText
-          :id="`details-name-${sessionId}`"
-          v-model="nameDraft"
-          size="small"
-          placeholder="Untitled"
-          class="rename-input"
-        />
-        <Button
-          type="submit"
-          label="Save"
-          size="small"
-          :disabled="!nameDraft.trim()"
-        />
-      </form>
-    </section>
-
-    <!-- Mode ------------------------------------------------------ -->
-    <section class="row">
-      <span class="row-label">Run mode</span>
-      <SelectButton
-        v-model="modeChoice"
-        :options="modeOptions"
-        option-label="label"
-        option-value="value"
-        :allow-empty="false"
-        size="small"
-        aria-label="Agent run mode"
-      >
-        <template #option="slotProps">
-          <i :class="slotProps.option.icon" :title="slotProps.option.label" />
-          <span class="sr-only">{{ slotProps.option.label }}</span>
-        </template>
-      </SelectButton>
-    </section>
-
-    <!-- Reasoning view ------------------------------------------- -->
-    <label class="row" :for="`details-reasoning-${sessionId}`">
-      <span class="row-label">Reasoning view</span>
-      <Select
-        :input-id="`details-reasoning-${sessionId}`"
-        v-model="reasoningChoice"
-        :options="reasoningOptions"
-        option-label="label"
-        option-value="value"
-        size="small"
-        aria-label="Reasoning visibility for this session"
-      />
-    </label>
-
-    <!-- Workspace ------------------------------------------------- -->
-    <section class="row row-stack">
-      <span class="row-label">Workspace</span>
+    <section class="row row-stack section">
       <button
-        v-if="record.workingDirectory"
         type="button"
-        class="workspace-path workspace-path-button"
-        :title="`Open ${record.workingDirectory}`"
-        :aria-label="`Open workspace folder ${record.workingDirectory}`"
-        @click="onWorkspaceClick"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.settings"
+        @click="toggleSection('settings')"
       >
-        <i class="pi pi-folder" aria-hidden="true" />
-        <span class="workspace-path-text">{{ record.workingDirectory }}</span>
-        <i class="pi pi-external-link workspace-path-hint" aria-hidden="true" />
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.settings ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Session settings</span>
+        <span class="section-count">collapsed</span>
       </button>
-      <div v-else class="workspace-path" title="Default (cli process cwd)">
-        <i class="pi pi-folder" aria-hidden="true" />
-        <span class="workspace-path-text">Default</span>
-      </div>
-    </section>
+      <div v-if="sectionOpen.settings" class="section-body">
+        <section class="row row-stack">
+          <label class="row-label" :for="`details-name-${sessionId}`">
+            Session name
+          </label>
+          <form class="rename-form" @submit.prevent="onRenameSubmit">
+            <InputText
+              :id="`details-name-${sessionId}`"
+              v-model="nameDraft"
+              size="small"
+              placeholder="Untitled"
+              class="rename-input"
+            />
+            <Button
+              type="submit"
+              label="Save"
+              size="small"
+              :disabled="!nameDraft.trim()"
+            />
+          </form>
+        </section>
 
-    <!-- Approve all ---------------------------------------------- -->
-    <section class="row row-toggle">
-      <span class="row-toggle-title" title="Skip permission prompts for the rest of this session.">
-        Auto-approve all tools
-      </span>
-      <ToggleSwitch
-        :model-value="approveAll"
-        @update:model-value="onToggleApproveAll"
-      />
+        <section class="row details-mode-row" :class="modeClass">
+          <span class="row-label">Run mode</span>
+          <SelectButton
+            v-model="modeChoice"
+            :options="modeOptions"
+            option-label="label"
+            option-value="value"
+            :allow-empty="false"
+            size="small"
+            aria-label="Agent run mode"
+          >
+            <template #option="slotProps">
+              <i :class="slotProps.option.icon" :title="slotProps.option.label" />
+              <span class="sr-only">{{ slotProps.option.label }}</span>
+            </template>
+          </SelectButton>
+        </section>
+
+        <label class="row" :for="`details-reasoning-${sessionId}`">
+          <span class="row-label">Reasoning view</span>
+          <Select
+            :input-id="`details-reasoning-${sessionId}`"
+            v-model="reasoningChoice"
+            :options="reasoningOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            aria-label="Reasoning visibility for this session"
+          />
+        </label>
+
+        <section class="row row-stack">
+          <span class="row-label">Workspace</span>
+          <button
+            v-if="record.workingDirectory"
+            type="button"
+            class="workspace-path workspace-path-button"
+            :title="`Open ${record.workingDirectory}`"
+            :aria-label="`Open workspace folder ${record.workingDirectory}`"
+            @click="onWorkspaceClick"
+          >
+            <i class="pi pi-folder" aria-hidden="true" />
+            <span class="workspace-path-text">{{ record.workingDirectory }}</span>
+            <i class="pi pi-external-link workspace-path-hint" aria-hidden="true" />
+          </button>
+          <div v-else class="workspace-path" title="Default (cli process cwd)">
+            <i class="pi pi-folder" aria-hidden="true" />
+            <span class="workspace-path-text">Default</span>
+          </div>
+        </section>
+
+        <section class="row row-toggle" :class="{ 'approve-all-on': approveAll }">
+          <span class="row-toggle-title" title="Skip permission prompts for the rest of this session.">
+            Auto-approve all tools
+          </span>
+          <ToggleSwitch
+            :model-value="approveAll"
+            @update:model-value="onToggleApproveAll"
+          />
+        </section>
+      </div>
     </section>
 
     <!-- Agents (19a) ---------------------------------------------- -->
@@ -1078,7 +1147,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               v-if="agent.description && isItemExpanded('agent', agent.name)"
               class="compact-desc"
             >
-              {{ agent.description }}
+              <MessageContent :text="agent.description" label="Agent description" />
             </div>
           </li>
         </ul>
@@ -1168,6 +1237,46 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
       </div>
     </section>
 
+    <!-- Files ------------------------------------------------------ -->
+    <section class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.files"
+        @click="toggleSection('files')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.files ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Files touched</span>
+        <span class="section-count">{{ record.touchedFiles.length }}</span>
+      </button>
+      <div v-if="sectionOpen.files" class="section-body">
+        <div v-if="record.touchedFiles.length === 0" class="empty-hint">
+          No file writes or edits seen in this session.
+        </div>
+        <ul v-else class="file-list compact-list">
+          <li
+            v-for="path in record.touchedFiles"
+            :key="path"
+            class="compact-row file-row"
+          >
+            <button
+              type="button"
+              class="file-path"
+              :title="`Open ${path}`"
+              @click="revealFile(path)"
+            >
+              <i class="pi pi-file" aria-hidden="true" />
+              <span>{{ path }}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </section>
+
     <!-- Skills ---------------------------------------------------- -->
     <section class="row row-stack section">
       <button
@@ -1219,7 +1328,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               v-if="skill.description && isItemExpanded('skill', skill.name)"
               class="compact-desc"
             >
-              {{ skill.description }}
+              <MessageContent :text="skill.description" label="Skill description" />
             </div>
           </li>
         </ul>
@@ -1317,7 +1426,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
                   v-if="t.description && isItemExpanded('tool', toolKey(t))"
                   class="compact-desc"
                 >
-                  {{ t.description }}
+                  <MessageContent :text="t.description" label="Tool description" />
                 </div>
               </li>
             </ul>
@@ -1405,7 +1514,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
           </template>
           <template v-else>
             <div v-if="planExists && planContent" class="plan-preview">
-              {{ planContent }}
+              <MessageContent :text="planContent" label="Plan markdown" />
             </div>
             <div v-else class="empty-hint">No plan yet.</div>
             <Button
@@ -1593,6 +1702,24 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
   flex: 1 1 0;
   min-width: 0;
   padding: 0.35rem 0.4rem;
+}
+
+.details-mode-row.mode-interactive {
+  --details-mode-color: var(--p-blue-500);
+}
+.details-mode-row.mode-plan {
+  --details-mode-color: var(--p-amber-500);
+}
+.details-mode-row.mode-autopilot {
+  --details-mode-color: var(--p-purple-500);
+}
+.details-mode-row :deep(.p-selectbutton .p-button.p-togglebutton-checked) {
+  background: color-mix(in srgb, var(--details-mode-color) 18%, transparent);
+  color: var(--details-mode-color);
+}
+
+.approve-all-on .row-toggle-title {
+  color: var(--p-green-500);
 }
 
 .session-details :deep(.p-select) {
@@ -2152,8 +2279,18 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
   font-size: 0.7rem;
   color: var(--p-text-muted-color);
   padding: 0.25rem 0.25rem 0.15rem 0.85rem;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.compact-desc :deep(.md-content),
+.plan-preview :deep(.md-content) {
+  gap: 0.25rem;
+}
+
+.compact-desc :deep(.md-html-segment),
+.plan-preview :deep(.md-html-segment) {
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .compact-desc-error {
@@ -2241,14 +2378,38 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
 }
 
 .plan-preview {
-  font-family: var(--p-font-family-mono, ui-monospace, monospace);
-  font-size: 0.72rem;
-  white-space: pre-wrap;
   padding: 0.4rem 0.5rem;
   background: var(--p-content-hover-background);
   border-radius: var(--p-border-radius-sm);
   max-height: 200px;
   overflow-y: auto;
+}
+
+.file-row {
+  grid-template-columns: 1fr;
+}
+
+.file-path {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--p-text-color);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.file-path span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
 }
 
 .plan-actions {

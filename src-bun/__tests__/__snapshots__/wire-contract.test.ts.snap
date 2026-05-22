@@ -3,6 +3,9 @@
 exports[`IPC wire contracts Settings shape 1`] = `
 {
   "appearance": {
+    "defaultModelId": "auto",
+    "defaultReasoningEffort": null,
+    "enableMermaid": false,
     "reasoningVisibility": "compact",
     "streaming": false,
     "theme": "dark",
@@ -14,7 +17,14 @@ exports[`IPC wire contracts Settings shape 1`] = `
     "turnEnd": false,
     "waitingForInput": true,
   },
-  "version": 7,
+  "permissions": {
+    "defaultApproveAll": false,
+  },
+  "tools": {
+    "defaultAllowed": [],
+    "defaultExcluded": [],
+  },
+  "version": 12,
   "workspaces": {
     "defaultWorkspace": "D:\\repo\\dafman",
     "recent": [
@@ -28,6 +38,9 @@ exports[`IPC wire contracts Settings shape 1`] = `
 exports[`IPC wire contracts Settings with persisted layout 1`] = `
 {
   "appearance": {
+    "defaultModelId": "gpt-5.5",
+    "defaultReasoningEffort": "medium",
+    "enableMermaid": false,
     "reasoningVisibility": "compact",
     "streaming": true,
     "theme": "dark",
@@ -53,7 +66,16 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
     "turnEnd": true,
     "waitingForInput": true,
   },
-  "version": 7,
+  "permissions": {
+    "defaultApproveAll": true,
+  },
+  "tools": {
+    "defaultAllowed": [],
+    "defaultExcluded": [
+      "bash",
+    ],
+  },
+  "version": 12,
   "workspaces": {
     "defaultWorkspace": "",
     "recent": [],
@@ -167,6 +189,22 @@ exports[`IPC wire contracts sendMessage request — explicit immediate mode 1`] 
   "mode": "immediate",
   "sessionId": "sess-1",
   "text": "steer this",
+}
+`;
+
+exports[`IPC wire contracts createSession request — model defaults 1`] = `
+{
+  "model": "gpt-5.5",
+  "reasoningEffort": "medium",
+  "workingDirectory": "D:\\repo\\dafman",
+}
+`;
+
+exports[`IPC wire contracts resumeSession response — cwd and current model 1`] = `
+{
+  "cwd": "D:\\repo\\dafman",
+  "model": "gpt-5.5",
+  "sessionId": "sess-1",
 }
 `;
 

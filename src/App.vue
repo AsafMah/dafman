@@ -53,7 +53,7 @@ function openPlayground() {
   if (!dock) return;
   const existing = dock.getPanel(PLAYGROUND_PANEL_ID);
   if (existing) {
-    existing.api.setActive();
+    dock.removePanel(existing);
     return;
   }
   // Resolve a body (non-edge) group inline rather than going through
@@ -382,6 +382,7 @@ function onDockReady(event: DockviewReadyEvent) {
   // resize/move/popout/dock — everything dockview considers a layout
   // mutation collapses into this single event.
   event.api.onDidLayoutChange(() => {
+    layoutStore.rememberSessionDetailsWidth();
     scheduleLayoutSave();
     // Keep the ActivityBar's pressed-state in sync with reality
     // (panels closed via their in-panel X, restored from layout,
@@ -431,7 +432,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       id: LIBRARY_PANEL_ID,
       component: "library",
       icon: "pi-book",
-      title: "Library — MCP servers + Skills + Agents + Instructions",
+      title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
       initialSize: 360,
       minimumSize: 280,
     },
@@ -512,6 +513,7 @@ function openSessionsByDefault(attempt = 0) {
     title: "Sessions",
     initialSize: 240,
     minimumSize: 160,
+    exclusive: true,
   });
   activityBarRef.value?.sync();
 }

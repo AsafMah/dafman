@@ -78,6 +78,10 @@ export interface EdgePanelOptions {
   /// this, the user-drag sash bottoms out. Defaults to dockview's
   /// own fallback (`collapsedSize + 50`) when omitted.
   minimumSize?: number;
+  /// When true, closes sibling panels in the same edge group before
+  /// opening this one. Used by the activity-bar left rail so only one
+  /// sidebar button can be active at a time.
+  exclusive?: boolean;
 }
 
 export const useLayoutStore = defineStore("layout", () => {
@@ -95,6 +99,7 @@ export const useLayoutStore = defineStore("layout", () => {
   /// — it reads its current session from `activeSessionId` and
   /// re-binds when the user switches chat tabs.
   const detailsOpen = ref<boolean>(false);
+  const lastSessionDetailsWidth = ref<number>(360);
   let activeUnsubs: Array<() => void> = [];
 
   function recomputeActiveSession(dock: DockviewApi): void {
@@ -262,9 +267,10 @@ export const useLayoutStore = defineStore("layout", () => {
       component: "sessionDetails",
       tabComponent: "sidebarTab",
       title: "Session",
-      initialSize: 360,
+      initialSize: lastSessionDetailsWidth.value,
       minimumSize: 200,
     });
+    restoreSessionDetailsWidth();
   }
 
   /// Toggles the details rail. If open, closes; if closed, opens.
@@ -277,6 +283,21 @@ export const useLayoutStore = defineStore("layout", () => {
     } else {
       openSessionDetailsPanel();
     }
+  }
+
+  function rememberSessionDetailsWidth(): void {
+    const edge = api.value?.getEdgeGroup("right");
+    if (!edge) return;
+    const width = edge.width;
+    if (Number.isFinite(width) && width >= 200) {
+      lastSessionDetailsWidth.value = width;
+    }
+  }
+
+  function restoreSessionDetailsWidth(): void {
+    const edge = api.value?.getEdgeGroup("right");
+    if (!edge) return;
+    edge.setSize({ width: lastSessionDetailsWidth.value });
   }
 
   /// Returns true if the rail singleton is currently open. Reactive
@@ -407,6 +428,7 @@ export const useLayoutStore = defineStore("layout", () => {
         title: "Sessions",
         initialSize: 240,
         minimumSize: 160,
+        exclusive: true,
       });
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -466,6 +488,20 @@ export const useLayoutStore = defineStore("layout", () => {
       return;
     }
     const existingGroup = dock.getEdgeGroup(position);
+    if (options.exclusive && existingGroup) {
+      const panels = (existingGroup as unknown as { panels?: unknown[] }).panels ?? [];
+      for (const panel of [...panels]) {
+        const panelId =
+          typeof (panel as { id?: unknown }).id === "string"
+            ? (panel as { id: string }).id
+            : typeof (panel as { api?: { id?: unknown } }).api?.id === "string"
+              ? ((panel as { api: { id: string } }).api.id)
+              : "";
+        if (panelId && panelId !== options.id) {
+          dock.removePanel(panel as Parameters<typeof dock.removePanel>[0]);
+        }
+      }
+    }
     if (existingGroup && options.initialSize !== undefined) {
       // dockview-vue's EdgeGroupApi exposes `width` / `height` via the
       // underlying group element. Read defensively — if the property
@@ -615,6 +651,8 @@ export const useLayoutStore = defineStore("layout", () => {
     api,
     activeSessionId,
     detailsOpen,
+    rememberSessionDetailsWidth,
+    restoreSessionDetailsWidth,
     setApi,
     addPanel,
     removePanel,

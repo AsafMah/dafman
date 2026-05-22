@@ -1,0 +1,17 @@
+- [x] Plans, tool and skill descriptions are markdown and should be displayed as such wherever they are.
+- [x] Restored sessions lose usage info.
+- [x] The right side panel should keep the same width when switching between sessions.
+- [x] New agent form is completely broken - everything is overlapping.
+- [x] Discovered MCP servers have different UI (enable vs switch), and the button doesn't seem to do anything.
+- [x] Let's add to the session editor bar an approve all toggle.
+- [x] All the settings that are duplicated from the session bar in the right pane, should be in a group collapsed by default.
+- [x] The library should also contain a section for tools, and global enable/disable toggles.
+- [x] The left pane window still have exclusivity issues where multiple tabs can be toggled at the same time.
+- [x] Pressing the playground button while it's open should close it.
+- [x] The default model doesn't show until the first message, and then the reasoning doesn't show either.
+- [x] Add a setting to also change the default model.
+- [x] The model just shows "5.5", it should include the full name, worst case ellipsis.
+- [x] The model selector and settings button should be aligned to the right.
+- [x] Color coded indication for normal/plan/autopilot mode.
+- [x] Color coded indication for allow all mode.
+- [x] The x files chip is useless. Maybe add a section to the right pane with all of the files (collapsible).

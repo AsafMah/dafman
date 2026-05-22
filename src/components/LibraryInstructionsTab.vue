@@ -12,6 +12,7 @@ import type { InstructionSource } from "../ipc/types";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
+import MessageContent from "./MessageContent.vue";
 
 const toasts = useToastStore();
 const layoutStore = useLayoutStore();
@@ -154,7 +155,9 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
                 @click="reveal(src)"
               />
             </div>
-            <pre v-if="src.exists && isExpanded(src)" class="instruction-content">{{ src.content }}</pre>
+            <div v-if="src.exists && isExpanded(src) && src.content" class="instruction-content">
+              <MessageContent :text="src.content" label="Instruction markdown" />
+            </div>
           </li>
         </ul>
       </section>
@@ -196,7 +199,9 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
                 @click="reveal(src)"
               />
             </div>
-            <pre v-if="src.exists && isExpanded(src)" class="instruction-content">{{ src.content }}</pre>
+            <div v-if="src.exists && isExpanded(src) && src.content" class="instruction-content">
+              <MessageContent :text="src.content" label="Instruction markdown" />
+            </div>
           </li>
         </ul>
       </section>
@@ -343,9 +348,11 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
   border-radius: var(--p-border-radius-sm);
   background: var(--p-surface-100);
   color: var(--p-text-color);
+}
+
+.instruction-content :deep(.md-html-segment) {
   font-size: 0.72rem;
   line-height: 1.35;
-  white-space: pre-wrap;
 }
 
 :global(.app-dark) .instruction-content {

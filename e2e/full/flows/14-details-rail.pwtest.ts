@@ -27,6 +27,12 @@ test("details rail opens by default on session create + cog toggles it", async (
   // the unique heading text the component renders.
   const detailsPanel = page.locator(".session-details").first();
   await expect(detailsPanel).toBeVisible({ timeout: 5_000 });
+  const settingsToggle = detailsPanel.getByRole("button", {
+    name: /session settings/i,
+  });
+  await expect(settingsToggle).toBeVisible();
+  await expect(detailsPanel.locator("text=Session name")).toHaveCount(0);
+  await settingsToggle.click();
   await expect(detailsPanel.locator("text=Session name")).toBeVisible();
   await expect(detailsPanel.locator("text=Run mode")).toBeVisible();
   await expect(detailsPanel.locator("text=Workspace")).toBeVisible();
