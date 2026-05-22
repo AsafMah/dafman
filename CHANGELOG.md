@@ -3,6 +3,21 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 22a — MCP OAuth toast)
+
+- **MCP OAuth lifecycle toasts.** `mcp.oauth_required` from the SDK
+  now surfaces an info toast naming the server that needs sign-in
+  ("MCP server needs sign-in — `<serverName>`: open the Library panel
+  and click the auth link to complete OAuth"). When the user
+  completes the flow, `mcp.oauth_completed` emits a success toast
+  ("MCP signed in — Connection established"). Previously both
+  events were in `IGNORED_EVENTS` and silently dropped, leaving the
+  user with no feedback that the MCP server was waiting on them.
+- **Toast de-duplication keyed by SDK requestId** so resumed
+  sessions don't replay stale `_required` notifications, and stray
+  `_completed` events (from another client driving the OAuth flow)
+  are ignored.
+
 ### Added (Phase 19c — Fleet + nested sub-agent rendering)
 
 - **`/fleet [prompt]` slash command** in the composer + command

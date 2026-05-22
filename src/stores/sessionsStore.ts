@@ -117,6 +117,11 @@ export type SessionRecord = {
   /// otherwise miss two events in a row if the rail hadn't read the
   /// previous state yet.
   tasksRefreshCounter: number;
+  /// 22a: requestIds of MCP OAuth required-events we've toasted, so a
+  /// resume / replay doesn't duplicate the notification, and so we
+  /// can pair `_completed` events with their `_required`. Internal —
+  /// renderer surfaces never read this directly.
+  _toastedOauthRequests: Set<string>;
 };
 
 /// Per-record mirror of a single pending request. Matches the
@@ -337,6 +342,45 @@ export const useSessionsStore = defineStore("sessions", () => {
       payload.eventType === "session.background_tasks_changed"
     ) {
       record.tasksRefreshCounter += 1;
+    }
+
+    // 22a: surface MCP OAuth lifecycle as user-visible toasts.
+    // `mcp.oauth_required` fires when an MCP server needs sign-in
+    // (typically right after the server is configured + connection
+    // attempted). The SDK handles the actual flow via
+    // `loginToMcpServer` + URL elicitation; here we just nudge the
+    // user. `mcp.oauth_completed` fires on success and we
+    // de-dup by requestId so we don't show duplicate completion
+    // toasts on resume / replay.
+    if (payload.eventType === "mcp.oauth_required") {
+      const d = (payload.data ?? {}) as {
+        serverName?: unknown;
+        requestId?: unknown;
+      };
+      if (typeof d.serverName === "string") {
+        const toasts = useToastStore();
+        const key =
+          typeof d.requestId === "string" ? `${record.id}:oauth:${d.requestId}` : null;
+        if (!key || !record._toastedOauthRequests.has(key)) {
+          if (key) record._toastedOauthRequests.add(key);
+          toasts.info(
+            "MCP server needs sign-in",
+            `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
+          );
+        }
+      }
+    } else if (payload.eventType === "mcp.oauth_completed") {
+      const d = (payload.data ?? {}) as { requestId?: unknown };
+      const toasts = useToastStore();
+      const key =
+        typeof d.requestId === "string" ? `${record.id}:oauth:${d.requestId}` : null;
+      // Only fire if we toasted the matching `_required`; suppresses
+      // stray `_completed` events on resume + the case where another
+      // client (e.g. CLI) drove the OAuth flow.
+      if (key && record._toastedOauthRequests.has(key)) {
+        record._toastedOauthRequests.delete(key);
+        toasts.success("MCP signed in", "Connection established");
+      }
     }
 // Both `session.start` (fresh create) and `session.resume` carry
     // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
@@ -565,6 +609,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         sawTurnBoundary: false,
         currentAgent: null,
         tasksRefreshCounter: 0,
+
+        _toastedOauthRequests: new Set<string>(),
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -655,6 +701,8 @@ export const useSessionsStore = defineStore("sessions", () => {
         sawTurnBoundary: false,
         currentAgent: null,
         tasksRefreshCounter: 0,
+
+        _toastedOauthRequests: new Set<string>(),
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and
@@ -1148,6 +1196,12 @@ export const useSessionsStore = defineStore("sessions", () => {
     /// handlers in `lib/sessionCommands.ts`) can push synthetic
     /// events while still bounding the per-session log.
     appendEvent,
+    /// 22a: exported for tests that need to exercise the
+    /// side-effectful event handling pipeline (MCP OAuth toasts,
+    /// model-change handling, …) without spinning up the real
+    /// `onSessionEvent` RPC subscription. Same function the runtime
+    /// subscription delegates to.
+    applySessionEvent: handleEvent,
   };
 });
 

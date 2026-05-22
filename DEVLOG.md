@@ -10,6 +10,48 @@
 
 ---
 
+## 2026-05-25 — Phase 22a: MCP OAuth toast
+
+### Takeaway
+
+`mcp.oauth_required` + `mcp.oauth_completed` were sitting in
+`IGNORED_EVENTS` — when an MCP server needed sign-in the user got no
+feedback and the connection silently stayed dead. Wired them into
+`sessionsStore.applyToRecord` (not the pure reducer — toasts are
+side-effectful) with requestId-keyed de-duplication so resume /
+replay doesn't fire duplicate notifications and stray `_completed`
+events from other clients are ignored.
+
+### Receipts
+
+- Reducer-vs-store choice: handled in `sessionsStore` next to the
+  existing model-change toast (which is also side-effectful), not in
+  `chatEvents.ts` — keeps the pure reducer pure. Same pattern as the
+  Phase 18a model-change toast.
+- De-dup map lives on `SessionRecord._toastedOauthRequests: Set<string>`
+  with key `"<sessionId>:oauth:<requestId>"`. Stray `_completed`
+  without a matching `_required` is silently dropped.
+- The toast doesn't auto-open the OAuth URL — the SDK already drives
+  the elicitation via `loginToMcpServer`, and auto-opening browsers
+  on background events would be hostile UX. We just point the user
+  at the Library panel where they can finish the flow.
+- 4 new tests in `sessionsStore.mcpOauth.test.ts`. Required exposing
+  `handleEvent` from the store return as `applySessionEvent` (same
+  function the runtime subscription uses; tests can now exercise the
+  full event pipeline without spinning up `onSessionEvent`).
+- Fixture maintenance for the new `_toastedOauthRequests` field:
+  `Playground.vue`, `sessionCommands.test.ts`, `boundedEvents.test.ts`,
+  `sessionsStore.mcpOauth.test.ts` itself.
+
+### Gates
+
+- `bun run lint` clean (vue-tsc).
+- 476 bun tests pass (+4 new).
+- 68/70 smoke — pre-existing `08-audit-rehydrate` flake on both prod
+  and HMR (also fails on plain main; orthogonal).
+
+---
+
 ## 2026-05-22 — CI failure triage: hidden build break + flaky control WebSocket
 
 ### Takeaway

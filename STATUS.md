@@ -345,6 +345,21 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-25** — Phase 22a shipped: **MCP OAuth toast**.
+  `mcp.oauth_required` and `mcp.oauth_completed` events were
+  previously in `IGNORED_EVENTS` and silently dropped, leaving users
+  with no feedback when an MCP server needed sign-in. Now wired into
+  `sessionsStore.applyToRecord` (next to the existing model-change
+  toast — toasts are side-effectful, not part of the pure reducer):
+  required→info toast naming the server with a hint to use the
+  Library panel; completed→success toast. De-duplicated by SDK
+  `requestId` so resume / replay doesn't fire stale notifications and
+  stray `_completed` events from other clients are ignored. Doesn't
+  auto-open URLs (the SDK already drives elicitation; auto-launching
+  browsers on background events would be hostile). 4 new tests in
+  `sessionsStore.mcpOauth.test.ts`. **476 bun tests** (was 472), 68/70
+  smoke (08-audit-rehydrate flake on plain main, unrelated).
+
 - **2026-05-22** — Phase 19c shipped: **Fleet + nested sub-agent
   rendering**. `/fleet [prompt]` slash command starts a fleet via
   the @experimental `session.rpc.fleet.start` surface (no count

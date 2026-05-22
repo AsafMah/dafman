@@ -836,3 +836,18 @@ The picker only lets you pick a folder, no files visible.
     - **Why not automated:** history replay through the reducer with the SubagentChatItem nesting.
 
 ---
+
+## Phase 22a — MCP OAuth toast
+
+- [ ] ⏳ **MCP OAuth required → toast**
+    - **Steps:** add an MCP server that requires OAuth (e.g. via Library / Add MCP). Configure it but don't yet complete sign-in. Start or restart a session that uses the server.
+    - **Expected:** info toast appears: "MCP server needs sign-in — <serverName>: open the Library panel and click the auth link to complete OAuth." No browser auto-opens.
+    - **Why not automated:** real SDK + real MCP server required.
+- [ ] ⏳ **MCP OAuth completed → toast + cleared state**
+    - **Steps:** complete the OAuth flow through the Library panel after the previous test.
+    - **Expected:** success toast: "MCP signed in — Connection established." Server now usable.
+    - **Why not automated:** real OAuth flow + browser interaction.
+- [ ] ⏳ **OAuth required de-duplicated on resume**
+    - **Steps:** trigger an oauth_required event, see the toast, but DON'T complete the flow. Close + restart the session.
+    - **Expected:** on resume, no duplicate toast pops (the same requestId is in the de-dup set). After actually completing OAuth, the success toast appears once.
+    - **Why not automated:** requires resume+replay against a real SDK event log.

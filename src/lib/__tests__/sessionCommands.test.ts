@@ -34,6 +34,7 @@ describe("sessionCommands", () => {
       sawTurnBoundary: false,
       currentAgent: null,
       tasksRefreshCounter: 0,
+      _toastedOauthRequests: new Set<string>(),
     });
 
     const handled = await runLocalSlashCommand("s1", "/cd");
@@ -88,6 +89,7 @@ describe("sessionCommands", () => {
       sawTurnBoundary: false,
       currentAgent: null,
       tasksRefreshCounter: 0,
+      _toastedOauthRequests: new Set<string>(),
     });
 
     const handled = await runLocalSlashCommand("s1", "/cd C:\\other");
