@@ -144,13 +144,16 @@ export type SendMessageAttachment =
 	| { type: "blob"; data: string; mimeType: string; displayName?: string };
 
 /// One file result from `searchWorkspaceFiles`. `path` is relative
-/// to the session's working directory so the renderer renders
-/// compactly; `absolutePath` is the resolved fs path bun uses to
-/// build SDK attachments at send-time.
+/// to the session's working directory (for fuzzy mode) or preserves
+/// the path-nav prefix the user typed (for `@/abs`, `@~/foo`,
+/// `@../path`). `absolutePath` is the resolved fs path bun uses to
+/// build SDK attachments at send-time. `kind` lets the renderer
+/// pick the right AttachmentNode type + icon.
 export interface WorkspaceFileMatch {
 	path: string;
 	absolutePath: string;
 	name: string;
+	kind: "file" | "directory";
 }
 
 /// Wire-format for a single SDK session event.
@@ -330,20 +333,35 @@ export type DafmanRPC = {
 				};
 				response: string;
 			};
-			/// Search files in a session's working directory by
-			/// fuzzy-substring match on the filename. Used by the
-			/// composer's `@file` typeahead. Returns relative paths
-			/// (to the session cwd) so the renderer can render them
-			/// compactly; bun resolves to absolute paths when
-			/// attaching on send.
+			/// Search files & directories in the session's working
+			/// directory by fuzzy-substring match on name + path.
+			/// Used by the composer's @file picker. Also supports
+			/// path-navigation queries — when the query starts with
+			/// `/`, `~/`, `./`, `../`, or a Windows drive letter, or
+			/// contains a `/`, the picker switches to listing
+			/// immediate children of the resolved directory whose
+			/// name matches the leaf prefix. `includeHidden=true`
+			/// surfaces dotfiles + ignored build-output dirs.
 			searchWorkspaceFiles: {
 				params: {
 					sessionId: string;
 					query: string;
 					/// Hard cap on returned results. Default 40.
 					limit?: number;
+					/// Include dotfiles + IGNORED_DIRS (node_modules,
+					/// dist, target, …). Default false.
+					includeHidden?: boolean;
 				};
 				response: WorkspaceFileMatch[];
+			};
+			/// Native file/directory picker. Opens the OS-native
+			/// chooser; user picks one file or one directory.
+			/// Returns the absolute path of the selection, or `null`
+			/// on cancel. The escape hatch the composer's @-picker
+			/// surfaces as a button inside its popup.
+			pickAttachment: {
+				params: { startingFolder?: string };
+				response: { path: string; kind: "file" | "directory" } | null;
 			};
 			/// Aborts the currently-running turn for this session. The
 			/// session remains valid; new sends after this point start a

@@ -743,19 +743,20 @@ export class SessionRegistry {
 		}
 	}
 
-	/// File-typeahead search backing the composer's `@file` mention
-	/// plugin. Resolves the session's working directory and delegates
-	/// to the shared workspace-files index (`app/fileSearch.ts`).
+	/// File-typeahead search backing the composer's `@file` picker.
+	/// Resolves the session's working directory and delegates to the
+	/// shared workspace-files index (`app/fileSearch.ts`).
 	async searchWorkspaceFiles(
 		sessionId: string,
 		query: string,
 		limit = 40,
+		includeHidden = false,
 	): Promise<WorkspaceFileMatch[]> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) return [];
 		const cwd = await this.cwdFor(sessionId);
 		if (!cwd) return [];
-		return searchWorkspaceFiles(cwd, query, limit);
+		return searchWorkspaceFiles(cwd, query, limit, includeHidden);
 	}
 
 	/// Resolve the session's working directory. Tries the workspace

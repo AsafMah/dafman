@@ -21,6 +21,7 @@
 
 import { computed, defineComponent, h, ref } from "vue";
 import SplitButton from "primevue/splitbutton";
+import Popover from "primevue/popover";
 import type { MenuItem } from "primevue/menuitem";
 import { LexicalComposer, useLexicalComposer } from "lexical-vue/LexicalComposer";
 import { ContentEditable } from "lexical-vue/LexicalContentEditable";
@@ -50,6 +51,7 @@ import { useToastStore } from "../stores/toastStore";
 import { runLocalSlashCommand } from "../lib/sessionCommands";
 import SlashCommandPlugin from "./SlashCommandPlugin.vue";
 import MentionPlugin from "./MentionPlugin.vue";
+import FilePicker from "./FilePicker.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
 
 const props = withDefaults(
@@ -234,29 +236,19 @@ function appendText(value: string): void {
   setTimeout(() => editor.focus(), 0);
 }
 
-/// Imperative file-picker trigger for the attach button. The hidden
-/// `<input type="file" multiple>` is the standard cross-browser way
-/// to open a native file chooser; we forward the chosen File objects
-/// to the same `blobFromFile` path that drag-drop + paste use. For
-/// `<input type="file">` (no path access in WebView2 / browsers) we
-/// can only ship the file as a blob — the SDK's `file` attachment
-/// kind needs an absolute filesystem path, which isn't exposed here.
-const fileInput = ref<HTMLInputElement | null>(null);
+/// Toggle the file picker popover anchored on the paperclip button.
+/// The popover hosts the same FilePicker the @-trigger uses, with
+/// its own search input (since the editor isn't the source of the
+/// query here) and the native Browse… escape hatch.
+const filePickerPopover = ref<InstanceType<typeof Popover> | null>(null);
 
-function pickFiles() {
-  fileInput.value?.click();
+function openFilePicker(event: Event): void {
+  filePickerPopover.value?.toggle(event);
 }
 
-async function onPickedFiles(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const files = input.files;
-  if (!files) return;
-  for (const f of Array.from(files)) {
-    const a = await blobFromFile(f);
-    if (a) addAttachment(a);
-  }
-  // Reset so the same file can be re-picked after removal.
-  input.value = "";
+function onPickerSelect(att: SendMessageAttachment): void {
+  addAttachment(att);
+  filePickerPopover.value?.hide();
 }
 
 defineExpose({ focus: focusComposer, setText, appendText });
@@ -403,13 +395,6 @@ const SubmitButton = defineComponent({
 
 <template>
   <div class="lex-composer" @dragover.prevent @drop="onDrop">
-    <input
-      ref="fileInput"
-      type="file"
-      class="lex-file-input"
-      multiple
-      @change="onPickedFiles"
-    />
     <div class="lex-composer-frame">
       <LexicalComposer :initial-config="initialConfig">
         <EditableSync :editable="editable" />
@@ -478,13 +463,23 @@ const SubmitButton = defineComponent({
           <button
             type="button"
             class="lex-toolbar-btn"
-            title="Attach files"
-            aria-label="Attach files"
+            title="Attach files or folders"
+            aria-label="Attach files or folders"
             :disabled="props.disabled"
-            @click="pickFiles"
+            @click="openFilePicker"
           >
             <i class="pi pi-paperclip" aria-hidden="true" />
           </button>
+          <Popover ref="filePickerPopover" class="lex-attach-popover" :pt="{ content: { style: 'padding: 0' } }">
+            <FilePicker
+              v-if="props.sessionId"
+              :session-id="props.sessionId"
+              :show-search-input="true"
+              initial-focus="input"
+              @select="onPickerSelect"
+              @dismiss="filePickerPopover?.hide()"
+            />
+          </Popover>
           <ModeButtonGroup
             v-if="props.sessionId"
             :session-id="props.sessionId"
@@ -503,10 +498,6 @@ const SubmitButton = defineComponent({
 
 
 <style scoped>
-.lex-file-input {
-  display: none;
-}
-
 .lex-composer-frame {
   display: flex;
   flex-direction: column;

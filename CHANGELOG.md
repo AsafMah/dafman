@@ -5,6 +5,30 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added
 
+- **`@file` / `@folder` picker rebuild.** The composer's `@`-trigger
+  and the paperclip button now both open the same `FilePicker.vue`
+  popup. Two modes:
+  - **Fuzzy** (no separators) — walks the session cwd recursively
+    (cached per `(cwd, includeHidden)`), ranks by filename startsWith
+    > substring > path-substring, returns files + directories with
+    `kind` flags.
+  - **Path navigation** — queries starting with `/`, `~/`, `./`, `../`,
+    a Windows drive letter, or containing a `/` switch to a directory-
+    listing-with-leaf-prefix mode against the resolved base (fs root /
+    home / cwd). Matches CLI 1.0.5's `@/abs`, `@~/foo`, `@../path`
+    ergonomics.
+  - **Show hidden / ignored** toggle reveals dotfiles + IGNORED_DIRS
+    (`node_modules`, `dist`, `target`, …).
+  - **Browse…** escape hatch opens the native OS file/folder picker
+    via the new `pickAttachment` RPC.
+  - Single-pick per popup; directories attach as `directory` pills
+    (existing AttachmentNode kind + `pi-folder` icon).
+  - Removed the hidden `<input type="file">` paperclip path — it only
+    yielded blob attachments due to WebView2 sandboxing; the native
+    dialog returns absolute paths so we ship `type: "file"` /
+    `"directory"` attachments end-to-end. Drag-drop + paste still use
+    the blob path for pasted images / dragged temp files.
+
 - **Permission + URL audit log.** Append-only JSONL under
   `<userData>/audit/permissions.jsonl` and `urls.jsonl`. Every
   `respondToRequest` permission decision records `permissionKind`,

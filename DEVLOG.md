@@ -10,6 +10,80 @@
 
 ---
 
+## 2026-05-22 — File picker rebuild (@, paperclip, native dialog)
+
+### Takeaway
+
+Rebuilt the composer's `@`-file picker end-to-end. User reported it
+"basically doesn't work"; instead of patching, I rewrote both layers:
+
+- **Bun side**: `fileSearch.ts` now supports two modes (fuzzy on the
+  cached workspace index + path-navigation for queries with separators
+  / `~` / absolute paths). Results carry `kind: "file" | "directory"`.
+  New `includeHidden` toggle bypasses the IGNORED_DIRS + dotfile
+  filter; cache is keyed on `(cwd, includeHidden)` so flipping the
+  switch in the UI doesn't re-walk.
+- **Renderer**: new `FilePicker.vue` is the popup body for both
+  entry points. `MentionPlugin.vue` rewritten to use a sentinel
+  TypeaheadMenuPlugin option + render FilePicker as the menu UI.
+  Paperclip button now opens a PrimeVue Popover hosting the same
+  FilePicker with its own search input. Single-pick per popup;
+  directories attach as `directory` pills (existing AttachmentNode
+  kind + folder icon).
+- **New RPC `pickAttachment`**: opens the native OS dialog (files OR
+  dirs) and returns `{path, kind}` or null. Powers the Browse… escape
+  hatch inside the popup.
+
+### Process notes
+
+- Interview-before-implement (rule #9) shaped the design — `ask_user`
+  form locked seven ambiguities (single-pick, directory-pill,
+  CLI-style paths, default-filtered toggle, replace MentionPlugin,
+  native files+dirs, paperclip opens popup).
+- Manual test list ships with the feature (rule #10) — 10 items
+  in `MANUAL_TESTS.md` covering @-trigger keyboard nav, path-nav
+  shapes, paperclip popover, native dialog, toggle behavior,
+  directory pill semantics. All depend on real Lexical / WebView /
+  OS dialog interactions that automated tests can't cover.
+
+### Tests added
+
+- `src-bun/__tests__/fileSearch.test.ts` rewritten: 11 tests across
+  fuzzy mode + path-nav mode + the hidden toggle.
+- `src/components/__tests__/FilePicker.test.ts`: 7 tests covering
+  result rendering, single-pick emit shapes (file vs directory),
+  toggle wiring, Browse… happy + cancel paths, empty state, internal
+  search input mode.
+- Wire-contract snapshots for `WorkspaceFileMatch` (with `kind`) and
+  `pickAttachment` result shape.
+
+### Decisions
+
+- **Removed the hidden `<input type="file">` paperclip path.** It only
+  yielded blobs (no fs path due to WebView2 sandbox), so SDK
+  attachments were stuck at `type: "blob"`. The new `pickAttachment`
+  RPC returns absolute paths via `Utils.openFileDialog`, letting us
+  ship `type: "file"` / `type: "directory"` attachments end-to-end.
+  Drag-drop + paste keep the blob path (still needed for pasted
+  images, dragged temp files).
+- **`displayName` carries the relative path** (e.g. `src/main.ts`) so
+  the pill label reads compactly while `path` holds the absolute fs
+  path for the SDK.
+- **Sentinel option in MentionPlugin** — TypeaheadMenuPlugin needs
+  `options.length > 0` to stay mounted; we render a single sentinel
+  and route real selection through a `pendingAttachment` tunnel + the
+  picker's imperative `pickCurrent()` / `moveHighlight()` API. Editor
+  keeps focus; we capture window-level ArrowUp/Down to drive the list.
+
+### Tests at a glance
+
+- `bun run lint`: clean.
+- `bun test`: 360 pass (was 347; +13 — 11 fileSearch + 2 wire-shape +
+  -7 FilePicker − duplicates from prior pendingRequests churn).
+- `bun run smoke`: prod + HMR green (4.6 s wall).
+
+---
+
 ## 2026-05-22 — Process rules #9 + #10; workspaces API verdict; manual-test backlog
 
 ### Takeaway

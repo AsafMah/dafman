@@ -99,6 +99,7 @@ export interface WorkspaceFileMatch {
   path: string;
   absolutePath: string;
   name: string;
+  kind: "file" | "directory";
 }
 
 export interface SessionEventPayload {
@@ -226,6 +227,10 @@ export type CommandMap = {
     args: { startingFolder?: string };
     result: string | null;
   };
+  pickAttachment: {
+    args: { startingFolder?: string };
+    result: { path: string; kind: "file" | "directory" } | null;
+  };
   browseDirectory: {
     args: { prefix: string };
     result: string[];
@@ -241,7 +246,12 @@ export type CommandMap = {
     result: string;
   };
   searchWorkspaceFiles: {
-    args: { sessionId: string; query: string; limit?: number };
+    args: {
+      sessionId: string;
+      query: string;
+      limit?: number;
+      includeHidden?: boolean;
+    };
     result: WorkspaceFileMatch[];
   };
   abortSession: { args: { sessionId: string }; result: string };

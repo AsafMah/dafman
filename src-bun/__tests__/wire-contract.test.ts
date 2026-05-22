@@ -343,4 +343,20 @@ describe("IPC wire contracts — diagnostics", () => {
 		];
 		expect(samples).toMatchSnapshot();
 	});
+
+	test("WorkspaceFileMatch carries kind", () => {
+		const samples: import("../rpc").WorkspaceFileMatch[] = [
+			{ path: "README.md", absolutePath: "/r/README.md", name: "README.md", kind: "file" },
+			{ path: "src", absolutePath: "/r/src", name: "src", kind: "directory" },
+			{ path: "~/Documents", absolutePath: "/home/u/Documents", name: "Documents", kind: "directory" },
+		];
+		expect(samples).toMatchSnapshot();
+	});
+
+	test("pickAttachment result shape", () => {
+		const cancel: { path: string; kind: "file" | "directory" } | null = null;
+		const file = { path: "C:/abs/foo.txt", kind: "file" as const };
+		const dir = { path: "C:/abs/repo", kind: "directory" as const };
+		expect({ cancel, file, dir }).toMatchSnapshot();
+	});
 });

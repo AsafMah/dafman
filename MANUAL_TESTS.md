@@ -283,3 +283,95 @@ Pick any ⏳ item, run it, then come back with one of:
 - ❌ + repro → I file it back to the open backlog.
 - N/A "I don't care about this case" → I'll remove (with a note in
   DEVLOG).
+
+---
+
+## 2026-05-22 — `FilePicker.vue` + `@`-picker + paperclip rebuild
+
+### `@`-trigger flow
+
+1. ⏳ **Typing `@` opens the picker; fuzzy text refines.**
+   - **Steps:** focus composer. Type `@`. Then type `comp`.
+   - **Expected:** popup appears above the composer immediately on
+     `@`. Typing `comp` filters; `ChatWindow.vue` and similar
+     should rank.
+   - **Why not automated:** Lexical's TypeaheadMenuPlugin uses the
+     real DOM selection model; happy-dom's selection support is
+     incomplete and we can't reliably exercise the trigger from
+     bun-test.
+
+2. ⏳ **Arrow keys + Enter pick a file as a pill.**
+   - **Steps:** with picker open, ArrowDown twice, Enter.
+   - **Expected:** the `@query` text is replaced with an
+     AttachmentNode pill carrying that file. Caret lands after a
+     trailing space.
+   - **Why not automated:** Lexical reconcile + pill DOM under real
+     contenteditable.
+
+3. ⏳ **Path-nav: `@/`, `@~/`, `@../`, `@C:/`.**
+   - **Steps:** type `@~/D` (Windows: `@C:/Users/`), watch results.
+   - **Expected:** entries from `$HOME` (or `C:/Users/`) starting
+     with `D` (or every entry under `C:/Users/`) appear. `~/Doc`
+     filters to e.g. `Documents` + `Downloads`.
+   - **Why not automated:** depends on the actual filesystem state
+     of your home dir.
+
+4. ⏳ **Single-pick: select dismisses popup.**
+   - **Steps:** open picker, pick something.
+   - **Expected:** popup closes; subsequent typing stays in
+     editor.
+   - **Why not automated:** the dismissal is driven by the plugin's
+     `closeMenu` callback + Lexical reconcile.
+
+### Paperclip-button flow
+
+5. ⏳ **Paperclip click opens the picker overlay.**
+   - **Steps:** click the paperclip in the composer footer.
+   - **Expected:** PrimeVue Popover anchored to the button shows
+     the same FilePicker, but with its own search input focused.
+   - **Why not automated:** PrimeVue Popover positioning + focus
+     management is brittle in jsdom.
+
+6. ⏳ **Browse… opens native OS dialog (files + dirs).**
+   - **Steps:** click the paperclip → Browse… inside the popup.
+   - **Expected:** native OS dialog appears. Picking either a file
+     or a directory inserts the right pill (file icon or folder
+     icon) at the caret. Cancel returns to the popup with no
+     insertion.
+   - **Why not automated:** Electrobun's `Utils.openFileDialog` is
+     a native FFI call; Playwright can't drive an OS dialog.
+
+7. ⏳ **Picker stays open after Browse… cancel.**
+   - **Steps:** click Browse…, hit Cancel in the OS dialog.
+   - **Expected:** popup remains visible, focused on the search
+     input. No spurious empty pill.
+   - **Why not automated:** same as #6.
+
+### Toggle + edge cases
+
+8. ⏳ **Show hidden toggle reveals dotfiles + `node_modules`.**
+   - **Steps:** open the picker. Type `.env`. Empty list (or
+     missing). Flip "Show hidden / ignored". Result appears.
+   - **Expected:** dotfiles + IGNORED_DIRS members (node_modules,
+     dist, target, …) now appear in results.
+   - **Why not automated:** `fileSearch` unit-tests cover the
+     filter logic, but the toggle wiring + cache-key behavior
+     across re-toggling needs human verification.
+
+9. ⏳ **Directory pill renders with folder icon + acts as folder
+   attachment.**
+   - **Steps:** pick a directory. Inspect the pill; submit the
+     message.
+   - **Expected:** pill shows `pi-folder`. SDK send carries
+     `attachment.type = "directory"` (verify via DevLog or by
+     checking the bun log JSON for the send).
+   - **Why not automated:** SDK round-trip + DevLog inspection.
+
+10. ⏳ **Large workspace stays snappy (subjective).**
+    - **Steps:** open the picker in dafman itself (~thousands of
+      files indexed). Type quickly.
+    - **Expected:** results refresh as you type without visible
+      lag. First open may take ~ms; subsequent opens cached.
+    - **Why not automated:** subjective perf check.
+
+---

@@ -403,3 +403,40 @@ exports[`IPC wire contracts — diagnostics AuditEntry permission + url shapes 1
   },
 ]
 `;
+
+exports[`IPC wire contracts — diagnostics WorkspaceFileMatch carries kind 1`] = `
+[
+  {
+    "absolutePath": "/r/README.md",
+    "kind": "file",
+    "name": "README.md",
+    "path": "README.md",
+  },
+  {
+    "absolutePath": "/r/src",
+    "kind": "directory",
+    "name": "src",
+    "path": "src",
+  },
+  {
+    "absolutePath": "/home/u/Documents",
+    "kind": "directory",
+    "name": "Documents",
+    "path": "~/Documents",
+  },
+]
+`;
+
+exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
+{
+  "cancel": null,
+  "dir": {
+    "kind": "directory",
+    "path": "C:/abs/repo",
+  },
+  "file": {
+    "kind": "file",
+    "path": "C:/abs/foo.txt",
+  },
+}
+`;

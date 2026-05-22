@@ -1,15 +1,29 @@
 <script setup lang="ts">
-/// @file mention typeahead for the composer.
+/// @-trigger file/dir picker for the composer.
 ///
-/// Triggers on "@" + at least one character, queries the bun-side
-/// workspace file index via `searchWorkspaceFiles`, and on select
-/// (a) inserts the relative path as a text token in the editor (so
-/// it ships with the message), and (b) emits `attach` so the parent
-/// composer appends the file as an SDK `attachment`. The two
-/// approaches together give the LLM both the textual hint and the
-/// structured attachment — empirically the best signal.
+/// Detects `@` in the editor via Lexical's `TypeaheadMenuPlugin`,
+/// then mounts FilePicker as the menu UI. On select we replace the
+/// typed `@query` TextNode with an AttachmentNode pill carrying
+/// either `type: "file"` or `type: "directory"`.
+///
+/// Wire-up:
+///   1. TypeaheadMenuPlugin watches the editor for `@`. When it
+///      matches, it provides an anchorElement + a `selectOptionAndCleanUp`
+///      callback that closes the menu and gives us the textNode
+///      containing the query.
+///   2. We render FilePicker into the anchor with `externalQuery`
+///      driven by the plugin's query-change events.
+///   3. ArrowUp/Down keystrokes from the editor are captured at the
+///      window level (since editor keeps focus, not the picker) and
+///      forwarded to FilePicker's imperative `moveHighlight`.
+///   4. Enter from the editor fires the plugin's `select-option` —
+///      we pick the picker's currently highlighted match.
+///   5. Mouse-click on a picker item OR clicking "Browse…" routes
+///      via `selectOptionAndCleanUp(sentinel)` so the plugin gives
+///      us the textNode, then we insert the pill using the
+///      attachment cached in `pendingAttachment`.
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { TextNode, $createTextNode, $isTextNode } from "lexical";
 import {
   TypeaheadMenuPlugin,
@@ -17,18 +31,13 @@ import {
   useBasicTypeaheadTriggerMatch,
 } from "lexical-vue/LexicalTypeaheadMenuPlugin";
 import { useLexicalComposer } from "lexical-vue/LexicalComposer";
-import { invokeCommand } from "../ipc/invoke";
 import { $createAttachmentNode } from "../lexical/AttachmentNode";
-import type {
-  WorkspaceFileMatch,
-  SendMessageAttachment,
-} from "../ipc/types";
+import type { SendMessageAttachment } from "../ipc/types";
+import FilePicker from "./FilePicker.vue";
 
-class FileOption extends MenuOption {
-  match: WorkspaceFileMatch;
-  constructor(match: WorkspaceFileMatch) {
-    super(match.absolutePath);
-    this.match = match;
+class SentinelOption extends MenuOption {
+  constructor() {
+    super("file-picker-sentinel");
   }
 }
 
@@ -38,47 +47,17 @@ const props = defineProps<{
 
 const editor = useLexicalComposer();
 const query = ref("");
-const results = ref<WorkspaceFileMatch[]>([]);
 const menuParent = ref<HTMLElement | null>(null);
+const pickerRef = ref<InstanceType<typeof FilePicker> | null>(null);
+/// Tunnel: set by click handlers, consumed by onSelectOption.
+const pendingAttachment = ref<SendMessageAttachment | null>(null);
 
 onMounted(() => {
   if (typeof document !== "undefined") menuParent.value = document.body;
 });
 
-/// Re-fetch on query change. Debounce-free for now — the bun index
-/// is cached, so subsequent calls are sub-millisecond.
-watch(query, async (q) => {
-  if (q.length === 0) {
-    // Show the top-of-tree files even on a bare "@".
-    try {
-      results.value = await invokeCommand("searchWorkspaceFiles", {
-        sessionId: props.sessionId,
-        query: "",
-        limit: 30,
-      });
-    } catch {
-      results.value = [];
-    }
-    return;
-  }
-  try {
-    results.value = await invokeCommand("searchWorkspaceFiles", {
-      sessionId: props.sessionId,
-      query: q,
-      limit: 40,
-    });
-  } catch {
-    results.value = [];
-  }
-});
+const sentinelOptions = computed(() => [new SentinelOption()]);
 
-const options = computed(() =>
-  results.value.map((r) => new FileOption(r)),
-);
-
-/// Trigger on "@". `minLength: 0` so we show the menu immediately on
-/// "@" and refine as the user types. `allowWhitespace: false` keeps
-/// "@ " from spuriously activating mid-sentence.
 const triggerFn = useBasicTypeaheadTriggerMatch("@", {
   minLength: 0,
   allowWhitespace: false,
@@ -88,40 +67,58 @@ function onQueryChange(q: string | null) {
   query.value = q ?? "";
 }
 
-function onSelectOption(payload: {
-  option: FileOption;
-  textNodeContainingQuery: TextNode | null;
-  closeMenu: () => void;
-}) {
-  const { option, textNodeContainingQuery, closeMenu } = payload;
-  // Replace the typed "@que" with an inline AttachmentNode pill so the
-  // file reference reads as `text text (path/to/file) text` instead of
-  // raw `@path/to/file `. The pill carries the structured attachment
-  // payload, and its text content (`(filename)`) flows through the
-  // standard markdown serializer.
-  const attachment: SendMessageAttachment = {
-    type: "file",
-    path: option.match.absolutePath,
-    displayName: option.match.path,
-  };
+function replaceTriggerWith(
+  textNodeContainingQuery: TextNode | null,
+  attachment: SendMessageAttachment,
+): void {
+  if (!textNodeContainingQuery) return;
   editor.update(() => {
-    if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
+    if ($isTextNode(textNodeContainingQuery)) {
       const pill = $createAttachmentNode(attachment);
       textNodeContainingQuery.replace(pill);
-      // Trailing space so the caret lands after the pill ready for more text.
       const space = $createTextNode(" ");
       pill.insertAfter(space);
       space.selectEnd();
     }
   });
+}
+
+function onSelectOption(payload: {
+  option: SentinelOption;
+  textNodeContainingQuery: TextNode | null;
+  closeMenu: () => void;
+}) {
+  const { textNodeContainingQuery, closeMenu } = payload;
+  // Click path: pendingAttachment is set. Enter-from-editor path:
+  // pendingAttachment is null, pull from the picker's highlight.
+  const attachment =
+    pendingAttachment.value ?? pickerRef.value?.pickCurrent?.() ?? null;
+  pendingAttachment.value = null;
+  if (attachment) {
+    replaceTriggerWith(textNodeContainingQuery, attachment);
+  }
   closeMenu();
 }
+
+function onWindowKey(e: KeyboardEvent): void {
+  if (!pickerRef.value?.hasResults?.()) return;
+  if (e.key === "ArrowDown") {
+    pickerRef.value.moveHighlight(1);
+    e.preventDefault();
+  } else if (e.key === "ArrowUp") {
+    pickerRef.value.moveHighlight(-1);
+    e.preventDefault();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onWindowKey, true));
+onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
 </script>
 
 <template>
   <TypeaheadMenuPlugin
     v-if="menuParent"
-    :options="options"
+    :options="sentinelOptions"
     :trigger-fn="triggerFn"
     :parent="menuParent"
     @query-change="onQueryChange"
@@ -132,28 +129,19 @@ function onSelectOption(payload: {
         v-if="itemProps.options.length > 0 && anchorElementRef"
         :to="anchorElementRef"
       >
-        <div
-          class="mention-menu"
-          role="listbox"
-        >
-          <button
-            v-for="(opt, i) in (itemProps.options as FileOption[])"
-            :key="opt.match.absolutePath"
-            type="button"
-            class="mention-item"
-            :class="{ 'is-selected': i === itemProps.selectedIndex }"
-            role="option"
-            :aria-selected="i === itemProps.selectedIndex"
-            @mousedown.prevent
-            @click="itemProps.selectOptionAndCleanUp(opt)"
-            @mouseenter="itemProps.setHighlightedIndex(i)"
-          >
-            <i class="pi pi-file mention-item-icon" aria-hidden="true" />
-            <span class="mention-item-text">
-              <span class="mention-item-name">{{ opt.match.name }}</span>
-              <span class="mention-item-path">{{ opt.match.path }}</span>
-            </span>
-          </button>
+        <div class="mention-menu-anchor">
+          <FilePicker
+            ref="pickerRef"
+            :session-id="props.sessionId"
+            :external-query="query"
+            :show-search-input="false"
+            initial-focus="none"
+            @select="(att: SendMessageAttachment) => {
+              pendingAttachment = att;
+              itemProps.selectOptionAndCleanUp(itemProps.options[0]);
+            }"
+            @dismiss="() => {}"
+          />
         </div>
       </Teleport>
     </template>
@@ -161,71 +149,10 @@ function onSelectOption(payload: {
 </template>
 
 <style scoped>
-.mention-menu {
-  display: flex;
-  flex-direction: column;
-  min-width: 24rem;
-  max-height: 18rem;
-  overflow-y: auto;
-  padding: 0.25rem;
-  background: var(--p-content-background);
-  border: 1px solid var(--p-surface-border);
-  border-radius: var(--p-border-radius-md);
-  box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
-  transform: translateY(calc(-100% - 2rem));
-  z-index: 100;
-}
-
-.mention-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.55rem;
-  background: transparent;
-  border: 0;
-  border-radius: var(--p-border-radius-sm);
-  font: inherit;
-  color: var(--p-text-color);
-  text-align: left;
-  cursor: pointer;
-  width: 100%;
-}
-
-.mention-item.is-selected,
-.mention-item:hover {
-  background: var(--p-content-hover-background);
-}
-
-.mention-item-icon {
-  font-size: 0.9rem;
-  color: var(--p-text-muted-color);
-  width: 1.2em;
-  text-align: center;
-}
-
-.mention-item-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.mention-item-name {
-  font-size: 0.85rem;
-  color: var(--p-text-color);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mention-item-path {
-  font-family: var(--p-font-family-mono, ui-monospace, monospace);
-  font-size: 0.7rem;
-  color: var(--p-text-muted-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.mention-menu-anchor {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 0.5rem;
 }
 </style>

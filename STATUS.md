@@ -26,6 +26,12 @@ every `@github/copilot` 1.0.48 changelog entry against what we ship),
 the ordering changed. Picked from the new Phase 18–23 ordering in the
 audit doc.
 
+**Most recently shipped (2026-05-22):** rebuilt the composer's `@file`
+picker (and unified the paperclip path). New `FilePicker.vue` with
+fuzzy + path-nav (`@/abs`, `@~/`, `@../`) modes, hidden / ignored
+toggle, native "Browse…" escape hatch via new `pickAttachment` RPC.
+Single-pick per popup. Directories attach as `directory` pills.
+
 1. **Phase 18 — Skills library + MCP registry MVP** (~3 d).
    `rpc.skills.list/enable/disable/reload` + `rpc.mcp.config.*` +
    per-session `rpc.mcp.enable/disable/reload`. Settings panes for
@@ -81,7 +87,7 @@ TODO reflects current state against the M0–M7 ambitions in
 | Markdown rendering | DONE | markdown-it + Prism + DOMPurify + KaTeX; footnotes / deflists / emoji / task lists / safe HTML subset. |
 | Mermaid diagrams (opt-in, lazy) | DONE | `MermaidBlock.vue`; Settings → Appearance toggle. |
 | File / image attachments (composer) | DONE | Inline `AttachmentNode` (DecoratorNode); icon by type; click-to-open; round-trip in user-message bubbles. |
-| `@file` mentions | DONE | `MentionPlugin.vue` + `searchWorkspaceFiles` RPC. |
+| `@file` / `@folder` picker | DONE | `FilePicker.vue` + `MentionPlugin.vue` + `searchWorkspaceFiles` RPC. Fuzzy + path-nav (`@/abs`, `@~/`, `@../`); hidden / ignored toggle; native Browse via `pickAttachment` RPC. Single-pick; dirs attach as `directory` pills. Same popup also opens via the paperclip button. |
 | Slash commands (local) | DONE | `SlashCommandPlugin.vue` + `lib/sessionCommands.ts` for `/cd`. |
 | Steering / queue / interrupt sends | DONE | `Ctrl+Enter` / `Alt+Enter` / `Ctrl+Shift+Enter` + SplitButton; per-session `defaultSendMode`. |
 | Message actions (copy / quote / retry / edit / fork) | DONE | `MessageActions.vue`. |
@@ -318,6 +324,12 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — File picker rebuild: `FilePicker.vue` powers both
+  the `@`-trigger and the paperclip button. Fuzzy mode + CLI-style
+  path-nav (`@/abs`, `@~/foo`, `@../path`); Show hidden / ignored
+  toggle; native "Browse…" escape hatch via new `pickAttachment`
+  RPC; directories attach as `directory` pills. 18 new tests
+  (11 fileSearch, 7 FilePicker).
 - **2026-05-22** — SDK + CLI deep audit: `plans/plan-sdk-audit.prompt.md`
   cross-references every supercharged RPC (`createServerRpc` +
   `createSessionRpc`), every config knob on `SessionConfig`, every CLI

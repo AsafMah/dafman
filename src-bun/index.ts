@@ -125,14 +125,37 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				const first = paths[0]?.trim();
 				return first && first.length > 0 ? first : null;
 			}),
+			pickAttachment: rpcGuard(async ({ startingFolder }) => {
+				// Single-pick, files OR directories. The composer's
+				// @-picker exposes this as the "Browse…" escape hatch
+				// when fuzzy search isn't fast enough or the file
+				// lives outside the workspace cwd.
+				const paths = await Utils.openFileDialog({
+					canChooseFiles: true,
+					canChooseDirectory: true,
+					allowsMultipleSelection: false,
+					...(startingFolder ? { startingFolder } : {}),
+				});
+				const first = paths[0]?.trim();
+				if (!first) return null;
+				try {
+					const { stat } = await import("node:fs/promises");
+					const st = await stat(first);
+					return { path: first, kind: st.isDirectory() ? "directory" : "file" };
+				} catch {
+					// Path vanished between pick and stat — treat as
+					// cancel rather than throwing.
+					return null;
+				}
+			}),
 			disconnectSession: rpcGuard(async ({ sessionId }) =>
 				sessions.disconnect(sessionId),
 			),
 			sendMessage: rpcGuard(async ({ sessionId, text, mode, attachments }) =>
 				sessions.send(sessionId, text, mode, attachments),
 			),
-			searchWorkspaceFiles: rpcGuard(async ({ sessionId, query, limit }) =>
-				sessions.searchWorkspaceFiles(sessionId, query, limit ?? 40),
+			searchWorkspaceFiles: rpcGuard(async ({ sessionId, query, limit, includeHidden }) =>
+				sessions.searchWorkspaceFiles(sessionId, query, limit ?? 40, includeHidden ?? false),
 			),
 			abortSession: rpcGuard(async ({ sessionId }) =>
 				sessions.abort(sessionId),
