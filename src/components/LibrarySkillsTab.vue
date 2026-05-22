@@ -75,7 +75,14 @@ function toggleExpansion(name: string) {
 
 async function revealSkillFile(path: string | undefined) {
   if (!path) return;
-  await invokeCommand("revealPath", { path });
+  try {
+    await invokeCommand("revealPath", { path });
+  } catch (err) {
+    toasts.error(
+      "Couldn't reveal skill",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 }
 
 onMounted(() => {

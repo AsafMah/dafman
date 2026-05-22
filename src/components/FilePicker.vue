@@ -24,6 +24,7 @@
 
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { invokeCommand } from "../ipc/invoke";
+import { useToastStore } from "../stores/toastStore";
 import type { WorkspaceFileMatch, SendMessageAttachment } from "../ipc/types";
 
 const props = withDefaults(
@@ -211,14 +212,21 @@ function scrollHighlightIntoView(): void {
 }
 
 async function browse(kind: "file" | "directory"): Promise<void> {
-  const picked = await invokeCommand("pickAttachment", { kind });
-  if (!picked) return;
-  emit(
-    "select",
-    picked.kind === "directory"
-      ? { type: "directory", path: picked.path, displayName: picked.path }
-      : { type: "file", path: picked.path, displayName: picked.path },
-  );
+  try {
+    const picked = await invokeCommand("pickAttachment", { kind });
+    if (!picked) return;
+    emit(
+      "select",
+      picked.kind === "directory"
+        ? { type: "directory", path: picked.path, displayName: picked.path }
+        : { type: "file", path: picked.path, displayName: picked.path },
+    );
+  } catch (err) {
+    useToastStore().error(
+      "Picker failed",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 }
 </script>
 

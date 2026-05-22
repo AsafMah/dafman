@@ -110,7 +110,12 @@ const reasoningChoice = computed<ReasoningVisibility>({
 function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
   if (!path) return;
-  void invokeCommand("revealPath", { path });
+  invokeCommand("revealPath", { path }).catch((err: unknown) => {
+    toasts.error(
+      "Couldn't open workspace",
+      err instanceof Error ? err.message : String(err),
+    );
+  });
 }
 
 // ---------- Approve-all ----------

@@ -53,6 +53,32 @@ describe("invokeCommand AppErrorPayload decoding", () => {
     }
   });
 
+  // One test per discriminated-union variant. Each one used to be
+  // silently dropped (renderer await hung forever) before the
+  // Error-wrapped-AppErrorPayload encoding shipped — these tests are
+  // the regression net for that protocol gap.
+  test.each([
+    { kind: "ClientNotStarted" } as const,
+    { kind: "SessionNotFound", data: "sess-x" } as const,
+    { kind: "Settings", data: "settings.json missing" } as const,
+    { kind: "Sdk", data: "internal sdk boom" } as const,
+    { kind: "Io", data: "EACCES /tmp" } as const,
+  ])("decodes variant %p back into a typed AppError", async (payload) => {
+    setRpcBridge(
+      makeBridge(async () => {
+        throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);
+      }),
+    );
+
+    try {
+      await invokeCommand("resumeSession" as never, {} as never);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).payload).toEqual(payload);
+    }
+  });
+
   test("passes through a raw AppErrorPayload throw (back-compat path)", async () => {
     setRpcBridge(
       makeBridge(async () => {

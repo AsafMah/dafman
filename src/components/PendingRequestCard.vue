@@ -195,11 +195,18 @@ async function openElicitationUrl(): Promise<void> {
     toasts.warn("No URL provided", "The agent didn't supply a URL to open.");
     return;
   }
-  const ok = await invokeCommand("openUrl", { url: req.url });
-  if (ok) {
-    urlOpened.value = true;
-  } else {
-    toasts.error("Couldn't open URL", req.url);
+  try {
+    const ok = await invokeCommand("openUrl", { url: req.url });
+    if (ok) {
+      urlOpened.value = true;
+    } else {
+      toasts.error("Couldn't open URL", req.url);
+    }
+  } catch (err) {
+    toasts.error(
+      "Couldn't open URL",
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 

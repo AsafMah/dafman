@@ -3,6 +3,39 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (Phase 20a — RPC error sweep)
+
+- **`respondToPending` now rolls back on RPC failure.** Previously
+  the pending-request card was spliced from the UI + a
+  `dafman.pending_response` event was appended BEFORE the
+  `respondToRequest` RPC. If the RPC threw (session disconnected
+  mid-flight, etc.), the UI dropped the card while the SDK still
+  had the request open — leaving the user stuck with no way to
+  respond. Now snapshots the entry + index before the splice and
+  re-inserts in catch, plus fires an error toast.
+- **`logStore.setLevel` now returns the new level + propagates RPC
+  errors.** Previously called as `void logStore.setLevel(v)` from
+  LogViewer — if bun rejected, the error was silently dropped.
+  Caller now catches + toasts.
+- **`pickAttachment` in FilePicker now catches** — bridge errors
+  were leaking unhandled. Error toast on failure.
+- **`openUrl` in PendingRequestCard now catches** — same pattern.
+- **`revealPath` in SessionDetailsPanel / SessionHeaderControls /
+  LibrarySkillsTab now catches** — same pattern. These were
+  `void invokeCommand(...)` paths that depended on errors being
+  silently swallowed (the pre-fix behaviour).
+
+### Added (Phase 20a)
+
+- **Test coverage**: `invoke.test.ts` now asserts a round-trip for
+  every `AppErrorPayload` discriminated-union variant
+  (ClientNotStarted / SessionNotFound / Settings / Sdk / Io) so a
+  future protocol drift fails loudly.
+- **`sessionsStore.respondToPending.test.ts`**: 2 new tests
+  asserting both happy-path splice AND rollback-on-RPC-failure
+  with the pending entry restored at its original index + an
+  error toast queued.
+
 ### Added (Phase 19b)
 
 - **"Manage globally →" link** in the right-rail Skills section

@@ -10,6 +10,87 @@
 
 ---
 
+## 2026-05-22 — Phase 20a: RPC error sweep
+
+### Takeaway
+
+After the Electrobun bridge fix uncovered that every RPC error
+since the bun migration had been silently swallowed (renderer
+await hung), I needed to audit every `invokeCommand` call site to
+find which ones had been depending on the swallow vs which had
+proper handling.
+
+Dispatched three parallel `explore` agents:
+1. **audit-stores** — every `invokeCommand` in `src/stores/*.ts`.
+2. **audit-components** — every `invokeCommand` in components +
+   `src/lib/`.
+3. **audit-rpc-guard** — every handler in `src-bun/index.ts` +
+   `src-bun/test-server.ts` (verify exhaustive `rpcGuard` wrap).
+
+### What the audits found
+
+- **100/100 bun handlers wrapped** — no missing `rpcGuard` calls.
+  (Inconsistency: 14 production handlers absent from test-server;
+  flagged for 20c since most are session-scoped operations not
+  exercised by E2E.)
+- **~70 renderer call sites** across stores + components. Most
+  were already wrapped in try/catch at their store-method level
+  (settingsStore, sessionsStore, sessionsListStore, modelsStore,
+  clientStore, auditStore). Some agent-flagged ❌❌ entries were
+  false positives — outer try/catch the agent missed (notably
+  `addMcpConfig` in LibraryMcpTab and `saveExportFile` in
+  SessionDetailsPanel — both inside `onDialogSubmit`/`onExport`
+  catch arms).
+
+### What actually needed fixing
+
+After manual verification:
+
+| Site | Issue | Fix |
+|---|---|---|
+| `sessionsStore.ts:987` `respondToPending` | optimistic splice + event append before await; no rollback | snapshot entry + index, restore in catch, error toast |
+| `logStore.ts:82` `setLevel` | no try/catch; called via `void` from LogViewer | LogViewer caller catches + toasts |
+| `FilePicker.vue:214` `pickAttachment` | bare `await invokeCommand` | try/catch + toast |
+| `PendingRequestCard.vue:198` `openUrl` | bare `await invokeCommand` | try/catch + toast |
+| `SessionDetailsPanel.vue:113` `revealPath` | `void invokeCommand` (best-effort) | `.catch()` + toast |
+| `SessionHeaderControls.vue:191` `revealPath` | same | same |
+| `LibrarySkillsTab.vue:78` `revealPath` | bare `await invokeCommand` | try/catch + toast |
+
+### Decisions
+
+- **Optimistic-no-rollback in `truncateSessionHistory` + send
+  follow-up** (sessionsStore.ts:844-852): the audit flagged this
+  but the outer try/catch + toast already handles the user-facing
+  case. The "rollback" would mean re-fetching SDK history (it's
+  already truncated), which is more correctness theater than
+  user value. Left as-is, documented in DEVLOG.
+- **Optimistic-no-rollback in `setSessionSkillEnabled` /
+  `setSessionMcpEnabled` / `setGloballyDisabledSkills`**: all
+  three have explicit rollback in their catch arms — they were
+  written defensively from the start. Verified each; no change.
+- **`getSessionMode` best-effort void calls** in restoreSession +
+  createSession: documented "older CLI hosts may lack this RPC;
+  ignore". Left as-is.
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ **396 pass (+7)**
+- `bun run smoke` ✅ **70/70**
+- `bun run dev` boot check ✅ — boot completes cleanly even when
+  both persisted-layout sessions are stale (catalog miss); splash
+  watchdog never fires.
+
+### Followups
+
+- 20b: dead code + duplication sweep (knip already shows several
+  unused exports + the orphan `permissionsStore.ts`).
+- 20c: stylistic findings + dep audit + tech-debt doc.
+- 14 RPC handlers in production missing from test-server harness
+  (means E2E can't drive those code paths). Audit in 20c.
+
+---
+
 ## 2026-05-22 — Phase 19b: Skills tab integration + Manage globally link
 
 ### Takeaway

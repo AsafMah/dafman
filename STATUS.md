@@ -345,6 +345,15 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 20a shipped: **RPC error-sweep**. Triggered
+  by the Electrobun bridge fix uncovering that every RPC error since
+  the bun migration had been silently swallowed (renderer await
+  hung). Audited every `invokeCommand` caller across stores +
+  components (~70 sites); fixed 1 real bug (respondToPending
+  rollback on RPC failure) + 5 best-effort sites
+  (revealPath/openUrl/pickAttachment) that now propagate errors
+  properly. **396 bun tests (+7), 70/70 E2E** — and the boot finally
+  completes cleanly with the splash watchdog never firing.
 - **2026-05-22** — Phase 19b shipped: **Skills tab** in the Library
   panel (already rendered in 19a) is now reachable from the right-
   rail's Skills section via a "Manage globally →" link. Click

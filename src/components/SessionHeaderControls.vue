@@ -24,6 +24,7 @@ import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useLayoutStore, basename } from "../stores/layoutStore";
+import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import {
   buildModelTree,
@@ -188,7 +189,12 @@ const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
 function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
   if (!path) return;
-  void invokeCommand("revealPath", { path });
+  invokeCommand("revealPath", { path }).catch((err: unknown) => {
+    useToastStore().error(
+      "Couldn't open workspace",
+      err instanceof Error ? err.message : String(err),
+    );
+  });
 }
 </script>
 

@@ -78,13 +78,16 @@ export const useLogStore = defineStore("logs", () => {
 
   /// Flip the bun-side level. Persists for the rest of the run; not
   /// stored in settings yet (TODO once we sketch Settings → Diagnostics).
-  async function setLevel(next: LogLevel): Promise<void> {
+  /// Throws on RPC failure so callers can toast — previously the throw
+  /// was swallowed by Electrobun's plain-object bridge.
+  async function setLevel(next: LogLevel): Promise<LogLevel> {
     const updated = await invokeCommand("setLogLevel", { level: next });
     level.value = updated;
     // Default the display filter to follow the bun-side level when the
     // user changes it. They can still override per-session via the
     // display dropdown.
     displayLevel.value = updated;
+    return updated;
   }
 
   function setDisplayLevel(next: LogLevel): void {

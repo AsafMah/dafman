@@ -971,11 +971,20 @@ export const useSessionsStore = defineStore("sessions", () => {
     params: RespondToRequestParams,
   ): Promise<void> {
     const record = sessions.value.find((s) => s.id === params.sessionId);
+    // Snapshot the pending entry so we can restore it if the bun-side
+    // RPC fails — without rollback, the UI would lose the pending
+    // card while the SDK still has the request open, leaving the user
+    // with no way to respond.
+    let restoredEntry: PendingRecordRequest | null = null;
+    let restoredIdx = -1;
     if (record) {
-      const idx = record.pendingRequests.findIndex(
+      restoredIdx = record.pendingRequests.findIndex(
         (p) => p.requestId === params.requestId,
       );
-      if (idx >= 0) record.pendingRequests.splice(idx, 1);
+      if (restoredIdx >= 0) {
+        restoredEntry = record.pendingRequests[restoredIdx] ?? null;
+        record.pendingRequests.splice(restoredIdx, 1);
+      }
       appendEvent(record, {
         sessionId: record.id,
         eventType: "dafman.pending_response",
@@ -986,6 +995,10 @@ export const useSessionsStore = defineStore("sessions", () => {
     try {
       await invokeCommand("respondToRequest", params);
     } catch (err) {
+      // Roll back the optimistic UI mutation so the user can retry.
+      if (record && restoredEntry) {
+        record.pendingRequests.splice(restoredIdx, 0, restoredEntry);
+      }
       const toasts = useToastStore();
       toasts.error(
         "Failed to send response",

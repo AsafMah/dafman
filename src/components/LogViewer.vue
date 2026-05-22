@@ -42,7 +42,12 @@ const levelOptions = LEVEL_NAMES.map((name) => ({
 const bunLevel = computed<LogLevel>({
   get: () => logStore.level,
   set: (v) => {
-    void logStore.setLevel(v);
+    logStore.setLevel(v).catch((err: unknown) => {
+      toasts.error(
+        "Failed to set log level",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
   },
 });
 
