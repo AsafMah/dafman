@@ -129,6 +129,11 @@ class FakeCopilotSession {
 				enable: async () => undefined,
 				disable: async () => undefined,
 				reload: async () => undefined,
+				oauth: {
+					login: async () => ({
+						authorizationUrl: "https://example.invalid/oauth/test",
+					}),
+				},
 			},
 			sessions: {
 				fork: async () => ({ sessionId: `fake-session-${Date.now()}` }),
@@ -173,6 +178,12 @@ export class FakeCopilotClient {
 	private readonly sendScriptRef: { current: SendScript } = { current: defaultSendScript };
 	private nextSeq = 1;
 	private readonly catalogPath?: string;
+	// Phase 19a fake state: in-memory MCP config + global disabled set
+	// so E2E flows can mutate without spawning a real CLI.
+	private readonly mcpConfigs = new Map<string, Record<string, unknown>>();
+	private readonly mcpDisabled = new Set<string>();
+	// Phase 19b fake state: global disabled-skills set.
+	private readonly skillsDisabled = new Set<string>();
 
 	constructor(opts: { catalogPath?: string } = {}) {
 		this.catalogPath = opts.catalogPath;
@@ -387,6 +398,98 @@ export class FakeCopilotClient {
 						},
 					},
 				}),
+			},
+			mcp: {
+				config: {
+					list: async () => ({
+						servers: Object.fromEntries(this.mcpConfigs.entries()),
+					}),
+					add: async (args) => {
+						const { name, config } = (args ?? {}) as {
+							name: string;
+							config: Record<string, unknown>;
+						};
+						this.mcpConfigs.set(name, config);
+					},
+					update: async (args) => {
+						const { name, config } = (args ?? {}) as {
+							name: string;
+							config: Record<string, unknown>;
+						};
+						this.mcpConfigs.set(name, config);
+					},
+					remove: async (args) => {
+						const { name } = (args ?? {}) as { name: string };
+						this.mcpConfigs.delete(name);
+						this.mcpDisabled.delete(name);
+					},
+					enable: async (args) => {
+						const { names } = (args ?? {}) as { names: string[] };
+						for (const n of names ?? []) this.mcpDisabled.delete(n);
+					},
+					disable: async (args) => {
+						const { names } = (args ?? {}) as { names: string[] };
+						for (const n of names ?? []) this.mcpDisabled.add(n);
+					},
+				},
+				discover: async () => ({
+					servers: [
+						{
+							name: "playwright",
+							type: "local",
+							source: "plugin",
+							enabled: !this.mcpDisabled.has("playwright"),
+						},
+						{
+							name: "github",
+							type: "http",
+							source: "personal-copilot",
+							enabled: !this.mcpDisabled.has("github"),
+						},
+					],
+				}),
+			},
+			skills: {
+				config: {
+					setDisabledSkills: async (args) => {
+						const { disabledSkills } = (args ?? {}) as { disabledSkills: string[] };
+						this.skillsDisabled.clear();
+						for (const n of disabledSkills ?? []) this.skillsDisabled.add(n);
+					},
+				},
+				discover: async () => {
+					const catalog: Array<{
+						name: string;
+						description: string;
+						source: string;
+						userInvocable: boolean;
+					}> = [
+						{
+							name: "summarize",
+							description: "Summarize the conversation so far.",
+							source: "builtin",
+							userInvocable: true,
+						},
+						{
+							name: "project-greet",
+							description: "Greet the user with project-specific context.",
+							source: "project",
+							userInvocable: false,
+						},
+						{
+							name: "personal-snippet",
+							description: "Insert a personal code snippet.",
+							source: "personal-copilot",
+							userInvocable: true,
+						},
+					];
+					return {
+						skills: catalog.map((s) => ({
+							...s,
+							enabled: !this.skillsDisabled.has(s.name),
+						})),
+					};
+				},
 			},
 		};
 	}

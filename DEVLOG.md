@@ -10,6 +10,102 @@
 
 ---
 
+## 2026-05-22 — Phase 19a: Library panel + MCP registry MVP
+
+### Takeaway
+
+First half of the Skills + MCP library milestone. A new left-edge
+sidebar (`LibraryPanel.vue`, pi-book icon on the activity bar)
+hosts global / cross-session config. First tab is **MCP servers**:
+Configured + Discovered lists, per-row enable/disable toggle, Edit
+and Remove buttons, inline "Sign in" for http servers with OAuth.
+Add dialog has a structured form **and** a JSON-mode toggle that
+round-trips.
+
+Second tab (Skills) stub is already in place but the
+`LibrarySkillsTab` component renders content from the new
+`discoverSkills` / `setGloballyDisabledSkills` RPCs — those RPCs
+shipped in this commit so 19b reduces to wiring polish + a "manage
+globally" link from the right-rail.
+
+### What shipped
+
+- **8 new bun RPCs**:
+  `listMcpConfigs / addMcpConfig / updateMcpConfig / removeMcpConfig`
+  `/ enableMcpServers / disableMcpServers` (server-scoped via
+  `client.rpc.mcp.config.*`); `discoverMcpServers`
+  (`client.rpc.mcp.discover`); `loginToMcpServer` (session-scoped
+  via `session.rpc.mcp.oauth.login`).
+- **2 new bun RPCs for 19b**: `discoverSkills` and
+  `setGloballyDisabledSkills` (server-scoped via `skills.discover`
+  / `skills.config.setDisabledSkills`).
+- **fakeClient** gets in-memory `mcpConfigs` + `mcpDisabled` +
+  `skillsDisabled` sets so E2E flows can mutate without spawning
+  a real CLI; `mcp.discover` returns playwright + github stubs;
+  `skills.discover` returns 3 stubs across builtin / project /
+  personal-copilot sources; session `mcp.oauth.login` returns a
+  stub `authorizationUrl`.
+- **`LibraryPanel.vue`** — PrimeVue Tabs container with MCP /
+  Skills tabs. Active tab persists in localStorage. Registered
+  globally as `library` component.
+- **`LibraryMcpTab.vue`** — list + form + dialog wiring.
+- **`McpServerForm.vue`** — structured ↔ JSON toggle dialog. The
+  structured side switches local / http transport with per-
+  variant fields. JSON mode mode-change round-trips through
+  `JSON.parse` with an inline error hint when invalid.
+- **`LibrarySkillsTab.vue`** — Skills tab body, grouped by
+  source, per-row toggle writes the full disabled-list. Reveal-
+  in-folder button when `path` is set. (Tab visible already; 19b
+  polishes the right-rail integration.)
+- **E2E F18** (`18-library-mcp.pwtest.ts`):
+  - open library from activity bar, MCP tab is selected by
+    default, Discovered shows playwright + github.
+  - Add dialog → fill name + command → submit → row appears in
+    Configured.
+  - JSON toggle copies structured payload out faithfully.
+
+### Decisions
+
+- **Library is an activity-bar edge panel**, not a body-grid
+  dockview panel. Matches the existing pattern (Sessions, Settings,
+  Log viewer all are edge panels) and the user's "like
+  sessionsManager" hint. Body-grid would have meant a new dockview
+  group + tab — overkill for what's essentially a single sidebar.
+- **MCP OAuth uses any available session**, not a transient one.
+  The SDK's oauth.login is session-scoped; spinning a new session
+  just to authenticate would add 1-2 s and create a dangling
+  session record. Reusing any live session works because the
+  oauth flow's callback listener is process-scoped, not session-
+  scoped. When no session exists, we warn the user instead.
+- **JSON mode is opt-in** (structured is default). Power users
+  with hand-crafted MCP configs can paste in raw JSON; everyone
+  else gets the form. The toggle is per-dialog-open — if you flip
+  to JSON, edit, and submit, your edits commit; if you flip back
+  to structured before submit, we re-parse so the structured side
+  shows your changes.
+- **Per-server MCP tool listing still deferred**. The SDK's
+  `McpServerList` returns `{ name, status, source?, error? }`
+  — no tool inventory. Tracked for the SDK upstream.
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ 386 pass
+- `bun run smoke` ✅ **64/64 in ~100 s** (prod + HMR)
+- **`bun run dev` boot verification** ✅ — dafman started, session
+  restored, no renderer errors, screenshot captured for both MCP
+  and Skills tabs.
+
+### Followups (19b + later)
+
+- "Manage globally" link in the right-rail Skills section that
+  opens the Library skills tab (19b).
+- Per-server MCP tool listing once SDK exposes it.
+- Custom agents tab (Phase 20).
+- Instructions tab (Phase 21).
+
+---
+
 ## 2026-05-22 — Phase 18b post-fix: rail singleton + collapsibles + truncated descriptions
 
 ### Takeaway

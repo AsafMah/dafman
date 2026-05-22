@@ -1265,6 +1265,186 @@ export class SessionRegistry {
 		}
 	}
 
+	// ---------- MCP config registry (server-scoped, Phase 19a) ----------
+
+	async listMcpConfigs(): Promise<Record<string, Record<string, unknown>>> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			const result = (await client.rpc.mcp.config.list()) as {
+				servers?: Record<string, Record<string, unknown>>;
+			};
+			return result.servers ?? {};
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async addMcpConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			await client.rpc.mcp.config.add({ name, config } as unknown as Record<string, unknown>);
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async updateMcpConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			await client.rpc.mcp.config.update({ name, config } as unknown as Record<string, unknown>);
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async removeMcpConfig(name: string): Promise<boolean> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			await client.rpc.mcp.config.remove({ name });
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async enableMcpServers(names: string[]): Promise<boolean> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			await client.rpc.mcp.config.enable({ names });
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async disableMcpServers(names: string[]): Promise<boolean> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			await client.rpc.mcp.config.disable({ names });
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async discoverMcpServers(
+		workingDirectory?: string,
+	): Promise<Array<{ name: string; type?: string; source: string; enabled: boolean }>> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			const result = (await client.rpc.mcp.discover({
+				...(workingDirectory ? { workingDirectory } : {}),
+			})) as {
+				servers?: Array<{
+					name?: unknown;
+					type?: unknown;
+					source?: unknown;
+					enabled?: unknown;
+				}>;
+			};
+			const servers = result.servers ?? [];
+			return servers
+				.filter((s) => typeof s.name === "string")
+				.map((s) => ({
+					name: String(s.name),
+					...(typeof s.type === "string" ? { type: s.type } : {}),
+					source: typeof s.source === "string" ? s.source : "unknown",
+					enabled: s.enabled === true,
+				}));
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async loginToMcpServer(
+		sessionId: string,
+		serverName: string,
+		opts: { forceReauth?: boolean; clientName?: string } = {},
+	): Promise<{ authorizationUrl: string | null }> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.mcp.oauth.login({
+				serverName,
+				...(opts.forceReauth ? { forceReauth: opts.forceReauth } : {}),
+				...(opts.clientName ? { clientName: opts.clientName } : {}),
+			})) as { authorizationUrl?: unknown };
+			return {
+				authorizationUrl:
+					typeof result.authorizationUrl === "string"
+						? result.authorizationUrl
+						: null,
+			};
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	// ---------- Skills registry (server-scoped, Phase 19b) ----------
+
+	async discoverSkills(workingDirectory?: string): Promise<
+		Array<{
+			name: string;
+			description: string;
+			source: string;
+			userInvocable: boolean;
+			enabled: boolean;
+			path?: string;
+			projectPath?: string;
+		}>
+	> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			const args = workingDirectory ? { projectPaths: [workingDirectory] } : {};
+			const result = (await client.rpc.skills.discover(args)) as {
+				skills?: Array<{
+					name?: unknown;
+					description?: unknown;
+					source?: unknown;
+					userInvocable?: unknown;
+					enabled?: unknown;
+					path?: unknown;
+					projectPath?: unknown;
+				}>;
+			};
+			const skills = result.skills ?? [];
+			return skills
+				.filter((s) => typeof s.name === "string")
+				.map((s) => ({
+					name: String(s.name),
+					description: typeof s.description === "string" ? s.description : "",
+					source: typeof s.source === "string" ? s.source : "unknown",
+					userInvocable: s.userInvocable === true,
+					enabled: s.enabled === true,
+					...(typeof s.path === "string" ? { path: s.path } : {}),
+					...(typeof s.projectPath === "string" ? { projectPath: s.projectPath } : {}),
+				}));
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async setGloballyDisabledSkills(disabledSkills: string[]): Promise<boolean> {
+		const client = tryGetClient();
+		if (!client) throw AppError.clientNotStarted();
+		try {
+			await client.rpc.skills.config.setDisabledSkills({ disabledSkills });
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
 	async resetApprovals(sessionId: string): Promise<boolean> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);

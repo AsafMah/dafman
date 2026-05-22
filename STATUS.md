@@ -345,6 +345,18 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 19a shipped: **Library panel** (left-edge
+  activity-bar sidebar, pi-book icon) hosting two tabs. **MCP** tab
+  (this commit) has a Configured + Discovered server list; per-row
+  enable/disable toggle (writes the SDK global allowlist via
+  `mcp.config.enable/disable`), Edit/Remove buttons, and an inline
+  "Sign in" action on http servers with OAuth that calls
+  `mcp.oauth.login` and opens the returned URL. Add dialog includes
+  a structured form (transport switch, command/args/env or url/
+  headers/oauth fields) with a **View as JSON** toggle that
+  round-trips. 8 new bun RPCs + fakeClient stubs.
+  **F18** covers open / add / round-trip. **64/64 E2E, 386 bun
+  tests.** Verified by launching dafman dev + screenshots.
 - **2026-05-22** — Phase 18b post-fix: details rail refactored to a
   **singleton** bound to `layoutStore.activeSessionId` (was per-session,
   caused N rails stacked at boot + rail not updating on session switch).

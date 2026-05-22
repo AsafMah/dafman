@@ -295,6 +295,51 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.deletePlan(sessionId);
 	}),
+	listMcpConfigs: rpcGuard(async () => sessions.listMcpConfigs()),
+	addMcpConfig: rpcGuard(async (args) => {
+		const { name, config } = args as { name: string; config: Record<string, unknown> };
+		return sessions.addMcpConfig(name, config);
+	}),
+	updateMcpConfig: rpcGuard(async (args) => {
+		const { name, config } = args as { name: string; config: Record<string, unknown> };
+		return sessions.updateMcpConfig(name, config);
+	}),
+	removeMcpConfig: rpcGuard(async (args) => {
+		const { name } = args as { name: string };
+		return sessions.removeMcpConfig(name);
+	}),
+	enableMcpServers: rpcGuard(async (args) => {
+		const { names } = args as { names: string[] };
+		return sessions.enableMcpServers(names);
+	}),
+	disableMcpServers: rpcGuard(async (args) => {
+		const { names } = args as { names: string[] };
+		return sessions.disableMcpServers(names);
+	}),
+	discoverMcpServers: rpcGuard(async (args) => {
+		const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
+		return sessions.discoverMcpServers(workingDirectory);
+	}),
+	loginToMcpServer: rpcGuard(async (args) => {
+		const { sessionId, serverName, forceReauth, clientName } = args as {
+			sessionId: string;
+			serverName: string;
+			forceReauth?: boolean;
+			clientName?: string;
+		};
+		return sessions.loginToMcpServer(sessionId, serverName, {
+			...(forceReauth !== undefined ? { forceReauth } : {}),
+			...(clientName !== undefined ? { clientName } : {}),
+		});
+	}),
+	discoverSkills: rpcGuard(async (args) => {
+		const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
+		return sessions.discoverSkills(workingDirectory);
+	}),
+	setGloballyDisabledSkills: rpcGuard(async (args) => {
+		const { disabledSkills } = args as { disabledSkills: string[] };
+		return sessions.setGloballyDisabledSkills(disabledSkills);
+	}),
 };
 
 // Test-server-only control RPCs. Test code uses these to drive the

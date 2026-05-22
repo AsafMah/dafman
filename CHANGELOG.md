@@ -3,6 +3,28 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 19a)
+
+- **Library panel** — new top-level left-edge sidebar (activity bar:
+  pi-book icon). Hosts global / cross-session config that doesn't
+  belong on the per-session rail. First tab: **MCP servers**.
+- **MCP server registry UI** with Configured + Discovered sections.
+  Configured rows: enable/disable toggle (writes the SDK's global
+  allowlist via `mcp.config.enable/disable`), Edit and Remove
+  buttons, inline "Sign in" action for http servers with OAuth
+  (calls `mcp.oauth.login` and opens the returned authorization
+  URL via the renderer's `openUrl`).
+- **Add MCP server dialog** with a structured form (transport
+  switch: local stdio / http, command/args/env or url/headers/
+  oauth fields) plus a **View as JSON** mode that round-trips
+  the same payload through a textarea editor.
+- **8 new bun RPCs** wrapping `client.rpc.mcp.config.*` (list,
+  add, update, remove, enable, disable), `client.rpc.mcp.discover`,
+  and session-scoped `session.rpc.mcp.oauth.login`. fakeClient
+  stubs back all of them with an in-memory map for E2E.
+- **E2E F18** covers: open library from activity bar, see
+  Discovered list, add via structured form, JSON-mode round-trip.
+
 ### Fixed (right-rail polish, follow-up to Phase 18b)
 
 - **Right-rail is now a singleton** instead of one panel per session.

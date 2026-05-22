@@ -563,6 +563,77 @@ export type DafmanRPC = {
 				params: { sessionId: string };
 				response: boolean;
 			};
+			// ---------- Phase 19a: MCP registry ----------
+			/// Server-scoped MCP config CRUD. The CLI persists this to
+			/// its user config; lists/edits affect new sessions only
+			/// (per SDK semantics — active sessions keep their conns).
+			/// `McpServerConfig` is the SDK union of Local + Http
+			/// variants; we pass it through as an opaque record so we
+			/// don't drift from the SDK's schema.
+			listMcpConfigs: {
+				params: Record<string, never>;
+				response: Record<string, Record<string, unknown>>;
+			};
+			addMcpConfig: {
+				params: { name: string; config: Record<string, unknown> };
+				response: boolean;
+			};
+			updateMcpConfig: {
+				params: { name: string; config: Record<string, unknown> };
+				response: boolean;
+			};
+			removeMcpConfig: {
+				params: { name: string };
+				response: boolean;
+			};
+			enableMcpServers: {
+				params: { names: string[] };
+				response: boolean;
+			};
+			disableMcpServers: {
+				params: { names: string[] };
+				response: boolean;
+			};
+			/// Server-scoped MCP discovery. Returns the union of all
+			/// servers the CLI can see (config + workspace + plugins).
+			discoverMcpServers: {
+				params: { workingDirectory?: string };
+				response: Array<{
+					name: string;
+					type?: string;
+					source: string;
+					enabled: boolean;
+				}>;
+			};
+			/// Session-scoped MCP OAuth login. Returns the URL the
+			/// renderer should open; when cached tokens are still
+			/// valid the SDK returns no URL and reconnects silently.
+			loginToMcpServer: {
+				params: {
+					sessionId: string;
+					serverName: string;
+					forceReauth?: boolean;
+					clientName?: string;
+				};
+				response: { authorizationUrl: string | null };
+			};
+			// ---------- Phase 19b: Skills library ----------
+			discoverSkills: {
+				params: { workingDirectory?: string };
+				response: Array<{
+					name: string;
+					description: string;
+					source: string;
+					userInvocable: boolean;
+					enabled: boolean;
+					path?: string;
+					projectPath?: string;
+				}>;
+			};
+			setGloballyDisabledSkills: {
+				params: { disabledSkills: string[] };
+				response: boolean;
+			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };
 			getLogDir: { params: Record<string, never>; response: string };

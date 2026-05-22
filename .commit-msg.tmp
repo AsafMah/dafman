@@ -1,0 +1,49 @@
+feat(library): Phase 19a — MCP server registry UI + 10 new bun RPCs
+
+New "Library" panel as a left-edge activity-bar sidebar (pi-book
+icon), hosting global/cross-session config. First tab: MCP servers.
+
+Library panel:
+- LibraryPanel.vue is a PrimeVue Tabs container (MCP + Skills).
+  Active tab persists in localStorage.
+- Registered as `library` component in main.ts.
+- Activity-bar item at initial-size 360 / minimum 280.
+
+MCP tab (LibraryMcpTab.vue + McpServerForm.vue):
+- Configured list with per-row enable/disable toggle (writes the
+  SDK global allowlist), Edit / Remove / Sign-in buttons.
+- Discovered list with Enable shortcut for servers not yet configured.
+- Add dialog: structured form (transport switch, command/args/env
+  or url/headers/oauth fields) with View-as-JSON toggle that
+  round-trips through JSON.parse + structured re-population.
+- Inline OAuth "Sign in" calls session-scoped mcp.oauth.login and
+  opens the returned authorizationUrl via the renderer's openUrl.
+
+Skills tab stub (LibrarySkillsTab.vue): rendered already but the
+right-rail "manage globally" link lands in 19b. The 19b-side RPCs
+(discoverSkills, setGloballyDisabledSkills) shipped here so 19b
+reduces to wiring polish.
+
+10 new bun RPCs threaded through src-bun/rpc.ts → src/ipc/types.ts
+→ src-bun/index.ts handlers → src-bun/test-server.ts mirrors:
+- listMcpConfigs / addMcpConfig / updateMcpConfig / removeMcpConfig
+- enableMcpServers / disableMcpServers / discoverMcpServers
+- loginToMcpServer (session-scoped)
+- discoverSkills / setGloballyDisabledSkills
+
+fakeClient gets in-memory mcpConfigs + mcpDisabled + skillsDisabled
+sets plus stub responses for discover so E2E flows can mutate
+without a real CLI.
+
+E2E F18 (18-library-mcp.pwtest.ts) covers open / add / JSON
+round-trip. 64/64 E2E green (prod + HMR), 386 bun unit tests.
+
+Boot-verified with `bun run dev` + log tail + Playwright screenshot
+of both MCP and Skills tabs at default rail size (per personal anti-
+regression rule 3a).
+
+Decisions captured in DEVLOG: edge panel over dockview body,
+session-reuse for OAuth, opt-in JSON mode, per-server tool listing
+deferred until SDK exposes it.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

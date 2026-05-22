@@ -373,6 +373,66 @@ export type CommandMap = {
     args: { sessionId: string };
     result: boolean;
   };
+  // ---------- Phase 19a: MCP registry ----------
+  listMcpConfigs: {
+    args: Record<string, never>;
+    result: Record<string, Record<string, unknown>>;
+  };
+  addMcpConfig: {
+    args: { name: string; config: Record<string, unknown> };
+    result: boolean;
+  };
+  updateMcpConfig: {
+    args: { name: string; config: Record<string, unknown> };
+    result: boolean;
+  };
+  removeMcpConfig: {
+    args: { name: string };
+    result: boolean;
+  };
+  enableMcpServers: {
+    args: { names: string[] };
+    result: boolean;
+  };
+  disableMcpServers: {
+    args: { names: string[] };
+    result: boolean;
+  };
+  discoverMcpServers: {
+    args: { workingDirectory?: string };
+    result: Array<{
+      name: string;
+      type?: string;
+      source: string;
+      enabled: boolean;
+    }>;
+  };
+  loginToMcpServer: {
+    args: {
+      sessionId: string;
+      serverName: string;
+      forceReauth?: boolean;
+      clientName?: string;
+    };
+    result: { authorizationUrl: string | null };
+  };
+  // ---------- Phase 19b: Skills library ----------
+  discoverSkills: {
+    args: { workingDirectory?: string };
+    result: Array<{
+      name: string;
+      description: string;
+      source: string;
+      userInvocable: boolean;
+      enabled: boolean;
+      path?: string;
+      projectPath?: string;
+    }>;
+  };
+  setGloballyDisabledSkills: {
+    args: { disabledSkills: string[] };
+    result: boolean;
+  };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };

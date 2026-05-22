@@ -248,6 +248,37 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			deleteSessionPlan: rpcGuard(async ({ sessionId }) =>
 				sessions.deletePlan(sessionId),
 			),
+			listMcpConfigs: rpcGuard(async () => sessions.listMcpConfigs()),
+			addMcpConfig: rpcGuard(async ({ name, config }) =>
+				sessions.addMcpConfig(name, config),
+			),
+			updateMcpConfig: rpcGuard(async ({ name, config }) =>
+				sessions.updateMcpConfig(name, config),
+			),
+			removeMcpConfig: rpcGuard(async ({ name }) =>
+				sessions.removeMcpConfig(name),
+			),
+			enableMcpServers: rpcGuard(async ({ names }) =>
+				sessions.enableMcpServers(names),
+			),
+			disableMcpServers: rpcGuard(async ({ names }) =>
+				sessions.disableMcpServers(names),
+			),
+			discoverMcpServers: rpcGuard(async ({ workingDirectory }) =>
+				sessions.discoverMcpServers(workingDirectory),
+			),
+			loginToMcpServer: rpcGuard(async ({ sessionId, serverName, forceReauth, clientName }) =>
+				sessions.loginToMcpServer(sessionId, serverName, {
+					...(forceReauth !== undefined ? { forceReauth } : {}),
+					...(clientName !== undefined ? { clientName } : {}),
+				}),
+			),
+			discoverSkills: rpcGuard(async ({ workingDirectory }) =>
+				sessions.discoverSkills(workingDirectory),
+			),
+			setGloballyDisabledSkills: rpcGuard(async ({ disabledSkills }) =>
+				sessions.setGloballyDisabledSkills(disabledSkills),
+			),
 			getSettings: rpcGuard(async () => settings.get()),
 			updateSettings: rpcGuard(async ({ next }) => settings.update(next)),
 			getLogDir: rpcGuard(async () => currentLogDir()),

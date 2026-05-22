@@ -403,6 +403,7 @@ function scheduleLayoutSave() {
 const SESSIONS_PANEL_ID = "sessions-manager";
 const SETTINGS_PANEL_ID = "settings-panel";
 const LOG_VIEWER_PANEL_ID = "log-viewer";
+const LIBRARY_PANEL_ID = "library";
 
 /// ActivityBar items.
 /// - Top stack (default `group: "top"`): panel toggles. Sessions today;
@@ -420,6 +421,15 @@ const activityItems = computed<ActivityItem[]>(() => {
       title: "Sessions",
       initialSize: 240,
       minimumSize: 160,
+    },
+    {
+      kind: "panel",
+      id: LIBRARY_PANEL_ID,
+      component: "library",
+      icon: "pi-book",
+      title: "Library — MCP servers + Skills",
+      initialSize: 360,
+      minimumSize: 280,
     },
   ];
   if (isDev) {
