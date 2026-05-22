@@ -157,7 +157,13 @@ async function onSelectOption(payload: {
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
   transform: translateY(calc(-100% - 2rem));
-  z-index: 100;
+  /* z-index 1200 sits above dockview's edge-group z-index 999 (chrome,
+   * left sidebar) so the slash menu wins when the picker geometry
+   * overlaps the sidebar. The `transform` already creates a stacking
+   * context here, so this z-index applies at the stacking-context
+   * root — matching MentionPlugin's `.mention-menu-anchor` (both must
+   * sit at the same layer). */
+  z-index: 1200;
 }
 
 .slash-item {
