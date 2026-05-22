@@ -345,6 +345,11 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 18a shipped: per-session settings moved from
+  gear popover into a dockview right-edge panel
+  (`SessionDetailsPanel.vue`). Auto-opens with each session; cog
+  toggles. Adds Fork button. Layout state persists via dockview JSON
+  (no settings bump). E2E F14 covers it. 22/22 E2E in 28s.
 - **2026-05-22** — Bug bash #2 (every MANUAL_TESTS ❌ fixed +
   locked): SDK perm-rule matcher uses `:*` (commands rule now
   actually allows follow-ups); pickAttachment/pickFolder force

@@ -310,6 +310,47 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ---
 
+## 2026-05-22 — Phase 18a session details right-rail panel
+
+1. ⏳ **Cog button toggles the right-rail panel.**
+   - **Steps:** click the `pi-cog` icon in the chat tab strip.
+   - **Expected:** the right-edge `Session` panel collapses; cog tooltip
+     changes to "Open session details". Click again to reopen.
+   - **Why not automated:** automated E2E covers it (F14). Manual is
+     for visual feel under WebView2.
+
+2. ⏳ **Panel auto-opens on each new session.**
+   - **Steps:** Cmd/Ctrl+N (or the topbar "New Session" button) twice.
+   - **Expected:** every new chat tab opens with its details panel
+     visible on the right.
+   - **Why not automated:** F14 covers single-session case; multi-
+     session panel state needs human eyeball.
+
+3. ⏳ **Fork button creates a new session with the parent's context.**
+   - **Steps:** in the details panel header, click "Fork". A new tab
+     opens.
+   - **Expected:** new session inherits the parent's working directory
+     and model (where applicable); transcript is empty (fresh fork).
+   - **Why not automated:** SDK fork behavior is real-CLI-only.
+
+4. ⏳ **Rename input echoes SDK title changes.**
+   - **Steps:** rename a session manually. Then trigger a turn that
+     causes the SDK to auto-summarise (long-running model). Re-open
+     panel.
+   - **Expected:** input reflects the latest SDK-side title without
+     clobbering an in-progress user edit.
+   - **Why not automated:** depends on SDK auto-title timing.
+
+5. ⏳ **Panel state persists across app restart.**
+   - **Steps:** close one session's details panel. Restart app.
+   - **Expected:** that session opens WITHOUT the rail; others keep
+     theirs open. Backed by dockview layout JSON in settings.
+   - **Why not automated:** full restart cycle.
+
+---
+
+---
+
 ## 2026-05-22 — `FilePicker.vue` v2 (fixed: cwd resolution, path-nav trigger, split toggles, persistence, border)
 
 > **Items 1-6 are now also covered by automated E2E tests** in

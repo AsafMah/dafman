@@ -3,6 +3,17 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- **Per-session settings moved from gear popover to right-rail panel.**
+  `SessionDetailsPanel.vue` is a dockview right-edge panel hosting the
+  full session-config surface (rename, run mode, reasoning view,
+  workspace chip, auto-approve, skills, usage metrics, export
+  Markdown/JSON, compact history, reset approvals) plus a new **Fork
+  session** button at the top. Auto-opens with each new session;
+  state persists via dockview's existing layout JSON (no settings
+  bump). Cog button in the tab strip toggles. The popover is gone.
+
 ### Fixed
 
 - **Permission rule editor: "Allow for session" now actually allows

@@ -84,6 +84,12 @@ export const useLayoutStore = defineStore("layout", () => {
   /// sync; consumers (command palette `when()` predicates, future
   /// status-bar bindings, …) just read the ref.
   const activeSessionId = ref<string | null>(null);
+  /// Reactive set of session ids whose details-rail panel is open.
+  /// Kept in sync via `onDidAddPanel` / `onDidRemovePanel` so consumers
+  /// (e.g. the cog button's pressed state in `SessionHeaderControls`)
+  /// can `computed(() => openDetails.value.has(sessionId))` and get
+  /// auto-updates instead of having to poll `dock.getPanel(...)`.
+  const openDetails = ref<Set<string>>(new Set());
   let activeUnsubs: Array<() => void> = [];
 
   function recomputeActiveSession(dock: DockviewApi): void {
@@ -95,23 +101,53 @@ export const useLayoutStore = defineStore("layout", () => {
     }
   }
 
+  function rescanOpenDetails(dock: DockviewApi): void {
+    const next = new Set<string>();
+    for (const group of dock.groups) {
+      for (const panel of group.panels) {
+        const id = panel.api.id;
+        if (id.startsWith("session-details-")) {
+          next.add(id.slice("session-details-".length));
+        }
+      }
+    }
+    // Only mutate when content actually changed; otherwise Vue's
+    // reactivity would fire for every dockview tick.
+    if (next.size !== openDetails.value.size) {
+      openDetails.value = next;
+      return;
+    }
+    for (const sid of next) {
+      if (!openDetails.value.has(sid)) {
+        openDetails.value = next;
+        return;
+      }
+    }
+  }
+
   function setApi(next: DockviewApi | null): void {
     for (const unsub of activeUnsubs) unsub();
     activeUnsubs = [];
     api.value = next;
     if (!next) {
       activeSessionId.value = null;
+      openDetails.value = new Set();
       return;
     }
     recomputeActiveSession(next);
+    rescanOpenDetails(next);
     const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
     const panelSub = next.onDidActivePanelChange(() => recomputeActiveSession(next));
-    // Removing the active panel can leave a stale id behind otherwise.
-    const removeSub = next.onDidRemovePanel(() => recomputeActiveSession(next));
+    const removeSub = next.onDidRemovePanel(() => {
+      recomputeActiveSession(next);
+      rescanOpenDetails(next);
+    });
+    const addSub = next.onDidAddPanel(() => rescanOpenDetails(next));
     activeUnsubs = [
       () => groupSub.dispose(),
       () => panelSub.dispose(),
       () => removeSub.dispose(),
+      () => addSub.dispose(),
     ];
   }
 
@@ -159,6 +195,59 @@ export const useLayoutStore = defineStore("layout", () => {
       params: { sessionId },
       position: { referenceGroup, direction },
     });
+    // Auto-open the per-session details right-rail panel alongside
+    // each chat. Skips if the panel is already in the persisted
+    // layout (dockview restore would re-create it then) or if the
+    // user explicitly closed it for this session. The panel reads
+    // `params.sessionId` to bind itself.
+    openSessionDetailsPanel(sessionId);
+  }
+
+  // ---------- Session details right-rail ----------
+  //
+  // Per-session panel mounted in a right-edge dockview group, hosting
+  // model picker, run mode, reasoning view, workspace chip, skills,
+  // usage, export/compact/reset actions, and the Fork button.
+  // Replaces the old gear-popover that lived inside SessionHeaderControls.
+
+  function sessionDetailsId(sessionId: string): string {
+    return `session-details-${sessionId}`;
+  }
+
+  /// Opens (or focuses) the details rail for `sessionId`. Idempotent —
+  /// reopening when the panel already exists just brings it forward.
+  function openSessionDetailsPanel(sessionId: string): void {
+    openEdgePanel("right", {
+      id: sessionDetailsId(sessionId),
+      component: "sessionDetails",
+      tabComponent: "sidebarTab",
+      title: "Session",
+      params: { sessionId },
+      initialSize: 280,
+      minimumSize: 200,
+    });
+  }
+
+  /// Toggles the details rail for `sessionId`. If it's currently
+  /// open, closes (removes) the panel. If closed, opens it.
+  function toggleSessionDetailsPanel(sessionId: string): void {
+    const dock = api.value;
+    if (!dock) return;
+    const id = sessionDetailsId(sessionId);
+    const panel = dock.getPanel(id);
+    if (panel) {
+      dock.removePanel(panel);
+    } else {
+      openSessionDetailsPanel(sessionId);
+    }
+  }
+
+  /// Returns true if the session-details rail panel for `sessionId`
+  /// is currently open. Reactive — backed by the `openDetails` set
+  /// that's maintained via dockview add/remove panel events. Callers
+  /// can wrap in `computed(...)` to get auto-updates.
+  function isSessionDetailsOpen(sessionId: string): boolean {
+    return openDetails.value.has(sessionId);
   }
 
   /// Returns the id of the active group when it lives inside the grid
@@ -279,6 +368,11 @@ export const useLayoutStore = defineStore("layout", () => {
     if (!dock) return;
     const panel = dock.getPanel(sessionId);
     if (panel) dock.removePanel(panel);
+    // Also close the session-details rail for this session if it's
+    // open. Keeps the right-edge group from collecting orphan panels
+    // bound to deleted sessions.
+    const details = dock.getPanel(sessionDetailsId(sessionId));
+    if (details) dock.removePanel(details);
   }
 
   /// Brings a panel forward in its group + activates it. Used by
@@ -462,6 +556,9 @@ export const useLayoutStore = defineStore("layout", () => {
     renamePanel,
     replaceMissingPanel,
     openEdgePanel,
+    openSessionDetailsPanel,
+    toggleSessionDetailsPanel,
+    isSessionDetailsOpen,
     isPanelOpen,
     closePanel,
     pruneEmptyEdgeGroup,

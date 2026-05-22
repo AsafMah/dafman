@@ -10,6 +10,63 @@
 
 ---
 
+## 2026-05-22 — Phase 18a: session details right-rail panel
+
+### Takeaway
+
+Moved every per-session setting that lived in the gear popover into a
+dockview right-edge panel (`SessionDetailsPanel.vue`). Cog button now
+toggles the panel instead of opening a popover. Panel auto-opens with
+each new session; state persists via dockview's existing layout
+serialisation (no settings v9 bump needed). Added Fork button.
+
+22/22 E2E green in 28 s (new F14 covers open-by-default + cog toggle).
+
+### Files
+
+- `src/components/SessionDetailsPanel.vue` (new, ~600 lines)
+- `src/components/SessionHeaderControls.vue` — popover ripped out;
+  inline header keeps workspace chip + model + effort + reasoning view
+  + a cog toggle button. Imports cleaned up (no more `Popover`,
+  `InputText`, `SelectButton`, `ToggleSwitch`, `useToastStore`,
+  `SessionMode`).
+- `src/stores/layoutStore.ts` — new `openSessionDetailsPanel` /
+  `toggleSessionDetailsPanel` / `isSessionDetailsOpen` (reactive via
+  a new `openDetails: Set<string>` ref maintained by `onDidAddPanel`
+  + `onDidRemovePanel` subs). `addPanel` auto-opens the rail; chat-
+  panel removal also tears down the rail.
+- `src/main.ts` — register `sessionDetails` component.
+- `src/stores/__tests__/layoutStore.addPanel.test.ts` — fake dock
+  gets `getEdgeGroup`/`addEdgeGroup` stubs; assertions updated to
+  filter on `component === "chat"` (addPanel now fires twice per
+  session create: chat + details).
+- `e2e/full/flows/14-details-rail.pwtest.ts` — new flow.
+- `e2e/full/flows/07-export-items.pwtest.ts` — export buttons are
+  now directly visible (no popover step needed).
+- `src/App.vue` autosession check still works.
+
+### Why no settings v9 bump
+
+The user asked for per-session persistence. Dockview's `toJSON()` /
+`fromJSON()` already snapshots every open panel including
+session-details ones (their ids encode the sessionId). When the user
+closes a panel, it disappears from the snapshot. On restart,
+`layoutStore.restore` rebuilds the same set. Net effect: the user's
+panel preferences ride existing infrastructure for free.
+
+### Tests at a glance
+
+- `bun run lint`: clean.
+- `bun test`: 367 pass.
+- `bun run e2e`: **22/22 in 28 s** (was 21/28s).
+
+### Next: 18b
+
+Tool toggle + Plans panel + Usage dashboard + quota warnings. See
+plan.md.
+
+---
+
 ## 2026-05-22 — Backlog audit: 14 major themes missing from Phase plan
 
 ### Takeaway

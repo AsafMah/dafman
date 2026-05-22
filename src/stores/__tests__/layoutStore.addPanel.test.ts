@@ -97,6 +97,14 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
           panels: [{ id: args.id, component: args.component }],
         };
         groups.push(newGroup);
+      } else if (!direction && refId) {
+        // Dockview's "position to a specific group without direction"
+        // → tab into that group. Used by openEdgePanel via
+        // openSessionDetailsPanel.
+        const target = groups.find((g) => g.id === refId);
+        if (target) {
+          target.panels.push({ id: args.id, component: args.component });
+        }
       } else if (!args.position) {
         // Default placement — match dockview's "into the active group"
         // semantics so we'd catch the regression we just fixed.
@@ -119,6 +127,29 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
       if (!g) return undefined;
       return { id: g.id, panels: g.panels };
     },
+    // Edge-group surface used by openSessionDetailsPanel (added in
+    // Phase 18a). For the addPanel tests we don't care about the
+    // details panel — return undefined for getEdgeGroup so
+    // openEdgePanel takes the addEdgeGroup path, and addEdgeGroup
+    // creates a tracked group so subsequent addPanel({ position:
+    // referenceGroup: edge.id }) resolves.
+    getEdgeGroup(_position: string) {
+      return undefined;
+    },
+    addEdgeGroup(position: string, opts: { id?: string } = {}) {
+      const id = opts.id ?? `edge-${position}`;
+      const newGroup: FakeGroup = {
+        id,
+        locationType: "edge",
+        panels: [],
+      };
+      groups.push(newGroup);
+      addGroupCalls.push({ id });
+      return { id };
+    },
+    removeEdgeGroup() { /* no-op */ },
+    setEdgeGroupVisible() { /* no-op */ },
+    isEdgeGroupVisible() { return true; },
     onDidActiveGroupChange: () => ({ dispose: () => {} }),
     onDidActivePanelChange: () => ({ dispose: () => {} }),
     onDidRemovePanel: () => ({ dispose: () => {} }),
@@ -139,25 +170,24 @@ describe("layoutStore.addPanel placement", () => {
 
     store.addPanel("session-1");
 
-    expect(dock.addGroupCalls).toHaveLength(1);
-    expect(dock.addPanelCalls).toHaveLength(1);
-    const call = dock.addPanelCalls[0]!;
-    expect(call.id).toBe("session-1");
-    expect(call.position?.direction).toBe("within");
-    expect(call.position?.referenceGroup).toBe(dock.addGroupCalls[0]!.id);
-    // The session ends up inside the new body group, not as a sibling
-    // — preventing the historic "50/50 split with empty pane" bug.
-    const bodyGroup = dock.groups.find(
-      (g) => g.id === dock.addGroupCalls[0]!.id,
-    );
+    // addPanel is responsible for the CHAT panel placement decision;
+    // it also auto-opens the per-session details right-rail panel
+    // (Phase 18a). The body-group add is the only `addGroup` that
+    // matters for placement (edge groups are tracked separately via
+    // addEdgeGroup), but the fake also routes addEdgeGroup through
+    // addGroupCalls, so we filter on the body-grid id we expect.
+    const chatCall = dock.addPanelCalls.find((c) => c.component === "chat")!;
+    expect(chatCall).toBeDefined();
+    expect(chatCall.id).toBe("session-1");
+    expect(chatCall.position?.direction).toBe("within");
+    const bodyGroupId = chatCall.position?.referenceGroup;
+    expect(bodyGroupId).toBeDefined();
+    expect(dock.addGroupCalls.some((g) => g.id === bodyGroupId)).toBe(true);
+    const bodyGroup = dock.groups.find((g) => g.id === bodyGroupId);
     expect(bodyGroup?.panels.map((p) => p.id)).toEqual(["session-1"]);
   });
 
   test("only edge group exists (Sessions sidebar) → still creates a body group, panel does NOT land in the sidebar", () => {
-    // Regression for "session opens to a tiny percentage / no tab bar
-    // / sometimes inside the sidebar" — when the only existing group
-    // is an edge sidebar, dockview's *default* placement would put the
-    // panel inside it. We must not rely on that default.
     const dock = makeFakeDock([
       { id: "sessions-sidebar", locationType: "edge", panels: [{ id: "sessions-manager", component: "sessionsManager" }] },
     ]);
@@ -166,10 +196,11 @@ describe("layoutStore.addPanel placement", () => {
 
     store.addPanel("session-1");
 
-    expect(dock.addGroupCalls).toHaveLength(1);
-    const newBodyId = dock.addGroupCalls[0]!.id;
-    expect(dock.addPanelCalls[0]?.position?.direction).toBe("within");
-    expect(dock.addPanelCalls[0]?.position?.referenceGroup).toBe(newBodyId);
+    const chatCall = dock.addPanelCalls.find((c) => c.component === "chat")!;
+    expect(chatCall.position?.direction).toBe("within");
+    const newBodyId = chatCall.position?.referenceGroup;
+    expect(newBodyId).toBeDefined();
+    expect(dock.addGroupCalls.some((g) => g.id === newBodyId)).toBe(true);
     // Sidebar must remain untouched.
     const sidebar = dock.groups.find((g) => g.id === "sessions-sidebar");
     expect(sidebar?.panels.map((p) => p.id)).toEqual(["sessions-manager"]);
@@ -187,11 +218,16 @@ describe("layoutStore.addPanel placement", () => {
 
     store.addPanel("session-2");
 
-    // No new group via addGroup() — dockview creates the sibling
-    // group as part of `addPanel({ direction: "right" })`.
-    expect(dock.addGroupCalls).toHaveLength(0);
-    expect(dock.addPanelCalls[0]?.position?.direction).toBe("right");
-    expect(dock.addPanelCalls[0]?.position?.referenceGroup).toBe("body-1");
+    // No new body group via addGroup() — dockview creates the sibling
+    // group as part of `addPanel({ direction: "right" })`. The
+    // details-rail panel will trigger an addEdgeGroup call though;
+    // assert specifically on the chat-panel placement.
+    const chatCall = dock.addPanelCalls.find((c) => c.component === "chat")!;
+    expect(chatCall.position?.direction).toBe("right");
+    expect(chatCall.position?.referenceGroup).toBe("body-1");
+    // Only the right-edge details group should be the addGroupCalls
+    // entry (id like `edge-right`), NOT a body group.
+    expect(dock.addGroupCalls.every((g) => g.id.startsWith("edge-"))).toBe(true);
   });
 
   test("targetGroupId supplied (orphan replacement) → WITHIN that group", () => {

@@ -13,23 +13,17 @@ import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import Chip from "primevue/chip";
-import InputText from "primevue/inputtext";
-import Popover from "primevue/popover";
 import Select from "primevue/select";
-import SelectButton from "primevue/selectbutton";
 import TreeSelect from "primevue/treeselect";
 import type { TreeNode } from "primevue/treenode";
-import ToggleSwitch from "primevue/toggleswitch";
 import type {
   ModelSummary,
   ReasoningVisibility,
-  SessionMode,
 } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import { useToastStore } from "../stores/toastStore";
-import { basename } from "../stores/layoutStore";
+import { useLayoutStore, basename } from "../stores/layoutStore";
 import { invokeCommand } from "../ipc/invoke";
 import {
   buildModelTree,
@@ -38,7 +32,7 @@ import {
 const props = defineProps<{ sessionId: string }>();
 
 const sessionsStore = useSessionsStore();
-const toasts = useToastStore();
+const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
 
@@ -155,22 +149,6 @@ const effortChoice = computed<string | null>({
   },
 });
 
-const modeOptions: { label: string; value: SessionMode; icon: string }[] = [
-  // Icons read as: interactive = chat bubble, plan = clipboard
-  // checklist, autopilot = play (auto-execute).
-  { label: "Interactive", value: "interactive", icon: "pi pi-comments" },
-  { label: "Plan", value: "plan", icon: "pi pi-list-check" },
-  { label: "Autopilot", value: "autopilot", icon: "pi pi-bolt" },
-];
-
-const modeChoice = computed<SessionMode | null>({
-  get: () => record.value?.mode ?? null,
-  set: (value) => {
-    if (!value || value === record.value?.mode) return;
-    void sessionsStore.setSessionMode(props.sessionId, value);
-  },
-});
-
 const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
   { label: "Hidden", value: "hidden" },
   { label: "Compact", value: "compact" },
@@ -195,89 +173,12 @@ const reasoningChoice = computed<ReasoningVisibility>({
   },
 });
 
-const nameDraft = ref<string>(record.value?.title ?? "");
-
-watch(
-  () => props.sessionId,
-  () => {
-    nameDraft.value = record.value?.title ?? "";
-  },
-);
-
-const optionsMenu = ref<InstanceType<typeof Popover> | null>(null);
-
-function toggleOptions(event: Event) {
-  // Pre-fill the rename input with the current title every time the
-  // popover opens, so the user sees what's there before editing. Done
-  // here (not in a watcher) so an in-flight edit isn't clobbered by a
-  // late `session.title_changed` echo while the popover is open.
-  nameDraft.value = record.value?.title ?? "";
-  optionsMenu.value?.toggle(event);
-  // Refresh skills + usage every popover-open. Cheap RPCs; gives the
-  // user always-current data without a separate refresh button.
-  void loadSkills();
-  void loadUsage();
-}
-
-function onRenameSubmit() {
-  const trimmed = nameDraft.value.trim();
-  if (!trimmed) return;
-  nameDraft.value = trimmed;
-  void sessionsStore.setSessionName(props.sessionId, trimmed);
-}
-
-function onCompactNow() {
-  void sessionsStore.compactSessionHistory(props.sessionId);
-}
-
-function onResetApprovals() {
-  void sessionsStore.resetSessionApprovals(props.sessionId);
-}
-
-/// Build a fresh ChatItem[] from the session's raw event log and
-/// shell it out as Markdown or JSON. Reusing `processEvents` here
-/// keeps the export in lockstep with what the chat tile renders —
-/// no second source of truth. Counter starts at 1; the export
-/// doesn't share ids with the live chat window so collisions are
-/// fine.
-async function onExport(format: "markdown" | "json"): Promise<void> {
-  const rec = record.value;
-  if (!rec) return;
-  try {
-    const { processEvents, defaultAmbient } = await import("../lib/chatEvents");
-    const { formatConversation, exportFilenameStem } = await import("../lib/exportConversation");
-    const counter = { next: 1 };
-    const result = processEvents([], defaultAmbient(), rec.events, counter, { live: false });
-    const title = rec.title?.trim() || `Session ${rec.id.slice(0, 8)}`;
-    const contents = formatConversation(
-      {
-        title,
-        workingDirectory: rec.workingDirectory,
-        model: rec.model,
-        exportedAt: new Date().toISOString(),
-        items: result.items,
-      },
-      format,
-    );
-    const fileName = exportFilenameStem(title, format);
-    const saved = await invokeCommand("saveExportFile", { fileName, contents });
-    toasts.success(
-      `Conversation exported (${format === "markdown" ? "MD" : "JSON"})`,
-      `${(saved.bytes / 1024).toFixed(1)} KiB`,
-    );
-    try {
-      await invokeCommand("revealPath", { path: saved.path });
-    } catch {
-      /* best-effort */
-    }
-  } catch (err) {
-    toasts.error("Export failed", err instanceof Error ? err.message : String(err));
-  }
-}
-
-const approveAll = computed(() => record.value?.approveAll ?? false);
-function onToggleApproveAll(next: boolean) {
-  void sessionsStore.setSessionApproveAll(props.sessionId, next);
+/// Cog button toggles the per-session details rail (right-edge
+/// dockview panel). Replaces the gear popover that previously hung
+/// off this header.
+const detailsOpen = computed(() => layoutStore.isSessionDetailsOpen(props.sessionId));
+function toggleDetails() {
+  layoutStore.toggleSessionDetailsPanel(props.sessionId);
 }
 
 /// Workspace label shown in the tab strip — basename only, so it
@@ -288,100 +189,6 @@ function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
   if (!path) return;
   void invokeCommand("revealPath", { path });
-}
-
-// ---------- Skills & usage (popover-only) ----------
-
-/// SDK skill list for this session. Empty until the user opens the
-/// popover (we don't fetch eagerly because the popover is the only
-/// surface that uses it). The result is cached on the component until
-/// the next popover-open so toggling a row isn't followed by a
-/// flicker-refetch.
-type SessionSkill = {
-  name: string;
-  description: string;
-  source: string;
-  enabled: boolean;
-  userInvocable: boolean;
-};
-const sessionSkills = ref<SessionSkill[]>([]);
-const skillsLoaded = ref(false);
-const skillsError = ref<string | null>(null);
-
-async function loadSkills() {
-  skillsError.value = null;
-  try {
-    sessionSkills.value = await invokeCommand("listSessionSkills", {
-      sessionId: props.sessionId,
-    });
-    skillsLoaded.value = true;
-  } catch (err) {
-    skillsError.value = err instanceof Error ? err.message : String(err);
-    skillsLoaded.value = true;
-  }
-}
-
-async function toggleSkill(skill: SessionSkill) {
-  const next = !skill.enabled;
-  // Optimistic flip so the toggle is responsive; revert on RPC failure.
-  skill.enabled = next;
-  try {
-    await invokeCommand("setSessionSkillEnabled", {
-      sessionId: props.sessionId,
-      name: skill.name,
-      enabled: next,
-    });
-  } catch {
-    skill.enabled = !next;
-  }
-}
-
-/// Usage metrics (token + request counts + per-model). Fetched the
-/// same way as skills — lazy on popover-open. The SDK returns a rich
-/// shape; we cherry-pick the fields the popover needs.
-const usage = ref<{
-  totalUserRequests: number;
-  totalPremiumRequestCost: number;
-  totalApiDurationMs: number;
-  lastCallInputTokens: number;
-  lastCallOutputTokens: number;
-} | null>(null);
-const usageError = ref<string | null>(null);
-
-async function loadUsage() {
-  usageError.value = null;
-  try {
-    const raw = await invokeCommand("getSessionUsageMetrics", {
-      sessionId: props.sessionId,
-    });
-    usage.value = {
-      totalUserRequests:
-        typeof raw.totalUserRequests === "number" ? raw.totalUserRequests : 0,
-      totalPremiumRequestCost:
-        typeof raw.totalPremiumRequestCost === "number"
-          ? raw.totalPremiumRequestCost
-          : 0,
-      totalApiDurationMs:
-        typeof raw.totalApiDurationMs === "number" ? raw.totalApiDurationMs : 0,
-      lastCallInputTokens:
-        typeof raw.lastCallInputTokens === "number" ? raw.lastCallInputTokens : 0,
-      lastCallOutputTokens:
-        typeof raw.lastCallOutputTokens === "number"
-          ? raw.lastCallOutputTokens
-          : 0,
-    };
-  } catch (err) {
-    usageError.value = err instanceof Error ? err.message : String(err);
-  }
-}
-
-function formatDurationMs(ms: number): string {
-  if (ms < 1000) return `${ms} ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)} s`;
-  const min = Math.floor(s / 60);
-  const sec = Math.round(s % 60);
-  return `${min}m ${sec}s`;
 }
 </script>
 
@@ -457,201 +264,12 @@ function formatDurationMs(ms: number): string {
       text
       rounded
       size="small"
-      aria-label="Session options"
-      aria-haspopup="true"
-      @click="toggleOptions"
+      :aria-label="detailsOpen ? 'Close session details' : 'Open session details'"
+      :aria-pressed="detailsOpen"
+      :title="detailsOpen ? 'Close session details (right rail)' : 'Open session details (right rail)'"
+      :class="{ 'cog-active': detailsOpen }"
+      @click="toggleDetails"
     />
-    <Popover ref="optionsMenu">
-      <div class="session-options">
-        <div class="option-row option-row-stack">
-          <label class="option-label" :for="`name-${props.sessionId}`">
-            Session name
-          </label>
-          <form class="rename-form" @submit.prevent="onRenameSubmit">
-            <InputText
-              :id="`name-${props.sessionId}`"
-              v-model="nameDraft"
-              size="small"
-              placeholder="Untitled"
-            />
-            <Button
-              type="submit"
-              label="Save"
-              size="small"
-              :disabled="!nameDraft.trim()"
-            />
-          </form>
-        </div>
-        <!-- Run mode + reasoning view live inline in the header strip
-             when there's room; the popover keeps them as a guaranteed
-             fallback so a narrow pane can still reach them. -->
-        <div class="option-row">
-          <span class="option-label">Run mode</span>
-          <SelectButton
-            v-model="modeChoice"
-            :options="modeOptions"
-            option-label="label"
-            option-value="value"
-            :allow-empty="false"
-            size="small"
-            aria-label="Agent run mode (popover)"
-          >
-            <template #option="slotProps">
-              <i
-                :class="slotProps.option.icon"
-                :title="slotProps.option.label"
-              />
-              <span class="sr-only">{{ slotProps.option.label }}</span>
-            </template>
-          </SelectButton>
-        </div>
-        <label
-          class="option-row"
-          :for="`reasoning-${props.sessionId}`"
-        >
-          <span class="option-label">Reasoning view</span>
-          <Select
-            :input-id="`reasoning-${props.sessionId}`"
-            v-model="reasoningChoice"
-            :options="reasoningOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            filter
-            aria-label="Reasoning visibility for this session (popover)"
-          />
-        </label>
-        <div class="option-row option-row-stack">
-          <span class="option-label">Workspace</span>
-          <button
-            v-if="record.workingDirectory"
-            type="button"
-            class="workspace-path workspace-path-button"
-            :title="`Open ${record.workingDirectory}`"
-            :aria-label="`Open workspace folder ${record.workingDirectory}`"
-            @click="onWorkspaceClick"
-          >
-            <i class="pi pi-folder" aria-hidden="true" />
-            <span class="workspace-path-text">
-              {{ record.workingDirectory }}
-            </span>
-            <i class="pi pi-external-link workspace-path-hint" aria-hidden="true" />
-          </button>
-          <div v-else class="workspace-path" title="Default (cli process cwd)">
-            <i class="pi pi-folder" aria-hidden="true" />
-            <span class="workspace-path-text">Default</span>
-          </div>
-        </div>
-        <div class="option-row option-row-toggle">
-          <div class="option-row-label">
-            <span class="option-row-title">Auto-approve all tools</span>
-            <span class="option-row-hint">
-              Skip permission prompts for the rest of this session.
-              "Reset approvals" below clears any per-tool memory the
-              SDK kept; this toggle controls dafman's prompt gate.
-            </span>
-          </div>
-          <ToggleSwitch
-            :model-value="approveAll"
-            @update:model-value="onToggleApproveAll"
-          />
-        </div>
-        <!-- Skills section. Lazy-loaded on popover-open. Empty state
-             when the SDK returns no skills for this session (most
-             common today — skills are M5 territory). -->
-        <div class="option-row option-row-stack">
-          <span class="option-label">Skills</span>
-          <div v-if="!skillsLoaded" class="popover-empty-hint">Loading…</div>
-          <div v-else-if="skillsError" class="popover-empty-hint popover-error">
-            {{ skillsError }}
-          </div>
-          <div v-else-if="sessionSkills.length === 0" class="popover-empty-hint">
-            No skills configured for this session.
-          </div>
-          <ul v-else class="popover-skill-list">
-            <li
-              v-for="skill in sessionSkills"
-              :key="skill.name"
-              class="popover-skill-row"
-            >
-              <div class="popover-skill-text">
-                <div class="popover-skill-name">
-                  <span>{{ skill.name }}</span>
-                  <small v-if="skill.userInvocable" class="popover-skill-tag">/</small>
-                </div>
-                <div v-if="skill.description" class="popover-skill-desc">
-                  {{ skill.description }}
-                </div>
-              </div>
-              <ToggleSwitch
-                :model-value="skill.enabled"
-                @update:model-value="() => toggleSkill(skill)"
-              />
-            </li>
-          </ul>
-        </div>
-
-        <!-- Usage metrics. Cherry-picked from SDK usage.getMetrics. -->
-        <div v-if="usage || usageError" class="option-row option-row-stack">
-          <span class="option-label">Usage</span>
-          <div v-if="usageError" class="popover-empty-hint popover-error">
-            {{ usageError }}
-          </div>
-          <dl v-else-if="usage" class="popover-usage">
-            <div class="popover-usage-row">
-              <dt>Requests</dt>
-              <dd>{{ usage.totalUserRequests }}</dd>
-            </div>
-            <div class="popover-usage-row">
-              <dt>Premium cost</dt>
-              <dd>{{ usage.totalPremiumRequestCost.toFixed(2) }}</dd>
-            </div>
-            <div class="popover-usage-row">
-              <dt>API time</dt>
-              <dd>{{ formatDurationMs(usage.totalApiDurationMs) }}</dd>
-            </div>
-            <div class="popover-usage-row">
-              <dt>Last in / out tokens</dt>
-              <dd>
-                {{ usage.lastCallInputTokens.toLocaleString() }} /
-                {{ usage.lastCallOutputTokens.toLocaleString() }}
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        <div class="option-actions">
-          <Button
-            icon="pi pi-download"
-            label="Export Markdown"
-            size="small"
-            severity="secondary"
-            @click="onExport('markdown')"
-          />
-          <Button
-            icon="pi pi-file-export"
-            label="Export JSON"
-            size="small"
-            severity="secondary"
-            @click="onExport('json')"
-          />
-          <Button
-            icon="pi pi-compress"
-            label="Compact history"
-            size="small"
-            severity="secondary"
-            @click="onCompactNow"
-          />
-          <Button
-            icon="pi pi-refresh"
-            label="Reset approvals"
-            size="small"
-            severity="secondary"
-            @click="onResetApprovals"
-          />
-        </div>
-      </div>
-    </Popover>
   </div>
 </template>
 
@@ -755,6 +373,13 @@ function formatDurationMs(ms: number): string {
 .compact-select {
   flex: 0 1 auto;
   min-width: 0;
+}
+
+/* Cog button — active state when the right-rail details panel is
+ * open for this session. Theme-aware tint via PrimeVue tokens. */
+:deep(.cog-active) {
+  background: color-mix(in srgb, var(--p-primary-color) 20%, transparent);
+  color: var(--p-primary-color);
 }
 
 /* Non-leaf tree rows (provider / type). We render the label inside a

@@ -33,9 +33,8 @@ test("Export JSON contains user + assistant items after a turn", async ({ page }
   // into the store (and therefore into rec.events).
   await expect(page.locator("text=ok: hello world").first()).toBeVisible({ timeout: 5_000 });
 
-  // Open the gear popover + click Export JSON. The gear lives in the
-  // SessionHeaderControls which mounts in the tab strip.
-  await page.getByRole("button", { name: /options/i }).first().click();
+  // The details rail opens by default (Phase 18a). Click Export JSON
+  // directly — no popover open step required.
   await page.getByRole("button", { name: /export json/i }).click();
 
   // Read the file from the test-server's userData exports dir.
