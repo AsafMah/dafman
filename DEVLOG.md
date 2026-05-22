@@ -10,6 +10,50 @@
 
 ---
 
+## 2026-05-22 — CI failure triage: hidden build break + flaky control WebSocket
+
+### Takeaway
+
+`gh run view` showed two independent CI problems on `main`:
+
+1. **Real build regression (hidden by `continue-on-error`)** — the tier-2
+   `electrobun build` matrix had been failing across Linux/macOS/Windows with
+   `No matching export in "src-bun/app/settings.ts" for import "ensureDefaultWorkspace"`
+   from `src-bun/index.ts:38`. Because the matrix job is non-blocking, runs like
+   `650acfb`, `83335c4`, `687d05b`, and `b7014dc` still showed overall green even
+   while the native bundle was broken. That build-side bug is already fixed on
+   main by `abda079` (restored `ensureDefaultWorkspace`) via merge commit `1165dec`.
+
+2. **Real CI flake in the full E2E harness** — the required `Lint + test + smoke`
+   job failed intermittently in `e2e/full/flows/13-perm-each-kind.pwtest.ts`
+   (and logs showed a retry failure in `12-perm-matcher.pwtest.ts` too). The
+   underlying error in the failed log was `control ws connect failed` from
+   `e2e/full/harness/bunHarness.ts:144`, followed by Playwright timing out waiting
+   for `.pending-card`. The harness was racing the first control-WebSocket
+   connection immediately after the bun test-server printed its ready marker.
+
+### Fix
+
+- Hardened `e2e/full/harness/bunHarness.ts`:
+  - retry initial control-WebSocket connection (`CONTROL_CONNECT_RETRIES`)
+  - clear stale socket/openPromise state on connect errors so retries can work
+  - warm the control channel with an initial `listSessions` RPC before each test
+    starts, so the first permission-trigger action doesn't race the handshake
+
+### Receipts
+
+- Failing runs inspected with `gh`:
+  - `26285466983` (`075bb09`) — check job failed on `13-perm-each-kind`; matrix
+    failed on missing `ensureDefaultWorkspace` export.
+  - `26286310103` (`7b395ce`) — same E2E flake + same matrix build error.
+  - `26286407487` (`e3b3fd5`) — same E2E flake + same matrix build error.
+- Hidden matrix failures confirmed on nominally-green runs:
+  - `26285880138` (`687d05b`)
+  - `26286299388` (`b7014dc`)
+- Harness fix lives in `e2e/full/harness/bunHarness.ts`.
+
+---
+
 ## 2026-05-22 — Phase 21d: D2 + D3 dep bumps
 
 ### Takeaway

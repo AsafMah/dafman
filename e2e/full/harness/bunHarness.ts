@@ -32,6 +32,8 @@ export interface BunHarness {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
+const CONTROL_CONNECT_RETRIES = 10;
+const CONTROL_CONNECT_RETRY_DELAY_MS = 100;
 
 function pickPort(): number {
   return 14000 + Math.floor(Math.random() * 1000);
@@ -86,6 +88,10 @@ export async function spawnBunHarness(options: {
   await waitForReadyMarker(child, port);
 
   const invokeControl = makeControlClient(`ws://127.0.0.1:${port}`);
+  // CI occasionally hits a tiny gap between the ready marker and the
+  // control WebSocket accepting its first connection. Warm the channel
+  // here so the first test action doesn't race the handshake.
+  await invokeControl("listSessions", {});
 
   return {
     port,
@@ -136,14 +142,39 @@ function makeControlClient(
   wsUrl: string,
 ): <T>(name: string, args: Record<string, unknown>) => Promise<T> {
   let ws: WebSocket | null = null;
+  let openPromise: Promise<void> | null = null;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   let nextId = 100_000;
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolveFn) => setTimeout(resolveFn, ms));
+  }
+
   function ensure(): Promise<void> {
     if (ws && ws.readyState === 1) return Promise.resolve();
-    return new Promise((resolveFn, reject) => {
+    if (openPromise) return openPromise;
+    openPromise = new Promise((resolveFn, reject) => {
       ws = new WebSocket(wsUrl);
       ws.addEventListener("open", () => resolveFn());
-      ws.addEventListener("error", () => reject(new Error("control ws connect failed")));
+      ws.addEventListener("error", () => {
+        const socket = ws;
+        ws = null;
+        openPromise = null;
+        try {
+          socket?.close();
+        } catch {
+          /* ignore */
+        }
+        reject(new Error("control ws connect failed"));
+      });
+      ws.addEventListener("close", () => {
+        ws = null;
+        openPromise = null;
+        for (const slot of pending.values()) {
+          slot.reject(new Error("control ws closed"));
+        }
+        pending.clear();
+      });
       ws.addEventListener("message", (e) => {
         try {
           const p = JSON.parse(String(e.data)) as {
@@ -164,9 +195,26 @@ function makeControlClient(
         }
       });
     });
+    return openPromise;
   }
+
+  async function ensureWithRetry(): Promise<void> {
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= CONTROL_CONNECT_RETRIES; attempt++) {
+      try {
+        await ensure();
+        return;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt === CONTROL_CONNECT_RETRIES) break;
+        await sleep(CONTROL_CONNECT_RETRY_DELAY_MS);
+      }
+    }
+    throw lastError ?? new Error("control ws connect failed");
+  }
+
   return async function invokeControl<T>(name: string, args: Record<string, unknown>): Promise<T> {
-    await ensure();
+    await ensureWithRetry();
     const id = nextId++;
     return new Promise<T>((resolveFn, reject) => {
       pending.set(id, { resolve: resolveFn as (v: unknown) => void, reject });
