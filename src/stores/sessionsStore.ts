@@ -11,6 +11,7 @@ import { defineStore } from "pinia";
 import { reactive, ref, watch } from "vue";
 import { invokeCommand, onPendingRequest, onSessionEvent } from "../ipc/invoke";
 import type {
+  AgentInfo,
   ElicitationRequestData,
   PendingRequestPayload,
   PermissionRequestData,
@@ -101,6 +102,12 @@ export type SessionRecord = {
   /// at the record level so other surfaces (the sidebar row) can
   /// trust `isThinking` without mounting the chat panel.
   sawTurnBoundary: boolean;
+  /// 19a: currently-selected custom agent for the session, or null
+  /// when the default agent is in use. Mirrors `ambient.currentAgent`
+  /// from the reducer so the header chip + rail can react without
+  /// importing the reducer (or running it). Hydrated from the
+  /// `getCurrentAgent` RPC on session resume + create.
+  currentAgent: AgentInfo | null;
 };
 
 /// Per-record mirror of a single pending request. Matches the
@@ -275,7 +282,40 @@ export const useSessionsStore = defineStore("sessions", () => {
       if (typeof title === "string" && title.length > 0) {
         record.title = title;
       }
-    }// Both `session.start` (fresh create) and `session.resume` carry
+    }
+
+    // 19a: track session-level custom agent selection so the header
+    // chip + rail react without mounting the chat panel. Mirror the
+    // chat reducer's `ambient.currentAgent` derivation: only treat
+    // events that carry `agentName` as session-level selection
+    // (transient delegation during fleet/task runs has a
+    // `parentToolCallId`).
+    if (payload.eventType === "subagent.selected") {
+      const d = (payload.data ?? {}) as {
+        agentName?: unknown;
+        agentDisplayName?: unknown;
+        agentDescription?: unknown;
+        agentPath?: unknown;
+        parentToolCallId?: unknown;
+      };
+      if (
+        typeof d.agentName === "string" &&
+        (typeof d.parentToolCallId !== "string" ||
+          d.parentToolCallId.length === 0)
+      ) {
+        record.currentAgent = {
+          name: d.agentName,
+          displayName:
+            typeof d.agentDisplayName === "string" ? d.agentDisplayName : d.agentName,
+          description:
+            typeof d.agentDescription === "string" ? d.agentDescription : "",
+          ...(typeof d.agentPath === "string" ? { path: d.agentPath } : {}),
+        };
+      }
+    } else if (payload.eventType === "subagent.deselected") {
+      record.currentAgent = null;
+    }
+// Both `session.start` (fresh create) and `session.resume` carry
     // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
     // Resumed sessions don't fire `session.start` again, so we have
     // to listen on both — otherwise the workspace would only appear
@@ -500,6 +540,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         unseenTurns: 0,
         isThinking: false,
         sawTurnBoundary: false,
+        currentAgent: null,
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -515,6 +556,18 @@ export const useSessionsStore = defineStore("sessions", () => {
         })
         .catch(() => {
           /* mode RPC may be unavailable on older CLI hosts; ignore */
+        });
+      // 19a: hydrate current custom agent so the header chip is
+      // accurate from the first paint (subagent.selected may not
+      // fire post-create if the SDK's selection persists from a
+      // previous session). Fire-and-forget like the mode fetch.
+      void invokeCommand("getCurrentAgent", { sessionId: id })
+        .then((agent) => {
+          const current = sessions.value.find((s) => s.id === id);
+          if (current) current.currentAgent = agent;
+        })
+        .catch(() => {
+          /* agent RPC may be unavailable; ignore */
         });
       return record;
     } catch (err) {
@@ -576,6 +629,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         unseenTurns: 0,
         isThinking: false,
         sawTurnBoundary: false,
+        currentAgent: null,
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and
@@ -603,6 +657,15 @@ export const useSessionsStore = defineStore("sessions", () => {
         })
         .catch(() => {
           /* mode RPC may be unavailable on older CLI hosts; ignore */
+        });
+      // 19a: same hydration as createSession.
+      void invokeCommand("getCurrentAgent", { sessionId: actualId })
+        .then((agent) => {
+          const current = sessions.value.find((s) => s.id === actualId);
+          if (current) current.currentAgent = agent;
+        })
+        .catch(() => {
+          /* agent RPC may be unavailable; ignore */
         });
       return record;
     } catch (err) {

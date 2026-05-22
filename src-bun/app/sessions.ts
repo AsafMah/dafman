@@ -40,6 +40,7 @@ import type {
 	SessionEventPayload, SessionMetadataSummary, SessionHistoryCompactionResult, SessionMode,
 	UserInputRequestData,
 	WorkspaceFileMatch,
+	AgentInfo,
 } from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
@@ -65,6 +66,27 @@ const HISTORY_REPLAY_BATCH = 50;
 /// force-clear the entry and move on — the OS process exit handles
 /// the rest.
 const SHUTDOWN_TIMEOUT_MS = 2000;
+
+/// 19a: normalize the SDK's loose AgentInfo wire shape (everything is
+/// `unknown`) into our typed `AgentInfo`. Caller pre-checks
+/// `typeof name === "string"` so the cast is safe; we still default
+/// the optional fields defensively because the SDK has shipped shape
+/// drifts before (see prismExtraLanguages.ts:1 for the load-order
+/// example).
+function normalizeAgent(raw: {
+	name?: unknown;
+	displayName?: unknown;
+	description?: unknown;
+	path?: unknown;
+}): AgentInfo {
+	const out: AgentInfo = {
+		name: String(raw.name),
+		displayName: typeof raw.displayName === "string" ? raw.displayName : String(raw.name),
+		description: typeof raw.description === "string" ? raw.description : "",
+	};
+	if (typeof raw.path === "string" && raw.path.length > 0) out.path = raw.path;
+	return out;
+}
 
 type Emit = (payload: SessionEventPayload) => void;
 type EmitPending = (payload: PendingRequestPayload) => void;
@@ -929,6 +951,111 @@ export class SessionRegistry {
 				enabled,
 			})) as { success?: boolean };
 			return result.success ?? true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	// ---------- Custom agents (Phase 19a) ----------
+	//
+	// SDK auto-discovers custom agents from `~/.copilot/agents/` (user
+	// config) and `<workingDirectory>/.github/agents/` (project) when
+	// `enableConfigDiscovery: true` is set in baseSessionConfig (which
+	// we have). We don't need our own scanner — these methods just
+	// wrap the @experimental `session.rpc.agent.*` surface.
+	//
+	// Wire shape per @github/copilot/schemas/api.schema.json#AgentInfo:
+	// { name: string, displayName: string, description: string, path?: string }
+	// `path` is set for file-based agents (we can derive "Project" vs
+	// "User" source by checking if path contains `.github/agents/`).
+
+	async listAgents(sessionId: string): Promise<AgentInfo[]> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.agent.list()) as {
+				agents?: Array<{
+					name?: unknown;
+					displayName?: unknown;
+					description?: unknown;
+					path?: unknown;
+				}>;
+			};
+			return (result.agents ?? [])
+				.filter((a) => typeof a.name === "string")
+				.map(normalizeAgent);
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async getCurrentAgent(sessionId: string): Promise<AgentInfo | null> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.agent.getCurrent()) as {
+				agent?: {
+					name?: unknown;
+					displayName?: unknown;
+					description?: unknown;
+					path?: unknown;
+				} | null;
+			};
+			if (!result.agent || typeof result.agent.name !== "string") return null;
+			return normalizeAgent(result.agent);
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async selectAgent(sessionId: string, name: string): Promise<AgentInfo> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.agent.select({ name })) as {
+				agent?: {
+					name?: unknown;
+					displayName?: unknown;
+					description?: unknown;
+					path?: unknown;
+				};
+			};
+			if (!result.agent || typeof result.agent.name !== "string") {
+				throw AppError.sdk("selectAgent: SDK returned no agent");
+			}
+			return normalizeAgent(result.agent);
+		} catch (err) {
+			if (err instanceof AppError) throw err;
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async deselectAgent(sessionId: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			await entry.session.rpc.agent.deselect();
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async reloadAgents(sessionId: string): Promise<AgentInfo[]> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.agent.reload()) as {
+				agents?: Array<{
+					name?: unknown;
+					displayName?: unknown;
+					description?: unknown;
+					path?: unknown;
+				}>;
+			};
+			return (result.agents ?? [])
+				.filter((a) => typeof a.name === "string")
+				.map(normalizeAgent);
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}

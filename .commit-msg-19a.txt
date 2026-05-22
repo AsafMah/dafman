@@ -1,0 +1,65 @@
+feat(agents): custom agent picker (Phase 19a)
+
+Surface the SDK's @experimental session.rpc.agent.* surface in a
+header chip + right-rail section. Lets the user see and switch the
+selected custom agent for the active session without going through
+a /agent slash command.
+
+What works after this commit:
+- Drop a markdown file at .github/agents/<name>.md in the workspace
+  OR at <userConfigDir>/agents/<name>.md, click Reload from disk,
+  and the agent shows up in the rail's new Agents section.
+- Click Select on the row -> SDK fires subagent.selected -> rail
+  highlights the row and header chip flips to display the agent
+  name.
+- Click Deselect -> SDK fires subagent.deselected -> chip hides,
+  rail clears selection.
+
+Architecture:
+- 5 session-scoped methods on SessionRegistry (listAgents,
+  getCurrentAgent, selectAgent, deselectAgent, reloadAgents)
+  wrapping the @experimental SDK surface. Matches the existing
+  listSkills / setSkillEnabled / listSessionMcpServers pattern;
+  no new class.
+- 5 bun RPCs in index.ts + test-server.ts.
+- AgentInfo type added to src-bun/rpc.ts (mirrors the SDK's
+  api.schema.json#AgentInfo shape: name + displayName +
+  description + optional path).
+- ChatAmbient.currentAgent + SessionRecord.currentAgent track
+  selection. sessionMetaHandlers["subagent.selected"] handles the
+  event (no longer in IGNORED_EVENTS).
+- sessionsStore.applySessionEvent mirrors the reducer's
+  derivation so the chip + rail react without mounting the chat
+  panel.
+- Transient delegation events (those with parentToolCallId) are
+  filtered out by both the reducer and the store — they're
+  per-turn sub-agent delegation, not session-level selection.
+  The delegation rendering arrives in 19c.
+- Path-based Project / User source disambiguation in the rail.
+
+Tests (11 new):
+- src-bun/__tests__/sessions.test.ts: 6 tests for the agent
+  methods (list/getCurrent/select/deselect/reload + error wrap +
+  SessionNotFound).
+- src/lib/chatEvents/__tests__/subagent-selection.test.ts: 5
+  tests for the reducer handler (full payload, missing fields,
+  parentToolCallId disambiguation, deselect clears, no-agentName
+  no-op).
+
+Rubber-duck adoptions (7 findings):
+- Methods on SessionRegistry instead of a new AgentRegistry class.
+- No optimistic UI on Select — row loading state, authoritative
+  via subagent.selected event.
+- Header chip opens the rail; no inline dropdown duplication.
+- Fetch agents on rail mount AND session switch.
+- Path-based source disambiguation (RPC wire shape doesn't carry
+  a source string).
+- session.custom_agents_updated stays in IGNORED_EVENTS (no chat
+  surface); Reload button is the explicit refresh path.
+- Tools display deferred (RPC wire shape doesn't carry tools list).
+
+Gates: lint clean, 439 bun tests (was 428), 68/70 E2E (the failing
+2 are 08-audit-rehydrate which also fail on plain main without my
+changes — pre-existing flake unrelated to 19a).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

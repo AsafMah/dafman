@@ -235,6 +235,21 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			setSessionSkillEnabled: rpcGuard(async ({ sessionId, name, enabled }) =>
 				sessions.setSkillEnabled(sessionId, name, enabled),
 			),
+			listAgents: rpcGuard(async ({ sessionId }) =>
+				sessions.listAgents(sessionId),
+			),
+			getCurrentAgent: rpcGuard(async ({ sessionId }) =>
+				sessions.getCurrentAgent(sessionId),
+			),
+			selectAgent: rpcGuard(async ({ sessionId, name }) =>
+				sessions.selectAgent(sessionId, name),
+			),
+			deselectAgent: rpcGuard(async ({ sessionId }) =>
+				sessions.deselectAgent(sessionId),
+			),
+			reloadAgents: rpcGuard(async ({ sessionId }) =>
+				sessions.reloadAgents(sessionId),
+			),
 			getSessionUsageMetrics: rpcGuard(async ({ sessionId }) =>
 				sessions.getUsageMetrics(sessionId),
 			),

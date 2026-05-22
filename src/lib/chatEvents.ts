@@ -186,6 +186,10 @@ export type ChatAmbient = {
   /// rare in practice but the SDK is allowed to re-enter — we don't
   /// drop later requests just because we're showing an earlier one.
   pendingRequests: PendingRequest[];
+  /// Currently-selected custom agent for the session, or null when the
+  /// default agent is in use. Driven by `subagent.selected` /
+  /// `.deselected` events; reflected in the header chip + rail.
+  currentAgent: import("../ipc/types").AgentInfo | null;
 };
 
 /// A single SDK-blocking pending callback. `requestId` is generated
@@ -224,6 +228,7 @@ export function defaultAmbient(): ChatAmbient {
     turnActive: false,
     sawTurnBoundary: false,
     pendingRequests: [],
+    currentAgent: null,
   };
 }
 

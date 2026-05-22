@@ -56,6 +56,92 @@
 
 ---
 
+## 2026-05-22 — Phase 19a: Custom agent picker
+
+### Takeaway
+
+First sub-phase of Phase 19. The SDK auto-discovers custom agents
+from `.github/agents/` (workspace) and `<userConfigDir>/agents/`
+(user) when `enableConfigDiscovery: true` is set (we already had
+that). We don't own the disk scanner — we just wrap the
+@experimental `session.rpc.agent.*` RPC surface and surface the
+result in two places: a header chip and a rail section.
+
+### Discovery before the duck
+
+The original Phase 19a plan called for a custom agent scanner
+mirroring the McpRegistry / SkillsRegistry pattern. Grep'ing
+`@github/copilot/app.js` for `ensureAgentsLoaded` / `customAgents`
+showed the SDK does the disk scan internally. Saved a day of work.
+
+### Rubber-duck adoptions
+
+I gave the duck the proposed thin RPC wrapper + 7 specific
+questions. Notable adoptions:
+
+- **Don't make a new `AgentRegistry` class** — the 5 agent methods
+  are all session-scoped (need `entries.get(sessionId)`), so they
+  belong on `SessionRegistry` just like `listSkills` /
+  `setSkillEnabled` already do.
+- **No optimistic UI on Select** — the SDK can reject (unknown
+  name, etc.), and `subagent.selected` is the authoritative event.
+  Row gets a loading state via `agentBusyName` while the RPC is
+  in flight; the chip updates from the event.
+- **Path-based source disambiguation** — the RPC's `AgentInfo` wire
+  shape is minimal (`name`, `displayName`, `description`, `path?`).
+  No `source` field. But `path` is enough: we normalize forward
+  slashes + lowercase on Windows, then check whether the path is
+  under `<workingDirectory>/.github/agents/`. "Project" if so,
+  "User" otherwise.
+- **Header chip = open rail** (not an inline dropdown) — keeps the
+  rail as the one place where agent management lives; no
+  duplicated dropdown code.
+- **Fetch agents on rail mount AND on session switch** — don't
+  rely on `session.custom_agents_updated` for initial load. It's
+  in our IGNORED_EVENTS for the chat reducer; treat it only as
+  an invalidation hint (which we currently ignore — the Reload
+  button is the explicit refresh path).
+
+### Subagent.selected disambiguation
+
+The SDK emits `subagent.selected` for BOTH session-level agent
+selection AND per-turn delegation during fleet / task runs. They
+share the same event type but transient delegation events carry
+a `parentToolCallId`. Both the chat reducer's
+`sessionMetaHandlers["subagent.selected"]` and
+`sessionsStore.applySessionEvent` filter on this — only treat
+events WITHOUT `parentToolCallId` as session-level. The
+delegation surface arrives in 19c (nested sub-agent rendering).
+
+### Tests
+
+- **6 new sessions tests** (`src-bun/__tests__/sessions.test.ts`):
+  list/getCurrent/select/deselect/reload happy paths, AppError.sdk
+  wrap on unknown agent, SessionNotFound on unknown sessionId for
+  all 5 methods. The FakeSession was extended with an `agent`
+  RPC stub keyed on `agentsList[]` + `currentAgentName`.
+- **5 new chatEvents reducer tests**
+  (`src/lib/chatEvents/__tests__/subagent-selection.test.ts`):
+  populates ambient.currentAgent from full payload + minimal
+  payload, parentToolCallId disambiguation (transient delegation
+  doesn't change currentAgent), deselected clears it, no-agentName
+  is a no-op.
+- Existing E2E flake on `08-audit-rehydrate` reproduces on plain
+  main without 19a — unrelated. Filed as known.
+
+### Receipts
+
+- Commit: this one. **439 bun tests (was 428), 68/70 smoke**
+  (pre-existing flake), lint clean.
+
+### What's queued for 19b
+
+- Tasks panel + Library Agents creation form. Need to verify the
+  SDK's `session.rpc.tasks.*` wire shape and figure out the
+  on-disk format the SDK accepts for agent definitions.
+
+---
+
 ## 2026-05-22 — Phase 21d: D2 + D3 dep bumps
 
 ### Takeaway

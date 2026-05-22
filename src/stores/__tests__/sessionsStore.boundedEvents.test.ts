@@ -34,6 +34,7 @@ function makeRecord(id: string): SessionRecord {
     unseenTurns: 0,
     isThinking: false,
     sawTurnBoundary: false,
+    currentAgent: null,
   };
 }
 

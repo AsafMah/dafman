@@ -3,6 +3,38 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 19a — Custom agent picker)
+
+- **Custom agent picker** in the right rail's new `Agents` section
+  (`SessionDetailsPanel.vue`). Lists every custom agent the SDK
+  discovered for the session (workspace `.github/agents/` +
+  `<userConfigDir>/agents/`, surfaced via the @experimental
+  `session.rpc.agent.list` RPC). Each row shows the agent's display
+  name, optional description (expand on chevron click), a
+  "Project" / "User" source badge derived from the agent's
+  absolute path, and a `Select` / `Deselect` button. A
+  `Reload from disk →` button at the section footer calls
+  `session.rpc.agent.reload` so newly-added agent files surface
+  without restarting the session.
+- **Header agent chip** in `SessionHeaderControls.vue` next to the
+  workspace pill. Renders the currently-selected custom agent's
+  display name; hidden when the default agent is in use to keep
+  the header clutter-free for users not using this feature.
+  Clicking opens the right rail so the user can switch / deselect.
+- 5 new bun RPCs wrapping `session.rpc.agent.*`: `listAgents`,
+  `getCurrentAgent`, `selectAgent`, `deselectAgent`, `reloadAgents`.
+  All session-scoped, methods live on `SessionRegistry` (matching
+  the 21a refactor's convention for session-scoped methods).
+- `subagent.selected` and `subagent.deselected` SDK events now
+  drive `ChatAmbient.currentAgent` + `SessionRecord.currentAgent`
+  reactively. Transient sub-agent delegation events (those
+  carrying `parentToolCallId`) are filtered out — session-level
+  selection and per-turn delegation are separate concepts
+  (delegation rendering arrives in 19c).
+- `getCurrentAgent` is fire-and-forget-fetched on session create
+  and resume to seed the chip + rail without waiting for the
+  first `subagent.selected` event.
+
 ### Changed (Phase 21d — dependency bumps)
 
 - **Lexical 0.38.1 → 0.44.0** (6-minor jump across the 5 direct

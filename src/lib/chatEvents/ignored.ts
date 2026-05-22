@@ -46,8 +46,9 @@ export const IGNORED_EVENTS: ReadonlySet<string> = new Set([
   "subagent.started",
   "subagent.completed",
   "subagent.failed",
-  "subagent.selected",
-  "subagent.deselected",
+  // 19a: subagent.selected + subagent.deselected now have handlers in
+  // sessionMetaHandlers (drive ambient.currentAgent for the header
+  // chip + rail).
   "hook.start",
   "hook.end",
   "sampling.requested",

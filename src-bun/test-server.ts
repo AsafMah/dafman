@@ -295,6 +295,26 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		return sessions.setSessionMcpEnabled(sessionId, serverName, enabled);
 	}),
 	getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
+	listAgents: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.listAgents(sessionId);
+	}),
+	getCurrentAgent: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.getCurrentAgent(sessionId);
+	}),
+	selectAgent: rpcGuard(async (args) => {
+		const { sessionId, name } = args as { sessionId: string; name: string };
+		return sessions.selectAgent(sessionId, name);
+	}),
+	deselectAgent: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.deselectAgent(sessionId);
+	}),
+	reloadAgents: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.reloadAgents(sessionId);
+	}),
 	readSessionPlan: rpcGuard(async (args) => {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.readPlan(sessionId);

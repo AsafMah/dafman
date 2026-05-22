@@ -160,12 +160,14 @@ describe("chatEvents — family ownership", () => {
     ]);
   });
 
-  test("sessionMeta handlers own title/model/usage", () => {
+  test("sessionMeta handlers own title/model/usage + subagent.selected/deselected", () => {
     expect(Object.keys(sessionMetaHandlers).sort()).toEqual([
       "assistant.usage",
       "session.model_change",
       "session.title_changed",
       "session.usage_info",
+      "subagent.deselected",
+      "subagent.selected",
     ]);
   });
 

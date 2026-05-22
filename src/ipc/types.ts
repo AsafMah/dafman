@@ -82,6 +82,18 @@ export interface SessionMetadataSummary {
   branch?: string;
 }
 
+/// Mirror of the SDK's AgentInfo wire shape (see
+/// `src-bun/rpc.ts:AgentInfo`). Returned by the @experimental
+/// `session.rpc.agent.*` surface. `path` is set for file-based agents
+/// — we use it to derive a "Project" vs "User" source label by
+/// checking whether the path is under `<wd>/.github/agents/`.
+export interface AgentInfo {
+  name: string;
+  displayName: string;
+  description: string;
+  path?: string;
+}
+
 /// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged.
 /// Mirrored here so the renderer can construct without importing the
 /// SDK types directly. Pass-through to bun → SDK at send time.
@@ -328,6 +340,26 @@ export type CommandMap = {
   setSessionSkillEnabled: {
     args: { sessionId: string; name: string; enabled: boolean };
     result: boolean;
+  };
+  listAgents: {
+    args: { sessionId: string };
+    result: AgentInfo[];
+  };
+  getCurrentAgent: {
+    args: { sessionId: string };
+    result: AgentInfo | null;
+  };
+  selectAgent: {
+    args: { sessionId: string; name: string };
+    result: AgentInfo;
+  };
+  deselectAgent: {
+    args: { sessionId: string };
+    result: boolean;
+  };
+  reloadAgents: {
+    args: { sessionId: string };
+    result: AgentInfo[];
   };
   getSessionUsageMetrics: {
     args: { sessionId: string };

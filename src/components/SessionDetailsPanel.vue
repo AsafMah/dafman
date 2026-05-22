@@ -25,6 +25,7 @@ import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
 import ToggleSwitch from "primevue/toggleswitch";
 import type {
+  AgentInfo,
   ReasoningVisibility,
   SessionMode,
 } from "../ipc/types";
@@ -122,6 +123,103 @@ function onWorkspaceClick() {
 const approveAll = computed(() => record.value?.approveAll ?? false);
 function onToggleApproveAll(next: boolean) {
   void sessionsStore.setSessionApproveAll(sessionId.value, next);
+}
+
+// ---------- Agents (19a) ----------
+//
+// SDK auto-discovers custom agents (enableConfigDiscovery=true on
+// session create + resume). The rail just lists them via the
+// @experimental session.rpc.agent.* surface. Source disambiguation
+// (Project vs User) is derived from the agent's `path` field — if
+// it sits under `<workingDirectory>/.github/agents/` it's a Project
+// agent; otherwise it came from the user config dir.
+const sessionAgents = ref<AgentInfo[]>([]);
+const agentsLoaded = ref(false);
+const agentsError = ref<string | null>(null);
+/// Selecting/deselecting is async; we set this so the clicked row
+/// can show a spinner without optimistically updating the selection
+/// (subagent.selected event is the source of truth — see rubber-duck
+/// finding 5 from 19a.1).
+const agentBusyName = ref<string | null>(null);
+
+async function loadAgents() {
+  if (!sessionId.value) return;
+  agentsError.value = null;
+  try {
+    sessionAgents.value = await invokeCommand("listAgents", {
+      sessionId: sessionId.value,
+    });
+    agentsLoaded.value = true;
+  } catch (err) {
+    agentsError.value = err instanceof Error ? err.message : String(err);
+    agentsLoaded.value = true;
+  }
+}
+
+async function reloadAgents() {
+  if (!sessionId.value) return;
+  agentsError.value = null;
+  try {
+    sessionAgents.value = await invokeCommand("reloadAgents", {
+      sessionId: sessionId.value,
+    });
+    toasts.success("Agents reloaded", `${sessionAgents.value.length} available`);
+  } catch (err) {
+    agentsError.value = err instanceof Error ? err.message : String(err);
+    toasts.error(
+      "Failed to reload agents",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+async function selectAgent(name: string) {
+  if (!sessionId.value || agentBusyName.value) return;
+  agentBusyName.value = name;
+  try {
+    await invokeCommand("selectAgent", {
+      sessionId: sessionId.value,
+      name,
+    });
+    // currentAgent updates via the subagent.selected event handler in
+    // sessionsStore.applySessionEvent — no manual store mutation here.
+  } catch (err) {
+    toasts.error(
+      "Failed to select agent",
+      err instanceof Error ? err.message : String(err),
+    );
+  } finally {
+    agentBusyName.value = null;
+  }
+}
+
+async function deselectAgent() {
+  if (!sessionId.value || agentBusyName.value) return;
+  agentBusyName.value = "__deselect__";
+  try {
+    await invokeCommand("deselectAgent", { sessionId: sessionId.value });
+  } catch (err) {
+    toasts.error(
+      "Failed to deselect agent",
+      err instanceof Error ? err.message : String(err),
+    );
+  } finally {
+    agentBusyName.value = null;
+  }
+}
+
+/// Derive "Project" vs "User" source from the agent's absolute path.
+/// Returns `null` when the agent has no path (remote/inline — none in
+/// our case but defensive).
+function agentSourceLabel(agent: AgentInfo): "Project" | "User" | null {
+  if (!agent.path) return null;
+  const wd = record.value?.workingDirectory;
+  if (!wd) return "User";
+  // Case-insensitive on Windows; the path may use forward or back
+  // slashes. Normalize both.
+  const norm = (s: string) => s.replace(/\\/g, "/").toLowerCase();
+  const projectPrefix = `${norm(wd)}/.github/agents/`;
+  return norm(agent.path).startsWith(projectPrefix) ? "Project" : "User";
 }
 
 // ---------- Skills ----------
@@ -242,6 +340,7 @@ function formatDurationMs(ms: number): string {
 onMounted(() => {
   void loadBuiltinTools();
   void loadQuota();
+  void loadAgents();
   void loadSkills();
   void loadUsage();
   void loadMcpServers();
@@ -250,6 +349,10 @@ onMounted(() => {
 watch(
   () => sessionId.value,
   () => {
+    sessionAgents.value = [];
+    agentsLoaded.value = false;
+    agentsError.value = null;
+    agentBusyName.value = null;
     sessionSkills.value = [];
     skillsLoaded.value = false;
     skillsError.value = null;
@@ -266,6 +369,7 @@ watch(
     // fired shouldn't re-fire just because the user clicked a
     // different session tab. The Set persists for the whole
     // component lifetime (i.e. as long as the rail is mounted).
+    void loadAgents();
     void loadSkills();
     void loadUsage();
     void loadMcpServers();
@@ -516,6 +620,7 @@ async function loadQuota() {
 // key. Defaults: tools collapsed (long); skills + mcp + plan + usage +
 // quota expanded. Toggling persists immediately.
 type SectionKey =
+  | "agents"
   | "skills"
   | "tools"
   | "mcp"
@@ -524,6 +629,7 @@ type SectionKey =
   | "quota";
 
 const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
+  agents: true,
   skills: true,
   tools: false,
   mcp: true,
@@ -544,6 +650,7 @@ function readSectionState(key: SectionKey): boolean {
 }
 
 const sectionOpen = ref<Record<SectionKey, boolean>>({
+  agents: readSectionState("agents"),
   skills: readSectionState("skills"),
   tools: readSectionState("tools"),
   mcp: readSectionState("mcp"),
@@ -572,11 +679,11 @@ function toggleSection(key: SectionKey): void {
 
 const expandedItems = ref<Set<string>>(new Set());
 
-function isItemExpanded(kind: "tool" | "skill", name: string): boolean {
+function isItemExpanded(kind: "tool" | "skill" | "agent", name: string): boolean {
   return expandedItems.value.has(`${kind}:${name}`);
 }
 
-function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
+function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): void {
   const key = `${kind}:${name}`;
   const next = new Set(expandedItems.value);
   if (next.has(key)) next.delete(key);
@@ -685,6 +792,101 @@ function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
         :model-value="approveAll"
         @update:model-value="onToggleApproveAll"
       />
+    </section>
+
+    <!-- Agents (19a) ---------------------------------------------- -->
+    <section class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.agents"
+        @click="toggleSection('agents')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.agents ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Agents</span>
+        <span v-if="agentsLoaded && !agentsError" class="section-count">
+          {{ sessionAgents.length }}
+        </span>
+      </button>
+      <div v-if="sectionOpen.agents" class="section-body">
+        <div v-if="!agentsLoaded" class="empty-hint">Loading…</div>
+        <div v-else-if="agentsError" class="empty-hint error">{{ agentsError }}</div>
+        <div v-else-if="sessionAgents.length === 0" class="empty-hint">
+          No custom agents. Add markdown files under
+          <code>.github/agents/</code> in your workspace or in
+          <code>&lt;userConfigDir&gt;/agents/</code>, then click Reload.
+        </div>
+        <ul v-else class="agent-list compact-list">
+          <li
+            v-for="agent in sessionAgents"
+            :key="agent.name"
+            class="compact-row agent-row"
+            :class="{
+              'is-current': record.currentAgent?.name === agent.name,
+            }"
+          >
+            <button
+              type="button"
+              class="compact-name-button"
+              :title="agent.description || agent.displayName"
+              :aria-expanded="!!agent.description && isItemExpanded('agent', agent.name)"
+              @click="agent.description && toggleItemExpansion('agent', agent.name)"
+            >
+              <i
+                v-if="agent.description"
+                class="pi compact-chevron"
+                :class="isItemExpanded('agent', agent.name) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                aria-hidden="true"
+              />
+              <span class="compact-name">{{ agent.displayName }}</span>
+              <small
+                v-if="agentSourceLabel(agent)"
+                class="compact-tag agent-source"
+                :title="agent.path ?? ''"
+              >
+                {{ agentSourceLabel(agent) }}
+              </small>
+            </button>
+            <Button
+              v-if="record.currentAgent?.name === agent.name"
+              size="small"
+              severity="secondary"
+              :loading="agentBusyName === '__deselect__'"
+              :disabled="!!agentBusyName"
+              label="Deselect"
+              :aria-label="`Deselect agent ${agent.displayName}`"
+              @click="deselectAgent"
+            />
+            <Button
+              v-else
+              size="small"
+              :loading="agentBusyName === agent.name"
+              :disabled="!!agentBusyName"
+              label="Select"
+              :aria-label="`Select agent ${agent.displayName}`"
+              @click="selectAgent(agent.name)"
+            />
+            <div
+              v-if="agent.description && isItemExpanded('agent', agent.name)"
+              class="compact-desc"
+            >
+              {{ agent.description }}
+            </div>
+          </li>
+        </ul>
+        <button
+          type="button"
+          class="link-button manage-globally"
+          :disabled="!sessionId"
+          @click="reloadAgents"
+        >
+          Reload from disk →
+        </button>
+      </div>
     </section>
 
     <!-- Skills ---------------------------------------------------- -->
@@ -1239,6 +1441,34 @@ function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+}
+
+/* Agent list mirrors the skill list. Currently-selected agent gets a
+ * subtle highlight via the `.is-current` class. The "Project" / "User"
+ * source label rides as a compact-tag inside compact-name-button. */
+.agent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.agent-row.is-current {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
+}
+
+.agent-row .agent-source {
+  /* Distinguish from the skill-list's `/` user-invocable tag so a quick
+   * glance can tell Project vs User without reading the path tooltip. */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  border-radius: 0.25rem;
 }
 
 .skill-row {

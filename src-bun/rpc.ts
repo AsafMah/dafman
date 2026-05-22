@@ -137,6 +137,19 @@ export interface SessionMetadataSummary {
 	branch?: string;
 }
 
+/// Mirror of `@github/copilot/schemas/api.schema.json#AgentInfo`. The
+/// shape the @experimental `session.rpc.agent.*` surface returns. The
+/// `path` field is present for file-based agents (which is everything
+/// we surface) and lets us derive a "Project" vs "User" source label
+/// in the renderer by checking whether the path is under the working
+/// directory's `.github/agents/` subtree vs the user's config dir.
+export interface AgentInfo {
+	name: string;
+	displayName: string;
+	description: string;
+	path?: string;
+}
+
 /// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged
 /// that the renderer can construct. Mirrors the SDK union so we can
 /// pass straight through `session.send({ attachments })` without
@@ -497,6 +510,28 @@ export type DafmanRPC = {
 			setSessionSkillEnabled: {
 				params: { sessionId: string; name: string; enabled: boolean };
 				response: boolean;
+			};
+			/// Phase 19a. Session-scoped @experimental
+			/// `session.rpc.agent.*` surface.
+			listAgents: {
+				params: { sessionId: string };
+				response: AgentInfo[];
+			};
+			getCurrentAgent: {
+				params: { sessionId: string };
+				response: AgentInfo | null;
+			};
+			selectAgent: {
+				params: { sessionId: string; name: string };
+				response: AgentInfo;
+			};
+			deselectAgent: {
+				params: { sessionId: string };
+				response: boolean;
+			};
+			reloadAgents: {
+				params: { sessionId: string };
+				response: AgentInfo[];
 			};
 			/// Raw SDK `usage.getMetrics` shape. Opaque to bun — the
 			/// renderer cherry-picks `totalUserRequests` / token-detail

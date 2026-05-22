@@ -41,6 +41,41 @@ interface FakeSession {
 			}>;
 			resetSessionApprovals: () => Promise<{ success: boolean }>;
 		};
+		agent: {
+			list: () => Promise<{
+				agents: Array<{
+					name: string;
+					displayName: string;
+					description: string;
+					path?: string;
+				}>;
+			}>;
+			getCurrent: () => Promise<{
+				agent: {
+					name: string;
+					displayName: string;
+					description: string;
+					path?: string;
+				} | null;
+			}>;
+			select: (params: { name: string }) => Promise<{
+				agent: {
+					name: string;
+					displayName: string;
+					description: string;
+					path?: string;
+				};
+			}>;
+			deselect: () => Promise<null>;
+			reload: () => Promise<{
+				agents: Array<{
+					name: string;
+					displayName: string;
+					description: string;
+					path?: string;
+				}>;
+			}>;
+		};
 	};
 	lastSentPrompt?: string;
 	lastModel?: { model: string; opts?: { reasoningEffort?: string } };
@@ -50,6 +85,15 @@ interface FakeSession {
 	approveAll: boolean;
 	approvalsReset: number;
 	compactCalls: number;
+	/// Stateful agents fixture. Tests seed via `seedAgents()`.
+	agentsList: Array<{
+		name: string;
+		displayName: string;
+		description: string;
+		path?: string;
+	}>;
+	currentAgentName: string | null;
+	agentReloadCount: number;
 }
 
 function makeFakeSession(
@@ -118,7 +162,36 @@ function makeFakeSession(
 					return { success: true };
 				},
 			},
+			agent: {
+				async list() {
+					return { agents: session.agentsList.slice() };
+				},
+				async getCurrent() {
+					const found =
+						session.currentAgentName == null
+							? null
+							: session.agentsList.find((a) => a.name === session.currentAgentName);
+					return { agent: found ?? null };
+				},
+				async select({ name }) {
+					const found = session.agentsList.find((a) => a.name === name);
+					if (!found) throw new Error(`unknown agent: ${name}`);
+					session.currentAgentName = name;
+					return { agent: found };
+				},
+				async deselect() {
+					session.currentAgentName = null;
+					return null;
+				},
+				async reload() {
+					session.agentReloadCount++;
+					return { agents: session.agentsList.slice() };
+				},
+			},
 		},
+		agentsList: [],
+		currentAgentName: null,
+		agentReloadCount: 0,
 	};
 	return session;
 }
@@ -691,5 +764,113 @@ describe("SessionRegistry", () => {
 		// Most-recent event present.
 		const last = emitted[emitted.length - 1];
 		expect((last?.data as { messageId?: string }).messageId).toBe("m-1499");
+	});
+
+	test("19a: listAgents returns the SDK shape normalized", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.agentsList = [
+			{
+				name: "reviewer",
+				displayName: "Code Reviewer",
+				description: "Reviews PRs",
+				path: "C:/repo/.github/agents/reviewer.md",
+			},
+			{ name: "bare", displayName: "Bare", description: "" },
+		];
+		const agents = await reg.listAgents(id);
+		expect(agents).toEqual([
+			{
+				name: "reviewer",
+				displayName: "Code Reviewer",
+				description: "Reviews PRs",
+				path: "C:/repo/.github/agents/reviewer.md",
+			},
+			{ name: "bare", displayName: "Bare", description: "" },
+		]);
+	});
+
+	test("19a: getCurrentAgent returns null when no agent is selected", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		expect(await reg.getCurrentAgent(id)).toBeNull();
+	});
+
+	test("19a: selectAgent + getCurrentAgent + deselectAgent round-trip", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.agentsList = [
+			{
+				name: "reviewer",
+				displayName: "Code Reviewer",
+				description: "Reviews PRs",
+			},
+		];
+		const selected = await reg.selectAgent(id, "reviewer");
+		expect(selected.name).toBe("reviewer");
+		const current = await reg.getCurrentAgent(id);
+		expect(current?.name).toBe("reviewer");
+		await reg.deselectAgent(id);
+		expect(await reg.getCurrentAgent(id)).toBeNull();
+	});
+
+	test("19a: selectAgent on unknown name wraps SDK error as AppError.sdk", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		try {
+			await reg.selectAgent(id, "does-not-exist");
+			throw new Error("should have thrown");
+		} catch (err) {
+			expect(err).toBeInstanceOf(AppError);
+			expect((err as AppError).payload.kind).toBe("Sdk");
+		}
+	});
+
+	test("19a: reloadAgents bumps the SDK reload counter and returns the fresh list", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.agentsList = [
+			{ name: "a1", displayName: "Agent 1", description: "" },
+		];
+		expect(fake.agentReloadCount).toBe(0);
+		const out = await reg.reloadAgents(id);
+		expect(fake.agentReloadCount).toBe(1);
+		expect(out).toHaveLength(1);
+		expect(out[0]?.name).toBe("a1");
+	});
+
+	test("19a: all agent RPCs reject with SessionNotFound on unknown sessionId", async () => {
+		_setClientForTest(
+			new FakeClient() as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		await expect(reg.listAgents("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.getCurrentAgent("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.selectAgent("ghost", "any")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.deselectAgent("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.reloadAgents("ghost")).rejects.toBeInstanceOf(AppError);
 	});
 });

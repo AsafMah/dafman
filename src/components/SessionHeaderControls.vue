@@ -196,6 +196,15 @@ function onWorkspaceClick() {
     );
   });
 }
+
+/// 19a: header chip surfaces the session's currently-selected custom
+/// agent. Hidden when no agent is selected (default agent in use) to
+/// keep the header clutter-free for users not using this feature.
+/// Clicking opens the right rail where the user can pick/deselect.
+const agentChipLabel = computed(() => record.value?.currentAgent?.displayName ?? null);
+function onAgentChipClick() {
+  if (!detailsOpen.value) layoutStore.toggleSessionDetailsPanel();
+}
 </script>
 
 <template>
@@ -212,6 +221,19 @@ function onWorkspaceClick() {
       @click="onWorkspaceClick"
       @keydown.enter.prevent="onWorkspaceClick"
       @keydown.space.prevent="onWorkspaceClick"
+    />
+    <Chip
+      v-if="agentChipLabel"
+      :label="agentChipLabel"
+      icon="pi pi-user"
+      class="agent-chip"
+      :title="`Custom agent: ${agentChipLabel}. Click to manage in the rail.`"
+      :aria-label="`Custom agent ${agentChipLabel}. Open session details to manage.`"
+      role="button"
+      tabindex="0"
+      @click="onAgentChipClick"
+      @keydown.enter.prevent="onAgentChipClick"
+      @keydown.space.prevent="onAgentChipClick"
     />
     <TreeSelect
       :input-id="`model-${props.sessionId}`"
@@ -325,6 +347,9 @@ function onWorkspaceClick() {
   .workspace-chip {
     display: none;
   }
+  .agent-chip {
+    display: none;
+  }
 }
 @container (max-width: 14rem) {
   .compact-select-effort {
@@ -370,6 +395,38 @@ function onWorkspaceClick() {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 11rem;
+}
+
+/* Agent chip mirrors the workspace-chip styling. Sits right after the
+ * workspace chip; only renders when record.currentAgent is set. */
+.agent-chip {
+  max-width: 12rem;
+  min-width: 0;
+  height: 1.75rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--p-text-color) 25%, transparent);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.agent-chip:hover {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  color: var(--p-text-color);
+  border-color: var(--p-text-color);
+}
+
+.agent-chip:focus-visible {
+  outline: 2px solid var(--p-focus-ring-color, var(--p-primary-color));
+  outline-offset: 2px;
+}
+
+.agent-chip :deep(.p-chip-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 9rem;
 }
 
 /* PrimeVue Select sized to fit comfortably alongside dockview tabs.

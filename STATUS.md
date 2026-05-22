@@ -345,6 +345,24 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 19a shipped: **Custom agent picker**. New
+  rail section in `SessionDetailsPanel.vue` lists agents the SDK
+  auto-discovered (workspace `.github/agents/` + user config dir)
+  via the @experimental `session.rpc.agent.*` surface. Header chip
+  in `SessionHeaderControls.vue` surfaces the current selection;
+  hidden when default. 5 new bun RPCs (`listAgents`,
+  `getCurrentAgent`, `selectAgent`, `deselectAgent`, `reloadAgents`),
+  all session-scoped methods on `SessionRegistry`. `subagent.selected`
+  / `.deselected` events drive `record.currentAgent` reactively; the
+  reducer filters out transient delegation events (those with
+  `parentToolCallId`) so per-turn sub-agent delegation doesn't get
+  confused with session-level selection (delegation rendering
+  arrives in 19c). Rubber-duck'd before writing code; 7 findings
+  adopted — notably (a) kept methods on `SessionRegistry` instead
+  of a new class, (b) no optimistic UI on Select, (c) path-based
+  Project/User source disambiguation. **439 bun tests (was 428),
+  68/70 E2E** (08-audit-rehydrate flake unrelated to 19a, also
+  fails on plain main).
 - **2026-05-22** — Phase 21d shipped: **D2 + D3 dep bumps** (Lexical
   0.38 → 0.44 and Katex 0.16 → 0.17). Lexical bump required a
   `package.json` `overrides` block because lexical-vue@0.14.1
