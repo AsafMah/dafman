@@ -315,6 +315,18 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.reloadAgents(sessionId);
 	}),
+	listTasks: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.listTasks(sessionId);
+	}),
+	cancelTask: rpcGuard(async (args) => {
+		const { sessionId, id } = args as { sessionId: string; id: string };
+		return sessions.cancelTask(sessionId, id);
+	}),
+	removeTask: rpcGuard(async (args) => {
+		const { sessionId, id } = args as { sessionId: string; id: string };
+		return sessions.removeTask(sessionId, id);
+	}),
 	readSessionPlan: rpcGuard(async (args) => {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.readPlan(sessionId);

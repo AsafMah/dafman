@@ -35,6 +35,7 @@ function makeRecord(id: string): SessionRecord {
     isThinking: false,
     sawTurnBoundary: false,
     currentAgent: null,
+    tasksRefreshCounter: 0,
   };
 }
 

@@ -94,6 +94,24 @@ export interface AgentInfo {
   path?: string;
 }
 
+/// Mirror of the SDK's TaskAgentInfo wire shape (see
+/// `src-bun/rpc.ts:TaskInfo`). Returned by the @experimental
+/// `session.rpc.tasks.list` surface, filtered to type === "agent" on
+/// the bun side.
+export interface TaskInfo {
+  id: string;
+  description: string;
+  status: "running" | "idle" | "completed" | "failed" | "cancelled";
+  agentType: string;
+  toolCallId?: string;
+  startedAt?: string;
+  completedAt?: string;
+  activeTimeMs?: number;
+  error?: string;
+  agentName?: string;
+  agentDisplayName?: string;
+}
+
 /// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged.
 /// Mirrored here so the renderer can construct without importing the
 /// SDK types directly. Pass-through to bun → SDK at send time.
@@ -360,6 +378,18 @@ export type CommandMap = {
   reloadAgents: {
     args: { sessionId: string };
     result: AgentInfo[];
+  };
+  listTasks: {
+    args: { sessionId: string };
+    result: TaskInfo[];
+  };
+  cancelTask: {
+    args: { sessionId: string; id: string };
+    result: boolean;
+  };
+  removeTask: {
+    args: { sessionId: string; id: string };
+    result: boolean;
   };
   getSessionUsageMetrics: {
     args: { sessionId: string };

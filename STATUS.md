@@ -345,6 +345,17 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 19b.1 shipped: **Background tasks rail
+  section**. Observational view of agent-delegated tasks via the
+  @experimental `session.rpc.tasks.*` surface. 3 new bun RPCs
+  (`listTasks`, `cancelTask`, `removeTask`), filtered to
+  `type === "agent"`. Per-row Cancel/Remove buttons, color-coded
+  status pills, elapsed time. Auto-refresh on `subagent.started`/
+  `.completed`/`.failed` + `session.background_tasks_changed` via
+  a per-record `tasksRefreshCounter`. Sequence-guarded loader.
+  Followed the 19b rubber-duck plan: split into 19b.1 (this) +
+  19b.2 (Library CRUD). 5 new unit tests. **444 bun tests** (was
+  439), 68/70 smoke (pre-existing flake).
 - **2026-05-22** — Phase 19a shipped: **Custom agent picker**. New
   rail section in `SessionDetailsPanel.vue` lists agents the SDK
   auto-discovered (workspace `.github/agents/` + user config dir)

@@ -3,6 +3,28 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 19b.1 — Tasks panel)
+
+- **Background tasks** section in the right rail's
+  `SessionDetailsPanel.vue`. Lists agent-delegated tasks for the
+  session (the agent spawns these via its built-in `task` tool — the
+  rail is observational). Each row shows status pill (running / idle
+  / completed / failed / cancelled with theme-aware colors), agent
+  name, elapsed time, description, error if any, and a
+  Cancel/Remove button.
+- 3 new bun RPCs wrapping `session.rpc.tasks.*`: `listTasks`,
+  `cancelTask`, `removeTask`. Filtered to `type === "agent"`; shell
+  tasks (internal bookkeeping) are dropped before the wire.
+- Auto-refresh on `subagent.started` / `.completed` / `.failed` and
+  on the SDK's `session.background_tasks_changed` event, driven via
+  a per-record `tasksRefreshCounter` (counter, not boolean — a
+  boolean flag would miss two events in a row).
+- Sequence-guarded loader: stale slow responses can't overwrite a
+  fresh fast one.
+- The `startAgent` task RPC is intentionally NOT exposed in v1 — the
+  user-facing trigger for task delegation is the chat composer; the
+  agent decides, the rail observes.
+
 ### Added (Phase 19a — Custom agent picker)
 
 - **Custom agent picker** in the right rail's new `Agents` section

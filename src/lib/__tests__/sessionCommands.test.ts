@@ -33,6 +33,7 @@ describe("sessionCommands", () => {
       isThinking: false,
       sawTurnBoundary: false,
       currentAgent: null,
+      tasksRefreshCounter: 0,
     });
 
     const handled = await runLocalSlashCommand("s1", "/cd");
@@ -86,6 +87,7 @@ describe("sessionCommands", () => {
       isThinking: false,
       sawTurnBoundary: false,
       currentAgent: null,
+      tasksRefreshCounter: 0,
     });
 
     const handled = await runLocalSlashCommand("s1", "/cd C:\\other");

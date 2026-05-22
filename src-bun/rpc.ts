@@ -150,6 +150,25 @@ export interface AgentInfo {
 	path?: string;
 }
 
+/// Mirror of `@github/copilot/schemas/api.schema.json#TaskAgentInfo`.
+/// Returned by the @experimental `session.rpc.tasks.list` surface,
+/// filtered to type === "agent" on the bun side (shell tasks are
+/// internal bookkeeping). Status enum is per
+/// #TaskAgentInfoStatus.
+export interface TaskInfo {
+	id: string;
+	description: string;
+	status: "running" | "idle" | "completed" | "failed" | "cancelled";
+	agentType: string;
+	toolCallId?: string;
+	startedAt?: string;
+	completedAt?: string;
+	activeTimeMs?: number;
+	error?: string;
+	agentName?: string;
+	agentDisplayName?: string;
+}
+
 /// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged
 /// that the renderer can construct. Mirrors the SDK union so we can
 /// pass straight through `session.send({ attachments })` without
@@ -532,6 +551,20 @@ export type DafmanRPC = {
 			reloadAgents: {
 				params: { sessionId: string };
 				response: AgentInfo[];
+			};
+			/// Phase 19b.1. Session-scoped @experimental
+			/// `session.rpc.tasks.*` surface.
+			listTasks: {
+				params: { sessionId: string };
+				response: TaskInfo[];
+			};
+			cancelTask: {
+				params: { sessionId: string; id: string };
+				response: boolean;
+			};
+			removeTask: {
+				params: { sessionId: string; id: string };
+				response: boolean;
 			};
 			/// Raw SDK `usage.getMetrics` shape. Opaque to bun — the
 			/// renderer cherry-picks `totalUserRequests` / token-detail

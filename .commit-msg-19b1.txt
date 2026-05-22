@@ -1,0 +1,50 @@
+feat(tasks): rail Tasks section (Phase 19b.1)
+
+Surface the SDK's @experimental session.rpc.tasks.* surface as an
+observational section in the right rail. Lists tasks spawned by
+the main agent via its built-in `task` tool; user actions are
+Cancel (running/idle) and Remove (completed/failed/cancelled).
+
+No "Start a task" button by design — task delegation is initiated
+by the agent during a turn, not by user click. The rail observes.
+
+What works:
+- subagent.started/.completed/.failed and the dedicated
+  session.background_tasks_changed event tick a per-record refresh
+  counter; the rail watches the counter and re-fetches via
+  listTasks. A request token guards against stale slow responses.
+- Cancel and Remove buttons per row; force-refresh after success.
+- Color-coded status pills (running blue / completed green /
+  failed red / cancelled grey).
+- Description, agent name, elapsed time (from activeTimeMs or
+  startedAt→now), error message if any.
+
+Architecture:
+- 3 session-scoped methods on SessionRegistry (listTasks,
+  cancelTask, removeTask). Matches the 19a + 21a pattern; no new
+  class.
+- TaskInfo type in src-bun/rpc.ts mirrors the SDK's TaskAgentInfo
+  schema. listTasks filters to type === "agent" on the bun side
+  (shell tasks are internal SDK bookkeeping).
+- Defensive normalizeTask wraps the status enum in an allowlist
+  and only copies known optional fields.
+- record.tasksRefreshCounter is a number (not boolean) so the
+  watcher fires on every event, not just transitions.
+
+Rubber-duck adoptions (relevant subset of 7 findings):
+- Split 19b into two commits — this is 19b.1, Library CRUD is
+  19b.2. Lets the filesystem-write surface ship separately.
+- subagent.* events + session.background_tasks_changed as
+  combined refresh trigger.
+- Sequence-guarded loader with tasksRequestToken.
+- Filter on type === "agent" + typeof id === "string" for
+  defensive SDK shape handling.
+
+Tests (5 new): listTasks shape filter + status enum fallback,
+cancelTask + removeTask happy/unknown-id, SessionNotFound on
+unknown sessionId for all three.
+
+Gates: lint clean, 444 bun tests (was 439), 68/70 smoke
+(pre-existing 08-audit-rehydrate flake on plain main; unrelated).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

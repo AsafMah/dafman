@@ -56,6 +56,86 @@
 
 ---
 
+## 2026-05-22 — Phase 19b.1: Background tasks rail section
+
+### Takeaway
+
+First half of 19b. Observational rail section that lists tasks
+spawned by the agent via the SDK's built-in `task` tool. No
+"Start a task" button — the agent decides; the rail observes.
+The user-facing actions are Cancel (for running/idle) and
+Remove (for completed/failed/cancelled).
+
+### Architecture
+
+- 3 RPCs on `SessionRegistry`: `listTasks`, `cancelTask`,
+  `removeTask`. Matches the same pattern as the 19a agent
+  methods (session-scoped methods stay on `SessionRegistry`,
+  no new class).
+- Wire filter: `listTasks` drops `type !== "agent"` (shell
+  tasks are internal SDK bookkeeping; the user shouldn't see
+  them).
+- `TaskInfo` type added to `src-bun/rpc.ts` mirroring the SDK's
+  `TaskAgentInfo` shape per the schema. Defensive `normalizeTask`
+  on bun side wraps `status` in an allowlist (falls back to
+  `running` on shape drift) and only copies known optional fields.
+
+### Refresh strategy
+
+The SDK doesn't carry the full `TaskInfo` shape on the lifecycle
+events (`subagent.started/.completed/.failed`), so the rail can't
+update from the event payload alone. Instead:
+
+- `sessionsStore.applySessionEvent` increments
+  `record.tasksRefreshCounter` whenever any of those events arrive
+  (plus the dedicated `session.background_tasks_changed`).
+- The rail watches the counter and calls `listTasks` on every tick.
+- A request token guards against stale responses (slow request
+  followed by fast request — the slow one's response is dropped).
+- After successful cancel/remove, the rail also force-refreshes.
+
+Counter > boolean flag: if two events arrive before the rail can
+debounce-read, the counter still fires twice (or settles to a
+unique value), where a boolean flag would coalesce both ticks
+into one rendering effect that might miss the second.
+
+### Rubber-duck adoptions (relevant subset)
+
+- "Split 19b into two commits (Tasks first, Library second)" —
+  adopted. Tasks is mostly observational and low-risk; Library
+  CRUD touches the filesystem.
+- "Task stale refresh should not rely only on `subagent.*`" —
+  adopted. Wired both `subagent.*` AND `session.background_tasks_changed`.
+- "Sequence guard against stale slow responses" — adopted via
+  `tasksRequestToken`.
+- "TaskAgentInfo type guard" — adopted: filter on `type === "agent"`
+  AND `typeof id === "string"` so a future SDK change can't sneak
+  malformed entries through.
+
+### Tests (5 new)
+
+- `listTasks` filters shell + missing-type + non-string-id entries.
+- Unknown `status` defaults to `running` (shape drift defense).
+- `cancelTask` and `removeTask` each: forwards id, returns boolean,
+  unknown id returns false.
+- All three RPCs reject with `SessionNotFound` on unknown sessionId.
+
+### Receipts
+
+- Commit: this one. **444 bun tests** (was 439), 68/70 smoke
+  (pre-existing flake on 08-audit-rehydrate, unrelated).
+
+### What's next (19b.2)
+
+Library Agents tab with create/delete (NOT edit — defer to v2
+per rubber-duck #2: editing risks losing unknown frontmatter
+keys). New `src-bun/app/agentFiles.ts` module with strict path
+validation + minimal YAML writer. `<userConfigDir>/agents/` and
+`<workspace>/.github/agents/` write targets only; plugin/remote
+agents read-only.
+
+---
+
 ## 2026-05-22 — Phase 19a: Custom agent picker
 
 ### Takeaway

@@ -41,6 +41,7 @@ import type {
 	UserInputRequestData,
 	WorkspaceFileMatch,
 	AgentInfo,
+	TaskInfo,
 } from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
@@ -85,6 +86,38 @@ function normalizeAgent(raw: {
 		description: typeof raw.description === "string" ? raw.description : "",
 	};
 	if (typeof raw.path === "string" && raw.path.length > 0) out.path = raw.path;
+	return out;
+}
+
+/// 19b.1: normalize the SDK's loose TaskAgentInfo wire shape into our
+/// typed `TaskInfo`. Caller has pre-filtered on `type === "agent"`
+/// and `typeof id === "string"`; defensive defaults for everything
+/// else.
+function normalizeTask(raw: Record<string, unknown>): TaskInfo {
+	const status = raw.status;
+	const validStatuses: TaskInfo["status"][] = [
+		"running",
+		"idle",
+		"completed",
+		"failed",
+		"cancelled",
+	];
+	const out: TaskInfo = {
+		id: String(raw.id),
+		description: typeof raw.description === "string" ? raw.description : "",
+		status:
+			typeof status === "string" && validStatuses.includes(status as TaskInfo["status"])
+				? (status as TaskInfo["status"])
+				: "running",
+		agentType: typeof raw.agentType === "string" ? raw.agentType : "agent",
+	};
+	if (typeof raw.toolCallId === "string") out.toolCallId = raw.toolCallId;
+	if (typeof raw.startedAt === "string") out.startedAt = raw.startedAt;
+	if (typeof raw.completedAt === "string") out.completedAt = raw.completedAt;
+	if (typeof raw.activeTimeMs === "number") out.activeTimeMs = raw.activeTimeMs;
+	if (typeof raw.error === "string") out.error = raw.error;
+	if (typeof raw.agentName === "string") out.agentName = raw.agentName;
+	if (typeof raw.agentDisplayName === "string") out.agentDisplayName = raw.agentDisplayName;
 	return out;
 }
 
@@ -1056,6 +1089,61 @@ export class SessionRegistry {
 			return (result.agents ?? [])
 				.filter((a) => typeof a.name === "string")
 				.map(normalizeAgent);
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	// ---------- Tasks (Phase 19b.1) ----------
+	//
+	// Wraps the @experimental `session.rpc.tasks.*` surface. Tasks are
+	// agent-delegated work items started by the main agent via its
+	// built-in `task` tool — this is observational from the rail's
+	// perspective. We don't expose `startTaskAgent` to the renderer
+	// because user-initiated task starts go through the chat composer
+	// (the agent decides), not a rail button. Cancel / remove are
+	// user-facing.
+	//
+	// Wire shape per @github/copilot/schemas/api.schema.json#TaskAgentInfo
+	// + #TaskShellInfo. We filter to type === "agent" because shell
+	// tasks are internal bookkeeping the user shouldn't see.
+
+	async listTasks(sessionId: string): Promise<TaskInfo[]> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.tasks.list()) as {
+				tasks?: Array<Record<string, unknown>>;
+			};
+			return (result.tasks ?? [])
+				.filter((t) => t.type === "agent" && typeof t.id === "string")
+				.map(normalizeTask);
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async cancelTask(sessionId: string, id: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.tasks.cancel({ id })) as {
+				cancelled?: boolean;
+			};
+			return result.cancelled === true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async removeTask(sessionId: string, id: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.tasks.remove({ id })) as {
+				removed?: boolean;
+			};
+			return result.removed === true;
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}

@@ -76,6 +76,11 @@ interface FakeSession {
 				}>;
 			}>;
 		};
+		tasks: {
+			list: () => Promise<{ tasks: Array<Record<string, unknown>> }>;
+			cancel: (params: { id: string }) => Promise<{ cancelled: boolean }>;
+			remove: (params: { id: string }) => Promise<{ removed: boolean }>;
+		};
 	};
 	lastSentPrompt?: string;
 	lastModel?: { model: string; opts?: { reasoningEffort?: string } };
@@ -94,6 +99,10 @@ interface FakeSession {
 	}>;
 	currentAgentName: string | null;
 	agentReloadCount: number;
+	/// 19b.1: stateful tasks fixture.
+	tasksList: Array<Record<string, unknown>>;
+	cancelCalls: string[];
+	removeCalls: string[];
 }
 
 function makeFakeSession(
@@ -188,10 +197,32 @@ function makeFakeSession(
 					return { agents: session.agentsList.slice() };
 				},
 			},
+			tasks: {
+				async list() {
+					return { tasks: session.tasksList.slice() };
+				},
+				async cancel({ id }) {
+					session.cancelCalls.push(id);
+					const t = session.tasksList.find((row) => row.id === id);
+					if (!t) return { cancelled: false };
+					t.status = "cancelled";
+					return { cancelled: true };
+				},
+				async remove({ id }) {
+					session.removeCalls.push(id);
+					const idx = session.tasksList.findIndex((row) => row.id === id);
+					if (idx < 0) return { removed: false };
+					session.tasksList.splice(idx, 1);
+					return { removed: true };
+				},
+			},
 		},
 		agentsList: [],
 		currentAgentName: null,
 		agentReloadCount: 0,
+		tasksList: [],
+		cancelCalls: [],
+		removeCalls: [],
 	};
 	return session;
 }
@@ -872,5 +903,108 @@ describe("SessionRegistry", () => {
 		await expect(reg.selectAgent("ghost", "any")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.deselectAgent("ghost")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.reloadAgents("ghost")).rejects.toBeInstanceOf(AppError);
+	});
+
+	test("19b.1: listTasks filters to type=agent and normalizes the shape", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.tasksList = [
+			{
+				type: "agent",
+				id: "task-1",
+				toolCallId: "tc-1",
+				description: "Explore the codebase",
+				status: "running",
+				agentType: "explore",
+				agentName: "explorer",
+				agentDisplayName: "Code Explorer",
+				startedAt: "2026-05-22T10:00:00Z",
+				activeTimeMs: 1234,
+			},
+			// Shell tasks are filtered out (internal bookkeeping).
+			{ type: "shell", id: "shell-1", status: "running", description: "" },
+			// Type-missing entry also dropped (defensive against SDK drift).
+			{ id: "no-type", status: "running" },
+			// Non-string id dropped.
+			{ type: "agent", id: 42, status: "running" },
+		];
+		const tasks = await reg.listTasks(id);
+		expect(tasks).toHaveLength(1);
+		expect(tasks[0]).toMatchObject({
+			id: "task-1",
+			description: "Explore the codebase",
+			status: "running",
+			agentType: "explore",
+			agentName: "explorer",
+			agentDisplayName: "Code Explorer",
+			startedAt: "2026-05-22T10:00:00Z",
+			activeTimeMs: 1234,
+		});
+	});
+
+	test("19b.1: listTasks defaults unknown status to running", async () => {
+		// SDK shape drift defense: an unexpected status string falls
+		// back to running rather than leaking into the UI.
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.tasksList = [
+			{ type: "agent", id: "task-1", status: "WHO_KNOWS", description: "x" },
+		];
+		const tasks = await reg.listTasks(id);
+		expect(tasks[0]?.status).toBe("running");
+	});
+
+	test("19b.1: cancelTask forwards id and returns boolean", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.tasksList = [
+			{ type: "agent", id: "task-1", status: "running", description: "" },
+		];
+		expect(await reg.cancelTask(id, "task-1")).toBe(true);
+		expect(fake.cancelCalls).toEqual(["task-1"]);
+		// Unknown id: SDK returns false; we propagate.
+		expect(await reg.cancelTask(id, "ghost")).toBe(false);
+	});
+
+	test("19b.1: removeTask forwards id and returns boolean", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.tasksList = [
+			{ type: "agent", id: "task-1", status: "completed", description: "" },
+		];
+		expect(await reg.removeTask(id, "task-1")).toBe(true);
+		expect(fake.removeCalls).toEqual(["task-1"]);
+		// Unknown id: false.
+		expect(await reg.removeTask(id, "ghost")).toBe(false);
+	});
+
+	test("19b.1: task RPCs reject with SessionNotFound on unknown sessionId", async () => {
+		_setClientForTest(
+			new FakeClient() as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		await expect(reg.listTasks("ghost")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.cancelTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.removeTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
 	});
 });

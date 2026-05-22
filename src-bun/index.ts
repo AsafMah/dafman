@@ -250,6 +250,15 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			reloadAgents: rpcGuard(async ({ sessionId }) =>
 				sessions.reloadAgents(sessionId),
 			),
+			listTasks: rpcGuard(async ({ sessionId }) =>
+				sessions.listTasks(sessionId),
+			),
+			cancelTask: rpcGuard(async ({ sessionId, id }) =>
+				sessions.cancelTask(sessionId, id),
+			),
+			removeTask: rpcGuard(async ({ sessionId, id }) =>
+				sessions.removeTask(sessionId, id),
+			),
 			getSessionUsageMetrics: rpcGuard(async ({ sessionId }) =>
 				sessions.getUsageMetrics(sessionId),
 			),

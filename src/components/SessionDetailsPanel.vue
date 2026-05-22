@@ -28,6 +28,7 @@ import type {
   AgentInfo,
   ReasoningVisibility,
   SessionMode,
+  TaskInfo,
 } from "../ipc/types";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useLayoutStore } from "../stores/layoutStore";
@@ -222,6 +223,107 @@ function agentSourceLabel(agent: AgentInfo): "Project" | "User" | null {
   return norm(agent.path).startsWith(projectPrefix) ? "Project" : "User";
 }
 
+// ---------- Tasks (19b.1) ----------
+//
+// Observational view of agent-delegated tasks for the active session.
+// The agent itself calls into the SDK's built-in `task` tool to spawn
+// background work; we just surface what's there. Cancel + Remove are
+// user actions.
+//
+// Refresh triggers:
+//   - rail mount + session switch
+//   - record.tasksRefreshCounter ticks (driven by subagent.* +
+//     session.background_tasks_changed in sessionsStore.applySessionEvent)
+//   - after a successful cancel/remove RPC
+//
+// Sequence guard: increment a request token on each fetch; only the
+// response matching the most-recent token gets to write `sessionTasks`,
+// so a stale slow response can't overwrite a fresh fast one.
+const sessionTasks = ref<TaskInfo[]>([]);
+const tasksLoaded = ref(false);
+const tasksError = ref<string | null>(null);
+const taskBusyId = ref<string | null>(null);
+let tasksRequestToken = 0;
+
+async function loadTasks() {
+  if (!sessionId.value) return;
+  tasksError.value = null;
+  const token = ++tasksRequestToken;
+  try {
+    const tasks = await invokeCommand("listTasks", {
+      sessionId: sessionId.value,
+    });
+    if (token !== tasksRequestToken) return;
+    sessionTasks.value = tasks;
+    tasksLoaded.value = true;
+  } catch (err) {
+    if (token !== tasksRequestToken) return;
+    tasksError.value = err instanceof Error ? err.message : String(err);
+    tasksLoaded.value = true;
+  }
+}
+
+async function cancelTask(task: TaskInfo) {
+  if (!sessionId.value || taskBusyId.value) return;
+  taskBusyId.value = task.id;
+  try {
+    await invokeCommand("cancelTask", {
+      sessionId: sessionId.value,
+      id: task.id,
+    });
+  } catch (err) {
+    toasts.error(
+      "Failed to cancel task",
+      err instanceof Error ? err.message : String(err),
+    );
+  } finally {
+    taskBusyId.value = null;
+    void loadTasks();
+  }
+}
+
+async function removeTask(task: TaskInfo) {
+  if (!sessionId.value || taskBusyId.value) return;
+  taskBusyId.value = task.id;
+  try {
+    await invokeCommand("removeTask", {
+      sessionId: sessionId.value,
+      id: task.id,
+    });
+  } catch (err) {
+    toasts.error(
+      "Failed to remove task",
+      err instanceof Error ? err.message : String(err),
+    );
+  } finally {
+    taskBusyId.value = null;
+    void loadTasks();
+  }
+}
+
+/// Format `activeTimeMs` (or fall back to `startedAt`→now) as a
+/// terse human-readable duration. Tasks rarely live longer than
+/// a few minutes; the precision drops off above an hour.
+function formatTaskElapsed(task: TaskInfo): string {
+  let ms: number | null = null;
+  if (typeof task.activeTimeMs === "number") {
+    ms = task.activeTimeMs;
+  } else if (task.startedAt) {
+    const start = Date.parse(task.startedAt);
+    const end = task.completedAt ? Date.parse(task.completedAt) : Date.now();
+    if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
+  }
+  if (ms === null) return "";
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return `${m}m ${rem}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
 // ---------- Skills ----------
 type SessionSkill = {
   name: string;
@@ -341,6 +443,7 @@ onMounted(() => {
   void loadBuiltinTools();
   void loadQuota();
   void loadAgents();
+  void loadTasks();
   void loadSkills();
   void loadUsage();
   void loadMcpServers();
@@ -353,6 +456,10 @@ watch(
     agentsLoaded.value = false;
     agentsError.value = null;
     agentBusyName.value = null;
+    sessionTasks.value = [];
+    tasksLoaded.value = false;
+    tasksError.value = null;
+    taskBusyId.value = null;
     sessionSkills.value = [];
     skillsLoaded.value = false;
     skillsError.value = null;
@@ -370,10 +477,22 @@ watch(
     // different session tab. The Set persists for the whole
     // component lifetime (i.e. as long as the rail is mounted).
     void loadAgents();
+    void loadTasks();
     void loadSkills();
     void loadUsage();
     void loadMcpServers();
     void loadPlan();
+  },
+);
+
+// 19b.1: refetch the Tasks section whenever the store's per-record
+// counter ticks (driven by subagent.* + session.background_tasks_changed
+// events). Counter pattern avoids the "two events in a row" miss a
+// boolean flag would suffer from.
+watch(
+  () => record.value?.tasksRefreshCounter ?? 0,
+  () => {
+    void loadTasks();
   },
 );
 
@@ -621,6 +740,7 @@ async function loadQuota() {
 // quota expanded. Toggling persists immediately.
 type SectionKey =
   | "agents"
+  | "tasks"
   | "skills"
   | "tools"
   | "mcp"
@@ -630,6 +750,7 @@ type SectionKey =
 
 const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
   agents: true,
+  tasks: false,
   skills: true,
   tools: false,
   mcp: true,
@@ -651,6 +772,7 @@ function readSectionState(key: SectionKey): boolean {
 
 const sectionOpen = ref<Record<SectionKey, boolean>>({
   agents: readSectionState("agents"),
+  tasks: readSectionState("tasks"),
   skills: readSectionState("skills"),
   tools: readSectionState("tools"),
   mcp: readSectionState("mcp"),
@@ -886,6 +1008,81 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         >
           Reload from disk →
         </button>
+      </div>
+    </section>
+
+    <!-- Tasks (19b.1) --------------------------------------------- -->
+    <section class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.tasks"
+        @click="toggleSection('tasks')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.tasks ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Background tasks</span>
+        <span v-if="tasksLoaded && !tasksError" class="section-count">
+          {{ sessionTasks.length }}
+        </span>
+      </button>
+      <div v-if="sectionOpen.tasks" class="section-body">
+        <div v-if="!tasksLoaded" class="empty-hint">Loading…</div>
+        <div v-else-if="tasksError" class="empty-hint error">{{ tasksError }}</div>
+        <div v-else-if="sessionTasks.length === 0" class="empty-hint">
+          No background tasks. The agent will spawn one here when it
+          delegates work via the <code>task</code> tool.
+        </div>
+        <ul v-else class="task-list compact-list">
+          <li
+            v-for="task in sessionTasks"
+            :key="task.id"
+            class="compact-row task-row"
+            :class="`task-status-${task.status}`"
+          >
+            <div class="task-line">
+              <span class="task-status-pill" :title="task.status">
+                {{ task.status }}
+              </span>
+              <span class="task-name" :title="task.description || task.id">
+                {{ task.agentDisplayName || task.agentName || task.agentType }}
+              </span>
+              <span v-if="formatTaskElapsed(task)" class="task-elapsed">
+                {{ formatTaskElapsed(task) }}
+              </span>
+            </div>
+            <div v-if="task.description" class="task-desc">
+              {{ task.description }}
+            </div>
+            <div v-if="task.error" class="task-error">{{ task.error }}</div>
+            <div class="task-actions">
+              <Button
+                v-if="task.status === 'running' || task.status === 'idle'"
+                size="small"
+                severity="secondary"
+                :loading="taskBusyId === task.id"
+                :disabled="!!taskBusyId"
+                label="Cancel"
+                :aria-label="`Cancel task ${task.id}`"
+                @click="cancelTask(task)"
+              />
+              <Button
+                v-else
+                size="small"
+                severity="secondary"
+                text
+                :loading="taskBusyId === task.id"
+                :disabled="!!taskBusyId"
+                label="Remove"
+                :aria-label="`Remove task ${task.id}`"
+                @click="removeTask(task)"
+              />
+            </div>
+          </li>
+        </ul>
       </div>
     </section>
 
@@ -1469,6 +1666,104 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
   padding: 0.05rem 0.35rem;
   background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
   border-radius: 0.25rem;
+}
+
+/* Tasks list (19b.1). Vertical layout per row — status pill + agent
+ * name + elapsed on a header line; description on a second line;
+ * Cancel/Remove right-aligned. Status colors derived from the
+ * `task-status-${status}` class on the row. */
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.task-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.task-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.task-status-pill {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--p-text-color) 10%, transparent);
+  color: var(--p-text-color);
+  flex-shrink: 0;
+}
+
+.task-status-running .task-status-pill,
+.task-status-idle .task-status-pill {
+  background: color-mix(in srgb, var(--p-primary-color) 18%, transparent);
+  color: var(--p-primary-color);
+}
+
+.task-status-completed .task-status-pill {
+  background: color-mix(in srgb, var(--p-green-500, #22c55e) 18%, transparent);
+  color: var(--p-green-500, #22c55e);
+}
+
+.task-status-failed .task-status-pill {
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 18%, transparent);
+  color: var(--p-red-500, #ef4444);
+}
+
+.task-status-cancelled .task-status-pill {
+  background: color-mix(in srgb, var(--p-text-muted-color) 18%, transparent);
+  color: var(--p-text-muted-color);
+}
+
+.task-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-elapsed {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  flex-shrink: 0;
+}
+
+.task-desc {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.task-error {
+  font-size: 0.7rem;
+  color: var(--p-red-500, #ef4444);
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 10%, transparent);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.2rem;
+  word-break: break-word;
+}
+
+.task-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
 .skill-row {

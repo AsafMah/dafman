@@ -820,6 +820,7 @@ function ensurePlaygroundSession(): SessionRecord {
     isThinking: false,
     sawTurnBoundary: false,
     currentAgent: null,
+    tasksRefreshCounter: 0,
   });
   sessionsStore.sessions.push(fresh);
   return fresh;

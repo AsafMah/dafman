@@ -108,6 +108,15 @@ export type SessionRecord = {
   /// importing the reducer (or running it). Hydrated from the
   /// `getCurrentAgent` RPC on session resume + create.
   currentAgent: AgentInfo | null;
+  /// 19b.1: monotonic counter the right rail's Tasks section watches
+  /// to trigger a refetch. Bumped whenever a `subagent.started`,
+  /// `subagent.completed`, `subagent.failed`, or
+  /// `session.background_tasks_changed` event arrives — the rail
+  /// reactively calls `listTasks` to pick up the new shape. Counter
+  /// (vs boolean flag) because watchers fire on value change; we'd
+  /// otherwise miss two events in a row if the rail hadn't read the
+  /// previous state yet.
+  tasksRefreshCounter: number;
 };
 
 /// Per-record mirror of a single pending request. Matches the
@@ -314,6 +323,20 @@ export const useSessionsStore = defineStore("sessions", () => {
       }
     } else if (payload.eventType === "subagent.deselected") {
       record.currentAgent = null;
+    }
+
+    // 19b.1: refetch the Tasks rail section on subagent.* + the
+    // dedicated `session.background_tasks_changed` event the SDK
+    // also emits. The wire payload for the started/completed events
+    // doesn't carry the full TaskInfo shape, so we just bump the
+    // counter and let the rail re-read via `listTasks`.
+    if (
+      payload.eventType === "subagent.started" ||
+      payload.eventType === "subagent.completed" ||
+      payload.eventType === "subagent.failed" ||
+      payload.eventType === "session.background_tasks_changed"
+    ) {
+      record.tasksRefreshCounter += 1;
     }
 // Both `session.start` (fresh create) and `session.resume` carry
     // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
@@ -541,6 +564,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         isThinking: false,
         sawTurnBoundary: false,
         currentAgent: null,
+        tasksRefreshCounter: 0,
       });
       sessions.value.push(record);
       drainPending(id, record);
@@ -630,6 +654,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         isThinking: false,
         sawTurnBoundary: false,
         currentAgent: null,
+        tasksRefreshCounter: 0,
       });
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and
