@@ -88,6 +88,23 @@ onMounted(async () => {
   });
   applyThemeClass(isDarkMode.value);
 
+  // Splash watchdog. Whatever happens below — uncaught rejection,
+  // dockview throw, infinite await on a hung RPC — the splash MUST
+  // dismiss within 20 s so the user can actually use the app. A
+  // half-restored UI with a toast is always better than a permanent
+  // "Restoring sessions…" lock-out (the regression that prompted
+  // this guard — see DEVLOG 2026-05-22).
+  const splashWatchdog = window.setTimeout(() => {
+    if (bootStore.isBooting && bootStore.phase !== "failed") {
+      console.error("[boot] watchdog: splash still up after 20s, forcing ready");
+      toastStore.warn(
+        "Startup took too long",
+        "The app loaded but something didn't finish. Try Reload Layout from the command palette if anything looks wrong.",
+      );
+      bootStore.markReady();
+    }
+  }, 20_000);
+
   // Settings + client load in parallel — they don't depend on each
   // other. Previously these were sequential, costing ~50-200 ms of
   // settings file I/O against the ~1-3 s CLI startup. We track each
@@ -180,6 +197,7 @@ onMounted(async () => {
 
   // Boot complete — splash fades out.
   bootStore.markReady();
+  window.clearTimeout(splashWatchdog);
 
   // Click-on-OS-notification handler. The `notificationsStore`
   // dispatches `dafman:focus-session` from a Notification's onclick;
