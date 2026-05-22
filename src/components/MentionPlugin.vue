@@ -150,9 +150,10 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
 
 <style scoped>
 .mention-menu-anchor {
+  /* Lexical positions anchorElementRef at the caret's BOTTOM. To put
+   * the menu above the caret line we translate up by its own height
+   * plus a small gap. Matches the original MentionPlugin's idiom. */
   position: absolute;
-  bottom: 100%;
-  left: 0;
-  margin-bottom: 0.5rem;
+  transform: translateY(calc(-100% - 2rem));
 }
 </style>

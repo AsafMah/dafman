@@ -288,7 +288,11 @@ async function browse(): Promise<void> {
   gap: 0.4rem;
   padding: 0.35rem 0.6rem;
   border-bottom: 1px solid var(--p-surface-border);
-  background: var(--p-surface-50, transparent);
+  /* Mild differentiation from the body — must use a dark-mode-aware
+   * token. `--p-surface-50` is light-only in our PrimeVue preset; we
+   * use a translucent layer of `--p-content-hover-background` so the
+   * toolbar reads as a subtle band in both themes. */
+  background: color-mix(in srgb, var(--p-content-hover-background) 35%, transparent);
 }
 
 .file-picker-toggle {
