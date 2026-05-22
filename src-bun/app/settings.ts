@@ -10,7 +10,8 @@
 // `Utils.paths.userData` and hands it to `SettingsService.loadOrDefault`.
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { mkdir } from "node:fs/promises";
 import type {
 	Appearance,
@@ -26,6 +27,28 @@ import { AppError } from "./errors";
 import { log } from "./logging";
 
 export const SETTINGS_VERSION = 9;
+
+/// One-time backfill: returns `<homedir>/dafman` (created on demand),
+/// or `""` on failure. Used by `src-bun/index.ts` to populate the
+/// default workspace when the user has never set one. Restored after
+/// 20b's knip-driven sweep wrongly removed it (knip's reachability
+/// graph didn't trace through electrobun's bun build entry, so it
+/// reported this as unused; the consumer in index.ts was the only
+/// caller).
+export async function ensureDefaultWorkspace(): Promise<string> {
+	try {
+		const home = homedir();
+		if (!home) return "";
+		const target = join(home, "dafman");
+		await mkdir(target, { recursive: true });
+		return target;
+	} catch (err) {
+		log.warn("ensureDefaultWorkspace failed", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return "";
+	}
+}
 /// Hard upper bound on the size of the workspace MRU. Anything beyond
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes

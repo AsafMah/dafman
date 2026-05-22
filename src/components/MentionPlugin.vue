@@ -158,8 +158,17 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
 .mention-menu-anchor {
   /* Lexical positions anchorElementRef at the caret's BOTTOM. To put
    * the menu above the caret line we translate up by its own height
-   * plus a small gap. Matches the original MentionPlugin's idiom. */
+   * plus a small gap. Matches the original MentionPlugin's idiom.
+   *
+   * `transform: translateY(...)` creates a NEW stacking context here,
+   * so any z-index set on `.file-picker` (the child) is confined to
+   * this local context. Without `z-index` set HERE, this element
+   * competes against dockview's edge groups (z-index: 999) at "auto",
+   * losing the z-fight when the picker overlaps the left sidebar.
+   * Setting z-index on the stacking-context root fixes it once: the
+   * picker's own z-index inside this element doesn't matter then. */
   position: absolute;
+  z-index: 1200;
   transform: translateY(calc(-100% - 2rem));
 }
 </style>

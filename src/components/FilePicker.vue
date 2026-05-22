@@ -337,11 +337,11 @@ async function browse(kind: "file" | "directory"): Promise<void> {
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
   overflow: hidden;
-  /* Lexical's typeahead container is appended to document.body with
-   * no z-index, which can let positioned ancestors of the editor
-   * (composer frame's focus border, dockview tab strip, etc.) paint
-   * over the popup. Force a stacking context above the standard
-   * PrimeVue overlay layer (1100). */
+  /* Local z-index for the paperclip-button mode (rendered as a
+   * PrimeVue Popover at z-index 1100). When the mention plugin
+   * teleports this into Lexical's typeahead containerDiv, the
+   * outer `.mention-menu-anchor` owns the stacking-context z-index
+   * — see MentionPlugin.vue. */
   position: relative;
   z-index: 1200;
 }
