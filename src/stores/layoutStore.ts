@@ -381,22 +381,37 @@ export const useLayoutStore = defineStore("layout", () => {
     // compatible with `removePanel(panel: DockviewGroupPanel)` at
     // runtime; the cast matches the same pattern used elsewhere in
     // this store for moveTo / removePanel calls.
+    //
+    // Each removePanel is wrapped in try/catch because this is also
+    // called as a fallback when fromJSON failed and the dock is in a
+    // partial / unknown state — one panel's removal throwing must
+    // not strand the user with a half-cleared layout.
     const panels = dock.panels.slice();
     for (const panel of panels) {
-      dock.removePanel(panel as unknown as Parameters<typeof dock.removePanel>[0]);
+      try {
+        dock.removePanel(panel as unknown as Parameters<typeof dock.removePanel>[0]);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[layoutStore.resetToDefault] removePanel threw", err);
+      }
     }
-    // Re-open the Sessions sidebar at default size. Hardcoded id /
-    // size to match App.vue's `SESSIONS_PANEL_ID` + `initialSize`.
-    // (Kept inline rather than imported from App.vue to keep the
-    // store free of UI imports.)
-    openEdgePanel("left", {
-      id: "sessions-manager",
-      component: "sessionsManager",
-      tabComponent: "sidebarTab",
-      title: "Sessions",
-      initialSize: 240,
-      minimumSize: 160,
-    });
+    // Re-open the Sessions sidebar at default size. Wrapped because
+    // a broken dock may also throw on openEdgePanel; we'd rather log
+    // and let the user create a session from the (empty) topbar than
+    // crash the boot.
+    try {
+      openEdgePanel("left", {
+        id: "sessions-manager",
+        component: "sessionsManager",
+        tabComponent: "sidebarTab",
+        title: "Sessions",
+        initialSize: 240,
+        minimumSize: 160,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[layoutStore.resetToDefault] openEdgePanel threw", err);
+    }
   }
 
   function removePanel(sessionId: string): void {
@@ -574,10 +589,26 @@ export const useLayoutStore = defineStore("layout", () => {
   /// Restores a previously-snapshotted layout. Caller is responsible
   /// for ensuring any session-backed panels referenced by the layout
   /// have been resumed first (so the slot can find their record).
-  function restore(layout: unknown): void {
+  ///
+  /// Wrapped in try/catch because a malformed persisted JSON
+  /// (legacy panel ids, dangling group refs, schema drift across
+  /// dockview versions) makes `fromJSON` throw — and an unhandled
+  /// throw here propagates up through `App.vue`'s async `onMounted`,
+  /// preventing `bootStore.markReady()` from ever firing and leaving
+  /// the splash stuck on "Applying layout…" / "Restoring sessions…".
+  /// Returns true on success, false on a swallowed failure (caller
+  /// can fall back to opening the Sessions sidebar at default size).
+  function restore(layout: unknown): boolean {
     const dock = api.value;
-    if (!dock || !layout || typeof layout !== "object") return;
-    dock.fromJSON(layout as Parameters<DockviewApi["fromJSON"]>[0]);
+    if (!dock || !layout || typeof layout !== "object") return false;
+    try {
+      dock.fromJSON(layout as Parameters<DockviewApi["fromJSON"]>[0]);
+      return true;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[layoutStore.restore] dockview.fromJSON threw — clearing layout", err);
+      return false;
+    }
   }
 
   return {

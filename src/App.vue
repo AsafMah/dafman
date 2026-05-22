@@ -19,6 +19,12 @@ import { useConfirm } from "primevue/useconfirm";
 import ConfirmDialog from "primevue/confirmdialog";
 import { resolveIsDark } from "./lib/theme";
 import { registerBuiltinCommands } from "./lib/registerBuiltinCommands";
+import {
+  extractChatPanelIds,
+  persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
+  stripLegacyDetailsPanels,
+  stripPanelFromLayout,
+} from "./lib/layoutSanitize";
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -140,7 +146,23 @@ onMounted(async () => {
   // parallel (`Promise.all`); we report per-session completion to
   // the boot store so the splash can show "Restoring 3 of 5…"
   // without us threading progress through every layer.
-  await restoreFromLayout();
+  //
+  // Wrapped in try/catch so a malformed persisted layout / SDK
+  // rejection / dockview throw doesn't strand the splash on
+  // "Restoring sessions…" / "Applying layout…" forever. We log,
+  // toast, and continue to `markReady` — better to surface a
+  // half-restored app the user can fix than to lock them out.
+  try {
+    await restoreFromLayout();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // eslint-disable-next-line no-console
+    console.error("[App] restoreFromLayout threw — continuing to ready", err);
+    toastStore.error(
+      "Layout restore failed",
+      `${message}. The app will load empty — your sessions are still in the catalog.`,
+    );
+  }
 
   // Open the Sessions Manager by default. We do this only when the
   // persisted dockview JSON didn't contain it — i.e. first launch, or
@@ -208,7 +230,8 @@ async function restoreFromLayout() {
   const sessionIds = extractChatPanelIds(sanitized);
   if (sessionIds.length === 0) {
     if (layoutStore.api) {
-      layoutStore.restore(sanitized);
+      const ok = layoutStore.restore(sanitized);
+      if (!ok) layoutStore.resetToDefault();
     } else {
       pendingRestoreLayout.value = sanitized;
     }
@@ -243,92 +266,20 @@ async function restoreFromLayout() {
   // dead panels (and the orphan UI gives them a one-click recovery
   // path). See `ChatPanel.vue`.
   if (layoutStore.api) {
-    layoutStore.restore(sanitized);
+    const ok = layoutStore.restore(sanitized);
+    if (!ok) {
+      // fromJSON threw — toast and fall back to a default layout
+      // so the user has something to work with instead of a blank
+      // window.
+      useToastStore().warn(
+        "Layout restore failed",
+        "The persisted dockview JSON was rejected. Resetting to default.",
+      );
+      layoutStore.resetToDefault();
+    }
   } else {
     pendingRestoreLayout.value = sanitized;
   }
-}
-
-/// Strips every panel whose id matches the legacy per-session
-/// `session-details-${sessionId}` pattern from a dockview layout
-/// blob. Phase 18b shipped per-session rails; the singleton refactor
-/// uses a fixed id `session-details`. Any persisted layout from
-/// before this commit carries N legacy panels that need to be
-/// dropped before fromJSON to avoid orphan tabs in the right rail.
-function stripLegacyDetailsPanels(layout: unknown): unknown {
-  if (!layout || typeof layout !== "object") return layout;
-  const panels = (layout as { panels?: unknown }).panels;
-  if (!panels || typeof panels !== "object") return layout;
-  const legacyIds: string[] = [];
-  for (const id of Object.keys(panels as Record<string, unknown>)) {
-    if (id === "session-details") continue;
-    if (id.startsWith("session-details-")) legacyIds.push(id);
-  }
-  let next: unknown = layout;
-  for (const id of legacyIds) {
-    next = stripPanelFromLayout(next, id);
-  }
-  return next;
-}
-
-/// Returns a shallow copy of a dockview layout JSON with the given
-/// panel id removed from `panels`, and pruned from any group's
-/// `data.views` so dockview doesn't error on a dangling reference.
-/// Other fields are left untouched. Pure: never mutates the input.
-function stripPanelFromLayout(layout: unknown, panelId: string): unknown {
-  if (!layout || typeof layout !== "object") return layout;
-  const obj = layout as Record<string, unknown>;
-  const panels = obj.panels;
-  if (!panels || typeof panels !== "object") return layout;
-  if (!Object.prototype.hasOwnProperty.call(panels, panelId)) return layout;
-  const nextPanels: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(panels as Record<string, unknown>)) {
-    if (k !== panelId) nextPanels[k] = v;
-  }
-  // Walk the grid + edge groups and remove the id from each group's
-  // views list. Dockview stores groups under `grid.root.data` (tree)
-  // and `floatingGroups` / edge groups under top-level arrays — but
-  // a JSON-walk over all "views: string[]" arrays is the robust path
-  // that doesn't depend on which exact slot the panel was in.
-  const stripViews = (node: unknown): unknown => {
-    if (!node || typeof node !== "object") return node;
-    if (Array.isArray(node)) return node.map(stripViews);
-    const next: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-      if (k === "views" && Array.isArray(v)) {
-        next[k] = (v as unknown[]).filter((x) => x !== panelId);
-      } else {
-        next[k] = stripViews(v);
-      }
-    }
-    return next;
-  };
-  const stripped = stripViews({ ...obj, panels: nextPanels });
-  return stripped;
-}
-
-/// Extract panel ids from a dockview `toJSON()` blob whose
-/// `contentComponent` is `"chat"`. The layout shape is roughly
-/// `{ panels: Record<panelId, { contentComponent, params, ... }>, ... }`.
-/// We deliberately exclude sidebar / activity-bar panels (sessions-
-/// manager, settings-panel) — those don't correspond to CLI sessions
-/// and asking the SDK to resume them just produces error toasts.
-function extractChatPanelIds(layout: unknown): string[] {
-  if (!layout || typeof layout !== "object") return [];
-  const panels = (layout as { panels?: unknown }).panels;
-  if (!panels || typeof panels !== "object") return [];
-  const out: string[] = [];
-  for (const [id, entry] of Object.entries(
-    panels as Record<string, unknown>,
-  )) {
-    if (!entry || typeof entry !== "object") continue;
-    const component = (entry as { contentComponent?: unknown })
-      .contentComponent;
-    if (typeof component !== "string") continue;
-    if (component !== "chat") continue;
-    out.push(id);
-  }
-  return out;
 }
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
@@ -396,7 +347,8 @@ function onDockReady(event: DockviewReadyEvent) {
   // now that the api is alive. Done before subscribing to layout
   // changes so the restore itself doesn't trigger a write.
   if (pendingRestoreLayout.value) {
-    layoutStore.restore(pendingRestoreLayout.value);
+    const ok = layoutStore.restore(pendingRestoreLayout.value);
+    if (!ok) layoutStore.resetToDefault();
     pendingRestoreLayout.value = null;
   }
   // One-shot rescue: older builds (or a stale persisted layout) could
@@ -498,11 +450,7 @@ const activityBarRef = ref<InstanceType<typeof ActivityBar> | null>(null);
 /// given panel id. Used by the "open by default" path to avoid
 /// re-opening a panel the user explicitly closed last time.
 function persistedLayoutHasPanel(id: string): boolean {
-  const layout = settingsStore.settings.layout?.dockview;
-  if (!layout || typeof layout !== "object") return false;
-  const panels = (layout as { panels?: unknown }).panels;
-  if (!panels || typeof panels !== "object") return false;
-  return Object.prototype.hasOwnProperty.call(panels, id);
+  return persistedLayoutHasPanelImpl(settingsStore.settings.layout?.dockview, id);
 }
 
 /// Opens the Sessions panel as the default sidebar on first launch.
