@@ -194,7 +194,7 @@ TODO reflects current state against the M0–M7 ambitions in
 | Perf benches | TODO | None. |
 | Telemetry (OTel) opt-in | TODO | Settings field reserved; not wired. |
 | End-user docs site | TODO | None. |
-| Tier-2 E2E (Playwright CDP → Electrobun binary) | TODO | Smoke test runs against `vite preview`/`vite dev` only. Tier-2 build matrix now runs but doesn't drive the binary. |
+| Tier-2 E2E (Playwright CDP → Electrobun binary) | TODO | Smoke runs against `vite preview`/`vite dev` only. Tier-2 build matrix runs but doesn't drive the binary. **Real-E2E proposal lives in [`plans/plan-e2e.prompt.md`](plans/plan-e2e.prompt.md)** — three options (mocked-SDK harness / + real-CLI / status quo) with a concrete breakdown of what each automated test class catches. Awaiting user approval. |
 | Cross-platform CI matrix | DONE | electrobun build runs on Ubuntu + macOS + Windows (continue-on-error initially). |
 
 ---

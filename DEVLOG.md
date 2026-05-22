@@ -10,6 +10,48 @@
 
 ---
 
+## 2026-05-22 — E2E plan + AGENTS.md rule #4a (dogfood before task_complete)
+
+### Takeaway
+
+User asked: "why don't we have actual for real end-to-end tests?"
+after MANUAL_TESTS.md filled with items tagged "can't be automated".
+
+Honest answer: most of those are dodges, not hard walls. Filed a
+concrete proposal at **`plans/plan-e2e.prompt.md`** with three
+options:
+
+- **A: Minimal harness** (~1 d) — Playwright + chromium + real bun
+  subprocess + mocked SDK + real temp-fs. Would have caught all 3
+  v1 file-picker bugs.
+- **B: A + real-CLI tier** (+1 d) — opt-in real Copilot CLI for
+  reasoning / quota / permission shape regressions.
+- **C: Status quo** — keep losing trust per regression cycle.
+
+Recommended A; implementation blocked on user approval (autonomous
+mode shouldn't burn a day+ of unilateral infrastructure work).
+
+The doc has an honest reassessment table: of ~12 "can't be
+automated" classes in MANUAL_TESTS.md, only **2 are real walls**
+(native OS file dialog + OS keyring). The other 10 are testable.
+
+### Process rule added
+
+AGENTS.md rule **#4a — Dogfood-before-`task_complete`** for any
+change touching composer / Lexical / IPC / dockview / z-index. Was
+implicit before; making it explicit because the three v1 file-picker
+bugs would all have surfaced from a single `bun run dev` session.
+"Lint + test + smoke green" is not a substitute for actually running
+the app.
+
+### Files
+
+- `plans/plan-e2e.prompt.md` (new)
+- `AGENTS.md` — rule #4a inserted under rule #4
+- `STATUS.md` — Tier-2 E2E backlog row points at the new plan
+
+---
+
 ## 2026-05-22 — File picker v2: the real fixes (cwd, trigger, toggles, border)
 
 ### Takeaway

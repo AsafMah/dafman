@@ -232,6 +232,35 @@ Every substantive session ends with:
 - Don't claim a UI change works without running it (`bun run dev`,
   `bun run smoke`, or a unit-test render with `@testing-library/vue`).
 
+#### 4a. Dogfood-before-`task_complete` (UI / IPC changes)
+
+Until the real-E2E tier lands (see
+[`plans/plan-e2e.prompt.md`](../plans/plan-e2e.prompt.md)), unit tests
++ smoke are **not sufficient** for changes that touch:
+
+- the composer / Lexical plugins
+- any `searchWorkspaceFiles` / `pickAttachment` / `sendMessage` /
+  `pendingRequest` IPC path
+- dockview layout / panel mount
+- z-index / stacking-context decisions
+
+Required additional gate before `task_complete`:
+
+1. `bun run dev` once (or `dev:hmr`) — actually exercise the changed
+   flow manually. (This single step catches the bug class that
+   shipped in commit 7c728e3 — `cwdFor()` returned undefined for
+   every session and "No matches" was the result, undetected by
+   347 unit tests + smoke + lint.)
+2. If touching Lexical / trigger / DOM-selection logic, also pop
+   chromium DevTools to check stacking + visual.
+3. If a manual step *can't* be turned into an automated test in the
+   current suite, add it to `MANUAL_TESTS.md` per rule #10 AND note
+   in DEVLOG which automated test would have caught it under the
+   planned E2E tier.
+
+The "I ran lint + tests + smoke and they were green" output is
+**not** a substitute for actually running the app. Don't dodge.
+
 ### 5. Test-first for behavior changes
 
 - Before fixing a bug: write a failing test (or describe in

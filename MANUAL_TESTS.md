@@ -80,15 +80,17 @@ visible.
    - **Why not automated:** each path requires the CLI to emit that
      specific PermissionRequest variant, which means a real CLI
      subprocess + tool-call.
-Shell: This exact command shows empty.
+Shell: This "exact command" field shows empty.
+Read/Write: Only asks if to allow all files to read or write.
 
 
-2. ⏳ **Rule survives the rest of the session.**
+2. ❌ **Rule survives the rest of the session.**
    - **Steps:** approve once with a rule like `git *`; later in same
      session, run `git status`.
    - **Expected:** no permission prompt the second time.
    - **Why not automated:** depends on SDK's session-approval state
      machine; we can't exercise it without spawning the CLI.
+command with same prefix required re-approval.
 
 3. ⏳ **Rule does NOT survive across session restart.**
    - **Steps:** approve a rule, restart the app, resume the session.
@@ -100,7 +102,7 @@ Shell: This exact command shows empty.
 
 ### `a0a3886` feat(session-popover): skills toggle + usage metrics
 
-1. ⏳ **Skill toggle persists across send.**
+1. ✅ **Skill toggle persists across send.**
    - **Steps:** open gear popover, flip a skill off, close popover,
      send a prompt that would have used it.
    - **Expected:** skill stays off after popover closes; the next
