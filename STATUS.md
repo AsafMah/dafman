@@ -345,6 +345,20 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 18b post-fix: details rail refactored to a
+  **singleton** bound to `layoutStore.activeSessionId` (was per-session,
+  caused N rails stacked at boot + rail not updating on session switch).
+  `recomputeActiveSession` now preserves the last bound chat when a
+  non-chat panel becomes active (rail/settings/playground), so the
+  rail no longer blanks when its own tab gets focus. Sections are
+  collapsible with localStorage persistence (Tools collapsed by
+  default, others expanded). Long tool/skill descriptions truncate
+  to one line with a "Show more" expander. Toggle switches stay
+  inside the panel (flex-shrink + min-width fix). Legacy
+  `session-details-${id}` panels in persisted layouts are stripped
+  on restore. New E2E F20 covers singleton invariant + collapse
+  persistence; new unit suite covers the activeSessionId fallback
+  (`layoutStore.activeSessionId.test.ts`). 58/58 E2E, 372 bun tests.
 - **2026-05-22** — Phase 18b shipped: Tools / Plan / Account quota
   sections added to the right-rail. Built-in tool checklist edits
   `settings.tools.defaultExcluded` (SDK has no runtime mutation, so

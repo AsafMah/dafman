@@ -3,6 +3,35 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (right-rail polish, follow-up to Phase 18b)
+
+- **Right-rail is now a singleton** instead of one panel per session.
+  Previously each session got its own rail (`session-details-${id}`),
+  so users with N open sessions saw N rail tabs stacked in the right
+  edge group — and switching chat tabs did NOT switch which rail
+  was visible. The new rail uses a fixed id and binds reactively
+  to `layoutStore.activeSessionId`.
+- **`activeSessionId` no longer blanks when a non-chat panel becomes
+  active** (the rail itself, Settings, dev playground). Previously
+  the moment the rail's tab took focus, the rail's content vanished
+  because it depended on its own group's active panel being a chat.
+  `recomputeActiveSession` now preserves the last bound chat unless
+  no chat exists in any body group.
+- **Sections are collapsible with persistence**. Tools is collapsed
+  by default (the description list is long); skills / MCP / plan /
+  usage / quota expanded. State persists in `localStorage` under
+  `dafman.details.section.<key>`.
+- **Long tool / skill descriptions truncate to one line** with a
+  "Show more" link. Multi-line / >120-char descriptions get the
+  expander; short ones render full-width.
+- **Toggle switches no longer overflow** the panel on narrow widths.
+  Added `flex-shrink: 0` on the `ToggleSwitch` inside each row +
+  `min-width: 0` on the row itself so the text column truncates
+  instead of pushing the switch off-screen.
+- **Legacy per-session rail panels are stripped on layout restore**,
+  preventing orphan tabs in the right edge group after upgrading
+  from the previous 18b build.
+
 ### Added
 
 - **Tool toggle UI in the right-rail details panel (Phase 18b).** Lists

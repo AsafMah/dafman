@@ -27,6 +27,9 @@ test("tools section lists built-in tools and toggling surfaces a restart toast",
   const detailsPanel = page.locator(".session-details").first();
   await expect(detailsPanel).toBeVisible({ timeout: 5_000 });
 
+  // Tools section is collapsed by default — expand it first.
+  await detailsPanel.getByRole("button", { name: /^Tools/i }).first().click();
+
   // The fakeClient's tools.list returns bash + str_replace_editor + grep.
   await expect(detailsPanel.locator(".tool-row").first()).toBeVisible({ timeout: 5_000 });
   await expect(detailsPanel.locator("text=bash")).toBeVisible();

@@ -10,6 +10,69 @@
 
 ---
 
+## 2026-05-22 — Phase 18b post-fix: rail singleton + collapsibles + truncated descriptions
+
+### Takeaway
+
+User-reported regressions on the 18b right-rail: stuck-at-restoring
+boot, off-screen toggle switches, rail not updating when switching
+chat tabs, way too much text, no way to collapse. Root cause was an
+architectural mistake — I shipped the rail as a per-session panel
+(one `session-details-${id}` per chat), which produced N stacked
+rails for N sessions AND coupled the rail's visible session to
+dockview's active edge tab rather than the active chat tab. Fix: the
+rail is now a single singleton bound to `layoutStore.activeSessionId`
+plus a smarter `recomputeActiveSession` that preserves the last bound
+chat when a non-chat panel takes focus.
+
+Also: collapsible sections w/ localStorage persistence, one-line
+truncated descriptions w/ "Show more" expander, CSS that keeps
+ToggleSwitches inside the panel, and a layout migration that strips
+the legacy per-session rail panels from persisted dockview JSON so
+upgrading from previous 18b doesn't leave orphan tabs.
+
+### Process note
+
+This entry exists because I shipped 18b without running `bun run dev`
+even once — the CI gates (`bun run check` = lint + test + smoke) only
+covered things I thought to assert in Playwright. The user's `dafman-
+*.log` showed a `ReferenceError: stripLegacyDetailsPanels is not
+defined` mid-implementation that no automated gate could have caught,
+plus the singleton-vs-per-session was a design flaw that no smoke
+test would have surfaced. Reinforcing my own rule 3 (`bun run dev`
+on every UI-touching commit, not optional).
+
+### Files
+
+- `src/stores/layoutStore.ts` — singleton rail, smarter
+  `recomputeActiveSession`, `detailsOpen` ref instead of
+  `openDetails: Set<string>`, exported `SESSION_DETAILS_PANEL_ID`.
+- `src/components/SessionDetailsPanel.vue` — reads from
+  `layoutStore.activeSessionId` (was `dockviewProps.params.sessionId`),
+  collapsible sections w/ localStorage + `shortDescription` +
+  per-item expand state.
+- `src/components/SessionHeaderControls.vue` — cog calls
+  `toggleSessionDetailsPanel()` / `isSessionDetailsOpen()` without
+  the per-session id.
+- `src/App.vue` — `stripLegacyDetailsPanels()` migration before
+  fromJSON.
+- `src/stores/__tests__/layoutStore.activeSessionId.test.ts` — new
+  5-test suite covering the activeSessionId fallback for
+  chat-active, rail-active, settings-active, two-body-groups,
+  switch-from-chat-to-rail-preserves scenarios.
+- `e2e/full/flows/20-details-singleton.pwtest.ts` — F20: singleton
+  invariant + collapse persistence + truncation visibility.
+- `e2e/full/flows/15-tools-toggle.pwtest.ts` — updated to expand
+  Tools first (collapsed by default now).
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ 372 pass
+- `bun run smoke` ✅ **58/58 in ~100 s** (prod + HMR)
+
+---
+
 ## 2026-05-22 — Phase 18b: tools / plan / quota in the right-rail
 
 ### Takeaway

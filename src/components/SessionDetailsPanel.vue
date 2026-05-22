@@ -34,25 +34,14 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 
-/// Dockview passes params either as `{ params }` (initial mount) or
-/// wrapped after `panel.update()` calls. Normalize both shapes —
-/// same defensive read pattern as `ChatPanel.vue`.
-const dockviewProps = defineProps<{
-  params?: {
-    sessionId?: string;
-    params?: { sessionId?: string };
-  };
-}>();
-
-const sessionId = computed<string>(() => {
-  const direct = dockviewProps.params?.sessionId;
-  const nested = dockviewProps.params?.params?.sessionId;
-  return direct ?? nested ?? "";
-});
-
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
+
+// Singleton rail: bind to whichever chat panel is active. The
+// component is mounted ONCE; the watch on `sessionId` below tears
+// down + re-loads per-session data when the user switches tabs.
+const sessionId = computed<string>(() => layoutStore.activeSessionId ?? "");
 
 const record = computed(() =>
   sessionsStore.sessions.find((s) => s.id === sessionId.value),
@@ -316,6 +305,7 @@ const toolsLoaded = ref(false);
 const toolsError = ref<string | null>(null);
 const settingsStore = useSettingsStore();
 async function loadTools() {
+  if (!sessionId.value) return;
   toolsError.value = null;
   try {
     const [tools, servers] = await Promise.all([
@@ -364,6 +354,7 @@ const planDraft = ref<string>("");
 const planError = ref<string | null>(null);
 const planLoaded = ref(false);
 async function loadPlan() {
+  if (!sessionId.value) return;
   planError.value = null;
   try {
     const result = await invokeCommand("readSessionPlan", {
@@ -442,6 +433,96 @@ async function loadQuota() {
   } catch (err) {
     quotaError.value = err instanceof Error ? err.message : String(err);
   }
+}
+
+// ---------- Collapsible sections (persisted via localStorage) ----------
+//
+// Each section's open/closed state lives in localStorage under a stable
+// key. Defaults: tools collapsed (long); skills + mcp + plan + usage +
+// quota expanded. Toggling persists immediately.
+type SectionKey =
+  | "skills"
+  | "tools"
+  | "mcp"
+  | "plan"
+  | "usage"
+  | "quota";
+
+const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
+  skills: true,
+  tools: false,
+  mcp: true,
+  plan: true,
+  usage: true,
+  quota: true,
+};
+
+function readSectionState(key: SectionKey): boolean {
+  if (typeof localStorage === "undefined") return SECTION_DEFAULTS[key];
+  try {
+    const raw = localStorage.getItem(`dafman.details.section.${key}`);
+    if (raw === null) return SECTION_DEFAULTS[key];
+    return raw === "1";
+  } catch {
+    return SECTION_DEFAULTS[key];
+  }
+}
+
+const sectionOpen = ref<Record<SectionKey, boolean>>({
+  skills: readSectionState("skills"),
+  tools: readSectionState("tools"),
+  mcp: readSectionState("mcp"),
+  plan: readSectionState("plan"),
+  usage: readSectionState("usage"),
+  quota: readSectionState("quota"),
+});
+
+function toggleSection(key: SectionKey): void {
+  const next = !sectionOpen.value[key];
+  sectionOpen.value = { ...sectionOpen.value, [key]: next };
+  try {
+    localStorage.setItem(`dafman.details.section.${key}`, next ? "1" : "0");
+  } catch {
+    /* private mode / quota — ignore, in-memory state still works */
+  }
+}
+
+// ---------- Per-item "show more" for long descriptions ----------
+//
+// Both tools and skills carry verbose descriptions. We truncate to
+// one line by default and let the user expand individual rows.
+// Expansion state is keyed by `${kind}:${name}` and lives in-memory
+// (per-panel-mount), not persisted — descriptions don't change often
+// enough to be worth a localStorage hop.
+
+const expandedItems = ref<Set<string>>(new Set());
+
+function isItemExpanded(kind: "tool" | "skill", name: string): boolean {
+  return expandedItems.value.has(`${kind}:${name}`);
+}
+
+function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
+  const key = `${kind}:${name}`;
+  const next = new Set(expandedItems.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedItems.value = next;
+}
+
+/// Returns the description with at most one short line. Anything past
+/// a newline or 120 chars gets elided with "…". The full text is
+/// revealed when the row is expanded.
+function shortDescription(description: string): string {
+  if (!description) return "";
+  const firstLine = description.split(/\r?\n/, 1)[0] ?? "";
+  if (firstLine.length <= 120) return firstLine;
+  return `${firstLine.slice(0, 119)}…`;
+}
+
+function needsExpansion(description: string): boolean {
+  if (!description) return false;
+  if (description.includes("\n")) return true;
+  return description.length > 120;
 }
 </script>
 
@@ -551,180 +632,305 @@ async function loadQuota() {
     </section>
 
     <!-- Skills ---------------------------------------------------- -->
-    <section class="row row-stack">
-      <span class="row-label">Skills</span>
-      <div v-if="!skillsLoaded" class="empty-hint">Loading…</div>
-      <div v-else-if="skillsError" class="empty-hint error">{{ skillsError }}</div>
-      <div v-else-if="sessionSkills.length === 0" class="empty-hint">
-        No skills configured for this session.
-      </div>
-      <ul v-else class="skill-list">
-        <li v-for="skill in sessionSkills" :key="skill.name" class="skill-row">
-          <div class="skill-text">
-            <div class="skill-name">
-              <span>{{ skill.name }}</span>
-              <small v-if="skill.userInvocable" class="skill-tag">/</small>
-            </div>
-            <div v-if="skill.description" class="skill-desc">
-              {{ skill.description }}
-            </div>
-          </div>
-          <ToggleSwitch
-            :model-value="skill.enabled"
-            @update:model-value="() => toggleSkill(skill)"
-          />
-        </li>
-      </ul>
-    </section>
-
-    <!-- Tools (18b) ----------------------------------------------- -->
-    <section class="row row-stack">
-      <span class="row-label">Tools</span>
-      <div v-if="!toolsLoaded" class="empty-hint">Loading…</div>
-      <div v-else-if="toolsError" class="empty-hint error">{{ toolsError }}</div>
-      <template v-else>
-        <div class="row-hint">
-          Excluded tools take effect on next session create. Restart this
-          session to apply changes here.
+    <section class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.skills"
+        @click="toggleSection('skills')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.skills ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Skills</span>
+        <span v-if="skillsLoaded && !skillsError" class="section-count">
+          {{ sessionSkills.length }}
+        </span>
+      </button>
+      <div v-if="sectionOpen.skills" class="section-body">
+        <div v-if="!skillsLoaded" class="empty-hint">Loading…</div>
+        <div v-else-if="skillsError" class="empty-hint error">{{ skillsError }}</div>
+        <div v-else-if="sessionSkills.length === 0" class="empty-hint">
+          No skills configured for this session.
         </div>
-        <ul class="tool-list">
-          <li
-            v-for="t in builtinTools"
-            :key="`builtin-${t.name}`"
-            class="tool-row"
-          >
-            <div class="tool-text">
-              <div class="tool-name">{{ t.name }}</div>
-              <div v-if="t.description" class="tool-desc">
-                {{ t.description }}
+        <ul v-else class="skill-list">
+          <li v-for="skill in sessionSkills" :key="skill.name" class="skill-row">
+            <div class="skill-text">
+              <div class="skill-name">
+                <span>{{ skill.name }}</span>
+                <small v-if="skill.userInvocable" class="skill-tag">/</small>
               </div>
+              <template v-if="skill.description">
+                <div
+                  v-if="isItemExpanded('skill', skill.name)"
+                  class="skill-desc skill-desc-full"
+                >
+                  {{ skill.description }}
+                </div>
+                <div v-else class="skill-desc">
+                  {{ shortDescription(skill.description) }}
+                </div>
+                <button
+                  v-if="needsExpansion(skill.description)"
+                  type="button"
+                  class="link-button"
+                  @click="toggleItemExpansion('skill', skill.name)"
+                >
+                  {{ isItemExpanded('skill', skill.name) ? "Show less" : "Show more" }}
+                </button>
+              </template>
             </div>
             <ToggleSwitch
-              :model-value="!isExcluded(t.name)"
-              :aria-label="`Enable tool ${t.name}`"
-              @update:model-value="(v) => setToolExcluded(t.name, !v)"
+              :model-value="skill.enabled"
+              @update:model-value="() => toggleSkill(skill)"
             />
           </li>
         </ul>
-        <div v-if="mcpServers.length > 0" class="mcp-group">
-          <div class="row-label mcp-heading">MCP servers</div>
+      </div>
+    </section>
+
+    <!-- Tools (18b) ----------------------------------------------- -->
+    <section class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.tools"
+        @click="toggleSection('tools')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.tools ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Tools</span>
+        <span v-if="toolsLoaded && !toolsError" class="section-count">
+          {{ builtinTools.length }}
+        </span>
+      </button>
+      <div v-if="sectionOpen.tools" class="section-body">
+        <div v-if="!toolsLoaded" class="empty-hint">Loading…</div>
+        <div v-else-if="toolsError" class="empty-hint error">{{ toolsError }}</div>
+        <template v-else>
+          <div class="row-hint">
+            Excluded tools take effect on next session create. Restart this
+            session to apply changes here.
+          </div>
           <ul class="tool-list">
             <li
-              v-for="s in mcpServers"
-              :key="`mcp-${s.name}`"
+              v-for="t in builtinTools"
+              :key="`builtin-${t.name}`"
               class="tool-row"
             >
               <div class="tool-text">
-                <div class="tool-name">
-                  {{ s.name }}
-                  <small class="tool-tag">{{ s.status }}</small>
-                </div>
-                <div v-if="s.error" class="tool-desc error">{{ s.error }}</div>
+                <div class="tool-name">{{ t.name }}</div>
+                <template v-if="t.description">
+                  <div
+                    v-if="isItemExpanded('tool', t.name)"
+                    class="tool-desc tool-desc-full"
+                  >
+                    {{ t.description }}
+                  </div>
+                  <div v-else class="tool-desc">
+                    {{ shortDescription(t.description) }}
+                  </div>
+                  <button
+                    v-if="needsExpansion(t.description)"
+                    type="button"
+                    class="link-button"
+                    @click="toggleItemExpansion('tool', t.name)"
+                  >
+                    {{ isItemExpanded('tool', t.name) ? "Show less" : "Show more" }}
+                  </button>
+                </template>
               </div>
+              <ToggleSwitch
+                :model-value="!isExcluded(t.name)"
+                :aria-label="`Enable tool ${t.name}`"
+                @update:model-value="(v) => setToolExcluded(t.name, !v)"
+              />
             </li>
           </ul>
-        </div>
-      </template>
+        </template>
+      </div>
+    </section>
+
+    <!-- MCP servers (18b) ----------------------------------------- -->
+    <section v-if="toolsLoaded && mcpServers.length > 0" class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.mcp"
+        @click="toggleSection('mcp')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.mcp ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">MCP servers</span>
+        <span class="section-count">{{ mcpServers.length }}</span>
+      </button>
+      <div v-if="sectionOpen.mcp" class="section-body">
+        <ul class="tool-list">
+          <li
+            v-for="s in mcpServers"
+            :key="`mcp-${s.name}`"
+            class="tool-row"
+          >
+            <div class="tool-text">
+              <div class="tool-name">
+                {{ s.name }}
+                <small class="tool-tag">{{ s.status }}</small>
+              </div>
+              <div v-if="s.error" class="tool-desc error">{{ s.error }}</div>
+            </div>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <!-- Plan (18b) ------------------------------------------------ -->
-    <section class="row row-stack">
-      <span class="row-label">Plan</span>
-      <div v-if="!planLoaded" class="empty-hint">Loading…</div>
-      <div v-else-if="planError" class="empty-hint error">{{ planError }}</div>
-      <template v-else>
-        <template v-if="planEditing">
-          <textarea
-            v-model="planDraft"
-            rows="8"
-            class="plan-editor"
-            aria-label="Plan content (markdown)"
-          ></textarea>
-          <div class="plan-actions">
-            <Button label="Save" size="small" @click="savePlan" />
+    <section class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.plan"
+        @click="toggleSection('plan')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.plan ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Plan</span>
+      </button>
+      <div v-if="sectionOpen.plan" class="section-body">
+        <div v-if="!planLoaded" class="empty-hint">Loading…</div>
+        <div v-else-if="planError" class="empty-hint error">{{ planError }}</div>
+        <template v-else>
+          <template v-if="planEditing">
+            <textarea
+              v-model="planDraft"
+              rows="8"
+              class="plan-editor"
+              aria-label="Plan content (markdown)"
+            ></textarea>
+            <div class="plan-actions">
+              <Button label="Save" size="small" @click="savePlan" />
+              <Button
+                label="Cancel"
+                size="small"
+                severity="secondary"
+                text
+                @click="cancelEditPlan"
+              />
+            </div>
+          </template>
+          <template v-else>
+            <div v-if="planExists && planContent" class="plan-preview">
+              {{ planContent }}
+            </div>
+            <div v-else class="empty-hint">No plan yet.</div>
             <Button
-              label="Cancel"
+              :label="planExists ? 'Edit plan' : 'Create plan'"
+              icon="pi pi-pencil"
               size="small"
               severity="secondary"
-              text
-              @click="cancelEditPlan"
+              @click="startEditPlan"
             />
-          </div>
+          </template>
         </template>
-        <template v-else>
-          <div v-if="planExists && planContent" class="plan-preview">
-            {{ planContent }}
-          </div>
-          <div v-else class="empty-hint">No plan yet.</div>
-          <Button
-            :label="planExists ? 'Edit plan' : 'Create plan'"
-            icon="pi pi-pencil"
-            size="small"
-            severity="secondary"
-            @click="startEditPlan"
-          />
-        </template>
-      </template>
+      </div>
     </section>
 
     <!-- Usage ----------------------------------------------------- -->
-    <section v-if="usage || usageError" class="row row-stack">
-      <span class="row-label">Usage</span>
-      <div v-if="usageError" class="empty-hint error">{{ usageError }}</div>
-      <dl v-else-if="usage" class="usage">
-        <div class="usage-row">
-          <dt>Requests</dt>
-          <dd>{{ usage.totalUserRequests }}</dd>
-        </div>
-        <div class="usage-row">
-          <dt>Premium cost</dt>
-          <dd>{{ usage.totalPremiumRequestCost.toFixed(2) }}</dd>
-        </div>
-        <div class="usage-row">
-          <dt>API time</dt>
-          <dd>{{ formatDurationMs(usage.totalApiDurationMs) }}</dd>
-        </div>
-        <div class="usage-row">
-          <dt>Last in / out tokens</dt>
-          <dd>
-            {{ usage.lastCallInputTokens.toLocaleString() }} /
-            {{ usage.lastCallOutputTokens.toLocaleString() }}
-          </dd>
-        </div>
-      </dl>
+    <section v-if="usage || usageError" class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.usage"
+        @click="toggleSection('usage')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.usage ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Usage</span>
+      </button>
+      <div v-if="sectionOpen.usage" class="section-body">
+        <div v-if="usageError" class="empty-hint error">{{ usageError }}</div>
+        <dl v-else-if="usage" class="usage">
+          <div class="usage-row">
+            <dt>Requests</dt>
+            <dd>{{ usage.totalUserRequests }}</dd>
+          </div>
+          <div class="usage-row">
+            <dt>Premium cost</dt>
+            <dd>{{ usage.totalPremiumRequestCost.toFixed(2) }}</dd>
+          </div>
+          <div class="usage-row">
+            <dt>API time</dt>
+            <dd>{{ formatDurationMs(usage.totalApiDurationMs) }}</dd>
+          </div>
+          <div class="usage-row">
+            <dt>Last in / out tokens</dt>
+            <dd>
+              {{ usage.lastCallInputTokens.toLocaleString() }} /
+              {{ usage.lastCallOutputTokens.toLocaleString() }}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </section>
 
     <!-- Quota (18b) ---------------------------------------------- -->
-    <section v-if="quota.length > 0 || quotaError" class="row row-stack">
-      <span class="row-label">Account quota</span>
-      <div v-if="quotaError" class="empty-hint error">{{ quotaError }}</div>
-      <ul v-else class="quota-list">
-        <li v-for="q in quota" :key="q.type" class="quota-row">
-          <div class="quota-name">
-            {{ q.type }}
-            <small v-if="q.isUnlimitedEntitlement" class="quota-tag">
-              unlimited
-            </small>
-          </div>
-          <template v-if="!q.isUnlimitedEntitlement">
-            <div class="quota-bar" :class="{
-              warn: 100 - q.remainingPercentage >= 75,
-              danger: 100 - q.remainingPercentage >= 90,
-            }">
-              <div
-                class="quota-fill"
-                :style="{ width: `${100 - q.remainingPercentage}%` }"
-              />
+    <section v-if="quota.length > 0 || quotaError" class="row row-stack section">
+      <button
+        type="button"
+        class="section-toggle"
+        :aria-expanded="sectionOpen.quota"
+        @click="toggleSection('quota')"
+      >
+        <i
+          class="pi section-chevron"
+          :class="sectionOpen.quota ? 'pi-chevron-down' : 'pi-chevron-right'"
+          aria-hidden="true"
+        />
+        <span class="row-label">Account quota</span>
+      </button>
+      <div v-if="sectionOpen.quota" class="section-body">
+        <div v-if="quotaError" class="empty-hint error">{{ quotaError }}</div>
+        <ul v-else class="quota-list">
+          <li v-for="q in quota" :key="q.type" class="quota-row">
+            <div class="quota-name">
+              {{ q.type }}
+              <small v-if="q.isUnlimitedEntitlement" class="quota-tag">
+                unlimited
+              </small>
             </div>
-            <div class="quota-meta">
-              {{ q.usedRequests }} / {{ q.entitlementRequests }}
-              <span v-if="q.resetDate" class="quota-reset">
-                · resets {{ new Date(q.resetDate).toLocaleDateString() }}
-              </span>
-            </div>
-          </template>
-        </li>
-      </ul>
+            <template v-if="!q.isUnlimitedEntitlement">
+              <div class="quota-bar" :class="{
+                warn: 100 - q.remainingPercentage >= 75,
+                danger: 100 - q.remainingPercentage >= 90,
+              }">
+                <div
+                  class="quota-fill"
+                  :style="{ width: `${100 - q.remainingPercentage}%` }"
+                />
+              </div>
+              <div class="quota-meta">
+                {{ q.usedRequests }} / {{ q.entitlementRequests }}
+                <span v-if="q.resetDate" class="quota-reset">
+                  · resets {{ new Date(q.resetDate).toLocaleDateString() }}
+                </span>
+              </div>
+            </template>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <!-- Actions --------------------------------------------------- -->
@@ -758,6 +964,9 @@ async function loadQuota() {
         @click="onResetApprovals"
       />
     </section>
+  </div>
+  <div v-else-if="!sessionId" class="session-details session-details-empty">
+    <p class="empty-hint">No active session.</p>
   </div>
   <div v-else class="session-details session-details-empty">
     <p class="empty-hint">Session not found.</p>
@@ -906,12 +1115,17 @@ async function loadQuota() {
 
 .skill-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.6rem;
   padding: 0.45rem 0.5rem;
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-sm);
   background: color-mix(in srgb, var(--p-content-hover-background) 35%, transparent);
+  min-width: 0;
+}
+
+.skill-row :deep(.p-toggleswitch) {
+  flex-shrink: 0;
 }
 
 .skill-text {
@@ -939,6 +1153,75 @@ async function loadQuota() {
 .skill-desc {
   font-size: 0.7rem;
   color: var(--p-text-muted-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-desc-full {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: visible;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  color: var(--p-primary-color);
+  cursor: pointer;
+  text-align: left;
+  align-self: flex-start;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Collapsible sections ---------- */
+.section {
+  gap: 0.3rem;
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  color: var(--p-text-color);
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.section-toggle:hover {
+  color: var(--p-primary-color);
+}
+
+.section-chevron {
+  font-size: 0.65rem;
+  color: var(--p-text-muted-color);
+  flex-shrink: 0;
+}
+
+.section-count {
+  font-size: 0.65rem;
+  color: var(--p-text-muted-color);
+  background: var(--p-content-hover-background);
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--p-border-radius-sm);
+  margin-left: auto;
+}
+
+.section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 /* ---------- Tools (18b) ---------- */
@@ -953,11 +1236,16 @@ async function loadQuota() {
 
 .tool-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.6rem;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-sm);
+  min-width: 0;
+}
+
+.tool-row :deep(.p-toggleswitch) {
+  flex-shrink: 0;
 }
 
 .tool-text {
@@ -977,6 +1265,15 @@ async function loadQuota() {
   font-size: 0.7rem;
   color: var(--p-text-muted-color);
   margin-top: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-desc-full {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: visible;
 }
 
 .tool-desc.error {

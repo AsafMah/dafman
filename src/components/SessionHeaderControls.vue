@@ -176,9 +176,9 @@ const reasoningChoice = computed<ReasoningVisibility>({
 /// Cog button toggles the per-session details rail (right-edge
 /// dockview panel). Replaces the gear popover that previously hung
 /// off this header.
-const detailsOpen = computed(() => layoutStore.isSessionDetailsOpen(props.sessionId));
+const detailsOpen = computed(() => layoutStore.isSessionDetailsOpen());
 function toggleDetails() {
-  layoutStore.toggleSessionDetailsPanel(props.sessionId);
+  layoutStore.toggleSessionDetailsPanel();
 }
 
 /// Workspace label shown in the tab strip — basename only, so it

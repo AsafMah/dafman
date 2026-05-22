@@ -200,7 +200,11 @@ const pendingRestoreLayout = ref<unknown | null>(null);
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;
   if (!layout || typeof layout !== "object") return;
-  const sanitized = stripPanelFromLayout(layout, SETTINGS_PANEL_ID);
+  // Strip the legacy `session-details-${sessionId}` panels first —
+  // Phase 18b shipped per-session rail panels; the singleton refactor
+  // makes those orphan ids that fromJSON would dutifully restore.
+  const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
+  const sanitized = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
   const sessionIds = extractChatPanelIds(sanitized);
   if (sessionIds.length === 0) {
     if (layoutStore.api) {
@@ -243,6 +247,28 @@ async function restoreFromLayout() {
   } else {
     pendingRestoreLayout.value = sanitized;
   }
+}
+
+/// Strips every panel whose id matches the legacy per-session
+/// `session-details-${sessionId}` pattern from a dockview layout
+/// blob. Phase 18b shipped per-session rails; the singleton refactor
+/// uses a fixed id `session-details`. Any persisted layout from
+/// before this commit carries N legacy panels that need to be
+/// dropped before fromJSON to avoid orphan tabs in the right rail.
+function stripLegacyDetailsPanels(layout: unknown): unknown {
+  if (!layout || typeof layout !== "object") return layout;
+  const panels = (layout as { panels?: unknown }).panels;
+  if (!panels || typeof panels !== "object") return layout;
+  const legacyIds: string[] = [];
+  for (const id of Object.keys(panels as Record<string, unknown>)) {
+    if (id === "session-details") continue;
+    if (id.startsWith("session-details-")) legacyIds.push(id);
+  }
+  let next: unknown = layout;
+  for (const id of legacyIds) {
+    next = stripPanelFromLayout(next, id);
+  }
+  return next;
 }
 
 /// Returns a shallow copy of a dockview layout JSON with the given

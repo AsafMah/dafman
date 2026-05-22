@@ -17,6 +17,11 @@ import type {
   EdgeGroupPosition,
 } from "dockview-core";
 
+/// Singleton id for the right-edge session details rail. One rail at
+/// a time, bound to `activeSessionId` so switching chat tabs swaps the
+/// rail's content rather than spawning a new panel per session.
+export const SESSION_DETAILS_PANEL_ID = "session-details";
+
 /// Short panel title from a session id. The CLI emits `session.title_changed`
 /// when the model summarizes the conversation; until then the tab shows
 /// the first 8 chars of the session id so each pane is identifiable.
@@ -84,31 +89,67 @@ export const useLayoutStore = defineStore("layout", () => {
   /// sync; consumers (command palette `when()` predicates, future
   /// status-bar bindings, …) just read the ref.
   const activeSessionId = ref<string | null>(null);
-  /// Reactive set of session ids whose details-rail panel is open.
-  /// Kept in sync via `onDidAddPanel` / `onDidRemovePanel` so consumers
-  /// (e.g. the cog button's pressed state in `SessionHeaderControls`)
-  /// can `computed(() => openDetails.value.has(sessionId))` and get
-  /// auto-updates instead of having to poll `dock.getPanel(...)`.
-  const openDetails = ref<Set<string>>(new Set());
+  /// Reactive flag for the singleton session-details right-rail
+  /// panel. Kept in sync via `onDidAddPanel` / `onDidRemovePanel`.
+  /// Unlike the old per-session set, only one rail exists at a time
+  /// — it reads its current session from `activeSessionId` and
+  /// re-binds when the user switches chat tabs.
+  const detailsOpen = ref<boolean>(false);
   let activeUnsubs: Array<() => void> = [];
 
   function recomputeActiveSession(dock: DockviewApi): void {
     const panel = dock.activeGroup?.activePanel;
     if (panel && panel.api.component === "chat") {
       activeSessionId.value = panel.api.id;
-    } else {
-      activeSessionId.value = null;
+      return;
     }
+    // The active panel may be a non-chat surface (the rail itself,
+    // Settings, Dev playground). Don't clobber `activeSessionId`
+    // unless the previously-bound session is gone — otherwise the
+    // rail (which keys off this ref) blanks out the moment its own
+    // tab steals focus. Walk the body groups for the currently-
+    // active chat panel; only null out when none exists.
+    const current = activeSessionId.value;
+    if (current && dock.getPanel(current)) return;
+    const panelComponent = (p: unknown): string | null => {
+      const api = (p as { api?: { component?: unknown } }).api;
+      if (typeof api?.component === "string") return api.component;
+      const flat = (p as { component?: unknown }).component;
+      return typeof flat === "string" ? flat : null;
+    };
+    const panelId = (p: unknown): string | null => {
+      const api = (p as { api?: { id?: unknown } }).api;
+      if (typeof api?.id === "string") return api.id;
+      const flat = (p as { id?: unknown }).id;
+      return typeof flat === "string" ? flat : null;
+    };
+    for (const group of dock.groups) {
+      if (group.model.location.type !== "grid") continue;
+      const activeChat = group.activePanel;
+      if (activeChat && panelComponent(activeChat) === "chat") {
+        const id = panelId(activeChat);
+        if (id) {
+          activeSessionId.value = id;
+          return;
+        }
+      }
+      for (const p of group.panels) {
+        if (panelComponent(p) === "chat") {
+          const id = panelId(p);
+          if (id) {
+            activeSessionId.value = id;
+            return;
+          }
+        }
+      }
+    }
+    activeSessionId.value = null;
   }
 
   function rescanOpenDetails(dock: DockviewApi): void {
-    const next = new Set<string>();
+    let found = false;
     for (const group of dock.groups) {
       for (const panel of group.panels) {
-        // Dockview's IDockviewPanel exposes id via `panel.api.id` at
-        // runtime, but our addPanel test fake uses plain `{ id }`
-        // objects in groups[].panels — guard with optional chaining
-        // so the rescan works in both environments.
         const rawApi = (panel as { api?: { id?: unknown } }).api;
         const id =
           typeof rawApi?.id === "string"
@@ -116,24 +157,14 @@ export const useLayoutStore = defineStore("layout", () => {
             : typeof (panel as { id?: unknown }).id === "string"
               ? ((panel as { id: string }).id)
               : null;
-        if (!id) continue;
-        if (id.startsWith("session-details-")) {
-          next.add(id.slice("session-details-".length));
+        if (id === SESSION_DETAILS_PANEL_ID) {
+          found = true;
+          break;
         }
       }
+      if (found) break;
     }
-    // Only mutate when content actually changed; otherwise Vue's
-    // reactivity would fire for every dockview tick.
-    if (next.size !== openDetails.value.size) {
-      openDetails.value = next;
-      return;
-    }
-    for (const sid of next) {
-      if (!openDetails.value.has(sid)) {
-        openDetails.value = next;
-        return;
-      }
-    }
+    if (detailsOpen.value !== found) detailsOpen.value = found;
   }
 
   function setApi(next: DockviewApi | null): void {
@@ -142,7 +173,7 @@ export const useLayoutStore = defineStore("layout", () => {
     api.value = next;
     if (!next) {
       activeSessionId.value = null;
-      openDetails.value = new Set();
+      detailsOpen.value = false;
       return;
     }
     recomputeActiveSession(next);
@@ -206,59 +237,53 @@ export const useLayoutStore = defineStore("layout", () => {
       params: { sessionId },
       position: { referenceGroup, direction },
     });
-    // Auto-open the per-session details right-rail panel alongside
-    // each chat. Skips if the panel is already in the persisted
-    // layout (dockview restore would re-create it then) or if the
-    // user explicitly closed it for this session. The panel reads
-    // `params.sessionId` to bind itself.
-    openSessionDetailsPanel(sessionId);
+    // Auto-open the session-details right-rail singleton alongside
+    // the first chat panel (subsequent panels reuse the same rail
+    // — it re-binds to whichever chat tab is active). Skips if the
+    // rail is already in the persisted layout (dockview restore
+    // re-creates it then) or if the user explicitly closed it.
+    if (!detailsOpen.value) {
+      openSessionDetailsPanel();
+    }
   }
 
-  // ---------- Session details right-rail ----------
+  // ---------- Session details right-rail (singleton) ----------
   //
-  // Per-session panel mounted in a right-edge dockview group, hosting
-  // model picker, run mode, reasoning view, workspace chip, skills,
-  // usage, export/compact/reset actions, and the Fork button.
-  // Replaces the old gear-popover that lived inside SessionHeaderControls.
+  // Single rail panel mounted in a right-edge dockview group. Its
+  // content reads from `activeSessionId` so switching chat tabs
+  // re-renders the rail for the new session rather than spawning
+  // a per-session panel.
 
-  function sessionDetailsId(sessionId: string): string {
-    return `session-details-${sessionId}`;
-  }
-
-  /// Opens (or focuses) the details rail for `sessionId`. Idempotent —
+  /// Opens (or focuses) the singleton details rail. Idempotent —
   /// reopening when the panel already exists just brings it forward.
-  function openSessionDetailsPanel(sessionId: string): void {
+  function openSessionDetailsPanel(): void {
     openEdgePanel("right", {
-      id: sessionDetailsId(sessionId),
+      id: SESSION_DETAILS_PANEL_ID,
       component: "sessionDetails",
       tabComponent: "sidebarTab",
       title: "Session",
-      params: { sessionId },
       initialSize: 280,
       minimumSize: 200,
     });
   }
 
-  /// Toggles the details rail for `sessionId`. If it's currently
-  /// open, closes (removes) the panel. If closed, opens it.
-  function toggleSessionDetailsPanel(sessionId: string): void {
+  /// Toggles the details rail. If open, closes; if closed, opens.
+  function toggleSessionDetailsPanel(): void {
     const dock = api.value;
     if (!dock) return;
-    const id = sessionDetailsId(sessionId);
-    const panel = dock.getPanel(id);
+    const panel = dock.getPanel(SESSION_DETAILS_PANEL_ID);
     if (panel) {
       dock.removePanel(panel);
     } else {
-      openSessionDetailsPanel(sessionId);
+      openSessionDetailsPanel();
     }
   }
 
-  /// Returns true if the session-details rail panel for `sessionId`
-  /// is currently open. Reactive — backed by the `openDetails` set
-  /// that's maintained via dockview add/remove panel events. Callers
-  /// can wrap in `computed(...)` to get auto-updates.
-  function isSessionDetailsOpen(sessionId: string): boolean {
-    return openDetails.value.has(sessionId);
+  /// Returns true if the rail singleton is currently open. Reactive
+  /// — backed by `detailsOpen` ref maintained via dockview add/remove
+  /// events. Consumers can read directly without computed-wrapping.
+  function isSessionDetailsOpen(): boolean {
+    return detailsOpen.value;
   }
 
   /// Returns the id of the active group when it lives inside the grid
@@ -379,11 +404,9 @@ export const useLayoutStore = defineStore("layout", () => {
     if (!dock) return;
     const panel = dock.getPanel(sessionId);
     if (panel) dock.removePanel(panel);
-    // Also close the session-details rail for this session if it's
-    // open. Keeps the right-edge group from collecting orphan panels
-    // bound to deleted sessions.
-    const details = dock.getPanel(sessionDetailsId(sessionId));
-    if (details) dock.removePanel(details);
+    // The session-details rail is a singleton bound to the active
+    // session — closing one chat panel doesn't close the rail. It
+    // re-binds to whatever chat becomes active next.
   }
 
   /// Brings a panel forward in its group + activates it. Used by
@@ -560,6 +583,7 @@ export const useLayoutStore = defineStore("layout", () => {
   return {
     api,
     activeSessionId,
+    detailsOpen,
     setApi,
     addPanel,
     removePanel,
