@@ -50,20 +50,28 @@ export function installRendererLogBridge(): void {
   // Mirror console.error so anything throwing inside Lexical/PrimeVue/etc.
   // shows up server-side. Keep the original behaviour so devtools users
   // still see the message in the WebView2 console.
-  const originalError = console.error.bind(console);
-  console.error = (...args: unknown[]) => {
-    try {
-      const message = args
-        .map((a) =>
-          a instanceof Error ? `${a.message}\n${a.stack ?? ""}` : typeof a === "string" ? a : safeStringify(a),
-        )
-        .join(" ");
-      send("error", message);
-    } catch {
-      /* swallow — we never want logging to break the page */
-    }
-    originalError(...args);
+  const wrap = (
+    level: RendererLogLevel,
+    method: "log" | "info" | "warn" | "error",
+  ) => {
+    const original = (console[method] as (...a: unknown[]) => void).bind(console);
+    (console[method] as unknown as (...a: unknown[]) => void) = (...args: unknown[]) => {
+      try {
+        const message = args
+          .map((a) =>
+            a instanceof Error ? `${a.message}\n${a.stack ?? ""}` : typeof a === "string" ? a : safeStringify(a),
+          )
+          .join(" ");
+        send(level, message);
+      } catch {
+        /* swallow — we never want logging to break the page */
+      }
+      original(...args);
+    };
   };
+  wrap("error", "error");
+  wrap("warn", "warn");
+  wrap("info", "info");
 }
 
 function safeStringify(value: unknown): string {
