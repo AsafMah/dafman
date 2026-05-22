@@ -29,8 +29,8 @@
 // → Zip in their OS. We'll add programmatic ZIP in a follow-up if
 // the manual step proves annoying.
 
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { getLogDir, log, recentLogs } from "./logging";
 import { AppError } from "./errors";
 
@@ -178,13 +178,3 @@ function timestamp(): string {
 		`-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`
 	);
 }
-
-/// Convenience: derive a friendly display name from the export result.
-export function exportDisplayName(result: DiagnosticsExportResult): string {
-	return basename(result.path);
-}
-
-// Re-exported so the in-process logging module can read settings
-// without taking a hard dependency. (`readFile` is re-exported to keep
-// this module a single import point for the bundle pipeline.)
-export { readFile as readBundleFile };

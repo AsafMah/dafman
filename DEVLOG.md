@@ -10,6 +10,75 @@
 
 ---
 
+## 2026-05-22 — Phase 20b: dead code + dep sweep
+
+### Takeaway
+
+Ran `bunx knip --reporter compact` and manually verified every
+finding (knip has false positives on .vue files and side-effect
+imports). Removed real dead code only — anything ambiguous left
+in place.
+
+### What got deleted
+
+- **1 orphan file**: `src/stores/permissionsStore.ts` — placeholder
+  Pinia store that was never wired up; real permission flow lives
+  in `sessionsStore` via the `dafman.pending_request` channel.
+- **7 dead-export functions**: `getAuditDir`, `exportDisplayName`,
+  `readBundleFile`, `ensureDefaultWorkspace`, `MarkdownSync`,
+  `CodeHighlightPlugin`, `hashString + accentForSession`. Each
+  had zero callers across `src/`, `src-bun/`, `e2e/`, `tools/`.
+- **3 redundant re-exports**: `sep` from directoryBrowser,
+  `IGNORED_EVENTS` from chatEvents (still exported by its own
+  submodule for the tests that consume it), no caller chained
+  through these intermediates.
+- **3 unnecessary `export` keywords** (`SESSION_DETAILS_PANEL_ID`,
+  `APP_ERROR_PREFIX`, `WORKSPACES_MRU_LIMIT` bun side) — values
+  used internally only.
+- **1 duplicated helper**: `basename` in sessionsListStore.ts now
+  imports from layoutStore.ts (single source of truth).
+- **6 npm packages**: `@codemirror/commands`, `@codemirror/language`,
+  `@lexical/utils`, `codemirror`, `@types/dompurify`, `@types/katex`.
+  All zero-usage; the umbrella `codemirror` was a transitive
+  no-op since we use the specific `@codemirror/*` packages.
+- **Boot tracing noise**: trimmed from 9 `console.info("[boot] ...")`
+  to 4 — a startup timeline (start / N sessions / settled /
+  fromJSON ok + onDockReady) that's still enough to localize any
+  future hang without flooding the log.
+
+### What got left alone (intentional)
+
+- **`setClientForTest / ensureClient / shutdownClient`** in
+  client.ts — flagged by knip but used at the test-server / E2E
+  harness bridge; knip can't follow the indirection.
+- **`installStderrFilter`** in stderrFilter.ts — IS imported by
+  src-bun/index.ts; knip false positive on the entry-point file.
+- **`useLexicalComposer`** re-export in plugins.ts — used by 4
+  components even though knip flagged it.
+- **All 7 unused exported types in rpc.ts and ipc/types.ts** —
+  these are the public IPC contract; .vue templates may consume
+  them via dynamic dispatch knip can't see. Leave for a more
+  careful audit if needed.
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ **396 pass** (unchanged)
+- `bun run smoke` ✅ **70/70** (unchanged)
+- `bun run dev` boot ✅ — splash reaches Ready, both stale
+  sessions handled cleanly via the AppError decode path.
+
+### Followups (20c)
+
+- 14 RPC handlers in production missing from test-server (means
+  E2E can't drive those paths) — audit + add stubs.
+- Largest files: sessions.ts (1451 lines) + fakeClient.ts (468) +
+  chatEvents.ts (408) — candidates for code-review subagent
+  inspection in 20c.
+- Knip-flagged unused exported types — verify in 20c.
+
+---
+
 ## 2026-05-22 — Phase 20a: RPC error sweep
 
 ### Takeaway

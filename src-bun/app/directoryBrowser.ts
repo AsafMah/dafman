@@ -21,7 +21,7 @@
 //   back to MRU-only suggestions without surfacing the error.
 
 import { readdirSync, statSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { dirname, join } from "node:path";
 
 const MAX_RESULTS = 20;
 
@@ -94,6 +94,3 @@ export function browseDirectorySync(prefix: string): string[] {
   matches.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   return matches;
 }
-
-/// Re-exported so callers don't have to import `node:path` themselves.
-export { sep };

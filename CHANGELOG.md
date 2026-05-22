@@ -3,6 +3,30 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Removed (Phase 20b — dead code + dep sweep)
+
+- **`src/stores/permissionsStore.ts`** — orphan placeholder file
+  never wired up; the real permission flow uses the
+  `dafman.pending_request` channel through `sessionsStore`.
+- **Dead exports**: `getAuditDir` (audit.ts), `exportDisplayName +
+  readBundleFile` (diagnostics.ts), `ensureDefaultWorkspace`
+  (settings.ts), `MarkdownSync + CodeHighlightPlugin`
+  (plugins.ts), `hashString + accentForSession` (color.ts),
+  `sep` re-export (directoryBrowser.ts), `IGNORED_EVENTS`
+  re-export (chatEvents.ts).
+- **De-exported (internal-only)**: `SESSION_DETAILS_PANEL_ID`
+  (layoutStore.ts), `APP_ERROR_PREFIX` (errors.ts),
+  `WORKSPACES_MRU_LIMIT` (settings.ts bun side).
+- **Duplicated `basename` helper** in sessionsListStore — now
+  imports from layoutStore (single source).
+- **Unused npm dependencies**: `@codemirror/commands`,
+  `@codemirror/language`, `@lexical/utils`, `codemirror`
+  (umbrella; we use specific `@codemirror/*` packages),
+  `@types/dompurify`, `@types/katex`.
+- **Noisy `[boot]` console.info traces** — trimmed to a 4-line
+  startup timeline (start / N sessions / settled / fromJSON ok +
+  onDockReady) instead of per-step.
+
 ### Fixed (Phase 20a — RPC error sweep)
 
 - **`respondToPending` now rolls back on RPC failure.** Previously

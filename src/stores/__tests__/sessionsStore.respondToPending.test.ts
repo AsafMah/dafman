@@ -110,7 +110,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     await store.respondToPending({
       sessionId: "s1",
       requestId: "req-1",
-      response: { kind: "approve-once" },
+      response: { kind: "permission", decision: "approveOnce" },
     });
 
     expect(record?.pendingRequests).toEqual([]);
@@ -130,7 +130,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     await store.respondToPending({
       sessionId: "s1",
       requestId: "req-1",
-      response: { kind: "approve-once" },
+      response: { kind: "permission", decision: "approveOnce" },
     });
 
     // Rollback: pending entry is back in place, same identity.

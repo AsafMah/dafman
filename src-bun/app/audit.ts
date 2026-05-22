@@ -123,10 +123,6 @@ async function hydrateRecent(): Promise<void> {
 	}
 }
 
-export function getAuditDir(): string {
-	return config.dir ?? "";
-}
-
 export function subscribeAudit(fn: Subscriber): () => void {
 	subscribers.add(fn);
 	return () => {

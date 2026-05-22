@@ -6,7 +6,6 @@
 // (return `null`) and exist only for their setup-time side effects.
 
 import {
-  $convertFromMarkdownString,
   $convertToMarkdownString,
   TRANSFORMERS,
   registerMarkdownShortcuts,
@@ -177,80 +176,7 @@ export const SubmitOnEnter = defineComponent({
 
 /// One-way binding from a markdown `text` prop into the editor state.
 ///
-/// Used by `MessageContent` to render streaming assistant output. We
-/// coalesce rapid prop changes via `requestAnimationFrame` so a burst of
-/// 5-30 deltas/sec doesn't trigger one full reconcile per delta. The
-/// last pending value always wins.
-export const MarkdownSync = defineComponent({
-  name: "MarkdownSync",
-  props: { markdown: { type: String, required: true } },
-  setup(props) {
-    const editor = useLexicalComposer();
-    let pending: string | null = null;
-    let rafHandle: number | null = null;
-
-    const flush = () => {
-      rafHandle = null;
-      if (pending === null) return;
-      const next = pending;
-      pending = null;
-      editor.update(() => {
-        const root = $getRoot();
-        root.clear();
-        $convertFromMarkdownString(next, TRANSFORMERS, root, false, false);
-      });
-    };
-
-    const schedule = (value: string) => {
-      pending = value;
-      if (rafHandle !== null) return;
-      const raf =
-        typeof requestAnimationFrame !== "undefined"
-          ? requestAnimationFrame
-          : (cb: FrameRequestCallback) => {
-              return setTimeout(
-                () => cb(typeof performance !== "undefined" ? performance.now() : Date.now()),
-                16,
-              ) as unknown as number;
-            };
-      rafHandle = raf(flush);
-    };
-
-    watch(
-      () => props.markdown,
-      (next) => schedule(next),
-      { immediate: true },
-    );
-
-    onBeforeUnmount(() => {
-      if (rafHandle !== null && typeof cancelAnimationFrame !== "undefined") {
-        cancelAnimationFrame(rafHandle);
-      }
-      pending = null;
-      rafHandle = null;
-    });
-
-    return () => null;
-  },
-});
-
 export { useLexicalComposer };
-
-/// Activates prism-backed syntax highlighting for any `CodeNode` in
-/// the editor. Mount inside `LexicalComposer` once. Lexical's
-/// `registerCodeHighlighting` returns an unregister; we tear down on
-/// unmount so HMR doesn't double-wire the highlighter.
-import { registerCodeHighlighting } from "@lexical/code";
-
-export const CodeHighlightPlugin = defineComponent({
-  name: "CodeHighlightPlugin",
-  setup() {
-    const editor = useLexicalComposer();
-    const unregister = registerCodeHighlighting(editor);
-    onBeforeUnmount(() => unregister());
-    return () => null;
-  },
-});
 
 /// Dev-only diagnostic: on mount, log enough state to bun's JSON log so
 /// we can figure out why typing might not work without needing WebView2

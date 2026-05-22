@@ -16,7 +16,6 @@
 import type { SessionEventPayload } from "../ipc/types";
 import { calloutHandlers } from "./chatEvents/calloutHandlers";
 import type { Handler, ReducerContext } from "./chatEvents/context";
-import { IGNORED_EVENTS } from "./chatEvents/ignored";
 import { lifecycleHandlers } from "./chatEvents/lifecycleHandlers";
 import { messageHandlers } from "./chatEvents/messageHandlers";
 import { notificationHandlers } from "./chatEvents/notificationHandlers";
@@ -295,8 +294,6 @@ const HANDLERS: Record<string, Handler> = {
 export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(
   Object.keys(HANDLERS),
 );
-
-export { IGNORED_EVENTS };
 
 export function processEvents(
   current: ChatItem[],

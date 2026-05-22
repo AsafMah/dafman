@@ -62,7 +62,7 @@ function formatPayload(p: AppErrorPayload): string {
 /// see node_modules/electrobun/dist/api/shared/rpc.ts:398). So we
 /// always throw a real `Error` whose message is a JSON-encoded
 /// `AppErrorPayload`; the renderer's `invokeCommand` decodes it.
-export const APP_ERROR_PREFIX = "AppErrorPayload:";
+const APP_ERROR_PREFIX = "AppErrorPayload:";
 
 export function rpcGuard<TArgs, TResult>(
 	fn: (args: TArgs) => Promise<TResult> | TResult,

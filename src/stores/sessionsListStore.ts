@@ -9,6 +9,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
 import type { SessionMetadataSummary } from "../ipc/types";
+import { basename } from "./layoutStore";
 import { useToastStore } from "./toastStore";
 
 export interface WorkspaceGroup {
@@ -20,14 +21,6 @@ export interface WorkspaceGroup {
   /// Full path tooltip (mirrors `key` for non-empty groups; empty for "").
   path: string;
   sessions: SessionMetadataSummary[];
-}
-
-function basename(path: string | undefined | null): string {
-  if (!path) return "";
-  const trimmed = path.trim().replace(/[\\/]+$/, "");
-  if (!trimmed) return "";
-  const match = trimmed.match(/[\\/]([^\\/]+)$/);
-  return match ? match[1] : trimmed;
 }
 
 export const useSessionsListStore = defineStore("sessionsList", () => {

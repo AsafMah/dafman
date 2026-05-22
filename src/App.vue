@@ -245,7 +245,6 @@ onMounted(async () => {
 const pendingRestoreLayout = ref<unknown | null>(null);
 
 async function restoreFromLayout() {
-  console.info("[boot] restoreFromLayout: reading layout");
   const layout = settingsStore.settings.layout?.dockview;
   if (!layout || typeof layout !== "object") {
     console.info("[boot] restoreFromLayout: no layout to restore");
@@ -287,9 +286,8 @@ async function restoreFromLayout() {
     requestAnimationFrame(() => resolve()),
   );
   if (layoutStore.api) {
-    console.info("[boot] restoreFromLayout: calling dock.fromJSON");
     const ok = layoutStore.restore(sanitized);
-    console.info(`[boot] restoreFromLayout: fromJSON returned ok=${ok}`);
+    console.info(`[boot] restoreFromLayout: fromJSON ok=${ok}`);
     if (!ok) {
       // fromJSON threw — toast and fall back to a default layout
       // so the user has something to work with instead of a blank
@@ -301,7 +299,6 @@ async function restoreFromLayout() {
       layoutStore.resetToDefault();
     }
   } else {
-    console.info("[boot] restoreFromLayout: api not ready, deferring");
     pendingRestoreLayout.value = sanitized;
   }
 }

@@ -345,6 +345,21 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 20b shipped: **dead code + dep sweep**. Used
+  knip to enumerate unused exports / files / deps; manually
+  verified each (knip has false positives on .vue files +
+  side-effect-import scripts). Deleted: `permissionsStore.ts`
+  (orphan placeholder), 7 dead-export functions (`getAuditDir`,
+  `exportDisplayName`, `readBundleFile`, `ensureDefaultWorkspace`,
+  `MarkdownSync`, `CodeHighlightPlugin`, `hashString +
+  accentForSession`); de-exported 3 internal-only consts
+  (`SESSION_DETAILS_PANEL_ID`, `APP_ERROR_PREFIX`, `sep`); dropped
+  duplicate `basename` in sessionsListStore (imports from
+  layoutStore now); removed 6 unused npm deps
+  (`@codemirror/commands`, `@codemirror/language`, `@lexical/utils`,
+  `codemirror`, `@types/dompurify`, `@types/katex`). Trimmed
+  noisy `[boot]` tracing to a 4-line timeline. **396 tests, 70/70
+  E2E, boot verified.**
 - **2026-05-22** — Phase 20a shipped: **RPC error-sweep**. Triggered
   by the Electrobun bridge fix uncovering that every RPC error since
   the bun migration had been silently swallowed (renderer await

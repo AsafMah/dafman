@@ -20,7 +20,7 @@ import type {
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
-export const SESSION_DETAILS_PANEL_ID = "session-details";
+const SESSION_DETAILS_PANEL_ID = "session-details";
 
 /// Short panel title from a session id. The CLI emits `session.title_changed`
 /// when the model summarizes the conversation; until then the tab shows

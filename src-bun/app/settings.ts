@@ -10,9 +10,8 @@
 // `Utils.paths.userData` and hands it to `SettingsService.loadOrDefault`.
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import type {
 	Appearance,
 	Layout,
@@ -31,7 +30,7 @@ export const SETTINGS_VERSION = 9;
 /// this trims off the tail so the on-disk settings file doesn't grow
 /// unbounded. Kept conservative — the AutoComplete dropdown becomes
 /// unwieldy past ~10 items anyway.
-export const WORKSPACES_MRU_LIMIT = 10;
+const WORKSPACES_MRU_LIMIT = 10;
 
 const VALID_THEMES: readonly ThemeChoice[] = ["system", "light", "dark"];
 const VALID_REASONING: readonly ReasoningVisibility[] = [
@@ -128,27 +127,6 @@ function coerceWorkspaces(raw: unknown): Workspaces {
 	const defaultWorkspace =
 		typeof rawDefault === "string" ? rawDefault.trim() : "";
 	return { recent: out, defaultWorkspace };
-}
-
-/// Resolves the auto-default workspace (`<homedir>/dafman`) and ensures
-/// the directory exists. Returns the absolute path on success, or an
-/// empty string when home-directory resolution / mkdir fails so the
-/// renderer falls back to "no default". Idempotent — safe to call on
-/// every startup; `recursive: true` makes the mkdir a no-op when the
-/// directory already exists.
-export async function ensureDefaultWorkspace(): Promise<string> {
-	try {
-		const home = homedir();
-		if (!home) return "";
-		const target = join(home, "dafman");
-		await mkdir(target, { recursive: true });
-		return target;
-	} catch (err) {
-		log.warn("ensureDefaultWorkspace failed", {
-			error: err instanceof Error ? err.message : String(err),
-		});
-		return "";
-	}
 }
 
 /// Coerces a raw `notifications` blob into the canonical shape. Both
