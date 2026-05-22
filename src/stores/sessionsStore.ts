@@ -535,17 +535,15 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function restoreSession(sessionId: string): Promise<SessionRecord | null> {
     ensureSubscription();
     const toasts = useToastStore();
+    const shortId = sessionId.slice(0, 8);
+    console.info(`[restoreSession ${shortId}] enter; calling invokeCommand`);
     try {
-      // The bun RPC handler may return a different id if the SDK
-      // forked on resume (rare, but the contract allows it). `cwd`
-      // comes from the session catalog, not the event stream —
-      // `getMessages()` history doesn't include `session.resume`, so
-      // the workspace chip would otherwise stay hidden after restore.
       const response = await invokeCommand("resumeSession", {
         sessionId,
         model: null,
         reasoningEffort: null,
       });
+      console.info(`[restoreSession ${shortId}] invokeCommand resolved`);
       const actualId = response.sessionId;
       // Idempotent: if a record for this id is already present (e.g.
       // double-restore), just return it.
@@ -607,10 +605,12 @@ export const useSessionsStore = defineStore("sessions", () => {
       return record;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      console.info(`[restoreSession ${shortId}] invokeCommand rejected: ${message}`);
       toasts.info(
         "Session not restored",
         `${sessionId.slice(0, 8)}…: ${message}`,
       );
+      console.info(`[restoreSession ${shortId}] returning null`);
       return null;
     }
   }
