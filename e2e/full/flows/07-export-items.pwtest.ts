@@ -33,9 +33,10 @@ test("Export JSON contains user + assistant items after a turn", async ({ page }
   // into the store (and therefore into rec.events).
   await expect(page.locator("text=ok: hello world").first()).toBeVisible({ timeout: 5_000 });
 
-  // The details rail opens by default (Phase 18a). Click Export JSON
-  // directly — no popover open step required.
-  await page.getByRole("button", { name: /export json/i }).click();
+  // The details rail opens by default (Phase 18a). Click the JSON
+  // export button (Phase 18b+ shortened the label from "Export JSON"
+  // to "JSON" with a tooltip).
+  await page.getByRole("button", { name: /^JSON$/ }).click();
 
   // Read the file from the test-server's userData exports dir.
   const exportsDir = join(harness.userData, "exports");

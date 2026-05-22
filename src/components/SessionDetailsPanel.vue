@@ -508,22 +508,6 @@ function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
   else next.add(key);
   expandedItems.value = next;
 }
-
-/// Returns the description with at most one short line. Anything past
-/// a newline or 120 chars gets elided with "…". The full text is
-/// revealed when the row is expanded.
-function shortDescription(description: string): string {
-  if (!description) return "";
-  const firstLine = description.split(/\r?\n/, 1)[0] ?? "";
-  if (firstLine.length <= 120) return firstLine;
-  return `${firstLine.slice(0, 119)}…`;
-}
-
-function needsExpansion(description: string): boolean {
-  if (!description) return false;
-  if (description.includes("\n")) return true;
-  return description.length > 120;
-}
 </script>
 
 <template>
@@ -619,12 +603,9 @@ function needsExpansion(description: string): boolean {
 
     <!-- Approve all ---------------------------------------------- -->
     <section class="row row-toggle">
-      <div class="row-toggle-label">
-        <span class="row-toggle-title">Auto-approve all tools</span>
-        <span class="row-hint">
-          Skip permission prompts for the rest of this session.
-        </span>
-      </div>
+      <span class="row-toggle-title" title="Skip permission prompts for the rest of this session.">
+        Auto-approve all tools
+      </span>
       <ToggleSwitch
         :model-value="approveAll"
         @update:model-value="onToggleApproveAll"
@@ -655,37 +636,35 @@ function needsExpansion(description: string): boolean {
         <div v-else-if="sessionSkills.length === 0" class="empty-hint">
           No skills configured for this session.
         </div>
-        <ul v-else class="skill-list">
-          <li v-for="skill in sessionSkills" :key="skill.name" class="skill-row">
-            <div class="skill-text">
-              <div class="skill-name">
-                <span>{{ skill.name }}</span>
-                <small v-if="skill.userInvocable" class="skill-tag">/</small>
-              </div>
-              <template v-if="skill.description">
-                <div
-                  v-if="isItemExpanded('skill', skill.name)"
-                  class="skill-desc skill-desc-full"
-                >
-                  {{ skill.description }}
-                </div>
-                <div v-else class="skill-desc">
-                  {{ shortDescription(skill.description) }}
-                </div>
-                <button
-                  v-if="needsExpansion(skill.description)"
-                  type="button"
-                  class="link-button"
-                  @click="toggleItemExpansion('skill', skill.name)"
-                >
-                  {{ isItemExpanded('skill', skill.name) ? "Show less" : "Show more" }}
-                </button>
-              </template>
-            </div>
+        <ul v-else class="skill-list compact-list">
+          <li v-for="skill in sessionSkills" :key="skill.name" class="compact-row">
+            <button
+              type="button"
+              class="compact-name-button"
+              :title="skill.description || skill.name"
+              :aria-expanded="!!skill.description && isItemExpanded('skill', skill.name)"
+              @click="skill.description && toggleItemExpansion('skill', skill.name)"
+            >
+              <i
+                v-if="skill.description"
+                class="pi compact-chevron"
+                :class="isItemExpanded('skill', skill.name) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                aria-hidden="true"
+              />
+              <span class="compact-name">{{ skill.name }}</span>
+              <small v-if="skill.userInvocable" class="compact-tag">/</small>
+            </button>
             <ToggleSwitch
               :model-value="skill.enabled"
+              :aria-label="`Enable skill ${skill.name}`"
               @update:model-value="() => toggleSkill(skill)"
             />
+            <div
+              v-if="skill.description && isItemExpanded('skill', skill.name)"
+              class="compact-desc"
+            >
+              {{ skill.description }}
+            </div>
           </li>
         </ul>
       </div>
@@ -717,39 +696,38 @@ function needsExpansion(description: string): boolean {
             Excluded tools take effect on next session create. Restart this
             session to apply changes here.
           </div>
-          <ul class="tool-list">
+          <ul class="tool-list compact-list">
             <li
               v-for="t in builtinTools"
               :key="`builtin-${t.name}`"
-              class="tool-row"
+              class="compact-row"
             >
-              <div class="tool-text">
-                <div class="tool-name">{{ t.name }}</div>
-                <template v-if="t.description">
-                  <div
-                    v-if="isItemExpanded('tool', t.name)"
-                    class="tool-desc tool-desc-full"
-                  >
-                    {{ t.description }}
-                  </div>
-                  <div v-else class="tool-desc">
-                    {{ shortDescription(t.description) }}
-                  </div>
-                  <button
-                    v-if="needsExpansion(t.description)"
-                    type="button"
-                    class="link-button"
-                    @click="toggleItemExpansion('tool', t.name)"
-                  >
-                    {{ isItemExpanded('tool', t.name) ? "Show less" : "Show more" }}
-                  </button>
-                </template>
-              </div>
+              <button
+                type="button"
+                class="compact-name-button"
+                :title="t.description || t.name"
+                :aria-expanded="!!t.description && isItemExpanded('tool', t.name)"
+                @click="t.description && toggleItemExpansion('tool', t.name)"
+              >
+                <i
+                  v-if="t.description"
+                  class="pi compact-chevron"
+                  :class="isItemExpanded('tool', t.name) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                  aria-hidden="true"
+                />
+                <span class="compact-name">{{ t.name }}</span>
+              </button>
               <ToggleSwitch
                 :model-value="!isExcluded(t.name)"
                 :aria-label="`Enable tool ${t.name}`"
                 @update:model-value="(v) => setToolExcluded(t.name, !v)"
               />
+              <div
+                v-if="t.description && isItemExpanded('tool', t.name)"
+                class="compact-desc"
+              >
+                {{ t.description }}
+              </div>
             </li>
           </ul>
         </template>
@@ -773,18 +751,18 @@ function needsExpansion(description: string): boolean {
         <span class="section-count">{{ mcpServers.length }}</span>
       </button>
       <div v-if="sectionOpen.mcp" class="section-body">
-        <ul class="tool-list">
+        <ul class="tool-list compact-list">
           <li
             v-for="s in mcpServers"
             :key="`mcp-${s.name}`"
-            class="tool-row"
+            class="compact-row"
           >
-            <div class="tool-text">
-              <div class="tool-name">
-                {{ s.name }}
-                <small class="tool-tag">{{ s.status }}</small>
-              </div>
-              <div v-if="s.error" class="tool-desc error">{{ s.error }}</div>
+            <div class="compact-name-button compact-name-static" :title="s.error || s.name">
+              <span class="compact-name">{{ s.name }}</span>
+              <small class="compact-tag">{{ s.status }}</small>
+            </div>
+            <div v-if="s.error" class="compact-desc compact-desc-error">
+              {{ s.error }}
             </div>
           </li>
         </ul>
@@ -1295,6 +1273,91 @@ function needsExpansion(description: string): boolean {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+/* Compact rows: just `name + toggle` per line, descriptions
+   hidden behind a chevron click. Keeps the rail usable at narrow
+   widths (240–320px) — full descriptions would force the rail to
+   ~500px before they fit comfortably. */
+.compact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.compact-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: var(--p-border-radius-sm);
+  min-width: 0;
+}
+
+.compact-row:hover {
+  background: color-mix(in srgb, var(--p-content-hover-background) 40%, transparent);
+}
+
+.compact-row :deep(.p-toggleswitch) {
+  flex-shrink: 0;
+  justify-self: end;
+}
+
+.compact-name-button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--p-text-color);
+  font: inherit;
+  text-align: left;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.compact-name-button.compact-name-static {
+  cursor: default;
+}
+
+.compact-chevron {
+  font-size: 0.55rem;
+  color: var(--p-text-muted-color);
+  flex-shrink: 0;
+}
+
+.compact-name {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.compact-tag {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+  flex-shrink: 0;
+}
+
+.compact-desc {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  padding: 0.25rem 0.25rem 0.15rem 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.compact-desc-error {
+  color: var(--p-message-error-color);
 }
 
 .tool-row {

@@ -68,18 +68,18 @@ test("collapsing tools section persists across reload (localStorage)", async ({ 
   expect(stored).toBe("1");
 });
 
-test("long tool descriptions truncate with a Show more affordance", async ({ page }) => {
-  // Force a tool with a long description via the test bridge.
+test("expanding a tool row reveals its description", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
 
   const detailsPanel = page.locator(".session-details").first();
   // Expand Tools (collapsed by default).
   await detailsPanel.getByRole("button", { name: /^Tools/i }).first().click();
-  await detailsPanel.locator(".tool-row").first().waitFor({ state: "visible", timeout: 5_000 });
+  const firstRow = detailsPanel.locator(".compact-row").first();
+  await firstRow.waitFor({ state: "visible", timeout: 5_000 });
 
-  // Built-in fake tools have short descriptions so no Show more should appear.
-  // We assert by ensuring the descriptions are visible and within one line.
-  const firstDesc = detailsPanel.locator(".tool-desc").first();
-  await expect(firstDesc).toBeVisible();
+  // Description hidden by default — clicking the name reveals it.
+  await expect(detailsPanel.locator(".compact-desc")).toHaveCount(0);
+  await firstRow.locator(".compact-name-button").click();
+  await expect(detailsPanel.locator(".compact-desc").first()).toBeVisible({ timeout: 3_000 });
 });
