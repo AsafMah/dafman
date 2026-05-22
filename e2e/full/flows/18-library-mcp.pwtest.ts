@@ -32,11 +32,19 @@ test("library opens from activity bar and lists discovered MCP servers", async (
   // MCP tab is selected by default.
   await expect(library.getByRole("tab", { name: "MCP", selected: true })).toBeVisible();
 
+  // Scope to the active MCP tab panel — PrimeVue Tabs render every
+  // panel in the DOM (just hide non-active via CSS), so unscoped
+  // `text=github` would collide with Phase 19b.2's Agents tab,
+  // which mentions `.github/agents/` in its help text.
+  const mcpPanel = library.locator('[role="tabpanel"]').filter({
+    has: page.locator("text=Configured"),
+  }).first();
+
   // Configured section is empty initially; Discovered shows the two
   // fake servers.
-  await expect(library.locator("text=No MCP servers configured.")).toBeVisible();
-  await expect(library.locator("text=playwright")).toBeVisible();
-  await expect(library.locator("text=github")).toBeVisible();
+  await expect(mcpPanel.locator("text=No MCP servers configured.")).toBeVisible();
+  await expect(mcpPanel.locator("text=playwright")).toBeVisible();
+  await expect(mcpPanel.locator("text=github")).toBeVisible();
 });
 
 test("add MCP server via structured form → moves to configured list", async ({ page }) => {

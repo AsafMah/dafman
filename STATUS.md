@@ -345,6 +345,20 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 19b.2 shipped: **Library Agents tab**.
+  Third tab in Library with create/delete CRUD for filesystem-backed
+  custom agents. New `src-bun/app/agentFiles.ts` module with strict
+  name validation, scope-path resolution, minimal YAML frontmatter
+  writer, atomic write, refuse-overwrite. 4 new bun RPCs
+  (`listAgentFiles`, `listAgentFilesGlobal`, `writeAgentFile`,
+  `deleteAgentFile`). Create + delete only in v1 — Edit deferred
+  until we have a parse-and-preserve round-trip (the SDK accepts
+  unknown frontmatter keys our writer would silently strip).
+  Includes a small fix to `e2e/full/flows/18-library-mcp.pwtest.ts`
+  for a `text=github` strict-mode collision (the new tab's hint
+  text mentions `.github/agents/`). 16 new unit tests including
+  path-traversal name attempts. **460 bun tests** (was 444), 68/70
+  smoke (08-audit-rehydrate flake on plain main, unrelated).
 - **2026-05-22** — Phase 19b.1 shipped: **Background tasks rail
   section**. Observational view of agent-delegated tasks via the
   @experimental `session.rpc.tasks.*` surface. 3 new bun RPCs

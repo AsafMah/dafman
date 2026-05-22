@@ -3,6 +3,33 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 19b.2 — Library Agents tab)
+
+- **Library → Agents tab**: third tab in the Library panel.
+  Lists filesystem-backed custom agents grouped by scope (Project /
+  User), with a "+ New agent" button that opens an inline form.
+  Form fields: scope (radio), name, displayName, description (required),
+  tools (csv), skills (csv), model, user-invocable (toggle), prompt
+  (textarea). Submit writes `<scope-root>/<name>.agent.md` with YAML
+  frontmatter and the prompt body.
+- **`src-bun/app/agentFiles.ts` module** with strict name validation
+  (alphanumerics + dot/hyphen/underscore, max 64 chars, rejects
+  path traversal + Windows reserved names like CON/PRN/AUX/COMx/LPTx),
+  scope path resolution (defense-in-depth root check), minimal YAML
+  serializer for the supported frontmatter, atomic write (tmp +
+  rename), and refuse-overwrite semantics.
+- 4 new bun RPCs: `listAgentFiles` (session-scoped, includes Project
+  + User), `listAgentFilesGlobal` (User only — for the "no session"
+  case), `writeAgentFile`, `deleteAgentFile`. Write/delete call
+  `session.rpc.agent.reload` after success so the new agent shows
+  up in the picker immediately.
+- **Create + delete only** in v1 — no Edit. The SDK accepts
+  frontmatter keys we don't model (`mcp-servers`, `github` toolsets,
+  etc.); a write-only serializer would lose those on save. Per the
+  19b duck's blocking finding #2, edit is deferred until we have a
+  parse-and-preserve round-trip implementation.
+- Refers users to "Reveal" the file for advanced edits.
+
 ### Added (Phase 19b.1 — Tasks panel)
 
 - **Background tasks** section in the right rail's

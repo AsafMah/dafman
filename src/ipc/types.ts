@@ -112,6 +112,35 @@ export interface TaskInfo {
   agentDisplayName?: string;
 }
 
+/// Mirror of `src-bun/rpc.ts:AgentFileScope`. Library tab scope
+/// discriminator for filesystem-backed agent CRUD.
+export type AgentFileScope = "user" | "project";
+
+/// Mirror of `src-bun/rpc.ts:AgentFileEntry`. Filesystem-discovered
+/// agent file (used by the Library tab; distinct from `AgentInfo`
+/// which only sees SDK-loaded agents).
+export interface AgentFileEntry {
+  scope: AgentFileScope;
+  name: string;
+  path: string;
+  canonical: boolean;
+}
+
+/// Mirror of `src-bun/rpc.ts:AgentFileSpec`. The renderer-supplied
+/// spec for `writeAgentFile`. v1 surface only — `mcp-servers` and
+/// `github` keys are deferred to direct file edits.
+export interface AgentFileSpec {
+  scope: AgentFileScope;
+  name: string;
+  displayName?: string;
+  description: string;
+  tools?: string[];
+  skills?: string[];
+  model?: string;
+  userInvocable?: boolean;
+  prompt: string;
+}
+
 /// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged.
 /// Mirrored here so the renderer can construct without importing the
 /// SDK types directly. Pass-through to bun → SDK at send time.
@@ -389,6 +418,22 @@ export type CommandMap = {
   };
   removeTask: {
     args: { sessionId: string; id: string };
+    result: boolean;
+  };
+  listAgentFiles: {
+    args: { sessionId: string };
+    result: AgentFileEntry[];
+  };
+  listAgentFilesGlobal: {
+    args: Record<string, never>;
+    result: AgentFileEntry[];
+  };
+  writeAgentFile: {
+    args: { sessionId: string; spec: AgentFileSpec };
+    result: string;
+  };
+  deleteAgentFile: {
+    args: { sessionId: string; scope: AgentFileScope; name: string };
     result: boolean;
   };
   getSessionUsageMetrics: {

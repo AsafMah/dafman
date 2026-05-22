@@ -327,6 +327,26 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		const { sessionId, id } = args as { sessionId: string; id: string };
 		return sessions.removeTask(sessionId, id);
 	}),
+	listAgentFiles: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return sessions.listAgentFiles(sessionId);
+	}),
+	listAgentFilesGlobal: rpcGuard(async () => sessions.listAgentFilesGlobal()),
+	writeAgentFile: rpcGuard(async (args) => {
+		const { sessionId, spec } = args as {
+			sessionId: string;
+			spec: Parameters<typeof sessions.writeAgentFile>[1];
+		};
+		return sessions.writeAgentFile(sessionId, spec);
+	}),
+	deleteAgentFile: rpcGuard(async (args) => {
+		const { sessionId, scope, name } = args as {
+			sessionId: string;
+			scope: "user" | "project";
+			name: string;
+		};
+		return sessions.deleteAgentFile(sessionId, scope, name);
+	}),
 	readSessionPlan: rpcGuard(async (args) => {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.readPlan(sessionId);

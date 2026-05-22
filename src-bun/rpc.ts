@@ -169,6 +169,39 @@ export interface TaskInfo {
 	agentDisplayName?: string;
 }
 
+/// 19b.2: scope discriminator for filesystem-backed agent CRUD. User
+/// scope writes to `~/.copilot/agents/`; project scope writes under
+/// the session's workspace `.github/agents/`. Plugin and remote
+/// agents are read-only from this surface (see src-bun/app/agentFiles.ts).
+export type AgentFileScope = "user" | "project";
+
+/// 19b.2: discovered agent file. Bun side enumerates these directly
+/// from disk for the Library tab; distinct from the @experimental
+/// `session.rpc.agent.list` surface (which only knows what the SDK
+/// loaded).
+export interface AgentFileEntry {
+	scope: AgentFileScope;
+	name: string;
+	path: string;
+	canonical: boolean;
+}
+
+/// 19b.2: spec the renderer passes to `writeAgentFile`. Mirrors
+/// `src-bun/app/agentFiles.ts:AgentFileSpec`. Only the simpler
+/// frontmatter keys are exposed; advanced ones (`mcp-servers`,
+/// `github`) are deferred to direct file edits.
+export interface AgentFileSpec {
+	scope: AgentFileScope;
+	name: string;
+	displayName?: string;
+	description: string;
+	tools?: string[];
+	skills?: string[];
+	model?: string;
+	userInvocable?: boolean;
+	prompt: string;
+}
+
 /// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged
 /// that the renderer can construct. Mirrors the SDK union so we can
 /// pass straight through `session.send({ attachments })` without
@@ -564,6 +597,26 @@ export type DafmanRPC = {
 			};
 			removeTask: {
 				params: { sessionId: string; id: string };
+				response: boolean;
+			};
+			/// Phase 19b.2. Filesystem-backed agent CRUD. Separate from
+			/// `session.rpc.agent.*` because the SDK surface only sees
+			/// loaded agents; the Library tab needs to enumerate,
+			/// create, and delete the .agent.md files directly.
+			listAgentFiles: {
+				params: { sessionId: string };
+				response: AgentFileEntry[];
+			};
+			listAgentFilesGlobal: {
+				params: Record<string, never>;
+				response: AgentFileEntry[];
+			};
+			writeAgentFile: {
+				params: { sessionId: string; spec: AgentFileSpec };
+				response: string;
+			};
+			deleteAgentFile: {
+				params: { sessionId: string; scope: AgentFileScope; name: string };
 				response: boolean;
 			};
 			/// Raw SDK `usage.getMetrics` shape. Opaque to bun — the

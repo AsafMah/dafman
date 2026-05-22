@@ -259,6 +259,18 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			removeTask: rpcGuard(async ({ sessionId, id }) =>
 				sessions.removeTask(sessionId, id),
 			),
+			listAgentFiles: rpcGuard(async ({ sessionId }) =>
+				sessions.listAgentFiles(sessionId),
+			),
+			listAgentFilesGlobal: rpcGuard(async () =>
+				sessions.listAgentFilesGlobal(),
+			),
+			writeAgentFile: rpcGuard(async ({ sessionId, spec }) =>
+				sessions.writeAgentFile(sessionId, spec),
+			),
+			deleteAgentFile: rpcGuard(async ({ sessionId, scope, name }) =>
+				sessions.deleteAgentFile(sessionId, scope, name),
+			),
 			getSessionUsageMetrics: rpcGuard(async ({ sessionId }) =>
 				sessions.getUsageMetrics(sessionId),
 			),

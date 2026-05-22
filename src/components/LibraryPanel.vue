@@ -17,6 +17,7 @@ import TabPanels from "primevue/tabpanels";
 import TabPanel from "primevue/tabpanel";
 import LibraryMcpTab from "./LibraryMcpTab.vue";
 import LibrarySkillsTab from "./LibrarySkillsTab.vue";
+import LibraryAgentsTab from "./LibraryAgentsTab.vue";
 
 // Persist the last-active tab across panel re-mounts so toggling the
 // activity bar doesn't lose the user's place.
@@ -66,6 +67,7 @@ onBeforeUnmount(() => {
       <TabList>
         <Tab value="mcp">MCP</Tab>
         <Tab value="skills">Skills</Tab>
+        <Tab value="agents">Agents</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="mcp">
@@ -73,6 +75,9 @@ onBeforeUnmount(() => {
         </TabPanel>
         <TabPanel value="skills">
           <LibrarySkillsTab />
+        </TabPanel>
+        <TabPanel value="agents">
+          <LibraryAgentsTab />
         </TabPanel>
       </TabPanels>
     </Tabs>

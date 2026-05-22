@@ -431,7 +431,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       id: LIBRARY_PANEL_ID,
       component: "library",
       icon: "pi-book",
-      title: "Library — MCP servers + Skills",
+      title: "Library — MCP servers + Skills + Agents",
       initialSize: 360,
       minimumSize: 280,
     },

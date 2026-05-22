@@ -380,7 +380,7 @@ function openSkillsLibrary() {
     id: "library",
     component: "library",
     tabComponent: "sidebarTab",
-    title: "Library — MCP servers + Skills",
+    title: "Library — MCP servers + Skills + Agents",
     initialSize: 360,
     minimumSize: 280,
   });

@@ -31,6 +31,13 @@ import { log } from "./logging";
 import { PendingRequestQueue } from "./pendingRequests";
 import { buildBuiltInTools } from "./tools";
 import { searchWorkspaceFiles } from "./fileSearch";
+import {
+	listAgentFiles,
+	writeAgent,
+	deleteAgent,
+	type AgentFileSpec,
+	type AgentScope as AgentFileScope,
+} from "./agentFiles";
 import type {
 	ElicitationRequestData,
 	PendingRequestPayload,
@@ -1147,6 +1154,103 @@ export class SessionRegistry {
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
+	}
+
+	// ---------- Agent files CRUD (Phase 19b.2) ----------
+	//
+	// Filesystem-level wrappers around `src-bun/app/agentFiles.ts`.
+	// Distinct from the @experimental `session.rpc.agent.*` surface
+	// (which only sees what the SDK loaded) — these wrappers give
+	// the Library tab the ability to enumerate / create / delete
+	// agent definitions directly. Workspace path resolution uses
+	// the entry's cached `workingDirectory`, so a session must
+	// exist for Project-scope writes (User scope doesn't need one
+	// — see `listAgentFilesGlobal`).
+
+	async listAgentFiles(sessionId: string): Promise<Array<{
+		scope: AgentFileScope;
+		name: string;
+		path: string;
+		canonical: boolean;
+	}>> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		const opts: Parameters<typeof listAgentFiles>[0] = {
+			includeUser: true,
+			includeProject: true,
+		};
+		if (entry.workingDirectory) opts.workingDirectory = entry.workingDirectory;
+		return listAgentFiles(opts);
+	}
+
+	/// User-scope only — for the Library tab when no session is
+	/// open. Doesn't require sessionId / workingDirectory.
+	async listAgentFilesGlobal(): Promise<Array<{
+		scope: AgentFileScope;
+		name: string;
+		path: string;
+		canonical: boolean;
+	}>> {
+		return listAgentFiles({ includeUser: true, includeProject: false });
+	}
+
+	async writeAgentFile(
+		sessionId: string,
+		spec: AgentFileSpec,
+	): Promise<string> {
+		// User-scope writes don't need a workingDirectory; project
+		// scope does. SessionRegistry resolves it from the session
+		// entry (no caller-supplied workingDirectory string allowed
+		// — defense in depth: a malicious renderer could otherwise
+		// pass an arbitrary path).
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		const wd = spec.scope === "project" ? entry.workingDirectory ?? undefined : undefined;
+		if (spec.scope === "project" && !wd) {
+			throw AppError.sdk(
+				"project scope requires a session with a working directory",
+			);
+		}
+		const path = await writeAgent(spec, wd);
+		// Tell the SDK to re-scan so the new agent shows up in
+		// `session.rpc.agent.list` immediately. Best-effort: a
+		// failed reload doesn't block the user's write.
+		try {
+			await entry.session.rpc.agent.reload();
+		} catch (err) {
+			log.warn("agent.reload after writeAgentFile failed", {
+				sessionId,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
+		return path;
+	}
+
+	async deleteAgentFile(
+		sessionId: string,
+		scope: AgentFileScope,
+		name: string,
+	): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		const wd = scope === "project" ? entry.workingDirectory ?? undefined : undefined;
+		if (scope === "project" && !wd) {
+			throw AppError.sdk(
+				"project scope requires a session with a working directory",
+			);
+		}
+		const removed = await deleteAgent(scope, name, wd);
+		if (removed) {
+			try {
+				await entry.session.rpc.agent.reload();
+			} catch (err) {
+				log.warn("agent.reload after deleteAgentFile failed", {
+					sessionId,
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+		}
+		return removed;
 	}
 
 	/// Lists session skills (name, description, enabled, source).

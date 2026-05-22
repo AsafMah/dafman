@@ -56,6 +56,120 @@
 
 ---
 
+## 2026-05-22 — Phase 19b.2: Library Agents tab
+
+### Takeaway
+
+Second half of 19b. Third tab in the Library panel with CRUD for
+filesystem-backed agent definitions. Bun-side module owns name
+validation, path resolution, YAML serialization, and atomic write.
+Renderer-side tab shows a grouped list (Project / User) with
+Reveal + Delete per row, and an inline create form.
+
+### Architecture
+
+- `src-bun/app/agentFiles.ts` is a new module distinct from the
+  SDK's `session.rpc.agent.*` surface (which only sees what the
+  SDK loaded). The Library tab needs to enumerate raw .md files
+  on disk and write new ones.
+- 4 new bun RPCs:
+  - `listAgentFiles(sessionId)`: enumerates both User + Project
+    scope. Requires a session (Project path comes from the
+    session's workingDirectory).
+  - `listAgentFilesGlobal()`: User scope only. For the Library
+    tab's "no active session" fallback.
+  - `writeAgentFile(sessionId, spec)`: creates, refuses overwrite.
+    Calls `session.rpc.agent.reload` after success.
+  - `deleteAgentFile(sessionId, scope, name)`: validates name +
+    path before any unlink. Calls reload after.
+- All file paths are resolved bun-side. The renderer can only
+  pass `(scope, name)`; the actual filesystem path is computed
+  from the session's workingDirectory (for Project) or homedir
+  (for User). No way for a malicious renderer to point at an
+  arbitrary path.
+
+### Path validation (rubber-duck blocking #1 + #3)
+
+`validateAgentName` enforces `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`,
+rejects Windows reserved names (CON, PRN, AUX, NUL, COM1-9,
+LPT1-9, case-insensitive), and max 64 chars. After name
+validation, `resolveTargetPath` normalizes the joined path and
+verifies the relative path from the root doesn't start with `..`
+or absolute marker — defense in depth in case some platform-
+specific edge case slips past the regex.
+
+### YAML serialization (rubber-duck #2)
+
+Hand-rolled minimal serializer. Supports only the simpler
+frontmatter keys: `name`, `displayName` (skipped if equal to
+name to match SDK default), `description`, `tools[]`, `skills[]`,
+`model`, `user-invocable`. **Does NOT** support `mcp-servers` or
+`github` toolsets — those require nested objects.
+
+Quoting uses `JSON.stringify` (proper escaping for double-quoted
+YAML strings; sufficient for our flat-key scope).
+
+### Create + delete only (no Edit)
+
+This was the rubber-duck's blocking #2. The SDK accepts unknown
+frontmatter keys we don't model (`mcp-servers`, `github`,
+`disable-model-invocation`, future keys). If we wrote an Edit
+that round-tripped through our minimal serializer, advanced
+users would silently lose those keys.
+
+v1: create + delete only. Users who need advanced edits open
+the file directly via Reveal. v2 candidate: parse-then-merge
+implementation that preserves unknown keys (but needs a YAML
+parser dep).
+
+### Atomic write
+
+Write to `<path>.tmp-<rand>`, then `rename` to final path.
+Rename is atomic on POSIX; Node's `fs.rename` on Windows
+(Node 22+) handles the overwrite case. On failure, the temp file
+is cleaned up.
+
+### Sessionless Library tab fallback
+
+The Library can be open before any session is created. In that
+case `listAgentFilesGlobal` returns only User-scope agents.
+Project radio is disabled in the form. Delete is also disabled
+because it needs the session for the SDK reload (could be
+relaxed later — the file write doesn't strictly need the
+session).
+
+### E2E fix
+
+PrimeVue's Tabs renders every panel in the DOM (just hides
+inactive). The Agents tab's hint text mentions
+`<code>.github/agents/</code>`, which broke
+`18-library-mcp.pwtest.ts`'s strict-mode `text=github` locator.
+Fixed by scoping the locator to the active MCP tab panel
+(filter by `text=Configured` to find the MCP-specific one).
+
+### Tests
+
+- `src-bun/__tests__/agentFiles.test.ts` — 16 tests:
+  - 4 `validateAgentName` cases (happy path, traversal, empty/
+    whitespace/leading-dot, Windows reserved, oversize)
+  - 11 round-trip tests: frontmatter content, displayName
+    omitted when equal to name, empty description rejected,
+    refuse-overwrite, scope-without-workingDirectory rejected,
+    path traversal in name throws before I/O, listAgentFiles
+    discovers .agent.md + .md and skips non-.md, empty list
+    when dir missing, deleteAgent removes file, returns false
+    for missing, validates name before resolve.
+
+### Receipts
+
+- Commit: this one. **460 bun tests** (was 444), 68/70 smoke
+  (08-audit-rehydrate flake, unrelated to 19b.2 — also fails
+  on plain main).
+- Phase 19b is now complete. 19c (Fleet + nested sub-agent
+  rendering) is next.
+
+---
+
 ## 2026-05-22 — Phase 19b.1: Background tasks rail section
 
 ### Takeaway
