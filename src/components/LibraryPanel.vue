@@ -9,7 +9,7 @@
 /// Each tab body is its own component so loading / state stays
 /// scoped — switching tabs doesn't re-fetch the other tab's data.
 
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import Tabs from "primevue/tabs";
 import TabList from "primevue/tablist";
 import Tab from "primevue/tab";
@@ -39,6 +39,22 @@ function onTabChange(value: string | number) {
     /* private mode — ignore */
   }
 }
+
+// Cross-component activation: the right-rail Skills section dispatches
+// `dafman:library-activate-tab` so a "Manage globally" click can both
+// open the Library panel AND focus the right tab even when Library is
+// already mounted (a localStorage write alone would only take effect
+// on next reload).
+function onActivateRequest(e: Event) {
+  const detail = (e as CustomEvent<{ tab?: string }>).detail;
+  if (detail?.tab) onTabChange(detail.tab);
+}
+onMounted(() => {
+  window.addEventListener("dafman:library-activate-tab", onActivateRequest);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("dafman:library-activate-tab", onActivateRequest);
+});
 </script>
 
 <template>

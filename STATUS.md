@@ -345,6 +345,17 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 19b shipped: **Skills tab** in the Library
+  panel (already rendered in 19a) is now reachable from the right-
+  rail's Skills section via a "Manage globally →" link. Click
+  writes `dafman.library.activeTab=skills` to localStorage AND
+  dispatches a `dafman:library-activate-tab` custom event so an
+  already-mounted Library panel re-focuses the tab. Skills tab
+  groups by source (builtin / project / personal-copilot), per-row
+  toggle pushes the full disabled-list via
+  `setGloballyDisabledSkills`, reveal-in-folder button when the
+  skill has a `path`. **F19** covers grouped render + toggle
+  persistence + Manage-globally link. **70/70 E2E, 386 bun tests.**
 - **2026-05-22** — Phase 19a shipped: **Library panel** (left-edge
   activity-bar sidebar, pi-book icon) hosting two tabs. **MCP** tab
   (this commit) has a Configured + Discovered server list; per-row

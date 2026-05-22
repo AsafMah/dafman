@@ -3,6 +3,15 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 19b)
+
+- **"Manage globally →" link** in the right-rail Skills section
+  that opens the Library panel and switches it to the Skills tab.
+  Uses a `dafman:library-activate-tab` custom event so an already-
+  mounted Library re-focuses without remount.
+- **F19 E2E** covers Skills tab grouped render, toggle persistence
+  via `setGloballyDisabledSkills`, and the Manage-globally link.
+
 ### Added (Phase 19a)
 
 - **Library panel** — new top-level left-edge sidebar (activity bar:

@@ -10,6 +10,49 @@
 
 ---
 
+## 2026-05-22 — Phase 19b: Skills tab integration + Manage globally link
+
+### Takeaway
+
+Closes out the Library milestone. The Skills tab UI shipped with
+19a; this commit adds the right-rail link that takes users to it
+and the F19 E2E coverage.
+
+### What shipped
+
+- **"Manage globally →" link** in `SessionDetailsPanel.vue`'s
+  Skills section. Implementation is the lightest sensible thing:
+  - writes `dafman.library.activeTab = "skills"` to localStorage
+    (the LibraryPanel reads it on mount), and
+  - dispatches a `dafman:library-activate-tab` CustomEvent so a
+    Library panel that's already mounted re-focuses the right
+    tab without remount, then
+  - calls `layoutStore.openEdgePanel("left", { id: "library", … })`
+    to ensure the panel is open.
+- `LibraryPanel.vue` adds an `onMounted` listener for the custom
+  event so it can switch tabs when activated from outside.
+- **F19** (`19-library-skills.pwtest.ts`):
+  - skills tab renders the three source groups (builtin, project,
+    personal-copilot) from the fake `skills.discover`.
+  - toggle on `summarize` writes the disabled-list; re-mounting
+    via MCP → Skills tab roundtrip surfaces the persisted state.
+  - Manage globally link in the rail opens Library + selects
+    Skills.
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ 386 pass
+- `bun run smoke` ✅ **70/70** (was 64; +3 F19 × 2 envs = +6)
+
+### Followups (Phase 20+)
+
+- Custom agents tab (Phase 20).
+- Instructions tab (Phase 21).
+- Per-server MCP tool listing once SDK exposes it.
+
+---
+
 ## 2026-05-22 — Phase 19a: Library panel + MCP registry MVP
 
 ### Takeaway

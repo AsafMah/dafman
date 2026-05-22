@@ -157,6 +157,30 @@ async function toggleSkill(skill: SessionSkill) {
   }
 }
 
+/// Opens the Library activity-bar panel and switches it to the
+/// Skills tab. localStorage write is what LibraryPanel.vue reads on
+/// mount; the custom event tells it to re-read if it's already
+/// mounted (otherwise switching tabs would only take effect on the
+/// next reload).
+function openSkillsLibrary() {
+  try {
+    localStorage.setItem("dafman.library.activeTab", "skills");
+  } catch {
+    /* private mode — ignore */
+  }
+  window.dispatchEvent(
+    new CustomEvent("dafman:library-activate-tab", { detail: { tab: "skills" } }),
+  );
+  layoutStore.openEdgePanel("left", {
+    id: "library",
+    component: "library",
+    tabComponent: "sidebarTab",
+    title: "Library — MCP servers + Skills",
+    initialSize: 360,
+    minimumSize: 280,
+  });
+}
+
 // ---------- Usage metrics ----------
 const usage = ref<{
   totalUserRequests: number;
@@ -697,6 +721,13 @@ function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
             </div>
           </li>
         </ul>
+        <button
+          type="button"
+          class="link-button manage-globally"
+          @click="openSkillsLibrary"
+        >
+          Manage globally →
+        </button>
       </div>
     </section>
 
@@ -1254,6 +1285,12 @@ function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
 
 .link-button:hover {
   text-decoration: underline;
+}
+
+.manage-globally {
+  margin-top: 0.4rem;
+  align-self: flex-start;
+  font-size: 0.72rem;
 }
 
 /* ---------- Collapsible sections ---------- */

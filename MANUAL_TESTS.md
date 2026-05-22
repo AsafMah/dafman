@@ -310,6 +310,47 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ---
 
+## 2026-05-22 — Phase 19b Library Skills tab + Manage globally
+
+1. ⏳ **Skills tab shows discovered skills grouped by source.**
+   - **Steps:** open Library → Skills tab.
+   - **Expected:** skills appear grouped by source (builtin /
+     project / personal-copilot / plugin). Each row: name +
+     slash badge if userInvocable + per-row toggle. Click the name
+     to expand the description.
+
+2. ⏳ **Reveal-in-folder button opens the skill file.**
+   - **Steps:** on a project-source skill (has a `path`), click
+     the folder icon.
+   - **Expected:** the OS opens the skill file with its default
+     app (markdown viewer or editor).
+   - **Why not automated:** F19 stubs the path; real `revealPath`
+     calls the OS shell.
+
+3. ⏳ **Toggle persists across restart.**
+   - **Steps:** disable a skill via the toggle. Restart the app.
+   - **Expected:** the skill stays disabled (persisted via
+     `setGloballyDisabledSkills` to the CLI's user config).
+   - **Why not automated:** full restart cycle.
+
+4. ⏳ **Manage globally → link from the right-rail.**
+   - **Steps:** open the right-rail Skills section → click
+     "Manage globally →".
+   - **Expected:** Library panel opens with Skills tab focused.
+     If Library was already open on the MCP tab, it switches to
+     Skills without reload.
+
+5. ⏳ **Per-session Skills toggle (right-rail) is separate from
+   global (Library).**
+   - **Steps:** in the right-rail, disable `summarize`. Then open
+     Library Skills and observe `summarize`.
+   - **Expected:** Library still shows `summarize` as enabled
+     (the rail toggle only affects this session; Library shows the
+     global allowlist).
+   - **Why not automated:** F19 covers each in isolation.
+
+---
+
 ## 2026-05-22 — Phase 19a Library panel + MCP registry
 
 1. ⏳ **Open from activity bar.**
