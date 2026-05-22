@@ -88,10 +88,6 @@ export async function spawnBunHarness(options: {
   await waitForReadyMarker(child, port);
 
   const invokeControl = makeControlClient(`ws://127.0.0.1:${port}`);
-  // CI occasionally hits a tiny gap between the ready marker and the
-  // control WebSocket accepting its first connection. Warm the channel
-  // here so the first test action doesn't race the handshake.
-  await invokeControl("listSessions", {});
 
   return {
     port,

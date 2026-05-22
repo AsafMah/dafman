@@ -37,8 +37,10 @@
 - Hardened `e2e/full/harness/bunHarness.ts`:
   - retry initial control-WebSocket connection (`CONTROL_CONNECT_RETRIES`)
   - clear stale socket/openPromise state on connect errors so retries can work
-  - warm the control channel with an initial `listSessions` RPC before each test
-    starts, so the first permission-trigger action doesn't race the handshake
+  - keep the fix entirely in the lazy `invokeControl()` path (a first attempt
+    to warm the socket in `spawnBunHarness()` tripped CI's Node-side
+    `ReferenceError: WebSocket is not defined` before Playwright had initialised
+    the environment, so the final fix avoids any eager pre-page connection)
 
 ### Receipts
 
