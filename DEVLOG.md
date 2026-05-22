@@ -10,6 +10,92 @@
 
 ---
 
+## 2026-05-22 — Phase 20c: code review + dep audit + tech-debt doc
+
+### Takeaway
+
+Closing out the cleanup sweep. Three `code-review` subagents
+covered the biggest files: `src-bun/app/sessions.ts` (1451 LoC),
+the `chatEvents` reducer family (`src/lib/chatEvents.ts` +
+sub-handlers), and the renderer's trio (`sessionsStore.ts`,
+`App.vue`, `SessionDetailsPanel.vue`).
+
+Per the "surgical only" appetite for this sweep, fixed 4 real
+bugs in 20c. Everything else (architectural extractions, type
+casts, UX nits, test gaps) catalogued in
+`plans/plan-tech-debt.prompt.md` as a tracked backlog for later.
+
+### Real bugs fixed
+
+1. **`respondToPending` event rollback** — 20a fix was incomplete.
+   The pending entry was restored on RPC failure but the appended
+   `dafman.pending_response` event stayed in `record.events`. The
+   chat reducer would close the pending card in the transcript
+   view despite the SDK still holding the request open. Now
+   appends the event AFTER the RPC succeeds.
+2. **`setSessionWorkingDirectory` stale record** — captured
+   `record` reference before the await; mutated it after. If the
+   user closed the session mid-RPC, the local update went to a
+   detached reactive object. Now captures `baseWorkingDirectory`
+   read-only before the await and re-looks-up the record after.
+3. **`chatEvents.upsertAssistant/Reasoning/Tool` O(N²)** — was
+   `items.find(...)` per event. 30 deltas/sec into a 200-item
+   session = 6000 ops/sec just locating the in-progress message.
+   Now uses per-call `Map<id, index>` indices rebuilt once at the
+   top of `processEvents` for O(1) lookup. Rebuild cost is paid
+   once (~200 ops) vs many find()s.
+4. **Architecture doc drift** — removed `permissionsStore` row
+   (deleted in 20b), added Library + SessionDetailsPanel + new
+   components, documented the Electrobun-error-wrapping wire
+   contract.
+
+### Deferred (in `plans/plan-tech-debt.prompt.md`)
+
+- **A1 (extract `PendingRequestQueue`)** — ~400 lines of
+  self-contained subsystem inside `sessions.ts`. Highest payoff
+  refactor.
+- **S1 (missing `shutdown()`)** — no app-quit teardown for the
+  SessionRegistry; pending callbacks would hang.
+- **S2 (`create()` race in earlyForward)** — `resolvedSessionId`
+  starts null; first SDK event forwards as "pending".
+- **A2/A3 (`McpRegistry` / `SkillsRegistry` extractions)** —
+  natural seams in `sessions.ts`.
+- **G1 (test-server missing 14 handlers)** — E2E coverage gap.
+- 8 UX/perf nits (over-fetch on tab switch, quota toast re-fire,
+  silent retry exhaustion, etc.)
+- 3 type-safety improvements (guard unsafe casts, type
+  `dafman.pending_request` event payload).
+
+### Dep audit
+
+Bumped 9 safe minors:
+| Package | From | To |
+|---|---|---|
+| `@happy-dom/global-registrator` | 20.0.0 | 20.9.0 |
+| `@vitejs/plugin-vue` | 5.2.1 | 5.2.4 |
+| `@vue/compiler-sfc` | 3.5.13 | 3.5.34 |
+| `concurrently` | 9.1.0 | 9.2.1 |
+| `dockview-vue` | 6.3.0 | 6.4.0 |
+| `typescript` | 5.6.2 | 5.9.3 |
+| `vite` | 6.0.3 | 6.4.2 |
+| `vue` | 3.5.13 | 3.5.34 |
+| `vue-tsc` | 2.1.10 | 2.2.12 |
+
+Deferred (high regression risk):
+- **Lexical 0.38 → 0.44** (6 minors). Editor depends on Lexical;
+  needs manual smoke on every composer feature.
+- **Katex 0.16 → 0.17** (major). Math rendering in MessageContent.
+
+### Gates
+
+- `bun run lint` ✅
+- `bun test` ✅ 396 pass (unchanged)
+- `bun run smoke` ✅ 70/70
+- `bun run dev` boot ✅ — sessions stale → handled cleanly via
+  AppError decode path; `[boot]` traces complete in ~150 ms.
+
+---
+
 ## 2026-05-22 — Phase 20b: dead code + dep sweep
 
 ### Takeaway

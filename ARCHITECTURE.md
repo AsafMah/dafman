@@ -100,6 +100,13 @@ src-bun/
   modules without spinning up Electrobun.
 - **Every RPC handler is wrapped with `rpcGuard`** so unknown failures
   serialize as `AppErrorPayload` and the renderer never sees a raw `Error`.
+  **Wire encoding:** `rpcGuard` throws `new Error("AppErrorPayload:" +
+  JSON.stringify(payload))` — a *real* Error instance, because Electrobun's
+  bridge (see `node_modules/electrobun/dist/api/shared/rpc.ts:398`) only
+  serializes thrown Error instances. Non-Error throws get re-thrown as
+  unhandled rejections on the worker side and the renderer's request
+  promise NEVER settles. The renderer's `invokeCommand` decodes the
+  `AppErrorPayload:` prefix back into a typed `AppError`.
 - **No background tasks without a cancellation/unsubscribe handle.** The
   `SessionRegistry` keeps `unsubscribe` callbacks per entry and calls them
   on disconnect / shutdown.
@@ -175,14 +182,13 @@ src/
 | `toastStore`       | PrimeVue toast bridge                                                             |
 | `notificationsStore` | OS notification gating + permission state                                       |
 | `commandRegistry`  | Cmd/Ctrl+K palette contributions (`register` returns a disposer)                  |
-| `permissionsStore` | (stub — kept for future rule-policy state)                                        |
 
 ### Component map
 
 | Component                  | Purpose                                                          |
 |----------------------------|------------------------------------------------------------------|
 | `App.vue`                  | Shell: ActivityBar + DockviewVue + global PendingRequestCard host |
-| `ActivityBar.vue`          | Left rail: brand mark + panel toggles + settings + dev wrench    |
+| `ActivityBar.vue`          | Left rail: brand mark + panel toggles (Sessions, Library, Settings, Diagnostics) + dev wrench |
 | `ChatPanel.vue`            | Dockview "chat" panel component (resolves wrapped params)         |
 | `ChatWindow.vue`           | One chat session: scroll list + composer; runs `processEvents`   |
 | `ChatTab.vue` / `ChatTabActions.vue` / `SidebarTab.vue` | Dockview tab renderers + indicators |
@@ -198,14 +204,18 @@ src/
 | `PermissionRuleEditor.vue` | "Allow for session" rule editor (commands/read/write/mcp/url)     |
 | `JsonSchemaForm.vue` / `JsonSchemaField.vue` / `JsonValueView.vue` | Elicitation form-mode renderer |
 | `CommandPalette.vue`       | Cmd/Ctrl+K overlay (`vue-command-palette` based)                  |
-| `SettingsPanel.vue`        | Modal settings dialog (theme, streaming, mermaid, notifications, default workspace) |
-| `SessionsManager.vue`      | Edge-panel CLI session catalog grouped by workspace (resume/delete) |
-| `SessionHeaderControls.vue`| Tab-strip model/effort/reasoning picker + gear popover (name, mode, skills, usage) |
+| `SettingsPanel.vue`        | Settings edge panel (theme, streaming, mermaid, notifications, default workspace) |
+| `SessionsManager.vue`      | Left-edge CLI session catalog grouped by workspace (resume/delete) |
+| `SessionDetailsPanel.vue`  | Right-edge **singleton** per-session settings rail (name, mode, reasoning, workspace, approve-all, skills, tools, MCP servers, plan, usage, quota, fork) — binds to `layoutStore.activeSessionId` |
+| `LibraryPanel.vue`         | Left-edge "Library" panel hosting global/cross-session config (Phase 19) |
+| `LibraryMcpTab.vue` / `McpServerForm.vue` | Configured + Discovered MCP servers; structured ↔ JSON add/edit dialog |
+| `LibrarySkillsTab.vue`     | Skills grouped by source (builtin / project / personal-copilot) with global enable/disable |
+| `SessionHeaderControls.vue`| Tab-strip workspace chip + model + effort + reasoning + cog toggle for the rail |
 | `ModeButtonGroup.vue`      | Run mode (interactive / plan / autopilot) button group            |
 | `MentionPlugin.vue` / `SlashCommandPlugin.vue` | Typeahead pickers inside the composer         |
 | `MermaidBlock.vue`         | Lazy mermaid renderer (opt-in via Settings)                       |
 | `CodeEditor.vue`           | CodeMirror 6 wrapper for code-fenced segments                     |
-| `BootSplash.vue`           | Boot-phase status overlay                                         |
+| `BootSplash.vue`           | Boot-phase status overlay (with 6s watchdog forcing ready)        |
 | `LogViewer.vue`            | Live log tail with level + display filter + search + diagnostics export |
 | `Watermark.vue`            | Empty-state body watermark                                        |
 

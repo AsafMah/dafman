@@ -3,6 +3,40 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (Phase 20c — code review surgical fixes)
+
+- **`respondToPending` no longer appends a phantom response event
+  on RPC failure.** 20a fix restored the pending entry in catch but
+  left the appended `dafman.pending_response` event in place — the
+  chat reducer would close the card in the transcript view despite
+  the SDK still holding the request open. Now appends the event
+  AFTER the RPC succeeds.
+- **`setSessionWorkingDirectory` no longer mutates a stale record
+  reference.** Captured `record` before await; if the user closed
+  the session mid-RPC, the update silently mutated a detached
+  reactive object. Now captures `baseWorkingDirectory` read-only
+  before the await and re-looks-up the record after.
+- **`chatEvents.upsertAssistant/Reasoning/Tool` O(N²) → O(1).** Was
+  `items.find(...)` per event — streaming 30 deltas/sec into a
+  200-item session = 6000 ops/sec just locating the in-progress
+  message. Now uses ephemeral per-call `Map<id, index>` indices.
+
+### Changed (Phase 20c)
+
+- **9 npm dependencies bumped** to safe minors: Vue 3.5.34,
+  `@vue/compiler-sfc` 3.5.34, `@vitejs/plugin-vue` 5.2.4, vite
+  6.4.2, vue-tsc 2.2.12, TypeScript 5.9.3, dockview-vue 6.4.0,
+  concurrently 9.2.1, `@happy-dom/global-registrator` 20.9. Lexical
+  (6-version jump) and Katex (major) deferred to dedicated PRs.
+- **`ARCHITECTURE.md` refresh**: removed `permissionsStore` row
+  (deleted in 20b), added Library + SessionDetailsPanel + new
+  components, documented the Electrobun-error-wrapping wire contract
+  in the rpcGuard hard rule.
+- **`plans/plan-tech-debt.prompt.md`** created with all deferred
+  findings from the 20c code review (3 architectural extractions,
+  5 correctness items, 3 type-safety nits, 8 UX/perf nits, 3 test
+  gaps, 2 dep deferrals).
+
 ### Removed (Phase 20b — dead code + dep sweep)
 
 - **`src/stores/permissionsStore.ts`** — orphan placeholder file

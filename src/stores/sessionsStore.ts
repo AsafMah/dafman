@@ -774,16 +774,22 @@ export const useSessionsStore = defineStore("sessions", () => {
     sessionId: string,
     workingDirectory: string,
   ): Promise<string> {
-    const record = sessions.value.find((s) => s.id === sessionId);
     const toasts = useToastStore();
+    // Capture the baseWorkingDirectory read-only BEFORE the await
+    // (so the RPC has it for relative-path resolution), but DO NOT
+    // capture the record reference itself — it may be unmounted by
+    // the time the RPC resolves. Re-lookup after.
+    const baseWd = sessions.value.find((s) => s.id === sessionId)?.workingDirectory;
     try {
       const next = await invokeCommand("setSessionWorkingDirectory", {
         sessionId,
         workingDirectory,
-        ...(record?.workingDirectory
-          ? { baseWorkingDirectory: record.workingDirectory }
-          : {}),
+        ...(baseWd ? { baseWorkingDirectory: baseWd } : {}),
       });
+      // Re-lookup the record post-await — it may have been closed
+      // mid-RPC, in which case there's nothing to update locally
+      // (the SDK side already committed the change).
+      const record = sessions.value.find((s) => s.id === sessionId);
       if (record) {
         record.workingDirectory = next;
         appendEvent(record, {
@@ -971,10 +977,12 @@ export const useSessionsStore = defineStore("sessions", () => {
     params: RespondToRequestParams,
   ): Promise<void> {
     const record = sessions.value.find((s) => s.id === params.sessionId);
-    // Snapshot the pending entry so we can restore it if the bun-side
-    // RPC fails — without rollback, the UI would lose the pending
-    // card while the SDK still has the request open, leaving the user
-    // with no way to respond.
+    // Snapshot + remove the pending entry optimistically so the UI's
+    // pending card disappears immediately on click. The
+    // `dafman.pending_response` event is NOT appended until the RPC
+    // succeeds — otherwise a failed response would leave a phantom
+    // response event in the transcript that the chat reducer would
+    // dutifully render.
     let restoredEntry: PendingRecordRequest | null = null;
     let restoredIdx = -1;
     if (record) {
@@ -985,17 +993,35 @@ export const useSessionsStore = defineStore("sessions", () => {
         restoredEntry = record.pendingRequests[restoredIdx] ?? null;
         record.pendingRequests.splice(restoredIdx, 1);
       }
-      appendEvent(record, {
-        sessionId: record.id,
-        eventType: "dafman.pending_response",
-        data: { requestId: params.requestId, kind: params.response.kind },
-      });
     }
-    if (params.sessionId === PLAYGROUND_PENDING_SESSION_ID) return;
+    if (params.sessionId === PLAYGROUND_PENDING_SESSION_ID) {
+      // Playground: synthesise the response event locally so the demo
+      // UI can show the closed-out card without a real RPC.
+      if (record) {
+        appendEvent(record, {
+          sessionId: record.id,
+          eventType: "dafman.pending_response",
+          data: { requestId: params.requestId, kind: params.response.kind },
+        });
+      }
+      return;
+    }
     try {
       await invokeCommand("respondToRequest", params);
+      // Only emit the response event after the RPC succeeds — the
+      // chat reducer uses it to clear the pending card from the
+      // transcript view.
+      if (record) {
+        appendEvent(record, {
+          sessionId: record.id,
+          eventType: "dafman.pending_response",
+          data: { requestId: params.requestId, kind: params.response.kind },
+        });
+      }
     } catch (err) {
-      // Roll back the optimistic UI mutation so the user can retry.
+      // Roll back the optimistic pending-list mutation so the user
+      // can retry. No response event was appended yet, so nothing
+      // else to undo.
       if (record && restoredEntry) {
         record.pendingRequests.splice(restoredIdx, 0, restoredEntry);
       }

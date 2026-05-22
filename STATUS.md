@@ -345,6 +345,21 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 20c shipped: **code review + dep audit +
+  tech-debt doc**. Three `code-review` subagents covered
+  `src-bun/app/sessions.ts`, the `chatEvents` reducer family, and
+  the renderer's largest files (`sessionsStore`, `App.vue`,
+  `SessionDetailsPanel`). Fixed 4 surgical bugs: incomplete
+  `respondToPending` rollback (event now appends after RPC
+  success), stale-record race in `setSessionWorkingDirectory`,
+  O(N²) `upsert*` in the chatEvents streaming hot path (now uses
+  per-call Map indices for O(1) lookup), arch doc + tech-debt
+  doc refresh. Bumped 9 safe npm minors (Vue 3.5.34, vite 6.4.2,
+  TypeScript 5.9.3, etc.); deferred Lexical 6-version + Katex
+  major. **397 bun tests, 70/70 E2E, boot verified.** Outstanding
+  findings live in `plans/plan-tech-debt.prompt.md` (3
+  architectural / 5 correctness / 3 type / 8 UX-perf nits / 3
+  test gaps / 2 dep deferrals).
 - **2026-05-22** — Phase 20b shipped: **dead code + dep sweep**. Used
   knip to enumerate unused exports / files / deps; manually
   verified each (knip has false positives on .vue files +

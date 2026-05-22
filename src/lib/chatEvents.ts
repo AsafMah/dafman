@@ -309,10 +309,25 @@ export function processEvents(
   let error = false;
   const isLive = opts.live ?? true;
 
+  // Per-call lookup indices so the upsert hot path is O(1) instead
+  // of O(N) per delta. Streaming a single assistant response can
+  // emit 30+ deltas per second; without these, a 200-item session
+  // was paying 200 comparisons per delta = 6000 ops/sec just to
+  // find the in-progress message. Maps are rebuilt per `processEvents`
+  // call (cheap — done once vs many find()s).
+  const assistantIdx = new Map<string, number>();
+  const reasoningIdx = new Map<string, number>();
+  const toolIdx = new Map<string, number>();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]!;
+    if (it.kind === "assistant" && it.messageId) assistantIdx.set(it.messageId, i);
+    else if (it.kind === "reasoning" && it.reasoningId) reasoningIdx.set(it.reasoningId, i);
+    else if (it.kind === "tool" && it.toolCallId) toolIdx.set(it.toolCallId, i);
+  }
+
   const upsertAssistant = (messageId: string, eventId?: string): ChatItem => {
-    let existing = items.find(
-      (i) => i.kind === "assistant" && i.messageId === messageId,
-    );
+    const cached = assistantIdx.get(messageId);
+    let existing = cached !== undefined ? items[cached] : undefined;
     if (!existing) {
       existing = {
         id: counter.next++,
@@ -321,6 +336,7 @@ export function processEvents(
         messageId,
         ...(eventId ? { eventId } : {}),
       };
+      assistantIdx.set(messageId, items.length);
       items.push(existing);
     } else if (eventId && existing.kind === "assistant" && !existing.eventId) {
       existing.eventId = eventId;
@@ -329,9 +345,8 @@ export function processEvents(
   };
 
   const upsertReasoning = (reasoningId: string, eventId?: string): ChatItem => {
-    let existing = items.find(
-      (i) => i.kind === "reasoning" && i.reasoningId === reasoningId,
-    );
+    const cached = reasoningIdx.get(reasoningId);
+    let existing = cached !== undefined ? items[cached] : undefined;
     if (!existing) {
       existing = {
         id: counter.next++,
@@ -340,6 +355,7 @@ export function processEvents(
         reasoningId,
         ...(eventId ? { eventId } : {}),
       };
+      reasoningIdx.set(reasoningId, items.length);
       items.push(existing);
     } else if (eventId && existing.kind === "reasoning" && !existing.eventId) {
       existing.eventId = eventId;
@@ -352,9 +368,8 @@ export function processEvents(
     fallbackName?: string,
     eventId?: string,
   ): ChatItem => {
-    let existing = items.find(
-      (i) => i.kind === "tool" && i.toolCallId === toolCallId,
-    );
+    const cached = toolIdx.get(toolCallId);
+    let existing = cached !== undefined ? items[cached] : undefined;
     if (!existing) {
       existing = {
         id: counter.next++,
@@ -365,6 +380,7 @@ export function processEvents(
         partialOutput: "",
         ...(eventId ? { eventId } : {}),
       };
+      toolIdx.set(toolCallId, items.length);
       items.push(existing);
     } else if (eventId && existing.kind === "tool" && !existing.eventId) {
       existing.eventId = eventId;

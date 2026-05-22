@@ -98,7 +98,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     setRpcBridge(null);
   });
 
-  test("happy path: splices entry, never restores it", async () => {
+  test("happy path: splices entry + appends response event", async () => {
     const { bridge, firePending } = makeBridge({ respondToRequestShouldThrow: false });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -106,6 +106,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
 
     const record = store.sessions.find((s) => s.id === "s1");
     expect(record?.pendingRequests).toHaveLength(1);
+    const eventsBefore = record!.events.length;
 
     await store.respondToPending({
       sessionId: "s1",
@@ -114,9 +115,15 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     });
 
     expect(record?.pendingRequests).toEqual([]);
+    // dafman.pending_response event was appended after RPC success.
+    const newEvents = record!.events.slice(eventsBefore);
+    const responseEvents = newEvents.filter(
+      (e) => e.eventType === "dafman.pending_response",
+    );
+    expect(responseEvents).toHaveLength(1);
   });
 
-  test("RPC failure: restores the pending entry + fires error toast", async () => {
+  test("RPC failure: restores pending entry + does NOT append phantom response event", async () => {
     const { bridge, firePending } = makeBridge({ respondToRequestShouldThrow: true });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -126,6 +133,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     const record = store.sessions.find((s) => s.id === "s1");
     expect(record?.pendingRequests).toHaveLength(1);
     const before = record!.pendingRequests[0];
+    const eventsBefore = record!.events.length;
 
     await store.respondToPending({
       sessionId: "s1",
@@ -136,6 +144,15 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     // Rollback: pending entry is back in place, same identity.
     expect(record?.pendingRequests).toHaveLength(1);
     expect(record?.pendingRequests[0]).toBe(before);
+
+    // No phantom response event got appended — the reducer would
+    // otherwise close the pending card in the transcript despite
+    // the request still being open.
+    const newEvents = record!.events.slice(eventsBefore);
+    const responseEvents = newEvents.filter(
+      (e) => e.eventType === "dafman.pending_response",
+    );
+    expect(responseEvents).toHaveLength(0);
 
     // Error toast queued.
     const errs = toasts.pending.filter((t) => t.severity === "error");

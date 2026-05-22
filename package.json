@@ -42,7 +42,7 @@
     "@lexical/rich-text": "0.38.1",
     "@primeuix/themes": "^2.0.3",
     "copilot-sdk-supercharged": "^2.1.2",
-    "dockview-vue": "^6.3.0",
+    "dockview-vue": "6.4.0",
     "dompurify": "^3.4.5",
     "electrobun": "1.18.1",
     "katex": "^0.16.47",
@@ -58,11 +58,11 @@
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",
-    "vue": "^3.5.13",
+    "vue": "3.5.34",
     "vue-command-palette": "^0.2.3"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.0.0",
+    "@happy-dom/global-registrator": "20.9.0",
     "@playwright/test": "^1.60.0",
     "@testing-library/vue": "^8.1.0",
     "@types/bun": "latest",
@@ -70,11 +70,11 @@
     "@types/markdown-it-emoji": "^3.0.1",
     "@types/markdown-it-footnote": "^3.0.4",
     "@types/prismjs": "^1.26.6",
-    "@vitejs/plugin-vue": "^5.2.1",
-    "@vue/compiler-sfc": "^3.5.13",
-    "concurrently": "^9.1.0",
-    "typescript": "~5.6.2",
-    "vite": "^6.0.3",
-    "vue-tsc": "^2.1.10"
+    "@vitejs/plugin-vue": "5.2.4",
+    "@vue/compiler-sfc": "3.5.34",
+    "concurrently": "9.2.1",
+    "typescript": "5.9.3",
+    "vite": "6.4.2",
+    "vue-tsc": "2.2.12"
   }
 }
