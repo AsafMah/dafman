@@ -694,3 +694,145 @@ The picker only lets you pick a folder, no files visible.
     - **Why not automated:** subjective perf check.
 
 ---
+
+
+---
+
+## `59d2197` feat(agents): custom agent picker (Phase 19a)
+
+1. ⏳ **Header chip appears when an agent is selected, hidden otherwise.**
+   - **Steps:** drop a markdown file at `~/.copilot/agents/reviewer.agent.md` with frontmatter `--- description: Reviews PRs ---` and body `You are a strict code reviewer.`. Click Reload from disk in the rail's Agents section. Click Select on the reviewer row.
+   - **Expected:** header gets a new pill next to the workspace chip showing `reviewer` (or `displayName` if set). Clicking Deselect hides the chip.
+   - **Why not automated:** filesystem + SDK discovery + reactive header chip across the full Electrobun → bun → renderer chain.
+
+2. ⏳ **Project vs User source badge derives from path correctly.**
+   - **Steps:** put one agent under `~/.copilot/agents/` and another under `<workspace>/.github/agents/`. Open the rail.
+   - **Expected:** the user one shows `USER` tag, the project one shows `PROJECT`. Tooltip on the tag shows the absolute path.
+   - **Why not automated:** path normalization is unit-tested, but the rail's reactive recompute when the working directory changes mid-session needs a human eye.
+
+3. ⏳ **subagent.selected event mid-session updates the chip without a refetch.**
+   - **Steps:** with no chip showing, run `/agent reviewer` in the composer (the SDK's slash command). Watch the header.
+   - **Expected:** chip flips to `reviewer` reactively — no full page reload, no refetch needed.
+   - **Why not automated:** SDK slash + event stream + Vue reactivity.
+
+4. ⏳ **Header chip click opens the rail's Agents section.**
+   - **Steps:** select an agent so chip is visible. Click it.
+   - **Expected:** rail opens (if closed). Agents section auto-expanded.
+   - **Why not automated:** rail mount + section auto-expand interaction.
+
+---
+
+## `d48ca4b` feat(tasks): background tasks rail section (Phase 19b.1)
+
+1. ⏳ **Agent-delegated task appears in the rail.**
+   - **Steps:** ask the agent something that triggers the built-in `task` tool (e.g. "explore this codebase and report 3 interesting files"). Watch the right rail's Background tasks section.
+   - **Expected:** a task row appears with status `running`, the agent's display name, elapsed time ticking up, and a description.
+   - **Why not automated:** depends on the LLM actually invoking the `task` tool, which we can't reliably script.
+
+2. ⏳ **Status pill flips to completed (green) when the task ends.**
+   - **Steps:** wait for the task above to finish.
+   - **Expected:** pill turns green `COMPLETED`, elapsed time freezes, Cancel button becomes a Remove button.
+   - **Why not automated:** event timing + lifecycle.
+
+3. ⏳ **Cancel button works on a long-running task.**
+   - **Steps:** trigger a task that takes >10s. Click Cancel.
+   - **Expected:** status flips to `CANCELLED` (grey). Task does not produce further events. SDK acknowledges via subsequent listTasks call.
+   - **Why not automated:** SDK side-effects on cancel + visual confirmation.
+
+4. ⏳ **Remove removes the row from the list.**
+   - **Steps:** click Remove on a completed/failed task.
+   - **Expected:** row vanishes immediately.
+
+5. ⏳ **Section auto-refreshes on subagent events without page reload.**
+   - **Steps:** with the rail Background tasks section EXPANDED and visible, trigger a task. Don't switch session.
+   - **Expected:** section repopulates on its own as `subagent.started` / `subagent.completed` events arrive — no manual reload needed.
+   - **Why not automated:** event flow + per-record counter + watcher chain.
+
+---
+
+## `e529b8e` feat(library): Library Agents tab CRUD (Phase 19b.2)
+
+1. ⏳ **"+ New agent" form creates a file with correct YAML frontmatter.**
+   - **Steps:** open Library → Agents tab. Click "+ New agent". Fill: scope=User, name=`test-bot`, description=`A test agent`, tools=`read, grep`, prompt=`You are a test agent.`. Submit.
+   - **Expected:** toast says "Agent created" with the path. `~/.copilot/agents/test-bot.agent.md` exists. Open it; frontmatter has `name: "test-bot"`, `description: "A test agent"`, `tools:\n  - "read"\n  - "grep"`. Body has the prompt.
+   - **Why not automated:** filesystem + form interaction + verify content shape.
+
+2. ⏳ **Project scope writes to `<workspace>/.github/agents/`.**
+   - **Steps:** with a session open, "+ New agent" → scope=Project, name=`proj-agent`. Submit.
+   - **Expected:** file lands at `<workspace>/.github/agents/proj-agent.agent.md`.
+   - **Why not automated:** workspace-relative path resolution + multi-session UI state.
+
+3. ⏳ **Name validation rejects path traversal.**
+   - **Steps:** type `../etc/passwd` in the name field. Submit.
+   - **Expected:** form shows error like "agent name must match [...]". No file is written outside the agents directory.
+   - **Why not automated:** UI form error display + filesystem safety check.
+
+4. ⏳ **Project radio is disabled when no session is open.**
+   - **Steps:** close all sessions. Open Library → Agents → "+ New agent".
+   - **Expected:** the "Project" radio option is disabled and unselectable; "User" is the only available scope.
+   - **Why not automated:** form state derived from session store.
+
+5. ⏳ **Newly created agent shows in the picker WITHOUT manual reload.**
+   - **Steps:** create an agent via the form. Switch to the right rail's Agents section.
+   - **Expected:** the new agent appears immediately (writeAgentFile calls session.rpc.agent.reload automatically).
+   - **Why not automated:** end-to-end of write → SDK reload → rail watcher.
+
+6. ⏳ **Delete button confirms then removes the file.**
+   - **Steps:** click Delete on an existing agent row.
+   - **Expected:** confirm dialog with the file path. After OK, file is gone from disk; row disappears.
+   - **Why not automated:** native `confirm()` + filesystem.
+
+7. ⏳ **Reveal opens the file's parent folder.**
+   - **Steps:** click the external-link icon on an agent row.
+   - **Expected:** OS file manager opens, file is highlighted (Windows Explorer / macOS Finder / Linux file manager).
+   - **Why not automated:** shells out to OS via revealPath.
+
+---
+
+## `3172b80` feat(fleet): /fleet slash + nested sub-agent rendering (Phase 19c)
+
+1. ⏳ **`/fleet` (no args) starts a fleet on the current session.**
+   - **Steps:** in the composer type `/fleet`. The slash menu shows the entry. Hit Enter (or Tab + Enter to confirm).
+   - **Expected:** toast "Fleet started". Session begins emitting subagent events shortly after.
+   - **Why not automated:** SDK-internal fleet sizing + emission timing.
+
+2. ⏳ **`/fleet [prompt]` forwards the prompt to the SDK.**
+   - **Steps:** type `/fleet review the security of this codebase`. Send.
+   - **Expected:** toast includes "Prompt: review the security of this codebase". Sub-agent activity reflects the prompt direction.
+
+3. ⏳ **Sub-agent appears as a collapsible nested block in chat.**
+   - **Steps:** wait for the first `subagent.started` event after kicking off the fleet.
+   - **Expected:** chat shows a bordered card with status pill `RUNNING` (blue), the sub-agent's display name, elapsed time. Body indented with a left border.
+
+4. ⏳ **Nested events appear INSIDE the sub-agent block (not interleaved).**
+   - **Steps:** watch a running sub-agent.
+   - **Expected:** when it emits an assistant message or runs a tool, the activity appears INSIDE its card — not as a top-level message. Tool calls show with their own ToolCallBlock nested.
+   - **Why not automated:** the reducer routing has unit-test coverage but the visual nesting needs a human check.
+
+5. ⏳ **Status pill changes color on completion.**
+   - **Steps:** wait for the sub-agent to finish.
+   - **Expected:** pill turns green `COMPLETED` (or red `FAILED` if it errored). Elapsed time freezes.
+
+6. ⏳ **Failed sub-agent shows the error message.**
+   - **Steps:** trigger a fleet that produces at least one failed sub-agent (e.g. ask for an impossible task or stress test).
+   - **Expected:** red `FAILED` pill + error text rendered prominently in red below the header.
+
+7. ⏳ **Collapsing a sub-agent block + expanding works; user toggle wins over auto-default.**
+   - **Steps:** while a sub-agent is running (auto-expanded), click the chevron to collapse.
+   - **Expected:** body hides but header stays visible. Once it completes, the auto-default would collapse — but our prior click is sticky, so it stays in whatever state we left it.
+
+8. ⏳ **Multiple parallel sub-agents render as separate cards.**
+   - **Steps:** start a fleet that spawns 2-3 sub-agents.
+   - **Expected:** each gets its own card in the chat, each updates independently. No cross-talk (one finishing doesn't affect another).
+
+9. ⏳ **Sub-agent's tool call doesn't collide with a root-level tool call with the same ID.**
+   - **Steps:** observe a fleet where both the main agent and a sub-agent use overlapping tools (rare in practice — SDK should namespace toolCallIds, but the per-buffer index defense matters).
+   - **Expected:** the root tool call updates in its own card, the sub-agent's in the nested block. Neither overwrites the other.
+   - **Why not automated:** can't reliably reproduce the ID collision without controlling the SDK.
+
+10. ⏳ **Sessions resumed after a fleet ran show the nested blocks correctly.**
+    - **Steps:** trigger a fleet, let it complete, close the session, restart the app. Resume the session.
+    - **Expected:** the chat transcript replays the sub-agent blocks correctly — they don't get flattened into top-level events.
+    - **Why not automated:** history replay through the reducer with the SubagentChatItem nesting.
+
+---
