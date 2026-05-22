@@ -272,7 +272,18 @@ async function restoreFromLayout() {
     sessionIds.map((id) =>
       sessionsStore
         .restoreSession(id)
-        .finally(() => bootStore.markSessionRestored()),
+        .then((r) => {
+          console.info(`[boot] restoreSession(${id.slice(0, 8)}) resolved → ${r ? "record" : "null"}`);
+          return r;
+        })
+        .catch((err) => {
+          console.error(`[boot] restoreSession(${id.slice(0, 8)}) THREW`, err);
+          return null;
+        })
+        .finally(() => {
+          console.info(`[boot] markSessionRestored(${id.slice(0, 8)})`);
+          bootStore.markSessionRestored();
+        }),
     ),
   );
   console.info("[boot] restoreFromLayout: all resumes settled, applying layout");
