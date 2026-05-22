@@ -13,65 +13,45 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **M2 — Messaging power-ups** (closing the tail).
-Most of M1 + M2 shipped; remaining tail is the in-app log viewer, export
-conversation, and the rough edges noted under "Observability tail" below.
+**Active milestone:** **M2 — Messaging power-ups** essentially closed.
+M1 + M2 shipped (including in-app log viewer, export conversation,
+permissions tab, tools allowlist, MCP OAuth toast). Active direction
+is now post-M2 work from the audit's Phase 18–40 ordering — Library
+tab consolidation, App shell redesign, and Long-jobs / Autopilot UI
+are the top-of-queue candidates.
 
 ---
 
 ## Next concrete steps
 
-**2026-05-22:** wrote a full backlog audit covering every feature documented
-across plans/ that's NOT in the current Phase plan — see
-**[`plans/plan-backlog-audit.prompt.md`](plans/plan-backlog-audit.prompt.md)**.
-14 major themes were missing from the phased ordering:
+**2026-05-25:** Phase 22 complete (MCP OAuth toast + Permissions tab
++ Tools tri-state allowlist). See DEVLOG for receipts. Image
+generation **stays deferred** per the user's earlier "skip until
+used" call — we will not pursue it speculatively.
 
-- Terminal integration (`Bun.spawn` PTY + xterm.js panes)
-- App shell redesign (sidebar + status bar)
-- Layout groups (workspace-of-pane-trees switcher)
-- Server mode (dafman over the browser)
-- Long jobs registry + Autopilot UI
-- Composer toolbar (WYSIWYG + slash picker)
-- Library panel (Skills + MCP + Instructions + Agents)
-- M365 + Teams bot
-- Desktop control / Bun shell / Browser-control tools
-- Per-session settings as right-rail panel (user explicitly asked for it)
+Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` §C):
 
-A fresh Phase 18–40 ordering is proposed in §C of the audit doc. Awaiting
-user pick.
-
-After the 2026-05-22 SDK + CLI audit (see
-**[`plans/plan-sdk-audit.prompt.md`](plans/plan-sdk-audit.prompt.md)** —
-exhaustive cross-reference of every `copilot-sdk-supercharged` RPC +
-every `@github/copilot` 1.0.48 changelog entry against what we ship),
-the ordering changed. Picked from the new Phase 18–23 ordering in the
-audit doc.
-
-**Most recently shipped (2026-05-22):** rebuilt the composer's `@file`
-picker (and unified the paperclip path). New `FilePicker.vue` with
-fuzzy + path-nav (`@/abs`, `@~/`, `@../`) modes, hidden / ignored
-toggle, native "Browse…" escape hatch via new `pickAttachment` RPC.
-Single-pick per popup. Directories attach as `directory` pills.
-
-1. **Phase 18 — Skills library + MCP registry MVP** (~3 d).
-   `rpc.skills.list/enable/disable/reload` + `rpc.mcp.config.*` +
-   per-session `rpc.mcp.enable/disable/reload`. Settings panes for
-   each. MCP OAuth status toast wired into the existing URL
-   elicitation path.
-2. **Phase 19 — Custom agents + tasks/fleet** (~3 d).
-   `rpc.agent.*` picker; `rpc.tasks.*` panel; `rpc.fleet.start`
-   runner.
-3. **Phase 20 — Power UX** (~2 d). Tool allow/exclude UI +
-   `rpc.tools.list`; plans panel via `rpc.plan.*`; usage dashboard +
-   `rpc.account.getQuota`; fork session via `rpc.sessions.fork`.
-4. **Phase 21 — Image generation + remembered permissions** (~2 d).
-   Image gen un-deferred per audit §E — `responseFormat: "image"` +
-   `assistant.image` event renderer. Settings → Remembered Permissions
-   via `rpc.permissions.setApproveAll` / `resetSessionApprovals`.
+1. **Library tab consolidation + slash commands** (audit P21, ~2 d).
+   Skills + MCP + Agents + Instructions currently live in separate
+   places; consolidate behind a single Library panel with a unified
+   item grid. Needs scope interview — "consolidation" is ambiguous.
+2. **App shell redesign — sidebar + status bar** (audit P22, ~2 d).
+   Replaces the topbar-only chrome with a left activity bar + bottom
+   status bar; affects every screen so it's a larger structural lift.
+3. **Long jobs registry + Autopilot UI** (audit P23, ~3 d).
+   Surface the SDK's background-tasks fleet as a first-class panel
+   instead of relying solely on the rail's Tasks section.
+4. **Terminal integration** (audit P24, ~3 d). `Bun.spawn` PTY +
+   xterm.js panes inside dockview.
+5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
+   surface for the composer.
 
 Older candidates (Tier-2 E2E, metrics counters / histograms) stay in
 the backlog but get displaced by the higher-ROI items the audit
 surfaced.
+
+Explicitly **out of scope**:
+- Image generation (deferred per user; un-defer requires explicit ask).
 
 ---
 
