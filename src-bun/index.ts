@@ -33,6 +33,7 @@ import { initAudit, recentAudit, recordUrl, subscribeAudit } from "./app/audit";
 import type { AuditEntry } from "./app/audit";
 import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
+import { McpRegistry } from "./app/mcpRegistry";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
@@ -99,6 +100,7 @@ const sessions = new SessionRegistry(
 	() => settings.get().appearance.streaming,
 	() => settings.get().tools.defaultExcluded,
 );
+const mcp = new McpRegistry();
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
 	maxRequestTime: 120000,
@@ -251,24 +253,24 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			deleteSessionPlan: rpcGuard(async ({ sessionId }) =>
 				sessions.deletePlan(sessionId),
 			),
-			listMcpConfigs: rpcGuard(async () => sessions.listMcpConfigs()),
+			listMcpConfigs: rpcGuard(async () => mcp.listConfigs()),
 			addMcpConfig: rpcGuard(async ({ name, config }) =>
-				sessions.addMcpConfig(name, config),
+				mcp.addConfig(name, config),
 			),
 			updateMcpConfig: rpcGuard(async ({ name, config }) =>
-				sessions.updateMcpConfig(name, config),
+				mcp.updateConfig(name, config),
 			),
 			removeMcpConfig: rpcGuard(async ({ name }) =>
-				sessions.removeMcpConfig(name),
+				mcp.removeConfig(name),
 			),
 			enableMcpServers: rpcGuard(async ({ names }) =>
-				sessions.enableMcpServers(names),
+				mcp.enable(names),
 			),
 			disableMcpServers: rpcGuard(async ({ names }) =>
-				sessions.disableMcpServers(names),
+				mcp.disable(names),
 			),
 			discoverMcpServers: rpcGuard(async ({ workingDirectory }) =>
-				sessions.discoverMcpServers(workingDirectory),
+				mcp.discover(workingDirectory),
 			),
 			loginToMcpServer: rpcGuard(async ({ sessionId, serverName, forceReauth, clientName }) =>
 				sessions.loginToMcpServer(sessionId, serverName, {

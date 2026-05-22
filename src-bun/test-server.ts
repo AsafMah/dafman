@@ -30,6 +30,7 @@ import { exportDiagnostics } from "./app/diagnostics";
 import { browseDirectorySync } from "./app/directoryBrowser";
 import { tryGetClient, setClientForTest } from "./app/client";
 import { SessionRegistry } from "./app/sessions";
+import { McpRegistry } from "./app/mcpRegistry";
 import { SettingsService } from "./app/settings";
 import { toModelSummary } from "./app/models";
 import { FakeCopilotClient } from "./app/fakeClient";
@@ -110,6 +111,7 @@ const sessions = new SessionRegistry(
 	() => settings.get().appearance.streaming,
 	() => settings.get().tools.defaultExcluded,
 );
+const mcp = new McpRegistry();
 
 subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
 subscribeAudit((entry: AuditEntry) => broadcast("auditEvent", entry));
@@ -303,30 +305,30 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.deletePlan(sessionId);
 	}),
-	listMcpConfigs: rpcGuard(async () => sessions.listMcpConfigs()),
+	listMcpConfigs: rpcGuard(async () => mcp.listConfigs()),
 	addMcpConfig: rpcGuard(async (args) => {
 		const { name, config } = args as { name: string; config: Record<string, unknown> };
-		return sessions.addMcpConfig(name, config);
+		return mcp.addConfig(name, config);
 	}),
 	updateMcpConfig: rpcGuard(async (args) => {
 		const { name, config } = args as { name: string; config: Record<string, unknown> };
-		return sessions.updateMcpConfig(name, config);
+		return mcp.updateConfig(name, config);
 	}),
 	removeMcpConfig: rpcGuard(async (args) => {
 		const { name } = args as { name: string };
-		return sessions.removeMcpConfig(name);
+		return mcp.removeConfig(name);
 	}),
 	enableMcpServers: rpcGuard(async (args) => {
 		const { names } = args as { names: string[] };
-		return sessions.enableMcpServers(names);
+		return mcp.enable(names);
 	}),
 	disableMcpServers: rpcGuard(async (args) => {
 		const { names } = args as { names: string[] };
-		return sessions.disableMcpServers(names);
+		return mcp.disable(names);
 	}),
 	discoverMcpServers: rpcGuard(async (args) => {
 		const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
-		return sessions.discoverMcpServers(workingDirectory);
+		return mcp.discover(workingDirectory);
 	}),
 	loginToMcpServer: rpcGuard(async (args) => {
 		const { sessionId, serverName, forceReauth, clientName } = args as {

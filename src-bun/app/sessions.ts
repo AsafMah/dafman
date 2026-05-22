@@ -1125,104 +1125,13 @@ export class SessionRegistry {
 	}
 
 	// ---------- MCP config registry (server-scoped, Phase 19a) ----------
-
-	async listMcpConfigs(): Promise<Record<string, Record<string, unknown>>> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			const result = (await client.rpc.mcp.config.list()) as {
-				servers?: Record<string, Record<string, unknown>>;
-			};
-			return result.servers ?? {};
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async addMcpConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			await client.rpc.mcp.config.add({ name, config } as unknown as Record<string, unknown>);
-			return true;
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async updateMcpConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			await client.rpc.mcp.config.update({ name, config } as unknown as Record<string, unknown>);
-			return true;
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async removeMcpConfig(name: string): Promise<boolean> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			await client.rpc.mcp.config.remove({ name });
-			return true;
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async enableMcpServers(names: string[]): Promise<boolean> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			await client.rpc.mcp.config.enable({ names });
-			return true;
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async disableMcpServers(names: string[]): Promise<boolean> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			await client.rpc.mcp.config.disable({ names });
-			return true;
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
-
-	async discoverMcpServers(
-		workingDirectory?: string,
-	): Promise<Array<{ name: string; type?: string; source: string; enabled: boolean }>> {
-		const client = tryGetClient();
-		if (!client) throw AppError.clientNotStarted();
-		try {
-			const result = (await client.rpc.mcp.discover({
-				...(workingDirectory ? { workingDirectory } : {}),
-			})) as {
-				servers?: Array<{
-					name?: unknown;
-					type?: unknown;
-					source?: unknown;
-					enabled?: unknown;
-				}>;
-			};
-			const servers = result.servers ?? [];
-			return servers
-				.filter((s) => typeof s.name === "string")
-				.map((s) => ({
-					name: String(s.name),
-					...(typeof s.type === "string" ? { type: s.type } : {}),
-					source: typeof s.source === "string" ? s.source : "unknown",
-					enabled: s.enabled === true,
-				}));
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
-	}
+	//
+	// Moved to `./mcpRegistry.ts` (21a.2). Server-scoped MCP methods
+	// don't touch the entries Map and shouldn't live on the session
+	// registry. RPC layer calls `mcpRegistry.X` directly. The 3
+	// session-scoped MCP methods (listSessionMcpServers,
+	// setSessionMcpEnabled, loginToMcpServer) remain below because
+	// they need entry lookup.
 
 	async loginToMcpServer(
 		sessionId: string,
