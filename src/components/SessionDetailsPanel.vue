@@ -937,30 +937,34 @@ function needsExpansion(description: string): boolean {
     <section class="row row-actions">
       <Button
         icon="pi pi-download"
-        label="Export Markdown"
+        label="Markdown"
         size="small"
         severity="secondary"
+        title="Export conversation as Markdown"
         @click="onExport('markdown')"
       />
       <Button
         icon="pi pi-file-export"
-        label="Export JSON"
+        label="JSON"
         size="small"
         severity="secondary"
+        title="Export conversation as JSON"
         @click="onExport('json')"
       />
       <Button
         icon="pi pi-compress"
-        label="Compact history"
+        label="Compact"
         size="small"
         severity="secondary"
+        title="Compact session history"
         @click="onCompactNow"
       />
       <Button
         icon="pi pi-refresh"
-        label="Reset approvals"
+        label="Reset"
         size="small"
         severity="secondary"
+        title="Reset session approvals"
         @click="onResetApprovals"
       />
     </section>
@@ -980,9 +984,44 @@ function needsExpansion(description: string): boolean {
   gap: 0.85rem;
   padding: 0.75rem 0.85rem 1rem;
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
   height: 100%;
   box-sizing: border-box;
   color: var(--p-text-color);
+  /* min-width: 0 lets flex children shrink past their intrinsic
+     content size. Without it, long unbreakable strings (paths,
+     tool names) would force the panel wider than its dockview
+     container — exactly the "sidebar is cut off, needs crazy
+     width" symptom. */
+  min-width: 0;
+}
+
+/* Force every direct flex / grid child to honour the parent's
+   width — otherwise an oversized SelectButton row or Action grid
+   pushes the whole rail out. */
+.session-details > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* PrimeVue SelectButton in the mode row sometimes lays out its
+   buttons at intrinsic width — clamp it so each icon button shares
+   the available row evenly. */
+.session-details :deep(.p-selectbutton) {
+  display: flex;
+  width: 100%;
+}
+
+.session-details :deep(.p-selectbutton .p-button) {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+}
+
+.session-details :deep(.p-select) {
+  width: 100%;
 }
 
 .session-details-empty {
@@ -1009,6 +1048,7 @@ function needsExpansion(description: string): boolean {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .row-stack {
@@ -1035,14 +1075,25 @@ function needsExpansion(description: string): boolean {
   font-weight: 500;
 }
 
+/* Action grid: two columns of icon+short-label buttons. Auto-fit so
+   when the rail is wider it stays 2-up; when narrow (sub-200px) it
+   falls back to a single column without overflowing. */
 .row-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
   gap: 0.4rem;
 }
 
 .row-actions :deep(.p-button) {
   width: 100%;
+  min-width: 0;
+}
+
+.row-actions :deep(.p-button .p-button-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .row-label {
@@ -1060,15 +1111,24 @@ function needsExpansion(description: string): boolean {
   display: flex;
   gap: 0.4rem;
   align-items: stretch;
+  min-width: 0;
 }
 
 .rename-input {
   flex: 1 1 auto;
   min-width: 0;
+  /* PrimeVue InputText sets a default width based on its size attr;
+     override so the input actually shrinks to fill the flex slot. */
+  width: 100%;
+}
+
+.rename-input :deep(input) {
+  width: 100%;
+  min-width: 0;
 }
 
 .workspace-path {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.55rem;
@@ -1078,7 +1138,10 @@ function needsExpansion(description: string): boolean {
   font-size: 0.72rem;
   color: var(--p-text-color);
   min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--p-surface-border);
+  overflow: hidden;
+  text-align: left;
 }
 
 .workspace-path-button {

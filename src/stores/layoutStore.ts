@@ -262,8 +262,8 @@ export const useLayoutStore = defineStore("layout", () => {
       component: "sessionDetails",
       tabComponent: "sidebarTab",
       title: "Session",
-      initialSize: 280,
-      minimumSize: 200,
+      initialSize: 320,
+      minimumSize: 240,
     });
   }
 
