@@ -34,6 +34,7 @@ describe("sessionCommands", () => {
       sawTurnBoundary: false,
       currentAgent: null,
       tasksRefreshCounter: 0,
+      planRefreshCounter: 0,
       _toastedOauthRequests: new Set<string>(),
     });
 
@@ -89,6 +90,7 @@ describe("sessionCommands", () => {
       sawTurnBoundary: false,
       currentAgent: null,
       tasksRefreshCounter: 0,
+      planRefreshCounter: 0,
       _toastedOauthRequests: new Set<string>(),
     });
 
@@ -113,5 +115,69 @@ describe("sessionCommands", () => {
         data: { content: "Working directory changed to C:\\other" },
       },
     ]);
+  });
+
+  test("/plan sends a CLI-style plan prompt and switches mode", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    setRpcBridge({
+      async request(name, args) {
+        calls.push({ name, args });
+        return name === "setSessionMode" ? "plan" : true;
+      },
+      onSessionEvent() {
+        return () => {};
+      },
+      onPendingRequest() {
+        return () => {};
+      },
+      onLogEvent() {
+        return () => {};
+      },
+      onAuditEvent() {
+        return () => {};
+      },
+    } as RpcBridge);
+    const sessions = useSessionsStore();
+    sessions.sessions.push({
+      id: "s1",
+      accent: "#000",
+      events: [],
+      droppedEventCount: 0,
+      model: null,
+      reasoningEffort: null,
+      mode: null,
+      approveAll: false,
+      title: null,
+      reasoningVisibilityOverride: "default",
+      workingDirectory: "C:\\repo\\dafman",
+      defaultSendMode: "steer",
+      pendingRequests: [],
+      unseenTurns: 0,
+      isThinking: false,
+      sawTurnBoundary: false,
+      currentAgent: null,
+      tasksRefreshCounter: 0,
+      planRefreshCounter: 0,
+      _toastedOauthRequests: new Set<string>(),
+    });
+
+    const handled = await runLocalSlashCommand("s1", "/plan build mode parity");
+
+    expect(handled).toBe(true);
+    expect(calls).toEqual([
+      {
+        name: "setSessionMode",
+        args: { sessionId: "s1", mode: "plan" },
+      },
+      {
+        name: "sendMessage",
+        args: {
+          sessionId: "s1",
+          text: "[[PLAN]] build mode parity",
+          mode: "immediate",
+        },
+      },
+    ]);
+    expect(sessions.sessions[0]?.mode).toBe("plan");
   });
 });

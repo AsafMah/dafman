@@ -6,7 +6,7 @@
 // only present (and non-empty) when the model accepts a reasoning effort
 // override.
 
-import type { ModelInfo } from "copilot-sdk-supercharged";
+import type { ModelInfo } from "./copilotSdk";
 import type { ModelSummary } from "../rpc";
 
 export function toModelSummary(model: ModelInfo): ModelSummary {

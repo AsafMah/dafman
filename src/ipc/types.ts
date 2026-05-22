@@ -164,7 +164,7 @@ export interface AgentFileSpec {
   prompt: string;
 }
 
-/// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged.
+/// Subset of `MessageOptions.attachments` from the Copilot JSON-RPC SDK.
 /// Mirrored here so the renderer can construct without importing the
 /// SDK types directly. Pass-through to bun → SDK at send time.
 export type SendMessageAttachment =
@@ -226,6 +226,18 @@ export interface ElicitationRequestData {
   requestedSchema?: unknown;
 }
 
+export interface ExitPlanModeRequestData {
+  summary: string;
+  planContent: string;
+  actions: string[];
+  recommendedAction: string;
+}
+
+export interface AutoModeSwitchRequestData {
+  errorCode?: string;
+  retryAfterSeconds?: number;
+}
+
 /// Dafman-internal pending-request push. See `src-bun/rpc.ts`.
 export type PendingRequestPayload =
   | {
@@ -245,11 +257,23 @@ export type PendingRequestPayload =
       requestId: string;
       kind: "elicitation";
       request: ElicitationRequestData;
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      kind: "exitPlanMode";
+      request: ExitPlanModeRequestData;
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      kind: "autoModeSwitch";
+      request: AutoModeSwitchRequestData;
     };
 
 /// Approval scope sent with `approveForSession` decisions. Mirrors the
 /// SDK's `PermissionDecisionApproveForSessionApproval` union — see
-/// `node_modules/copilot-sdk-supercharged/dist/generated/rpc.d.ts`.
+/// the Copilot JSON-RPC SDK generated rpc.d.ts.
 /// `undefined` falls back to the SDK's default (kind-specific blanket
 /// approval); we only send a concrete rule when the user picks one.
 export type PermissionApprovalRule =
@@ -291,6 +315,21 @@ export type RespondToRequestParams =
         action: "accept" | "decline" | "cancel";
         content?: Record<string, unknown>;
       };
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      response: {
+        kind: "exitPlanMode";
+        approved: boolean;
+        selectedAction?: "interactive" | "autopilot" | "exit_only" | "autopilot_fleet";
+        feedback?: string;
+      };
+    }
+  | {
+      sessionId: string;
+      requestId: string;
+      response: { kind: "autoModeSwitch"; response: "yes" | "yes_always" | "no" };
     };
 
 /// Discriminated union mirroring `AppErrorPayload` in `src-bun/app/errors.ts`.

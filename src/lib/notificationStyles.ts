@@ -22,6 +22,8 @@ export type NotificationEventType =
   | "permission"
   | "userInput"
   | "elicitation"
+  | "exitPlanMode"
+  | "autoModeSwitch"
   | "thinking"
   | "unseenActivity";
 
@@ -64,6 +66,18 @@ const STYLES: Record<NotificationEventType, NotificationStyle> = {
     label: "Awaiting response",
     pulse: true,
   },
+  exitPlanMode: {
+    color: "var(--p-indigo-500, #6366f1)",
+    iconSuffix: "list-check",
+    label: "Plan approval",
+    pulse: true,
+  },
+  autoModeSwitch: {
+    color: "var(--p-orange-500, #f97316)",
+    iconSuffix: "bolt",
+    label: "Auto mode",
+    pulse: true,
+  },
   thinking: {
     // Session-primary tinted so it reads as "this session is
     // working" rather than as a blocking signal. Spinner icon
@@ -97,7 +111,14 @@ export function styleFor(type: NotificationEventType): NotificationStyle {
 /// agent is mid-turn"), and unseen activity is the lowest priority
 /// ("there was new output you haven't read yet").
 export function indicatorStyle(
-  pendingRequestType: "permission" | "userInput" | "elicitation" | null | undefined,
+  pendingRequestType:
+    | "permission"
+    | "userInput"
+    | "elicitation"
+    | "exitPlanMode"
+    | "autoModeSwitch"
+    | null
+    | undefined,
   isThinking: boolean,
   unseenTurns: number,
 ): NotificationStyle | null {

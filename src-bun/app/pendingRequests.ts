@@ -16,7 +16,12 @@ import { recordPermission, type PermissionAuditEntry } from "./audit";
 import { log } from "./logging";
 import type { RespondToRequestParams } from "../rpc";
 
-export type PendingKind = "permission" | "userInput" | "elicitation";
+export type PendingKind =
+	| "permission"
+	| "userInput"
+	| "elicitation"
+	| "exitPlanMode"
+	| "autoModeSwitch";
 
 interface PendingEntry {
 	sessionId: string;
@@ -101,8 +106,12 @@ export class PendingRequestQueue {
 			entry.kind === "permission"
 				? { kind: "user-not-available" }
 				: entry.kind === "userInput"
-					? { answer: "", wasFreeform: false }
-					: { action: "cancel" };
+					? { answer: "User is unavailable in autopilot mode.", wasFreeform: true }
+					: entry.kind === "elicitation"
+						? { action: "cancel" }
+						: entry.kind === "exitPlanMode"
+							? { approved: false }
+							: "no";
 		try {
 			entry.resolve(cancellation);
 		} catch (err) {
@@ -221,6 +230,16 @@ export class PendingRequestQueue {
 					action: params.response.action,
 					...(params.response.content ? { content: params.response.content } : {}),
 				};
+				break;
+			case "exitPlanMode":
+				sdkResult = {
+					approved: params.response.approved,
+					...(params.response.selectedAction ? { selectedAction: params.response.selectedAction } : {}),
+					...(params.response.feedback ? { feedback: params.response.feedback } : {}),
+				};
+				break;
+			case "autoModeSwitch":
+				sdkResult = params.response.response;
 				break;
 		}
 		try {

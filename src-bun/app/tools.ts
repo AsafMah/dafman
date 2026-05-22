@@ -7,7 +7,7 @@
 /// way to trigger an elicitation request in dafman until someone
 /// connects an MCP server that elicits.
 
-import type { Tool, ToolInvocation } from "copilot-sdk-supercharged";
+import type { Tool, ToolInvocation } from "./copilotSdk";
 import type { SessionRegistry } from "./sessions";
 
 /// Loose JSON-Schema-ish shape that mirrors what the MCP elicitation

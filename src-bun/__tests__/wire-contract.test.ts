@@ -210,6 +210,31 @@ describe("IPC wire contracts", () => {
 		expect(sample).toMatchSnapshot();
 	});
 
+	test("PendingRequestPayload — exit plan mode", () => {
+		const sample: PendingRequestPayload = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-4",
+			kind: "exitPlanMode",
+			request: {
+				summary: "- Implement the plan",
+				planContent: "# Plan: Do the thing.",
+				actions: ["interactive", "autopilot", "exit_only", "autopilot_fleet"],
+				recommendedAction: "interactive",
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("PendingRequestPayload — auto mode switch", () => {
+		const sample: PendingRequestPayload = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-5",
+			kind: "autoModeSwitch",
+			request: { errorCode: "rate_limit", retryAfterSeconds: 60 },
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
 	test("RespondToRequestParams — permission approve once", () => {
 		const sample: RespondToRequestParams = {
 			sessionId: "sess-1",
@@ -272,6 +297,28 @@ describe("IPC wire contracts", () => {
 			sessionId: "sess-1",
 			requestId: "req-uuid-3",
 			response: { kind: "elicitation", action: "accept" },
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — exit plan mode autopilot fleet", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-4",
+			response: {
+				kind: "exitPlanMode",
+				approved: true,
+				selectedAction: "autopilot_fleet",
+			},
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("RespondToRequestParams — auto mode switch yes always", () => {
+		const sample: RespondToRequestParams = {
+			sessionId: "sess-1",
+			requestId: "req-uuid-5",
+			response: { kind: "autoModeSwitch", response: "yes_always" },
 		};
 		expect(sample).toMatchSnapshot();
 	});

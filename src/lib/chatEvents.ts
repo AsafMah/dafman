@@ -115,7 +115,12 @@ export type ChatItem =
       /// or the SDK's `*.completed` (out-of-band resolution)
       /// arrives.
       requestId: string;
-      pendingKind: "permission" | "userInput" | "elicitation";
+      pendingKind:
+        | "permission"
+        | "userInput"
+        | "elicitation"
+        | "exitPlanMode"
+        | "autoModeSwitch";
       /// Short human-readable summary used by accessible labels and
       /// as a fallback when the renderer wants a single string.
       message: string;
@@ -123,7 +128,9 @@ export type ChatItem =
       request:
         | import("../ipc/types").PermissionRequestData
         | import("../ipc/types").UserInputRequestData
-        | import("../ipc/types").ElicitationRequestData;
+        | import("../ipc/types").ElicitationRequestData
+        | import("../ipc/types").ExitPlanModeRequestData
+        | import("../ipc/types").AutoModeSwitchRequestData;
     }
   | {
       id: number;
@@ -250,6 +257,18 @@ export type PendingRequest =
       requestId: string;
       message: string;
       request: import("../ipc/types").ElicitationRequestData;
+    }
+  | {
+      kind: "exitPlanMode";
+      requestId: string;
+      message: string;
+      request: import("../ipc/types").ExitPlanModeRequestData;
+    }
+  | {
+      kind: "autoModeSwitch";
+      requestId: string;
+      message: string;
+      request: import("../ipc/types").AutoModeSwitchRequestData;
     };
 
 export function defaultAmbient(): ChatAmbient {

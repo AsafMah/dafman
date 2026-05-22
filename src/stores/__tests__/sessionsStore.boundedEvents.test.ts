@@ -36,6 +36,7 @@ function makeRecord(id: string): SessionRecord {
     sawTurnBoundary: false,
     currentAgent: null,
     tasksRefreshCounter: 0,
+    planRefreshCounter: 0,
     _toastedOauthRequests: new Set<string>(),
   };
 }

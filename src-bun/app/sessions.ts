@@ -14,16 +14,20 @@
 // "user-not-available" / "cancel" so the SDK never hangs.
 
 import {
+	type AutoModeSwitchRequest,
+	type AutoModeSwitchResponse,
 	type CopilotSession,
 	type CommandDefinition,
 	type ElicitationContext,
 	type ElicitationResult,
+	type ExitPlanModeRequest,
+	type ExitPlanModeResult,
 	type PermissionRequest,
 	type PermissionRequestResult,
 	type SessionEvent,
 	type UserInputRequest,
 	type UserInputResponse,
-} from "copilot-sdk-supercharged";
+} from "./copilotSdk";
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { tryGetClient } from "./client";
@@ -40,7 +44,9 @@ import {
 	type AgentScope as AgentFileScope,
 } from "./agentFiles";
 import type {
+	AutoModeSwitchRequestData,
 	ElicitationRequestData,
+	ExitPlanModeRequestData,
 	PendingRequestPayload,
 	PermissionRequestData,
 	RespondToRequestParams,
@@ -245,6 +251,7 @@ export class SessionRegistry {
 	/// handler — without this, a renderer-side toggle wouldn't affect
 	/// the dafman handler path.
 	private readonly approveAllBySession = new Map<string, boolean>();
+	private readonly modeBySession = new Map<string, SessionMode>();
 
 	/// `streamingResolver` is called at session create/resume time to
 	/// pick the current SDK streaming mode. Decoupled from on-disk
@@ -295,6 +302,13 @@ export class SessionRegistry {
 				if (this.approveAllBySession.get(sid) === true) {
 					return Promise.resolve({ kind: "approve-once" });
 				}
+				if (this.modeBySession.get(sid) === "autopilot") {
+					log.info("permission unavailable in autopilot", {
+						sessionId: sid,
+						permissionKind: request.kind,
+					});
+					return Promise.resolve({ kind: "user-not-available" });
+				}
 				return this.pending.enqueue(
 					sid,
 					"permission",
@@ -320,6 +334,13 @@ export class SessionRegistry {
 			},
 			onUserInputRequest: (request: UserInputRequest): Promise<UserInputResponse> => {
 				const sid = sessionId();
+				if (this.modeBySession.get(sid) === "autopilot") {
+					log.info("user input unavailable in autopilot", { sessionId: sid });
+					return Promise.resolve({
+						answer: "User is unavailable in autopilot mode.",
+						wasFreeform: true,
+					});
+				}
 				return this.pending.enqueue(sid, "userInput", (requestId) => {
 					const data: UserInputRequestData = {
 						question: request.question,
@@ -336,6 +357,13 @@ export class SessionRegistry {
 			},
 			onElicitationRequest: (context: ElicitationContext): Promise<ElicitationResult> => {
 				const sid = sessionId();
+				if (this.modeBySession.get(sid) === "autopilot") {
+					log.info("elicitation declined in autopilot", {
+						sessionId: sid,
+						mode: context.mode ?? "form",
+					});
+					return Promise.resolve({ action: "decline" });
+				}
 				return this.pending.enqueue(sid, "elicitation", (requestId) => {
 					const data: ElicitationRequestData = {
 						message: context.message,
@@ -355,6 +383,40 @@ export class SessionRegistry {
 						request: data,
 					});
 				}) as Promise<ElicitationResult>;
+			},
+			onExitPlanMode: (request: ExitPlanModeRequest): Promise<ExitPlanModeResult> => {
+				const sid = sessionId();
+				return this.pending.enqueue(sid, "exitPlanMode", (requestId) => {
+					const data: ExitPlanModeRequestData = {
+						summary: request.summary,
+						planContent: request.planContent ?? "",
+						actions: request.actions,
+						recommendedAction: request.recommendedAction,
+					};
+					this.emitPending({
+						sessionId: sid,
+						requestId,
+						kind: "exitPlanMode",
+						request: data,
+					});
+				}) as Promise<ExitPlanModeResult>;
+			},
+			onAutoModeSwitch: (request: AutoModeSwitchRequest): Promise<AutoModeSwitchResponse> => {
+				const sid = sessionId();
+				return this.pending.enqueue(sid, "autoModeSwitch", (requestId) => {
+					const data: AutoModeSwitchRequestData = {
+						...(request.errorCode ? { errorCode: request.errorCode } : {}),
+						...(typeof request.retryAfterSeconds === "number"
+							? { retryAfterSeconds: request.retryAfterSeconds }
+							: {}),
+					};
+					this.emitPending({
+						sessionId: sid,
+						requestId,
+						kind: "autoModeSwitch",
+						request: data,
+					});
+				}) as Promise<AutoModeSwitchResponse>;
 			},
 			streaming: this.streamingResolver(),
 			...((() => {
@@ -419,6 +481,7 @@ export class SessionRegistry {
 		}
 		this.entries.delete(sessionId);
 		this.approveAllBySession.delete(sessionId);
+		this.modeBySession.delete(sessionId);
 	}
 
 	async create(opts: { workingDirectory?: string } = {}): Promise<string> {
@@ -451,6 +514,7 @@ export class SessionRegistry {
 			this.forward(sessionId, event);
 		});
 		this.entries.set(sessionId, { session, unsubscribe, ...(wd ? { workingDirectory: wd } : {}) });
+		this.modeBySession.set(sessionId, "interactive");
 		// Drain anything that fired during the createSession await.
 		for (const event of earlyEventBuffer) this.forward(sessionId, event);
 		log.info("session created", { sessionId, workingDirectory: wd ?? null });
@@ -521,6 +585,7 @@ export class SessionRegistry {
 			unsubscribe,
 			...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
 		});
+		this.modeBySession.set(actualId, "interactive");
 		// Hydrate transcript. Failures here aren't fatal — the session is
 		// connected and will receive live events; we just won't have the
 		// scrollback.
@@ -735,6 +800,19 @@ export class SessionRegistry {
 			});
 		}
 		const data = (isPlainObject ? rawData : {}) as Record<string, unknown>;
+		if (eventType === "session.mode_changed") {
+			const newMode = data.newMode;
+			if (
+				newMode === "interactive" ||
+				newMode === "plan" ||
+				newMode === "autopilot"
+			) {
+				this.modeBySession.set(sessionId, newMode);
+				if (newMode === "autopilot") {
+					this.pending.settleForSession(sessionId, "autopilot-mode");
+				}
+			}
+		}
 		try {
 			this.emit({
 				sessionId,
@@ -899,6 +977,7 @@ export class SessionRegistry {
 					`unexpected session mode from SDK: ${JSON.stringify(result)}`,
 				);
 			}
+			this.modeBySession.set(sessionId, result);
 			return result;
 		} catch (err) {
 			if (err instanceof AppError) throw err;
@@ -911,6 +990,10 @@ export class SessionRegistry {
 		if (!entry) throw AppError.sessionNotFound(sessionId);
 		try {
 			await entry.session.rpc.mode.set({ mode });
+			this.modeBySession.set(sessionId, mode);
+			if (mode === "autopilot") {
+				this.pending.settleForSession(sessionId, "autopilot-mode");
+			}
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}

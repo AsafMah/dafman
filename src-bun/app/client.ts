@@ -6,7 +6,7 @@
 
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { CopilotClient } from "copilot-sdk-supercharged";
+import { CopilotClient } from "./copilotSdk";
 import { AppError } from "./errors";
 import { log } from "./logging";
 

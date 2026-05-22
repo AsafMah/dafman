@@ -11,7 +11,7 @@
 // need entry lookup. If MCP grows substantially, revisit by passing a
 // `getSession(sessionId)` accessor here.
 
-import type { CopilotClient } from "copilot-sdk-supercharged";
+import type { CopilotClient } from "./copilotSdk";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 

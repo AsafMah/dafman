@@ -15,6 +15,45 @@
 
 ---
 
+## Phase 23b — Copilot CLI mode parity
+
+1. ⏳ **Plan mode approval flow.**
+   - **Steps:** open a real session, run `/plan add a tiny safe change`,
+     let the agent write `plan.md`, and wait for the exit-plan approval
+     request.
+   - **Expected:** an in-chat Plan approval card appears with summary,
+     plan content, feedback box, and actions for Interactive,
+     Autopilot, Exit only, and Autopilot fleet. Choosing Interactive
+     exits plan mode and continues normally.
+   - **Why not automated:** requires the live CLI model/tool loop to
+     call `exit_plan_mode`.
+
+2. ⏳ **Autopilot unavailable-user behavior.**
+   - **Steps:** start a session, switch the mode toggle to Autopilot,
+     then prompt for an action that would normally ask a question or
+     request permission without enabling approve-all.
+   - **Expected:** Dafman does not leave a pending card hanging; the
+     agent gets unavailable/declined and continues or reports the block.
+   - **Why not automated:** depends on live CLI tool selection and
+     permission timing.
+
+3. ⏳ **Plan file refresh.**
+   - **Steps:** open Session Details → Plan, run a plan-mode prompt that
+     updates `plan.md`, then keep the details panel open.
+   - **Expected:** the plan preview refreshes after the SDK emits
+     `session.plan_changed` without closing/reopening the panel.
+   - **Why not automated:** live SDK file-change events are not emitted
+     in unit tests.
+
+4. ⏳ **Rate-limit auto-mode switch prompt.**
+   - **Steps:** if an eligible rate-limit occurs, observe the SDK
+     `auto_mode_switch` prompt.
+   - **Expected:** Dafman shows a distinct Auto mode switch card with
+     No / Yes / Yes, always, mirroring the CLI decision.
+   - **Why not automated:** requires an external rate-limit condition.
+
+---
+
 ## Retroactive backlog (commits 38d42ca → 9d7eeb6, since 52a2956)
 
 > **2026-05-22 bulk update:** every ❌ item in this section was

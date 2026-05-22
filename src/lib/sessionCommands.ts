@@ -224,6 +224,27 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 		},
 	},
 	{
+		slash: "/plan",
+		label: "Create an implementation plan",
+		description: "Switch to Plan mode and send a CLI-style planning prompt.",
+		icon: "pi-list-check",
+		group: "Session",
+		keywords: ["mode", "planning", "implementation"],
+		run: async (sessionId, args = "") => {
+			const sessions = useSessionsStore();
+			await sessions.setSessionMode(sessionId, "plan");
+			const prompt = args.trim();
+			if (!prompt) {
+				pushLocalSystem(
+					sessionId,
+					"Plan mode enabled. Type your request or use /plan <request> to start a planning turn.",
+				);
+				return;
+			}
+			await sessions.sendMessage(sessionId, `[[PLAN]] ${prompt}`);
+		},
+	},
+	{
 		slash: "/help",
 		label: "Show available commands",
 		description: "List all slash commands this session understands.",

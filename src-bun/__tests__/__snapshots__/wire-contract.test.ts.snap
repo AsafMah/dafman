@@ -184,6 +184,14 @@ exports[`IPC wire contracts SessionHistoryCompactionResult shape 1`] = `
 }
 `;
 
+exports[`IPC wire contracts setSessionWorkingDirectory request shape 1`] = `
+{
+  "baseWorkingDirectory": "C:\\repo\\dafman",
+  "sessionId": "sess-1",
+  "workingDirectory": "..\\other",
+}
+`;
+
 exports[`IPC wire contracts PendingRequestPayload — permission 1`] = `
 {
   "kind": "permission",
@@ -231,6 +239,37 @@ exports[`IPC wire contracts PendingRequestPayload — elicitation url 1`] = `
 }
 `;
 
+exports[`IPC wire contracts PendingRequestPayload — exit plan mode 1`] = `
+{
+  "kind": "exitPlanMode",
+  "request": {
+    "actions": [
+      "interactive",
+      "autopilot",
+      "exit_only",
+      "autopilot_fleet",
+    ],
+    "planContent": "# Plan: Do the thing.",
+    "recommendedAction": "interactive",
+    "summary": "- Implement the plan",
+  },
+  "requestId": "req-uuid-4",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts PendingRequestPayload — auto mode switch 1`] = `
+{
+  "kind": "autoModeSwitch",
+  "request": {
+    "errorCode": "rate_limit",
+    "retryAfterSeconds": 60,
+  },
+  "requestId": "req-uuid-5",
+  "sessionId": "sess-1",
+}
+`;
+
 exports[`IPC wire contracts RespondToRequestParams — permission approve once 1`] = `
 {
   "requestId": "req-uuid-1",
@@ -239,37 +278,6 @@ exports[`IPC wire contracts RespondToRequestParams — permission approve once 1
     "kind": "permission",
   },
   "sessionId": "sess-1",
-}
-`;
-
-exports[`IPC wire contracts RespondToRequestParams — userInput freeform 1`] = `
-{
-  "requestId": "req-uuid-2",
-  "response": {
-    "answer": "Alice",
-    "kind": "userInput",
-    "wasFreeform": false,
-  },
-  "sessionId": "sess-1",
-}
-`;
-
-exports[`IPC wire contracts RespondToRequestParams — elicitation accept 1`] = `
-{
-  "requestId": "req-uuid-3",
-  "response": {
-    "action": "accept",
-    "kind": "elicitation",
-  },
-  "sessionId": "sess-1",
-}
-`;
-
-exports[`IPC wire contracts setSessionWorkingDirectory request shape 1`] = `
-{
-  "baseWorkingDirectory": "C:\\repo\\dafman",
-  "sessionId": "sess-1",
-  "workingDirectory": "..\\other",
 }
 `;
 
@@ -313,6 +321,52 @@ exports[`IPC wire contracts RespondToRequestParams — permission approve for se
     "decision": "approveForSession",
     "domain": "github.com",
     "kind": "permission",
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — userInput freeform 1`] = `
+{
+  "requestId": "req-uuid-2",
+  "response": {
+    "answer": "Alice",
+    "kind": "userInput",
+    "wasFreeform": false,
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — elicitation accept 1`] = `
+{
+  "requestId": "req-uuid-3",
+  "response": {
+    "action": "accept",
+    "kind": "elicitation",
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — exit plan mode autopilot fleet 1`] = `
+{
+  "requestId": "req-uuid-4",
+  "response": {
+    "approved": true,
+    "kind": "exitPlanMode",
+    "selectedAction": "autopilot_fleet",
+  },
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts RespondToRequestParams — auto mode switch yes always 1`] = `
+{
+  "requestId": "req-uuid-5",
+  "response": {
+    "kind": "autoModeSwitch",
+    "response": "yes_always",
   },
   "sessionId": "sess-1",
 }
@@ -427,20 +481,6 @@ exports[`IPC wire contracts — diagnostics WorkspaceFileMatch carries kind 1`] 
 ]
 `;
 
-exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
-{
-  "cancel": null,
-  "dir": {
-    "kind": "directory",
-    "path": "C:/abs/repo",
-  },
-  "file": {
-    "kind": "file",
-    "path": "C:/abs/foo.txt",
-  },
-}
-`;
-
 exports[`IPC wire contracts — diagnostics InstructionSource shape 1`] = `
 [
   {
@@ -462,4 +502,18 @@ exports[`IPC wire contracts — diagnostics InstructionSource shape 1`] = `
     "sizeBytes": null,
   },
 ]
+`;
+
+exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
+{
+  "cancel": null,
+  "dir": {
+    "kind": "directory",
+    "path": "C:/abs/repo",
+  },
+  "file": {
+    "kind": "file",
+    "path": "C:/abs/foo.txt",
+  },
+}
 `;

@@ -687,7 +687,10 @@ describe("SessionRegistry", () => {
 		// Each promise settles with the kind-appropriate cancellation
 		// so the SDK never hangs after the session is gone.
 		await expect(permPromise).resolves.toEqual({ kind: "user-not-available" });
-		await expect(inputPromise).resolves.toEqual({ answer: "", wasFreeform: false });
+		await expect(inputPromise).resolves.toEqual({
+			answer: "User is unavailable in autopilot mode.",
+			wasFreeform: true,
+		});
 		await expect(elicPromise).resolves.toEqual({ action: "cancel" });
 	});
 
@@ -712,6 +715,96 @@ describe("SessionRegistry", () => {
 		const decision = await config.onPermissionRequest({ kind: "shell" });
 		expect(decision).toEqual({ kind: "approve-once" });
 		expect(pendingEmitted).toHaveLength(0);
+	});
+
+	test("autopilot returns unavailable/decline instead of prompting", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const pendingEmitted: unknown[] = [];
+		const reg = new SessionRegistry(
+			() => {},
+			(p) => pendingEmitted.push(p),
+		);
+		const id = await reg.create();
+		await reg.setApproveAll(id, false);
+		await reg.setMode(id, "autopilot");
+		const config = client.createdConfigs[0] as {
+			onPermissionRequest: (req: { kind: string }) => Promise<unknown>;
+			onUserInputRequest: (req: { question: string }) => Promise<unknown>;
+			onElicitationRequest: (ctx: { sessionId: string; message: string; mode: string }) => Promise<unknown>;
+		};
+
+		await expect(config.onPermissionRequest({ kind: "write" })).resolves.toEqual({
+			kind: "user-not-available",
+		});
+		await expect(config.onUserInputRequest({ question: "continue?" })).resolves.toEqual({
+			answer: "User is unavailable in autopilot mode.",
+			wasFreeform: true,
+		});
+		await expect(
+			config.onElicitationRequest({ sessionId: id, message: "pick", mode: "form" }),
+		).resolves.toEqual({ action: "decline" });
+		expect(pendingEmitted).toHaveLength(0);
+	});
+
+	test("exit plan and auto mode switch callbacks emit pending payloads and resolve", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const pendingEmitted: Array<{ requestId: string; kind: string }> = [];
+		const reg = new SessionRegistry(
+			() => {},
+			(p) => pendingEmitted.push(p as { requestId: string; kind: string }),
+		);
+		const id = await reg.create();
+		const config = client.createdConfigs[0] as {
+			onExitPlanMode: (req: {
+				summary: string;
+				planContent?: string;
+				actions: string[];
+				recommendedAction: string;
+			}) => Promise<unknown>;
+			onAutoModeSwitch: (req: {
+				errorCode?: string;
+				retryAfterSeconds?: number;
+			}) => Promise<unknown>;
+		};
+
+		const exitPromise = config.onExitPlanMode({
+			summary: "- Looks good",
+			planContent: "# Plan",
+			actions: ["interactive", "autopilot"],
+			recommendedAction: "interactive",
+		});
+		expect(pendingEmitted[0]?.kind).toBe("exitPlanMode");
+		await reg.respondToRequest({
+			sessionId: id,
+			requestId: pendingEmitted[0]!.requestId,
+			response: {
+				kind: "exitPlanMode",
+				approved: true,
+				selectedAction: "interactive",
+			},
+		});
+		await expect(exitPromise).resolves.toEqual({
+			approved: true,
+			selectedAction: "interactive",
+		});
+
+		const autoPromise = config.onAutoModeSwitch({
+			errorCode: "rate_limit",
+			retryAfterSeconds: 30,
+		});
+		expect(pendingEmitted[1]?.kind).toBe("autoModeSwitch");
+		await reg.respondToRequest({
+			sessionId: id,
+			requestId: pendingEmitted[1]!.requestId,
+			response: { kind: "autoModeSwitch", response: "yes_always" },
+		});
+		await expect(autoPromise).resolves.toBe("yes_always");
 	});
 
 	test("S2: create() buffers events fired during createSession await + drains under the real sessionId", async () => {

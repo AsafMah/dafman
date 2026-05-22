@@ -24,7 +24,9 @@
 import { pickString } from "../chatEvents";
 import type { ChatItem, PendingRequest } from "../chatEvents";
 import type {
+  AutoModeSwitchRequestData,
   ElicitationRequestData,
+  ExitPlanModeRequestData,
   PermissionRequestData,
   UserInputRequestData,
 } from "../../ipc/types";
@@ -59,6 +61,20 @@ function describeElicitation(data: ElicitationRequestData | unknown): string {
     pickString(data, ["message", "prompt", "summary", "description", "url"]) ||
     "Awaiting input"
   );
+}
+
+function describeExitPlan(data: ExitPlanModeRequestData | unknown): string {
+  if (data && typeof data === "object" && typeof (data as ExitPlanModeRequestData).summary === "string") {
+    return (data as ExitPlanModeRequestData).summary;
+  }
+  return "Plan ready for approval";
+}
+
+function describeAutoModeSwitch(data: AutoModeSwitchRequestData | unknown): string {
+  if (data && typeof data === "object" && typeof (data as AutoModeSwitchRequestData).errorCode === "string") {
+    return `Switch to auto mode after rate limit: ${(data as AutoModeSwitchRequestData).errorCode}`;
+  }
+  return "Switch to auto mode?";
 }
 
 /// Removes entries from BOTH the ambient queue and the chat-stream
@@ -106,6 +122,8 @@ export const notificationHandlers: Record<string, Handler> = {
             | PermissionRequestData
             | UserInputRequestData
             | ElicitationRequestData
+            | ExitPlanModeRequestData
+            | AutoModeSwitchRequestData
             | unknown;
         }
       | undefined;
@@ -163,6 +181,34 @@ export const notificationHandlers: Record<string, Handler> = {
         };
         break;
       }
+      case "exitPlanMode": {
+        const req = d.request as ExitPlanModeRequestData;
+        const message = describeExitPlan(req);
+        ambientEntry = { kind: "exitPlanMode", requestId, message, request: req };
+        cardItem = {
+          id,
+          kind: "pendingRequest",
+          requestId,
+          pendingKind: "exitPlanMode",
+          message,
+          request: req,
+        };
+        break;
+      }
+      case "autoModeSwitch": {
+        const req = d.request as AutoModeSwitchRequestData;
+        const message = describeAutoModeSwitch(req);
+        ambientEntry = { kind: "autoModeSwitch", requestId, message, request: req };
+        cardItem = {
+          id,
+          kind: "pendingRequest",
+          requestId,
+          pendingKind: "autoModeSwitch",
+          message,
+          request: req,
+        };
+        break;
+      }
     }
     if (ambientEntry && cardItem) {
       ctx.ambient.pendingRequests.push(ambientEntry);
@@ -202,5 +248,17 @@ export const notificationHandlers: Record<string, Handler> = {
   },
   "elicitation.completed": (ctx) => {
     removePending(ctx, "elicitation");
+  },
+  "exit_plan_mode.requested": () => {
+    /* informational */
+  },
+  "exit_plan_mode.completed": (ctx) => {
+    removePending(ctx, "exitPlanMode");
+  },
+  "auto_mode_switch.requested": () => {
+    /* informational */
+  },
+  "auto_mode_switch.completed": (ctx) => {
+    removePending(ctx, "autoModeSwitch");
   },
 };

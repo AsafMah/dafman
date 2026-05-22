@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import { McpRegistry } from "../app/mcpRegistry";
 import { AppError } from "../app/errors";
-import type { CopilotClient } from "copilot-sdk-supercharged";
+import type { CopilotClient } from "../app/copilotSdk";
 
 /// Minimal fake client that satisfies the McpRegistry surface. Lets
 /// each test script its own behavior without instantiating the real

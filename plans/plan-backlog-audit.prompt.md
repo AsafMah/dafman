@@ -122,6 +122,12 @@ From `plan-roadmap.prompt.md` Backlog (lines 129):
 > button. Per-step audit log. On completion, show diff summary + offer to
 > commit/PR."
 
+**Status note (Phase 23b):** CLI mode semantics are now wired
+(three-way toggle, `/plan`, exit-plan approval callback, autopilot
+unavailable-user behavior). Remaining work here is the larger
+Autopilot/Jobs UX: pre-run checks, progress timeline, halt controls,
+diff summary, and commit/PR handoff.
+
 **Effort:** ~2 d. Depends on A5 (Long jobs).
 
 ### A8. Skills/MCPs/Instructions library — single Library panel

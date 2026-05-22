@@ -495,6 +495,12 @@ watch(
     void loadTasks();
   },
 );
+watch(
+  () => record.value?.planRefreshCounter ?? 0,
+  () => {
+    void loadPlan();
+  },
+);
 
 // ---------- Actions ----------
 async function onExport(format: "markdown" | "json"): Promise<void> {

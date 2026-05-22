@@ -238,7 +238,7 @@ export interface AgentFileSpec {
 	prompt: string;
 }
 
-/// Subset of `MessageOptions.attachments` from copilot-sdk-supercharged
+/// Subset of `MessageOptions.attachments` from the Copilot JSON-RPC SDK
 /// that the renderer can construct. Mirrors the SDK union so we can
 /// pass straight through `session.send({ attachments })` without
 /// re-shaping on the bun side.
@@ -332,6 +332,18 @@ export interface ElicitationRequestData {
 	requestedSchema?: unknown;
 }
 
+export interface ExitPlanModeRequestData {
+	summary: string;
+	planContent: string;
+	actions: string[];
+	recommendedAction: string;
+}
+
+export interface AutoModeSwitchRequestData {
+	errorCode?: string;
+	retryAfterSeconds?: number;
+}
+
 /// Dafman-internal "the SDK is blocked on a callback" push, sent
 /// alongside the existing SDK `*.requested` events. The renderer
 /// queues these per session and responds via `respondToRequest`. The
@@ -355,6 +367,18 @@ export type PendingRequestPayload =
 		requestId: string;
 		kind: "elicitation";
 		request: ElicitationRequestData;
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		kind: "exitPlanMode";
+		request: ExitPlanModeRequestData;
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		kind: "autoModeSwitch";
+		request: AutoModeSwitchRequestData;
 	};
 
 /// Renderer → bun response. Discriminated on `kind` so the bun side
@@ -394,6 +418,21 @@ export type RespondToRequestParams =
 		sessionId: string;
 		requestId: string;
 		response: { kind: "elicitation"; action: "accept" | "decline" | "cancel"; content?: Record<string, unknown> };
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		response: {
+			kind: "exitPlanMode";
+			approved: boolean;
+			selectedAction?: "interactive" | "autopilot" | "exit_only" | "autopilot_fleet";
+			feedback?: string;
+		};
+	}
+	| {
+		sessionId: string;
+		requestId: string;
+		response: { kind: "autoModeSwitch"; response: "yes" | "yes_always" | "no" };
 	};
 
 export type DafmanRPC = {
@@ -442,7 +481,7 @@ export type DafmanRPC = {
 					/// Optional SDK attachments — files / directories /
 					/// selections / blobs (base64 data + mimeType for
 					/// pasted images). Mirrors `MessageOptions.attachments`
-					/// in copilot-sdk-supercharged.
+					/// in the Copilot JSON-RPC SDK.
 					attachments?: SendMessageAttachment[];
 				};
 				response: string;

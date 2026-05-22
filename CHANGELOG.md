@@ -3,6 +3,24 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 23b — Copilot CLI mode parity)
+
+- **Native plan/autopilot lifecycle wiring.** Dafman now uses the
+  bundled Copilot JSON-RPC SDK entrypoint that exposes
+  `onExitPlanMode` and `onAutoModeSwitch`, while preserving the
+  prebuilt native `cliPath` workaround for Node-version compatibility.
+- **Plan approval pending cards.** `exit_plan_mode` requests now show
+  an in-chat approval card with plan summary/content, feedback, and
+  actions for Interactive, Autopilot, Exit only, and Autopilot fleet.
+- **Autopilot unavailable-user behavior.** Autopilot honors existing
+  approve-all/session approvals, then resolves permission/input/form
+  requests as unavailable/declined instead of hanging on a user reply.
+- **CLI-style `/plan <prompt>` local command** switches to Plan mode
+  and sends the one-shot `[[PLAN]]` bootstrap prompt while keeping the
+  existing three-way mode toggle.
+- **Plan file refresh.** `session.plan_changed` now refreshes the
+  Session Details plan preview/editor.
+
 ### Added (Phase 23a — Library Instructions + command wiring)
 
 - **Library → Instructions tab** with read-only inventory of global

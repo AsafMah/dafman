@@ -6,7 +6,7 @@
 // session-scoped skill methods (`listSkills`, `setSkillEnabled`)
 // remain on `SessionRegistry` because they need entries Map lookup.
 
-import type { CopilotClient } from "copilot-sdk-supercharged";
+import type { CopilotClient } from "./copilotSdk";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 

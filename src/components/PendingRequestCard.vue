@@ -31,7 +31,9 @@ import Button from "primevue/button";
 import RadioButton from "primevue/radiobutton";
 import Textarea from "primevue/textarea";
 import type {
+  AutoModeSwitchRequestData,
   ElicitationRequestData,
+  ExitPlanModeRequestData,
   PermissionApprovalRule,
   PermissionRequestData,
   UserInputRequestData,
@@ -47,12 +49,19 @@ import JsonSchemaForm from "./JsonSchemaForm.vue";
 const props = defineProps<{
   sessionId: string;
   requestId: string;
-  pendingKind: "permission" | "userInput" | "elicitation";
+  pendingKind:
+    | "permission"
+    | "userInput"
+    | "elicitation"
+    | "exitPlanMode"
+    | "autoModeSwitch";
   message: string;
   request:
     | PermissionRequestData
     | UserInputRequestData
-    | ElicitationRequestData;
+    | ElicitationRequestData
+    | ExitPlanModeRequestData
+    | AutoModeSwitchRequestData;
 }>();
 
 const sessionsStore = useSessionsStore();
@@ -68,6 +77,10 @@ const title = computed(() => {
       return "Question";
     case "elicitation":
       return "Input requested";
+    case "exitPlanMode":
+      return "Plan approval";
+    case "autoModeSwitch":
+      return "Auto mode switch";
   }
 });
 
@@ -76,6 +89,7 @@ const inputChoice = ref<string | null>(null);
 const urlOpened = ref(false);
 const formContent = ref<Record<string, unknown>>({});
 const formComponentRef = ref<{ validate: () => string | null } | null>(null);
+const exitPlanFeedback = ref("");
 
 // Type-narrowed accessors so the template doesn't need casts.
 const asPermission = computed(() =>
@@ -91,6 +105,16 @@ const asUserInput = computed(() =>
 const asElicitation = computed(() =>
   props.pendingKind === "elicitation"
     ? (props.request as ElicitationRequestData)
+    : null,
+);
+const asExitPlanMode = computed(() =>
+  props.pendingKind === "exitPlanMode"
+    ? (props.request as ExitPlanModeRequestData)
+    : null,
+);
+const asAutoModeSwitch = computed(() =>
+  props.pendingKind === "autoModeSwitch"
+    ? (props.request as AutoModeSwitchRequestData)
     : null,
 );
 
@@ -246,6 +270,32 @@ async function elicitationCancel(
     sessionId: props.sessionId,
     requestId: props.requestId,
     response: { kind: "elicitation", action },
+  });
+}
+
+async function exitPlanRespond(
+  approved: boolean,
+  selectedAction?: "interactive" | "autopilot" | "exit_only" | "autopilot_fleet",
+): Promise<void> {
+  await sessionsStore.respondToPending({
+    sessionId: props.sessionId,
+    requestId: props.requestId,
+    response: {
+      kind: "exitPlanMode",
+      approved,
+      ...(selectedAction ? { selectedAction } : {}),
+      ...(exitPlanFeedback.value.trim()
+        ? { feedback: exitPlanFeedback.value.trim() }
+        : {}),
+    },
+  });
+}
+
+async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<void> {
+  await sessionsStore.respondToPending({
+    sessionId: props.sessionId,
+    requestId: props.requestId,
+    response: { kind: "autoModeSwitch", response },
   });
 }
 </script>
@@ -427,6 +477,84 @@ async function elicitationCancel(
         />
       </div>
     </template>
+
+    <!-- Exit plan mode -->
+    <template v-else-if="asExitPlanMode">
+      <p class="pending-card-source">
+        Recommended: {{ asExitPlanMode.recommendedAction }}
+      </p>
+      <pre
+        v-if="asExitPlanMode.planContent"
+        class="pending-card-plan"
+      >{{ asExitPlanMode.planContent }}</pre>
+      <div class="pending-card-input">
+        <label class="pending-card-input-label">Feedback / requested changes:</label>
+        <Textarea v-model="exitPlanFeedback" rows="3" />
+      </div>
+      <div class="pending-card-actions">
+        <Button
+          v-if="asExitPlanMode.actions.includes('exit_only')"
+          label="Exit only"
+          severity="secondary"
+          size="small"
+          @click="exitPlanRespond(false, 'exit_only')"
+        />
+        <Button
+          v-if="asExitPlanMode.actions.includes('interactive')"
+          label="Continue interactive"
+          severity="primary"
+          size="small"
+          @click="exitPlanRespond(true, 'interactive')"
+        />
+        <Button
+          v-if="asExitPlanMode.actions.includes('autopilot')"
+          label="Autopilot"
+          severity="warn"
+          size="small"
+          icon="pi pi-bolt"
+          @click="exitPlanRespond(true, 'autopilot')"
+        />
+        <Button
+          v-if="asExitPlanMode.actions.includes('autopilot_fleet')"
+          label="Autopilot fleet"
+          severity="warn"
+          size="small"
+          icon="pi pi-users"
+          @click="exitPlanRespond(true, 'autopilot_fleet')"
+        />
+      </div>
+    </template>
+
+    <!-- Rate-limit auto-mode switch -->
+    <template v-else-if="asAutoModeSwitch">
+      <p class="pending-card-source">
+        The CLI can switch modes after an eligible rate limit.
+        <template v-if="asAutoModeSwitch.retryAfterSeconds !== undefined">
+          Retry after {{ asAutoModeSwitch.retryAfterSeconds }}s.
+        </template>
+      </p>
+      <div class="pending-card-actions">
+        <Button
+          label="No"
+          severity="secondary"
+          size="small"
+          @click="autoModeRespond('no')"
+        />
+        <Button
+          label="Yes"
+          severity="primary"
+          size="small"
+          @click="autoModeRespond('yes')"
+        />
+        <Button
+          label="Yes, always"
+          severity="warn"
+          size="small"
+          icon="pi pi-bolt"
+          @click="autoModeRespond('yes_always')"
+        />
+      </div>
+    </template>
   </article>
 </template>
 
@@ -515,6 +643,18 @@ async function elicitationCancel(
   font-family: var(--p-font-family-mono, ui-monospace, monospace);
   font-size: 0.82rem;
   word-break: break-all;
+}
+
+.pending-card-plan {
+  max-height: 16rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--p-border-radius-sm);
+  background: var(--p-content-hover-background);
+  white-space: pre-wrap;
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
 }
 
 .pending-card-source {

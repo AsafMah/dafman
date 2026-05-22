@@ -205,12 +205,16 @@ describe("chatEvents — family ownership", () => {
     ]);
   });
 
-  test("notification handlers own permission/user_input/elicitation .requested+.completed + dafman.pending_request/_response", () => {
+  test("notification handlers own pending request lifecycle events", () => {
     expect(Object.keys(notificationHandlers).sort()).toEqual([
+      "auto_mode_switch.completed",
+      "auto_mode_switch.requested",
       "dafman.pending_request",
       "dafman.pending_response",
       "elicitation.completed",
       "elicitation.requested",
+      "exit_plan_mode.completed",
+      "exit_plan_mode.requested",
       "permission.completed",
       "permission.requested",
       "user_input.completed",

@@ -12,7 +12,9 @@ import { reactive, ref, watch } from "vue";
 import { invokeCommand, onPendingRequest, onSessionEvent } from "../ipc/invoke";
 import type {
   AgentInfo,
+  AutoModeSwitchRequestData,
   ElicitationRequestData,
+  ExitPlanModeRequestData,
   PendingRequestPayload,
   PermissionRequestData,
   ReasoningVisibility,
@@ -118,6 +120,10 @@ export type SessionRecord = {
   /// otherwise miss two events in a row if the rail hadn't read the
   /// previous state yet.
   tasksRefreshCounter: number;
+  /// Monotonic counter watched by the details rail's Plan section.
+  /// Bumped on SDK `session.plan_changed` so plan.md edits made by the
+  /// agent or CLI callbacks refresh the preview without remounting.
+  planRefreshCounter: number;
   /// 22a: requestIds of MCP OAuth required-events we've toasted, so a
   /// resume / replay doesn't duplicate the notification, and so we
   /// can pair `_completed` events with their `_required`. Internal —
@@ -148,6 +154,18 @@ export type PendingRecordRequest =
       requestId: string;
       message: string;
       request: ElicitationRequestData;
+    }
+  | {
+      kind: "exitPlanMode";
+      requestId: string;
+      message: string;
+      request: ExitPlanModeRequestData;
+    }
+  | {
+      kind: "autoModeSwitch";
+      requestId: string;
+      message: string;
+      request: AutoModeSwitchRequestData;
     };
 
 let unsubscribe: (() => void) | null = null;
@@ -287,6 +305,17 @@ export const useSessionsStore = defineStore("sessions", () => {
         data.newMode === "autopilot"
       ) {
         record.mode = data.newMode;
+        if (data.newMode === "autopilot" && record.pendingRequests.length > 0) {
+          const requestIds = record.pendingRequests.map((p) => p.requestId);
+          record.pendingRequests.splice(0, record.pendingRequests.length);
+          for (const requestId of requestIds) {
+            appendEvent(record, {
+              sessionId: record.id,
+              eventType: "dafman.pending_response",
+              data: { requestId },
+            });
+          }
+        }
       }
     }
 
@@ -343,6 +372,9 @@ export const useSessionsStore = defineStore("sessions", () => {
       payload.eventType === "session.background_tasks_changed"
     ) {
       record.tasksRefreshCounter += 1;
+    }
+    if (payload.eventType === "session.plan_changed") {
+      record.planRefreshCounter += 1;
     }
 
     // 22a: surface MCP OAuth lifecycle as user-visible toasts.
@@ -446,6 +478,8 @@ export const useSessionsStore = defineStore("sessions", () => {
     if (payload.eventType === "permission.completed") completedKind = "permission";
     else if (payload.eventType === "user_input.completed") completedKind = "userInput";
     else if (payload.eventType === "elicitation.completed") completedKind = "elicitation";
+    else if (payload.eventType === "exit_plan_mode.completed") completedKind = "exitPlanMode";
+    else if (payload.eventType === "auto_mode_switch.completed") completedKind = "autoModeSwitch";
     if (completedKind) {
       const idx = record.pendingRequests.findIndex((p) => p.kind === completedKind);
       if (idx >= 0) record.pendingRequests.splice(idx, 1);
@@ -518,6 +552,24 @@ export const useSessionsStore = defineStore("sessions", () => {
           kind: "elicitation",
           requestId: payload.requestId,
           message: payload.request.message,
+          request: payload.request,
+        };
+        break;
+      case "exitPlanMode":
+        entry = {
+          kind: "exitPlanMode",
+          requestId: payload.requestId,
+          message: payload.request.summary || "Plan ready for approval",
+          request: payload.request,
+        };
+        break;
+      case "autoModeSwitch":
+        entry = {
+          kind: "autoModeSwitch",
+          requestId: payload.requestId,
+          message: payload.request.errorCode
+            ? `Switch to auto mode after rate limit: ${payload.request.errorCode}`
+            : "Switch to auto mode?",
           request: payload.request,
         };
         break;
@@ -610,6 +662,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         sawTurnBoundary: false,
         currentAgent: null,
         tasksRefreshCounter: 0,
+        planRefreshCounter: 0,
 
         _toastedOauthRequests: new Set<string>(),
       });
@@ -715,6 +768,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         sawTurnBoundary: false,
         currentAgent: null,
         tasksRefreshCounter: 0,
+        planRefreshCounter: 0,
 
         _toastedOauthRequests: new Set<string>(),
       });

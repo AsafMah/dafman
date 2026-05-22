@@ -44,7 +44,10 @@ describe("PendingRequestQueue.enqueue", () => {
 		});
 		expect(q.size).toBe(0);
 		const resolved = await p;
-		expect(resolved).toEqual({ answer: "", wasFreeform: false });
+		expect(resolved).toEqual({
+			answer: "User is unavailable in autopilot mode.",
+			wasFreeform: true,
+		});
 	});
 
 	test("elicitation cancellation shape is { action: cancel }", async () => {
@@ -61,6 +64,22 @@ describe("PendingRequestQueue.enqueue", () => {
 			throw new Error("emit-failure");
 		});
 		expect(await p).toEqual({ kind: "user-not-available" });
+	});
+
+	test("exit-plan cancellation declines approval", async () => {
+		const q = new PendingRequestQueue(() => {});
+		const p = q.enqueue("sess-1", "exitPlanMode", () => {
+			throw new Error("emit-failure");
+		});
+		expect(await p).toEqual({ approved: false });
+	});
+
+	test("auto-mode-switch cancellation answers no", async () => {
+		const q = new PendingRequestQueue(() => {});
+		const p = q.enqueue("sess-1", "autoModeSwitch", () => {
+			throw new Error("emit-failure");
+		});
+		expect(await p).toEqual("no");
 	});
 });
 
@@ -192,6 +211,45 @@ describe("PendingRequestQueue.respond", () => {
 		expect(second).toBe(false);
 		expect(await p).toEqual({ answer: "hi", wasFreeform: true });
 	});
+
+	test("exit-plan approval maps to SDK result shape", async () => {
+		const q = new PendingRequestQueue(() => {});
+		let rid: string | undefined;
+		const p = q.enqueue("sess-1", "exitPlanMode", (id) => {
+			rid = id;
+		});
+		const ok = await q.respond({
+			sessionId: "sess-1",
+			requestId: rid!,
+			response: {
+				kind: "exitPlanMode",
+				approved: true,
+				selectedAction: "autopilot_fleet",
+				feedback: "go",
+			},
+		});
+		expect(ok).toBe(true);
+		expect(await p).toEqual({
+			approved: true,
+			selectedAction: "autopilot_fleet",
+			feedback: "go",
+		});
+	});
+
+	test("auto-mode-switch response maps to CLI response string", async () => {
+		const q = new PendingRequestQueue(() => {});
+		let rid: string | undefined;
+		const p = q.enqueue("sess-1", "autoModeSwitch", (id) => {
+			rid = id;
+		});
+		const ok = await q.respond({
+			sessionId: "sess-1",
+			requestId: rid!,
+			response: { kind: "autoModeSwitch", response: "yes_always" },
+		});
+		expect(ok).toBe(true);
+		expect(await p).toBe("yes_always");
+	});
 });
 
 describe("PendingRequestQueue teardown", () => {
@@ -216,7 +274,10 @@ describe("PendingRequestQueue teardown", () => {
 		expect(q.size).toBe(2);
 		q.settleAll("shutdown");
 		expect(q.size).toBe(0);
-		expect(await a).toEqual({ answer: "", wasFreeform: false });
+		expect(await a).toEqual({
+			answer: "User is unavailable in autopilot mode.",
+			wasFreeform: true,
+		});
 		expect(await b).toEqual({ action: "cancel" });
 	});
 });

@@ -16,10 +16,10 @@
 **Active milestone:** **Post-M2 audit burn-down**.
 M1 + M2 shipped (including in-app log viewer, export conversation,
 permissions tab, tools allowlist, MCP OAuth toast). Current work is
-the audit's Phase 21/23 local slice: Library consolidation + command
-wiring. Library now has MCP, Skills, Agents, and read-only
-Instructions; remaining Library work is a richer unified item grid /
-editing flows if desired.
+the audit's Phase 23 local slice: Copilot CLI mode parity before the
+larger long-jobs/fleet UI. The three-way mode toggle now has native
+plan/autopilot lifecycle handling, `/plan <prompt>` bootstrap behavior,
+exit-plan approval UI, and autopilot unavailable-user semantics.
 
 ---
 
@@ -32,18 +32,19 @@ used" call — we will not pursue it speculatively.
 
 Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` §C):
 
-1. **Library tab consolidation follow-up** (audit P21, remaining).
+1. **Long jobs registry + Autopilot UI** (audit P23, remaining).
+   Mode semantics are now wired; the remaining work is surfacing
+   SDK/background tasks as a first-class Jobs panel/status indicator
+   instead of relying solely on the rail's Tasks section.
+2. **Library tab consolidation follow-up** (audit P21, remaining).
    Initial slice shipped: Instructions tab + `/library ...` command
    wiring + SDK `CommandDefinition` registration. Remaining optional
    work: unified Library item grid, in-app instruction editor (must be
    permissioned), or deeper SDK hook features (`onUserPromptSubmitted`,
    `onSessionStart`) once there is a concrete use case.
-2. **App shell redesign — sidebar + status bar** (audit P22, ~2 d).
+3. **App shell redesign — sidebar + status bar** (audit P22, ~2 d).
    Replaces the topbar-only chrome with a left activity bar + bottom
    status bar; affects every screen so it's a larger structural lift.
-3. **Long jobs registry + Autopilot UI** (audit P23, ~3 d).
-   Surface the SDK's background-tasks fleet as a first-class panel
-   instead of relying solely on the rail's Tasks section.
 4. **Terminal integration** (audit P24, ~3 d). `Bun.spawn` PTY +
    xterm.js panes inside dockview.
 5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
@@ -69,7 +70,7 @@ TODO reflects current state against the M0–M7 ambitions in
 | Area | Status | Notes |
 |---|---|---|
 | Tauri → Electrobun port | DONE | `src-tauri/` deleted; one TS+Bun stack. |
-| SDK pinned to `copilot-sdk-supercharged` | DONE | npm; prebuilt platform binary resolved in `src-bun/app/client.ts` to dodge the Node 24 floor. |
+| SDK pinned to bundled Copilot JSON-RPC SDK | DONE | `src-bun/app/copilotSdk.ts` centralises the bundled SDK import; prebuilt platform binary resolved in `src-bun/app/client.ts` to dodge the Node 24 floor. |
 | Single Client lifecycle | DONE | `clientStore` + bun `client.ts`. |
 | Multi-session create / resume / disconnect / delete | DONE | `SessionRegistry`; layout-driven resume on startup. |
 | Streaming chat | DONE | rAF-coalesced; reducer in `src/lib/chatEvents.ts`. |

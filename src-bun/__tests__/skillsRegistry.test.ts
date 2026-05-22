@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { SkillsRegistry } from "../app/skillsRegistry";
 import { AppError } from "../app/errors";
-import type { CopilotClient } from "copilot-sdk-supercharged";
+import type { CopilotClient } from "../app/copilotSdk";
 
 function makeFakeClient(
 	overrides: Partial<{
