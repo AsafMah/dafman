@@ -310,6 +310,82 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ---
 
+## 2026-05-22 — Phase 19a Library panel + MCP registry
+
+1. ⏳ **Open from activity bar.**
+   - **Steps:** click the book icon (`pi-book`) in the left activity bar.
+   - **Expected:** Library sidebar opens at ~360 px. Header shows
+     "LIBRARY". Two tabs: **MCP** (selected) + **Skills**.
+
+2. ⏳ **Active tab persists across closes.**
+   - **Steps:** open Library → click **Skills** tab → click the
+     book icon to close → click again to reopen.
+   - **Expected:** Skills tab is still selected. (Backed by
+     `localStorage` `dafman.library.activeTab`.)
+
+3. ⏳ **MCP Discovered list populates from real CLI.**
+   - **Steps:** with a workspace that has an `.mcp.json` or a
+     plugin-registered MCP server, open Library → MCP.
+   - **Expected:** the **Discovered** section lists those servers
+     with their source badge (project / personal-copilot / plugin).
+   - **Why not automated:** F18 covers the fake-client shape; the
+     real-CLI discovery path is environment-dependent.
+
+4. ⏳ **Add a real local MCP server via structured form.**
+   - **Steps:** click **Add** → fill `name` + `command` (e.g.
+     `python` `args: -m mcp.server`) → submit.
+   - **Expected:** dialog closes, the server appears in
+     **Configured** with the `local` badge. Spin up a new session
+     and confirm the server's tools are offered (via the rail's
+     Tools section).
+   - **Why not automated:** requires a real MCP server binary.
+
+5. ⏳ **Add an http MCP server with OAuth.**
+   - **Steps:** click **Add** → switch transport to **HTTP** →
+     fill `url` + optional `oauthClientId` + grant type → submit.
+   - **Expected:** server appears in Configured with the `http`
+     badge + a **Sign in** button. Clicking Sign in opens the
+     OAuth URL in the browser.
+   - **Why not automated:** real OAuth flow requires a real provider.
+
+6. ⏳ **JSON mode round-trips structured fields.**
+   - **Steps:** click **Add** → fill name + command + an env row
+     → switch to **JSON** mode → confirm the textarea shows your
+     payload → tweak a field → switch back to **Form** mode.
+   - **Expected:** structured fields reflect the JSON edit. If
+     JSON is malformed, mode toggle stays on JSON and shows an
+     inline error.
+
+7. ⏳ **Enable / disable toggle survives a restart.**
+   - **Steps:** disable a configured server via the toggle.
+     Restart the app.
+   - **Expected:** the server stays disabled (persisted via the
+     SDK's user config; not via dafman's settings.json).
+   - **Why not automated:** full restart cycle.
+
+8. ⏳ **Remove confirms before deleting.**
+   - **Steps:** click the trash icon on a configured server.
+   - **Expected:** native confirm prompt; on accept, server
+     disappears from Configured and (if it was in Discovered) the
+     "Enable" shortcut reappears in Discovered.
+
+9. ⏳ **Sign-in toast when no session exists.**
+   - **Steps:** close every chat session → open Library → MCP →
+     click **Sign in** on a configured http server.
+   - **Expected:** warn toast: "No session to authenticate / Create
+     a session first…". Sign-in does NOT proceed.
+
+10. ⏳ **Skills tab is rendered (UI only — 19b polishes wiring).**
+    - **Steps:** open Library → Skills tab.
+    - **Expected:** skills grouped by source (builtin / project /
+      personal-copilot). Per-row toggle. Reveal-in-folder button
+      when the skill has a `path`. Description hidden until you
+      click the row name.
+    - **Note:** 19b will add a "Manage globally" link from the
+      right-rail Skills section.
+
+---
+
 ## 2026-05-22 — Phase 18b tools / plan / quota (right-rail)
 
 1. ⏳ **Tool toggle hint actually requires restart to apply.**
