@@ -1166,6 +1166,29 @@ export class SessionRegistry {
 		}
 	}
 
+	/// Session-scoped per-MCP toggle. Lives on the live session
+	/// (`session.rpc.mcp.enable/disable`) rather than the server-
+	/// scoped allowlist — lets the user gate an MCP for one session
+	/// without persistently disabling it everywhere.
+	async setSessionMcpEnabled(
+		sessionId: string,
+		serverName: string,
+		enabled: boolean,
+	): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			if (enabled) {
+				await entry.session.rpc.mcp.enable({ serverName });
+			} else {
+				await entry.session.rpc.mcp.disable({ serverName });
+			}
+			return true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
 	async getAccountQuota(): Promise<
 		Record<
 			string,

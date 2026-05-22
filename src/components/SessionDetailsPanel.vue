@@ -328,6 +328,36 @@ async function loadTools() {
     toolsLoaded.value = true;
   }
 }
+async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
+  if (!sessionId.value) return;
+  // Optimistic local flip so the toggle responds immediately;
+  // reload to pick up the SDK-side status change.
+  server.status = enabled ? "connected" : "disabled";
+  try {
+    await invokeCommand("setSessionMcpEnabled", {
+      sessionId: sessionId.value,
+      serverName: server.name,
+      enabled,
+    });
+    // Re-fetch to surface the real status (might be "connecting"
+    // or an error).
+    await loadTools();
+  } catch (err) {
+    toasts.error(
+      "Failed to toggle MCP server",
+      err instanceof Error ? err.message : String(err),
+    );
+    server.status = enabled ? "disabled" : "connected";
+  }
+}
+
+function mcpEnabled(s: McpItem): boolean {
+  // SDK's McpServerStatus uses "disabled" specifically for the
+  // user-toggled-off state; anything else (connected, pending,
+  // disconnected, error) counts as enabled.
+  return s.status !== "disabled";
+}
+
 function isExcluded(name: string): boolean {
   return settings.value.tools?.defaultExcluded?.includes(name) ?? false;
 }
@@ -761,6 +791,11 @@ function toggleItemExpansion(kind: "tool" | "skill", name: string): void {
               <span class="compact-name">{{ s.name }}</span>
               <small class="compact-tag">{{ s.status }}</small>
             </div>
+            <ToggleSwitch
+              :model-value="mcpEnabled(s)"
+              :aria-label="`Enable MCP server ${s.name}`"
+              @update:model-value="(v: boolean) => setMcpServerEnabled(s, v)"
+            />
             <div v-if="s.error" class="compact-desc compact-desc-error">
               {{ s.error }}
             </div>

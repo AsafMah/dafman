@@ -1,0 +1,29 @@
+fix(mcp): Library discovers session MCPs + rail toggles per-session
+
+User feedback (2026-05-22): "github MCP doesn't appear in Library
+but is in the session" and "session menu doesn't let you enable/
+disable MCP servers".
+
+Two fixes:
+
+1) Library Discovered list now picks up the active session's
+   workingDirectory AND merges in the active session's live
+   mcp.list. The SDK's server-scoped mcp.discover defaults to
+   user-config only — plugin-supplied workspace configs (the
+   github MCP via the github plugin) only register against a live
+   session, so we have to merge those in explicitly. Source badge
+   reads "session" for merged-in entries.
+
+2) Right-rail MCP servers now have a per-server toggle. New
+   session-scoped RPC setSessionMcpEnabled wraps
+   session.rpc.mcp.enable/disable. Toggle uses status === "disabled"
+   as the user-toggled-off state; pending/connecting/error all
+   count as enabled. Optimistic flip + reload to surface the real
+   SDK status.
+
+Plumbing: 1 new bun RPC threaded through rpc.ts / types.ts /
+index.ts / test-server.ts.
+
+Gates: lint clean, 386 bun tests, 64/64 E2E.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

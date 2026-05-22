@@ -282,6 +282,14 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.listSessionMcpServers(sessionId);
 	}),
+	setSessionMcpEnabled: rpcGuard(async (args) => {
+		const { sessionId, serverName, enabled } = args as {
+			sessionId: string;
+			serverName: string;
+			enabled: boolean;
+		};
+		return sessions.setSessionMcpEnabled(sessionId, serverName, enabled);
+	}),
 	getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
 	readSessionPlan: rpcGuard(async (args) => {
 		const { sessionId } = args as { sessionId: string };

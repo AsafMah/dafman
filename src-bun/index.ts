@@ -238,6 +238,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			listSessionMcpServers: rpcGuard(async ({ sessionId }) =>
 				sessions.listSessionMcpServers(sessionId),
 			),
+			setSessionMcpEnabled: rpcGuard(async ({ sessionId, serverName, enabled }) =>
+				sessions.setSessionMcpEnabled(sessionId, serverName, enabled),
+			),
 			getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
 			readSessionPlan: rpcGuard(async ({ sessionId }) =>
 				sessions.readPlan(sessionId),

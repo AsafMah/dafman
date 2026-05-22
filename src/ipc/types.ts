@@ -350,6 +350,10 @@ export type CommandMap = {
       error?: string;
     }>;
   };
+  setSessionMcpEnabled: {
+    args: { sessionId: string; serverName: string; enabled: boolean };
+    result: boolean;
+  };
   getAccountQuota: {
     args: Record<string, never>;
     result: Record<string, {

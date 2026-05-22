@@ -14,6 +14,7 @@ import Dialog from "primevue/dialog";
 import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "../stores/toastStore";
 import { useSessionsStore } from "../stores/sessionsStore";
+import { useLayoutStore } from "../stores/layoutStore";
 import McpServerForm from "./McpServerForm.vue";
 
 type McpConfig = Record<string, unknown>;
@@ -68,15 +69,50 @@ async function loadAll() {
   error.value = null;
   loaded.value = false;
   try {
-    const [configs, disc] = await Promise.all([
+    // Pass the active session's workingDirectory (or any open
+    // session's, falling back to none) so the SDK's discovery picks
+    // up workspace-level `.mcp.json` files. Without this, servers
+    // configured per-workspace (e.g. the github MCP a session has
+    // already auto-connected to) would NOT show up in the Library
+    // — the SDK's mcp.discover defaults to user-config only.
+    const activeId = useLayoutStore().activeSessionId;
+    const active = sessionsStore.sessions.find((s) => s.id === activeId);
+    const wd =
+      active?.workingDirectory ||
+      sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
+      "";
+    // Also query the active session's live MCP list — it includes
+    // servers that the SDK auto-discovered AND connected to, which
+    // mcp.discover (server-scoped) may miss for plugin-supplied
+    // configs that only register against a live session.
+    const sessionMcpsPromise = activeId
+      ? invokeCommand("listSessionMcpServers", { sessionId: activeId }).catch(() => [] as Array<{ name: string }>)
+      : Promise.resolve([] as Array<{ name: string }>);
+    const [configs, disc, sessionMcps] = await Promise.all([
       invokeCommand("listMcpConfigs", {}),
-      invokeCommand("discoverMcpServers", {}),
+      invokeCommand("discoverMcpServers", wd ? { workingDirectory: wd } : {}),
+      sessionMcpsPromise,
     ]);
     configured.value = Object.entries(configs).map(([name, config]) => {
       const c = classifyTransport(config);
       return { name, config, ...c };
     });
-    discovered.value = disc.map((d) => ({ ...d }));
+    // Merge session-side MCP names into the Discovered list. A live
+    // session's mcp.list can include servers that the server-scoped
+    // mcp.discover misses (e.g. plugin-supplied configs that only
+    // resolve against a real session). Tag them as discovered with
+    // source="session" so the user knows where they came from.
+    const merged = new Map<string, DiscoveredEntry>();
+    for (const d of disc) merged.set(d.name, { ...d });
+    for (const s of sessionMcps) {
+      if (merged.has(s.name)) continue;
+      merged.set(s.name, {
+        name: s.name,
+        source: "session",
+        enabled: true,
+      });
+    }
+    discovered.value = [...merged.values()];
     loaded.value = true;
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);

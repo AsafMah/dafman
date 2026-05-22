@@ -530,6 +530,12 @@ export type DafmanRPC = {
 					error?: string;
 				}>;
 			};
+			/// Session-scoped MCP enable/disable. Toggles whether the
+			/// session can use this MCP server for tool calls.
+			setSessionMcpEnabled: {
+				params: { sessionId: string; serverName: string; enabled: boolean };
+				response: boolean;
+			};
 			/// Server-scoped account quota snapshot. Returns the SDK
 			/// `quotaSnapshots` map verbatim — the renderer cherry-
 			/// picks fields for display + warning thresholds.
