@@ -860,7 +860,7 @@ The picker only lets you pick a folder, no files visible.
     - **Why not automated:** visual-only check; covered by tests at the data layer.
 - [ ] ⏳ **defaultApproveAll persists across restart**
     - **Steps:** flip the Permissions toggle ON, restart the app.
-    - **Expected:** toggle still ON after restart (v10 settings file on disk).
+    - **Expected:** toggle still ON after restart (v11 settings file on disk).
     - **Why not automated:** disk persistence + restart.
 - [ ] ⏳ **defaultApproveAll applies to NEW sessions only**
     - **Steps:** with defaultApproveAll ON, create a new session.
@@ -897,3 +897,11 @@ The picker only lets you pick a folder, no files visible.
     - **Steps:** start with a v10 settings file (defaultExcluded: ["bash"], no defaultAllowed). Launch the app.
     - **Expected:** settings load cleanly; "bash" still shows "Forbid"; defaultAllowed initializes to empty.
     - **Why not automated:** disk persistence + restart.
+- [ ] ⏳ **Mutual exclusion: setting Only allow clears Forbid for the same tool**
+    - **Steps:** mark "bash" as "Forbid". Then mark it as "Only allow".
+    - **Expected:** "bash" leaves defaultExcluded and enters defaultAllowed — no stale entries in either list. Verifiable by inspecting settings.json on disk.
+    - **Why not automated:** covered at the data layer; manual confirmation of on-disk shape is the high-signal check.
+- [ ] ⏳ **MCP tool canonical key (namespacedName) is what gets persisted**
+    - **Steps:** with a real MCP server configured (e.g. playwright), open the rail Tools section and mark `playwright/navigate` as "Only allow".
+    - **Expected:** settings.json shows `defaultAllowed: ["playwright/navigate"]`, NOT `["navigate"]`. This is what makes multi-server setups correct — same `name` across servers won't collide.
+    - **Why not automated:** real MCP server needed.
