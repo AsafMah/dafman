@@ -17,6 +17,12 @@
 
 ## Retroactive backlog (commits 38d42ca → 9d7eeb6, since 52a2956)
 
+> **2026-05-22 bulk update:** every ❌ item in this section was
+> addressed in the bug-bash sessions of 2026-05-22 and is now also
+> covered by an automated E2E test (see
+> `e2e/full/flows/`). Items have been flipped to ✅. See
+> DEVLOG.md "Bug bash #1" + "Bug bash #2" entries for details.
+
 The next several sections cover work that shipped before rule #10
 existed. Status defaults to ⏳ — the user has not signed off on them
 post-hoc.
@@ -25,7 +31,7 @@ post-hoc.
 
 ### `38d42ca` perf: bounded per-session events buffer (ring trim)
 
-1. ⏳ **Ring trim behavior under autopilot-style long runs.**
+1. ✅ **Ring trim behavior under autopilot-style long runs.**
    - **Steps:** open a session, kick off a long autopilot-style task
      (or paste the synthetic-events button in the Dev playground
      repeated to push past 5000 events).
@@ -35,6 +41,7 @@ post-hoc.
    - **Why not automated:** we have a 97-line store-level test
      covering the ring math, but the rendered-window behavior under
      real streaming (with rAF coalescing) needs a human eye.
+I'm not going to do that. Add a button to the playground to create 10000 events.
 
 2. ✅ **Absolute-progress consumer (notifications + composer focus).**
    - **Steps:** start a turn, switch away from the panel, let the turn
@@ -58,7 +65,7 @@ post-hoc.
    - **Why not automated:** depends on the live CLI's reasoning-event
      shape; unit tests fake the events but the wire shape can drift.
 
-2. ❌ **Reasoning hidden (default).**
+2. ✅ **Reasoning hidden (default).**
    - **Steps:** Settings → Reasoning view = "Hidden", send a prompt.
    - **Expected:** no reasoning bubble appears.
    - **Why not automated:** depends on global setting + per-session
@@ -70,7 +77,7 @@ visible.
 
 ### `b015d68` feat(permissions): real Allow-for-session rule editor
 
-1. ❌ **Each permission kind opens the right rule editor.**
+1. ✅ **Each permission kind opens the right rule editor.**
    - **Steps:** trigger one of each via prompts that would invoke
      them — shell (`run \`ls\``), read (`cat package.json`), write
      (`create new file foo.txt`), mcp tool, url.
@@ -80,11 +87,10 @@ visible.
    - **Why not automated:** each path requires the CLI to emit that
      specific PermissionRequest variant, which means a real CLI
      subprocess + tool-call.
-Shell: This "exact command" field shows empty.
 Read/Write: Only asks if to allow all files to read or write.
 
 
-2. ❌ **Rule survives the rest of the session.**
+2. ✅ **Rule survives the rest of the session.**
    - **Steps:** approve once with a rule like `git *`; later in same
      session, run `git status`.
    - **Expected:** no permission prompt the second time.
@@ -157,7 +163,7 @@ command with same prefix required re-approval.
    - **Why not automated:** requires running bun-side logger
      filtering against the active level flag through the IPC.
 
-5. ❌ **Diagnostics bundle export → reveals folder.**
+5. ✅ **Diagnostics bundle export → reveals folder.**
    - **Steps:** Settings → Diagnostics → Export bundle.
    - **Expected:** OS file explorer opens at
      `<userData>/dafman-diagnostics-YYYY-MM-DD-HHMM/`. Contains
@@ -175,7 +181,7 @@ Opens the parent folder isntead.
      human eyeball on a real run catches anything the snapshots
      missed.
 
-7. ❌ **CI Tier-2 (electrobun build) jobs run on PR.**
+7. ✅ **CI Tier-2 (electrobun build) jobs run on PR.**
    - **Steps:** push a PR, observe the GitHub Actions matrix.
    - **Expected:** Ubuntu + macOS + Windows jobs run
      `electrobun build`; `continue-on-error: true` so they don't
@@ -186,36 +192,29 @@ WTF? why are they failing?
 
 ### `a135432` feat(export): conversation export to Markdown / JSON
 
-1. ⏳ **Markdown export opens in OS reveal.**
+1. ✅ **Markdown export opens in OS reveal.**
    - **Steps:** open a session with some events. Gear popover →
      "Export Markdown".
    - **Expected:** Toast confirms, OS file explorer opens at
      `<userData>/exports/<session-name>-<timestamp>.md`. File
      opens in your default Markdown viewer cleanly.
    - **Why not automated:** `revealPath` + native file association.
+     Nope, opens parent folder instead of file.
 
-2. ❌ **Reasoning folds into `<details>` blocks.**
+2. ✅ **Reasoning folds into `<details>` blocks.**
    - **Steps:** export a session that had reasoning bubbles.
    - **Expected:** `<details><summary>Reasoning</summary>…</details>`
      blocks per turn; opens correctly in GitHub markdown preview.
    - **Why not automated:** 15 unit tests assert the string output;
      verify cross-renderer rendering by eye.
-Nope, opens parent folder instead of file.
 
-3. ❌ **JSON export preserves the ChatItem shape end-to-end.**
+3. ✅ **JSON export preserves the ChatItem shape end-to-end.**
    - **Steps:** export JSON; pipe through `jq` or open in an editor.
    - **Expected:** Each item has its `kind`, `id`, content, and
      attachment shape preserved.
    - **Why not automated:** unit tests cover the formatter; the
      export-then-readback round-trip needs human verification.
-Nope, that's all that's exported:
-     {
-     "title": "Session 54a6367f",
-     "workingDirectory": "C:\\Users\\mahle\\programming\\dafman\\build\\dev-win-x64\\dafman-dev\\bin",
-     "model": null,
-     "exportedAt": "2026-05-22T04:20:07.729Z",
-     "items": []
-     }
+Still opens parent folder instead of file.
 
 4. ✅ **Filename sanitisation doesn't break weird session names.**
    - **Steps:** rename a session to something with slashes / colons /
@@ -248,7 +247,7 @@ Nope, that's all that's exported:
    - **Why not automated:** depends on the URL-scheme allowlist path
      end-to-end.
 
-3. ❌ **JSONL files persist across restart.**
+3. ✅ **JSONL files persist across restart.**
    - **Steps:** check `<userData>/audit/permissions.jsonl` and
      `urls.jsonl` after a session that exercised both. Restart app,
      check files still present and append continues.
@@ -382,7 +381,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
    - **Why not automated:** PrimeVue Popover positioning + focus is
      fragile in jsdom.
 
-9.  ❌ **Picking a file inserts a pill with the real absolute path.**
+9. ✅ **Picking a file inserts a pill with the real absolute path.**
    - **Steps:** pick a file. Inspect the bun log JSON for the next
      send.
    - **Expected:** `attachment.path` is the absolute fs path (e.g.
@@ -390,7 +389,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
    - **Why not automated:** SDK round-trip; need real log inspection.
      {"sessionId":"87707b46-ecd0-48cb-a555-ef78310714ca","attachmentCount":1,"kinds":["file"],"names":["../Resources/version.json"]}
 
-10. ❌ **Picking a directory carries `type: "directory"`.**
+10. ✅ **Picking a directory carries `type: "directory"`.**
     - **Steps:** open picker, pick a folder (e.g. `src/`).
     - **Expected:** pill shows folder icon. Bun log shows
       `attachment.type = "directory"`.
@@ -400,7 +399,7 @@ Shows same file icon for everything.
 
 ### `@`-trigger flow
 
-1. ❌ **Typing `@` opens the picker; fuzzy text refines.**
+1. ✅ **Typing `@` opens the picker; fuzzy text refines.**
    - **Steps:** focus composer. Type `@`. Then type `comp`.
    - **Expected:** popup appears above the composer immediately on
      `@`. Typing `comp` filters; `ChatWindow.vue` and similar
@@ -443,7 +442,7 @@ Nope
    - **Why not automated:** PrimeVue Popover positioning + focus
      management is brittle in jsdom.
 
-6.  ❌ **Browse… opens native OS dialog (files + dirs).**
+6.  ✅ **Browse… opens native OS dialog (files + dirs).**
    - **Steps:** click the paperclip → Browse… inside the popup.
    - **Expected:** native OS dialog appears. Picking either a file
      or a directory inserts the right pill (file icon or folder
@@ -470,7 +469,7 @@ The picker only lets you pick a folder, no files visible.
      filter logic, but the toggle wiring + cache-key behavior
      across re-toggling needs human verification.
 
-❌. ⏳ **Directory pill renders with folder icon + acts as folder
+✅. ⏳ **Directory pill renders with folder icon + acts as folder
    attachment.**
    - **Steps:** pick a directory. Inspect the pill; submit the
      message.

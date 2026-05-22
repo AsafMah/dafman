@@ -54,26 +54,58 @@ function pickStr(...keys: string[]): string | null {
 // ---------- shell ----------
 const shellCommand = computed(() => pickStr("fullCommandText", "command", "cmd") ?? "");
 
-/// Split a shell command into the leading token (e.g. "git" from
-/// "git status -s"). Used to suggest a command-prefix rule that
-/// covers similar future invocations.
-const shellFirstToken = computed(() => {
-  const c = shellCommand.value.trim();
-  if (!c) return "";
-  const m = /^\s*([^\s|;&]+)/.exec(c);
-  return m ? m[1]! : c;
+/// SDK-offered identifiers. The CLI pre-formats these to either
+/// match a single exact command (`"git status"`) or a command-
+/// prefix family (`"git:*"`). The matcher in the bundled CLI
+/// (`aYr` in `@github/copilot/app.js`):
+///   - argument === null → matches everything (we never send null)
+///   - argument ends with `":*"` → matches exact prefix OR prefix + " "
+///   - else → strict equality
+///
+/// So we MUST use the identifiers the SDK provides — fabricating
+/// our own first-token (e.g. `"git"`) only matches literal `git`
+/// and re-prompts on `git status`. This was the v1 bug behind the
+/// MANUAL_TESTS report "command with same prefix required
+/// re-approval".
+const offeredIdentifiers = computed<string[]>(() => {
+  const v = raw.value.commandIdentifiers;
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 });
 
-type ShellChoice = "exact" | "first-token" | "custom";
-const shellChoice = ref<ShellChoice>(shellFirstToken.value ? "first-token" : "exact");
+/// Pick the offered identifier the user likely wants to broaden:
+/// prefer the one that ends with `:*` (so the rule covers
+/// follow-up `git diff`, `git log`, …). Falls back to the first
+/// offered identifier, or empty.
+const broadIdentifier = computed<string>(() => {
+  const offered = offeredIdentifiers.value;
+  const wildcard = offered.find((id) => id.endsWith(":*"));
+  return wildcard ?? offered[0] ?? "";
+});
+
+/// Human label for the broad-identifier suggestion. Strip the
+/// trailing `:*` so the user sees `git` instead of `git:*`.
+const broadIdentifierLabel = computed(() =>
+  broadIdentifier.value.replace(/:\*$/, ""),
+);
+
+type ShellChoice = "exact" | "broad" | "custom";
+const shellChoice = ref<ShellChoice>(broadIdentifier.value ? "broad" : "exact");
 const shellCustom = ref(shellCommand.value);
 
 const shellRule = computed<PermissionApprovalRule | null>(() => {
   if (props.request.kind !== "shell" && props.request.kind !== "hook") return null;
   let id: string;
   if (shellChoice.value === "exact") id = shellCommand.value.trim();
-  else if (shellChoice.value === "first-token") id = shellFirstToken.value;
-  else id = shellCustom.value.trim();
+  else if (shellChoice.value === "broad") id = broadIdentifier.value;
+  else {
+    // Custom: the user typed a prefix string. Append `:*` if they
+    // haven't already, so it actually broadens (per the CLI
+    // matcher rules). Bare custom strings without `:*` would
+    // only match literal equality.
+    const c = shellCustom.value.trim();
+    if (!c) id = "";
+    else id = c.endsWith(":*") ? c : `${c}:*`;
+  }
   if (!id) return null;
   return { kind: "commands", commandIdentifiers: [id] };
 });
@@ -159,12 +191,12 @@ function submit() {
             <code class="rule-mono">{{ shellCommand || '(empty)' }}</code>
           </span>
         </label>
-        <label v-if="shellFirstToken" class="rule-choice">
-          <RadioButton v-model="shellChoice" name="shell" input-id="shell-prefix" value="first-token" />
+        <label v-if="broadIdentifier" class="rule-choice">
+          <RadioButton v-model="shellChoice" name="shell" input-id="shell-broad" value="broad" />
           <span>
             <strong>Anything starting with</strong>
-            <code class="rule-mono">{{ shellFirstToken }}</code>
-            <small class="rule-hint">e.g. {{ shellFirstToken }} status, {{ shellFirstToken }} diff …</small>
+            <code class="rule-mono">{{ broadIdentifierLabel }}</code>
+            <small class="rule-hint">e.g. {{ broadIdentifierLabel }} status, {{ broadIdentifierLabel }} diff …</small>
           </span>
         </label>
         <label class="rule-choice">
@@ -178,6 +210,9 @@ function submit() {
               placeholder="e.g. bun test"
               @focus="shellChoice = 'custom'"
             />
+            <small class="rule-hint">
+              Matches anything starting with this prefix (we append <code>:*</code> automatically).
+            </small>
           </span>
         </label>
       </div>

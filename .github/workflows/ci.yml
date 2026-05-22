@@ -53,7 +53,11 @@ jobs:
   # block merges; flip to required once it's been green for a week.
   build-matrix:
     name: electrobun build (${{ matrix.os }})
-    needs: check
+    # No `needs: check` — tier-2 should run independently. If the
+    # tier-1 smoke job is transiently flaky, tier-2 builds still
+    # report whether the bundle compiles on each OS. Previously
+    # tier-2 was skipped whenever check failed, which made it
+    # invisible to the user (manual-test #178 reported this).
     strategy:
       fail-fast: false
       matrix:

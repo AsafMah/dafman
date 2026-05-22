@@ -895,6 +895,35 @@ function pushCustom() {
   }
 }
 
+/// Stress test: synthesise a large number of assistant turns so we
+/// can observe how the ring-buffer trim + reducer hold up. Synchronous
+/// push so the events fire in a single tick — the reducer runs in a
+/// rAF coalescer, so the UI freeze is brief but real.
+function pushManyEvents(count: number): void {
+  const start = performance.now();
+  for (let i = 0; i < count; i++) {
+    const turnId = `stress-${i}`;
+    const messageId = `stress-msg-${i}`;
+    events.push({
+      sessionId: PLAYGROUND_PENDING_SESSION_ID,
+      eventType: "assistant.turn_start",
+      data: { turnId },
+    });
+    events.push({
+      sessionId: PLAYGROUND_PENDING_SESSION_ID,
+      eventType: "assistant.message",
+      data: { messageId, content: `stress message ${i}` },
+    });
+    events.push({
+      sessionId: PLAYGROUND_PENDING_SESSION_ID,
+      eventType: "assistant.turn_end",
+      data: { turnId },
+    });
+  }
+  const ms = performance.now() - start;
+  toastStore.info(`Pushed ${count * 3} events`, `${ms.toFixed(0)} ms enqueue`);
+}
+
 const toastSeverities = ["info", "success", "warn", "error"] as const;
 function fireToast(severity: (typeof toastSeverities)[number]) {
   toastStore[severity](
@@ -1364,6 +1393,20 @@ function toggleDarkPreview() {
       <header class="chat-wrapper-header">
         <h2>Chat preview</h2>
         <span class="muted small">{{ eventCount }} events</span>
+        <Button
+          label="+1k events"
+          icon="pi pi-bolt"
+          size="small"
+          severity="warn"
+          @click="pushManyEvents(333)"
+        />
+        <Button
+          label="+10k events"
+          icon="pi pi-bolt"
+          size="small"
+          severity="warn"
+          @click="pushManyEvents(3333)"
+        />
         <Button label="Clear chat" icon="pi pi-trash" severity="danger" text size="small" @click="clearChat" />
       </header>
       <div class="chat-frame">

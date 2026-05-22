@@ -123,7 +123,10 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				// hands back an empty comma-separated string). Treat
 				// any empty / whitespace-only entry as a cancel.
 				const first = paths[0]?.trim();
-				return first && first.length > 0 ? first : null;
+				if (!first || first.length === 0) return null;
+				// Force absolute (see pickAttachment above for why).
+				const { resolve, isAbsolute } = await import("node:path");
+				return isAbsolute(first) ? first : resolve(first);
 			}),
 			pickAttachment: rpcGuard(async ({ kind, startingFolder }) => {
 				// Windows native dialogs are file-only OR folder-only,
@@ -136,7 +139,15 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				});
 				const first = paths[0]?.trim();
 				if (!first) return null;
-				return { path: first, kind };
+				// CRITICAL: Electrobun's `openFileDialog` can return a
+				// path relative to the *bun process cwd* (the exe's
+				// `bin/` folder in prod), producing pills like
+				// `../Resources/version.json`. Force an absolute path.
+				// `node:path.resolve` is a no-op on already-absolute
+				// input, so it's safe regardless.
+				const { resolve, isAbsolute } = await import("node:path");
+				const abs = isAbsolute(first) ? first : resolve(first);
+				return { path: abs, kind };
 			}),
 			disconnectSession: rpcGuard(async ({ sessionId }) =>
 				sessions.disconnect(sessionId),
@@ -235,15 +246,28 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				const trimmed = path.trim();
 				if (!trimmed) return false;
 				try {
-					// Windows: bypass electrobun's showItemInFolder (which
-					// has reliably been opening the PARENT folder
-					// without selecting the file) and shell out to
-					// `explorer /select,<path>`. This is the canonical
-					// Windows "reveal file in folder" invocation and
-					// selects the target item inside Explorer.
 					if (process.platform === "win32") {
+						// Behavior depends on file vs folder:
+						//   File: explorer.exe /select,<file> opens
+						//     parent + highlights file.
+						//   Folder: explorer.exe <folder> opens it.
+						//     (/select,<folder> would open the parent
+						//     — that was the v1 diagnostics-bundle bug:
+						//     the reveal landed on userData/ instead
+						//     of inside the dafman-diagnostics-*/ dir.)
 						const { spawn } = await import("node:child_process");
-						spawn("explorer.exe", [`/select,${trimmed}`], { detached: true, stdio: "ignore" }).unref();
+						const { stat } = await import("node:fs/promises");
+						let isDir = false;
+						try {
+							const st = await stat(trimmed);
+							isDir = st.isDirectory();
+						} catch {
+							/* path missing — fall through with isDir=false;
+							 * /select,<missing> is a benign no-op rather
+							 * than misleading. */
+						}
+						const args = isDir ? [trimmed] : [`/select,${trimmed}`];
+						spawn("explorer.exe", args, { detached: true, stdio: "ignore" }).unref();
 						return true;
 					}
 					Utils.showItemInFolder(trimmed);

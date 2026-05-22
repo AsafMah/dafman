@@ -5,8 +5,30 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Fixed
 
-- **CRITICAL: Session working directory now persists across app
-  restart.** Resumed sessions previously defaulted to
+- **Permission rule editor: "Allow for session" now actually allows
+  follow-up commands.** The bundled CLI's matcher (`aYr` in
+  `@github/copilot/app.js`) treats bare identifiers like `"git"` as
+  strict equality and only `:*`-suffixed ones like `"git:*"` as
+  prefix-broadening. The editor was fabricating its own first-token
+  identifier, so `git status` re-prompted even after the user
+  approved `git`. Fix: use the SDK-offered `commandIdentifiers`
+  (which include `git:*`); custom-prefix input auto-appends `:*`.
+- **File / folder pill now carries the absolute path.** Electrobun's
+  `openFileDialog` can return paths relative to the bun process cwd
+  (the exe's `bin/` in prod), producing pills like
+  `../Resources/version.json`. `pickAttachment` + `pickFolder` now
+  `path.resolve()` the result.
+- **Reveal-in-explorer respects file vs folder on Windows.** The
+  previous fix used `explorer /select,<path>` uniformly, but
+  `/select,<dir>` opens the dir's *parent* — that was the
+  diagnostics + export bundle reveal bug. Now: `stat` the path; file
+  → `/select,<file>`; folder → `explorer <folder>`.
+- **CI Tier-2 (`electrobun build` matrix) actually runs on every
+  PR.** Removed `needs: check` so a transient tier-1 flake no
+  longer skips the tier-2 jobs — they were silently invisible.
+
+### CRITICAL: Session working directory now persists across app restart.
+- Resumed sessions previously defaulted to
   `process.cwd()` (the Electrobun exe folder) when the SDK catalog
   didn't surface a `cwd`. Root cause: `cwdFor` fell back to
   `process.cwd()` silently. Fix: cache `workingDirectory` on the

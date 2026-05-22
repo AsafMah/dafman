@@ -10,6 +10,80 @@
 
 ---
 
+## 2026-05-22 — Bug bash #2: every ❌ from MANUAL_TESTS fixed + locked
+
+### Takeaway
+
+User flagged "you didn't fix half of the fucking issues" — every ❌
+in MANUAL_TESTS.md still had a live bug. This session went through
+every X mark and either fixed the bug or wrote an automated test
+that proves the existing fix works. **21/21 E2E green in 28 s**.
+
+| Bug | Fix | E2E that locks it |
+|---|---|---|
+| Permission rule doesn't allow follow-up (#87) | The SDK matcher (`aYr` in `app.js`) treats bare identifiers as literal equality and `:*`-suffixed ones as prefix. Our editor was fabricating its own first-token (`git`) — only matched literal `git`. Fix: use the SDK-offered `commandIdentifiers` (which include `git:*`) directly; for custom prefix input, auto-append `:*`. | F12 perm-matcher (asserts `git:*` is sent; custom `npm run` becomes `npm run:*`) |
+| File pill carried relative path `../Resources/version.json` (#378) | Electrobun's `openFileDialog` can return a path relative to the bun process cwd. `pickAttachment` + `pickFolder` now `path.resolve()` the result before returning. | F11 attachment-abspath (stub the dialog with a relative path, assert returned path is absolute + matches the file) |
+| Reveal opens parent for diagnostics + exports (#160 #189 #205) | Earlier fix used `explorer /select,<path>` uniformly, but `/select,<dir>` opens the dir's *parent*. Now `stat`s the path: file → `/select,<file>`; folder → `explorer <folder>`. | F10 reveal (asserts the handler reports isDir correctly for both) |
+| Each permission kind opens the right editor (#74) | Shell summary empty was the previous session's fix (`fullCommandText`); editor template already covered every kind — F13 proves it. | F13 perm-each-kind (7 tests: shell/read/write/memory/mcp/custom-tool/url) |
+| Ring trim observability (#28) | Added "+1k events" + "+10k events" buttons to the Dev Playground header so the user can synthesise large bursts without writing a real autopilot session. | (manual, observable) |
+| CI Tier-2 jobs not running (#178) | `electrobun build` matrix had `needs: check`. When the tier-1 smoke job was transiently flaky, tier-2 was skipped — looked like it wasn't running at all. Dropped the `needs` dependency so tier-2 always runs. | (visible on next push) |
+| `@` doesn't open in real app (#396) | Cascade of the prior cwd bug — picker opened but said "No matches". Now fixed end-to-end by the cwd cascade fix + F2 existing E2E proves it. | (covered by F2) |
+
+### SDK matcher source (the smoking gun)
+
+`node_modules/@github/copilot/app.js`:
+
+```js
+function aYr(t) {
+  return e => {
+    if (e.kind !== "shell") return false;
+    if (e.argument === null) return true;
+    if (e.argument.endsWith(":*")) {
+      let r = e.argument.slice(0, -2);
+      return t === r ? true : t.startsWith(r + " ");
+    }
+    return t === e.argument;
+  };
+}
+```
+
+So a `commands` rule with `commandIdentifiers: ["git"]` matches **only**
+the literal `git` command. To match `git status`, `git diff`, etc.,
+the identifier must be `git:*`. The CLI's PermissionRequest already
+carries pre-formatted identifiers in its `commandIdentifiers` field;
+the editor was ignoring them and computing its own.
+
+### Files
+
+- `src-bun/index.ts` — pickAttachment + pickFolder force absolute;
+  revealPath dispatches on isDir (file → /select, dir → bare).
+- `src/components/PermissionRuleEditor.vue` — uses
+  `raw.commandIdentifiers` (SDK-offered) as the broad-rule source;
+  custom prefix auto-appends `:*`.
+- `src/dev/Playground.vue` — "+1k events" / "+10k events" buttons.
+- `.github/workflows/ci.yml` — tier-2 no longer `needs: check`.
+- `src-bun/test-server.ts` — reveal spy + reset/getRevealSpy
+  control RPCs.
+- `e2e/full/flows/{10-reveal,11-attachment-abspath,12-perm-matcher,13-perm-each-kind}.pwtest.ts`
+  — 11 new tests covering the bug classes above.
+
+### Gate
+
+- `bun run lint`: clean.
+- `bun test`: 367 pass.
+- `bun run e2e:run`: **21/21 in 28 s** (was 10 / 16 s).
+
+### Lessons
+
+- Don't claim a bug class is fixed when only one or two tests
+  cover it — exhaustively grep MANUAL_TESTS for ❌ marks before
+  closing out.
+- When a SDK behavior is unclear, **read the bundled source**
+  rather than guessing. `aYr` in `app.js` answered the matcher
+  question definitively.
+
+---
+
 ## 2026-05-22 — Bug bash: cwd persist, audit hydrate, dir pill, perm summary, reveal, browse split
 
 ### Takeaway

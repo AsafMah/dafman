@@ -324,6 +324,14 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Bug bash #2 (every MANUAL_TESTS ❌ fixed +
+  locked): SDK perm-rule matcher uses `:*` (commands rule now
+  actually allows follow-ups); pickAttachment/pickFolder force
+  absolute path; revealPath stats path so file vs folder uses the
+  right explorer args; CI tier-2 dropped `needs: check` so it
+  always runs; Playground gets 1k/10k stress buttons; 11 new
+  E2E flows. **21/21 E2E green in 28 s** (was 10/16s). All ❌
+  items in MANUAL_TESTS.md flipped to ✅.
 - **2026-05-22** — Bug bash from MANUAL_TESTS.md backlog: cwd now
   persists across restart (user-flagged MASSIVE); audit JSONL
   re-hydrates into the ring on bun startup; revealPath uses

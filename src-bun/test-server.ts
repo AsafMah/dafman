@@ -113,6 +113,14 @@ const sessions = new SessionRegistry(
 subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
 subscribeAudit((entry: AuditEntry) => broadcast("auditEvent", entry));
 
+// Reveal-spy state. The test-server's revealPath handler records the
+// resolved-isDir + path into spyReveal.calls instead of shelling out
+// to OS Explorer. Lets E2E F11 assert the file-vs-folder distinction
+// without depending on a real shell.
+const spyReveal: { calls: Array<{ isDir: boolean; path: string }> } = {
+	calls: [],
+};
+
 // Handler table — same signatures as production index.ts, just
 // returning plain promises so the ws dispatcher can `await` them.
 const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
@@ -219,6 +227,23 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		recordUrl({ url, allowed: false, reason: "stubbed-test-server" });
 		return false;
 	}),
+	revealPath: rpcGuard(async (args) => {
+		const { path } = args as { path: string };
+		const trimmed = path.trim();
+		if (!trimmed) return false;
+		// Mirror production isDir-detection but record the decision
+		// into spyReveal.calls (used by F11 E2E to assert that
+		// file/folder are revealed with the right strategy).
+		try {
+			const { stat } = await import("node:fs/promises");
+			const st = await stat(trimmed);
+			spyReveal.calls.push({ isDir: st.isDirectory(), path: trimmed });
+			return true;
+		} catch {
+			spyReveal.calls.push({ isDir: false, path: trimmed });
+			return false;
+		}
+	}),
 	respondToRequest: rpcGuard(async (args) => sessions.respondToRequest(args as Parameters<typeof sessions.respondToRequest>[0])),
 	browseDirectory: rpcGuard(async (args) => {
 		const { prefix } = args as { prefix: string };
@@ -279,8 +304,6 @@ const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
 				| (Omit<import("./app/audit").PermissionAuditEntry, "ts" | "kind"> & { kind: "permission" })
 				| (Omit<import("./app/audit").UrlAuditEntry, "ts" | "kind"> & { kind: "url" });
 		};
-		// Direct test seam — bypasses sessions.respondToRequest so we
-		// can deterministically seed entries for persistence tests.
 		const { recordPermission, recordUrl } = await import("./app/audit");
 		if (entry.kind === "permission") {
 			const { kind: _kind, ...rest } = entry;
@@ -291,6 +314,11 @@ const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		}
 		return "ok";
 	},
+	"__test.resetRevealSpy": async () => {
+		spyReveal.calls = [];
+		return "ok";
+	},
+	"__test.getRevealSpy": async () => spyReveal.calls,
 	"__test.ready": async () => "ok",
 };
 
