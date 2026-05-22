@@ -119,11 +119,26 @@ describe("chatEvents — split invariants", () => {
       "mcp.oauth_completed",
     ];
     const untriaged = KNOWN_SDK_EVENTS.filter(
-      (e) => !HANDLED_EVENT_TYPES.has(e) && !IGNORED_EVENTS.has(e),
+      (e) =>
+        !HANDLED_EVENT_TYPES.has(e) &&
+        !IGNORED_EVENTS.has(e) &&
+        // 19c: subagent.started/.completed/.failed are handled inline
+        // by processEvents (they drive the SubagentChatItem lifecycle),
+        // so they are neither in HANDLED_EVENT_TYPES nor IGNORED_EVENTS.
+        !INLINE_HANDLED.has(e),
     );
     expect(untriaged).toEqual([]);
   });
 });
+
+/// 19c inline-handled event types — drive nested SubagentChatItem
+/// lifecycle in `processEvents`. Exempt from the "every event is
+/// handled or ignored" completeness check.
+const INLINE_HANDLED: ReadonlySet<string> = new Set([
+  "subagent.started",
+  "subagent.completed",
+  "subagent.failed",
+]);
 
 describe("chatEvents — family ownership", () => {
   test("message handlers own assistant.message* + user.message", () => {

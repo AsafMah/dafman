@@ -15,6 +15,7 @@
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
+import { invokeCommand } from "../ipc/invoke";
 
 export interface SessionCommand {
 	/// Slash form (with leading "/"). What the user types in the
@@ -152,6 +153,37 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 		run: (sessionId) => {
 			const layout = useLayoutStore();
 			layout.closePanel(sessionId);
+		},
+	},
+	{
+		slash: "/fleet",
+		label: "Start a fleet of sub-agents",
+		description: "Spawn parallel sub-agents to work on a problem (optional prompt).",
+		icon: "pi-users",
+		group: "Session",
+		keywords: ["parallel", "subagent", "delegate", "fleet"],
+		run: async (sessionId, args = "") => {
+			const toasts = useToastStore();
+			try {
+				const prompt = args.trim();
+				const started = await invokeCommand("startFleet", {
+					sessionId,
+					...(prompt.length > 0 ? { prompt } : {}),
+				});
+				if (started) {
+					toasts.success(
+						"Fleet started",
+						prompt ? `Prompt: ${prompt.slice(0, 60)}` : "Fleet running",
+					);
+				} else {
+					toasts.warn("Fleet not started", "SDK returned false");
+				}
+			} catch (err) {
+				toasts.error(
+					"Failed to start fleet",
+					err instanceof Error ? err.message : String(err),
+				);
+			}
 		},
 	},
 	{

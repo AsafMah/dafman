@@ -1156,6 +1156,28 @@ export class SessionRegistry {
 		}
 	}
 
+	// ---------- Fleet (Phase 19c) ----------
+	//
+	// Wraps the @experimental `session.rpc.fleet.start` surface. Fleet
+	// kicks off parallel sub-agent work. The RPC takes an optional
+	// prompt; the count is determined by SDK internals (no caller
+	// parameter). Sub-agent activity streams via the regular session
+	// events (each tagged with the sub-agent's envelope `agentId`),
+	// rendered by the chat reducer's nested SubagentChatItem branch.
+
+	async startFleet(sessionId: string, prompt?: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.fleet.start(
+				prompt ? { prompt } : {},
+			)) as { started?: boolean };
+			return result.started === true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
 	// ---------- Agent files CRUD (Phase 19b.2) ----------
 	//
 	// Filesystem-level wrappers around `src-bun/app/agentFiles.ts`.

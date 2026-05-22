@@ -1,0 +1,65 @@
+feat(fleet): /fleet slash + nested sub-agent rendering (Phase 19c)
+
+Wraps the @experimental session.rpc.fleet.start surface as a /fleet
+slash command. Sub-agent activity streams via the regular session
+event channel, now routed into a new SubagentChatItem variant that
+renders as a collapsible nested block in the chat transcript.
+
+What works:
+- /fleet (no args) starts a fleet on the current session.
+- /fleet review this PR sends a prompt to the SDK.
+- Sub-agents fired during a fleet appear as collapsible
+  "Sub-agent" blocks in the chat with status pill + elapsed time.
+- Assistant messages, reasoning, and tool calls emitted BY the
+  sub-agent appear inside its nested block (not interleaved with
+  the main thread).
+- Status pill colors: running blue, completed green, failed red
+  (with error message visible).
+- Default expanded while running; collapsed when completed/failed;
+  user toggle wins after first click.
+
+Reducer refactor (substantial):
+- Per-buffer assistantIdx/reasoningIdx/toolIdx Maps via a new
+  makeReducerCtx factory. Each context builds its own indices over
+  its own items[]. Fixes the duplicate-toolCallId collision the
+  rubber-duck flagged (root tool and sub-agent tool with same id
+  no longer overwrite each other).
+- subagent.started/.completed/.failed handled INLINE in
+  processEvents (not via the family handler dispatch). Drives the
+  nestedByAgentId routing map.
+- Routing rules: visual events (assistant/reasoning/tool/system
+  notification) with envelope agentId matching an active sub-agent
+  go to nested ctx. All other events stay top-level — a sub-agent
+  can't mutate global ambient state.
+- No recursive processEvents — single top-level loop with ctx
+  picked per payload.
+
+Rubber-duck adoptions (all 7 findings):
+1. Don't gate subagent.started on parentToolCallId — use envelope
+   agentId as the routing key.
+2. No recursive processEvents — scoped dispatch via makeReducerCtx
+   factory instead.
+3. Per-buffer upsert indices.
+4. Route by event category, not just "has agentId" — visual
+   events only.
+5. Two-pass not needed: subagent.started inline before any visual
+   event in the same batch establishes the routing slot.
+6. Collapse state in component-local ref (not in ChatItem).
+7. Tests upfront (10 reducer + 2 bun tests).
+
+New code:
+- src/lib/chatEvents.ts: SubagentChatItem variant + reducer refactor.
+- src/lib/chatEvents/ignored.ts: subagent.started/.completed/.failed
+  removed (handled inline).
+- src/components/SubagentBlock.vue: new component.
+- src/components/ChatWindow.vue: v-else-if branch for subagent.
+- src/lib/sessionCommands.ts: /fleet command.
+- src-bun/app/sessions.ts: startFleet method.
+- src-bun/rpc.ts + src/ipc/types.ts: startFleet RPC.
+
+Gates: lint clean, 472 bun tests (was 460), 68/70 smoke (08-audit-
+rehydrate flake unrelated).
+
+Phase 19 is now complete (19a + 19b.1 + 19b.2 + 19c shipped today).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

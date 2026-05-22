@@ -271,6 +271,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			deleteAgentFile: rpcGuard(async ({ sessionId, scope, name }) =>
 				sessions.deleteAgentFile(sessionId, scope, name),
 			),
+			startFleet: rpcGuard(async ({ sessionId, prompt }) =>
+				sessions.startFleet(sessionId, prompt),
+			),
 			getSessionUsageMetrics: rpcGuard(async ({ sessionId }) =>
 				sessions.getUsageMetrics(sessionId),
 			),

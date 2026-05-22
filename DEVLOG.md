@@ -56,6 +56,110 @@
 
 ---
 
+## 2026-05-22 — Phase 19c: Fleet + nested sub-agent rendering
+
+### Takeaway
+
+Third and final part of Phase 19. `/fleet` slash command dispatches
+to the SDK's @experimental fleet RPC; the chat reducer is refactored
+to route sub-agent events into nested `SubagentChatItem` blocks.
+
+### SDK surprise (vs original plan)
+
+The `fleet.start` RPC takes only an optional `prompt`. **No count
+parameter** — fleet sizing is determined by SDK internals. So the
+original `/fleet <count> <prompt>` syntax planned in 19c was wrong.
+Adjusted to `/fleet [prompt]`.
+
+### Reducer refactor
+
+Per the rubber-duck duck's blocking findings, the reducer was
+restructured:
+
+1. **Per-buffer indices via `makeReducerCtx` factory**. Each
+   `ReducerContext` builds its own `assistantIdx`/`reasoningIdx`/
+   `toolIdx` Maps over its own `items[]`. Root context indexes
+   root items; nested contexts index their sub-agent's items.
+   Fixes blocking finding #3: duplicate `toolCallId` at root +
+   sub-agent no longer collide.
+
+2. **Sub-agent lifecycle inline**. `subagent.started/.completed/
+   .failed` are not in `HANDLERS` (the family dispatch table) and
+   not in `IGNORED_EVENTS`. They're handled in `processEvents`
+   itself because they need to mutate the routing map. Updated
+   `split.test.ts` with an `INLINE_HANDLED` set so the
+   "every event is handled or ignored" completeness check still
+   passes.
+
+3. **Explicit routing rules** (blocking finding #4). For each
+   payload:
+   - If `subagent.started` with envelope `agentId`: create
+     `SubagentChatItem`, register in `nestedByAgentId`.
+   - If `subagent.completed/.failed` with matching `agentId`:
+     flip status, set completedAt/error, drop from routing map.
+   - Else if event is visual (assistant/reasoning/tool/
+     system.notification) AND envelope `agentId` matches a known
+     sub-agent: dispatch via nested ctx.
+   - Else: dispatch via top ctx.
+
+   The visual filter ensures `session.title_changed`,
+   `session.usage_info`, etc., always update top-level ambient
+   even if a sub-agent emits them.
+
+4. **No recursive `processEvents`** (blocking finding #2). The
+   nested context shares `ambient` / `counter` / `toasts` /
+   `setIdle` / `setError` with the top context but has its own
+   items + indices. Family handlers don't see any difference —
+   they just call `ctx.upsertAssistant` (which now upserts into
+   the right buffer).
+
+### `SubagentBlock.vue`
+
+Collapsible card with status pill (running blue / completed green
+/ failed red), display name, elapsed time, optional description
++ error. Body renders nested items[] — only the four kinds we
+expect to find there: assistant, reasoning, tool, system. Default
+expanded while running, collapsed after completion. User toggle
+wins after first click.
+
+### What's not in 19c (deferred)
+
+- **Sub-sub-agents**: a sub-agent inside a sub-agent. The reducer's
+  nestedByAgentId map is keyed by agentId — if a nested sub-agent
+  spawned its own delegations with new agentIds, those would land
+  at top level today. We can add recursion later if the SDK
+  actually exposes nested fleets.
+- **Per-sub-agent header chip**: a "view 3 running sub-agents"
+  indicator near the composer. Not implemented; the rail's Tasks
+  section (19b.1) already surfaces this.
+- **Restartable fleet from a SubagentBlock**: no "redo this
+  sub-agent" button. Defer.
+
+### Tests added
+
+- `src/lib/chatEvents/__tests__/subagent-nesting.test.ts` — 10
+  tests:
+  - subagent.started with envelope agentId → SubagentChatItem
+  - subagent.started without agentId dropped + warn
+  - subagent.completed flips status + sets completedAt
+  - subagent.failed sets status + error
+  - assistant.message_start/delta/message routed to nested items
+  - tool.execution_start/.execution_complete routed to nested items
+  - duplicate toolCallId at root + sub-agent don't collide
+  - session.title_changed STAYS at top even with agentId
+  - post-completion events with stale agentId fall through to top
+  - event with unknown agentId falls through to top
+- `src-bun/__tests__/sessions.test.ts` — 2 tests:
+  - `startFleet` forwards optional prompt
+  - rejects with SessionNotFound on unknown sessionId
+
+### Receipts
+
+- Commit: this one. **472 bun tests** (was 460), 68/70 smoke
+  (08-audit-rehydrate flake, unrelated). Phase 19 is complete.
+
+---
+
 ## 2026-05-22 — Phase 19b.2: Library Agents tab
 
 ### Takeaway

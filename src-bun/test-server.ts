@@ -347,6 +347,10 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		};
 		return sessions.deleteAgentFile(sessionId, scope, name);
 	}),
+	startFleet: rpcGuard(async (args) => {
+		const { sessionId, prompt } = args as { sessionId: string; prompt?: string };
+		return sessions.startFleet(sessionId, prompt);
+	}),
 	readSessionPlan: rpcGuard(async (args) => {
 		const { sessionId } = args as { sessionId: string };
 		return sessions.readPlan(sessionId);

@@ -42,13 +42,11 @@ export const IGNORED_EVENTS: ReadonlySet<string> = new Set([
   "command.queued",
   "command.execute",
   "command.completed",
-  // Sub-agents / hooks / sampling / MCP OAuth — surfaced later.
-  "subagent.started",
-  "subagent.completed",
-  "subagent.failed",
-  // 19a: subagent.selected + subagent.deselected now have handlers in
-  // sessionMetaHandlers (drive ambient.currentAgent for the header
-  // chip + rail).
+  // 19c: subagent.started/.completed/.failed are now handled INLINE
+  // by `processEvents` (they drive nested SubagentChatItem
+  // lifecycle), so they're neither in IGNORED nor in HANDLED_EVENT_TYPES.
+  // subagent.selected/.deselected continue to live in
+  // sessionMetaHandlers — those are the session-level picker events.
   "hook.start",
   "hook.end",
   "sampling.requested",

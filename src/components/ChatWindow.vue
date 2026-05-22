@@ -8,6 +8,7 @@ import MessageActions from "./MessageActions.vue";
 import MessageEditor from "./MessageEditor.vue";
 import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
+import SubagentBlock from "./SubagentBlock.vue";
 import PendingRequestCard from "./PendingRequestCard.vue";
 import {
   appendSystemMessage,
@@ -579,6 +580,19 @@ const pendingStyle = computed(() => {
             @fork="onMessageFork(idx)"
           />
         </div>
+        <SubagentBlock
+          v-else-if="item.kind === 'subagent'"
+          :agent-id="item.agentId"
+          :agent-name="item.agentName"
+          :display-name="item.displayName"
+          :description="item.description"
+          :status="item.status"
+          :started-at="item.startedAt"
+          :completed-at="item.completedAt"
+          :error="item.error"
+          :items="item.items"
+          :reasoning-visibility="reasoningVisibility"
+        />
         <PendingRequestCard
           v-else-if="item.kind === 'pendingRequest'"
           :session-id="props.sessionId"

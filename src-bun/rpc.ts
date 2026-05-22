@@ -619,6 +619,15 @@ export type DafmanRPC = {
 				params: { sessionId: string; scope: AgentFileScope; name: string };
 				response: boolean;
 			};
+			/// Phase 19c. Wraps the @experimental
+			/// `session.rpc.fleet.start` surface. `prompt` is optional;
+			/// the fleet size is determined by SDK internals (no caller
+			/// parameter). Sub-agent activity streams via session events
+			/// rendered as nested SubagentChatItem blocks.
+			startFleet: {
+				params: { sessionId: string; prompt?: string };
+				response: boolean;
+			};
 			/// Raw SDK `usage.getMetrics` shape. Opaque to bun — the
 			/// renderer cherry-picks `totalUserRequests` / token-detail
 			/// counts / per-model breakdowns for display.

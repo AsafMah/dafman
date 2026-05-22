@@ -345,6 +345,26 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Phase 19c shipped: **Fleet + nested sub-agent
+  rendering**. `/fleet [prompt]` slash command starts a fleet via
+  the @experimental `session.rpc.fleet.start` surface (no count
+  parameter — SDK-internal). Chat reducer refactored for scoped
+  dispatch: per-buffer indices, `subagent.started/.completed/.failed`
+  handled inline to drive nested `SubagentChatItem` lifecycle.
+  Visual events (assistant/reasoning/tool/system notification) with
+  envelope `agentId` matching an active sub-agent are routed into
+  its nested `items[]`; non-visual events stay top-level so sub-
+  agents can't mutate session-level state. New `SubagentBlock.vue`
+  renders a collapsible card with status pill + elapsed + nested
+  items. Rubber-duck'd before implementing — all 7 findings adopted
+  (per-buffer indices, no recursive `processEvents`, no
+  `parentToolCallId` gate on `subagent.started`, explicit visual
+  event filter, etc.). 10 new reducer tests + 2 new bun tests
+  cover lifecycle, routing, toolCallId disambiguation, and
+  post-completion stale routing. **472 bun tests** (was 460),
+  68/70 smoke (08-audit-rehydrate flake on plain main, unrelated).
+  **Phase 19 complete** (19a + 19b + 19c shipped in 4 commits
+  spread across the day).
 - **2026-05-22** — Phase 19b.2 shipped: **Library Agents tab**.
   Third tab in Library with create/delete CRUD for filesystem-backed
   custom agents. New `src-bun/app/agentFiles.ts` module with strict

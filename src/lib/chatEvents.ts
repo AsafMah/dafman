@@ -139,6 +139,41 @@ export type ChatItem =
       /// user-supplied). The renderer looks it up in the sessionsStore
       /// to resolve to a clickable id.
       referenceName: string;
+    }
+  | {
+      /// 19c: Sub-agent block, nested inline in the parent chat. Holds
+      /// its own `items[]` populated by events fired during the
+      /// sub-agent's run (any event with envelope `agentId` matching).
+      /// Created on `subagent.started`; status flips to completed /
+      /// failed on the matching `subagent.completed` / `.failed` event.
+      id: number;
+      kind: "subagent";
+      /// SDK's sub-agent instance identifier from the envelope's
+      /// `agentId` field. Routing key for nested events.
+      agentId: string;
+      /// Internal agent name from the `subagent.started.data.agentName`.
+      agentName: string;
+      /// Human-readable label from `agentDisplayName`.
+      displayName: string;
+      /// Sub-agent description from `agentDescription`.
+      description: string;
+      /// Lifecycle status. `running` from start to completion; flips to
+      /// `completed` on `subagent.completed`, `failed` on
+      /// `subagent.failed` (with `error` set).
+      status: "running" | "completed" | "failed";
+      /// Started/completed timestamps from the event envelope. ISO 8601
+      /// strings to match the rest of the wire shape.
+      startedAt?: string;
+      completedAt?: string;
+      /// Error message when `status === "failed"`. Surfaced in the
+      /// SubagentBlock header.
+      error?: string;
+      /// Nested items produced by THIS sub-agent during its run. The
+      /// reducer routes any event with `envelope.agentId === this.agentId`
+      /// AND a visual event type (assistant / reasoning / tool / system
+      /// notification) into here via a nested ReducerContext over this
+      /// items array.
+      items: ChatItem[];
     };
 
 /// Maximum bytes of partial / result content we keep in memory and
@@ -300,26 +335,37 @@ export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(
   Object.keys(HANDLERS),
 );
 
-export function processEvents(
-  current: ChatItem[],
-  ambient: ChatAmbient,
-  newPayloads: SessionEventPayload[],
-  counter: IdCounter,
-  opts: { live?: boolean } = {},
-): ProcessResult {
-  const items = current.slice();
-  const next: ChatAmbient = { ...ambient };
-  const toasts: ChatToast[] = [];
-  let idle = false;
-  let error = false;
-  const isLive = opts.live ?? true;
+/// Visual event types that get routed to a sub-agent's nested
+/// `items[]` when the envelope carries a matching `agentId`. All
+/// other events stay at top-level (session lifecycle, ambient/usage
+/// updates, pending requests, etc.) so a sub-agent's emission can't
+/// corrupt global state — per the 19c rubber-duck #4.
+function isVisualEventType(eventType: string): boolean {
+  return (
+    eventType.startsWith("assistant.") ||
+    eventType.startsWith("user.") ||
+    eventType.startsWith("tool.") ||
+    eventType === "system.notification"
+  );
+}
 
-  // Per-call lookup indices so the upsert hot path is O(1) instead
-  // of O(N) per delta. Streaming a single assistant response can
-  // emit 30+ deltas per second; without these, a 200-item session
-  // was paying 200 comparisons per delta = 6000 ops/sec just to
-  // find the in-progress message. Maps are rebuilt per `processEvents`
-  // call (cheap — done once vs many find()s).
+/// Per-buffer ReducerContext factory. Returns a context whose
+/// `items` + `upsert*` closures all operate on the given items
+/// array. The `setIdle` / `setError` flags are shared so a
+/// nested sub-agent's lifecycle event can still bubble up the
+/// session-level signal (currently those events don't reach
+/// nested contexts because they're not "visual", but the shape
+/// is uniform either way).
+function makeReducerCtx(opts: {
+  items: ChatItem[];
+  ambient: ChatAmbient;
+  toasts: ChatToast[];
+  counter: IdCounter;
+  isLive: boolean;
+  setIdle: () => void;
+  setError: () => void;
+}): ReducerContext {
+  const { items, ambient, toasts, counter, isLive, setIdle, setError } = opts;
   const assistantIdx = new Map<string, number>();
   const reasoningIdx = new Map<string, number>();
   const toolIdx = new Map<string, number>();
@@ -329,7 +375,6 @@ export function processEvents(
     else if (it.kind === "reasoning" && it.reasoningId) reasoningIdx.set(it.reasoningId, i);
     else if (it.kind === "tool" && it.toolCallId) toolIdx.set(it.toolCallId, i);
   }
-
   const upsertAssistant = (messageId: string, eventId?: string): ChatItem => {
     const cached = assistantIdx.get(messageId);
     let existing = cached !== undefined ? items[cached] : undefined;
@@ -348,7 +393,6 @@ export function processEvents(
     }
     return existing;
   };
-
   const upsertReasoning = (reasoningId: string, eventId?: string): ChatItem => {
     const cached = reasoningIdx.get(reasoningId);
     let existing = cached !== undefined ? items[cached] : undefined;
@@ -367,7 +411,6 @@ export function processEvents(
     }
     return existing;
   };
-
   const upsertTool = (
     toolCallId: string,
     fallbackName?: string,
@@ -392,32 +435,167 @@ export function processEvents(
     }
     return existing;
   };
-
   const pushSystem = (text: string, severity: SystemSeverity) => {
     items.push({ id: counter.next++, kind: "system", text, severity });
   };
-
-  const ctx: ReducerContext = {
+  return {
     items,
-    ambient: next,
+    ambient,
     toasts,
     counter,
     isLive,
-    setIdle() {
-      idle = true;
-    },
-    setError() {
-      error = true;
-    },
+    setIdle,
+    setError,
     upsertAssistant,
     upsertReasoning,
     upsertTool,
     pushSystem,
   };
+}
+
+export function processEvents(
+  current: ChatItem[],
+  ambient: ChatAmbient,
+  newPayloads: SessionEventPayload[],
+  counter: IdCounter,
+  opts: { live?: boolean } = {},
+): ProcessResult {
+  const items = current.slice();
+  const next: ChatAmbient = { ...ambient };
+  const toasts: ChatToast[] = [];
+  let idle = false;
+  let error = false;
+  const isLive = opts.live ?? true;
+  const setIdle = () => {
+    idle = true;
+  };
+  const setError = () => {
+    error = true;
+  };
+
+  const topCtx = makeReducerCtx({
+    items,
+    ambient: next,
+    toasts,
+    counter,
+    isLive,
+    setIdle,
+    setError,
+  });
+
+  /// 19c: per-running-subagent nested contexts. Populated lazily on
+  /// `subagent.started`, drained on `subagent.completed/.failed`.
+  /// Pre-built from any in-progress SubagentChatItems already in the
+  /// items buffer so a fresh `processEvents` call (resume / replay)
+  /// can continue routing into them.
+  const nestedByAgentId = new Map<string, { item: ChatItem; ctx: ReducerContext }>();
+  for (const it of items) {
+    if (it.kind === "subagent" && it.status === "running") {
+      nestedByAgentId.set(it.agentId, {
+        item: it,
+        ctx: makeReducerCtx({
+          items: it.items,
+          ambient: next,
+          toasts,
+          counter,
+          isLive,
+          setIdle,
+          setError,
+        }),
+      });
+    }
+  }
 
   for (const payload of newPayloads) {
-    const handler = HANDLERS[payload.eventType];
-    if (!handler) continue; // ignored or unknown — same effect either way
+    const eventType = payload.eventType;
+    const envelopeAgentId = (payload as { agentId?: string }).agentId;
+
+    // 19c: sub-agent lifecycle is handled inline so we can mutate
+    // the nestedByAgentId map. `subagent.selected/.deselected` stay
+    // in sessionMetaHandlers (those are session-level picker events,
+    // not per-turn delegation — see 19a).
+    if (eventType === "subagent.started") {
+      if (typeof envelopeAgentId !== "string" || envelopeAgentId.length === 0) {
+        // No envelope agentId means we can't route subsequent events
+        // to this sub-agent — drop the visual block but log so the
+        // issue surfaces in diagnostics.
+        // eslint-disable-next-line no-console
+        console.warn("subagent.started with no envelope agentId; ignoring", payload);
+        continue;
+      }
+      // If this agentId already has a SubagentChatItem (rare —
+      // shouldn't fire twice in normal flow; defensive against
+      // replay), skip the duplicate.
+      if (nestedByAgentId.has(envelopeAgentId)) continue;
+      const d = (payload.data ?? {}) as {
+        agentName?: unknown;
+        agentDisplayName?: unknown;
+        agentDescription?: unknown;
+      };
+      const subItem: ChatItem = {
+        id: counter.next++,
+        kind: "subagent",
+        agentId: envelopeAgentId,
+        agentName: typeof d.agentName === "string" ? d.agentName : envelopeAgentId,
+        displayName:
+          typeof d.agentDisplayName === "string"
+            ? d.agentDisplayName
+            : typeof d.agentName === "string"
+              ? d.agentName
+              : envelopeAgentId,
+        description: typeof d.agentDescription === "string" ? d.agentDescription : "",
+        status: "running",
+        ...(payload.timestamp ? { startedAt: payload.timestamp } : {}),
+        items: [],
+      };
+      items.push(subItem);
+      nestedByAgentId.set(envelopeAgentId, {
+        item: subItem,
+        ctx: makeReducerCtx({
+          items: subItem.items,
+          ambient: next,
+          toasts,
+          counter,
+          isLive,
+          setIdle,
+          setError,
+        }),
+      });
+      continue;
+    }
+
+    if (eventType === "subagent.completed" || eventType === "subagent.failed") {
+      if (typeof envelopeAgentId !== "string" || envelopeAgentId.length === 0) continue;
+      // Find the SubagentChatItem by agentId. We rely on the
+      // nestedByAgentId map (built from items[]) so this is O(1).
+      const slot = nestedByAgentId.get(envelopeAgentId);
+      if (slot && slot.item.kind === "subagent") {
+        slot.item.status = eventType === "subagent.failed" ? "failed" : "completed";
+        if (payload.timestamp) slot.item.completedAt = payload.timestamp;
+        if (eventType === "subagent.failed") {
+          const errMsg = (payload.data as { error?: unknown }).error;
+          if (typeof errMsg === "string") slot.item.error = errMsg;
+        }
+        // Drop from the routing map — subsequent events with this
+        // (now-stale) agentId won't get routed back into the
+        // completed sub-agent.
+        nestedByAgentId.delete(envelopeAgentId);
+      }
+      continue;
+    }
+
+    // Pick the ctx based on routing rules:
+    // - visual event type AND envelope.agentId in active nested map
+    //   → route to that sub-agent's nested context
+    // - everything else → top-level context
+    const nestedSlot =
+      typeof envelopeAgentId === "string" && envelopeAgentId.length > 0
+        ? nestedByAgentId.get(envelopeAgentId)
+        : undefined;
+    const ctx =
+      nestedSlot && isVisualEventType(eventType) ? nestedSlot.ctx : topCtx;
+    const handler = HANDLERS[eventType];
+    if (!handler) continue;
     const data = payload.data ?? {};
     handler(ctx, data, payload);
   }

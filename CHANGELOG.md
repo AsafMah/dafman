@@ -3,6 +3,38 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 19c — Fleet + nested sub-agent rendering)
+
+- **`/fleet [prompt]` slash command** in the composer + command
+  palette. Spawns parallel sub-agents via the @experimental
+  `session.rpc.fleet.start` surface. Fire-and-forget; sub-agent
+  activity streams via session events tagged with the sub-agent's
+  envelope `agentId`.
+- **Sub-agent inline blocks in chat**: new `SubagentChatItem`
+  variant in the ChatItem union with its own nested `items[]`.
+  `SubagentBlock.vue` renders a collapsible card (header with
+  status pill, display name, elapsed time, error if any; body
+  shows the sub-agent's assistant messages, reasoning, tool
+  calls). Default expanded while running; default collapsed
+  when completed/failed; user toggle wins after first click.
+- **`processEvents` reducer refactored** for scoped dispatch:
+  - Per-buffer indices: each `ReducerContext` builds its own
+    `assistantIdx`/`reasoningIdx`/`toolIdx` Maps over its own
+    items[] (was: one set of indices over the top-level items[]
+    only). Prevents collisions between root and sub-agent tool
+    calls with the same `toolCallId`.
+  - `subagent.started/.completed/.failed` handled inline (not via
+    the family handler dispatch table); they create / update the
+    nested SubagentChatItem and register / deregister in a
+    routing map.
+  - Routing rules: visual events (assistant/reasoning/tool/system
+    notification) with envelope `agentId` matching a known
+    sub-agent get dispatched into the nested context. ALL other
+    events (session lifecycle, ambient updates, pending requests)
+    stay at top level — so a sub-agent can't mutate session-level
+    state (per the 19c duck's blocking finding #4).
+- **`startFleet` bun RPC** wrapping `session.rpc.fleet.start`.
+
 ### Added (Phase 19b.2 — Library Agents tab)
 
 - **Library → Agents tab**: third tab in the Library panel.

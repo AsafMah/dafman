@@ -436,6 +436,10 @@ export type CommandMap = {
     args: { sessionId: string; scope: AgentFileScope; name: string };
     result: boolean;
   };
+  startFleet: {
+    args: { sessionId: string; prompt?: string };
+    result: boolean;
+  };
   getSessionUsageMetrics: {
     args: { sessionId: string };
     result: Record<string, unknown>;

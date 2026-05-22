@@ -81,6 +81,9 @@ interface FakeSession {
 			cancel: (params: { id: string }) => Promise<{ cancelled: boolean }>;
 			remove: (params: { id: string }) => Promise<{ removed: boolean }>;
 		};
+		fleet: {
+			start: (params?: { prompt?: string }) => Promise<{ started: boolean }>;
+		};
 	};
 	lastSentPrompt?: string;
 	lastModel?: { model: string; opts?: { reasoningEffort?: string } };
@@ -103,6 +106,7 @@ interface FakeSession {
 	tasksList: Array<Record<string, unknown>>;
 	cancelCalls: string[];
 	removeCalls: string[];
+	fleetStartCalls: Array<string | undefined>;
 }
 
 function makeFakeSession(
@@ -216,6 +220,12 @@ function makeFakeSession(
 					return { removed: true };
 				},
 			},
+			fleet: {
+				async start(params?: { prompt?: string }) {
+					session.fleetStartCalls.push(params?.prompt);
+					return { started: true };
+				},
+			},
 		},
 		agentsList: [],
 		currentAgentName: null,
@@ -223,6 +233,7 @@ function makeFakeSession(
 		tasksList: [],
 		cancelCalls: [],
 		removeCalls: [],
+		fleetStartCalls: [],
 	};
 	return session;
 }
@@ -1006,5 +1017,26 @@ describe("SessionRegistry", () => {
 		await expect(reg.listTasks("ghost")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.cancelTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.removeTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
+	});
+
+	test("19c: startFleet forwards optional prompt and returns started", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		expect(await reg.startFleet(id, "review this PR")).toBe(true);
+		expect(await reg.startFleet(id)).toBe(true);
+		expect(fake.fleetStartCalls).toEqual(["review this PR", undefined]);
+	});
+
+	test("19c: startFleet rejects with SessionNotFound on unknown sessionId", async () => {
+		_setClientForTest(
+			new FakeClient() as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		await expect(reg.startFleet("ghost")).rejects.toBeInstanceOf(AppError);
 	});
 });
