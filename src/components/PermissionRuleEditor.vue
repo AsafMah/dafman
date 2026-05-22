@@ -52,7 +52,7 @@ function pickStr(...keys: string[]): string | null {
 }
 
 // ---------- shell ----------
-const shellCommand = computed(() => pickStr("command", "cmd") ?? "");
+const shellCommand = computed(() => pickStr("fullCommandText", "command", "cmd") ?? "");
 
 /// Split a shell command into the leading token (e.g. "git" from
 /// "git status -s"). Used to suggest a command-prefix rule that
@@ -189,6 +189,10 @@ function submit() {
         Allow <strong>all file reads</strong> in this session?
       </p>
       <p class="rule-hint">No more read confirmations until you close this session.</p>
+      <p class="rule-hint rule-hint-muted">
+        Per-path glob rules aren't a Copilot SDK feature — read/write
+        rules are session-wide. Reverse via the gear → Reset approvals.
+      </p>
     </template>
     <template v-else-if="props.request.kind === 'write'">
       <p class="rule-label">
@@ -197,6 +201,10 @@ function submit() {
       <p class="rule-hint">
         Writes will be applied without further confirmation. Reverse via
         the session options gear (Reset approvals).
+      </p>
+      <p class="rule-hint rule-hint-muted">
+        Per-path glob rules aren't a Copilot SDK feature — read/write
+        rules are session-wide.
       </p>
     </template>
     <template v-else-if="props.request.kind === 'memory'">

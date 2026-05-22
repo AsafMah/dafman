@@ -15,7 +15,8 @@
 // command bytes — record only what's strictly needed to answer
 // "what was approved, when, by whom, on which session".
 
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { log } from "./logging";
 
@@ -74,6 +75,51 @@ export async function initAudit(opts: InitAuditOptions): Promise<void> {
 		await mkdir(opts.dir, { recursive: true });
 	} catch {
 		// Best-effort — never block startup on audit log init.
+	}
+	// Hydrate the in-memory ring from the persisted JSONL files so
+	// the Activity view shows history immediately on app restart
+	// (otherwise the panel reads empty until the next live event).
+	// Bounded by RECENT_CAP: read the last ~N lines from each file.
+	await hydrateRecent();
+}
+
+async function hydrateRecent(): Promise<void> {
+	const dir = config.dir;
+	if (!dir) return;
+	const files = ["permissions.jsonl", "urls.jsonl"];
+	const collected: AuditEntry[] = [];
+	for (const name of files) {
+		const path = join(dir, name);
+		if (!existsSync(path)) continue;
+		try {
+			const raw = await readFile(path, "utf8");
+			const lines = raw.split(/\r?\n/);
+			// Take the tail of the file; sufficient for the ring cap.
+			const tail = lines.slice(Math.max(0, lines.length - RECENT_CAP));
+			for (const line of tail) {
+				if (!line.trim()) continue;
+				try {
+					const parsed = JSON.parse(line) as AuditEntry;
+					if (parsed && typeof parsed === "object" && (parsed as { kind?: string }).kind) {
+						collected.push(parsed);
+					}
+				} catch {
+					/* skip malformed line */
+				}
+			}
+		} catch (err) {
+			log.warn("audit hydrate failed", {
+				file: path,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
+	}
+	// Sort by ts so interleaved categories restore in chronological
+	// order. Trim to ring cap.
+	collected.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+	const start = Math.max(0, collected.length - RECENT_CAP);
+	for (let i = start; i < collected.length; i++) {
+		recent.push(collected[i]!);
 	}
 }
 

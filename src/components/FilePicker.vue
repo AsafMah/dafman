@@ -210,8 +210,8 @@ function scrollHighlightIntoView(): void {
   child?.scrollIntoView({ block: "nearest" });
 }
 
-async function browse(): Promise<void> {
-  const picked = await invokeCommand("pickAttachment", {});
+async function browse(kind: "file" | "directory"): Promise<void> {
+  const picked = await invokeCommand("pickAttachment", { kind });
   if (!picked) return;
   emit(
     "select",
@@ -257,15 +257,26 @@ async function browse(): Promise<void> {
           <span class="file-picker-shortcut">Alt+I</span>
         </label>
       </div>
-      <button
-        type="button"
-        class="file-picker-browse"
-        title="Open native file or folder picker"
-        @click="browse"
-      >
-        <i class="pi pi-folder-open" aria-hidden="true" />
-        Browse…
-      </button>
+      <div class="file-picker-browse-group">
+        <button
+          type="button"
+          class="file-picker-browse"
+          title="Open native file picker"
+          @click="browse('file')"
+        >
+          <i class="pi pi-file" aria-hidden="true" />
+          File…
+        </button>
+        <button
+          type="button"
+          class="file-picker-browse"
+          title="Open native folder picker"
+          @click="browse('directory')"
+        >
+          <i class="pi pi-folder-open" aria-hidden="true" />
+          Folder…
+        </button>
+      </div>
     </div>
     <div
       ref="listRef"
@@ -388,6 +399,12 @@ async function browse(): Promise<void> {
   background: color-mix(in srgb, var(--p-text-muted-color) 18%, transparent);
   border-radius: 3px;
   color: var(--p-text-muted-color);
+}
+
+.file-picker-browse-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .file-picker-browse {

@@ -104,13 +104,24 @@ interface PendingEntry {
 /// "what kind of permission and against what target".
 function summarizePermission(request: PermissionRequest): string {
 	const raw = request as unknown as Record<string, unknown>;
-	const path = typeof raw.path === "string" ? raw.path : null;
+	// SDK shape varies by kind. Field names verified via the CLI
+	// changelog notes (1.0.44+) and runtime inspection: shell uses
+	// `fullCommandText` (not `command`), write/read use `fileName`
+	// (not `path`). Keep the older aliases as fallbacks in case
+	// any SDK upgrade renames them again.
+	const path =
+		typeof raw.fileName === "string" ? raw.fileName :
+		typeof raw.path === "string" ? raw.path : null;
+	const command =
+		typeof raw.fullCommandText === "string" ? raw.fullCommandText :
+		typeof raw.command === "string" ? raw.command :
+		typeof raw.cmd === "string" ? raw.cmd : null;
 	const url = typeof raw.url === "string" ? raw.url : null;
 	const server = typeof raw.serverName === "string" ? raw.serverName : null;
 	const tool = typeof raw.toolName === "string" ? raw.toolName : null;
 	switch (request.kind) {
 		case "shell":
-			return "Run a shell command";
+			return command ? `Run \`${command}\`` : "Run a shell command";
 		case "write":
 			return path ? `Modify ${path}` : "Modify a file";
 		case "read":
@@ -500,6 +511,20 @@ export class SessionRegistry {
 			return sessionId;
 		}
 		const client = tryGetClient();
+		// Look up the persisted cwd BEFORE resume so we can hand it
+		// back to the SDK explicitly. The SDK is supposed to remember
+		// the cwd in its on-disk catalog, but we hit a bug in prod
+		// where resumed sessions ended up with `process.cwd()` (the
+		// Electrobun exe folder). Reading the catalog and pinning the
+		// value here closes that gap end-to-end.
+		let persistedCwd: string | undefined;
+		try {
+			const meta = await client.getSessionMetadata(sessionId);
+			if (meta?.context?.cwd) persistedCwd = meta.context.cwd;
+		} catch {
+			/* non-fatal */
+		}
+		const effectiveCwd = opts.workingDirectory ?? persistedCwd;
 		let resolvedSessionId: string | null = null;
 		const earlyForward = (event: SessionEvent) => {
 			this.forward(resolvedSessionId ?? sessionId, event);
@@ -513,7 +538,7 @@ export class SessionRegistry {
 				...(opts.reasoningEffort
 					? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
 					: {}),
-				...(opts.workingDirectory ? { workingDirectory: opts.workingDirectory } : {}),
+				...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
 			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -528,7 +553,7 @@ export class SessionRegistry {
 		this.entries.set(actualId, {
 			session,
 			unsubscribe,
-			...(opts.workingDirectory ? { workingDirectory: opts.workingDirectory } : {}),
+			...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
 		});
 		// Hydrate transcript. Failures here aren't fatal — the session is
 		// connected and will receive live events; we just won't have the
@@ -536,7 +561,11 @@ export class SessionRegistry {
 		try {
 			const history = await session.getMessages();
 			for (const event of history) this.forward(actualId, event);
-			log.info("session resumed", { sessionId: actualId, historyCount: history.length });
+			log.info("session resumed", {
+				sessionId: actualId,
+				historyCount: history.length,
+				workingDirectory: effectiveCwd ?? null,
+			});
 		} catch (err) {
 			log.warn("failed to hydrate session history", {
 				sessionId: actualId,
@@ -773,28 +802,49 @@ export class SessionRegistry {
 		return searchWorkspaceFiles(cwd, query, limit, options);
 	}
 
+	/// Public accessor for the session's resolved working directory.
+	/// Used by RPC handlers (resumeSession surfaces this to the
+	/// renderer so the workspace chip stays accurate after restart).
+	async getCwd(sessionId: string): Promise<string | undefined> {
+		return this.cwdFor(sessionId);
+	}
+
 	/// Resolve the session's working directory. Reads from our entry
-	/// (set at create/resume time) first — this is the authoritative
-	/// source because the SDK doesn't expose `session.workingDirectory`
-	/// and `client.listSessions()` doesn't always include a freshly-
-	/// created session. Falls back to the catalog only when the entry
-	/// is missing one (e.g. a session created without an explicit
-	/// `workingDirectory` so the SDK used its own default).
+	/// (set at create/resume time — see `resume()` which actively
+	/// pulls the persisted cwd from `getSessionMetadata` and pins it
+	/// on the SDK call so the SDK can't drift to its default), then
+	/// the catalog as a fallback. Returns undefined if neither
+	/// source has a cwd — we deliberately DO NOT fall back to
+	/// `process.cwd()` because that silently substitutes the
+	/// Electrobun exe folder in prod, which produced the v1 export
+	/// regression where every session reported the binary's `bin/`
+	/// dir as its workspace.
 	private async cwdFor(sessionId: string): Promise<string | undefined> {
 		const entry = this.entries.get(sessionId);
 		if (entry?.workingDirectory) return entry.workingDirectory;
 		const client = tryGetClient();
 		if (!client) return undefined;
 		try {
+			const meta = await client.getSessionMetadata(sessionId);
+			if (meta?.context?.cwd) {
+				// Backfill the entry so future calls hit it directly.
+				if (entry) entry.workingDirectory = meta.context.cwd;
+				return meta.context.cwd;
+			}
+		} catch {
+			/* fall through to listSessions */
+		}
+		try {
 			const summaries = await client.listSessions();
 			const summary = summaries.find((s) => s.sessionId === sessionId);
-			if (summary?.cwd) return summary.cwd;
+			if (summary?.context?.cwd) {
+				if (entry) entry.workingDirectory = summary.context.cwd;
+				return summary.context.cwd;
+			}
 		} catch {
-			// Ignore catalog-read failures; the cwd is best-effort.
+			/* non-fatal */
 		}
-		// Final fallback: the bun process's cwd — same fallback the SDK
-		// uses internally when `workingDirectory` is omitted.
-		return process.cwd();
+		return undefined;
 	}
 
 	async abort(sessionId: string): Promise<string> {

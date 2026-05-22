@@ -125,28 +125,18 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				const first = paths[0]?.trim();
 				return first && first.length > 0 ? first : null;
 			}),
-			pickAttachment: rpcGuard(async ({ startingFolder }) => {
-				// Single-pick, files OR directories. The composer's
-				// @-picker exposes this as the "Browse…" escape hatch
-				// when fuzzy search isn't fast enough or the file
-				// lives outside the workspace cwd.
+			pickAttachment: rpcGuard(async ({ kind, startingFolder }) => {
+				// Windows native dialogs are file-only OR folder-only,
+				// never both. Honor the kind the renderer asked for.
 				const paths = await Utils.openFileDialog({
-					canChooseFiles: true,
-					canChooseDirectory: true,
+					canChooseFiles: kind === "file",
+					canChooseDirectory: kind === "directory",
 					allowsMultipleSelection: false,
 					...(startingFolder ? { startingFolder } : {}),
 				});
 				const first = paths[0]?.trim();
 				if (!first) return null;
-				try {
-					const { stat } = await import("node:fs/promises");
-					const st = await stat(first);
-					return { path: first, kind: st.isDirectory() ? "directory" : "file" };
-				} catch {
-					// Path vanished between pick and stat — treat as
-					// cancel rather than throwing.
-					return null;
-				}
+				return { path: first, kind };
 			}),
 			disconnectSession: rpcGuard(async ({ sessionId }) =>
 				sessions.disconnect(sessionId),
@@ -176,18 +166,12 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 					...(model ? { model } : {}),
 					...(reasoningEffort ? { reasoningEffort } : {}),
 				});
-				// `getMessages()` history never includes `session.resume`,
-				// so the renderer can't learn the cwd from the event
-				// stream. Look it up from the session catalog (already in
-				// memory CLI-side) and surface it on the RPC response.
-				let cwd: string | null = null;
-				try {
-					const list = await sessions.list();
-					const match = list.find((s) => s.sessionId === actualId);
-					if (match?.cwd) cwd = match.cwd;
-				} catch {
-					/* non-fatal — chip will just be hidden until next live event */
-				}
+				// Authoritative cwd via SessionRegistry.getCwd — reads
+				// entry first, then getSessionMetadata, then catalog.
+				// Returns undefined (not process.cwd()) if nothing
+				// has a real cwd, so the renderer doesn't silently
+				// display the exe folder as the workspace.
+				const cwd = (await sessions.getCwd(actualId)) ?? null;
 				return { sessionId: actualId, cwd };
 			}),
 			listSessions: rpcGuard(async () => sessions.list()),
@@ -251,6 +235,17 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				const trimmed = path.trim();
 				if (!trimmed) return false;
 				try {
+					// Windows: bypass electrobun's showItemInFolder (which
+					// has reliably been opening the PARENT folder
+					// without selecting the file) and shell out to
+					// `explorer /select,<path>`. This is the canonical
+					// Windows "reveal file in folder" invocation and
+					// selects the target item inside Explorer.
+					if (process.platform === "win32") {
+						const { spawn } = await import("node:child_process");
+						spawn("explorer.exe", [`/select,${trimmed}`], { detached: true, stdio: "ignore" }).unref();
+						return true;
+					}
 					Utils.showItemInFolder(trimmed);
 					return true;
 				} catch (err) {

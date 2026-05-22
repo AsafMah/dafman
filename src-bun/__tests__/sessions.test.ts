@@ -453,7 +453,7 @@ describe("SessionRegistry", () => {
 		expect(emitted.sessionId).toBe(id);
 		expect(emitted.kind).toBe("permission");
 		expect(emitted.request.kind).toBe("shell");
-		expect(emitted.request.summary).toBe("Run a shell command");
+		expect(emitted.request.summary).toBe("Run `ls -la`");
 
 		const ok = await reg.respondToRequest({
 			sessionId: id,
@@ -541,7 +541,7 @@ describe("SessionRegistry", () => {
 			expect(first.permissionKind).toBe("shell");
 			expect(first.decision).toBe("approveForSession");
 			expect(first.approvalKind).toBe("commands");
-			expect(first.summary).toBe("Run a shell command");
+			expect(first.summary).toBe("Run `ls -la`");
 		}
 	});
 

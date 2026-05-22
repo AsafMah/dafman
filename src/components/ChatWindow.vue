@@ -548,6 +548,7 @@ const pendingStyle = computed(() => {
             :opaque="item.kind === 'reasoning' && item.opaque === true"
           />
           <MessageActions
+            v-if="reasoningVisibility !== 'hidden'"
             kind="reasoning"
             :text="item.text"
             :event-id="item.eventId"

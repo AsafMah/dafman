@@ -10,6 +10,65 @@
 
 ---
 
+## 2026-05-22 — Bug bash: cwd persist, audit hydrate, dir pill, perm summary, reveal, browse split
+
+### Takeaway
+
+User flagged a backlog of bugs in MANUAL_TESTS.md, with **#1 (cwd
+not persisting)** as MASSIVE. Fixed end-to-end with 10/10 E2E green
+in 16 s wall (was 6 in 12 s):
+
+| Bug | Fix | E2E |
+|---|---|---|
+| cwd resets to exe folder on restart | Cache `workingDirectory` on `Entry` at create+resume. `resume()` now reads `getSessionMetadata` before SDK call and pins the persisted cwd. Dropped `process.cwd()` fallback in `cwdFor` — silent substitution was the root cause. | F6 cwd-persist (spawn bun#1 wsA → kill → bun#2 wsB shared userdata → resume → assert cwd is A) |
+| Export JSON `items: []` | Cascade of cwd bug (no events flowed). | F7 export-items (send, export, parse, assert items contain prompt + reply) |
+| Audit JSONL gone after restart | `initAudit` now reads the tail of each JSONL file into the in-memory `recent` ring on startup. Files always persisted on disk; the ring just wasn't hydrated. | F8 audit-rehydrate |
+| Reveal opens parent folder | Windows: shell out to `explorer.exe /select,<path>` (canonical Windows reveal idiom). Other platforms keep `Utils.showItemInFolder`. | (manual — OS dialog) |
+| Browse… only allowed folders | Native Windows dialogs are file-only OR folder-only — never both. `pickAttachment` now takes `kind: "file" | "directory"`; FilePicker exposes "File…" + "Folder…" buttons. | F9 dir-pill verifies the type+icon round-trip |
+| Permission rule shell summary empty | SDK field is `fullCommandText`, not `command`. Updated `summarizePermission` + `PermissionRuleEditor.shellCommand` to read both. Summary now reads e.g. ``Run `git status` ``. | sessions unit test updated |
+| Reasoning-hidden showed actions bar | Gate `<MessageActions>` for reasoning items on `reasoningVisibility !== "hidden"`. | (trivial v-if gate; verified by manual) |
+| Read/Write rule editor "allow all" only | SDK limit — per-path glob isn't in the rule type union. Added an honest hint in the editor: "Per-path glob rules aren't a Copilot SDK feature." | n/a |
+| Permission rule doesn't allow follow-up | **DEFERRED** — likely SDK matcher semantics issue; needs separate investigation. | n/a |
+
+### Fake-client persistence
+
+For the cwd-persistence E2E to work, the test-server's
+`FakeCopilotClient` now persists its catalog (sessionId + cwd) to
+`<userData>/fake-sessions.json`. A fresh bun subprocess pointed at
+the same userData finds the same sessions. Mirrors the real SDK's
+on-disk catalog.
+
+### Harness changes
+
+`spawnBunHarness` now accepts an `userData` override + only
+auto-nukes the workspace it created (caller-supplied workspaces are
+the caller's responsibility). Required for the two-spawn cwd test.
+
+### Test-server control RPCs
+
+Added `__test.recordAudit` so audit-rehydrate tests can deterministically
+seed entries without going through the renderer permission flow.
+
+### Tests at a glance
+
+- `bun run lint`: clean.
+- `bun test`: **367 pass** (one expected-summary string updated to
+  reflect the new shell summary shape).
+- `bun run e2e`: **10/10 in 16 s** (was 6/12 s). New flows:
+  06-cwd-persist, 07-export-items, 08-audit-rehydrate, 09-dir-pill.
+
+### Still on the board
+
+- `perm-rule-match`: SDK matcher needs investigation. The shape we
+  send matches the documented `PermissionDecisionApproveForSessionApproval`
+  type but the CLI re-prompts anyway. Possibly needs `git *` glob
+  vs literal `git`, or a different shape.
+- `at-empty` ("@ doesn't show fuzzy in real app"): expected to be
+  fixed by the cwd fix (no events → no UI). User to re-verify
+  against `bun run dev` and report.
+
+---
+
 ## 2026-05-22 — Real E2E tier shipped (6 flows green, 12 s wall)
 
 ### Takeaway

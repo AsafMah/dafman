@@ -3,6 +3,50 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed
+
+- **CRITICAL: Session working directory now persists across app
+  restart.** Resumed sessions previously defaulted to
+  `process.cwd()` (the Electrobun exe folder) when the SDK catalog
+  didn't surface a `cwd`. Root cause: `cwdFor` fell back to
+  `process.cwd()` silently. Fix: cache `workingDirectory` on the
+  registry `Entry` at create+resume; fetch persisted cwd from
+  `getSessionMetadata` before resume; pass it explicitly to
+  `client.resumeSession`; drop the dangerous fallback. The export
+  feature, the @-picker, the workspace chip, and anything else
+  reading the session cwd were all silently wrong before this fix.
+- **Audit JSONL re-hydrates into the in-memory ring on bun startup.**
+  Previously, the on-disk `<userData>/audit/*.jsonl` files persisted
+  correctly but the Activity tab was empty after restart until new
+  events flowed. `initAudit` now reads the tail of each file into
+  the `recent` ring on startup.
+- **Reveal-in-explorer on Windows now selects the file** instead of
+  opening its parent. Spawns `explorer.exe /select,<path>` directly
+  (the canonical Windows "reveal file in folder" idiom) rather than
+  going through `Utils.showItemInFolder`, which has been opening the
+  parent folder without selecting the target.
+- **Permission rule editor shows the actual shell command.** SDK
+  field is `fullCommandText` (not `command`); the editor was always
+  showing empty. Both the bun-side `summarizePermission` and the
+  renderer-side rule editor now read all known aliases.
+- **Reasoning-hidden suppresses the action bar too.** When
+  Settings → Reasoning view = "Hidden", the (invisible) reasoning
+  bubble's MessageActions strip stayed visible. Now gated on
+  `reasoningVisibility !== "hidden"`.
+- **Read/Write permission rules honestly disclose the SDK limit.**
+  Per-path glob rules aren't a Copilot SDK feature — read/write
+  approvals are session-wide. The editor now says so instead of
+  pretending finer granularity is possible.
+
+### Changed
+
+- **`pickAttachment` RPC takes `kind: "file" | "directory"`.** Windows
+  native dialogs cannot offer mixed file+folder picking (the
+  `IFileDialog` API is either an Open-File dialog or a folder
+  dialog, never both). The composer's FilePicker now exposes two
+  buttons — "File…" and "Folder…" — instead of one ambiguous
+  "Browse…". Mac/Linux behave the same way for consistency.
+
 ### Added
 
 - **Real E2E test tier.** `bun run e2e` (and `bun run e2e:run` for

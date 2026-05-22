@@ -7,6 +7,9 @@
 /// - `createSession` / `resumeSession` returning fake CopilotSession
 ///   instances with deterministic ids (`fake-session-N`).
 /// - `listSessions` / `deleteSession` over an in-memory catalog.
+/// - `getSessionMetadata` returns the per-session context (cwd, …)
+///   so dafman's cwd-persistence logic can re-discover after a
+///   process restart.
 /// - `listModels` returning two canned models.
 /// - Per-session `send()` triggers a scripted reply via injected
 ///   event scripts (defaults to a simple assistant.message reply).
@@ -14,16 +17,24 @@
 /// - `getMessages()` returns the per-session event log so resume
 ///   replays correctly.
 ///
+/// **Catalog persistence**: session state (id + cwd) is persisted
+/// to a JSON file under the caller-supplied `catalogPath`. This is
+/// what lets a fresh bun subprocess (e.g. the second half of a
+/// cwd-persistence E2E) find the sessions the first subprocess
+/// created. In-memory event history is NOT persisted — resumes
+/// just rebuild an empty live session, which matches what the
+/// real SDK does when its CLI is restarted.
+///
 /// Test scripts can replace the default response by calling
-/// `setSendScript(scriptFn)` on the mock client. The scriptFn
-/// receives the send args + a `push(event)` callback and is free
-/// to emit any sequence of events.
+/// `setSendScript(scriptFn)` on the mock client.
 ///
 /// All ids / timestamps / event shapes match the SDK wire format
 /// so the rest of the dafman pipeline (reducer, audit, log) sees
 /// indistinguishable input.
 
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 interface FakeSessionState {
 	sessionId: string;
@@ -150,6 +161,54 @@ export class FakeCopilotClient {
 	private readonly sessions = new Map<string, FakeSessionState>();
 	private readonly sendScriptRef: { current: SendScript } = { current: defaultSendScript };
 	private nextSeq = 1;
+	private readonly catalogPath?: string;
+
+	constructor(opts: { catalogPath?: string } = {}) {
+		this.catalogPath = opts.catalogPath;
+		this.loadCatalog();
+	}
+
+	private loadCatalog(): void {
+		if (!this.catalogPath || !existsSync(this.catalogPath)) return;
+		try {
+			const raw = readFileSync(this.catalogPath, "utf8");
+			const parsed = JSON.parse(raw) as {
+				nextSeq?: number;
+				sessions?: Array<{ sessionId: string; cwd?: string; model?: string }>;
+			};
+			if (typeof parsed.nextSeq === "number") this.nextSeq = parsed.nextSeq;
+			for (const s of parsed.sessions ?? []) {
+				this.sessions.set(s.sessionId, {
+					sessionId: s.sessionId,
+					...(s.cwd ? { cwd: s.cwd } : {}),
+					...(s.model ? { model: s.model } : {}),
+					listeners: new Set(),
+					history: [],
+					disposed: false,
+				});
+			}
+		} catch {
+			/* corrupted catalog → start fresh */
+		}
+	}
+
+	private saveCatalog(): void {
+		if (!this.catalogPath) return;
+		try {
+			mkdirSync(dirname(this.catalogPath), { recursive: true });
+			const data = {
+				nextSeq: this.nextSeq,
+				sessions: [...this.sessions.values()].map((s) => ({
+					sessionId: s.sessionId,
+					...(s.cwd ? { cwd: s.cwd } : {}),
+					...(s.model ? { model: s.model } : {}),
+				})),
+			};
+			writeFileSync(this.catalogPath, JSON.stringify(data, null, 2));
+		} catch {
+			/* non-fatal */
+		}
+	}
 
 	/// Test seam: drive a permission request through a live session's
 	/// captured onPermissionRequest handler. Returns the handler's
@@ -191,6 +250,7 @@ export class FakeCopilotClient {
 			...(opts.onPermissionRequest ? { onPermissionRequest: opts.onPermissionRequest } : {}),
 		};
 		this.sessions.set(sessionId, state);
+		this.saveCatalog();
 		const session = new FakeCopilotSession(state, this.sendScriptRef);
 		if (opts.onEvent) {
 			state.listeners.add(opts.onEvent);
@@ -208,7 +268,7 @@ export class FakeCopilotClient {
 		return session;
 	}
 
-	async resumeSession(sessionId: string, opts: { workingDirectory?: string; onEvent?: (e: Record<string, unknown>) => void } = {}): Promise<FakeCopilotSession> {
+	async resumeSession(sessionId: string, opts: { workingDirectory?: string; onEvent?: (e: Record<string, unknown>) => void; onPermissionRequest?: (req: unknown) => Promise<unknown> } = {}): Promise<FakeCopilotSession> {
 		let state = this.sessions.get(sessionId);
 		if (!state) {
 			state = {
@@ -219,21 +279,47 @@ export class FakeCopilotClient {
 				disposed: false,
 			};
 			this.sessions.set(sessionId, state);
+			this.saveCatalog();
+		}
+		if (opts.onPermissionRequest) state.onPermissionRequest = opts.onPermissionRequest;
+		// Resume keeps the persisted cwd unless caller explicitly
+		// overrides — same semantics dafman expects from the real SDK.
+		if (opts.workingDirectory) {
+			state.cwd = opts.workingDirectory;
+			this.saveCatalog();
 		}
 		const session = new FakeCopilotSession(state, this.sendScriptRef);
 		if (opts.onEvent) state.listeners.add(opts.onEvent);
 		return session;
 	}
 
-	async listSessions(): Promise<Array<{ sessionId: string; cwd?: string; context?: { cwd?: string } }>> {
+	async listSessions(): Promise<Array<{ sessionId: string; startTime: Date; modifiedTime: Date; summary?: string; isRemote: boolean; context?: { cwd?: string } }>> {
+		const now = new Date();
 		return [...this.sessions.values()].map((s) => ({
 			sessionId: s.sessionId,
-			...(s.cwd ? { cwd: s.cwd, context: { cwd: s.cwd } } : {}),
+			startTime: now,
+			modifiedTime: now,
+			isRemote: false,
+			...(s.cwd ? { context: { cwd: s.cwd } } : {}),
 		}));
+	}
+
+	async getSessionMetadata(sessionId: string): Promise<{ sessionId: string; startTime: Date; modifiedTime: Date; isRemote: boolean; context?: { cwd?: string } } | undefined> {
+		const s = this.sessions.get(sessionId);
+		if (!s) return undefined;
+		const now = new Date();
+		return {
+			sessionId: s.sessionId,
+			startTime: now,
+			modifiedTime: now,
+			isRemote: false,
+			...(s.cwd ? { context: { cwd: s.cwd } } : {}),
+		};
 	}
 
 	async deleteSession(sessionId: string): Promise<void> {
 		this.sessions.delete(sessionId);
+		this.saveCatalog();
 	}
 
 	async listModels(): Promise<Array<{ id: string; name: string; vendor: string; reasoning?: boolean }>> {

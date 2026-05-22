@@ -228,7 +228,7 @@ export type CommandMap = {
     result: string | null;
   };
   pickAttachment: {
-    args: { startingFolder?: string };
+    args: { kind: "file" | "directory"; startingFolder?: string };
     result: { path: string; kind: "file" | "directory" } | null;
   };
   browseDirectory: {

@@ -356,13 +356,16 @@ export type DafmanRPC = {
 				};
 				response: WorkspaceFileMatch[];
 			};
-			/// Native file/directory picker. Opens the OS-native
-			/// chooser; user picks one file or one directory.
-			/// Returns the absolute path of the selection, or `null`
-			/// on cancel. The escape hatch the composer's @-picker
-			/// surfaces as a button inside its popup.
+			/// Native file/directory picker. Single-pick. Caller passes
+			/// `kind: "file" | "directory"` because Windows native
+			/// dialogs cannot offer mixed picking — the underlying
+			/// `IFileDialog` API is either an Open-File dialog
+			/// or a folder dialog, not both. Forcing the kind also
+			/// makes the resulting pill icon deterministic.
+			/// Returns the absolute path + the requested kind, or
+			/// `null` on cancel.
 			pickAttachment: {
-				params: { startingFolder?: string };
+				params: { kind: "file" | "directory"; startingFolder?: string };
 				response: { path: string; kind: "file" | "directory" } | null;
 			};
 			/// Aborts the currently-running turn for this session. The

@@ -292,6 +292,15 @@ List gone after restart
 
 ---
 
+> **2026-05-22 update:** the items below were addressed in the
+> 2026-05-22 bug-bash session. Now covered by automated E2E:
+> - cwd persistence → `e2e/full/flows/06-cwd-persist.pwtest.ts`
+> - export captures items → `07-export-items.pwtest.ts`
+> - audit re-hydrate → `08-audit-rehydrate.pwtest.ts`
+> - directory pill icon → `09-dir-pill.pwtest.ts`
+> Manual items remaining: reveal-select-file (OS dialog),
+> permission rule follow-up (SDK matcher investigation pending).
+
 ## How to use this list
 
 Pick any ⏳ item, run it, then come back with one of:
@@ -381,17 +390,17 @@ the surfaces they cover, but the deeper bug fixes shipped today:
    - **Why not automated:** SDK round-trip; need real log inspection.
      {"sessionId":"87707b46-ecd0-48cb-a555-ef78310714ca","attachmentCount":1,"kinds":["file"],"names":["../Resources/version.json"]}
 
-10. ⏳ **Picking a directory carries `type: "directory"`.**
+10. ❌ **Picking a directory carries `type: "directory"`.**
     - **Steps:** open picker, pick a folder (e.g. `src/`).
     - **Expected:** pill shows folder icon. Bun log shows
       `attachment.type = "directory"`.
     - **Why not automated:** same as #9.
-
+Shows same file icon for everything.
 ---
 
 ### `@`-trigger flow
 
-1. ⏳ **Typing `@` opens the picker; fuzzy text refines.**
+1. ❌ **Typing `@` opens the picker; fuzzy text refines.**
    - **Steps:** focus composer. Type `@`. Then type `comp`.
    - **Expected:** popup appears above the composer immediately on
      `@`. Typing `comp` filters; `ChatWindow.vue` and similar
@@ -400,8 +409,9 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      real DOM selection model; happy-dom's selection support is
      incomplete and we can't reliably exercise the trigger from
      bun-test.
-
-2. ⏳ **Arrow keys + Enter pick a file as a pill.**
+Nope
+   
+2. ✅ **Arrow keys + Enter pick a file as a pill.**
    - **Steps:** with picker open, ArrowDown twice, Enter.
    - **Expected:** the `@query` text is replaced with an
      AttachmentNode pill carrying that file. Caret lands after a
@@ -409,7 +419,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
    - **Why not automated:** Lexical reconcile + pill DOM under real
      contenteditable.
 
-3. ⏳ **Path-nav: `@/`, `@~/`, `@../`, `@C:/`.**
+3. ✅ **Path-nav: `@/`, `@~/`, `@../`, `@C:/`.**
    - **Steps:** type `@~/D` (Windows: `@C:/Users/`), watch results.
    - **Expected:** entries from `$HOME` (or `C:/Users/`) starting
      with `D` (or every entry under `C:/Users/`) appear. `~/Doc`
@@ -417,7 +427,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
    - **Why not automated:** depends on the actual filesystem state
      of your home dir.
 
-4. ⏳ **Single-pick: select dismisses popup.**
+4. ✅ **Single-pick: select dismisses popup.**
    - **Steps:** open picker, pick something.
    - **Expected:** popup closes; subsequent typing stays in
      editor.
@@ -426,14 +436,14 @@ the surfaces they cover, but the deeper bug fixes shipped today:
 
 ### Paperclip-button flow
 
-5. ⏳ **Paperclip click opens the picker overlay.**
+5. ✅ **Paperclip click opens the picker overlay.**
    - **Steps:** click the paperclip in the composer footer.
    - **Expected:** PrimeVue Popover anchored to the button shows
      the same FilePicker, but with its own search input focused.
    - **Why not automated:** PrimeVue Popover positioning + focus
      management is brittle in jsdom.
 
-6. ⏳ **Browse… opens native OS dialog (files + dirs).**
+6.  ❌ **Browse… opens native OS dialog (files + dirs).**
    - **Steps:** click the paperclip → Browse… inside the popup.
    - **Expected:** native OS dialog appears. Picking either a file
      or a directory inserts the right pill (file icon or folder
@@ -441,8 +451,9 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      insertion.
    - **Why not automated:** Electrobun's `Utils.openFileDialog` is
      a native FFI call; Playwright can't drive an OS dialog.
+The picker only lets you pick a folder, no files visible.
 
-7. ⏳ **Picker stays open after Browse… cancel.**
+✅. ⏳ **Picker stays open after Browse… cancel.**
    - **Steps:** click Browse…, hit Cancel in the OS dialog.
    - **Expected:** popup remains visible, focused on the search
      input. No spurious empty pill.
@@ -450,7 +461,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
 
 ### Toggle + edge cases
 
-8. ⏳ **Show hidden toggle reveals dotfiles + `node_modules`.**
+✅. ⏳ **Show hidden toggle reveals dotfiles + `node_modules`.**
    - **Steps:** open the picker. Type `.env`. Empty list (or
      missing). Flip "Show hidden / ignored". Result appears.
    - **Expected:** dotfiles + IGNORED_DIRS members (node_modules,
@@ -459,7 +470,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      filter logic, but the toggle wiring + cache-key behavior
      across re-toggling needs human verification.
 
-9. ⏳ **Directory pill renders with folder icon + acts as folder
+❌. ⏳ **Directory pill renders with folder icon + acts as folder
    attachment.**
    - **Steps:** pick a directory. Inspect the pill; submit the
      message.
@@ -468,7 +479,7 @@ the surfaces they cover, but the deeper bug fixes shipped today:
      checking the bun log JSON for the send).
    - **Why not automated:** SDK round-trip + DevLog inspection.
 
-10. ⏳ **Large workspace stays snappy (subjective).**
+10. ✅ **Large workspace stays snappy (subjective).**
     - **Steps:** open the picker in dafman itself (~thousands of
       files indexed). Type quickly.
     - **Expected:** results refresh as you type without visible

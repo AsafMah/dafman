@@ -74,7 +74,9 @@ await initLogger({ logDir });
 await initAudit({ dir: join(flags.userData, "audit") });
 
 // Inject the fake SDK BEFORE any session work.
-const fakeClient = new FakeCopilotClient();
+const fakeClient = new FakeCopilotClient({
+	catalogPath: join(flags.userData, "fake-sessions.json"),
+});
 setClientForTest(fakeClient);
 
 const settingsPath = join(flags.userData, "settings.json");
@@ -121,12 +123,18 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		return sessions.create({ workingDirectory: cwd });
 	}),
 	pickFolder: rpcGuard(async () => flags.stubPickerPath ?? null),
-	pickAttachment: rpcGuard(async () => {
+	pickAttachment: rpcGuard(async (args) => {
+		const { kind } = args as { kind: "file" | "directory" };
 		if (!flags.stubPickerPath) return null;
+		// Test mode stubs both modes to the same configured path,
+		// reporting back whatever kind the caller asked for. Tests
+		// that need kind-specific files just set DAFMAN_TEST_PICKER_PATH
+		// to a file vs a directory.
 		try {
 			const { stat } = await import("node:fs/promises");
 			const st = await stat(flags.stubPickerPath);
-			return { path: flags.stubPickerPath, kind: st.isDirectory() ? "directory" : "file" };
+			const actualKind: "file" | "directory" = st.isDirectory() ? "directory" : "file";
+			return { path: flags.stubPickerPath, kind: kind === actualKind ? kind : actualKind };
 		} catch {
 			return null;
 		}
@@ -184,10 +192,12 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 			model?: string;
 			reasoningEffort?: string;
 		};
-		return sessions.resume(sessionId, {
+		const actualId = await sessions.resume(sessionId, {
 			...(model ? { model } : {}),
 			...(reasoningEffort ? { reasoningEffort } : {}),
 		});
+		const cwd = (await sessions.getCwd(actualId)) ?? null;
+		return { sessionId: actualId, cwd };
 	}),
 	getSettings: rpcGuard(async () => settings.get()),
 	updateSettings: rpcGuard(async (args) => {
@@ -262,6 +272,24 @@ const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
 	"__test.triggerPermission": async (args) => {
 		const { sessionId, request } = args as { sessionId: string; request: unknown };
 		return fakeClient.triggerPermission(sessionId, request);
+	},
+	"__test.recordAudit": async (args) => {
+		const { entry } = args as {
+			entry:
+				| (Omit<import("./app/audit").PermissionAuditEntry, "ts" | "kind"> & { kind: "permission" })
+				| (Omit<import("./app/audit").UrlAuditEntry, "ts" | "kind"> & { kind: "url" });
+		};
+		// Direct test seam — bypasses sessions.respondToRequest so we
+		// can deterministically seed entries for persistence tests.
+		const { recordPermission, recordUrl } = await import("./app/audit");
+		if (entry.kind === "permission") {
+			const { kind: _kind, ...rest } = entry;
+			await recordPermission(rest);
+		} else {
+			const { kind: _kind, ...rest } = entry;
+			await recordUrl(rest);
+		}
+		return "ok";
 	},
 	"__test.ready": async () => "ok",
 };

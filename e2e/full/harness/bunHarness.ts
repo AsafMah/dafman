@@ -56,10 +56,14 @@ export function seedWorkspace(extra: Record<string, string> = {}): string {
 
 export async function spawnBunHarness(options: {
   workspace?: string;
+  /// Override the default `<workspace>/.dafman-userdata` location.
+  /// Used by the cwd-persistence E2E so two bun subprocesses can
+  /// share a catalog even though they point at different workspaces.
+  userData?: string;
   stubPickerPath?: string;
 } = {}): Promise<BunHarness> {
   const workspace = options.workspace ?? seedWorkspace();
-  const userData = join(workspace, ".dafman-userdata");
+  const userData = options.userData ?? join(workspace, ".dafman-userdata");
   const port = pickPort();
   const args = [
     "src-bun/test-server.ts",
@@ -96,10 +100,15 @@ export async function spawnBunHarness(options: {
         /* ignore */
       }
       await new Promise((r) => setTimeout(r, 50));
-      try {
-        rmSync(workspace, { recursive: true, force: true });
-      } catch {
-        /* ignore */
+      // Only nuke the workspace when WE created it. The caller
+      // owns external workspaces (cwd-persistence test passes its
+      // own A + B tempdirs in and cleans them up itself).
+      if (!options.workspace) {
+        try {
+          rmSync(workspace, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       }
     },
   };

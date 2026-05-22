@@ -324,6 +324,16 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-22** — Bug bash from MANUAL_TESTS.md backlog: cwd now
+  persists across restart (user-flagged MASSIVE); audit JSONL
+  re-hydrates into the ring on bun startup; revealPath uses
+  `explorer /select,...` on Windows; native picker split into
+  File…/Folder… (Windows can't do mixed); shell perm summary now
+  shows the actual command; reasoning-hidden suppresses its action
+  bar; read/write blanket-only is now documented as an SDK limit.
+  **10/10 E2E green in 16 s** (added F6 cwd-persist, F7
+  export-items, F8 audit-rehydrate, F9 dir-pill). 367 bun tests.
+  Deferred: SDK perm-rule matcher behavior (separate investigation).
 - **2026-05-22** — Real E2E tier shipped: `bun run e2e` spawns the
   bun test-server with mocked Copilot SDK + real temp-fs per test,
   drives chromium via the new `wsBridge`. **6 baseline flows green

@@ -198,7 +198,7 @@ describe("FilePicker", () => {
     expect(localStorage.getItem("dafman.filePicker.showIgnored")).toBe("1");
   });
 
-  test("Browse… invokes pickAttachment and emits on the result", async () => {
+  test("File… invokes pickAttachment with kind=file and emits", async () => {
     bridge.setNext("searchWorkspaceFiles", sample);
     bridge.setNext("pickAttachment", {
       path: "/abs/picked.txt",
@@ -207,9 +207,13 @@ describe("FilePicker", () => {
     const utils = render(FilePicker, {
       props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
     });
-    await waitFor(() => utils.getByText("Browse…"));
-    await fireEvent.click(utils.getByText("Browse…"));
+    await waitFor(() => utils.getByText("File…"));
+    await fireEvent.click(utils.getByText("File…"));
     await waitFor(() => (utils.emitted("select") as unknown[][])?.length === 1);
+    const args = bridge.calls.find((c) => c.name === "pickAttachment")?.args as {
+      kind?: string;
+    };
+    expect(args?.kind).toBe("file");
     const emitted = utils.emitted("select") as unknown[][];
     expect(emitted[0]?.[0]).toEqual({
       type: "file",
@@ -218,14 +222,38 @@ describe("FilePicker", () => {
     });
   });
 
-  test("Browse… cancellation does not emit", async () => {
+  test("Folder… invokes pickAttachment with kind=directory and emits directory attachment", async () => {
+    bridge.setNext("searchWorkspaceFiles", sample);
+    bridge.setNext("pickAttachment", {
+      path: "/abs/some-dir",
+      kind: "directory",
+    });
+    const utils = render(FilePicker, {
+      props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
+    });
+    await waitFor(() => utils.getByText("Folder…"));
+    await fireEvent.click(utils.getByText("Folder…"));
+    await waitFor(() => (utils.emitted("select") as unknown[][])?.length === 1);
+    const args = bridge.calls.find((c) => c.name === "pickAttachment")?.args as {
+      kind?: string;
+    };
+    expect(args?.kind).toBe("directory");
+    const emitted = utils.emitted("select") as unknown[][];
+    expect(emitted[0]?.[0]).toEqual({
+      type: "directory",
+      path: "/abs/some-dir",
+      displayName: "/abs/some-dir",
+    });
+  });
+
+  test("Browse cancellation does not emit", async () => {
     bridge.setNext("searchWorkspaceFiles", sample);
     bridge.setNext("pickAttachment", null);
     const utils = render(FilePicker, {
       props: { sessionId: "s1", showSearchInput: false, externalQuery: "" },
     });
-    await waitFor(() => utils.getByText("Browse…"));
-    await fireEvent.click(utils.getByText("Browse…"));
+    await waitFor(() => utils.getByText("File…"));
+    await fireEvent.click(utils.getByText("File…"));
     await nextTick();
     await nextTick();
     expect(utils.emitted("select")).toBeUndefined();
