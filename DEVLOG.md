@@ -10,6 +10,65 @@
 
 ---
 
+## 2026-05-22 — Process rules #9 + #10; workspaces API verdict; manual-test backlog
+
+### Takeaway
+
+Two new hard rules in AGENTS.md:
+
+- **#9 Spec-interview before implementation** — use `ask_user` with a
+  structured form for every non-trivial feature. Plan mode if the
+  design space is large enough that a single form can't cover it.
+- **#10 Manual-test list per feature** — every feature appends a
+  checklist to `MANUAL_TESTS.md` with steps / expected / why-not-
+  automated. User runs the list and reports back; passing items get
+  promoted to verified.
+
+Retroactive `MANUAL_TESTS.md` covers every code-bearing commit since
+`52a2956`: ring buffer, reasoning fix, permission rule editor, skills
+toggle, observability stack, export, audit log, workspace MCP
+discovery.
+
+### Workspaces API verdict — NOT an enforcement surface
+
+User asked whether `rpc.workspaces.*` could power a "files the agent
+is allowed to touch" view. After reading the SDK README + the bundled
+CLI's `app.js` impl:
+
+- `rpc.workspaces.{getWorkspace,listFiles,readFile,createFile}` targets
+  the **session's infinite-sessions state directory** —
+  `~/.copilot/session-state/{sessionId}/{checkpoints,plan.md,files}/`.
+- It is **not** a permission gate. All paths in those calls are
+  **relative to that one directory** — no traversal, no project-cwd
+  access.
+- Filesystem access against the user's repo is gated by
+  `onPermissionRequest` (kind `"read"` / `"write"`, with `fileName`
+  populated). **That** is the enforcement layer — and we already
+  consume it via PendingRequestCard + PermissionRuleEditor (commit
+  `b015d68`).
+
+Useful applications of `rpc.workspaces.*` exist but are different:
+plan panel (`plan.md`), per-session generated-files tab, checkpoint
+browser. None help with "what can the agent touch in my repo".
+
+Receipts: `node_modules/copilot-sdk-supercharged/dist/generated/rpc.d.ts:2209-2330`
+(types + namespace shape), `app.js:1322` (`listWorkspaceFiles` walks
+the session state dir), `app.js:7342` (`getWorkspacePath` returns the
+session state path), README.md:210-212 (`workspacePath?: string`
+property documented).
+
+### Next: @-file picker
+
+Spec locked via `ask_user` (per rule #9): single-pick, directory =
+single pill, CLI-style `@/abs`, `@~/`, `@../` paths, default-filtered
+fuzzy with a toggle, replace `MentionPlugin.vue`, native dialog button
+files + dirs, paperclip opens popup, backend = my call (will use
+Bun.glob in the bun process + cache).
+
+Implementing next session.
+
+---
+
 ## 2026-05-22 — SDK + CLI deep audit deliverable
 
 ### Takeaway

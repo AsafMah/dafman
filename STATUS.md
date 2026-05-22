@@ -6,6 +6,8 @@
 > See [`DEVLOG.md`](DEVLOG.md) for the session-by-session running log,
 > [`CHANGELOG.md`](CHANGELOG.md) for release notes,
 > [`ARCHITECTURE.md`](ARCHITECTURE.md) for the live architecture snapshot,
+> [`MANUAL_TESTS.md`](MANUAL_TESTS.md) for the manual-test backlog
+> (per-feature checklists the user runs to sign off),
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 

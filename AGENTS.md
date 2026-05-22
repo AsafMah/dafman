@@ -23,7 +23,10 @@ editor, inline file/image attachments, command palette, dark mode.
    tribal knowledge.
 3. **`ARCHITECTURE.md`** — current module map + lifecycle invariants +
    SDK gotchas.
-4. Whatever **`plans/*.prompt.md`** is relevant to your task (index at
+4. **`MANUAL_TESTS.md`** — open manual-test checklist the user runs to
+   sign off features. Append a new section per feature you ship
+   (per rule #10 below).
+5. Whatever **`plans/*.prompt.md`** is relevant to your task (index at
    `plans/plan-overview.prompt.md`).
 
 If your task touches the IPC wire contract, also read `src-bun/rpc.ts` and
@@ -264,6 +267,55 @@ caught.
   SHAs) so the next agent can verify your conclusions.
 - Memories you store via `store_memory` are facts the next agent will
   treat as ground truth; cite the source so they can re-verify.
+
+### 9. Spec-interview before you implement
+
+For **any** non-trivial feature — anything touching UI shape, IPC
+surface, file layout, or user-visible behavior — interview the user
+**before writing code** until you are completely sure of the spec.
+
+- Use the `ask_user` tool with a structured form. Don't ask
+  trade-offs in free-form chat.
+- Cover every fork that would materially change the implementation:
+  scope (one shape vs many), defaults, keyboard / shortcut shape,
+  empty/edge states, error states, what existing component is
+  replaced vs extended.
+- If the design space is large enough that one form can't cover it,
+  **remind the user to enter plan mode** and iterate the plan with
+  them before exiting.
+- Locked specs go in the commit message and (for non-trivial
+  features) into the relevant `plans/*.prompt.md` so the next agent
+  doesn't re-litigate them.
+
+This rule exists because too many features in this repo were built
+on assumed defaults that the user disagreed with, costing rework.
+"I assumed you wanted X" is not an acceptable post-hoc justification.
+
+### 10. Ship a manual-test list with every feature
+
+Automated tests cover what you can write. Anything you can't be
+confident is correct from `bun run check` alone (hover states,
+keyboard flows, OS dialogs, drag-and-drop, multi-window timing,
+focus management, real CLI side-effects, accessibility) ships with a
+**manual test list**.
+
+Append a checklist to the relevant `DEVLOG.md` entry. Each item must
+include:
+
+1. **Steps** — exact clicks / keys / inputs.
+2. **Expected result** — what the user should observe.
+3. **Why not automated** — one-line reason (e.g. "Playwright can't
+   drive the native OS file picker", "depends on Notification API
+   permission state", "depends on WebView2 IME shape on Windows").
+
+The user runs the list and reports back. Items that pass get
+promoted to "verified" in the DEVLOG entry. Items that fail get
+filed back to the open backlog with a repro.
+
+Reason: automated coverage on a desktop app with native dialogs,
+OS-keyring, real CLI processes, and a custom IPC bridge will never
+be 100%. The manual list is the explicit hand-off of what's *not*
+covered, instead of pretending it is.
 
 ---
 
