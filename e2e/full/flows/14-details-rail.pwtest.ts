@@ -291,13 +291,17 @@ test("composer !! command mode opens the session terminal", async ({ page }) => 
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
-  await expect(page.getByRole("button", { name: "Open embedded session terminal" }).first()).toBeVisible();
+  const commandButton = page.getByRole("button", { name: "Open embedded session terminal" }).first();
+  await expect(commandButton).toBeVisible();
   await expect(page.getByRole("button", { name: "Open session terminal" }).first()).toBeVisible();
+  const commandBox = await commandButton.boundingBox();
+  const paperclipBox = await page.getByRole("button", { name: "Attach files or folders" }).first().boundingBox();
+  expect(commandBox && paperclipBox && commandBox.x + commandBox.width <= paperclipBox.x).toBeTruthy();
 
-  await composer.click();
-  await page.keyboard.type("!!");
+  await commandButton.click();
   const terminal = page.locator(".lex-command-mode .terminal-panel").first();
   await expect(terminal).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".xterm-helper-textarea").first()).toBeFocused({ timeout: 10_000 });
   await page.keyboard.type("echo EMBEDDED_CAPTURE_OK");
   await page.keyboard.press("Enter");
   await expect(page.locator(".command-result-card").first()).toContainText("EMBEDDED_CAPTURE_OK", {
@@ -306,8 +310,12 @@ test("composer !! command mode opens the session terminal", async ({ page }) => 
   await expect(page.locator('.composer-attachment-pill[data-attachment-kind="command-result"]').first()).toBeVisible({
     timeout: 10_000,
   });
+  await commandButton.click();
+  await expect(page.locator(".lex-command-mode .terminal-panel").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".command-result-card")).toHaveCount(1);
   await page.getByRole("button", { name: "Open session terminal" }).first().click();
   await expect(terminal).toHaveCount(0);
   await expect(page.locator(".terminal-panel").first()).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("button", { name: "Open owning session" }).first()).toBeVisible();
+  await expect(page.locator(".xterm-helper-textarea").first()).toBeFocused({ timeout: 10_000 });
 });

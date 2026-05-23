@@ -80,6 +80,15 @@
      covers runner streaming/persistence and `e2e/full/flows/14-details-rail.pwtest.ts`
      covers `!!` mode, card rendering, and add-to-composer.
 
+6. ⏳ **Terminal settings live under Settings.**
+   - **Steps:** open ActivityBar → Settings → Terminal.
+   - **Expected:** font family, font size, scrollback, foreground/background
+     color pickers with visible swatches, and addon toggles are in Settings.
+     The Terminals panel only manages running terminals and new-terminal
+     creation.
+   - **Why not automated:** color picker overlay behavior is visual and
+     WebView-specific; type-checks cover the settings data flow.
+
 ---
 
 ## Phase 23c — Long Jobs + Autopilot UI

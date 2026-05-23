@@ -423,6 +423,8 @@ const usage = ref<{
   totalApiDurationMs: number;
   lastCallInputTokens: number;
   lastCallOutputTokens: number;
+  currentTokens: number;
+  tokenLimit: number;
 } | null>(null);
 const usageError = ref<string | null>(null);
 async function loadUsage() {
@@ -447,15 +449,27 @@ async function loadUsage() {
         typeof raw.lastCallOutputTokens === "number"
           ? raw.lastCallOutputTokens
           : 0,
+      currentTokens:
+        typeof raw.currentTokens === "number"
+          ? raw.currentTokens
+          : typeof raw.inputTokens === "number"
+            ? raw.inputTokens
+            : 0,
+      tokenLimit:
+        typeof raw.tokenLimit === "number"
+          ? raw.tokenLimit
+          : typeof raw.maxTokens === "number"
+            ? raw.maxTokens
+            : 0,
     };
     const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
     usage.value =
-      fromRpc.totalUserRequests > 0 || fromRpc.lastCallInputTokens > 0
+      fromRpc.totalUserRequests > 0 || fromRpc.lastCallInputTokens > 0 || fromRpc.tokenLimit > 0
         ? fromRpc
         : fromEvents;
   } catch (err) {
     const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
-    if (fromEvents.totalUserRequests > 0) {
+    if (fromEvents.totalUserRequests > 0 || fromEvents.tokenLimit > 0) {
       usage.value = fromEvents;
       return;
     }
@@ -468,18 +482,29 @@ function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<s
   let totalApiDurationMs = 0;
   let lastCallInputTokens = 0;
   let lastCallOutputTokens = 0;
+  let currentTokens = 0;
+  let tokenLimit = 0;
   for (const event of events) {
-    if (event.eventType !== "assistant.usage") continue;
     const data = event.data;
-    totalUserRequests += 1;
-    const cost = data.cost;
-    if (typeof cost === "number") totalPremiumRequestCost += cost;
-    const duration = data.duration;
-    if (typeof duration === "number") totalApiDurationMs += duration;
-    const input = data.inputTokens;
-    if (typeof input === "number") lastCallInputTokens = input;
-    const output = data.outputTokens;
-    if (typeof output === "number") lastCallOutputTokens = output;
+    if (event.eventType === "assistant.usage") {
+      totalUserRequests += 1;
+      const cost = data.cost;
+      if (typeof cost === "number") totalPremiumRequestCost += cost;
+      const duration = data.duration;
+      if (typeof duration === "number") totalApiDurationMs += duration;
+      const input = data.inputTokens;
+      if (typeof input === "number") {
+        lastCallInputTokens = input;
+        currentTokens = input;
+      }
+      const output = data.outputTokens;
+      if (typeof output === "number") lastCallOutputTokens = output;
+    } else if (event.eventType === "session.usage_info") {
+      const current = data.currentTokens;
+      if (typeof current === "number") currentTokens = current;
+      const limit = data.tokenLimit;
+      if (typeof limit === "number") tokenLimit = limit;
+    }
   }
   return {
     totalUserRequests,
@@ -487,6 +512,8 @@ function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<s
     totalApiDurationMs,
     lastCallInputTokens,
     lastCallOutputTokens,
+    currentTokens,
+    tokenLimit,
   };
 }
 function formatDurationMs(ms: number): string {
@@ -1589,6 +1616,13 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
             <dd>
               {{ usage.lastCallInputTokens.toLocaleString() }} /
               {{ usage.lastCallOutputTokens.toLocaleString() }}
+            </dd>
+          </div>
+          <div v-if="usage.tokenLimit > 0" class="usage-row">
+            <dt>Context tokens</dt>
+            <dd>
+              {{ usage.currentTokens.toLocaleString() }} /
+              {{ usage.tokenLimit.toLocaleString() }}
             </dd>
           </div>
         </dl>

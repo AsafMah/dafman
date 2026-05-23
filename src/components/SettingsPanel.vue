@@ -12,6 +12,8 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
+import ColorPicker from "primevue/colorpicker";
+import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import ToggleSwitch from "primevue/toggleswitch";
@@ -19,7 +21,7 @@ import { useNotificationsStore } from "../stores/notificationsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
-import type { ModelSummary, ReasoningVisibility, ThemeChoice } from "../ipc/types";
+import type { ModelSummary, ReasoningVisibility, TerminalAddonPrefs, ThemeChoice } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
 
 const settingsStore = useSettingsStore();
@@ -52,6 +54,20 @@ const terminalProfileOptions = [
   { label: "Windows PowerShell", value: "powershell" },
   { label: "Command Prompt", value: "cmd" },
   { label: "Unix shell ($SHELL)", value: "unix-shell" },
+];
+
+const terminalAddonLabels: Array<{ key: keyof TerminalAddonPrefs; label: string }> = [
+  { key: "search", label: "Search" },
+  { key: "webLinks", label: "Web links" },
+  { key: "clipboard", label: "Clipboard" },
+  { key: "unicode11", label: "Unicode 11" },
+  { key: "webFonts", label: "Web fonts" },
+  { key: "progress", label: "Progress" },
+  { key: "ligatures", label: "Ligatures" },
+  { key: "image", label: "Images" },
+  { key: "unicodeGraphemes", label: "Graphemes" },
+  { key: "webgl", label: "WebGL" },
+  { key: "serialize", label: "Serialize" },
 ];
 
 const defaultModelOptions = computed<Array<ModelSummary | { id: ""; name: string }>>(
@@ -94,6 +110,38 @@ const defaultTerminalProfile = computed<string>({
     void settingsStore.setDefaultTerminalProfile(value);
   },
 });
+
+const terminalPrefs = computed(() => settings.value.terminal);
+
+function setTerminalFontFamily(value: string): void {
+  void settingsStore.setTerminalPrefs({ fontFamily: value.trim() || terminalPrefs.value.fontFamily });
+}
+
+function setTerminalFontSize(value: number | null | undefined): void {
+  if (typeof value === "number") void settingsStore.setTerminalPrefs({ fontSize: value });
+}
+
+function setTerminalScrollback(value: number | null | undefined): void {
+  if (typeof value === "number") void settingsStore.setTerminalPrefs({ scrollback: value });
+}
+
+function hexNoHash(value: string): string {
+  return value.trim().replace(/^#/, "");
+}
+
+function hexWithHash(value: string): string {
+  const clean = hexNoHash(value);
+  return clean ? `#${clean}` : "";
+}
+
+function setTerminalColor(which: "background" | "foreground", value: string): void {
+  const next = hexWithHash(value) || terminalPrefs.value.theme[which];
+  void settingsStore.setTerminalPrefs({ theme: { [which]: next } });
+}
+
+function setTerminalAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
+  void settingsStore.setTerminalPrefs({ addons: { [key]: value } as Partial<TerminalAddonPrefs> });
+}
 
 const theme = computed<ThemeChoice>({
   get: () => settings.value.appearance.theme,
@@ -453,6 +501,75 @@ function toggle(id: string) {
             Used for new terminal panes. Full profile editing is planned for a later slice.
           </p>
         </label>
+        <label class="field" for="terminal-font-family">
+          <span class="field-label">Font family</span>
+          <InputText
+            id="terminal-font-family"
+            :model-value="terminalPrefs.fontFamily"
+            size="small"
+            @update:model-value="(value) => setTerminalFontFamily(String(value))"
+          />
+        </label>
+        <div class="settings-grid">
+          <label class="field" for="terminal-font-size">
+            <span class="field-label">Font size</span>
+            <InputNumber
+              id="terminal-font-size"
+              :model-value="terminalPrefs.fontSize"
+              size="small"
+              :min="8"
+              :max="32"
+              @update:model-value="setTerminalFontSize"
+            />
+          </label>
+          <label class="field" for="terminal-scrollback">
+            <span class="field-label">Scrollback</span>
+            <InputNumber
+              id="terminal-scrollback"
+              :model-value="terminalPrefs.scrollback"
+              size="small"
+              :min="1000"
+              :max="100000"
+              @update:model-value="setTerminalScrollback"
+            />
+          </label>
+        </div>
+        <div class="settings-grid">
+          <label class="field color-field" for="terminal-background">
+            <span class="field-label">Background</span>
+            <div class="color-row">
+              <ColorPicker
+                input-id="terminal-background"
+                :model-value="hexNoHash(terminalPrefs.theme.background)"
+                @update:model-value="(value) => setTerminalColor('background', String(value))"
+              />
+              <span class="color-swatch" :style="{ background: terminalPrefs.theme.background }" />
+              <code>{{ terminalPrefs.theme.background }}</code>
+            </div>
+          </label>
+          <label class="field color-field" for="terminal-foreground">
+            <span class="field-label">Foreground</span>
+            <div class="color-row">
+              <ColorPicker
+                input-id="terminal-foreground"
+                :model-value="hexNoHash(terminalPrefs.theme.foreground)"
+                @update:model-value="(value) => setTerminalColor('foreground', String(value))"
+              />
+              <span class="color-swatch" :style="{ background: terminalPrefs.theme.foreground }" />
+              <code>{{ terminalPrefs.theme.foreground }}</code>
+            </div>
+          </label>
+        </div>
+        <div class="addon-grid">
+          <label v-for="addon in terminalAddonLabels" :key="addon.key" class="addon-toggle">
+            <ToggleSwitch
+              :model-value="terminalPrefs.addons[addon.key]"
+              @update:model-value="(value) => setTerminalAddon(addon.key, value)"
+            />
+            <span>{{ addon.label }}</span>
+          </label>
+        </div>
+        <p class="field-hint">Display and addon changes apply to newly opened terminal panels.</p>
       </div>
     </section>
 
@@ -729,6 +846,43 @@ function toggle(id: string) {
 .workspace-row :deep(.p-inputtext) {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.addon-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 0.6rem;
+}
+
+.addon-toggle,
+.color-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.addon-toggle {
+  font-size: 0.82rem;
+}
+
+.color-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.color-swatch {
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-sm);
+  flex: 0 0 auto;
 }
 
 /* PrimeVue Select fills its container — let it shrink with the

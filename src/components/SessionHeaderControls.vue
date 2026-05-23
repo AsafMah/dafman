@@ -9,7 +9,7 @@
 // component just reads + dispatches actions. Self-contained: takes
 // only `sessionId` as a prop.
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import Chip from "primevue/chip";
@@ -237,6 +237,16 @@ function onAgentChipClick() {
   if (!detailsOpen.value) layoutStore.toggleSessionDetailsPanel();
 }
 
+function requestTerminalFocus(terminalId: string): void {
+  for (const delay of [0, 50, 150]) {
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("dafman:focus-terminal", {
+        detail: { terminalId },
+      }));
+    }, delay);
+  }
+}
+
 async function openSessionTerminal() {
   try {
     window.dispatchEvent(new CustomEvent("dafman:close-command-terminal", {
@@ -244,18 +254,14 @@ async function openSessionTerminal() {
     }));
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
     layoutStore.addTerminalPanel(terminal.id, terminal.title);
+    await nextTick();
+    requestTerminalFocus(terminal.id);
   } catch (err) {
     useToastStore().error(
       "Couldn't open terminal",
       err instanceof Error ? err.message : String(err),
     );
   }
-}
-
-function openEmbeddedTerminalMode() {
-  window.dispatchEvent(new CustomEvent("dafman:open-command-terminal", {
-    detail: { sessionId: props.sessionId },
-  }));
 }
 </script>
 
@@ -288,19 +294,8 @@ function openEmbeddedTerminalMode() {
       @keydown.space.prevent="onWorkspaceClick"
     />
     <Button
-      v-if="props.area === 'all' || props.area === 'composer-left'"
-      icon="pi pi-terminal"
-      label="Command"
-      text
-      size="small"
-      class="session-terminal-button session-command-button"
-      aria-label="Open embedded session terminal"
-      title="Open embedded session terminal"
-      @click="openEmbeddedTerminalMode"
-    />
-    <Button
-      v-if="props.area === 'all' || props.area === 'composer-left'"
-      icon="pi pi-window-maximize"
+      v-if="props.area === 'all' || props.area === 'composer-right'"
+      icon="pi pi-desktop"
       label="Terminal"
       text
       size="small"

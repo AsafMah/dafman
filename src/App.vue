@@ -465,7 +465,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       id: TERMINALS_PANEL_ID,
       component: "terminalsPanel",
       icon: "pi-window-maximize",
-      title: "Terminals — running shells + settings",
+      title: "Terminals — running shells",
       initialSize: 360,
       minimumSize: 320,
     },

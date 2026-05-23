@@ -737,6 +737,17 @@ const SubmitButton = defineComponent({
           </div>
           <div class="lex-toolbar-center">
             <button
+              v-if="props.sessionId"
+              type="button"
+              class="lex-toolbar-btn lex-command-trigger"
+              title="Open embedded session terminal"
+              aria-label="Open embedded session terminal"
+              :disabled="props.disabled"
+              @click="enterCommandMode"
+            >
+              <i class="pi pi-bolt" aria-hidden="true" />
+            </button>
+            <button
               type="button"
               class="lex-toolbar-btn"
               title="Attach files or folders"
@@ -1162,6 +1173,32 @@ const SubmitButton = defineComponent({
 
 .lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .compact-select) {
   display: none;
+}
+
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .session-terminal-button) {
+  width: 1.45rem;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding-inline: 0;
+}
+
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .session-terminal-button .p-button-label) {
+  display: none;
+}
+
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right) {
+  gap: 0;
+}
+
+.lex-toolbar-stage-4 .lex-toolbar-btn {
+  width: 1.35rem;
+  height: 1.45rem;
+  padding: 0;
+}
+
+.lex-toolbar-stage-4 {
+  gap: 0.2rem;
+  padding-inline: 0.25rem;
 }
 
 </style>

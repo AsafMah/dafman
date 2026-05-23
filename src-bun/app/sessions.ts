@@ -28,8 +28,9 @@ import {
 	type UserInputRequest,
 	type UserInputResponse,
 } from "./copilotSdk";
-import { stat } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { mkdir, stat, writeFile } from "node:fs/promises";
+import { isAbsolute, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
@@ -120,6 +121,22 @@ function commandResultMarkdown(result: CommandResultRecord): string {
 		"",
 	];
 	return lines.join("\n");
+}
+
+function safeFilePart(value: string): string {
+	return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "command-result";
+}
+
+async function commandResultFileAttachment(
+	result: CommandResultRecord,
+	displayName?: string,
+): Promise<{ type: "file"; path: string; displayName: string }> {
+	const dir = join(tmpdir(), "dafman-command-results", safeFilePart(result.sessionId));
+	await mkdir(dir, { recursive: true });
+	const name = displayName ?? `command-result-${safeFilePart(result.id)}.md`;
+	const path = join(dir, name);
+	await writeFile(path, commandResultMarkdown(result), "utf8");
+	return { type: "file", path, displayName: name };
 }
 
 /// 19a: normalize the SDK's loose AgentInfo wire shape (everything is
@@ -999,18 +1016,15 @@ export class SessionRegistry {
 			});
 		}
 		try {
-			const commandResults = attachments?.filter((a) => a.type === "commandResult") ?? [];
-			const sdkAttachments = attachments?.filter((a) => a.type !== "commandResult");
-			const prompt = commandResults.length === 0
-				? text
-				: [
-					text,
-					"",
-					"Attached command result context:",
-					...commandResults.map((a) => commandResultMarkdown(a.result)),
-				].join("\n");
+			const sdkAttachments = await Promise.all(
+				(attachments ?? []).map((attachment) =>
+					attachment.type === "commandResult"
+						? commandResultFileAttachment(attachment.result, attachment.displayName)
+						: Promise.resolve(attachment),
+				),
+			);
 			return await entry.session.send({
-				prompt,
+				prompt: text,
 				...(mode ? { mode } : {}),
 				...(sdkAttachments && sdkAttachments.length > 0
 					? { attachments: sdkAttachments as Parameters<typeof entry.session.send>[0]["attachments"] }

@@ -2,39 +2,19 @@
 import { computed, ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
-import ToggleSwitch from "primevue/toggleswitch";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
-import { useSettingsStore } from "../stores/settingsStore";
 import { useTerminalStore } from "../stores/terminalStore";
 import { useToastStore } from "../stores/toastStore";
-import type { TerminalAddonPrefs } from "../ipc/types";
 
 const terminalStore = useTerminalStore();
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
-const settingsStore = useSettingsStore();
 const toasts = useToastStore();
 
 const shell = ref("");
 const args = ref("");
 const cwd = ref("");
-
-const terminalPrefs = computed(() => settingsStore.settings.terminal);
-const addonLabels: Array<{ key: keyof TerminalAddonPrefs; label: string }> = [
-  { key: "search", label: "Search" },
-  { key: "webLinks", label: "Web links" },
-  { key: "clipboard", label: "Clipboard" },
-  { key: "unicode11", label: "Unicode 11" },
-  { key: "webFonts", label: "Web fonts" },
-  { key: "progress", label: "Progress" },
-  { key: "ligatures", label: "Ligatures" },
-  { key: "image", label: "Images" },
-  { key: "unicodeGraphemes", label: "Graphemes" },
-  { key: "webgl", label: "WebGL" },
-  { key: "serialize", label: "Serialize" },
-];
 
 const terminals = computed(() =>
   [...terminalStore.terminals].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -71,32 +51,6 @@ async function createTerminal(useSessionCwd = false): Promise<void> {
 
 function openTerminal(id: string, title: string): void {
   layoutStore.addTerminalPanel(id, title);
-}
-
-function setFontFamily(value: string): void {
-  void settingsStore.setTerminalPrefs({ fontFamily: value.trim() || terminalPrefs.value.fontFamily });
-}
-
-function setFontSize(value: number | null | undefined): void {
-  if (typeof value !== "number") return;
-  void settingsStore.setTerminalPrefs({ fontSize: value });
-}
-
-function setScrollback(value: number | null | undefined): void {
-  if (typeof value !== "number") return;
-  void settingsStore.setTerminalPrefs({ scrollback: value });
-}
-
-function setBackground(value: string): void {
-  void settingsStore.setTerminalPrefs({ theme: { background: value.trim() || terminalPrefs.value.theme.background } });
-}
-
-function setForeground(value: string): void {
-  void settingsStore.setTerminalPrefs({ theme: { foreground: value.trim() || terminalPrefs.value.theme.foreground } });
-}
-
-function setAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
-  void settingsStore.setTerminalPrefs({ addons: { [key]: value } as Partial<TerminalAddonPrefs> });
 }
 
 function displayCwd(terminalId: string, fallback: string): string {
@@ -162,68 +116,6 @@ async function copyCommand(command: string | undefined): Promise<void> {
           @click="createTerminal(true)"
         />
       </div>
-    </section>
-
-    <section class="terminal-create">
-      <h3>Display + addons</h3>
-      <label class="field">
-        <span>Font family</span>
-        <InputText
-          :model-value="terminalPrefs.fontFamily"
-          size="small"
-          @update:model-value="(value) => setFontFamily(String(value))"
-        />
-      </label>
-      <div class="settings-grid">
-        <label class="field">
-          <span>Font size</span>
-          <InputNumber
-            :model-value="terminalPrefs.fontSize"
-            size="small"
-            :min="8"
-            :max="32"
-            @update:model-value="setFontSize"
-          />
-        </label>
-        <label class="field">
-          <span>Scrollback</span>
-          <InputNumber
-            :model-value="terminalPrefs.scrollback"
-            size="small"
-            :min="1000"
-            :max="100000"
-            @update:model-value="setScrollback"
-          />
-        </label>
-      </div>
-      <div class="settings-grid">
-        <label class="field">
-          <span>Background</span>
-          <InputText
-            :model-value="terminalPrefs.theme.background"
-            size="small"
-            @update:model-value="(value) => setBackground(String(value))"
-          />
-        </label>
-        <label class="field">
-          <span>Foreground</span>
-          <InputText
-            :model-value="terminalPrefs.theme.foreground"
-            size="small"
-            @update:model-value="(value) => setForeground(String(value))"
-          />
-        </label>
-      </div>
-      <div class="addon-grid">
-        <label v-for="addon in addonLabels" :key="addon.key" class="addon-toggle">
-          <ToggleSwitch
-            :model-value="terminalPrefs.addons[addon.key]"
-            @update:model-value="(value) => setAddon(addon.key, value)"
-          />
-          <span>{{ addon.label }}</span>
-        </label>
-      </div>
-      <p class="empty">Changes apply to newly opened terminal panels.</p>
     </section>
 
     <ul class="terminal-list">
@@ -351,26 +243,6 @@ async function copyCommand(command: string | undefined): Promise<void> {
   color: var(--p-text-muted-color);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.addon-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.35rem 0.55rem;
-}
-
-.addon-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-width: 0;
-  font-size: 0.78rem;
 }
 
 .create-actions,

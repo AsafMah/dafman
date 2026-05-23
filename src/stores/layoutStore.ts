@@ -76,7 +76,7 @@ const EDGE_PANEL_DEFINITIONS: Record<
     id: TERMINALS_PANEL_ID,
     component: "terminalsPanel",
     tabComponent: "sidebarTab",
-    title: "Terminals — running shells + settings",
+    title: "Terminals — running shells",
     initialSize: 360,
     minimumSize: 320,
   },

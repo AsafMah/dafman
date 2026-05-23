@@ -57,7 +57,8 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   progress, ligatures, images, WebGL, and serialization.
 - **Terminal manager panel.** Added an ActivityBar Terminals panel with
   running terminal list, open/kill actions, a basic new-terminal form for
-  command/args/cwd, and terminal display/addon settings.
+  command/args/cwd. Terminal display/addon settings now live in Settings with
+  color pickers and visible foreground/background swatches.
 - **Terminal shell integration foundation.** New terminals get a per-terminal
   nonce and shell-integration env. PowerShell/pwsh now emit VS Code-style
   OSC 633 command/CWD/exit markers; cmd emits best-effort prompt/CWD markers.

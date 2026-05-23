@@ -99,7 +99,7 @@ const commandResultOrder = ref<Record<string, number>>({});
 function onExternalFocusRequest(e: Event) {
   const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
   if (!detail || detail.sessionId !== props.sessionId) return;
-  composerRef.value?.focus();
+  void scrollToBottom().then(() => composerRef.value?.focus());
 }
 
 function onExternalCommandTerminalRequest(e: Event) {
@@ -221,6 +221,10 @@ const timelineItems = computed(() => {
 
 async function scrollToBottom() {
   await nextTick();
+  if (typeof requestAnimationFrame !== "undefined") {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
   const el = messagesEl.value;
   if (el) el.scrollTop = el.scrollHeight;
 }
@@ -389,6 +393,12 @@ async function ensureCommandTerminal(): Promise<string | null> {
 async function onRequestCommandTerminal(): Promise<void> {
   commandModeOpenedAt.value = Date.now();
   await ensureCommandTerminal();
+  await nextTick();
+  if (commandTerminalId.value) {
+    window.dispatchEvent(new CustomEvent("dafman:focus-terminal", {
+      detail: { terminalId: commandTerminalId.value },
+    }));
+  }
 }
 
 async function openFullSessionTerminal(): Promise<void> {

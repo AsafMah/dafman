@@ -115,7 +115,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           id,
           component: "terminalsPanel",
           tabComponent: "sidebarTab",
-          title: "Terminals — running shells + settings",
+          title: "Terminals — running shells",
           initialSize: 360,
           minimumSize: 320,
           exclusive: true,

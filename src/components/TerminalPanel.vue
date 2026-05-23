@@ -45,6 +45,7 @@ let resizeObserver: ResizeObserver | null = null;
 let pendingSearchFrame: number | null = null;
 let commandCaptureActive = false;
 let commandCaptureBuffer = "";
+let replayingBuffer = false;
 
 const terminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
 const summary = computed(() =>
@@ -117,6 +118,7 @@ function applyShellEvent(event: TerminalShellEvent): void {
 
 function handleOsc(ident: 7 | 9 | 133 | 633 | 1337, data: string): boolean {
   const parsed = parseTerminalOsc(ident, data, integrationNonce.value);
+  if (replayingBuffer) return parsed.handled;
   parsed.events.forEach(applyShellEvent);
   return parsed.handled;
 }
@@ -209,6 +211,11 @@ function focusSession(): void {
   if (!sessionId) return;
   layoutStore.addPanel(sessionId);
   layoutStore.activatePanel(sessionId);
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("dafman:focus-composer", {
+      detail: { sessionId },
+    }));
+  }, 0);
 }
 
 onMounted(async () => {
@@ -296,7 +303,13 @@ onMounted(async () => {
     const ligatures = new LigaturesAddon();
     loadAddon(ligatures, () => term?.loadAddon(ligatures));
   }
-  if (buffer.value) term.write(buffer.value, () => scheduleSearch(false));
+  if (buffer.value) {
+    replayingBuffer = true;
+    term.write(buffer.value, () => {
+      replayingBuffer = false;
+      scheduleSearch(false);
+    });
+  }
   registerShellIntegrationHandlers();
   registerCopyShortcuts();
   term.onData((data) => {
@@ -305,7 +318,8 @@ onMounted(async () => {
   resizeObserver = new ResizeObserver(() => fitAndNotify());
   resizeObserver.observe(host.value);
   setTimeout(fitAndNotify, 0);
-  if (compact.value) setTimeout(() => term?.focus(), 0);
+  setTimeout(() => term?.focus(), 0);
+  window.addEventListener("dafman:focus-terminal", onFocusTerminal);
 });
 
 watch(buffer, (next, prev) => {
@@ -335,6 +349,7 @@ watch(searchOpen, async (open) => {
 watch(searchQuery, () => scheduleSearch(true), { flush: "post" });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("dafman:focus-terminal", onFocusTerminal);
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (pendingSearchFrame !== null) {
@@ -352,6 +367,12 @@ onBeforeUnmount(() => {
   term = null;
   fit = null;
 });
+
+function onFocusTerminal(event: Event): void {
+  const detail = (event as CustomEvent<{ terminalId?: string }>).detail;
+  if (detail?.terminalId !== terminalId.value) return;
+  term?.focus();
+}
 </script>
 
 <template>

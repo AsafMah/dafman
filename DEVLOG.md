@@ -51,8 +51,9 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   image, webgl, and serialize addons. Search/copy/paste/copy-buffer controls
   are available in the terminal header.
 - ActivityBar Terminals panel: lists known terminals, opens/kills them, and
-  creates new terminals with optional command/args/cwd. It also persists
-  font family, font size, scrollback, theme colors, and per-addon toggles.
+  creates new terminals with optional command/args/cwd. Terminal display/addon
+  preferences moved to Settings, with proper color pickers plus foreground and
+  background swatches.
 - Shell-integration foundation: `TerminalRegistry` now assigns a nonce and
   exposes `DAFMAN_SHELL_INTEGRATION`/`DAFMAN_NONCE`; PowerShell/pwsh are
   wrapped with prompt/readline hooks that emit OSC 633 command/CWD/exit

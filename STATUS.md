@@ -31,7 +31,8 @@ composer/sidebar polish from the terminal regression sweep. Terminal panels
 now load the requested xterm addon foundation (search, links, clipboard,
 Unicode, web fonts, progress, ligatures, images, WebGL, serialization).
 The ActivityBar now has a Terminals panel for listing, opening, killing,
-and creating terminals with command/args/cwd, plus display/addon settings.
+and creating terminals with command/args/cwd; display/addon settings live in
+Settings with proper color pickers/swatches.
 The first shell-integration slice emits/parses OSC 633/133/7/9/1337 markers
 for PowerShell/cmd so terminals can track CWD, active commands, exit codes,
 and nonce-backed trusted command lines without reviving PTY output scraping.
