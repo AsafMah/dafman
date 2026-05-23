@@ -5,7 +5,8 @@
 
 ## Open
 
-_(none — all items from the 2026-05-22 sweep are resolved)_
+- [x] View tool shows raw diff instead of file content — now strips diff header
+- [x] Plan mode missing autopilot/fleet buttons — always shown now
 
 ## Solved (2026-05-22 sweep)
 

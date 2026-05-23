@@ -134,6 +134,31 @@ const todoItems = computed<Array<{ id?: unknown; title?: unknown; status?: unkno
   return Array.isArray(t) ? (t as Array<{ id?: unknown; title?: unknown; status?: unknown }>) : [];
 });
 
+// View tool result: the SDK may return a unified diff instead of plain
+// file content. Strip the diff header + hunk markers and show just the
+// content lines (without leading +/- space).
+const viewContent = computed(() => {
+  const raw = liveResult.value;
+  if (!raw) return "";
+  // Detect unified diff format
+  if (/^diff --git /m.test(raw) || /^---\s+a\//m.test(raw)) {
+    const lines = raw.split("\n");
+    const content: string[] = [];
+    let inHunk = false;
+    for (const line of lines) {
+      if (line.startsWith("@@")) { inHunk = true; continue; }
+      if (!inHunk) continue;
+      // Skip removed lines (leading -)
+      if (line.startsWith("-")) continue;
+      // Added or context lines: strip leading + or space
+      if (line.startsWith("+")) content.push(line.slice(1));
+      else content.push(line.startsWith(" ") ? line.slice(1) : line);
+    }
+    return content.join("\n");
+  }
+  return raw;
+});
+
 // Language inference for results
 const fileExtension = computed(() => {
   const p = filePath.value;
@@ -277,8 +302,8 @@ const isStructuredResult = computed(() => {
         </span>
       </div>
       <CommandBlock
-        v-if="hasResult"
-        :code="liveResult"
+        v-if="viewContent"
+        :code="viewContent"
         :lang="fileExtension || 'text'"
         :filename="filePath"
       />

@@ -496,21 +496,18 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
       </div>
       <div class="pending-card-actions">
         <Button
-          v-if="asExitPlanMode.actions.includes('exit_only')"
           label="Exit only"
           severity="secondary"
           size="small"
           @click="exitPlanRespond(false, 'exit_only')"
         />
         <Button
-          v-if="asExitPlanMode.actions.includes('interactive')"
           label="Continue interactive"
           severity="primary"
           size="small"
           @click="exitPlanRespond(true, 'interactive')"
         />
         <Button
-          v-if="asExitPlanMode.actions.includes('autopilot')"
           label="Autopilot"
           severity="warn"
           size="small"
@@ -518,7 +515,6 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
           @click="exitPlanRespond(true, 'autopilot')"
         />
         <Button
-          v-if="asExitPlanMode.actions.includes('autopilot_fleet')"
           label="Autopilot fleet"
           severity="warn"
           size="small"
