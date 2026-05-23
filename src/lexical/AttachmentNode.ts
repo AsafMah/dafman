@@ -127,10 +127,7 @@ export class AttachmentNode extends DecoratorNode<null> {
   }
 
   getTextContent(): string {
-    // Plain-text serialization for the LLM prompt — just the
-    // filename inline, no brackets. The structured attachment is sent
-    // separately via the SDK's `attachments` field.
-    return labelForAttachment(this.__attachment);
+    return promptTextForAttachment(this.__attachment);
   }
 
   static importJSON(json: SerializedAttachmentNode): AttachmentNode {
@@ -151,10 +148,12 @@ export function labelForAttachment(a: SendMessageAttachment): string {
     return a.displayName ?? a.path.split(/[\\/]/).pop() ?? a.path;
   }
   if (a.type === "blob") return a.displayName ?? "attachment";
-  if (a.type === "commandResult") {
-    return `Here is the output of the command \`${a.result.command.replace(/`/g, "\\`")}\` (exit code: ${a.result.exitCode ?? "unknown"}). The full output is in the attached file "${a.displayName ?? "command-result.md"}".`;
-  }
+  if (a.type === "commandResult") return a.displayName ?? `Command: ${a.result.command}`;
   return "selection";
+}
+
+function promptTextForAttachment(a: SendMessageAttachment): string {
+  return `(see attachment "${labelForAttachment(a)}")`;
 }
 
 function iconClassForAttachment(

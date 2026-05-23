@@ -62,14 +62,14 @@ describe("AttachmentNode", () => {
     );
   });
 
-  test("getTextContent returns the bare filename (no brackets)", () => {
+  test("getTextContent returns prompt-friendly reference", () => {
     const editor = makeEditor();
     editor.update(
       () => {
         const node = new AttachmentNode(sampleFile);
-        expect(node.getTextContent()).toBe("src/sample.ts");
+        expect(node.getTextContent()).toBe('(see attachment "src/sample.ts")');
         const imageNode = new AttachmentNode(sampleImage);
-        expect(imageNode.getTextContent()).toBe("screenshot.png");
+        expect(imageNode.getTextContent()).toBe('(see attachment "screenshot.png")');
       },
       { discrete: true },
     );
