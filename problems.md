@@ -5,7 +5,7 @@
 
 ## Open
 
-_(none)_
+- [] clicking on a detached closed session doesn't resume it
 
 
 ## Solved (2026-05-22 sweep)

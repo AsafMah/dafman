@@ -93,16 +93,19 @@
 
 ## Phase 23c — Long Jobs + Autopilot UI
 
-1. ⏳ **Jobs panel aggregates active SDK tasks.**
+1. X **Jobs panel aggregates active SDK tasks.**
    - **Steps:** start a session, ask the agent to spawn a background
      task/fleet, then open the Jobs activity-bar panel.
    - **Expected:** Jobs shows the active task with session label,
      elapsed time, latest response/progress when available, and Cancel /
      Background / Remove actions only when applicable.
    - **Why not automated:** requires the live SDK task tool to spawn
-     real background work.
+     real background work. 
+Note:
+   - the spinner in the jobs panels orbits around a center point. 
+   - The go to session button scrolls all the way up instead of jumping to the relevant message
 
-2. ⏳ **Autopilot launcher drives the current session.**
+2. V **Autopilot launcher drives the current session.**
    - **Steps:** open Jobs, enter a goal in Start Autopilot, and click
      Start Autopilot.
    - **Expected:** the active session switches to Autopilot, receives
@@ -119,7 +122,7 @@
    - **Why not automated:** dockview close lifecycle + live SDK job
      lifetime is best validated in the running app.
 
-4. ⏳ **Composer follow-up layout and slash commands.**
+4. V **Composer follow-up layout and slash commands.**
    - **Steps:** resize a chat pane from wide to narrow, inspect the
       composer toolbar, type `/?`, `/mcp`, and `/skill`.
    - **Expected:** mode, Allow all, workspace, and shell stay left;
@@ -137,7 +140,7 @@
 
 ## 2026-05-22 — UI problem sweep
 
-1. ⏳ **Composer controls alignment + indicators.**
+1.V **Composer controls alignment + indicators.**
    - **Steps:** open a session, resize the window from wide to narrow,
      switch between Interactive / Plan / Autopilot, and toggle the
      shield auto-approve button.
@@ -147,7 +150,7 @@
    - **Why not automated:** visual alignment and color affordances are
      easiest to validate in the live WebView layout.
 
-2. ⏳ **Library MCP/Tools/Agent form.**
+2. V **Library MCP/Tools/Agent form.**
    - **Steps:** open Library, check MCP discovered rows, Tools, and New
      agent. Toggle one discovered MCP row and one tool, then cancel New
      agent.
@@ -156,7 +159,7 @@
    - **Why not automated:** depends on live SDK-discovered MCP/tool data
      and sidebar dimensions.
 
-3. ⏳ **Details rail width/files/settings.**
+3.  V **Details rail width/files/settings.**
    - **Steps:** resize the right details rail, switch between session
      tabs, open Session settings, and expand Files touched after a file
      write/edit tool has run.
@@ -170,7 +173,7 @@
 
 ## Phase 23b — Copilot CLI mode parity
 
-1. ⏳ **Plan mode approval flow.**
+1. V **Plan mode approval flow.**
    - **Steps:** open a real session, run `/plan add a tiny safe change`,
      let the agent write `plan.md`, and wait for the exit-plan approval
      request.
@@ -180,8 +183,9 @@
      exits plan mode and continues normally.
    - **Why not automated:** requires the live CLI model/tool loop to
      call `exit_plan_mode`.
+Note: didn't actually switch to plan mode
 
-2. ⏳ **Autopilot unavailable-user behavior.**
+2. V **Autopilot unavailable-user behavior.**
    - **Steps:** start a session, switch the mode toggle to Autopilot,
      then prompt for an action that would normally ask a question or
      request permission without enabling approve-all.
@@ -190,7 +194,7 @@
    - **Why not automated:** depends on live CLI tool selection and
      permission timing.
 
-3. ⏳ **Plan file refresh.**
+3. V **Plan file refresh.**
    - **Steps:** open Session Details → Plan, run a plan-mode prompt that
      updates `plan.md`, then keep the details panel open.
    - **Expected:** the plan preview refreshes after the SDK emits
@@ -504,14 +508,15 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ## 2026-05-22 — Phase 19b Library Skills tab + Manage globally
 
-1. ⏳ **Skills tab shows discovered skills grouped by source.**
+1. X **Skills tab shows discovered skills grouped by source.**
    - **Steps:** open Library → Skills tab.
    - **Expected:** skills appear grouped by source (builtin /
      project / personal-copilot / plugin). Each row: name +
      slash badge if userInvocable + per-row toggle. Click the name
      to expand the description.
-
-2. ⏳ **Reveal-in-folder button opens the skill file.**
+Note: Doesn't regcognize a skill from .github/skills
+   
+2. V **Reveal-in-folder button opens the skill file.**
    - **Steps:** on a project-source skill (has a `path`), click
      the folder icon.
    - **Expected:** the OS opens the skill file with its default
@@ -519,20 +524,20 @@ Pick any ⏳ item, run it, then come back with one of:
    - **Why not automated:** F19 stubs the path; real `revealPath`
      calls the OS shell.
 
-3. ⏳ **Toggle persists across restart.**
+3. V **Toggle persists across restart.**
    - **Steps:** disable a skill via the toggle. Restart the app.
    - **Expected:** the skill stays disabled (persisted via
      `setGloballyDisabledSkills` to the CLI's user config).
    - **Why not automated:** full restart cycle.
 
-4. ⏳ **Manage globally → link from the right-rail.**
+4. V **Manage globally → link from the right-rail.**
    - **Steps:** open the right-rail Skills section → click
      "Manage globally →".
    - **Expected:** Library panel opens with Skills tab focused.
      If Library was already open on the MCP tab, it switches to
      Skills without reload.
 
-5. ⏳ **Per-session Skills toggle (right-rail) is separate from
+5. V **Per-session Skills toggle (right-rail) is separate from
    global (Library).**
    - **Steps:** in the right-rail, disable `summarize`. Then open
      Library Skills and observe `summarize`.
@@ -545,26 +550,27 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ## 2026-05-22 — Phase 19a Library panel + MCP registry
 
-1. ⏳ **Open from activity bar.**
+1. V **Open from activity bar.**
    - **Steps:** click the book icon (`pi-book`) in the left activity bar.
    - **Expected:** Library sidebar opens at ~360 px. Header shows
      "LIBRARY". Two tabs: **MCP** (selected) + **Skills**.
 
-2. ⏳ **Active tab persists across closes.**
+2. V **Active tab persists across closes.**
    - **Steps:** open Library → click **Skills** tab → click the
      book icon to close → click again to reopen.
    - **Expected:** Skills tab is still selected. (Backed by
      `localStorage` `dafman.library.activeTab`.)
 
-3. ⏳ **MCP Discovered list populates from real CLI.**
+3. V **MCP Discovered list populates from real CLI.**
    - **Steps:** with a workspace that has an `.mcp.json` or a
      plugin-registered MCP server, open Library → MCP.
    - **Expected:** the **Discovered** section lists those servers
      with their source badge (project / personal-copilot / plugin).
    - **Why not automated:** F18 covers the fake-client shape; the
      real-CLI discovery path is environment-dependent.
+- Notes: Mcp tools don't fetch until you send a message
 
-4. ⏳ **Add a real local MCP server via structured form.**
+4. V **Add a real local MCP server via structured form.**
    - **Steps:** click **Add** → fill `name` + `command` (e.g.
      `python` `args: -m mcp.server`) → submit.
    - **Expected:** dialog closes, the server appears in
@@ -572,7 +578,10 @@ Pick any ⏳ item, run it, then come back with one of:
      and confirm the server's tools are offered (via the rail's
      Tools section).
    - **Why not automated:** requires a real MCP server binary.
-
+Notes: 
+   - can we not do a mcp reload?
+   - we should be able to choose if to add the mcp to the local .mcp.json or the global file
+   
 5. ⏳ **Add an http MCP server with OAuth.**
    - **Steps:** click **Add** → switch transport to **HTTP** →
      fill `url` + optional `oauthClientId` + grant type → submit.
@@ -580,8 +589,9 @@ Pick any ⏳ item, run it, then come back with one of:
      badge + a **Sign in** button. Clicking Sign in opens the
      OAuth URL in the browser.
    - **Why not automated:** real OAuth flow requires a real provider.
+Note: - No such option
 
-6. ⏳ **JSON mode round-trips structured fields.**
+6. V **JSON mode round-trips structured fields.**
    - **Steps:** click **Add** → fill name + command + an env row
      → switch to **JSON** mode → confirm the textarea shows your
      payload → tweak a field → switch back to **Form** mode.
@@ -589,26 +599,29 @@ Pick any ⏳ item, run it, then come back with one of:
      JSON is malformed, mode toggle stays on JSON and shows an
      inline error.
 
-7. ⏳ **Enable / disable toggle survives a restart.**
+7. X **Enable / disable toggle survives a restart.**
    - **Steps:** disable a configured server via the toggle.
      Restart the app.
    - **Expected:** the server stays disabled (persisted via the
      SDK's user config; not via dafman's settings.json).
    - **Why not automated:** full restart cycle.
+   - Note: - Toggling discovered MCPs doesn't work at all
+          - They should be editable/deleteable/show their location?
 
-8. ⏳ **Remove confirms before deleting.**
+8. X **Remove confirms before deleting.**
    - **Steps:** click the trash icon on a configured server.
    - **Expected:** native confirm prompt; on accept, server
      disappears from Configured and (if it was in Discovered) the
      "Enable" shortcut reappears in Discovered.
+     Note:  - it removes it, but then it just jumps to "discovered"
 
-9. ⏳ **Sign-in toast when no session exists.**
+9. X **Sign-in toast when no session exists.**
    - **Steps:** close every chat session → open Library → MCP →
      click **Sign in** on a configured http server.
    - **Expected:** warn toast: "No session to authenticate / Create
      a session first…". Sign-in does NOT proceed.
-
-10. ⏳ **Skills tab is rendered (UI only — 19b polishes wiring).**
+Note: no sign in button at all
+10. X **Skills tab is rendered (UI only — 19b polishes wiring).**
     - **Steps:** open Library → Skills tab.
     - **Expected:** skills grouped by source (builtin / project /
       personal-copilot). Per-row toggle. Reveal-in-folder button
@@ -616,12 +629,12 @@ Pick any ⏳ item, run it, then come back with one of:
       click the row name.
     - **Note:** 19b will add a "Manage globally" link from the
       right-rail Skills section.
-
+Notes: Misses local skill 
 ---
 
 ## 2026-05-22 — Phase 18b tools / plan / quota (right-rail)
 
-1. ⏳ **Tool toggle hint actually requires restart to apply.**
+1. V **Tool toggle hint actually requires restart to apply.**
    - **Steps:** in the details panel Tools section, disable `bash`.
      Without restarting, ask the agent to run a shell command.
    - **Expected:** the agent still receives `bash` (because the SDK
@@ -633,7 +646,7 @@ Pick any ⏳ item, run it, then come back with one of:
    - **Why not automated:** real SDK reaction to `excludedTools` only
      visible end-to-end with the real CLI.
 
-2. ⏳ **MCP server status accurately reflects connection state.**
+2. V **MCP server status accurately reflects connection state.**
    - **Steps:** add an `.mcp.json` to your workspace with a deliberately
      broken server (e.g. command path that doesn't exist), spin a
      fresh session in that workspace.
@@ -641,7 +654,7 @@ Pick any ⏳ item, run it, then come back with one of:
      server with an `error` status and the error message inline.
    - **Why not automated:** fakeClient returns `servers: []`.
 
-3. ⏳ **Plan editor round-trips a real `plan.md` file on disk.**
+3. V **Plan editor round-trips a real `plan.md` file on disk.**
    - **Steps:** in the details panel Plan section, click "Create
      plan", type some content, Save. Open `<workspace>/plan.md` in
      an external editor.
@@ -660,7 +673,7 @@ Pick any ⏳ item, run it, then come back with one of:
      is per component instance which auto-resets on real-app
      navigation but persists for a session in dev.
 
-5. ⏳ **`settings.tools.defaultExcluded` persists across restart.**
+5. V **`settings.tools.defaultExcluded` persists across restart.**
    - **Steps:** toggle off `bash`. Quit + restart the app. Open the
      same session's details panel.
    - **Expected:** `bash` is still off; new sessions created after
@@ -671,28 +684,28 @@ Pick any ⏳ item, run it, then come back with one of:
 
 ## 2026-05-22 — Phase 18a session details right-rail panel
 
-1. ⏳ **Cog button toggles the right-rail panel.**
+1. V **Cog button toggles the right-rail panel.**
    - **Steps:** click the `pi-cog` icon in the chat tab strip.
    - **Expected:** the right-edge `Session` panel collapses; cog tooltip
      changes to "Open session details". Click again to reopen.
    - **Why not automated:** automated E2E covers it (F14). Manual is
      for visual feel under WebView2.
 
-2. ⏳ **Panel auto-opens on each new session.**
+2. V **Panel auto-opens on each new session.**
    - **Steps:** Cmd/Ctrl+N (or the topbar "New Session" button) twice.
    - **Expected:** every new chat tab opens with its details panel
      visible on the right.
    - **Why not automated:** F14 covers single-session case; multi-
      session panel state needs human eyeball.
 
-3. ⏳ **Fork button creates a new session with the parent's context.**
+3. X **Fork button creates a new session with the parent's context.**
    - **Steps:** in the details panel header, click "Fork". A new tab
      opens.
    - **Expected:** new session inherits the parent's working directory
      and model (where applicable); transcript is empty (fresh fork).
    - **Why not automated:** SDK fork behavior is real-CLI-only.
-
-4. ⏳ **Rename input echoes SDK title changes.**
+- The forked info button again, scrolls all the way to the top
+4. V **Rename input echoes SDK title changes.**
    - **Steps:** rename a session manually. Then trigger a turn that
      causes the SDK to auto-summarise (long-running model). Re-open
      panel.
@@ -700,7 +713,7 @@ Pick any ⏳ item, run it, then come back with one of:
      clobbering an in-progress user edit.
    - **Why not automated:** depends on SDK auto-title timing.
 
-5. ⏳ **Panel state persists across app restart.**
+5. V **Panel state persists across app restart.**
    - **Steps:** close one session's details panel. Restart app.
    - **Expected:** that session opens WITHOUT the rail; others keep
      theirs open. Backed by dockview layout JSON in settings.
@@ -794,7 +807,6 @@ the surfaces they cover, but the deeper bug fixes shipped today:
     - **Expected:** pill shows folder icon. Bun log shows
       `attachment.type = "directory"`.
     - **Why not automated:** same as #9.
-Shows same file icon for everything.
 ---
 
 ### `@`-trigger flow
@@ -892,50 +904,53 @@ The picker only lets you pick a folder, no files visible.
 
 ## `59d2197` feat(agents): custom agent picker (Phase 19a)
 
-1. ⏳ **Header chip appears when an agent is selected, hidden otherwise.**
+1. V **Header chip appears when an agent is selected, hidden otherwise.**
    - **Steps:** drop a markdown file at `~/.copilot/agents/reviewer.agent.md` with frontmatter `--- description: Reviews PRs ---` and body `You are a strict code reviewer.`. Click Reload from disk in the rail's Agents section. Click Select on the reviewer row.
    - **Expected:** header gets a new pill next to the workspace chip showing `reviewer` (or `displayName` if set). Clicking Deselect hides the chip.
    - **Why not automated:** filesystem + SDK discovery + reactive header chip across the full Electrobun → bun → renderer chain.
-
-2. ⏳ **Project vs User source badge derives from path correctly.**
+Note: should have an edit button
+2. V **Project vs User source badge derives from path correctly.**
    - **Steps:** put one agent under `~/.copilot/agents/` and another under `<workspace>/.github/agents/`. Open the rail.
    - **Expected:** the user one shows `USER` tag, the project one shows `PROJECT`. Tooltip on the tag shows the absolute path.
    - **Why not automated:** path normalization is unit-tested, but the rail's reactive recompute when the working directory changes mid-session needs a human eye.
 
-3. ⏳ **subagent.selected event mid-session updates the chip without a refetch.**
+3. X **subagent.selected event mid-session updates the chip without a refetch.**
    - **Steps:** with no chip showing, run `/agent reviewer` in the composer (the SDK's slash command). Watch the header.
    - **Expected:** chip flips to `reviewer` reactively — no full page reload, no refetch needed.
    - **Why not automated:** SDK slash + event stream + Vue reactivity.
+Note: Doesn't seem to do anything - no indication of what's my agent, no way to choose from the agent library, and /agents <name> doesn't seem to do anything except opening the tab
 
-4. ⏳ **Header chip click opens the rail's Agents section.**
+4. X **Header chip click opens the rail's Agents section.**
    - **Steps:** select an agent so chip is visible. Click it.
    - **Expected:** rail opens (if closed). Agents section auto-expanded.
    - **Why not automated:** rail mount + section auto-expand interaction.
+Notes: No chip
 
 ---
 
 ## `d48ca4b` feat(tasks): background tasks rail section (Phase 19b.1)
 
-1. ⏳ **Agent-delegated task appears in the rail.**
+1. V **Agent-delegated task appears in the rail.**
    - **Steps:** ask the agent something that triggers the built-in `task` tool (e.g. "explore this codebase and report 3 interesting files"). Watch the right rail's Background tasks section.
    - **Expected:** a task row appears with status `running`, the agent's display name, elapsed time ticking up, and a description.
    - **Why not automated:** depends on the LLM actually invoking the `task` tool, which we can't reliably script.
 
-2. ⏳ **Status pill flips to completed (green) when the task ends.**
+2. V **Status pill flips to completed (green) when the task ends.**
    - **Steps:** wait for the task above to finish.
    - **Expected:** pill turns green `COMPLETED`, elapsed time freezes, Cancel button becomes a Remove button.
    - **Why not automated:** event timing + lifecycle.
 
-3. ⏳ **Cancel button works on a long-running task.**
+3. X **Cancel button works on a long-running task.**
    - **Steps:** trigger a task that takes >10s. Click Cancel.
    - **Expected:** status flips to `CANCELLED` (grey). Task does not produce further events. SDK acknowledges via subsequent listTasks call.
    - **Why not automated:** SDK side-effects on cancel + visual confirmation.
+- it doesn't seem to acknowledge it was canceled - it just says "done"
 
-4. ⏳ **Remove removes the row from the list.**
+4. V **Remove removes the row from the list.**
    - **Steps:** click Remove on a completed/failed task.
    - **Expected:** row vanishes immediately.
 
-5. ⏳ **Section auto-refreshes on subagent events without page reload.**
+5. V **Section auto-refreshes on subagent events without page reload.**
    - **Steps:** with the rail Background tasks section EXPANDED and visible, trigger a task. Don't switch session.
    - **Expected:** section repopulates on its own as `subagent.started` / `subagent.completed` events arrive — no manual reload needed.
    - **Why not automated:** event flow + per-record counter + watcher chain.
@@ -944,72 +959,80 @@ The picker only lets you pick a folder, no files visible.
 
 ## `e529b8e` feat(library): Library Agents tab CRUD (Phase 19b.2)
 
-1. ⏳ **"+ New agent" form creates a file with correct YAML frontmatter.**
+1. V **"+ New agent" form creates a file with correct YAML frontmatter.**
    - **Steps:** open Library → Agents tab. Click "+ New agent". Fill: scope=User, name=`test-bot`, description=`A test agent`, tools=`read, grep`, prompt=`You are a test agent.`. Submit.
    - **Expected:** toast says "Agent created" with the path. `~/.copilot/agents/test-bot.agent.md` exists. Open it; frontmatter has `name: "test-bot"`, `description: "A test agent"`, `tools:\n  - "read"\n  - "grep"`. Body has the prompt.
    - **Why not automated:** filesystem + form interaction + verify content shape.
 
-2. ⏳ **Project scope writes to `<workspace>/.github/agents/`.**
+2. V **Project scope writes to `<workspace>/.github/agents/`.**
    - **Steps:** with a session open, "+ New agent" → scope=Project, name=`proj-agent`. Submit.
    - **Expected:** file lands at `<workspace>/.github/agents/proj-agent.agent.md`.
    - **Why not automated:** workspace-relative path resolution + multi-session UI state.
 
-3. ⏳ **Name validation rejects path traversal.**
+3. V **Name validation rejects path traversal.**
    - **Steps:** type `../etc/passwd` in the name field. Submit.
    - **Expected:** form shows error like "agent name must match [...]". No file is written outside the agents directory.
    - **Why not automated:** UI form error display + filesystem safety check.
 
-4. ⏳ **Project radio is disabled when no session is open.**
+4. X **Project radio is disabled when no session is open.**
    - **Steps:** close all sessions. Open Library → Agents → "+ New agent".
    - **Expected:** the "Project" radio option is disabled and unselectable; "User" is the only available scope.
    - **Why not automated:** form state derived from session store.
-
-5. ⏳ **Newly created agent shows in the picker WITHOUT manual reload.**
+   Not only that,the old project agents are still displayed
+   
+5. X **Newly created agent shows in the picker WITHOUT manual reload.**
    - **Steps:** create an agent via the form. Switch to the right rail's Agents section.
    - **Expected:** the new agent appears immediately (writeAgentFile calls session.rpc.agent.reload automatically).
    - **Why not automated:** end-to-end of write → SDK reload → rail watcher.
-
-6. ⏳ **Delete button confirms then removes the file.**
+   No picker
+   
+6. V **Delete button confirms then removes the file.**
    - **Steps:** click Delete on an existing agent row.
    - **Expected:** confirm dialog with the file path. After OK, file is gone from disk; row disappears.
    - **Why not automated:** native `confirm()` + filesystem.
 
-7. ⏳ **Reveal opens the file's parent folder.**
+7. V **Reveal opens the file's parent folder.**
    - **Steps:** click the external-link icon on an agent row.
    - **Expected:** OS file manager opens, file is highlighted (Windows Explorer / macOS Finder / Linux file manager).
    - **Why not automated:** shells out to OS via revealPath.
-
+   It opens the file, but that's fine.
 ---
 
 ## `3172b80` feat(fleet): /fleet slash + nested sub-agent rendering (Phase 19c)
 
-1. ⏳ **`/fleet` (no args) starts a fleet on the current session.**
+1. V **`/fleet` (no args) starts a fleet on the current session.**
    - **Steps:** in the composer type `/fleet`. The slash menu shows the entry. Hit Enter (or Tab + Enter to confirm).
    - **Expected:** toast "Fleet started". Session begins emitting subagent events shortly after.
    - **Why not automated:** SDK-internal fleet sizing + emission timing.
+Note: pressing tab on this should just insert it into the composer, so you could add the description
 
-2. ⏳ **`/fleet [prompt]` forwards the prompt to the SDK.**
+2. V **`/fleet [prompt]` forwards the prompt to the SDK.**
    - **Steps:** type `/fleet review the security of this codebase`. Send.
    - **Expected:** toast includes "Prompt: review the security of this codebase". Sub-agent activity reflects the prompt direction.
 
-3. ⏳ **Sub-agent appears as a collapsible nested block in chat.**
+3. V **Sub-agent appears as a collapsible nested block in chat.**
    - **Steps:** wait for the first `subagent.started` event after kicking off the fleet.
    - **Expected:** chat shows a bordered card with status pill `RUNNING` (blue), the sub-agent's display name, elapsed time. Body indented with a left border.
-
-4. ⏳ **Nested events appear INSIDE the sub-agent block (not interleaved).**
+Note: Getting tons of unparsed messages:
+```
+   - <system_notification>
+     Agent "list-e-drive-root" (task) has finished processing and is now idle. Use read_agent with agent_id "list-e-drive-root" to read the results, or write_agent to send follow-up messages.
+     </system_notification>
+```
+4. V **Nested events appear INSIDE the sub-agent block (not interleaved).**
    - **Steps:** watch a running sub-agent.
    - **Expected:** when it emits an assistant message or runs a tool, the activity appears INSIDE its card — not as a top-level message. Tool calls show with their own ToolCallBlock nested.
    - **Why not automated:** the reducer routing has unit-test coverage but the visual nesting needs a human check.
 
-5. ⏳ **Status pill changes color on completion.**
+5. V **Status pill changes color on completion.**
    - **Steps:** wait for the sub-agent to finish.
    - **Expected:** pill turns green `COMPLETED` (or red `FAILED` if it errored). Elapsed time freezes.
 
-6. ⏳ **Failed sub-agent shows the error message.**
+6. V **Failed sub-agent shows the error message.**
    - **Steps:** trigger a fleet that produces at least one failed sub-agent (e.g. ask for an impossible task or stress test).
    - **Expected:** red `FAILED` pill + error text rendered prominently in red below the header.
 
-7. ⏳ **Collapsing a sub-agent block + expanding works; user toggle wins over auto-default.**
+7. V **Collapsing a sub-agent block + expanding works; user toggle wins over auto-default.**
    - **Steps:** while a sub-agent is running (auto-expanded), click the chevron to collapse.
    - **Expected:** body hides but header stays visible. Once it completes, the auto-default would collapse — but our prior click is sticky, so it stays in whatever state we left it.
 
@@ -1022,7 +1045,7 @@ The picker only lets you pick a folder, no files visible.
    - **Expected:** the root tool call updates in its own card, the sub-agent's in the nested block. Neither overwrites the other.
    - **Why not automated:** can't reliably reproduce the ID collision without controlling the SDK.
 
-10. ⏳ **Sessions resumed after a fleet ran show the nested blocks correctly.**
+10. V **Sessions resumed after a fleet ran show the nested blocks correctly.**
     - **Steps:** trigger a fleet, let it complete, close the session, restart the app. Resume the session.
     - **Expected:** the chat transcript replays the sub-agent blocks correctly — they don't get flattened into top-level events.
     - **Why not automated:** history replay through the reducer with the SubagentChatItem nesting.
@@ -1031,92 +1054,96 @@ The picker only lets you pick a folder, no files visible.
 
 ## Phase 22a — MCP OAuth toast
 
-- [ ] ⏳ **MCP OAuth required → toast**
+- [X] ⏳ **MCP OAuth required → toast**
     - **Steps:** add an MCP server that requires OAuth (e.g. via Library / Add MCP). Configure it but don't yet complete sign-in. Start or restart a session that uses the server.
     - **Expected:** info toast appears: "MCP server needs sign-in — <serverName>: open the Library panel and click the auth link to complete OAuth." No browser auto-opens.
     - **Why not automated:** real SDK + real MCP server required.
-- [ ] ⏳ **MCP OAuth completed → toast + cleared state**
+- [X] ⏳ **MCP OAuth completed → toast + cleared state**
     - **Steps:** complete the OAuth flow through the Library panel after the previous test.
     - **Expected:** success toast: "MCP signed in — Connection established." Server now usable.
     - **Why not automated:** real OAuth flow + browser interaction.
-- [ ] ⏳ **OAuth required de-duplicated on resume**
+- [X] ⏳ **OAuth required de-duplicated on resume**
     - **Steps:** trigger an oauth_required event, see the toast, but DON'T complete the flow. Close + restart the session.
     - **Expected:** on resume, no duplicate toast pops (the same requestId is in the de-dup set). After actually completing OAuth, the success toast appears once.
     - **Why not automated:** requires resume+replay against a real SDK event log.
 
 ## Phase 22c — Permissions Settings tab
 
-- [ ] ⏳ **Permissions section renders in Settings**
+- [V] ⏳ **Permissions section renders in Settings**
     - **Steps:** open Settings (left rail). Scroll to / expand the Permissions section.
     - **Expected:** new section appears after Notifications, before Diagnostics. Single toggle: "Default to approve all for new sessions". Off by default. Description text explains it sets the starting value only.
     - **Why not automated:** visual-only check; covered by tests at the data layer.
-- [ ] ⏳ **defaultApproveAll persists across restart**
+- [V] ⏳ **defaultApproveAll persists across restart**
     - **Steps:** flip the Permissions toggle ON, restart the app.
     - **Expected:** toggle still ON after restart (v11 settings file on disk).
     - **Why not automated:** disk persistence + restart.
-- [ ] ⏳ **defaultApproveAll applies to NEW sessions only**
+- [V] ⏳ **defaultApproveAll applies to NEW sessions only**
     - **Steps:** with defaultApproveAll ON, create a new session.
     - **Expected:** the session's rail shows "approve-all" toggle already ON. Tool calls auto-approve without a prompt.
     - **Why not automated:** real SDK + permission gate exercise.
-- [ ] ⏳ **defaultApproveAll OFF does not turn off existing sessions**
+- [V] ⏳ **defaultApproveAll OFF does not turn off existing sessions**
     - **Steps:** with defaultApproveAll ON, create a session (approve-all ON). Then flip defaultApproveAll OFF. Existing session's approve-all should stay ON until explicitly toggled.
     - **Expected:** existing session unaffected; only newly-created sessions start with the new default.
     - **Why not automated:** real per-session lifecycle.
 
 ## Phase 22b — Tools tri-state + grouped view
 
-- [ ] ⏳ **Tools section groups by source**
+- [V] ⏳ **Tools section groups by source**
     - **Steps:** open the right rail's Tools section.
     - **Expected:** "Built-in" group header appears first, then alphabetically-sorted namespace headers (one per MCP server prefix, etc.). Each header shows a count.
     - **Why not automated:** real SDK + real MCP servers needed for multi-group view.
-- [ ] ⏳ **Tri-state SelectButton per tool**
+- [V] ⏳ **Tri-state SelectButton per tool**
     - **Steps:** click each segment of the tool tri-state (Default / Only allow / Forbid) on the same tool.
     - **Expected:** clicking "Forbid" puts the tool in defaultExcluded; clicking "Only allow" moves it to defaultAllowed (removed from defaultExcluded); clicking "Default" removes it from both. Toast appears each time.
     - **Why not automated:** covered at the test layer; visual cycle is a manual check.
-- [ ] ⏳ **Allowlist banner appears when allowlist is non-empty**
+- [V] ⏳ **Allowlist banner appears when allowlist is non-empty**
     - **Steps:** mark any tool as "Only allow".
     - **Expected:** info-banner appears in the Tools section: "Allowlist active — sessions are restricted to the tools marked 'Only allow'. The exclude list is ignored when allowlist is non-empty."
     - **Why not automated:** visual-only check.
-- [ ] ⏳ **Allowlist actually restricts new sessions**
+- [V] ⏳ **Allowlist actually restricts new sessions**
     - **Steps:** mark only "bash" as "Only allow". Create a NEW session. Try to use file-edit / write tools.
     - **Expected:** SDK rejects everything except bash. Audit log shows the rejections.
     - **Why not automated:** real SDK + tool exercise.
-- [ ] ⏳ **Critical-tool warning badge**
+- [V] ⏳ **Critical-tool warning badge**
     - **Steps:** mark "bash" or "str_replace_editor" as "Forbid".
     - **Expected:** small yellow exclamation icon appears next to the name (not blocked — warning only).
     - **Why not automated:** visual-only check.
-- [ ] ⏳ **Settings v9/v10 → v11 migration preserves existing exclude list**
+- [V] ⏳ **Settings v9/v10 → v11 migration preserves existing exclude list**
     - **Steps:** start with a v10 settings file (defaultExcluded: ["bash"], no defaultAllowed). Launch the app.
     - **Expected:** settings load cleanly; "bash" still shows "Forbid"; defaultAllowed initializes to empty.
     - **Why not automated:** disk persistence + restart.
-- [ ] ⏳ **Mutual exclusion: setting Only allow clears Forbid for the same tool**
+- [V] ⏳ **Mutual exclusion: setting Only allow clears Forbid for the same tool**
     - **Steps:** mark "bash" as "Forbid". Then mark it as "Only allow".
     - **Expected:** "bash" leaves defaultExcluded and enters defaultAllowed — no stale entries in either list. Verifiable by inspecting settings.json on disk.
     - **Why not automated:** covered at the data layer; manual confirmation of on-disk shape is the high-signal check.
-- [ ] ⏳ **MCP tool canonical key (namespacedName) is what gets persisted**
+- [V] ⏳ **MCP tool canonical key (namespacedName) is what gets persisted**
     - **Steps:** with a real MCP server configured (e.g. playwright), open the rail Tools section and mark `playwright/navigate` as "Only allow".
     - **Expected:** settings.json shows `defaultAllowed: ["playwright/navigate"]`, NOT `["navigate"]`. This is what makes multi-server setups correct — same `name` across servers won't collide.
     - **Why not automated:** real MCP server needed.
 
 ## Phase 23a — Library Instructions + command wiring
 
-- [ ] ⏳ **Library has Instructions tab**
+- [V] ⏳ **Library has Instructions tab**
     - **Steps:** open the Library activity-bar item.
     - **Expected:** tabs are MCP, Skills, Agents, Instructions. The title mentions Instructions. The stale "future agents" copy is gone.
     - **Why not automated:** visual/tab integration check.
-- [ ] ⏳ **Project instructions are listed for the active workspace**
+- [X] ⏳ **Project instructions are listed for the active workspace**
     - **Steps:** open a session in a repo containing `AGENTS.md` and `.github/copilot-instructions.md`, then open Library → Instructions.
     - **Expected:** Project group lists `AGENTS.md`, `.github/copilot-instructions.md`, and any nested `AGENTS.md` (excluding `node_modules` / `.git` / build dirs). Existing rows expand inline.
+The markdown doesn't respect dark mode
     - **Why not automated:** real workspace + local instruction content.
-- [ ] ⏳ **Global instruction candidates are visible**
+- [X] ⏳ **Global instruction candidates are visible**
     - **Steps:** open Library → Instructions with and without an active session.
     - **Expected:** Global group always appears with common user-instruction candidate paths. Existing files expand inline; missing candidates are greyed as "missing".
     - **Why not automated:** depends on the user's machine-level config.
+The only correct path is ~/.copilot/copilot-instructions.md
 - [ ] ⏳ **Reveal opens the instruction file**
     - **Steps:** click the reveal icon on an existing instruction file.
     - **Expected:** OS opens the file (or file manager/default app, depending on platform) via the existing `revealPath` behavior.
     - **Why not automated:** OS integration.
-- [ ] ⏳ **/library slash command opens the requested tab**
+- [X] ⏳ **/library slash command opens the requested tab**
     - **Steps:** in a session composer, run `/library instructions`, `/library skills`, `/library agents`, `/library mcp`.
     - **Expected:** Library sidebar opens and switches to the requested tab. `/mcp`, `/skill`, `/skills`, and `/agent` also open their Library tabs locally.
     - **Why not automated:** end-to-end composer + dockview interaction; unit test covers SDK command registration non-collision.
+Notes: - Pressing tab should just insert it, not also send (so we can continue tabbing)
+- Autocomplete for sub commands needed
