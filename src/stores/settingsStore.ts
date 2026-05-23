@@ -6,12 +6,12 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
-import type { NotificationPrefs, ReasoningVisibility, Settings, ThemeChoice } from "../ipc/types";
+import type { NotificationPrefs, ReasoningVisibility, Settings, TerminalPrefs, ThemeChoice } from "../ipc/types";
 import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 13,
+    version: 14,
     appearance: {
       theme: "system",
       reasoningVisibility: "compact",
@@ -25,13 +25,36 @@ function defaultSettings(): Settings {
     notifications: { turnEnd: false, waitingForInput: true },
     tools: { defaultExcluded: [], defaultAllowed: [] },
     permissions: { defaultApproveAll: false },
-    terminal: { defaultProfileId: "platform-default" },
+    terminal: {
+      defaultProfileId: "platform-default",
+      fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
+      fontSize: 13,
+      scrollback: 10_000,
+      theme: { background: "#111827", foreground: "#d1d5db" },
+      addons: {
+        search: true,
+        webLinks: true,
+        clipboard: true,
+        unicode11: true,
+        webFonts: true,
+        progress: true,
+        ligatures: true,
+        image: true,
+        unicodeGraphemes: true,
+        webgl: true,
+        serialize: true,
+      },
+    },
   };
 }
 
 /// Hard upper bound on the workspace MRU; matches the backend constant
 /// `WORKSPACES_MRU_LIMIT`. Anything past this is trimmed off the tail.
 const WORKSPACES_MRU_LIMIT = 10;
+type TerminalPrefsPatch = Omit<Partial<TerminalPrefs>, "addons" | "theme"> & {
+  addons?: Partial<TerminalPrefs["addons"]>;
+  theme?: Partial<TerminalPrefs["theme"]>;
+};
 
 export const useSettingsStore = defineStore("settings", () => {
   const settings = ref<Settings>(defaultSettings());
@@ -229,6 +252,22 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function setTerminalPrefs(next: TerminalPrefsPatch): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        terminal: {
+          ...settings.value.terminal,
+          ...next,
+          theme: { ...settings.value.terminal.theme, ...(next.theme ?? {}) },
+          addons: { ...settings.value.terminal.addons, ...(next.addons ?? {}) },
+        },
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
+  }
+
   return {
     settings,
     loaded,
@@ -246,5 +285,6 @@ export const useSettingsStore = defineStore("settings", () => {
     setDefaultWorkspace,
     setDefaultApproveAll,
     setDefaultTerminalProfile,
+    setTerminalPrefs,
   };
 });

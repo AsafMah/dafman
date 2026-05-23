@@ -31,7 +31,7 @@ composer/sidebar polish from the terminal regression sweep. Terminal panels
 now load the requested xterm addon foundation (search, links, clipboard,
 Unicode, web fonts, progress, ligatures, images, WebGL, serialization).
 The ActivityBar now has a Terminals panel for listing, opening, killing,
-and creating terminals with command/args/cwd.
+and creating terminals with command/args/cwd, plus display/addon settings.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.

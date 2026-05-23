@@ -64,6 +64,28 @@ export interface PermissionsPrefs {
 
 export interface TerminalPrefs {
   defaultProfileId: string;
+  fontFamily: string;
+  fontSize: number;
+  scrollback: number;
+  theme: {
+    background: string;
+    foreground: string;
+  };
+  addons: TerminalAddonPrefs;
+}
+
+export interface TerminalAddonPrefs {
+  search: boolean;
+  webLinks: boolean;
+  clipboard: boolean;
+  unicode11: boolean;
+  webFonts: boolean;
+  progress: boolean;
+  ligatures: boolean;
+  image: boolean;
+  unicodeGraphemes: boolean;
+  webgl: boolean;
+  serialize: boolean;
 }
 
 export interface TerminalCreateParams {

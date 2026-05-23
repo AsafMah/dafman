@@ -16,6 +16,7 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import "@xterm/xterm/css/xterm.css";
 import Button from "primevue/button";
 import { useTerminalStore } from "../stores/terminalStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { invokeCommand } from "../ipc/invoke";
 
 type UserParams = { terminalId?: string; compact?: boolean };
@@ -24,6 +25,7 @@ const props = defineProps<{ params: UserParams & WrappedParams }>();
 const compact = computed(() => props.params?.params?.compact === true || (props.params as { compact?: boolean })?.compact === true);
 
 const terminalStore = useTerminalStore();
+const settingsStore = useSettingsStore();
 const host = ref<HTMLElement | null>(null);
 const searchOpen = ref(false);
 const searchQuery = ref("");
@@ -42,6 +44,7 @@ const summary = computed(() =>
   terminalStore.terminals.find((t) => t.id === terminalId.value),
 );
 const buffer = computed(() => terminalStore.buffers[terminalId.value] ?? "");
+const terminalPrefs = computed(() => settingsStore.settings.terminal);
 
 function fitAndNotify(): void {
   if (!fit || !term || !terminalId.value) return;
@@ -109,58 +112,78 @@ onMounted(async () => {
   term = new Terminal({
     convertEol: true,
     cursorBlink: true,
-    scrollback: 10_000,
-    fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
-    fontSize: 13,
-    theme: {
-      background: "#111827",
-      foreground: "#d1d5db",
-    },
+    scrollback: terminalPrefs.value.scrollback,
+    fontFamily: terminalPrefs.value.fontFamily,
+    fontSize: terminalPrefs.value.fontSize,
+    theme: terminalPrefs.value.theme,
   });
   fit = new FitAddon();
   term.loadAddon(fit);
   addonDisposables.push(fit);
-  search = new SearchAddon();
-  loadAddon(search, () => term?.loadAddon(search!));
-  serialize = new SerializeAddon();
-  loadAddon(serialize, () => term?.loadAddon(serialize!));
-  const unicode11 = new Unicode11Addon();
-  loadAddon(unicode11, () => {
-    term?.loadAddon(unicode11);
-    if (term) term.unicode.activeVersion = "11";
-  });
-  const unicodeGraphemes = new UnicodeGraphemesAddon();
-  loadAddon(unicodeGraphemes, () => term?.loadAddon(unicodeGraphemes));
-  const links = new WebLinksAddon((_event, uri) => {
-    void invokeCommand("openUrl", { url: uri });
-  });
-  loadAddon(links, () => term?.loadAddon(links));
-  const clipboard = new ClipboardAddon();
-  loadAddon(clipboard, () => term?.loadAddon(clipboard));
-  webFonts = new WebFontsAddon(true);
-  loadAddon(webFonts, () => {
-    term?.loadAddon(webFonts!);
-    void webFonts?.loadFonts().then(() => fitAndNotify()).catch(() => {});
-  });
-  const progressAddon = new ProgressAddon();
-  loadAddon(progressAddon, () => {
-    term?.loadAddon(progressAddon);
-    addonDisposables.push(progressAddon.onChange((state) => {
-      progress.value = state;
-    }));
-  });
-  const ligatures = new LigaturesAddon();
-  loadAddon(ligatures, () => term?.loadAddon(ligatures));
-  const image = new ImageAddon({ storageLimit: 64 });
-  loadAddon(image, () => term?.loadAddon(image));
-  webgl = new WebglAddon();
-  loadAddon(webgl, () => {
-    term?.loadAddon(webgl!);
-    addonDisposables.push(webgl!.onContextLoss(() => {
-      webgl?.dispose();
-      webgl = null;
-    }));
-  });
+  const addons = terminalPrefs.value.addons;
+  if (addons.search) {
+    search = new SearchAddon();
+    loadAddon(search, () => term?.loadAddon(search!));
+  }
+  if (addons.serialize) {
+    serialize = new SerializeAddon();
+    loadAddon(serialize, () => term?.loadAddon(serialize!));
+  }
+  if (addons.unicode11) {
+    const unicode11 = new Unicode11Addon();
+    loadAddon(unicode11, () => {
+      term?.loadAddon(unicode11);
+      if (term) term.unicode.activeVersion = "11";
+    });
+  }
+  if (addons.unicodeGraphemes) {
+    const unicodeGraphemes = new UnicodeGraphemesAddon();
+    loadAddon(unicodeGraphemes, () => term?.loadAddon(unicodeGraphemes));
+  }
+  if (addons.webLinks) {
+    const links = new WebLinksAddon((_event, uri) => {
+      void invokeCommand("openUrl", { url: uri });
+    });
+    loadAddon(links, () => term?.loadAddon(links));
+  }
+  if (addons.clipboard) {
+    const clipboard = new ClipboardAddon();
+    loadAddon(clipboard, () => term?.loadAddon(clipboard));
+  }
+  if (addons.webFonts) {
+    webFonts = new WebFontsAddon(true);
+    loadAddon(webFonts, () => {
+      term?.loadAddon(webFonts!);
+      void webFonts?.loadFonts().then(() => fitAndNotify()).catch(() => {});
+    });
+  }
+  if (addons.progress) {
+    const progressAddon = new ProgressAddon();
+    loadAddon(progressAddon, () => {
+      term?.loadAddon(progressAddon);
+      addonDisposables.push(progressAddon.onChange((state) => {
+        progress.value = state;
+      }));
+    });
+  }
+  if (addons.ligatures) {
+    const ligatures = new LigaturesAddon();
+    loadAddon(ligatures, () => term?.loadAddon(ligatures));
+  }
+  if (addons.image) {
+    const image = new ImageAddon({ storageLimit: 64 });
+    loadAddon(image, () => term?.loadAddon(image));
+  }
+  if (addons.webgl) {
+    webgl = new WebglAddon();
+    loadAddon(webgl, () => {
+      term?.loadAddon(webgl!);
+      addonDisposables.push(webgl!.onContextLoss(() => {
+        webgl?.dispose();
+        webgl = null;
+      }));
+    });
+  }
   term.open(host.value);
   if (buffer.value) term.write(buffer.value);
   term.onData((data) => {

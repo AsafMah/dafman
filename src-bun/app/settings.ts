@@ -28,7 +28,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 13;
+export const SETTINGS_VERSION = 14;
 
 /// One-time backfill: returns `<homedir>/dafman` (created on demand),
 /// or `""` on failure. Used by `src-bun/index.ts` to populate the
@@ -87,7 +87,26 @@ export function defaultSettings(): Settings {
 		notifications: { turnEnd: false, waitingForInput: true },
 		tools: { defaultExcluded: [], defaultAllowed: [] },
 		permissions: { defaultApproveAll: false },
-		terminal: { defaultProfileId: "platform-default" },
+		terminal: {
+			defaultProfileId: "platform-default",
+			fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
+			fontSize: 13,
+			scrollback: 10_000,
+			theme: { background: "#111827", foreground: "#d1d5db" },
+			addons: {
+				search: true,
+				webLinks: true,
+				clipboard: true,
+				unicode11: true,
+				webFonts: true,
+				progress: true,
+				ligatures: true,
+				image: true,
+				unicodeGraphemes: true,
+				webgl: true,
+				serialize: true,
+			},
+		},
 	};
 }
 
@@ -225,7 +244,40 @@ function coerceTerminal(raw: unknown): TerminalPrefs {
 		typeof obj.defaultProfileId === "string" && obj.defaultProfileId.trim()
 			? obj.defaultProfileId.trim()
 			: base.defaultProfileId;
-	return { defaultProfileId };
+	const fontFamily =
+		typeof obj.fontFamily === "string" && obj.fontFamily.trim()
+			? obj.fontFamily.trim()
+			: base.fontFamily;
+	const fontSize =
+		typeof obj.fontSize === "number" && Number.isFinite(obj.fontSize)
+			? Math.min(32, Math.max(8, Math.floor(obj.fontSize)))
+			: base.fontSize;
+	const scrollback =
+		typeof obj.scrollback === "number" && Number.isFinite(obj.scrollback)
+			? Math.min(100_000, Math.max(1_000, Math.floor(obj.scrollback)))
+			: base.scrollback;
+	const rawTheme = obj.theme as Record<string, unknown> | undefined;
+	const background =
+		typeof rawTheme?.background === "string" && rawTheme.background.trim()
+			? rawTheme.background.trim()
+			: base.theme.background;
+	const foreground =
+		typeof rawTheme?.foreground === "string" && rawTheme.foreground.trim()
+			? rawTheme.foreground.trim()
+			: base.theme.foreground;
+	const rawAddons = obj.addons as Record<string, unknown> | undefined;
+	const addons = { ...base.addons };
+	for (const key of Object.keys(addons) as Array<keyof typeof addons>) {
+		if (typeof rawAddons?.[key] === "boolean") addons[key] = rawAddons[key];
+	}
+	return {
+		defaultProfileId,
+		fontFamily,
+		fontSize,
+		scrollback,
+		theme: { background, foreground },
+		addons,
+	};
 }
 
 export function migrate(input: unknown): Settings {

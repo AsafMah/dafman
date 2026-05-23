@@ -49,11 +49,10 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
 - xterm addon foundation: TerminalPanel now loads search, web-links,
   clipboard, unicode11, unicode-graphemes, web-fonts, progress, ligatures,
   image, webgl, and serialize addons. Search/copy/paste/copy-buffer controls
-  are available in the terminal header; addon settings/manager UI remains
-  the next terminal slice.
+  are available in the terminal header.
 - ActivityBar Terminals panel: lists known terminals, opens/kills them, and
-  creates new terminals with optional command/args/cwd. This is the first
-  management surface before full terminal profiles.
+  creates new terminals with optional command/args/cwd. It also persists
+  font family, font size, scrollback, theme colors, and per-addon toggles.
 
 ---
 
