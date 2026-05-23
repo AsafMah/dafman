@@ -225,27 +225,8 @@ function focusSession(): void {
   }, 0);
 }
 
-onMounted(async () => {
-  await nextTick();
-  if (!host.value) return;
-
-  // Recovery: if this terminal doesn't exist on the backend (e.g. after restart),
-  // find the session that owned it and create a new terminal
-  if (terminalId.value && !terminalStore.terminals.find((t) => t.id === terminalId.value)) {
-    const sessionId = Object.entries(terminalStore.sessionTerminalIds)
-      .find(([, tid]) => tid === propTerminalId.value)?.[0];
-    if (sessionId) {
-      try {
-        const newTerminal = await terminalStore.getOrCreateSessionTerminal(sessionId);
-        overrideTerminalId.value = newTerminal.id;
-        await nextTick();
-      } catch {
-        /* recovery failed, proceed with stale id */
-      }
-    }
-  }
-
-  if (isOwnedByOther.value) return;
+function initXterm(): void {
+  if (term || !host.value || isOwnedByOther.value) return;
   terminalStore.claimRenderer(terminalId.value, rendererRole.value);
   term = new Terminal({
     allowProposedApi: true,
@@ -345,7 +326,37 @@ onMounted(async () => {
   resizeObserver.observe(host.value);
   setTimeout(fitAndNotify, 0);
   setTimeout(() => term?.focus(), 0);
+}
+
+onMounted(async () => {
+  await nextTick();
+  if (!host.value) return;
+
+  // Recovery: if this terminal doesn't exist on the backend (e.g. after restart),
+  // find the session that owned it and create a new terminal
+  if (terminalId.value && !terminalStore.terminals.find((t) => t.id === terminalId.value)) {
+    const sessionId = Object.entries(terminalStore.sessionTerminalIds)
+      .find(([, tid]) => tid === propTerminalId.value)?.[0];
+    if (sessionId) {
+      try {
+        const newTerminal = await terminalStore.getOrCreateSessionTerminal(sessionId);
+        overrideTerminalId.value = newTerminal.id;
+        await nextTick();
+      } catch {
+        /* recovery failed, proceed with stale id */
+      }
+    }
+  }
+
+  initXterm();
   window.addEventListener("dafman:focus-terminal", onFocusTerminal);
+});
+
+// When ownership is released by another renderer, initialize xterm
+watch(isOwnedByOther, (blocked) => {
+  if (!blocked && !term && host.value) {
+    initXterm();
+  }
 });
 
 watch(buffer, (next, prev) => {
