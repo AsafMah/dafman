@@ -75,6 +75,14 @@ export const useJobsStore = defineStore("jobs", () => {
           sessionId: job.sessionId,
           id: taskIdFromJob(job),
         });
+        // Mark locally as cancelled immediately — the SDK's task list
+        // may still report "completed" if the cancel arrived too late.
+        updateLocalJob(job.id, {
+          status: "cancelled",
+          completedAt: nowIso(),
+          canCancel: false,
+          canRemove: true,
+        });
         await refresh();
       }
     } catch (err) {

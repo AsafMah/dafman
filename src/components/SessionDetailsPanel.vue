@@ -1196,6 +1196,16 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               :aria-label="`Select agent ${agent.displayName}`"
               @click="selectAgent(agent.name)"
             />
+            <Button
+              v-if="agent.path"
+              icon="pi pi-file-edit"
+              size="small"
+              severity="secondary"
+              text
+              :title="`Open ${agent.path}`"
+              :aria-label="`Open agent file ${agent.displayName}`"
+              @click="invokeCommand('revealPath', { path: agent.path! })"
+            />
             <div
               v-if="agent.description && isItemExpanded('agent', agent.name)"
               class="compact-desc"
