@@ -61,7 +61,11 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   history, exit code, and trusted-command metadata for future manual
   send-to-chat/copy-output actions. Follow-up hardening scrubs the nonce from
   the child process environment after PowerShell captures it and bounds command
-  history per terminal so long-lived shells do not leak memory.
+  history per terminal so long-lived shells do not leak memory. The first
+  smart-terminal UI is intentionally narrow: the Terminals panel hides recent
+  command lines behind a disclosure and only supports manual copy of the typed
+  command; output capture/send-to-chat stays deferred until xterm buffer ranges
+  are anchored.
 
 ---
 

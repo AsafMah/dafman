@@ -108,6 +108,16 @@ function activeCommandLabel(terminalId: string): string | null {
   if (!active) return null;
   return active.command ? `Running: ${active.command}` : "Running command";
 }
+
+function recentCommands(terminalId: string) {
+  return (terminalStore.commands[terminalId] ?? []).slice(-5).reverse();
+}
+
+async function copyCommand(command: string | undefined): Promise<void> {
+  if (!command) return;
+  await navigator.clipboard.writeText(command);
+  toasts.success("Command copied");
+}
 </script>
 
 <template>
@@ -251,6 +261,26 @@ function activeCommandLabel(terminalId: string): string | null {
             @click="terminalStore.killTerminal(terminal.id)"
           />
         </div>
+        <details v-if="recentCommands(terminal.id).length" class="command-history">
+          <summary>Recent commands</summary>
+          <ul>
+            <li v-for="command in recentCommands(terminal.id)" :key="command.id">
+              <span class="command-meta">
+                {{ command.exitCode === undefined ? "?" : command.exitCode }}
+              </span>
+              <code>{{ command.command || "Command line unavailable" }}</code>
+              <Button
+                v-if="command.command"
+                icon="pi pi-copy"
+                text
+                rounded
+                size="small"
+                aria-label="Copy command"
+                @click="copyCommand(command.command)"
+              />
+            </li>
+          </ul>
+        </details>
       </li>
     </ul>
 
@@ -419,6 +449,52 @@ function activeCommandLabel(terminalId: string): string | null {
 .terminal-status.status-running {
   color: var(--p-green-500);
   background: color-mix(in srgb, var(--p-green-500) 15%, transparent);
+}
+
+.command-history {
+  min-width: 0;
+  border-top: 1px solid var(--p-surface-border);
+  padding-top: 0.35rem;
+}
+
+.command-history summary {
+  cursor: pointer;
+  color: var(--p-text-muted-color);
+  font-size: 0.72rem;
+}
+
+.command-history ul {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.35rem 0 0;
+  margin: 0;
+  list-style: none;
+}
+
+.command-history li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.command-history code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--p-text-color);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-meta {
+  min-width: 1.5rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.3rem;
+  color: var(--p-text-muted-color);
+  background: color-mix(in srgb, var(--p-text-muted-color) 12%, transparent);
+  font-size: 0.68rem;
+  text-align: center;
 }
 
 @container (max-width: 22rem) {

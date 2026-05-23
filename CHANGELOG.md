@@ -65,6 +65,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   history, current CWD, and trusted command metadata for later smart-terminal
   actions. Command history is bounded per terminal, and the nonce is scrubbed
   from the child process environment after the shell hook captures it.
+- **Manual smart terminal history.** The Terminals panel can reveal recent
+  shell-integrated commands per terminal and copy a command line manually;
+  output copy/send-to-chat remains deferred until command buffer ranges are
+  anchored.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.
