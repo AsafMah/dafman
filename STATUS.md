@@ -43,9 +43,11 @@ The first `!!` composer command-mode slice now runs bounded session-cwd
 subprocesses for persisted command-result records, audits command metadata
 without output bytes, and renders/copies command output without ANSI escape
 garbage. The visible composer flow for `!!` now opens the real session terminal
-inside the composer so autocomplete/shortcuts work, with controls to jump to the
-full terminal tab and back to the editor. Completed command-result records
-auto-add a command-result pill by default.
+inside the composer so autocomplete/shortcuts work. The composer exposes
+separate Command and Terminal buttons; the full terminal has a Session button to
+return to the owning chat; duplicate full terminal panels are closed while the
+embedded terminal is active; completed terminal commands auto-add a
+command-result pill by default.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.

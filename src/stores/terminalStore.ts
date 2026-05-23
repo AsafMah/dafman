@@ -12,6 +12,7 @@ export interface TerminalCommandRecord {
   id: string;
   command?: string;
   cwd?: string;
+  output?: string;
   startedAt: string;
   endedAt?: string;
   exitCode?: number;
@@ -145,11 +146,12 @@ export const useTerminalStore = defineStore("terminals", () => {
     };
   }
 
-  function finishCommand(terminalId: string, exitCode?: number): TerminalCommandRecord | null {
+  function finishCommand(terminalId: string, exitCode?: number, output?: string): TerminalCommandRecord | null {
     const record = activeCommands.value[terminalId];
     if (!record) return null;
     const finished: TerminalCommandRecord = {
       ...record,
+      ...(output !== undefined ? { output } : {}),
       ...(exitCode !== undefined ? { exitCode } : {}),
       endedAt: new Date().toISOString(),
     };

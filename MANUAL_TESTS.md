@@ -64,14 +64,17 @@
 
 5. ⏳ **Composer `!!` session-terminal mode + command-result pill.**
    - **Steps:** in an empty composer type `!!`, use the embedded session
-     terminal (including shell autocomplete/shortcuts), click Open full
-     terminal, return to the chat/editor, and run a command-result flow that
-     produces stderr with ANSI colors.
+     terminal (including shell autocomplete/shortcuts), click the separate
+     Terminal toolbar button, use the terminal panel's Session button to return
+     to chat, and run a command-result flow that produces stderr with ANSI
+     colors.
    - **Expected:** `!!` opens the real session terminal inside the composer,
-     Back to editor exits terminal mode, Open full terminal focuses the session
-     terminal tab, the toolbar has a visible Terminal button, completed
-     command-result records add an orange command-result pill by default, and
-     command-result output/copy/attachment text strips ANSI escape codes.
+     embedded terminal chrome is hidden and stays composer-height, the toolbar
+     has separate Command and Terminal buttons, the Terminal button focuses the
+     existing session terminal tab, the terminal's Session button returns to the
+     owning chat, completed command-result records add an orange command-result
+     pill by default, and command-result output/copy/attachment text strips ANSI
+     escape codes.
      Audit shows command metadata only, not stdout/stderr bytes.
    - **Automated coverage:** `src-bun/__tests__/commandResultRegistry.test.ts`
      covers runner streaming/persistence and `e2e/full/flows/14-details-rail.pwtest.ts`

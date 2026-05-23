@@ -78,10 +78,14 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   `commandResultEvent`s, audit metadata without stdout/stderr bytes). Follow-up
   UX correction changed the composer command mode from a plain input into the
   real session terminal so users keep shell autocomplete and shortcuts. The
-  composer now also has a visible Session Terminal button, command mode has
-  "Open full terminal" and "Back to editor" controls, completed command-result
-  records auto-add a `commandResult` attachment pill, and command-result
-  rendering/copying strips ANSI escape codes before display/serialization.
+  composer now has two separate controls: Command opens embedded terminal mode,
+  Terminal opens/focuses the full session terminal tab. Full terminal panels
+  now have a Session button to jump back to the owning chat. Embedded command
+  mode hides terminal chrome, keeps the composer-height footprint, and closes
+  any duplicate full terminal panel for the same PTY while embedded. Completed
+  terminal commands are converted into `commandResult` records and auto-add a
+  `commandResult` attachment pill; command-result rendering/copying strips ANSI
+  escape codes before display/serialization.
 
 ---
 

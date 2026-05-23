@@ -27,6 +27,10 @@ export const useCommandResultsStore = defineStore("commandResults", () => {
     };
   }
 
+  function addLocal(record: CommandResultRecord): void {
+    upsert(record);
+  }
+
   function patch(
     sessionId: string,
     commandId: string,
@@ -91,5 +95,6 @@ export const useCommandResultsStore = defineStore("commandResults", () => {
     start,
     cancel,
     applyEvent,
+    addLocal,
   };
 });

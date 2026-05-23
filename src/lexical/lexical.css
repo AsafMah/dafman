@@ -222,41 +222,21 @@
   gap: 0.35rem;
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 8rem;
-}
-
-.lex-command-mode-header {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
-.lex-command-prefix,
-.lex-command-mode-btn {
-  flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 0.1rem 0.45rem;
-  background: color-mix(in srgb, var(--p-orange-500) 22%, transparent);
-  color: var(--p-orange-600);
-  font-weight: 700;
-}
-
-.lex-command-mode-btn {
-  border: 1px solid color-mix(in srgb, var(--p-orange-500) 35%, transparent);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.lex-command-mode-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+  height: 3rem;
+  min-height: 3rem;
 }
 
 .lex-command-loading {
   margin: 0;
   color: var(--p-text-muted-color);
+}
+
+.lex-command-mode .terminal-panel {
+  min-height: 0;
+}
+
+.lex-command-mode .terminal-host {
+  padding: 0;
 }
 
 .lex-composer-editor {

@@ -239,6 +239,9 @@ function onAgentChipClick() {
 
 async function openSessionTerminal() {
   try {
+    window.dispatchEvent(new CustomEvent("dafman:close-command-terminal", {
+      detail: { sessionId: props.sessionId },
+    }));
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
     layoutStore.addTerminalPanel(terminal.id, terminal.title);
   } catch (err) {
@@ -247,6 +250,12 @@ async function openSessionTerminal() {
       err instanceof Error ? err.message : String(err),
     );
   }
+}
+
+function openEmbeddedTerminalMode() {
+  window.dispatchEvent(new CustomEvent("dafman:open-command-terminal", {
+    detail: { sessionId: props.sessionId },
+  }));
 }
 </script>
 
@@ -277,6 +286,17 @@ async function openSessionTerminal() {
       @click="onWorkspaceClick"
       @keydown.enter.prevent="onWorkspaceClick"
       @keydown.space.prevent="onWorkspaceClick"
+    />
+    <Button
+      v-if="props.area === 'all' || props.area === 'composer-left'"
+      icon="pi pi-terminal"
+      label="Command"
+      text
+      size="small"
+      class="session-terminal-button session-command-button"
+      aria-label="Open embedded session terminal"
+      title="Open embedded session terminal"
+      @click="openEmbeddedTerminalMode"
     />
     <Button
       v-if="props.area === 'all' || props.area === 'composer-left'"
@@ -438,6 +458,9 @@ async function openSessionTerminal() {
  *   < 10rem     →  drop "model"         (gear only) */
 @container (max-width: 26rem) {
   .compact-select-reasoning {
+    display: none;
+  }
+  .session-terminal-button :deep(.p-button-label) {
     display: none;
   }
 }

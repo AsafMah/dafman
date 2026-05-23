@@ -458,7 +458,7 @@ function readEditorFormatState(): void {
   };
 }
 
-defineExpose({ focus: focusComposer, setText, appendText, addAttachment });
+defineExpose({ focus: focusComposer, setText, appendText, addAttachment, enterCommandMode, exitCommandMode });
 
 async function enterCommandMode(): Promise<void> {
   clearEditor();
@@ -666,21 +666,7 @@ const SubmitButton = defineComponent({
           :session-id="props.sessionId"
         />
           <div class="lex-composer-shell" :class="{ 'is-command-mode': commandMode }" @paste="onPaste" @keydown.capture="onComposerKeydown">
-          <div v-if="commandMode" class="lex-command-mode">
-            <div class="lex-command-mode-header">
-              <span class="lex-command-prefix">!! Session terminal</span>
-              <button
-                type="button"
-                class="lex-command-mode-btn"
-                :disabled="!props.commandTerminalId"
-                @click="emit('openFullTerminal')"
-              >
-                Open full terminal
-              </button>
-              <button type="button" class="lex-command-mode-btn" @click="exitCommandMode">
-                Back to editor
-              </button>
-            </div>
+          <div v-if="commandMode" class="lex-command-mode" @keydown.esc.prevent="exitCommandMode">
             <TerminalPanel
               v-if="props.commandTerminalId"
               :params="{ terminalId: props.commandTerminalId, compact: true }"

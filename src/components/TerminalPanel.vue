@@ -17,6 +17,7 @@ import "@xterm/xterm/css/xterm.css";
 import Button from "primevue/button";
 import { useTerminalStore } from "../stores/terminalStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useLayoutStore } from "../stores/layoutStore";
 import { invokeCommand } from "../ipc/invoke";
 import { parseTerminalOsc, type TerminalShellEvent } from "../lib/terminalShellIntegration";
 
@@ -27,6 +28,7 @@ const compact = computed(() => props.params?.params?.compact === true || (props.
 
 const terminalStore = useTerminalStore();
 const settingsStore = useSettingsStore();
+const layoutStore = useLayoutStore();
 const host = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const searchOpen = ref(false);
@@ -41,6 +43,8 @@ let webgl: WebglAddon | null = null;
 const addonDisposables: Array<{ dispose(): void }> = [];
 let resizeObserver: ResizeObserver | null = null;
 let pendingSearchFrame: number | null = null;
+let commandCaptureActive = false;
+let commandCaptureBuffer = "";
 
 const terminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
 const summary = computed(() =>
@@ -77,6 +81,8 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
 function applyShellEvent(event: TerminalShellEvent): void {
   if (!terminalId.value) return;
   if (event.kind === "commandStart") {
+    commandCaptureActive = true;
+    commandCaptureBuffer = "";
     if (!terminalStore.activeCommands[terminalId.value]) {
       terminalStore.startCommand(terminalId.value, {
         cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
@@ -87,7 +93,10 @@ function applyShellEvent(event: TerminalShellEvent): void {
     return;
   }
   if (event.kind === "commandFinish") {
-    terminalStore.finishCommand(terminalId.value, event.exitCode);
+    const output = commandCaptureBuffer;
+    commandCaptureActive = false;
+    commandCaptureBuffer = "";
+    terminalStore.finishCommand(terminalId.value, event.exitCode, output);
     return;
   }
   if (event.kind === "commandLine") {
@@ -195,6 +204,13 @@ function registerCopyShortcuts(): void {
   });
 }
 
+function focusSession(): void {
+  const sessionId = summary.value?.sessionId;
+  if (!sessionId) return;
+  layoutStore.addPanel(sessionId);
+  layoutStore.activatePanel(sessionId);
+}
+
 onMounted(async () => {
   await nextTick();
   if (!host.value) return;
@@ -289,6 +305,7 @@ onMounted(async () => {
   resizeObserver = new ResizeObserver(() => fitAndNotify());
   resizeObserver.observe(host.value);
   setTimeout(fitAndNotify, 0);
+  if (compact.value) setTimeout(() => term?.focus(), 0);
 });
 
 watch(buffer, (next, prev) => {
@@ -297,7 +314,9 @@ watch(buffer, (next, prev) => {
     term.reset();
     term.write(next, () => scheduleSearch(false));
   } else if (next.length > prev.length) {
-    term.write(next.slice(prev.length), () => scheduleSearch(false));
+    const delta = next.slice(prev.length);
+    if (commandCaptureActive) commandCaptureBuffer += delta;
+    term.write(delta, () => scheduleSearch(false));
   }
 });
 
@@ -351,6 +370,16 @@ onBeforeUnmount(() => {
         <span class="terminal-progress-bar" :style="{ width: `${progress.value}%` }" />
       </div>
       <div class="terminal-actions">
+        <Button
+          v-if="summary?.sessionId"
+          icon="pi pi-comments"
+          label="Session"
+          text
+          size="small"
+          aria-label="Open owning session"
+          title="Open owning session"
+          @click="focusSession"
+        />
         <Button
           icon="pi pi-search"
           label="Find"

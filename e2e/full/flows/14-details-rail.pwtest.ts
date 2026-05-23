@@ -291,13 +291,23 @@ test("composer !! command mode opens the session terminal", async ({ page }) => 
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
+  await expect(page.getByRole("button", { name: "Open embedded session terminal" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Open session terminal" }).first()).toBeVisible();
 
   await composer.click();
   await page.keyboard.type("!!");
   const terminal = page.locator(".lex-command-mode .terminal-panel").first();
   await expect(terminal).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("button", { name: "Open full terminal" })).toBeVisible();
-  await page.getByRole("button", { name: "Back to editor" }).click();
+  await page.keyboard.type("echo EMBEDDED_CAPTURE_OK");
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".command-result-card").first()).toContainText("EMBEDDED_CAPTURE_OK", {
+    timeout: 10_000,
+  });
+  await expect(page.locator('.composer-attachment-pill[data-attachment-kind="command-result"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByRole("button", { name: "Open session terminal" }).first().click();
   await expect(terminal).toHaveCount(0);
+  await expect(page.locator(".terminal-panel").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Open owning session" }).first()).toBeVisible();
 });

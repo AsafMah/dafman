@@ -77,11 +77,13 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   status, and clears highlights when closed.
 - **`!!` command result attachments.** Typing `!!` in an empty composer enters
   a distinct command mode backed by the real session terminal, so shell
-  autocomplete and shortcuts still work. The composer also has a visible
-  Session Terminal toolbar button, command mode can jump to the full terminal
-  tab and back to the editor, completed command-result records auto-insert a
-  first-class `commandResult` pill, and command-result rendering/copying strips
-  ANSI escape codes.
+  autocomplete and shortcuts still work. The composer now has separate
+  Command and Terminal buttons, the Terminal button focuses the existing
+  session terminal tab, full terminal panels have a Session button to jump back,
+  embedded command mode hides terminal chrome and freezes the duplicate full
+  terminal panel, completed command-result records auto-insert a first-class
+  `commandResult` pill, and command-result rendering/copying strips ANSI escape
+  codes.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

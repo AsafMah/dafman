@@ -36,6 +36,7 @@ import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 import type { ComposerSubmitPayload } from "../lexical/plugins";
 import { styleFor } from "../lib/notificationStyles";
+import { stripAnsi } from "../lib/ansi";
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -83,9 +84,12 @@ const tileEl = ref<HTMLElement | null>(null);
 const composerRef = ref<{
   focus: () => void;
   addAttachment?: (attachment: SendMessageAttachment) => void;
+  exitCommandMode?: () => void;
+  enterCommandMode?: () => void;
 } | null>(null);
 const commandTerminalId = ref<string>("");
 const autoAttachedCommandIds = new Set<string>();
+const capturedTerminalCommandIds = new Set<string>();
 
 /// External "focus my composer" requests arrive as a window event
 /// from the Sessions sidebar (clicking an already-open session row).
@@ -96,8 +100,22 @@ function onExternalFocusRequest(e: Event) {
   composerRef.value?.focus();
 }
 
+function onExternalCommandTerminalRequest(e: Event) {
+  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+  if (!detail || detail.sessionId !== props.sessionId) return;
+  void composerRef.value?.enterCommandMode?.();
+}
+
+function onExternalCloseCommandTerminalRequest(e: Event) {
+  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+  if (!detail || detail.sessionId !== props.sessionId) return;
+  composerRef.value?.exitCommandMode?.();
+}
+
 onMounted(() => {
   window.addEventListener("dafman:focus-composer", onExternalFocusRequest);
+  window.addEventListener("dafman:open-command-terminal", onExternalCommandTerminalRequest);
+  window.addEventListener("dafman:close-command-terminal", onExternalCloseCommandTerminalRequest);
   void commandResultsStore.refresh(props.sessionId)
     .then(() => {
       for (const record of commandResultsStore.recordsBySession[props.sessionId] ?? []) {
@@ -111,6 +129,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("dafman:focus-composer", onExternalFocusRequest);
+  window.removeEventListener("dafman:open-command-terminal", onExternalCommandTerminalRequest);
+  window.removeEventListener("dafman:close-command-terminal", onExternalCloseCommandTerminalRequest);
 });
 /// Live `--tile-height` so the composer can cap itself at a percentage of
 /// the chat tile's height even though the tile lives inside a flex/grid
@@ -342,6 +362,7 @@ async function ensureCommandTerminal(): Promise<string | null> {
   try {
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
     commandTerminalId.value = terminal.id;
+    layoutStore.closePanel(`terminal-${terminal.id}`);
     return terminal.id;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -357,6 +378,7 @@ async function onRequestCommandTerminal(): Promise<void> {
 async function openFullSessionTerminal(): Promise<void> {
   const terminalId = await ensureCommandTerminal();
   if (!terminalId) return;
+  composerRef.value?.exitCommandMode?.();
   const terminal = terminalStore.terminals.find((t) => t.id === terminalId);
   layoutStore.addTerminalPanel(terminalId, terminal?.title ?? "Session Shell");
 }
@@ -380,6 +402,33 @@ watch(commandResults, (records) => {
     addCommandResultAttachment(record);
   }
 });
+
+watch(
+  () => commandTerminalId.value ? terminalStore.commands[commandTerminalId.value] ?? [] : [],
+  (commands) => {
+    for (const command of commands) {
+      if (!command.command || capturedTerminalCommandIds.has(command.id)) continue;
+      capturedTerminalCommandIds.add(command.id);
+      const now = new Date().toISOString();
+      commandResultsStore.addLocal({
+        id: command.id,
+        sessionId: props.sessionId,
+        command: command.command,
+        cwd: command.cwd ?? "",
+        shell: "session terminal",
+        status: command.exitCode === 0 ? "completed" : "failed",
+        stdout: stripAnsi(command.output ?? ""),
+        stderr: "",
+        truncated: false,
+        createdAt: command.startedAt,
+        completedAt: command.endedAt ?? now,
+        exitCode: command.exitCode ?? null,
+      });
+      composerRef.value?.exitCommandMode?.();
+    }
+  },
+  { deep: true },
+);
 
 /// Inline edit mode for user messages: when set, the matching user
 /// bubble is replaced by a MessageEditor in place. Reset on save,
