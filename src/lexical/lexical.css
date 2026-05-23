@@ -211,6 +211,40 @@
   gap: 0.4rem;
 }
 
+.lex-composer-shell.is-command-mode {
+  padding: 0.25rem 0.45rem;
+  border-radius: var(--p-border-radius-md);
+  background: color-mix(in srgb, var(--p-orange-500) 8%, transparent);
+}
+
+.lex-command-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lex-command-prefix {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  background: color-mix(in srgb, var(--p-orange-500) 22%, transparent);
+  color: var(--p-orange-600);
+  font-weight: 700;
+}
+
+.lex-command-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--p-text-color);
+  font: inherit;
+  font-family: var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
 .lex-composer-editor {
   position: relative;
   flex: 1 1 auto;
@@ -306,6 +340,15 @@
 
 .composer-attachment-pill[data-attachment-kind="image"]:hover {
   background: color-mix(in srgb, var(--p-primary-color) 28%, transparent);
+}
+
+.composer-attachment-pill[data-attachment-kind="command-result"] {
+  background: color-mix(in srgb, var(--p-orange-500) 18%, transparent);
+  border-color: color-mix(in srgb, var(--p-orange-500) 38%, transparent);
+}
+
+.composer-attachment-pill[data-attachment-kind="command-result"]:hover {
+  background: color-mix(in srgb, var(--p-orange-500) 28%, transparent);
 }
 
 .composer-attachment-pill-icon {

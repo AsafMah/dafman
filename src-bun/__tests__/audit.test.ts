@@ -8,6 +8,7 @@ import {
 	_resetAudit,
 	initAudit,
 	recentAudit,
+	recordCommand,
 	recordPermission,
 	recordUrl,
 	subscribeAudit,
@@ -69,6 +70,28 @@ describe("audit log writer", () => {
 		expect(parsed[1].url).toBe("javascript:alert(1)");
 		expect(parsed[1].allowed).toBe(false);
 		expect(parsed[1].reason).toBe("scheme-blocked");
+	});
+
+	test("recordCommand appends command metadata without output", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "dafman-audit-"));
+		await initAudit({ dir });
+		await recordCommand({
+			sessionId: "sess-1",
+			commandId: "cmd-1",
+			command: "echo SECRET",
+			cwd: "C:\\repo",
+			shell: "pwsh.exe",
+			status: "completed",
+			exitCode: 0,
+			durationMs: 12,
+			truncated: false,
+		});
+		const content = await readFile(join(dir, "commands.jsonl"), "utf8");
+		const parsed = JSON.parse(content.trim());
+		expect(parsed.kind).toBe("command");
+		expect(parsed.command).toBe("echo SECRET");
+		expect(parsed).not.toHaveProperty("stdout");
+		expect(parsed).not.toHaveProperty("stderr");
 	});
 
 	test("ring buffer caps at 500 entries", async () => {

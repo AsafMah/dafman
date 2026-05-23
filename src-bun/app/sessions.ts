@@ -30,6 +30,7 @@ import {
 } from "./copilotSdk";
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
+import { Buffer } from "node:buffer";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
@@ -58,6 +59,7 @@ import type {
 	JobRecord,
 	TaskInfo,
 	TaskStatus,
+	CommandResultRecord,
 } from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
@@ -83,6 +85,46 @@ const HISTORY_REPLAY_BATCH = 50;
 /// force-clear the entry and move on — the OS process exit handles
 /// the rest.
 const SHUTDOWN_TIMEOUT_MS = 2000;
+
+function commandResultMarkdown(result: CommandResultRecord): string {
+	const status = result.status === "completed" && result.exitCode === 0
+		? "success"
+		: result.status;
+	const lines = [
+		"# Command result",
+		"",
+		`- Command: \`${result.command.replace(/`/g, "\\`")}\``,
+		`- CWD: \`${result.cwd.replace(/`/g, "\\`")}\``,
+		`- Shell: \`${result.shell.replace(/`/g, "\\`")}\``,
+		`- Status: ${status}`,
+		...(typeof result.exitCode === "number" ? [`- Exit code: ${result.exitCode}`] : []),
+		...(typeof result.durationMs === "number" ? [`- Duration: ${result.durationMs} ms`] : []),
+		...(result.truncated ? ["- Output: truncated"] : []),
+		"",
+		"## stdout",
+		"```text",
+		result.stdout || "(empty)",
+		"```",
+		"",
+		"## stderr",
+		"```text",
+		result.stderr || "(empty)",
+		"```",
+		"",
+	];
+	return lines.join("\n");
+}
+
+function toSdkAttachment(attachment: SendMessageAttachment): Exclude<SendMessageAttachment, { type: "commandResult" }> {
+	if (attachment.type !== "commandResult") return attachment;
+	const markdown = commandResultMarkdown(attachment.result);
+	return {
+		type: "blob",
+		data: Buffer.from(markdown, "utf8").toString("base64"),
+		mimeType: "text/markdown",
+		displayName: attachment.displayName ?? `command-result-${attachment.result.id}.md`,
+	};
+}
 
 /// 19a: normalize the SDK's loose AgentInfo wire shape (everything is
 /// `unknown`) into our typed `AgentInfo`. Caller pre-checks
@@ -961,11 +1003,12 @@ export class SessionRegistry {
 			});
 		}
 		try {
+			const sdkAttachments = attachments?.map(toSdkAttachment);
 			return await entry.session.send({
 				prompt: text,
 				...(mode ? { mode } : {}),
-				...(attachments && attachments.length > 0
-					? { attachments: attachments as Parameters<typeof entry.session.send>[0]["attachments"] }
+				...(sdkAttachments && sdkAttachments.length > 0
+					? { attachments: sdkAttachments as Parameters<typeof entry.session.send>[0]["attachments"] }
 					: {}),
 			});
 		} catch (err) {

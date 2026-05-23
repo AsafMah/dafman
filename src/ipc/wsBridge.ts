@@ -14,6 +14,7 @@ import type {
   AuditEntry,
   CommandMap,
   CommandName,
+  CommandResultEvent,
   LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
@@ -21,6 +22,7 @@ import type {
 } from "./types";
 import type {
   AuditEventListener,
+  CommandResultEventListener,
   LogEventListener,
   PendingRequestListener,
   RpcBridge,
@@ -64,6 +66,7 @@ export function createWebSocketBridge(url: string): RpcBridge {
   const logListeners = new Set<LogEventListener>();
   const auditListeners = new Set<AuditEventListener>();
   const terminalListeners = new Set<TerminalEventListener>();
+  const commandResultListeners = new Set<CommandResultEventListener>();
   const pending = new Map<number, PendingRpc>();
   let nextId = 1;
   let socket: WebSocket | null = null;
@@ -128,6 +131,8 @@ export function createWebSocketBridge(url: string): RpcBridge {
       for (const l of auditListeners) l(payload as AuditEntry);
     } else if (name === "terminalEvent") {
       for (const l of terminalListeners) l(payload as TerminalEventPayload);
+    } else if (name === "commandResultEvent") {
+      for (const l of commandResultListeners) l(payload as CommandResultEvent);
     }
   }
 
@@ -177,6 +182,10 @@ export function createWebSocketBridge(url: string): RpcBridge {
     onTerminalEvent(listener) {
       terminalListeners.add(listener);
       return () => terminalListeners.delete(listener);
+    },
+    onCommandResultEvent(listener) {
+      commandResultListeners.add(listener);
+      return () => commandResultListeners.delete(listener);
     },
   };
 }

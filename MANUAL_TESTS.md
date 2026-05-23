@@ -62,6 +62,20 @@
      covers command lifecycle and bounded history. Live shell hooks still need
      manual runtime confirmation.
 
+5. ⏳ **Composer `!!` command-result attachment.**
+   - **Steps:** in an empty composer type `!!`, run `echo COMMAND_OK`, wait for
+     the command-result card, click Add to composer, send a prompt with the pill
+     still present, then repeat and delete the pill before sending.
+   - **Expected:** `!!` opens a distinct command input, Enter runs the command
+     in the session cwd, stdout streams into a command-result card, copy buttons
+     work, Add to composer inserts an orange command-result pill, keeping the
+     pill sends it as an attachment, and deleting the pill leaves the card in
+     chat but does not send the result. Audit shows command metadata only, not
+     stdout/stderr bytes.
+   - **Automated coverage:** `src-bun/__tests__/commandResultRegistry.test.ts`
+     covers runner streaming/persistence and `e2e/full/flows/14-details-rail.pwtest.ts`
+     covers `!!` mode, card rendering, and add-to-composer.
+
 ---
 
 ## Phase 23c — Long Jobs + Autopilot UI

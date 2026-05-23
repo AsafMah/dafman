@@ -39,6 +39,10 @@ Terminal header actions now use visible labels instead of icon-only controls,
 Buffer/Paste header buttons are gone, selected-text copy has keyboard
 shortcuts, and terminal Find enables xterm search decorations, focuses the
 search field, and reports match state.
+The first `!!` composer command-mode slice now runs bounded session-cwd
+subprocesses, streams command-result cards into chat, persists capped results,
+audits command metadata without output bytes, and lets users explicitly attach
+results back to the composer as command-result pills.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.

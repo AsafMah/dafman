@@ -10,6 +10,7 @@ import type {
   AuditEntry,
   CommandMap,
   CommandName,
+  CommandResultEvent,
   LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
@@ -17,6 +18,7 @@ import type {
 } from "./types";
 import type {
   AuditEventListener,
+  CommandResultEventListener,
   LogEventListener,
   PendingRequestListener,
   RpcBridge,
@@ -42,6 +44,7 @@ interface ElectrobunRpcType {
       logEvent: LogRecord;
       auditEvent: AuditEntry;
       terminalEvent: TerminalEventPayload;
+      commandResultEvent: CommandResultEvent;
     };
   };
 }
@@ -55,6 +58,7 @@ export function createElectrobunBridge(): {
   const logListeners = new Set<LogEventListener>();
   const auditListeners = new Set<AuditEventListener>();
   const terminalListeners = new Set<TerminalEventListener>();
+  const commandResultListeners = new Set<CommandResultEventListener>();
 
   const rpc = Electroview.defineRPC<ElectrobunRpcType>({
     maxRequestTime: 120000,
@@ -106,6 +110,15 @@ export function createElectrobunBridge(): {
             }
           }
         },
+        commandResultEvent: (payload) => {
+          for (const listener of commandResultListeners) {
+            try {
+              listener(payload);
+            } catch (err) {
+              console.error("[commandResultEvent listener threw]", err);
+            }
+          }
+        },
       },
     },
   });
@@ -138,6 +151,10 @@ export function createElectrobunBridge(): {
     onTerminalEvent(listener) {
       terminalListeners.add(listener);
       return () => terminalListeners.delete(listener);
+    },
+    onCommandResultEvent(listener) {
+      commandResultListeners.add(listener);
+      return () => commandResultListeners.delete(listener);
     },
   };
 

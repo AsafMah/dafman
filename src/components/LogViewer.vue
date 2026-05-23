@@ -128,6 +128,10 @@ function auditLabel(entry: AuditEntry): string {
     const tail = scope ? ` · ${scope}` : "";
     return `${entry.permissionKind} ${verb}${tail}`;
   }
+  if (entry.kind === "command") {
+    const exit = typeof entry.exitCode === "number" ? ` · exit ${entry.exitCode}` : "";
+    return `${entry.status} · ${entry.command}${exit}`;
+  }
   return `${entry.allowed ? "opened" : "blocked"} · ${entry.url}`;
 }
 
@@ -266,7 +270,9 @@ function formatFields(fields: Record<string, unknown>): string {
         class="logviewer-row-record"
         :class="entry.kind === 'permission'
           ? `audit-perm-${entry.decision}`
-          : entry.allowed ? 'audit-url-ok' : 'audit-url-blocked'"
+          : entry.kind === 'command'
+            ? `audit-command-${entry.status}`
+            : entry.allowed ? 'audit-url-ok' : 'audit-url-blocked'"
         :title="entry.ts"
       >
         <span class="logviewer-ts">{{ fmtTime(entry.ts) }}</span>
@@ -274,6 +280,9 @@ function formatFields(fields: Record<string, unknown>): string {
         <span class="logviewer-message">{{ auditLabel(entry) }}</span>
         <span v-if="entry.kind === 'permission' && entry.summary" class="logviewer-fields">
           {{ entry.summary }}
+        </span>
+        <span v-else-if="entry.kind === 'command'" class="logviewer-fields">
+          {{ entry.cwd }}
         </span>
       </article>
     </div>

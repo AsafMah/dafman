@@ -138,6 +138,9 @@ function attachmentLabel(
   if (a.type === "blob") {
     return `\`${a.displayName ?? "attachment"}\` (${a.mimeType})`;
   }
+  if (a.type === "commandResult") {
+    return `\`${a.displayName ?? a.result.command}\` (command result)`;
+  }
   return `\`${a.displayName ?? a.filePath}\` (selection)`;
 }
 

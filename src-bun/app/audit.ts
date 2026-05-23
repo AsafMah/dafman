@@ -8,6 +8,7 @@
 //
 //   audit/permissions.jsonl   — every respondToRequest decision
 //   audit/urls.jsonl          — every openUrl + decision
+//   audit/commands.jsonl      — direct user-initiated shell commands
 //
 // Schema: each line a JSON object with `ts` (ISO8601), `kind`, and
 // kind-specific fields. Stable; future readers (an in-app Activity
@@ -51,7 +52,21 @@ export interface UrlAuditEntry {
 	reason: string;
 }
 
-export type AuditEntry = PermissionAuditEntry | UrlAuditEntry;
+export interface CommandAuditEntry {
+	ts: string;
+	kind: "command";
+	sessionId: string;
+	commandId: string;
+	command: string;
+	cwd: string;
+	shell: string;
+	status: "started" | "completed" | "failed" | "cancelled" | "timeout";
+	exitCode?: number | null;
+	durationMs?: number;
+	truncated?: boolean;
+}
+
+export type AuditEntry = PermissionAuditEntry | UrlAuditEntry | CommandAuditEntry;
 
 interface AuditConfig {
 	dir: string | null;
@@ -86,7 +101,7 @@ export async function initAudit(opts: InitAuditOptions): Promise<void> {
 async function hydrateRecent(): Promise<void> {
 	const dir = config.dir;
 	if (!dir) return;
-	const files = ["permissions.jsonl", "urls.jsonl"];
+	const files = ["permissions.jsonl", "urls.jsonl", "commands.jsonl"];
 	const collected: AuditEntry[] = [];
 	for (const name of files) {
 		const path = join(dir, name);
@@ -146,7 +161,14 @@ async function append(entry: AuditEntry): Promise<void> {
 	}
 	const dir = config.dir;
 	if (!dir) return;
-	const file = join(dir, entry.kind === "permission" ? "permissions.jsonl" : "urls.jsonl");
+	const file = join(
+		dir,
+		entry.kind === "permission"
+			? "permissions.jsonl"
+			: entry.kind === "url"
+				? "urls.jsonl"
+				: "commands.jsonl",
+	);
 	const line = `${JSON.stringify(entry)}\n`;
 	try {
 		await appendFile(file, line);
@@ -180,6 +202,12 @@ export function recordUrl(
 	entry: Omit<UrlAuditEntry, "ts" | "kind">,
 ): Promise<void> {
 	return append({ ts: new Date().toISOString(), kind: "url", ...entry });
+}
+
+export function recordCommand(
+	entry: Omit<CommandAuditEntry, "ts" | "kind">,
+): Promise<void> {
+	return append({ ts: new Date().toISOString(), kind: "command", ...entry });
 }
 
 /// Test-only.

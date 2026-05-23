@@ -57,6 +57,7 @@ const segments = computed<Segment[]>(() => {
 function iconClass(a: SendMessageAttachment): string {
   if (a.type === "directory") return "pi-folder";
   if (a.type === "selection") return "pi-bookmark";
+  if (a.type === "commandResult") return "pi-terminal";
   if (a.type === "blob" && (a.mimeType ?? "").startsWith("image/")) return "pi-image";
   return "pi-file";
 }
@@ -77,7 +78,9 @@ function iconClass(a: SendMessageAttachment): string {
         class="composer-attachment-pill user-attachment-pill"
         :data-attachment-type="seg.attachment.type"
         :data-attachment-kind="
-          seg.attachment.type === 'blob' && (seg.attachment.mimeType ?? '').startsWith('image/')
+          seg.attachment.type === 'commandResult'
+            ? 'command-result'
+            : seg.attachment.type === 'blob' && (seg.attachment.mimeType ?? '').startsWith('image/')
             ? 'image'
             : undefined
         "

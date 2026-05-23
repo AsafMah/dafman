@@ -120,6 +120,56 @@ export type TerminalEventPayload =
   | { terminalId: string; kind: "exit"; summary: TerminalSummary }
   | { terminalId: string; kind: "error"; message: string };
 
+export type CommandResultStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "timeout";
+
+export interface CommandResultRecord {
+  id: string;
+  sessionId: string;
+  command: string;
+  cwd: string;
+  shell: string;
+  status: CommandResultStatus;
+  stdout: string;
+  stderr: string;
+  truncated: boolean;
+  createdAt: string;
+  completedAt?: string;
+  exitCode?: number | null;
+  durationMs?: number;
+  displayName?: string;
+}
+
+export type CommandResultEvent =
+  | {
+      kind: "started";
+      sessionId: string;
+      commandId: string;
+      record: CommandResultRecord;
+    }
+  | {
+      kind: "stdout" | "stderr";
+      sessionId: string;
+      commandId: string;
+      data: string;
+    }
+  | {
+      kind: "truncated";
+      sessionId: string;
+      commandId: string;
+      limitBytes: number;
+    }
+  | {
+      kind: "completed" | "cancelled";
+      sessionId: string;
+      commandId: string;
+      record: CommandResultRecord;
+    };
+
 export interface Layout {
   dockview: unknown | null;
 }
@@ -295,7 +345,8 @@ export type SendMessageAttachment =
       };
       text?: string;
     }
-  | { type: "blob"; data: string; mimeType: string; displayName?: string };
+  | { type: "blob"; data: string; mimeType: string; displayName?: string }
+  | { type: "commandResult"; result: CommandResultRecord; displayName?: string };
 
 export interface WorkspaceFileMatch {
   path: string;
@@ -761,6 +812,18 @@ export type CommandMap = {
     args: Record<string, never>;
     result: TerminalSummary[];
   };
+  startSessionCommand: {
+    args: { sessionId: string; command: string };
+    result: CommandResultRecord;
+  };
+  cancelSessionCommand: {
+    args: { sessionId: string; commandId: string };
+    result: boolean;
+  };
+  listCommandResults: {
+    args: { sessionId: string };
+    result: CommandResultRecord[];
+  };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };
   getLogDir: { args: Record<string, never>; result: string };
@@ -824,6 +887,19 @@ export type AuditEntry =
       url: string;
       allowed: boolean;
       reason: string;
+    }
+  | {
+      ts: string;
+      kind: "command";
+      sessionId: string;
+      commandId: string;
+      command: string;
+      cwd: string;
+      shell: string;
+      status: "started" | "completed" | "failed" | "cancelled" | "timeout";
+      exitCode?: number | null;
+      durationMs?: number;
+      truncated?: boolean;
     };
 
 export type CommandName = keyof CommandMap;

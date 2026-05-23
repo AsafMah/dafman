@@ -285,3 +285,23 @@ test("terminal toolbar supports find without buffer or paste buttons", async ({ 
     timeout: 10_000,
   });
 });
+
+test("composer !! command mode streams a command result and can attach it", async ({ page }) => {
+  await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
+  const composer = page.locator(".lex-composer-input").first();
+  await composer.waitFor({ state: "visible", timeout: 15_000 });
+
+  await composer.click();
+  await page.keyboard.type("!!");
+  const commandInput = page.getByRole("textbox", { name: "Session command" });
+  await expect(commandInput).toBeVisible();
+  await commandInput.fill("echo COMMAND_ATTACHMENT_OK");
+  await page.keyboard.press("Enter");
+
+  const card = page.locator(".command-result-card").first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await expect(card).toContainText("COMMAND_ATTACHMENT_OK", { timeout: 10_000 });
+  await expect(card).toContainText("completed", { timeout: 10_000 });
+  await card.getByRole("button", { name: "Add to composer" }).click();
+  await expect(page.locator('.composer-attachment-pill[data-attachment-kind="command-result"]').first()).toBeVisible();
+});

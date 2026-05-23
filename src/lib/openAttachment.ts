@@ -10,6 +10,31 @@ import { invokeCommand } from "../ipc/invoke";
 import type { SendMessageAttachment } from "../ipc/types";
 
 export async function openAttachment(a: SendMessageAttachment): Promise<void> {
+  if (a.type === "commandResult") {
+    const text = [
+      "# Command result",
+      "",
+      `- Command: \`${a.result.command}\``,
+      `- CWD: \`${a.result.cwd}\``,
+      `- Shell: \`${a.result.shell}\``,
+      `- Status: ${a.result.status}`,
+      ...(typeof a.result.exitCode === "number" ? [`- Exit code: ${a.result.exitCode}`] : []),
+      "",
+      "## stdout",
+      "```text",
+      a.result.stdout || "(empty)",
+      "```",
+      "",
+      "## stderr",
+      "```text",
+      a.result.stderr || "(empty)",
+      "```",
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
   if (a.type === "file" || a.type === "directory") {
     try {
       await invokeCommand("revealPath", { path: a.path });

@@ -14,6 +14,9 @@ import type {
 	TerminalCreateParams,
 	TerminalEventPayload,
 	TerminalSummary,
+	CommandResultEvent,
+	CommandResultRecord,
+	SendMessageAttachment,
 } from "../rpc";
 import type { AppErrorPayload } from "../app/errors";
 
@@ -228,6 +231,56 @@ describe("IPC wire contracts", () => {
 			terminalId: "term-1",
 			kind: "output",
 			data: "hello",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("CommandResultRecord shape", () => {
+		const sample: CommandResultRecord = {
+			id: "cmd-1",
+			sessionId: "sess-1",
+			command: "bun test",
+			cwd: "C:\\repo\\dafman",
+			shell: "pwsh.exe",
+			status: "completed",
+			stdout: "ok",
+			stderr: "",
+			truncated: false,
+			createdAt: "2026-05-23T10:00:00.000Z",
+			completedAt: "2026-05-23T10:00:01.000Z",
+			exitCode: 0,
+			durationMs: 1000,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("CommandResultEvent — stdout", () => {
+		const sample: CommandResultEvent = {
+			kind: "stdout",
+			sessionId: "sess-1",
+			commandId: "cmd-1",
+			data: "hello",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("SendMessageAttachment — command result", () => {
+		const sample: SendMessageAttachment = {
+			type: "commandResult",
+			displayName: "command-result.md",
+			result: {
+				id: "cmd-1",
+				sessionId: "sess-1",
+				command: "echo hi",
+				cwd: "C:\\repo\\dafman",
+				shell: "pwsh.exe",
+				status: "completed",
+				stdout: "hi",
+				stderr: "",
+				truncated: false,
+				createdAt: "2026-05-23T10:00:00.000Z",
+				exitCode: 0,
+			},
 		};
 		expect(sample).toMatchSnapshot();
 	});

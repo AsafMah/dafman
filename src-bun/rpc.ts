@@ -188,6 +188,56 @@ export type TerminalEventPayload =
 	| { terminalId: string; kind: "exit"; summary: TerminalSummary }
 	| { terminalId: string; kind: "error"; message: string };
 
+export type CommandResultStatus =
+	| "running"
+	| "completed"
+	| "failed"
+	| "cancelled"
+	| "timeout";
+
+export interface CommandResultRecord {
+	id: string;
+	sessionId: string;
+	command: string;
+	cwd: string;
+	shell: string;
+	status: CommandResultStatus;
+	stdout: string;
+	stderr: string;
+	truncated: boolean;
+	createdAt: string;
+	completedAt?: string;
+	exitCode?: number | null;
+	durationMs?: number;
+	displayName?: string;
+}
+
+export type CommandResultEvent =
+	| {
+			kind: "started";
+			sessionId: string;
+			commandId: string;
+			record: CommandResultRecord;
+	  }
+	| {
+			kind: "stdout" | "stderr";
+			sessionId: string;
+			commandId: string;
+			data: string;
+	  }
+	| {
+			kind: "truncated";
+			sessionId: string;
+			commandId: string;
+			limitBytes: number;
+	  }
+	| {
+			kind: "completed" | "cancelled";
+			sessionId: string;
+			commandId: string;
+			record: CommandResultRecord;
+	  };
+
 export interface Workspaces {
 	/// Most-recently-used absolute filesystem paths the user has spun
 	/// sessions in. Capped at WORKSPACES_MRU_LIMIT (10) entries; head
@@ -371,7 +421,8 @@ export type SendMessageAttachment =
 			};
 			text?: string;
 	  }
-	| { type: "blob"; data: string; mimeType: string; displayName?: string };
+	| { type: "blob"; data: string; mimeType: string; displayName?: string }
+	| { type: "commandResult"; result: CommandResultRecord; displayName?: string };
 
 /// One file result from `searchWorkspaceFiles`. `path` is relative
 /// to the session's working directory (for fuzzy mode) or preserves
@@ -1000,6 +1051,18 @@ export type DafmanRPC = {
 				params: Record<string, never>;
 				response: TerminalSummary[];
 			};
+			startSessionCommand: {
+				params: { sessionId: string; command: string };
+				response: CommandResultRecord;
+			};
+			cancelSessionCommand: {
+				params: { sessionId: string; commandId: string };
+				response: boolean;
+			};
+			listCommandResults: {
+				params: { sessionId: string };
+				response: CommandResultRecord[];
+			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };
 			getLogDir: { params: Record<string, never>; response: string };
@@ -1125,6 +1188,7 @@ export type DafmanRPC = {
 			/// in-app Activity view (Diagnostics panel) subscribes.
 			auditEvent: AuditEntry;
 			terminalEvent: TerminalEventPayload;
+			commandResultEvent: CommandResultEvent;
 		};
 	}>;
 };
@@ -1155,6 +1219,19 @@ export type AuditEntry =
 		url: string;
 		allowed: boolean;
 		reason: string;
+	}
+	| {
+		ts: string;
+		kind: "command";
+		sessionId: string;
+		commandId: string;
+		command: string;
+		cwd: string;
+		shell: string;
+		status: "started" | "completed" | "failed" | "cancelled" | "timeout";
+		exitCode?: number | null;
+		durationMs?: number;
+		truncated?: boolean;
 	};
 
 export type { AppErrorPayload };

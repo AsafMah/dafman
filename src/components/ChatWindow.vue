@@ -10,6 +10,7 @@ import SessionHeaderControls from "./SessionHeaderControls.vue";
 import ToolCallBlock from "./ToolCallBlock.vue";
 import SubagentBlock from "./SubagentBlock.vue";
 import PendingRequestCard from "./PendingRequestCard.vue";
+import CommandResultCard from "./CommandResultCard.vue";
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -20,13 +21,16 @@ import {
   type IdCounter,
 } from "../lib/chatEvents";
 import type {
+  CommandResultRecord,
   ReasoningVisibility,
+  SendMessageAttachment,
   SessionEventPayload,
 } from "../ipc/types";
 import { useSessionsStore, type DefaultSendMode } from "../stores/sessionsStore";
 import { useSessionsListStore } from "../stores/sessionsListStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useCommandResultsStore } from "../stores/commandResultsStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 import type { ComposerSubmitPayload } from "../lexical/plugins";
@@ -66,6 +70,7 @@ const sessionsStore = useSessionsStore();
 const sessionsListStore = useSessionsListStore();
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
+const commandResultsStore = useCommandResultsStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
 
@@ -73,7 +78,10 @@ const items = ref<ChatItem[]>([]);
 const ambient = ref<ChatAmbient>(defaultAmbient());
 const messagesEl = ref<HTMLElement | null>(null);
 const tileEl = ref<HTMLElement | null>(null);
-const composerRef = ref<{ focus: () => void } | null>(null);
+const composerRef = ref<{
+  focus: () => void;
+  addAttachment?: (attachment: SendMessageAttachment) => void;
+} | null>(null);
 
 /// External "focus my composer" requests arrive as a window event
 /// from the Sessions sidebar (clicking an already-open session row).
@@ -86,6 +94,9 @@ function onExternalFocusRequest(e: Event) {
 
 onMounted(() => {
   window.addEventListener("dafman:focus-composer", onExternalFocusRequest);
+  void commandResultsStore.refresh(props.sessionId).catch(() => {
+    /* non-critical persisted command history */
+  });
 });
 
 onBeforeUnmount(() => {
@@ -315,6 +326,28 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
 
+async function onCommandSubmit(command: string): Promise<void> {
+  try {
+    await commandResultsStore.start(props.sessionId, command);
+    await scrollToBottom();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    toasts.error("Command failed to start", message);
+  }
+}
+
+function addCommandResultAttachment(record: CommandResultRecord): void {
+  composerRef.value?.addAttachment?.({
+    type: "commandResult",
+    result: record,
+    displayName: `command-result-${record.id.slice(0, 8)}.md`,
+  });
+}
+
+async function cancelCommandResult(record: CommandResultRecord): Promise<void> {
+  await commandResultsStore.cancel(props.sessionId, record.id);
+}
+
 /// Inline edit mode for user messages: when set, the matching user
 /// bubble is replaced by a MessageEditor in place. Reset on save,
 /// fork-and-save, or cancel. Keyed by ChatItem.id (counter-derived).
@@ -499,6 +532,8 @@ const commandsRun = computed(() => {
   return total;
 });
 
+const commandResults = computed(() => commandResultsStore.recordsBySession[props.sessionId] ?? []);
+
 const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
 /// Type-aware styling for the pending-request banner. Pulls the
 /// color + icon + label from the shared `notificationStyles` so the
@@ -673,6 +708,14 @@ const pendingStyle = computed(() => {
         </div>
       </template>
 
+      <CommandResultCard
+        v-for="record in commandResults"
+        :key="`command-${record.id}`"
+        :record="record"
+        @add="addCommandResultAttachment"
+        @cancel="cancelCommandResult"
+      />
+
       <!-- Mid-turn indicator inside the chat. Visible whenever the
            record reports `isThinking` (driven by assistant.turn_start
            / turn_end / session.idle in sessionsStore). Previously
@@ -753,6 +796,7 @@ const pendingStyle = computed(() => {
         :default-mode="props.defaultSendMode"
         :session-id="props.sendHandler ? undefined : props.sessionId"
         @submit="sendMessage"
+        @command-submit="onCommandSubmit"
         @update:default-mode="onUpdateDefaultMode"
       >
         <template #session-left-controls>

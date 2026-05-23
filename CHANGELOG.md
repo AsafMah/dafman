@@ -75,6 +75,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   and Find now enables the xterm proposed API needed by search decorations,
   focuses the search box, performs incremental lookup, exposes match/no-match
   status, and clears highlights when closed.
+- **`!!` command result attachments.** Typing `!!` in an empty composer enters
+  a distinct command mode. Enter runs a bounded session-cwd subprocess (1024 KiB
+  output cap, 60 second timeout, one running command per session), streams a
+  command-result card into chat, persists capped results, audits command
+  metadata without stdout/stderr bytes, and lets the user manually add the
+  result back to the composer as a first-class `commandResult` attachment.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

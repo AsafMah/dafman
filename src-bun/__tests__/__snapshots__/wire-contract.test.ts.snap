@@ -689,3 +689,50 @@ exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
   },
 }
 `;
+
+exports[`IPC wire contracts CommandResultRecord shape 1`] = `
+{
+  "command": "bun test",
+  "completedAt": "2026-05-23T10:00:01.000Z",
+  "createdAt": "2026-05-23T10:00:00.000Z",
+  "cwd": "C:\\repo\\dafman",
+  "durationMs": 1000,
+  "exitCode": 0,
+  "id": "cmd-1",
+  "sessionId": "sess-1",
+  "shell": "pwsh.exe",
+  "status": "completed",
+  "stderr": "",
+  "stdout": "ok",
+  "truncated": false,
+}
+`;
+
+exports[`IPC wire contracts CommandResultEvent — stdout 1`] = `
+{
+  "commandId": "cmd-1",
+  "data": "hello",
+  "kind": "stdout",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts SendMessageAttachment — command result 1`] = `
+{
+  "displayName": "command-result.md",
+  "result": {
+    "command": "echo hi",
+    "createdAt": "2026-05-23T10:00:00.000Z",
+    "cwd": "C:\\repo\\dafman",
+    "exitCode": 0,
+    "id": "cmd-1",
+    "sessionId": "sess-1",
+    "shell": "pwsh.exe",
+    "status": "completed",
+    "stderr": "",
+    "stdout": "hi",
+    "truncated": false,
+  },
+  "type": "commandResult",
+}
+`;

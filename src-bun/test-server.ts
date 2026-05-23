@@ -33,6 +33,7 @@ import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
 import { SkillsRegistry } from "./app/skillsRegistry";
 import { TerminalRegistry } from "./app/terminalRegistry";
+import { CommandResultRegistry } from "./app/commandResultRegistry";
 import { SettingsService } from "./app/settings";
 import { listInstructionSources } from "./app/instructions";
 import { toModelSummary } from "./app/models";
@@ -114,6 +115,8 @@ const emitPending = (payload: PendingRequestPayload) =>
 	broadcast("pendingRequest", payload);
 const emitTerminal = (payload: import("./rpc").TerminalEventPayload) =>
 	broadcast("terminalEvent", payload);
+const emitCommandResult = (payload: import("./rpc").CommandResultEvent) =>
+	broadcast("commandResultEvent", payload);
 
 const sessions = new SessionRegistry(
 	emitEvent,
@@ -125,6 +128,10 @@ const sessions = new SessionRegistry(
 const mcp = new McpRegistry();
 const skills = new SkillsRegistry();
 const terminals = new TerminalRegistry(emitTerminal);
+const commandResults = new CommandResultRegistry(
+	join(flags.userData, "command-results.json"),
+	emitCommandResult,
+);
 
 subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
 subscribeAudit((entry: AuditEntry) => broadcast("auditEvent", entry));
@@ -448,6 +455,19 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		return terminals.kill(terminalId);
 	}),
 	listTerminals: rpcGuard(async () => terminals.list()),
+	startSessionCommand: rpcGuard(async (args) => {
+		const { sessionId, command } = args as { sessionId: string; command: string };
+		const cwd = (await sessions.getCwd(sessionId)) ?? flags.workspace;
+		return commandResults.start({ sessionId, command, cwd });
+	}),
+	cancelSessionCommand: rpcGuard(async (args) => {
+		const { sessionId, commandId } = args as { sessionId: string; commandId: string };
+		return commandResults.cancel(sessionId, commandId);
+	}),
+	listCommandResults: rpcGuard(async (args) => {
+		const { sessionId } = args as { sessionId: string };
+		return commandResults.list(sessionId);
+	}),
 };
 
 // Test-server-only control RPCs. Test code uses these to drive the

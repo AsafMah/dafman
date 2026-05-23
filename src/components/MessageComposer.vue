@@ -19,7 +19,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import SplitButton from "primevue/splitbutton";
 import Popover from "primevue/popover";
 import type { MenuItem } from "primevue/menuitem";
@@ -108,7 +108,11 @@ const diagEnabled =
 /// ref array drifting from the editor state.
 const toasts = useToastStore();
 const toolbarRef = ref<HTMLElement | null>(null);
+const commandInputRef = ref<HTMLInputElement | null>(null);
 const toolbarWidth = ref(1000);
+const commandMode = ref(false);
+const commandDraft = ref("");
+let bangArmed = false;
 const formatActions = computed(() => editorFormatActions);
 const visibleFormatCount = computed(() => {
   const width = toolbarWidth.value;
@@ -188,6 +192,14 @@ function addAttachment(a: SendMessageAttachment): void {
   );
 }
 
+function clearEditor(): void {
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor) return;
+  editor.update(() => {
+    $getRoot().clear();
+  });
+}
+
 const MAX_BLOB_BYTES = 8 * 1024 * 1024; // 8 MiB safety cap
 
 /// Read a File/Blob into a base64 SDK blob attachment. Wraps the
@@ -246,6 +258,7 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
 /// session-store action.
 const emit = defineEmits<{
   (e: "submit", payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }): void;
+  (e: "commandSubmit", command: string): void;
   (e: "update:defaultMode", mode: DefaultSendMode): void;
 }>();
 
@@ -443,7 +456,53 @@ function readEditorFormatState(): void {
   };
 }
 
-defineExpose({ focus: focusComposer, setText, appendText });
+defineExpose({ focus: focusComposer, setText, appendText, addAttachment });
+
+async function enterCommandMode(): Promise<void> {
+  clearEditor();
+  commandDraft.value = "";
+  commandMode.value = true;
+  await nextTick();
+  commandInputRef.value?.focus();
+}
+
+function exitCommandMode(): void {
+  commandMode.value = false;
+  commandDraft.value = "";
+  bangArmed = false;
+  setTimeout(() => focusComposer(), 0);
+}
+
+function submitCommandMode(): void {
+  const command = commandDraft.value.trim();
+  if (!command) {
+    exitCommandMode();
+    return;
+  }
+  emit("commandSubmit", command);
+  exitCommandMode();
+}
+
+function onComposerKeydown(event: KeyboardEvent): void {
+  if (props.disabled || commandMode.value) return;
+  if (event.key !== "!" || event.ctrlKey || event.altKey || event.metaKey) {
+    bangArmed = false;
+    return;
+  }
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor) return;
+  const text = editor.getEditorState().read(() => $getRoot().getTextContent());
+  if (!bangArmed && text.length === 0) {
+    bangArmed = true;
+    return;
+  }
+  if (bangArmed && text === "!") {
+    event.preventDefault();
+    void enterCommandMode();
+    return;
+  }
+  bangArmed = false;
+}
 
 const editable = computed(() => !props.disabled);
 const richText = computed(() => props.enableMarkdownShortcuts);
@@ -616,8 +675,21 @@ const SubmitButton = defineComponent({
           v-if="props.sessionId"
           :session-id="props.sessionId"
         />
-          <div class="lex-composer-shell" @paste="onPaste">
-          <div class="lex-composer-editor">
+          <div class="lex-composer-shell" :class="{ 'is-command-mode': commandMode }" @paste="onPaste" @keydown.capture="onComposerKeydown">
+          <div v-if="commandMode" class="lex-command-mode">
+            <span class="lex-command-prefix">!!</span>
+            <input
+              ref="commandInputRef"
+              v-model="commandDraft"
+              class="lex-command-input"
+              type="text"
+              placeholder="Run command in session workspace — Enter to run, Esc to cancel"
+              aria-label="Session command"
+              @keydown.enter.prevent="submitCommandMode"
+              @keydown.esc.prevent="exitCommandMode"
+            />
+          </div>
+          <div v-show="!commandMode" class="lex-composer-editor">
             <template v-if="richText">
               <RichTextPlugin>
                 <template #contentEditable>
@@ -658,7 +730,7 @@ const SubmitButton = defineComponent({
           </div>
           <div class="lex-composer-send">
             <SubmitButton
-              :disabled="props.disabled"
+              :disabled="props.disabled || commandMode"
               :label="primaryLabel"
               :icon="primaryIcon"
               :tooltip="primaryTooltip"
