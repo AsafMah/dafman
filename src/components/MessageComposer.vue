@@ -459,9 +459,40 @@ async function enterCommandMode(): Promise<void> {
   await nextTick();
 }
 
+let escArmed = false;
+let escTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onCommandModeKeydown(event: KeyboardEvent): void {
+  // Double-Esc exits command mode
+  if (event.key === "Escape") {
+    if (escArmed) {
+      event.preventDefault();
+      event.stopPropagation();
+      escArmed = false;
+      if (escTimer) { clearTimeout(escTimer); escTimer = null; }
+      exitCommandMode();
+      return;
+    }
+    escArmed = true;
+    if (escTimer) clearTimeout(escTimer);
+    escTimer = setTimeout(() => { escArmed = false; escTimer = null; }, 400);
+    return;
+  }
+  // Ctrl+Backspace exits command mode
+  if (event.key === "Backspace" && event.ctrlKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    exitCommandMode();
+    return;
+  }
+  escArmed = false;
+}
+
 function exitCommandMode(): void {
   commandMode.value = false;
   bangArmed = false;
+  escArmed = false;
+  if (escTimer) { clearTimeout(escTimer); escTimer = null; }
   setTimeout(() => focusComposer(), 0);
 }
 
@@ -658,7 +689,7 @@ const SubmitButton = defineComponent({
           :session-id="props.sessionId"
         />
           <div class="lex-composer-shell" :class="{ 'is-command-mode': commandMode }" @paste="onPaste" @keydown.capture="onComposerKeydown">
-          <div v-if="commandMode" class="lex-command-mode" @keydown.esc.prevent="exitCommandMode">
+          <div v-if="commandMode" class="lex-command-mode" @keydown.capture="onCommandModeKeydown">
             <TerminalPanel
               v-if="props.commandTerminalId"
               :params="{ terminalId: props.commandTerminalId, compact: true }"
