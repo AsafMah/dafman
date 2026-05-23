@@ -15,6 +15,7 @@ import type {
   LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
+  TerminalEventPayload,
 } from "./types";
 
 export type InvokeResult<N extends CommandName> = CommandMap[N]["result"];
@@ -75,6 +76,7 @@ export type SessionEventListener = (event: SessionEventPayload) => void;
 export type PendingRequestListener = (payload: PendingRequestPayload) => void;
 export type LogEventListener = (record: LogRecord) => void;
 export type AuditEventListener = (entry: AuditEntry) => void;
+export type TerminalEventListener = (event: TerminalEventPayload) => void;
 
 /// Minimal surface that the IPC bridge has to implement. Both the real
 /// Electrobun bridge and unit-test fakes match this shape; tests inject a
@@ -88,6 +90,7 @@ export interface RpcBridge {
   onPendingRequest(listener: PendingRequestListener): () => void;
   onLogEvent(listener: LogEventListener): () => void;
   onAuditEvent(listener: AuditEventListener): () => void;
+  onTerminalEvent?(listener: TerminalEventListener): () => void;
 }
 
 let bridge: RpcBridge | null = null;
@@ -95,6 +98,7 @@ const pendingSessionListeners = new Set<SessionEventListener>();
 const pendingPendingRequestListeners = new Set<PendingRequestListener>();
 const pendingLogListeners = new Set<LogEventListener>();
 const pendingAuditListeners = new Set<AuditEventListener>();
+const pendingTerminalListeners = new Set<TerminalEventListener>();
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
@@ -115,6 +119,10 @@ export function setRpcBridge(next: RpcBridge | null): void {
     next.onAuditEvent(listener);
   }
   pendingAuditListeners.clear();
+  for (const listener of pendingTerminalListeners) {
+    next.onTerminalEvent?.(listener);
+  }
+  pendingTerminalListeners.clear();
 }
 
 export async function invokeCommand<N extends CommandName>(
@@ -161,4 +169,10 @@ export function onAuditEvent(listener: AuditEventListener): () => void {
   if (bridge) return bridge.onAuditEvent(listener);
   pendingAuditListeners.add(listener);
   return () => pendingAuditListeners.delete(listener);
+}
+
+export function onTerminalEvent(listener: TerminalEventListener): () => void {
+  if (bridge?.onTerminalEvent) return bridge.onTerminalEvent(listener);
+  pendingTerminalListeners.add(listener);
+  return () => pendingTerminalListeners.delete(listener);
 }

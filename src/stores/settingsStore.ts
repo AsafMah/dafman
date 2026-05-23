@@ -11,7 +11,7 @@ import { useToastStore } from "./toastStore";
 
 function defaultSettings(): Settings {
   return {
-    version: 12,
+    version: 13,
     appearance: {
       theme: "system",
       reasoningVisibility: "compact",
@@ -25,6 +25,7 @@ function defaultSettings(): Settings {
     notifications: { turnEnd: false, waitingForInput: true },
     tools: { defaultExcluded: [], defaultAllowed: [] },
     permissions: { defaultApproveAll: false },
+    terminal: { defaultProfileId: "platform-default" },
   };
 }
 
@@ -217,6 +218,17 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function setDefaultTerminalProfile(defaultProfileId: string): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        terminal: { ...settings.value.terminal, defaultProfileId },
+      });
+    } catch {
+      /* toast already shown */
+    }
+  }
+
   return {
     settings,
     loaded,
@@ -233,5 +245,6 @@ export const useSettingsStore = defineStore("settings", () => {
     recordWorkspaceUse,
     setDefaultWorkspace,
     setDefaultApproveAll,
+    setDefaultTerminalProfile,
   };
 });

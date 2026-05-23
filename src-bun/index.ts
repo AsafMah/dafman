@@ -35,11 +35,12 @@ import { toModelSummary } from "./app/models";
 import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
 import { SkillsRegistry } from "./app/skillsRegistry";
+import { TerminalRegistry } from "./app/terminalRegistry";
 import { listInstructionSources } from "./app/instructions";
 import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
-import type { DafmanRPC, LogRecord, SessionEventPayload } from "./rpc";
+import type { DafmanRPC, LogRecord, SessionEventPayload, TerminalEventPayload } from "./rpc";
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -96,6 +97,12 @@ let emitPending: (payload: import("./rpc").PendingRequestPayload) => void = (pay
 		requestId: payload.requestId,
 	});
 };
+let emitTerminal: (payload: TerminalEventPayload) => void = (payload) => {
+	log.debug("dropped terminal event before webview ready", {
+		terminalId: payload.terminalId,
+		kind: payload.kind,
+	});
+};
 const sessions = new SessionRegistry(
 	(payload) => emitEvent(payload),
 	(payload) => emitPending(payload),
@@ -105,6 +112,7 @@ const sessions = new SessionRegistry(
 );
 const mcp = new McpRegistry();
 const skills = new SkillsRegistry();
+const terminals = new TerminalRegistry((payload) => emitTerminal(payload));
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
 	maxRequestTime: 120000,
@@ -337,6 +345,17 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			listInstructionSources: rpcGuard(async ({ workingDirectory }) =>
 				listInstructionSources({ workingDirectory }),
 			),
+			createTerminal: rpcGuard(async (params) => terminals.create(params)),
+			writeTerminal: rpcGuard(async ({ terminalId, data }) =>
+				terminals.write(terminalId, data),
+			),
+			resizeTerminal: rpcGuard(async ({ terminalId, cols, rows }) =>
+				terminals.resize(terminalId, cols, rows),
+			),
+			killTerminal: rpcGuard(async ({ terminalId }) =>
+				terminals.kill(terminalId),
+			),
+			listTerminals: rpcGuard(async () => terminals.list()),
 			getSettings: rpcGuard(async () => settings.get()),
 			updateSettings: rpcGuard(async ({ next }) => settings.update(next)),
 			getLogDir: rpcGuard(async () => currentLogDir()),
@@ -560,6 +579,11 @@ emitPending = (payload) => {
 		send: { pendingRequest: (p: import("./rpc").PendingRequestPayload) => void };
 	}).send.pendingRequest(payload);
 };
+emitTerminal = (payload) => {
+	(mainWindow.webview.rpc as unknown as {
+		send: { terminalEvent: (p: TerminalEventPayload) => void };
+	}).send.terminalEvent(payload);
+};
 
 // Live log fan-out to the renderer. The in-app log viewer subscribes
 // via the `logEvent` webview message and applies its own level filter
@@ -590,6 +614,14 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
 		await sessions.shutdownAll();
 	} catch (err) {
 		log.warn("sessions.shutdownAll threw during signal handler", {
+			signal,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+	try {
+		terminals.shutdownAll();
+	} catch (err) {
+		log.warn("terminals.shutdownAll threw during signal handler", {
 			signal,
 			error: err instanceof Error ? err.message : String(err),
 		});

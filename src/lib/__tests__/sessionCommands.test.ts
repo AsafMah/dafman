@@ -192,14 +192,18 @@ describe("sessionCommands", () => {
 
   test("SDK passthrough commands appear but are not intercepted", async () => {
     const slashes = SESSION_COMMANDS.map((cmd) => cmd.slash);
-    expect(slashes).toContain("/mcp");
     expect(slashes).toContain("/skill");
     expect(slashes).toContain("/skills");
     expect(slashes).toContain("/agent");
     expect(slashes).toContain("/model");
 
-    const handled = await runLocalSlashCommand("s1", "/mcp list");
+    const handled = await runLocalSlashCommand("s1", "/model");
 
     expect(handled).toBe(false);
+  });
+
+  test("/mcp and /skills are local library commands", async () => {
+    expect(await runLocalSlashCommand("s1", "/mcp")).toBe(true);
+    expect(await runLocalSlashCommand("s1", "/skills")).toBe(true);
   });
 });

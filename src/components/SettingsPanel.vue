@@ -46,6 +46,14 @@ const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
   { label: "Expanded", value: "expanded" },
 ];
 
+const terminalProfileOptions = [
+  { label: "Platform default", value: "platform-default" },
+  { label: "PowerShell 7 / pwsh", value: "pwsh" },
+  { label: "Windows PowerShell", value: "powershell" },
+  { label: "Command Prompt", value: "cmd" },
+  { label: "Unix shell ($SHELL)", value: "unix-shell" },
+];
+
 const defaultModelOptions = computed<Array<ModelSummary | { id: ""; name: string }>>(
   () => [{ id: "", name: "CLI default" }, ...models.value],
 );
@@ -77,6 +85,13 @@ const defaultReasoning = computed<string | null>({
   get: () => settings.value.appearance.defaultReasoningEffort ?? null,
   set: (value) => {
     void settingsStore.setDefaultModel(defaultModel.value, value);
+  },
+});
+
+const defaultTerminalProfile = computed<string>({
+  get: () => settings.value.terminal?.defaultProfileId ?? "platform-default",
+  set: (value) => {
+    void settingsStore.setDefaultTerminalProfile(value);
   },
 });
 
@@ -403,6 +418,41 @@ function toggle(id: string) {
             <code>~/dafman</code> (created on first launch).
           </p>
         </div>
+      </div>
+    </section>
+
+    <!-- Terminal -->
+    <section class="settings-group">
+      <button
+        type="button"
+        class="group-header"
+        :aria-expanded="!collapsed.terminal"
+        @click="toggle('terminal')"
+      >
+        <i
+          class="pi group-chevron"
+          :class="collapsed.terminal ? 'pi-chevron-right' : 'pi-chevron-down'"
+          aria-hidden="true"
+        />
+        <i class="pi pi-terminal group-icon" aria-hidden="true" />
+        <span class="group-label">Terminal</span>
+      </button>
+      <div v-show="!collapsed.terminal" class="group-body">
+        <label class="field" for="terminal-profile-select">
+          <span class="field-label">Default terminal profile</span>
+          <Select
+            id="terminal-profile-select"
+            v-model="defaultTerminalProfile"
+            :options="terminalProfileOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            class="field-control"
+          />
+          <p class="field-hint">
+            Used for new terminal panes. Full profile editing is planned for a later slice.
+          </p>
+        </label>
       </div>
     </section>
 

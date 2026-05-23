@@ -1,22 +1,5 @@
-- [x] Plans, tool and skill descriptions are markdown and should be displayed as such wherever they are.
-- [x] Restored sessions lose usage info.
-- [x] The right side panel should keep the same width when switching between sessions.
-- [x] New agent form is completely broken - everything is overlapping.
-- [x] Discovered MCP servers have different UI (enable vs switch), and the button doesn't seem to do anything.
-- [x] Let's add to the session editor bar an approve all toggle.
-- [x] All the settings that are duplicated from the session bar in the right pane, should be in a group collapsed by default.
-- [x] The library should also contain a section for tools, and global enable/disable toggles.
-- [x] The left pane window still have exclusivity issues where multiple tabs can be toggled at the same time.
-- [x] Pressing the playground button while it's open should close it.
-- [x] The default model doesn't show until the first message, and then the reasoning doesn't show either.
-- [x] Add a setting to also change the default model.
-- [x] The model just shows "5.5", it should include the full name, worst case ellipsis.
-- [x] The model selector and settings button should be aligned to the right.
-- [x] Color coded indication for normal/plan/autopilot mode.
-- [x] Color coded indication for allow all mode.
-- [x] The x files chip is useless. Maybe add a section to the right pane with all of the files (collapsible).
-- [x] Min-width on the library pane and the right pane are broken again - it's possible to cut them off.
-- [x] The allow all button should say "allow all", and should actually show when it's on.
-- [x] The directory in the bottom session bar should be anchored left.
-- [x] you want to put something in the middle? see if you can get the editor's markdown tools there, and collapse them if the width is too small. put the add attachment button to the left.
-- [x] I thought we hooked up cli commands like /skill and /mcp and yet I don't see them when I write /? they should all be hooked up.
+- [x] Command palette doesn't do anything with slash commands such as /mcp
+- [x] It seems that forwarding /mcp to the session doesn't do anything. Do any of the slash commands work? We need to figure it out, and if not, then remake them.
+- Command Palette should have sub-menus, but still be fully searchable.
+- Pretty much every toggleable setting should be in the command palette.
+- Command palette should support prefixes for different groups of commands, like vscode.

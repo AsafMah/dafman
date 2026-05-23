@@ -45,6 +45,7 @@ export interface Settings {
   notifications: NotificationPrefs;
   tools: ToolsPrefs;
   permissions: PermissionsPrefs;
+  terminal: TerminalPrefs;
 }
 
 export interface ToolsPrefs {
@@ -60,6 +61,41 @@ export interface PermissionsPrefs {
   /// Default false — explicit user opt-in.
   defaultApproveAll: boolean;
 }
+
+export interface TerminalPrefs {
+  defaultProfileId: string;
+}
+
+export interface TerminalCreateParams {
+  cwd?: string;
+  shell?: string;
+  args?: string[];
+  cols?: number;
+  rows?: number;
+  title?: string;
+  sessionId?: string;
+}
+
+export interface TerminalSummary {
+  id: string;
+  title: string;
+  cwd: string;
+  shell: string;
+  args: string[];
+  status: "running" | "exiting" | "exited" | "failed";
+  createdAt: string;
+  cols: number;
+  rows: number;
+  sessionId?: string;
+  exitCode?: number | null;
+  signal?: string | null;
+}
+
+export type TerminalEventPayload =
+  | { terminalId: string; kind: "output"; data: string }
+  | { terminalId: string; kind: "status"; summary: TerminalSummary }
+  | { terminalId: string; kind: "exit"; summary: TerminalSummary }
+  | { terminalId: string; kind: "error"; message: string };
 
 export interface Layout {
   dockview: unknown | null;
@@ -681,6 +717,26 @@ export type CommandMap = {
   listInstructionSources: {
     args: { workingDirectory?: string };
     result: InstructionSource[];
+  };
+  createTerminal: {
+    args: TerminalCreateParams;
+    result: TerminalSummary;
+  };
+  writeTerminal: {
+    args: { terminalId: string; data: string };
+    result: boolean;
+  };
+  resizeTerminal: {
+    args: { terminalId: string; cols: number; rows: number };
+    result: boolean;
+  };
+  killTerminal: {
+    args: { terminalId: string };
+    result: boolean;
+  };
+  listTerminals: {
+    args: Record<string, never>;
+    result: TerminalSummary[];
   };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };

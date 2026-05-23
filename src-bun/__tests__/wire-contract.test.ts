@@ -11,6 +11,9 @@ import type {
 	SessionEventPayload,
 	InstructionSource,
 	TaskInfo,
+	TerminalCreateParams,
+	TerminalEventPayload,
+	TerminalSummary,
 } from "../rpc";
 import type { AppErrorPayload } from "../app/errors";
 
@@ -22,7 +25,7 @@ import type { AppErrorPayload } from "../app/errors";
 describe("IPC wire contracts", () => {
 	test("Settings shape", () => {
 		const sample: Settings = {
-			version: 12,
+			version: 13,
 			appearance: {
 				theme: "dark",
 				reasoningVisibility: "compact",
@@ -39,13 +42,14 @@ describe("IPC wire contracts", () => {
 			notifications: { turnEnd: false, waitingForInput: true },
 			tools: { defaultExcluded: [], defaultAllowed: [] },
 			permissions: { defaultApproveAll: false },
+			terminal: { defaultProfileId: "platform-default" },
 		};
 		expect(sample).toMatchSnapshot();
 	});
 
 	test("Settings with persisted layout", () => {
 		const sample: Settings = {
-			version: 12,
+			version: 13,
 			appearance: {
 				theme: "dark",
 				reasoningVisibility: "compact",
@@ -70,6 +74,7 @@ describe("IPC wire contracts", () => {
 			notifications: { turnEnd: true, waitingForInput: true },
 			tools: { defaultExcluded: ["bash"], defaultAllowed: [] },
 			permissions: { defaultApproveAll: true },
+			terminal: { defaultProfileId: "pwsh" },
 		};
 		expect(sample).toMatchSnapshot();
 	});
@@ -202,6 +207,31 @@ describe("IPC wire contracts", () => {
 		expect(sample).toMatchSnapshot();
 	});
 
+	test("TerminalSummary shape", () => {
+		const sample: TerminalSummary = {
+			id: "term-1",
+			title: "PowerShell",
+			cwd: "C:\\repo\\dafman",
+			shell: "pwsh.exe",
+			args: ["-NoLogo"],
+			status: "running",
+			createdAt: "2026-05-23T06:00:00.000Z",
+			cols: 100,
+			rows: 30,
+			sessionId: "sess-1",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("TerminalEventPayload — output", () => {
+		const sample: TerminalEventPayload = {
+			terminalId: "term-1",
+			kind: "output",
+			data: "hello",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
 	test("sendMessage request — default mode (omitted)", () => {
 		const sample = { sessionId: "sess-1", text: "hello" };
 		expect(sample).toMatchSnapshot();
@@ -245,6 +275,19 @@ describe("IPC wire contracts", () => {
 
 	test("promoteTask request shape", () => {
 		const sample = { sessionId: "sess-1", id: "agent-1" };
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("createTerminal request shape", () => {
+		const sample: TerminalCreateParams = {
+			cwd: "C:\\repo\\dafman",
+			shell: "pwsh.exe",
+			args: ["-NoLogo"],
+			cols: 80,
+			rows: 24,
+			title: "Session Shell",
+			sessionId: "sess-1",
+		};
 		expect(sample).toMatchSnapshot();
 	});
 

@@ -29,6 +29,7 @@ import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useModelsStore } from "../stores/modelsStore";
 import { useToastStore } from "../stores/toastStore";
+import { useTerminalStore } from "../stores/terminalStore";
 import { SESSION_COMMANDS } from "./sessionCommands";
 import type { SessionMode } from "../ipc/types";
 
@@ -99,6 +100,43 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           minimumSize: 300,
           exclusive: true,
         });
+      },
+    },
+    {
+      id: "terminal.new",
+      label: "New Terminal",
+      group: "Terminal",
+      icon: "pi pi-terminal",
+      keywords: ["shell", "pty", "command"],
+      run: async () => {
+        const terminalStore = useTerminalStore();
+        const summary = await terminalStore.createTerminal({
+          cols: 80,
+          rows: 24,
+        });
+        layoutStore.addTerminalPanel(summary.id, summary.title);
+      },
+    },
+    {
+      id: "terminal.newSession",
+      label: "New Terminal in Session Workspace",
+      group: "Terminal",
+      icon: "pi pi-folder-open",
+      keywords: ["shell", "pty", "cwd"],
+      when: () => layoutStore.activeSessionId !== null,
+      run: async () => {
+        const sid = layoutStore.activeSessionId;
+        const record = sessionsStore.sessions.find((s) => s.id === sid);
+        const terminalStore = useTerminalStore();
+        const cwd = record?.workingDirectory ?? undefined;
+        const summary = await terminalStore.createTerminal({
+          cols: 80,
+          rows: 24,
+          ...(cwd ? { cwd } : {}),
+          ...(record ? { sessionId: record.id } : {}),
+          title: cwd ? `Terminal · ${cwd.split(/[\\/]/).pop()}` : "Session Terminal",
+        });
+        layoutStore.addTerminalPanel(summary.id, summary.title);
       },
     },
     {
@@ -224,6 +262,10 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       run: async () => {
         const id = layoutStore.activeSessionId;
         if (!id) return;
+        if (sc.passthrough) {
+          await sessionsStore.sendMessage(id, sc.slash);
+          return;
+        }
         await sc.run(id);
       },
     });

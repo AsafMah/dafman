@@ -5,6 +5,13 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added (Phase 23c — Long Jobs + Autopilot UI)
 
+- **Terminal panes (Bun native PTY).** Added a Bun `TerminalRegistry`
+  backed by `Bun.spawn(..., { terminal })`, terminal RPC/events, xterm.js
+  dockview panels, command-palette actions for standalone/session
+  terminals, and a session composer shell mode with command capture.
+- **Terminal default profile setting.** Settings now persists a default
+  terminal profile id (`platform-default` initially); full profile CRUD
+  remains a later slice.
 - **Global Jobs panel.** New activity-bar Jobs surface aggregates SDK
   agent and shell tasks across registered sessions, shows active counts,
   and exposes open-session, cancel, remove, and promote-to-background

@@ -13,6 +13,7 @@ import type {
   LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
+  TerminalEventPayload,
 } from "./types";
 import type {
   AuditEventListener,
@@ -20,6 +21,7 @@ import type {
   PendingRequestListener,
   RpcBridge,
   SessionEventListener,
+  TerminalEventListener,
 } from "./invoke";
 
 interface ElectrobunRpcType {
@@ -39,6 +41,7 @@ interface ElectrobunRpcType {
       pendingRequest: PendingRequestPayload;
       logEvent: LogRecord;
       auditEvent: AuditEntry;
+      terminalEvent: TerminalEventPayload;
     };
   };
 }
@@ -51,6 +54,7 @@ export function createElectrobunBridge(): {
   const pendingListeners = new Set<PendingRequestListener>();
   const logListeners = new Set<LogEventListener>();
   const auditListeners = new Set<AuditEventListener>();
+  const terminalListeners = new Set<TerminalEventListener>();
 
   const rpc = Electroview.defineRPC<ElectrobunRpcType>({
     maxRequestTime: 120000,
@@ -93,6 +97,15 @@ export function createElectrobunBridge(): {
             }
           }
         },
+        terminalEvent: (payload) => {
+          for (const listener of terminalListeners) {
+            try {
+              listener(payload);
+            } catch (err) {
+              console.error("[terminalEvent listener threw]", err);
+            }
+          }
+        },
       },
     },
   });
@@ -121,6 +134,10 @@ export function createElectrobunBridge(): {
     onAuditEvent(listener) {
       auditListeners.add(listener);
       return () => auditListeners.delete(listener);
+    },
+    onTerminalEvent(listener) {
+      terminalListeners.add(listener);
+      return () => terminalListeners.delete(listener);
     },
   };
 

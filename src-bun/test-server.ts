@@ -32,12 +32,18 @@ import { tryGetClient, setClientForTest } from "./app/client";
 import { SessionRegistry } from "./app/sessions";
 import { McpRegistry } from "./app/mcpRegistry";
 import { SkillsRegistry } from "./app/skillsRegistry";
+import { TerminalRegistry } from "./app/terminalRegistry";
 import { SettingsService } from "./app/settings";
 import { listInstructionSources } from "./app/instructions";
 import { toModelSummary } from "./app/models";
 import { FakeCopilotClient } from "./app/fakeClient";
 import type { AuditEntry } from "./app/audit";
-import type { LogRecord, SessionEventPayload, PendingRequestPayload } from "./rpc";
+import type {
+	LogRecord,
+	SessionEventPayload,
+	PendingRequestPayload,
+	TerminalCreateParams,
+} from "./rpc";
 
 interface CliFlags {
 	port: number;
@@ -106,15 +112,19 @@ const emitEvent = (payload: SessionEventPayload) =>
 	broadcast("sessionEvent", payload);
 const emitPending = (payload: PendingRequestPayload) =>
 	broadcast("pendingRequest", payload);
+const emitTerminal = (payload: import("./rpc").TerminalEventPayload) =>
+	broadcast("terminalEvent", payload);
 
 const sessions = new SessionRegistry(
 	emitEvent,
 	emitPending,
 	() => settings.get().appearance.streaming,
 	() => settings.get().tools.defaultExcluded,
+	() => settings.get().tools.defaultAllowed,
 );
 const mcp = new McpRegistry();
 const skills = new SkillsRegistry();
+const terminals = new TerminalRegistry(emitTerminal);
 
 subscribeLogs((record: LogRecord) => broadcast("logEvent", record));
 subscribeAudit((entry: AuditEntry) => broadcast("auditEvent", entry));
@@ -418,6 +428,26 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 		const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
 		return listInstructionSources({ workingDirectory });
 	}),
+	createTerminal: rpcGuard(async (args) =>
+		terminals.create(args as TerminalCreateParams),
+	),
+	writeTerminal: rpcGuard(async (args) => {
+		const { terminalId, data } = args as { terminalId: string; data: string };
+		return terminals.write(terminalId, data);
+	}),
+	resizeTerminal: rpcGuard(async (args) => {
+		const { terminalId, cols, rows } = args as {
+			terminalId: string;
+			cols: number;
+			rows: number;
+		};
+		return terminals.resize(terminalId, cols, rows);
+	}),
+	killTerminal: rpcGuard(async (args) => {
+		const { terminalId } = args as { terminalId: string };
+		return terminals.kill(terminalId);
+	}),
+	listTerminals: rpcGuard(async () => terminals.list()),
 };
 
 // Test-server-only control RPCs. Test code uses these to drive the

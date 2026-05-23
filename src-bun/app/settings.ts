@@ -20,6 +20,7 @@ import type {
 	PermissionsPrefs,
 	ReasoningVisibility,
 	Settings,
+	TerminalPrefs,
 	ThemeChoice,
 	ToolsPrefs,
 	Workspaces,
@@ -27,7 +28,7 @@ import type {
 import { AppError } from "./errors";
 import { log } from "./logging";
 
-export const SETTINGS_VERSION = 12;
+export const SETTINGS_VERSION = 13;
 
 /// One-time backfill: returns `<homedir>/dafman` (created on demand),
 /// or `""` on failure. Used by `src-bun/index.ts` to populate the
@@ -86,6 +87,7 @@ export function defaultSettings(): Settings {
 		notifications: { turnEnd: false, waitingForInput: true },
 		tools: { defaultExcluded: [], defaultAllowed: [] },
 		permissions: { defaultApproveAll: false },
+		terminal: { defaultProfileId: "platform-default" },
 	};
 }
 
@@ -215,6 +217,17 @@ function coercePermissions(raw: unknown): PermissionsPrefs {
 	return { defaultApproveAll };
 }
 
+function coerceTerminal(raw: unknown): TerminalPrefs {
+	const base = defaultSettings().terminal;
+	if (!raw || typeof raw !== "object") return base;
+	const obj = raw as Record<string, unknown>;
+	const defaultProfileId =
+		typeof obj.defaultProfileId === "string" && obj.defaultProfileId.trim()
+			? obj.defaultProfileId.trim()
+			: base.defaultProfileId;
+	return { defaultProfileId };
+}
+
 export function migrate(input: unknown): Settings {
 	const defaults = defaultSettings();
 	if (!input || typeof input !== "object") return defaults;
@@ -227,6 +240,7 @@ export function migrate(input: unknown): Settings {
 		notifications: coerceNotifications(raw.notifications),
 		tools: coerceTools(raw.tools),
 		permissions: coercePermissions(raw.permissions),
+		terminal: coerceTerminal(raw.terminal),
 	};
 }
 

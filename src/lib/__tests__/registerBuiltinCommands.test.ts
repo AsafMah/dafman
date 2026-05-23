@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setActivePinia, createPinia } from "pinia";
 import { registerBuiltinCommands, type ConfirmHandle } from "../registerBuiltinCommands";
 import { useCommandRegistry } from "../../stores/commandRegistry";
 import { useSessionsStore } from "../../stores/sessionsStore";
 import { useClientStore } from "../../stores/clientStore";
 import { useLayoutStore } from "../../stores/layoutStore";
+import { setRpcBridge, type RpcBridge } from "../../ipc/invoke";
 
 // Lightweight stub for the PrimeVue useConfirm() return value.
 // Captures the options object so tests can assert what would be
@@ -31,6 +32,9 @@ function makeConfirmStub() {
 describe("registerBuiltinCommands — Reset Layout", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+  });
+  afterEach(() => {
+    setRpcBridge(null);
   });
 
   test("with 0 open sessions, runs immediately without prompting", () => {
@@ -124,5 +128,55 @@ describe("registerBuiltinCommands — Reset Layout", () => {
     registerBuiltinCommands({ confirm: stub.handle });
     const visible = useCommandRegistry().visibleCommands.map((c) => c.id);
     expect(visible).not.toContain("session.switch.not-in-dock");
+  });
+
+  test("SDK passthrough slash commands send the slash text to the active session", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    setRpcBridge({
+      async request(name, args) {
+        calls.push({ name, args });
+        return "ok";
+      },
+      onSessionEvent: () => () => {},
+      onPendingRequest: () => () => {},
+      onLogEvent: () => () => {},
+      onAuditEvent: () => () => {},
+    } as RpcBridge);
+    const sessionsStore = useSessionsStore();
+    sessionsStore.sessions.push({
+      id: "s1",
+      accent: "#000",
+      events: [],
+      droppedEventCount: 0,
+      model: null,
+      reasoningEffort: null,
+      title: null,
+      mode: null,
+      approveAll: true,
+      reasoningVisibilityOverride: "default",
+      workingDirectory: null,
+      defaultSendMode: "steer",
+      pendingRequests: [],
+      unseenTurns: 0,
+      isThinking: false,
+      sawTurnBoundary: false,
+      currentAgent: null,
+      tasksRefreshCounter: 0,
+      planRefreshCounter: 0,
+      touchedFiles: [],
+      commandsRun: 0,
+      _toastedOauthRequests: new Set(),
+      _artifactToolCallIds: new Set(),
+    });
+    const layoutStore = useLayoutStore();
+    layoutStore.activeSessionId = "s1";
+    registerBuiltinCommands({ confirm: makeConfirmStub().handle });
+
+    await useCommandRegistry().commands.get("session.cmd.model")?.run();
+
+    expect(calls).toContainEqual({
+      name: "sendMessage",
+      args: { sessionId: "s1", text: "/model", mode: "immediate" },
+    });
   });
 });

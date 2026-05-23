@@ -17,6 +17,7 @@ import type {
   LogRecord,
   PendingRequestPayload,
   SessionEventPayload,
+  TerminalEventPayload,
 } from "./types";
 import type {
   AuditEventListener,
@@ -24,6 +25,7 @@ import type {
   PendingRequestListener,
   RpcBridge,
   SessionEventListener,
+  TerminalEventListener,
 } from "./invoke";
 
 interface PendingRpc {
@@ -61,6 +63,7 @@ export function createWebSocketBridge(url: string): RpcBridge {
   const pendingListeners = new Set<PendingRequestListener>();
   const logListeners = new Set<LogEventListener>();
   const auditListeners = new Set<AuditEventListener>();
+  const terminalListeners = new Set<TerminalEventListener>();
   const pending = new Map<number, PendingRpc>();
   let nextId = 1;
   let socket: WebSocket | null = null;
@@ -123,6 +126,8 @@ export function createWebSocketBridge(url: string): RpcBridge {
       for (const l of logListeners) l(payload as LogRecord);
     } else if (name === "auditEvent") {
       for (const l of auditListeners) l(payload as AuditEntry);
+    } else if (name === "terminalEvent") {
+      for (const l of terminalListeners) l(payload as TerminalEventPayload);
     }
   }
 
@@ -168,6 +173,10 @@ export function createWebSocketBridge(url: string): RpcBridge {
     onAuditEvent(listener) {
       auditListeners.add(listener);
       return () => auditListeners.delete(listener);
+    },
+    onTerminalEvent(listener) {
+      terminalListeners.add(listener);
+      return () => terminalListeners.delete(listener);
     },
   };
 }

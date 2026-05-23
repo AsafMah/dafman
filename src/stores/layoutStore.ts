@@ -360,6 +360,34 @@ export const useLayoutStore = defineStore("layout", () => {
     }
   }
 
+  function addTerminalPanel(terminalId: string, title = "Terminal"): void {
+    const dock = api.value;
+    if (!dock) return;
+    const panelId = `terminal-${terminalId}`;
+    const existing = dock.getPanel(panelId);
+    if (existing) {
+      existing.api.setActive();
+      return;
+    }
+    let referenceGroup = firstBodyGroupId();
+    let createdBodyGroup = false;
+    if (!referenceGroup) {
+      const body = dock.addGroup();
+      referenceGroup = body.id;
+      createdBodyGroup = true;
+    }
+    dock.addPanel({
+      id: panelId,
+      component: "terminal",
+      title,
+      params: { terminalId },
+      position: {
+        referenceGroup,
+        direction: createdBodyGroup ? "within" : "right",
+      },
+    });
+  }
+
   // ---------- Session details right-rail (singleton) ----------
   //
   // Single rail panel mounted in a right-edge dockview group. Its
@@ -772,6 +800,7 @@ export const useLayoutStore = defineStore("layout", () => {
     restoreSessionDetailsWidth,
     setApi,
     addPanel,
+    addTerminalPanel,
     removePanel,
     activatePanel,
     renamePanel,

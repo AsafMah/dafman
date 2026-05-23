@@ -84,6 +84,7 @@ export interface Settings {
 	/// The SDK doesn't expose a list-approvals RPC, so we can't show
 	/// what's been remembered; this is the only knob we can surface.
 	permissions: PermissionsPrefs;
+	terminal: TerminalPrefs;
 }
 
 export interface PermissionsPrefs {
@@ -92,6 +93,10 @@ export interface PermissionsPrefs {
 	/// `createSession` returns; the rail's toggle continues to drive
 	/// the per-session state thereafter.
 	defaultApproveAll: boolean;
+}
+
+export interface TerminalPrefs {
+	defaultProfileId: string;
 }
 
 export interface ToolsPrefs {
@@ -128,6 +133,37 @@ export interface Layout {
 	/// "no panes were open last time" — start with an empty dockview.
 	dockview: unknown | null;
 }
+
+export interface TerminalCreateParams {
+	cwd?: string;
+	shell?: string;
+	args?: string[];
+	cols?: number;
+	rows?: number;
+	title?: string;
+	sessionId?: string;
+}
+
+export interface TerminalSummary {
+	id: string;
+	title: string;
+	cwd: string;
+	shell: string;
+	args: string[];
+	status: "running" | "exiting" | "exited" | "failed";
+	createdAt: string;
+	cols: number;
+	rows: number;
+	sessionId?: string;
+	exitCode?: number | null;
+	signal?: string | null;
+}
+
+export type TerminalEventPayload =
+	| { terminalId: string; kind: "output"; data: string }
+	| { terminalId: string; kind: "status"; summary: TerminalSummary }
+	| { terminalId: string; kind: "exit"; summary: TerminalSummary }
+	| { terminalId: string; kind: "error"; message: string };
 
 export interface Workspaces {
 	/// Most-recently-used absolute filesystem paths the user has spun
@@ -921,6 +957,26 @@ export type DafmanRPC = {
 				params: { workingDirectory?: string };
 				response: InstructionSource[];
 			};
+			createTerminal: {
+				params: TerminalCreateParams;
+				response: TerminalSummary;
+			};
+			writeTerminal: {
+				params: { terminalId: string; data: string };
+				response: boolean;
+			};
+			resizeTerminal: {
+				params: { terminalId: string; cols: number; rows: number };
+				response: boolean;
+			};
+			killTerminal: {
+				params: { terminalId: string };
+				response: boolean;
+			};
+			listTerminals: {
+				params: Record<string, never>;
+				response: TerminalSummary[];
+			};
 			getSettings: { params: Record<string, never>; response: Settings };
 			updateSettings: { params: { next: Settings }; response: Settings };
 			getLogDir: { params: Record<string, never>; response: string };
@@ -1045,6 +1101,7 @@ export type DafmanRPC = {
 			/// for every recordPermission / recordUrl call. The
 			/// in-app Activity view (Diagnostics panel) subscribes.
 			auditEvent: AuditEntry;
+			terminalEvent: TerminalEventPayload;
 		};
 	}>;
 };

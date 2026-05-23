@@ -15,6 +15,32 @@
 
 ---
 
+## Phase 24 — Terminal integration
+
+1. ⏳ **Standalone terminal pane.**
+   - **Steps:** run Command Palette → New Terminal, type a command, resize
+     the dockview pane, then kill the terminal.
+   - **Expected:** terminal opens in a dockview tab, command output
+     renders, resize keeps fitting, and Kill exits the terminal cleanly.
+   - **Why not automated:** uses live OS shell + WebView terminal focus.
+
+2. ⏳ **Session workspace terminal.**
+   - **Steps:** open a session with a workspace, run Command Palette →
+     New Terminal in Session Workspace, and run `pwd`/`cd` equivalent.
+   - **Expected:** terminal starts in the session workspace.
+   - **Why not automated:** depends on live shell behavior and platform
+     cwd display.
+
+3. ⏳ **Composer shell mode.**
+   - **Steps:** in an empty composer type `!`, or click the terminal
+     toolbar button. Run a command from the shell command capture input.
+   - **Expected:** compact terminal opens in the composer area, output
+     appears, and a shell-completed note appears in the chat stream.
+   - **Why not automated:** Lexical focus + xterm input inside WebView2
+     needs runtime validation.
+
+---
+
 ## Phase 23c — Long Jobs + Autopilot UI
 
 1. ⏳ **Jobs panel aggregates active SDK tasks.**

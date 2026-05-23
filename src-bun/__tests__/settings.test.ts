@@ -59,6 +59,7 @@ describe("SettingsService", () => {
 			notifications: { turnEnd: false, waitingForInput: true },
 			tools: { defaultExcluded: [], defaultAllowed: [] },
 			permissions: { defaultApproveAll: false },
+			terminal: { defaultProfileId: "platform-default" },
 		};
 		const written = await svc.update(next);
 		expect(written).toEqual(next);

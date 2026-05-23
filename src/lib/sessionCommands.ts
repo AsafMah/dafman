@@ -71,11 +71,13 @@ function openLibraryTab(tab = "mcp"): void {
 	} catch {
 		/* private mode — ignore */
 	}
-	window.dispatchEvent(
-		new CustomEvent("dafman:library-activate-tab", {
-			detail: { tab: normalized },
-		}),
-	);
+	if (typeof window !== "undefined") {
+		window.dispatchEvent(
+			new CustomEvent("dafman:library-activate-tab", {
+				detail: { tab: normalized },
+			}),
+		);
+	}
 	useLayoutStore().openEdgePanel("left", {
 		id: "library",
 		component: "library",
@@ -108,46 +110,6 @@ export async function runLocalSlashCommand(
 
 const SDK_PASSTHROUGH_COMMANDS: SessionCommand[] = [
 	{
-		slash: "/mcp",
-		label: "MCP servers",
-		description: "SDK command for MCP server status and management.",
-		icon: "pi-sitemap",
-		group: "SDK",
-		keywords: ["server", "tools", "oauth"],
-		passthrough: true,
-		run: () => {},
-	},
-	{
-		slash: "/skill",
-		label: "Skills",
-		description: "SDK skill command. Also try /skills.",
-		icon: "pi-sparkles",
-		group: "SDK",
-		keywords: ["skills", "library"],
-		passthrough: true,
-		run: () => {},
-	},
-	{
-		slash: "/skills",
-		label: "Skills",
-		description: "SDK command for listing and invoking skills.",
-		icon: "pi-sparkles",
-		group: "SDK",
-		keywords: ["skill", "library"],
-		passthrough: true,
-		run: () => {},
-	},
-	{
-		slash: "/agent",
-		label: "Agents",
-		description: "SDK command for selecting custom agents.",
-		icon: "pi-user",
-		group: "SDK",
-		keywords: ["subagent", "custom agent"],
-		passthrough: true,
-		run: () => {},
-	},
-	{
 		slash: "/model",
 		label: "Model",
 		description: "SDK command for switching model from the CLI.",
@@ -171,6 +133,42 @@ const SDK_PASSTHROUGH_COMMANDS: SessionCommand[] = [
 
 export const SESSION_COMMANDS: SessionCommand[] = [
 	...SDK_PASSTHROUGH_COMMANDS,
+	{
+		slash: "/mcp",
+		label: "Open MCP Library",
+		description: "Open Library to the MCP server tab.",
+		icon: "pi-sitemap",
+		group: "Library",
+		keywords: ["server", "tools", "oauth"],
+		run: () => openLibraryTab("mcp"),
+	},
+	{
+		slash: "/skill",
+		label: "Open Skills Library",
+		description: "Open Library to the Skills tab. Also available as /skills.",
+		icon: "pi-sparkles",
+		group: "Library",
+		keywords: ["skills", "library"],
+		run: () => openLibraryTab("skills"),
+	},
+	{
+		slash: "/skills",
+		label: "Open Skills Library",
+		description: "Open Library to the Skills tab.",
+		icon: "pi-sparkles",
+		group: "Library",
+		keywords: ["skill", "library"],
+		run: () => openLibraryTab("skills"),
+	},
+	{
+		slash: "/agent",
+		label: "Open Agents Library",
+		description: "Open Library to the Agents tab.",
+		icon: "pi-user",
+		group: "Library",
+		keywords: ["subagent", "custom agent"],
+		run: () => openLibraryTab("agents"),
+	},
 	{
 		slash: "/compact",
 		label: "Compact conversation history",
