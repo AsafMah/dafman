@@ -304,13 +304,16 @@ function onRefresh() {
 const resumingIds = ref<Set<string>>(new Set());
 
 async function onResume(session: SessionMetadataSummary) {
-  // Already-open sessions: activate the panel and focus the composer
-  // rather than no-op. Clicking the row in the sidebar is the most
-  // natural "take me there" affordance.
+  // Already-open sessions: activate the panel (or re-add if the panel
+  // was removed while the session was detached with active jobs).
   if (openSessionIds.value.has(session.sessionId)) {
     const dock = layoutStore.api;
     const panel = dock?.getPanel(session.sessionId);
-    panel?.api.setActive();
+    if (panel) {
+      panel.api.setActive();
+    } else {
+      layoutStore.addPanel(session.sessionId);
+    }
     window.dispatchEvent(
       new CustomEvent("dafman:focus-composer", {
         detail: { sessionId: session.sessionId },
