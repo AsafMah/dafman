@@ -51,6 +51,9 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   image, webgl, and serialize addons. Search/copy/paste/copy-buffer controls
   are available in the terminal header; addon settings/manager UI remains
   the next terminal slice.
+- ActivityBar Terminals panel: lists known terminals, opens/kills them, and
+  creates new terminals with optional command/args/cwd. This is the first
+  management surface before full terminal profiles.
 
 ---
 

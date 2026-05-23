@@ -422,6 +422,7 @@ const SETTINGS_PANEL_ID = "settings-panel";
 const LOG_VIEWER_PANEL_ID = "log-viewer";
 const LIBRARY_PANEL_ID = "library";
 const JOBS_PANEL_ID = "jobs-panel";
+const TERMINALS_PANEL_ID = "terminals-panel";
 
 /// ActivityBar items.
 /// - Top stack (default `group: "top"`): panel toggles. Sessions today;
@@ -458,6 +459,15 @@ const activityItems = computed<ActivityItem[]>(() => {
       initialSize: 380,
       minimumSize: 380,
       badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
+    },
+    {
+      kind: "panel",
+      id: TERMINALS_PANEL_ID,
+      component: "terminalsPanel",
+      icon: "pi-window-maximize",
+      title: "Terminals — running shells + settings",
+      initialSize: 360,
+      minimumSize: 320,
     },
   ];
   if (isDev) {

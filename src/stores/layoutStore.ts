@@ -25,6 +25,7 @@ const SESSIONS_PANEL_ID = "sessions-manager";
 const SETTINGS_PANEL_ID = "settings-panel";
 const LIBRARY_PANEL_ID = "library";
 const JOBS_PANEL_ID = "jobs-panel";
+const TERMINALS_PANEL_ID = "terminals-panel";
 const LOG_VIEWER_PANEL_ID = "log-viewer";
 const SESSION_DETAILS_MIN_WIDTH = 380;
 const LEFT_EDGE_MIN_BY_PANEL_ID: Record<string, number> = {
@@ -32,6 +33,7 @@ const LEFT_EDGE_MIN_BY_PANEL_ID: Record<string, number> = {
   [SETTINGS_PANEL_ID]: 380,
   [LIBRARY_PANEL_ID]: 320,
   [JOBS_PANEL_ID]: 380,
+  [TERMINALS_PANEL_ID]: 320,
   [LOG_VIEWER_PANEL_ID]: 420,
 };
 const EDGE_PANEL_DEFINITIONS: Record<
@@ -69,6 +71,14 @@ const EDGE_PANEL_DEFINITIONS: Record<
     title: "Jobs",
     initialSize: 380,
     minimumSize: 380,
+  },
+  [TERMINALS_PANEL_ID]: {
+    id: TERMINALS_PANEL_ID,
+    component: "terminalsPanel",
+    tabComponent: "sidebarTab",
+    title: "Terminals — running shells + settings",
+    initialSize: 360,
+    minimumSize: 320,
   },
   [LOG_VIEWER_PANEL_ID]: {
     id: LOG_VIEWER_PANEL_ID,

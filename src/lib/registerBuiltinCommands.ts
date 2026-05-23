@@ -103,6 +103,26 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
+      id: "terminals.open",
+      label: "Open Terminals",
+      group: "Terminal",
+      icon: "pi pi-window-maximize",
+      keywords: ["shell", "terminal", "pty", "settings"],
+      run: () => {
+        const id = "terminals-panel";
+        if (layoutStore.isPanelOpen(id)) return;
+        layoutStore.openEdgePanel("left", {
+          id,
+          component: "terminalsPanel",
+          tabComponent: "sidebarTab",
+          title: "Terminals — running shells + settings",
+          initialSize: 360,
+          minimumSize: 320,
+          exclusive: true,
+        });
+      },
+    },
+    {
       id: "terminal.new",
       label: "New Terminal",
       group: "Terminal",

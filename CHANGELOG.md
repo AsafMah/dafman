@@ -55,6 +55,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Terminal addon foundation.** Terminal panels now load xterm addons for
   search, web links, clipboard, Unicode width/grapheme handling, web fonts,
   progress, ligatures, images, WebGL, and serialization.
+- **Terminal manager panel.** Added an ActivityBar Terminals panel with
+  running terminal list, open/kill actions, and a basic new-terminal form
+  for command, args, and cwd.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

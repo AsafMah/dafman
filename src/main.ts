@@ -38,6 +38,7 @@ import SessionsManager from "./components/SessionsManager.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
 import SidebarTab from "./components/SidebarTab.vue";
 import TerminalPanel from "./components/TerminalPanel.vue";
+import TerminalsPanel from "./components/TerminalsPanel.vue";
 import Watermark from "./components/Watermark.vue";
 import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
@@ -139,6 +140,7 @@ async function mountWith(Root: typeof App) {
   app.component("settingsPanel", SettingsPanel);
   app.component("logViewer", LogViewer);
   app.component("terminal", TerminalPanel);
+  app.component("terminalsPanel", TerminalsPanel);
   app.component("watermark", Watermark);
   app.component("chatTabActions", ChatTabActions);
   app.component("chatTab", ChatTab);

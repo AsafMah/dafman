@@ -18,9 +18,9 @@
 ## Phase 24 — Terminal integration
 
 1. ⏳ **Standalone terminal pane.**
-   - **Steps:** run Command Palette → New Terminal, type a command, resize
-     the dockview pane, try the Search, Copy, Paste, Copy buffer, and
-     Kill controls.
+   - **Steps:** open ActivityBar → Terminals, create a terminal from the
+     panel or run Command Palette → New Terminal, type a command, resize the
+     dockview pane, try Search, Copy, Paste, Copy buffer, and Kill controls.
    - **Expected:** terminal opens in a dockview tab, command output
      renders via native PTY/ConPTY (not piped stdio), resize keeps
      fitting, URLs are clickable, search works, clipboard actions work,

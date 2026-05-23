@@ -244,3 +244,16 @@ test("slash menu scrolls selected commands into view and /model opens selector",
   await page.keyboard.press("Enter");
   await expect(page.locator(".p-treeselect-overlay").first()).toBeVisible();
 });
+
+test("terminals activity panel opens manager without creating a terminal", async ({ page }) => {
+  await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
+  const composer = page.locator(".lex-composer-input").first();
+  await composer.waitFor({ state: "visible", timeout: 15_000 });
+
+  await page.getByRole("button", { name: /Terminals — running shells/i }).click();
+  const panel = page.locator(".terminals-panel").first();
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Terminals" })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "New terminal" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "New" })).toBeVisible();
+});
