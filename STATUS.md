@@ -35,6 +35,8 @@ and creating terminals with command/args/cwd, plus display/addon settings.
 The first shell-integration slice emits/parses OSC 633/133/7/9/1337 markers
 for PowerShell/cmd so terminals can track CWD, active commands, exit codes,
 and nonce-backed trusted command lines without reviving PTY output scraping.
+Terminal header actions now use visible labels instead of icon-only controls,
+and terminal find focuses the search field and reports match state.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.
@@ -72,8 +74,9 @@ Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` 
    Terminal addon foundation, the ActivityBar terminal manager, terminal
    settings, and the first Windows shell-integration parser/emitter are now
    wired. Remaining follow-ups: richer profile CRUD, bash/zsh/fish shell
-   integration, buffer persistence UX, agent terminal tool, inline terminal
-   blocks, shortcut design, and optional Ghostty Web renderer spike.
+   integration, buffer persistence UX, the return of session-bound terminal
+   affordances inside session/editor surfaces, agent terminal tool, inline
+   terminal blocks, shortcut design, and optional Ghostty Web renderer spike.
 5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
    surface for the composer.
 

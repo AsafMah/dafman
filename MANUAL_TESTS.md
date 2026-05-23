@@ -19,12 +19,14 @@
 
 1. ⏳ **Standalone terminal pane.**
    - **Steps:** open ActivityBar → Terminals, create a terminal from the
-     panel or run Command Palette → New Terminal, type a command, resize the
-     dockview pane, try Search, Copy, Paste, Copy buffer, and Kill controls.
+      panel or run Command Palette → New Terminal, type a command, resize the
+      dockview pane, try Find, Copy, Buffer, Paste, and Kill controls.
    - **Expected:** terminal opens in a dockview tab, command output
-     renders via native PTY/ConPTY (not piped stdio), resize keeps
-     fitting, URLs are clickable, search works, clipboard actions work,
-     and Kill exits the terminal cleanly.
+      renders via native PTY/ConPTY (not piped stdio), resize keeps
+      fitting, URLs are clickable, the top action buttons have visible
+      labels and accessible names, search focuses the query box and reports
+      matches/no matches, clipboard actions work, and Kill exits the
+      terminal cleanly.
    - **Automated coverage:** `src-bun/__tests__/terminalRegistry.test.ts`
      covers native PTY create/write/resize/kill; local build validation
      also runs the bundled Windows Bun 1.3.14 PTY smoke.
@@ -42,8 +44,21 @@
    - **Expected:** `!` remains ordinary composer text and there is no
      embedded "send and capture output" terminal form. Terminal usage is
      through normal terminal panes only.
-   - **Why not automated:** Lexical text handling and user-visible
-     toolbar composition are best confirmed in the running app.
+    - **Why not automated:** Lexical text handling and user-visible
+      toolbar composition are best confirmed in the running app.
+
+4. ⏳ **Shell-integrated command awareness.**
+   - **Steps:** open a PowerShell/pwsh terminal, run a successful command,
+     run a failing command, `cd` to another directory, then open ActivityBar
+     → Terminals and expand Recent commands for that terminal.
+   - **Expected:** the panel shows the updated CWD, active/running command
+     while a command is executing, recent command rows with exit codes after
+     completion, and manual Copy command actions only. No command output is
+     copied or sent to chat automatically.
+   - **Automated coverage:** `src/lib/__tests__/terminalShellIntegration.test.ts`
+     covers OSC parsing and trust checks; `src/stores/__tests__/terminalStore.test.ts`
+     covers command lifecycle and bounded history. Live shell hooks still need
+     manual runtime confirmation.
 
 ---
 

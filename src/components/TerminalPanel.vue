@@ -28,8 +28,10 @@ const compact = computed(() => props.params?.params?.compact === true || (props.
 const terminalStore = useTerminalStore();
 const settingsStore = useSettingsStore();
 const host = ref<HTMLElement | null>(null);
+const searchInput = ref<HTMLInputElement | null>(null);
 const searchOpen = ref(false);
 const searchQuery = ref("");
+const searchResultLabel = ref("");
 const progress = ref<IProgressState>({ state: 0, value: 0 });
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
@@ -122,23 +124,33 @@ function registerShellIntegrationHandlers(): void {
 }
 
 function findNext(): void {
-  if (!searchQuery.value.trim()) return;
-  search?.findNext(searchQuery.value, {
+  if (!searchQuery.value.trim() || !search) {
+    search?.clearDecorations();
+    searchResultLabel.value = "";
+    return;
+  }
+  const found = search.findNext(searchQuery.value, {
     decorations: {
       matchOverviewRuler: "#64748b",
       activeMatchColorOverviewRuler: "#38bdf8",
     },
   });
+  if (!found) searchResultLabel.value = "No matches";
 }
 
 function findPrevious(): void {
-  if (!searchQuery.value.trim()) return;
-  search?.findPrevious(searchQuery.value, {
+  if (!searchQuery.value.trim() || !search) {
+    search?.clearDecorations();
+    searchResultLabel.value = "";
+    return;
+  }
+  const found = search.findPrevious(searchQuery.value, {
     decorations: {
       matchOverviewRuler: "#64748b",
       activeMatchColorOverviewRuler: "#38bdf8",
     },
   });
+  if (!found) searchResultLabel.value = "No matches";
 }
 
 async function copySelection(): Promise<void> {
@@ -174,7 +186,12 @@ onMounted(async () => {
   const addons = terminalPrefs.value.addons;
   if (addons.search) {
     search = new SearchAddon();
-    loadAddon(search, () => term?.loadAddon(search!));
+    loadAddon(search, () => {
+      term?.loadAddon(search!);
+      addonDisposables.push(search!.onDidChangeResults(({ resultIndex, resultCount }) => {
+        searchResultLabel.value = resultCount > 0 ? `${resultIndex + 1} / ${resultCount}` : "No matches";
+      }));
+    });
   }
   if (addons.serialize) {
     serialize = new SerializeAddon();
@@ -256,6 +273,18 @@ watch(buffer, (next, prev) => {
   }
 });
 
+watch(searchOpen, async (open) => {
+  if (!open) {
+    search?.clearDecorations();
+    searchResultLabel.value = "";
+    term?.focus();
+    return;
+  }
+  await nextTick();
+  searchInput.value?.focus();
+  searchInput.value?.select();
+});
+
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
@@ -290,35 +319,39 @@ onBeforeUnmount(() => {
       <div class="terminal-actions">
         <Button
           icon="pi pi-search"
+          label="Find"
           text
-          rounded
           size="small"
           aria-label="Search terminal"
+          title="Search terminal"
           :aria-pressed="searchOpen"
           @click="searchOpen = !searchOpen"
         />
         <Button
           icon="pi pi-copy"
+          label="Copy"
           text
-          rounded
           size="small"
           aria-label="Copy selected terminal text"
+          title="Copy selected text"
           @click="copySelection"
         />
         <Button
-          icon="pi pi-clone"
+          icon="pi pi-list"
+          label="Buffer"
           text
-          rounded
           size="small"
           aria-label="Copy terminal buffer"
+          title="Copy scrollback buffer"
           @click="copyBuffer"
         />
         <Button
           icon="pi pi-clipboard"
+          label="Paste"
           text
-          rounded
           size="small"
           aria-label="Paste into terminal"
+          title="Paste into terminal"
           @click="pasteClipboard"
         />
       </div>
@@ -337,13 +370,31 @@ onBeforeUnmount(() => {
       @submit.prevent="findNext"
     >
       <input
+        ref="searchInput"
         v-model="searchQuery"
         type="search"
         placeholder="Search terminal"
         aria-label="Search terminal"
+        @input="findNext"
       />
-      <Button icon="pi pi-arrow-up" text size="small" aria-label="Previous result" @click="findPrevious" />
-      <Button icon="pi pi-arrow-down" text size="small" aria-label="Next result" type="submit" />
+      <span class="terminal-search-status" role="status" aria-live="polite">{{ searchResultLabel }}</span>
+      <Button
+        icon="pi pi-arrow-up"
+        label="Previous"
+        text
+        size="small"
+        aria-label="Previous result"
+        type="button"
+        @click="findPrevious"
+      />
+      <Button
+        icon="pi pi-arrow-down"
+        label="Next"
+        text
+        size="small"
+        aria-label="Next result"
+        type="submit"
+      />
     </form>
     <div ref="host" class="terminal-host" />
   </section>
@@ -379,6 +430,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.15rem;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .terminal-progress {
@@ -425,6 +478,14 @@ onBeforeUnmount(() => {
   padding: 0.25rem 0.4rem;
   font: inherit;
   font-size: 0.8rem;
+}
+
+.terminal-search-status {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+  color: #9ca3af;
+  font-size: 0.72rem;
+  text-align: center;
 }
 
 .terminal-title {

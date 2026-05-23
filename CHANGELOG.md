@@ -69,6 +69,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   shell-integrated commands per terminal and copy a command line manually;
   output copy/send-to-chat remains deferred until command buffer ranges are
   anchored.
+- **Terminal header accessibility/search.** Terminal toolbar actions now use
+  visible text labels with clearer icons/titles, and Find focuses the search
+  box, performs incremental lookup, exposes match/no-match status, and clears
+  highlights when closed.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

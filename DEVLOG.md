@@ -65,7 +65,10 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   smart-terminal UI is intentionally narrow: the Terminals panel hides recent
   command lines behind a disclosure and only supports manual copy of the typed
   command; output capture/send-to-chat stays deferred until xterm buffer ranges
-  are anchored.
+  are anchored. Follow-up a11y polish changed the terminal header actions from
+  icon-only controls to visible labels and fixed the Find flow so opening it
+  focuses the query field, updates incrementally, reports match/no-match state,
+  and clears decorations when closed.
 
 ---
 
