@@ -346,6 +346,93 @@ OS-keyring, real CLI processes, and a custom IPC bridge will never
 be 100%. The manual list is the explicit hand-off of what's *not*
 covered, instead of pretending it is.
 
+### 11. Convert every user complaint into tracked acceptance items before coding
+
+When the user reports multiple misses, do **not** rely on memory and do **not**
+start patching immediately. First create/check a concrete task list with one
+acceptance item per sentence/complaint, then implement against that list.
+
+- If the user says "A, B, C, and D", make four tracked items before editing.
+- Keep the list visible while working and mark items done only after the exact
+  behavior is verified.
+- Add the acceptance items to `MANUAL_TESTS.md` or an E2E test when they involve
+  UI/focus/keyboard/scroll/layout behavior.
+- If a later fix changes the shape of a previously-approved UI, re-check every
+  previous acceptance item for regressions.
+
+This rule exists because the terminal/composer work in May 2026 repeatedly
+missed explicit details (two separate buttons, focus transfer, single terminal
+renderer ownership, attachment shape, prompt stripping, scroll position) after
+the agent started coding from memory instead of a checklist.
+
+### 12. Integration features need an ownership model before UI work
+
+For features that bridge multiple surfaces (composer ↔ terminal ↔ chat ↔
+attachments ↔ settings), write down the ownership model before touching UI:
+
+- Which component owns the live resource?
+- Can two components mount the same live resource at once?
+- What is persisted, and where?
+- What is the wire shape?
+- What is rendered in the transcript, and in what order?
+- What exactly is sent to the SDK/model?
+
+Do not implement UI controls until these answers are explicit in the plan or in
+the task list. If the answer changes mid-implementation, stop and update the
+plan/checklist first.
+
+Concrete precedent: embedded terminal command mode must define one xterm owner
+for a PTY, how command output becomes a result record, how the result becomes a
+real file attachment, and where it appears in the chat timeline. "Just show a
+terminal" is not enough.
+
+### 13. UI focus, scroll, and responsiveness are first-class acceptance criteria
+
+For composer, terminal, dockview, settings, and other layout work, verification
+must cover the actual user-visible interaction, not just DOM existence.
+
+Required checks when touched:
+
+- **Focus:** after clicking a button or switching panels, assert the intended
+  input/editor/terminal receives keyboard focus.
+- **Scroll:** after loading/resuming history, assert the transcript or terminal
+  is at the expected end unless the user intentionally scrolled away.
+- **Responsiveness:** run a narrow-pane matrix and assert no horizontal overflow
+  or overlap. Pin exact affordance positions when requested (e.g. "left of
+  paperclip", "pinned right").
+- **Duplicate live surfaces:** assert that two active renderers do not control
+  the same live PTY/editor/session resource at once.
+
+Do not call a UI fix done if the E2E only checks that an element is visible.
+It must check the requested behavior.
+
+### 14. Prove attachment semantics end-to-end
+
+For any feature that creates an "attachment" pill or sends derived context:
+
+- Verify the pill is represented in the editor.
+- Verify deleting the pill removes it from the outgoing payload.
+- Verify keeping the pill sends the intended payload shape to the SDK.
+- Verify the SDK receives the same content the UI shows.
+- Prefer a real file attachment when the user asked for a file; don't silently
+  swap to inline prompt text or blob shortcuts.
+
+Add a unit test at the `SessionRegistry.send`/IPC boundary for the final payload
+shape. A renderer-only pill test is insufficient.
+
+### 15. Reproduce the user's bug before improving around it
+
+When the user reports a concrete broken output, copy the exact sample into a
+test or fixture before fixing. Examples:
+
+- Raw ANSI/OSC output such as `ESC[31;1m...ESC]633;P;Cwd=...BEL` must become a
+  fixture for the sanitizer.
+- Wrong context-token limits must become normalization tests.
+- Repeated command invocation using a stale result must become a re-entry test.
+
+Do not replace the repro with a nearby happy-path test. The bug the user saw is
+the test.
+
 ---
 
 ## Hard rules (do not violate)
