@@ -762,12 +762,14 @@ const SubmitButton = defineComponent({
               v-if="props.sessionId"
               type="button"
               class="lex-toolbar-btn lex-command-trigger"
-              title="Open embedded session terminal"
-              aria-label="Open embedded session terminal"
+              :class="{ 'is-active': commandMode }"
+              :title="commandMode ? 'Exit command mode' : 'Open embedded session terminal'"
+              :aria-label="commandMode ? 'Exit command mode' : 'Open embedded session terminal'"
+              :aria-pressed="commandMode"
               :disabled="props.disabled"
-              @click="enterCommandMode"
+              @click="commandMode ? exitCommandMode() : enterCommandMode()"
             >
-              <i class="pi pi-bolt" aria-hidden="true" />
+              <i class="pi pi-chevron-right" aria-hidden="true" />
             </button>
             <button
               type="button"
