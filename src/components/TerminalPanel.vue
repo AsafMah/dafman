@@ -18,6 +18,7 @@ import Button from "primevue/button";
 import { useTerminalStore } from "../stores/terminalStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { invokeCommand } from "../ipc/invoke";
+import { parseTerminalOsc, type TerminalShellEvent } from "../lib/terminalShellIntegration";
 
 type UserParams = { terminalId?: string; compact?: boolean };
 type WrappedParams = { params?: UserParams };
@@ -71,112 +72,52 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
   }
 }
 
-function tryDecodeUriComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function parseExitCode(value: string): number | undefined {
-  const match = value.match(/(?:^|;)(-?\d+)(?:;|$)/);
-  if (!match) return undefined;
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseOsc633(command: string): void {
+function applyShellEvent(event: TerminalShellEvent): void {
   if (!terminalId.value) return;
-  const [kind = "", ...parts] = command.split(";");
-  if (kind === "C") {
+  if (event.kind === "commandStart") {
     if (!terminalStore.activeCommands[terminalId.value]) {
       terminalStore.startCommand(terminalId.value, {
         cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
-        protocol: "osc633",
+        protocol: event.protocol,
         trusted: false,
       });
     }
     return;
   }
-  if (kind === "D") {
-    terminalStore.finishCommand(terminalId.value, parseExitCode(parts.join(";")));
+  if (event.kind === "commandFinish") {
+    terminalStore.finishCommand(terminalId.value, event.exitCode);
     return;
   }
-  if (kind === "E") {
-    const nonce = parts[parts.length - 1];
-    const trusted = Boolean(integrationNonce.value && nonce === integrationNonce.value);
-    const commandLine = tryDecodeUriComponent(parts.slice(0, -1).join(";"));
+  if (event.kind === "commandLine") {
     const patch = {
-      command: commandLine,
+      command: event.command,
       cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
-      protocol: "osc633" as const,
-      trusted,
+      protocol: event.protocol,
+      trusted: event.trusted,
     };
     if (terminalStore.activeCommands[terminalId.value]) terminalStore.updateActiveCommand(terminalId.value, patch);
     else terminalStore.startCommand(terminalId.value, patch);
     return;
   }
-  if (kind === "P") {
-    const cwdPart = parts.find((part) => part.startsWith("Cwd="));
-    if (cwdPart) terminalStore.updateTerminalCwd(terminalId.value, tryDecodeUriComponent(cwdPart.slice(4)));
+  if (event.kind === "cwd") {
+    terminalStore.updateTerminalCwd(terminalId.value, event.cwd);
   }
 }
 
-function parseOsc133(command: string): void {
-  if (!terminalId.value) return;
-  const [kind = "", ...parts] = command.split(";");
-  if (kind === "C") {
-    if (!terminalStore.activeCommands[terminalId.value]) {
-      terminalStore.startCommand(terminalId.value, {
-        cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
-        protocol: "osc133",
-        trusted: false,
-      });
-    }
-  } else if (kind === "D") {
-    terminalStore.finishCommand(terminalId.value, parseExitCode(parts.join(";")));
-  }
-}
-
-function parseOsc7(uri: string): void {
-  if (!terminalId.value || !uri.startsWith("file://")) return;
-  const pathname = uri
-    .slice("file://".length)
-    .replace(/^[^/]*(\/.*)$/, "$1")
-    .replace(/^\/([A-Za-z]:\/)/, "$1");
-  terminalStore.updateTerminalCwd(terminalId.value, tryDecodeUriComponent(pathname));
+function handleOsc(ident: 7 | 9 | 133 | 633 | 1337, data: string): boolean {
+  const parsed = parseTerminalOsc(ident, data, integrationNonce.value);
+  parsed.events.forEach(applyShellEvent);
+  return parsed.handled;
 }
 
 function registerShellIntegrationHandlers(): void {
   if (!term) return;
   addonDisposables.push(
-    term.parser.registerOscHandler(633, (data) => {
-      parseOsc633(data);
-      return true;
-    }),
-    term.parser.registerOscHandler(133, (data) => {
-      parseOsc133(data);
-      return true;
-    }),
-    term.parser.registerOscHandler(7, (data) => {
-      parseOsc7(data);
-      return true;
-    }),
-    term.parser.registerOscHandler(9, (data) => {
-      if (terminalId.value && data.startsWith("9;")) {
-        terminalStore.updateTerminalCwd(terminalId.value, data.slice(2));
-        return true;
-      }
-      return false;
-    }),
-    term.parser.registerOscHandler(1337, (data) => {
-      if (terminalId.value && data.startsWith("CurrentDir=")) {
-        terminalStore.updateTerminalCwd(terminalId.value, tryDecodeUriComponent(data.slice("CurrentDir=".length)));
-        return true;
-      }
-      return false;
-    }),
+    term.parser.registerOscHandler(633, (data) => handleOsc(633, data)),
+    term.parser.registerOscHandler(133, (data) => handleOsc(133, data)),
+    term.parser.registerOscHandler(7, (data) => handleOsc(7, data)),
+    term.parser.registerOscHandler(9, (data) => handleOsc(9, data)),
+    term.parser.registerOscHandler(1337, (data) => handleOsc(1337, data)),
   );
 }
 
