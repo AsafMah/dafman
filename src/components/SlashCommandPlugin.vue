@@ -11,8 +11,8 @@
 /// won't show — pressing Enter sends as a normal message, and the
 /// SDK's built-in command resolver picks it up.
 
-import { computed, nextTick, onMounted, ref, type ComponentPublicInstance } from "vue";
-import { TextNode, $isTextNode } from "lexical";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
+import { TextNode, $isTextNode, $getSelection, $isRangeSelection, $createTextNode, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH } from "lexical";
 import {
   TypeaheadMenuPlugin,
   MenuOption,
@@ -35,6 +35,38 @@ const props = defineProps<{
 
 const editor = useLexicalComposer();
 const query = ref("");
+const menuOpen = ref(false);
+
+// Intercept Tab when the slash menu is open: replace the typed query
+// with the full command text (so user can add args), but do NOT execute.
+const unregisterTab = editor.registerCommand(
+  KEY_TAB_COMMAND,
+  (event) => {
+    if (!menuOpen.value) return false;
+    const opts = filteredOptions.value;
+    if (opts.length === 0) return false;
+    const selected = opts[0];
+    event.preventDefault();
+    editor.update(() => {
+      const sel = $getSelection();
+      if (!$isRangeSelection(sel)) return;
+      const anchor = sel.anchor.getNode();
+      if ($isTextNode(anchor)) {
+        const text = anchor.getTextContent();
+        const slashIdx = text.lastIndexOf("/");
+        if (slashIdx >= 0) {
+          const before = text.slice(0, slashIdx);
+          anchor.setTextContent(before + selected.cmd.slash + " ");
+          anchor.select(before.length + selected.cmd.slash.length + 1);
+        }
+      }
+    });
+    menuOpen.value = false;
+    return true;
+  },
+  COMMAND_PRIORITY_HIGH,
+);
+onBeforeUnmount(() => unregisterTab());
 
 /// Force the typeahead anchor to mount inside <body> so it positions
 /// page-absolute (not as a flex child of the composer row). Default
@@ -88,6 +120,7 @@ function keepSelectedVisible(
 
 function onQueryChange(q: string | null) {
   query.value = q ?? "";
+  menuOpen.value = q !== null;
 }
 
 async function onSelectOption(payload: {
@@ -102,6 +135,7 @@ async function onSelectOption(payload: {
     }
   });
   closeMenu();
+  menuOpen.value = false;
   try {
     await option.cmd.run(props.sessionId);
   } catch {
