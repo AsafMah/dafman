@@ -399,7 +399,7 @@ function openSkillsLibrary() {
     tabComponent: "sidebarTab",
     title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
     initialSize: 360,
-    minimumSize: 300,
+    minimumSize: 320,
     exclusive: true,
   });
 }
@@ -411,7 +411,7 @@ function openJobsPanel() {
     tabComponent: "sidebarTab",
     title: "Jobs",
     initialSize: 380,
-    minimumSize: 300,
+    minimumSize: 380,
     exclusive: true,
   });
 }
@@ -1703,7 +1703,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
      tool names) would force the panel wider than its dockview
      container — exactly the "sidebar is cut off, needs crazy
      width" symptom. */
-  min-width: 300px;
+  min-width: 380px;
 }
 
 /* Force every direct flex / grid child to honour the parent's

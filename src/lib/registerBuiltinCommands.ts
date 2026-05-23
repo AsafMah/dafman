@@ -75,8 +75,8 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             component: "sessionsManager",
             tabComponent: "sidebarTab",
             title: "Sessions",
-            initialSize: 240,
-            minimumSize: 160,
+            initialSize: 260,
+            minimumSize: 180,
             exclusive: true,
           });
         }
@@ -97,7 +97,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           tabComponent: "sidebarTab",
           title: "Jobs",
           initialSize: 380,
-          minimumSize: 300,
+          minimumSize: 380,
           exclusive: true,
         });
       },
@@ -106,7 +106,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       id: "terminal.new",
       label: "New Terminal",
       group: "Terminal",
-      icon: "pi pi-terminal",
+      icon: "pi pi-window-maximize",
       keywords: ["shell", "pty", "command"],
       run: async () => {
         const terminalStore = useTerminalStore();
@@ -156,8 +156,8 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           // Keep in sync with App.vue's ActivityBar settings item —
           // both paths must use the same size or the panel jumps
           // width when opened via different surfaces.
-          initialSize: 340,
-          minimumSize: 300,
+          initialSize: 400,
+          minimumSize: 380,
           exclusive: true,
         });
       },
@@ -262,10 +262,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       run: async () => {
         const id = layoutStore.activeSessionId;
         if (!id) return;
-        if (sc.passthrough) {
-          await sessionsStore.sendMessage(id, sc.slash);
-          return;
-        }
         await sc.run(id);
       },
     });

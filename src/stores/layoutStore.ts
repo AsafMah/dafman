@@ -26,13 +26,66 @@ const SETTINGS_PANEL_ID = "settings-panel";
 const LIBRARY_PANEL_ID = "library";
 const JOBS_PANEL_ID = "jobs-panel";
 const LOG_VIEWER_PANEL_ID = "log-viewer";
-const SESSION_DETAILS_MIN_WIDTH = 300;
+const SESSION_DETAILS_MIN_WIDTH = 380;
 const LEFT_EDGE_MIN_BY_PANEL_ID: Record<string, number> = {
-  [SESSIONS_PANEL_ID]: 160,
-  [SETTINGS_PANEL_ID]: 300,
-  [LIBRARY_PANEL_ID]: 300,
-  [JOBS_PANEL_ID]: 300,
-  [LOG_VIEWER_PANEL_ID]: 320,
+  [SESSIONS_PANEL_ID]: 180,
+  [SETTINGS_PANEL_ID]: 380,
+  [LIBRARY_PANEL_ID]: 320,
+  [JOBS_PANEL_ID]: 380,
+  [LOG_VIEWER_PANEL_ID]: 420,
+};
+const EDGE_PANEL_DEFINITIONS: Record<
+  string,
+  Omit<EdgePanelOptions, "exclusive">
+> = {
+  [SESSIONS_PANEL_ID]: {
+    id: SESSIONS_PANEL_ID,
+    component: "sessionsManager",
+    tabComponent: "sidebarTab",
+    title: "Sessions",
+    initialSize: 260,
+    minimumSize: 180,
+  },
+  [SETTINGS_PANEL_ID]: {
+    id: SETTINGS_PANEL_ID,
+    component: "settingsPanel",
+    tabComponent: "sidebarTab",
+    title: "Settings",
+    initialSize: 400,
+    minimumSize: 380,
+  },
+  [LIBRARY_PANEL_ID]: {
+    id: LIBRARY_PANEL_ID,
+    component: "library",
+    tabComponent: "sidebarTab",
+    title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
+    initialSize: 360,
+    minimumSize: 320,
+  },
+  [JOBS_PANEL_ID]: {
+    id: JOBS_PANEL_ID,
+    component: "jobsPanel",
+    tabComponent: "sidebarTab",
+    title: "Jobs",
+    initialSize: 380,
+    minimumSize: 380,
+  },
+  [LOG_VIEWER_PANEL_ID]: {
+    id: LOG_VIEWER_PANEL_ID,
+    component: "logViewer",
+    tabComponent: "sidebarTab",
+    title: "Diagnostics — live log + bundle export",
+    initialSize: 480,
+    minimumSize: 420,
+  },
+  [SESSION_DETAILS_PANEL_ID]: {
+    id: SESSION_DETAILS_PANEL_ID,
+    component: "sessionDetails",
+    tabComponent: "sidebarTab",
+    title: "Session",
+    initialSize: SESSION_DETAILS_MIN_WIDTH,
+    minimumSize: SESSION_DETAILS_MIN_WIDTH,
+  },
 };
 
 /// Short panel title from a session id. The CLI emits `session.title_changed`
@@ -112,7 +165,7 @@ export const useLayoutStore = defineStore("layout", () => {
   /// — it reads its current session from `activeSessionId` and
   /// re-binds when the user switches chat tabs.
   const detailsOpen = ref<boolean>(false);
-  const lastSessionDetailsWidth = ref<number>(360);
+  const lastSessionDetailsWidth = ref<number>(SESSION_DETAILS_MIN_WIDTH);
   let activeUnsubs: Array<() => void> = [];
 
   function panelId(panel: unknown): string | null {
@@ -199,13 +252,82 @@ export const useLayoutStore = defineStore("layout", () => {
     }
   }
 
+  function edgeSize(
+    position: EdgeGroupPosition,
+    edge: unknown,
+  ): number | undefined {
+    const edgeApi = edge as { width?: number; height?: number };
+    return position === "left" || position === "right"
+      ? edgeApi.width
+      : edgeApi.height;
+  }
+
+  function isEdgeBelowMinimum(
+    position: EdgeGroupPosition,
+    edge: unknown,
+    minimumSize: number | undefined,
+  ): boolean {
+    if (minimumSize === undefined) return false;
+    const current = edgeSize(position, edge);
+    return typeof current === "number" && current < minimumSize;
+  }
+
+  function recreateKnownEdgeGroup(
+    position: EdgeGroupPosition,
+    edge: unknown,
+    minimumSize: number,
+  ): boolean {
+    const dock = api.value;
+    if (!dock) return false;
+    const panels = edgePanelsFromDock(edge);
+    const knownPanels = panels
+      .map((panel) => {
+        const id = panelId(panel);
+        return id ? EDGE_PANEL_DEFINITIONS[id] : undefined;
+      })
+      .filter((panel): panel is Omit<EdgePanelOptions, "exclusive"> => !!panel);
+    if (knownPanels.length === 0) return false;
+    dock.removeEdgeGroup(position);
+    const initialSize = Math.max(
+      minimumSize,
+      ...knownPanels.map((panel) => panel.initialSize ?? minimumSize),
+    );
+    const recreatedEdge = dock.addEdgeGroup(position, {
+      id: `edge-${position}`,
+      initialSize,
+      minimumSize,
+    });
+    for (const panel of knownPanels) {
+      dock.addPanel({
+        id: panel.id,
+        component: panel.component,
+        title: panel.title ?? panel.id,
+        params: panel.params ?? {},
+        ...(panel.tabComponent ? { tabComponent: panel.tabComponent } : {}),
+        position: { referenceGroup: recreatedEdge.id },
+      });
+    }
+    if (knownPanels.some((panel) => panel.id === SESSION_DETAILS_PANEL_ID)) {
+      detailsOpen.value = true;
+    }
+    return true;
+  }
+
   function enforceKnownEdgeMinimums(): void {
     const dock = api.value;
     if (!dock) return;
     for (const position of ["left", "right"] as const) {
       const edge = dock.getEdgeGroup(position);
       if (!edge) continue;
-      applyEdgeMinimum(position, minimumForEdgeGroup(position, edge));
+      const minimumSize = minimumForEdgeGroup(position, edge);
+      if (
+        minimumSize !== undefined &&
+        isEdgeBelowMinimum(position, edge, minimumSize) &&
+        recreateKnownEdgeGroup(position, edge, minimumSize)
+      ) {
+        continue;
+      }
+      applyEdgeMinimum(position, minimumSize);
     }
   }
 
@@ -563,8 +685,8 @@ export const useLayoutStore = defineStore("layout", () => {
         component: "sessionsManager",
         tabComponent: "sidebarTab",
         title: "Sessions",
-        initialSize: 240,
-        minimumSize: 160,
+        initialSize: 260,
+        minimumSize: 180,
         exclusive: true,
       });
     } catch (err) {
@@ -619,8 +741,13 @@ export const useLayoutStore = defineStore("layout", () => {
   ): void {
     const dock = api.value;
     if (!dock) return;
-    const existingGroup = dock.getEdgeGroup(position);
-    const existing = dock.getPanel(options.id);
+    let existingGroup = dock.getEdgeGroup(position);
+    let existing = dock.getPanel(options.id);
+    if (existingGroup && isEdgeBelowMinimum(position, existingGroup, options.minimumSize)) {
+      dock.removeEdgeGroup(position);
+      existingGroup = undefined;
+      existing = undefined;
+    }
     if (existing) {
       existing.api.setActive();
       applyEdgeMinimum(

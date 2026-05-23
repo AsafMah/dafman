@@ -30,7 +30,10 @@ import {
   buildModelTree,
 } from "../lib/modelTree";
 
-const props = defineProps<{ sessionId: string }>();
+const props = withDefaults(
+  defineProps<{ sessionId: string; area?: "all" | "composer-left" | "composer-right" }>(),
+  { area: "all" },
+);
 
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
@@ -221,9 +224,22 @@ function onAgentChipClick() {
 </script>
 
 <template>
-  <div v-if="record" class="session-header-controls">
+  <div v-if="record" class="session-header-controls" :class="`area-${props.area}`">
+    <Button
+      v-if="props.area === 'composer-left'"
+      icon="pi pi-shield"
+      label="Allow all"
+      text
+      size="small"
+      class="approve-all-button"
+      :aria-label="approveAll ? 'Disable auto-approve all tools' : 'Enable auto-approve all tools'"
+      :aria-pressed="approveAll"
+      :title="approveAll ? 'Auto-approve all tools is ON' : 'Auto-approve all tools is OFF'"
+      :class="{ 'approve-all-active': approveAll }"
+      @click="toggleApproveAll"
+    />
     <Chip
-      v-if="workspaceLabel"
+      v-if="workspaceLabel && (props.area === 'all' || props.area === 'composer-left')"
       :label="workspaceLabel"
       icon="pi pi-folder"
       class="workspace-chip"
@@ -236,7 +252,7 @@ function onAgentChipClick() {
       @keydown.space.prevent="onWorkspaceClick"
     />
     <Chip
-      v-if="agentChipLabel"
+      v-if="agentChipLabel && props.area === 'all'"
       :label="agentChipLabel"
       icon="pi pi-user"
       class="agent-chip"
@@ -249,6 +265,7 @@ function onAgentChipClick() {
       @keydown.space.prevent="onAgentChipClick"
     />
     <TreeSelect
+      v-if="props.area === 'all' || props.area === 'composer-right'"
       :input-id="`model-${props.sessionId}`"
       v-model="modelTreeChoice"
       v-model:expanded-keys="expandedKeys"
@@ -256,6 +273,7 @@ function onAgentChipClick() {
       selection-mode="single"
       size="small"
       filter
+      append-to="body"
       placeholder="Model"
       :disabled="models.length === 0"
       aria-label="Model for this session"
@@ -276,7 +294,7 @@ function onAgentChipClick() {
       </template>
     </TreeSelect>
     <Select
-      v-if="selectedModel?.supportsReasoningEffort"
+      v-if="selectedModel?.supportsReasoningEffort && (props.area === 'all' || props.area === 'composer-right')"
       :input-id="`effort-${props.sessionId}`"
       v-model="effortChoice"
       :options="effortOptions"
@@ -284,11 +302,13 @@ function onAgentChipClick() {
       option-value="value"
       size="small"
       filter
+      append-to="body"
       placeholder="Effort"
       aria-label="Reasoning effort for this session"
       class="compact-select compact-select-effort"
     />
     <Select
+      v-if="props.area === 'all'"
       :input-id="`reasoning-inline-${props.sessionId}`"
       v-model="reasoningChoice"
       :options="reasoningOptions"
@@ -296,15 +316,18 @@ function onAgentChipClick() {
       option-value="value"
       size="small"
       filter
+      append-to="body"
       placeholder="Reasoning"
       aria-label="Reasoning visibility for this session"
       class="compact-select compact-select-reasoning"
     />
     <Button
+      v-if="props.area === 'all'"
       icon="pi pi-shield"
       label="Allow all"
       text
       size="small"
+      class="approve-all-button"
       :aria-label="approveAll ? 'Disable auto-approve all tools' : 'Enable auto-approve all tools'"
       :aria-pressed="approveAll"
       :title="approveAll ? 'Auto-approve all tools is ON' : 'Auto-approve all tools is OFF'"
@@ -312,6 +335,7 @@ function onAgentChipClick() {
       @click="toggleApproveAll"
     />
     <Button
+      v-if="props.area === 'all' || props.area === 'composer-right'"
       icon="pi pi-cog"
       text
       rounded
@@ -350,6 +374,17 @@ function onAgentChipClick() {
   flex: 1 1 auto;
   justify-content: flex-end;
   flex-wrap: nowrap;
+}
+
+.session-header-controls.area-composer-left,
+.session-header-controls.area-composer-right {
+  flex: 0 1 auto;
+  padding: 0;
+}
+
+.session-header-controls.area-composer-left .workspace-chip {
+  margin-right: 0;
+  max-width: 7rem;
 }
 
 /* Progressive collapse as the tile narrows. Order of removal (least-
@@ -473,6 +508,16 @@ function onAgentChipClick() {
   background: color-mix(in srgb, var(--p-green-500) 20%, transparent);
   color: var(--p-green-500);
   font-weight: 700;
+}
+
+@container (max-width: 34rem) {
+  .session-header-controls.area-composer-left :deep(.approve-all-button .p-button-label) {
+    display: none;
+  }
+  .session-header-controls.area-composer-left :deep(.approve-all-button) {
+    width: 1.75rem;
+    padding-inline: 0;
+  }
 }
 
 /* Non-leaf tree rows (provider / type). We render the label inside a

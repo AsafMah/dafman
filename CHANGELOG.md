@@ -27,11 +27,20 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   task shapes; `JobRecord` is the normalized UI-facing model and the
   backend exposes aggregate `listJobs` plus `promoteTask`.
 - **Composer/sidebar follow-ups.** Library/details/jobs edge panels now
-  enforce minimum widths, the composer keeps attachments left and the
-  workspace chip anchored left while model/settings stay right, adds a
-  collapsible markdown toolbar, shows a labelled Allow all toggle, and
-  exposes SDK passthrough slash commands (`/mcp`, `/skill(s)`, `/agent`,
-  `/model`, `/autopilot`) in the slash menu.
+  enforce minimum widths (including stale persisted left/right edge
+  sizes), menus render outside clipped panes, and the composer toolbar is
+  split into left mode/Allow all/workspace/shell, center upload/editor
+  formatting, and right model/settings controls. Narrow composers switch
+  mode to an icon-only select, hide Allow all text, and move formatting
+  into an overflow menu instead of overlapping. `/mcp`, `/skill(s)`,
+  `/agent`, `/model`, and `/autopilot` now execute local UI actions
+  instead of forwarding token-wasting chat messages.
+- **Expanded editor formatting.** Composer formatting now uses Lexical
+  commands for bold, italic, underline, strikethrough, inline code,
+  headings, quote, code block, bullet list, and numbered list.
+- **Terminal Windows fallback.** If the packaged Bun runtime does not
+  expose a native PTY handle, terminals fall back to stdin/stdout pipes
+  instead of failing with “terminal not supported on this platform.”
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.
@@ -85,9 +94,8 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   expanded inline and revealed in the OS file manager; missing
   candidates stay visible as guidance.
 - **`/library [mcp|skills|agents|instructions]` local slash command**
-  opens the Library sidebar and switches tabs. It deliberately does
-  **not** claim `/mcp` or `/skills`, which remain SDK passthrough
-  commands.
+  opens the Library sidebar and switches tabs. Later UI follow-up also
+  maps `/mcp`, `/skill(s)`, and `/agent` to local Library tabs.
 - **SDK `CommandDefinition` infrastructure** now registers a
   non-colliding `library` command in each session config. This gives
   the SDK/TUI a safe hook without shadowing built-in CLI commands.

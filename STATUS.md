@@ -25,7 +25,9 @@ from `problems.md`, and a global Jobs panel with current-session
 Autopilot launcher. The local check gate also now includes a Bun-side
 entry reachability dry-run so dead `src-bun/index.ts` imports fail in
 `bun run check`. Terminal integration is in progress with Bun native PTY
-(`Bun.spawn(..., { terminal })`) and xterm.js dockview panels.
+(`Bun.spawn(..., { terminal })`) plus pipe fallback for runtimes without
+native PTY handles, xterm.js dockview panels, composer shell mode, and
+responsive composer/sidebar polish from the terminal regression sweep.
 
 ---
 
@@ -54,11 +56,11 @@ Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` 
    Replaces the topbar-only chrome with a left activity bar + bottom
    status bar; affects every screen so it's a larger structural lift.
 4. **Terminal integration follow-up** (audit P24, remaining). First
-   pass adds Bun native PTY registry/RPC, xterm dockview panels, command
-   palette actions, and composer shell mode. Remaining follow-ups:
-   profile CRUD, richer command-result cards/actions, agent terminal
-   tool, inline terminal blocks, shortcut design, and optional Ghostty
-   Web renderer spike.
+   pass adds Bun native PTY registry/RPC with pipe fallback, xterm
+   dockview panels, command palette actions, and composer shell mode.
+   Remaining follow-ups: profile CRUD, richer command-result
+   cards/actions, agent terminal tool, inline terminal blocks, shortcut
+   design, and optional Ghostty Web renderer spike.
 5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
    surface for the composer.
 

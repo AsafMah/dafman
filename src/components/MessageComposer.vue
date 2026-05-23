@@ -19,7 +19,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, ref } from "vue";
+import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
 import SplitButton from "primevue/splitbutton";
 import Popover from "primevue/popover";
 import type { MenuItem } from "primevue/menuitem";
@@ -31,7 +31,25 @@ import { HistoryPlugin } from "lexical-vue/LexicalHistoryPlugin";
 import { AutoFocusPlugin } from "lexical-vue/LexicalAutoFocusPlugin";
 import { ListPlugin } from "lexical-vue/LexicalListPlugin";
 import { LinkPlugin } from "lexical-vue/LexicalLinkPlugin";
-import type { LexicalEditor } from "lexical";
+import {
+  COMMAND_PRIORITY_LOW,
+  FORMAT_TEXT_COMMAND,
+  SELECTION_CHANGE_COMMAND,
+  type LexicalEditor,
+} from "lexical";
+import { $createCodeNode, $isCodeNode } from "@lexical/code";
+import {
+  $isListNode,
+  INSERT_ORDERED_LIST_COMMAND,
+  INSERT_UNORDERED_LIST_COMMAND,
+} from "@lexical/list";
+import {
+  $createHeadingNode,
+  $createQuoteNode,
+  $isHeadingNode,
+  $isQuoteNode,
+} from "@lexical/rich-text";
+import { $setBlocksType } from "@lexical/selection";
 import {
   EditableSync,
   RegisterMarkdownShortcuts,
@@ -41,7 +59,7 @@ import {
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
 } from "../lexical/plugins";
-import { $getRoot, $getSelection, $isElementNode, $isRangeSelection, $createParagraphNode, $createTextNode, type ElementNode } from "lexical";
+import { $getRoot, $getSelection, $isElementNode, $isRangeSelection, $createParagraphNode, $createTextNode, type ElementNode, type TextFormatType } from "lexical";
 import { markdownNodes } from "../lexical/nodes";
 import { $createAttachmentNode } from "../lexical/AttachmentNode";
 import { lexicalTheme } from "../lexical/theme";
@@ -250,9 +268,14 @@ function appendText(value: string): void {
 /// its own search input (since the editor isn't the source of the
 /// query here) and the native Browse… escape hatch.
 const filePickerPopover = ref<InstanceType<typeof Popover> | null>(null);
+const formatPopover = ref<InstanceType<typeof Popover> | null>(null);
 
 function openFilePicker(event: Event): void {
   filePickerPopover.value?.toggle(event);
+}
+
+function toggleFormatPopover(event: Event): void {
+  formatPopover.value?.toggle(event);
 }
 
 function onPickerSelect(att: SendMessageAttachment): void {
@@ -260,34 +283,131 @@ function onPickerSelect(att: SendMessageAttachment): void {
   filePickerPopover.value?.hide();
 }
 
-function insertMarkdown(before: string, after = "", placeholder = "text"): void {
+function formatEditor(action: EditorFormatAction): void {
   const editor = editorRef.value as LexicalEditor | null;
   if (!editor || props.disabled) return;
-  editor.update(() => {
-    const sel = $getSelection();
-    if ($isRangeSelection(sel)) {
-      const text = sel.getTextContent();
-      sel.insertText(`${before}${text || placeholder}${after}`);
-      return;
-    }
-    const root = $getRoot();
-    let last = root.getLastChild();
-    if (!$isElementNode(last)) {
-      last = $createParagraphNode();
-      root.append(last);
-    }
-    (last as ElementNode).append($createTextNode(`${before}${placeholder}${after}`));
-  });
-  setTimeout(() => editor.focus(), 0);
+  if (TEXT_FORMAT_ACTIONS.has(action)) {
+    editor.dispatchCommand(FORMAT_TEXT_COMMAND, action as TextFormatType);
+  } else if (action === "bullet") {
+    editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined);
+  } else if (action === "number") {
+    editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined);
+  } else {
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return;
+      if (action === "h1") {
+        $setBlocksType(selection, () => $createHeadingNode("h1"));
+      } else if (action === "h2") {
+        $setBlocksType(selection, () => $createHeadingNode("h2"));
+      } else if (action === "quote") {
+        $setBlocksType(selection, () => $createQuoteNode());
+      } else if (action === "codeblock") {
+        $setBlocksType(selection, () => $createCodeNode());
+      }
+    });
+  }
+  editor.focus();
 }
 
-const markdownActions = [
-  { label: "Bold", icon: "pi pi-bold", title: "Bold", before: "**", after: "**" },
-  { label: "Italic", icon: "pi pi-italic", title: "Italic", before: "*", after: "*" },
-  { label: "Code", icon: "pi pi-code", title: "Inline code", before: "`", after: "`" },
-  { label: "Quote", icon: "pi pi-align-left", title: "Quote", before: "> ", after: "" },
-  { label: "List", icon: "pi pi-list", title: "Bullet list", before: "- ", after: "" },
+type EditorFormatAction =
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "code"
+  | "bullet"
+  | "number"
+  | "h1"
+  | "h2"
+  | "quote"
+  | "codeblock";
+
+const TEXT_FORMAT_ACTIONS = new Set<EditorFormatAction>([
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "code",
+]);
+
+const editorFormatActions: Array<{
+  label: string;
+  title: string;
+  action: EditorFormatAction;
+  icon?: string;
+  glyph?: string;
+}> = [
+  { label: "Bold", glyph: "B", title: "Bold", action: "bold" },
+  { label: "Italic", glyph: "I", title: "Italic", action: "italic" },
+  { label: "Underline", glyph: "U", title: "Underline", action: "underline" },
+  { label: "Strikethrough", glyph: "S", title: "Strikethrough", action: "strikethrough" },
+  { label: "Code", icon: "pi pi-code", title: "Inline code", action: "code" },
+  { label: "Heading 1", glyph: "H1", title: "Heading 1", action: "h1" },
+  { label: "Heading 2", glyph: "H2", title: "Heading 2", action: "h2" },
+  { label: "Quote", glyph: "❝", title: "Quote block", action: "quote" },
+  { label: "Code block", glyph: "{ }", title: "Code block", action: "codeblock" },
+  { label: "Bullet list", icon: "pi pi-list", title: "Bullet list", action: "bullet" },
+  { label: "Numbered list", icon: "pi pi-list-check", title: "Numbered list", action: "number" },
 ] as const;
+
+const editorFormatState = ref<Record<EditorFormatAction, boolean>>({
+  bold: false,
+  italic: false,
+  underline: false,
+  strikethrough: false,
+  code: false,
+  bullet: false,
+  number: false,
+  h1: false,
+  h2: false,
+  quote: false,
+  codeblock: false,
+});
+
+function readEditorFormatState(): void {
+  const selection = $getSelection();
+  let inBulletList = false;
+  let inNumberList = false;
+  let inHeading1 = false;
+  let inHeading2 = false;
+  let inQuote = false;
+  let inCodeBlock = false;
+  if ($isRangeSelection(selection)) {
+    let node = selection.anchor.getNode();
+    while (node) {
+      if ($isListNode(node)) {
+        inBulletList = node.getListType() === "bullet";
+        inNumberList = node.getListType() === "number";
+        break;
+      }
+      if ($isHeadingNode(node)) {
+        inHeading1 = node.getTag() === "h1";
+        inHeading2 = node.getTag() === "h2";
+      } else if ($isQuoteNode(node)) {
+        inQuote = true;
+      } else if ($isCodeNode(node)) {
+        inCodeBlock = true;
+      }
+      const parent = node.getParent();
+      if (!parent) break;
+      node = parent;
+    }
+  }
+  editorFormatState.value = {
+    bold: $isRangeSelection(selection) && selection.hasFormat("bold"),
+    italic: $isRangeSelection(selection) && selection.hasFormat("italic"),
+    underline: $isRangeSelection(selection) && selection.hasFormat("underline"),
+    strikethrough: $isRangeSelection(selection) && selection.hasFormat("strikethrough"),
+    code: $isRangeSelection(selection) && selection.hasFormat("code"),
+    bullet: inBulletList,
+    number: inNumberList,
+    h1: inHeading1,
+    h2: inHeading2,
+    quote: inQuote,
+    codeblock: inCodeBlock,
+  };
+}
 
 defineExpose({ focus: focusComposer, setText, appendText });
 
@@ -414,7 +534,23 @@ function triggerSubmit(mode: ComposerSubmitMode) {
 const EditorRefCapture = defineComponent({
   name: "EditorRefCapture",
   setup() {
-    editorRef.value = useLexicalComposer();
+    const editor = useLexicalComposer();
+    editorRef.value = editor;
+    const unregisterUpdate = editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(readEditorFormatState);
+    });
+    const unregisterSelection = editor.registerCommand(
+      SELECTION_CHANGE_COMMAND,
+      () => {
+        editor.getEditorState().read(readEditorFormatState);
+        return false;
+      },
+      COMMAND_PRIORITY_LOW,
+    );
+    onBeforeUnmount(() => {
+      unregisterUpdate();
+      unregisterSelection();
+    });
     return () => null;
   },
 });
@@ -569,61 +705,122 @@ const SubmitButton = defineComponent({
           </div>
         </div>
         <footer class="lex-composer-toolbar">
-          <button
-            type="button"
-            class="lex-toolbar-btn"
-            title="Attach files or folders"
-            aria-label="Attach files or folders"
-            :disabled="props.disabled"
-            @click="openFilePicker"
-          >
-            <i class="pi pi-paperclip" aria-hidden="true" />
-          </button>
-          <Popover ref="filePickerPopover" class="lex-attach-popover" :pt="{ content: { style: 'padding: 0' } }">
-            <FilePicker
+          <div class="lex-toolbar-left">
+            <ModeButtonGroup
               v-if="props.sessionId"
               :session-id="props.sessionId"
-              :show-search-input="true"
-              initial-focus="input"
-              @select="onPickerSelect"
-              @dismiss="filePickerPopover?.hide()"
             />
-          </Popover>
-          <button
-            v-if="props.sessionId"
-            type="button"
-            class="lex-toolbar-btn"
-            :class="{ 'is-active': shellMode }"
-            title="Toggle session shell"
-            aria-label="Toggle session shell"
-            :disabled="props.disabled"
-            @click="toggleShellMode"
-          >
-            <i class="pi pi-terminal" aria-hidden="true" />
-          </button>
-          <ModeButtonGroup
-            v-if="props.sessionId"
-            :session-id="props.sessionId"
-          />
-          <div class="lex-markdown-tools" aria-label="Markdown shortcuts">
+            <slot name="session-left-controls" />
             <button
-              v-for="action in markdownActions"
-              :key="action.label"
+              v-if="props.sessionId"
               type="button"
               class="lex-toolbar-btn"
-              :title="action.title"
-              :aria-label="action.title"
+              :class="{ 'is-active': shellMode }"
+              title="Toggle session shell"
+              aria-label="Toggle session shell"
               :disabled="props.disabled"
-              @click="insertMarkdown(action.before, action.after)"
+              @click="toggleShellMode"
             >
-              <i class="pi" :class="action.icon" aria-hidden="true" />
+              <span class="lex-terminal-glyph" aria-hidden="true">&gt;_</span>
             </button>
           </div>
-          <!-- Slot for per-session controls (model picker, reasoning
-               effort, options gear). This flexes across remaining
-               width so the workspace chip anchors left while model /
-               settings stay right. -->
-          <slot name="session-controls" />
+          <div class="lex-toolbar-center">
+            <button
+              type="button"
+              class="lex-toolbar-btn"
+              title="Attach files or folders"
+              aria-label="Attach files or folders"
+              :disabled="props.disabled"
+              @click="openFilePicker"
+            >
+              <i class="pi pi-paperclip" aria-hidden="true" />
+            </button>
+            <Popover ref="filePickerPopover" class="lex-attach-popover" :pt="{ content: { style: 'padding: 0' } }">
+              <FilePicker
+                v-if="props.sessionId"
+                :session-id="props.sessionId"
+                :show-search-input="true"
+                initial-focus="input"
+                @select="onPickerSelect"
+                @dismiss="filePickerPopover?.hide()"
+              />
+            </Popover>
+            <button
+              type="button"
+              class="lex-toolbar-btn lex-format-overflow"
+              title="Formatting"
+              aria-label="Formatting"
+              :disabled="props.disabled"
+              @click="toggleFormatPopover"
+            >
+              <i class="pi pi-ellipsis-h" aria-hidden="true" />
+            </button>
+            <Popover ref="formatPopover" class="lex-format-popover">
+              <div class="lex-format-menu" aria-label="Formatting commands">
+                <button
+                  v-for="action in editorFormatActions"
+                  :key="`menu-${action.label}`"
+                  type="button"
+                  class="lex-format-menu-item"
+                  :class="{ 'is-active': editorFormatState[action.action] }"
+                  :aria-pressed="editorFormatState[action.action]"
+                  :disabled="props.disabled"
+                  @click="() => { formatEditor(action.action); formatPopover?.hide(); }"
+                >
+                  <i
+                    v-if="action.icon"
+                    class="pi"
+                    :class="action.icon"
+                    aria-hidden="true"
+                  />
+                  <span
+                    v-else
+                    class="lex-format-glyph"
+                    :class="`lex-format-glyph-${action.action}`"
+                    aria-hidden="true"
+                  >
+                    {{ action.glyph }}
+                  </span>
+                  <span>{{ action.label }}</span>
+                </button>
+              </div>
+            </Popover>
+            <div class="lex-markdown-tools" aria-label="Markdown shortcuts">
+              <button
+                v-for="action in editorFormatActions"
+                :key="action.label"
+                type="button"
+                class="lex-toolbar-btn"
+                :title="action.title"
+                :aria-label="action.title"
+                :aria-pressed="editorFormatState[action.action]"
+                :disabled="props.disabled"
+                :class="{ 'is-active': editorFormatState[action.action] }"
+                @click="formatEditor(action.action)"
+              >
+                <i
+                  v-if="action.icon"
+                  class="pi"
+                  :class="action.icon"
+                  aria-hidden="true"
+                />
+                <span
+                  v-else
+                  class="lex-format-glyph"
+                  :class="`lex-format-glyph-${action.action}`"
+                  aria-hidden="true"
+                >
+                  {{ action.glyph }}
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="lex-toolbar-right">
+            <slot name="session-right-controls" />
+          </div>
+          <slot
+            name="session-controls"
+          />
         </footer>
         <EditorRefCapture />
       </LexicalComposer>
@@ -699,7 +896,8 @@ const SubmitButton = defineComponent({
 .lex-composer-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: space-between;
+  gap: 0.45rem;
   padding: 0.25rem 0.4rem;
   min-height: 2.3rem;
   border-top: 1px solid color-mix(in srgb, var(--p-content-border-color) 60%, transparent);
@@ -708,16 +906,35 @@ const SubmitButton = defineComponent({
    * children. Give it a container context here so it reacts to the
    * toolbar's width, not the page width. */
   container-type: inline-size;
-  /* No wrap — keep everything on one row. Inner elements use overflow
-   * + ellipsis on their own labels (model picker etc.) to absorb tight
-   * widths instead of pushing controls onto a second line. */
+  /* No overlap: controls shrink/hide first; if the pane becomes genuinely
+   * too narrow, horizontal scroll is the final fallback. */
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
-.lex-toolbar-spacer {
-  flex: 1 1 auto;
-  min-width: 0.5rem;
+.lex-toolbar-left,
+.lex-toolbar-center,
+.lex-toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.lex-toolbar-left {
+  justify-content: flex-start;
+  flex: 0 1 auto;
+}
+
+.lex-toolbar-center {
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.lex-toolbar-right {
+  justify-content: flex-end;
+  flex: 0 1 auto;
 }
 
 .lex-markdown-tools {
@@ -728,6 +945,40 @@ const SubmitButton = defineComponent({
   padding: 0 0.2rem;
   border-left: 1px solid color-mix(in srgb, var(--p-content-border-color) 70%, transparent);
   border-right: 1px solid color-mix(in srgb, var(--p-content-border-color) 70%, transparent);
+}
+
+.lex-format-overflow {
+  display: none;
+}
+
+.lex-format-menu {
+  display: grid;
+  min-width: 11rem;
+  padding: 0.25rem;
+  gap: 0.1rem;
+}
+
+.lex-format-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  border: 0;
+  border-radius: var(--p-border-radius-sm, 4px);
+  background: transparent;
+  color: var(--p-text-color);
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lex-format-menu-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+}
+
+.lex-format-menu-item.is-active {
+  background: color-mix(in srgb, var(--p-primary-color) 16%, transparent);
+  color: var(--p-primary-color);
 }
 
 .lex-toolbar-btn {
@@ -764,6 +1015,46 @@ const SubmitButton = defineComponent({
   font-size: 0.95rem;
 }
 
+.lex-format-glyph,
+.lex-terminal-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  height: 1rem;
+  font-size: 0.78rem;
+  line-height: 1;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.lex-format-glyph-bold {
+  font-weight: 800;
+}
+
+.lex-format-glyph-italic {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.lex-format-glyph-underline {
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.lex-format-glyph-strikethrough {
+  text-decoration: line-through;
+  font-weight: 700;
+}
+
+.lex-terminal-glyph {
+  width: auto;
+  min-width: 1.05rem;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-weight: 700;
+  letter-spacing: -0.12em;
+}
+
 /* Send button inside the editor row: icon-only, taller + narrower
  * pill that vertically centers in the input shell. */
 .lex-submit-button :deep(.p-button) {
@@ -790,7 +1081,7 @@ const SubmitButton = defineComponent({
   gap: 0.2rem;
   padding: 0;
   height: 1.75rem;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -832,9 +1123,47 @@ const SubmitButton = defineComponent({
   color: var(--p-text-muted-color);
 }
 
-@container (max-width: 42rem) {
+@container (max-width: 46rem) {
+  .lex-composer-toolbar :deep(.mode-button-group) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.mode-select-shell) {
+    display: inline-flex;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button) {
+    width: 1.75rem;
+    padding-inline: 0;
+  }
   .lex-markdown-tools {
     display: none;
   }
+  .lex-format-overflow {
+    display: inline-flex;
+  }
 }
+
+@container (max-width: 34rem) {
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip) {
+    display: none;
+  }
+}
+
+@container (max-width: 28rem) {
+  .lex-composer-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 0.2rem;
+  }
+  .lex-toolbar-left,
+  .lex-toolbar-right {
+    flex: 1 1 auto;
+  }
+  .lex-toolbar-center {
+    order: 3;
+  }
+}
+
 </style>

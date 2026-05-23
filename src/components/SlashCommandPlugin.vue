@@ -79,16 +79,10 @@ async function onSelectOption(payload: {
   const { option, textNodeContainingQuery, closeMenu } = payload;
   editor.update(() => {
     if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
-      if (option.cmd.passthrough) {
-        textNodeContainingQuery.setTextContent(`${option.cmd.slash} `);
-        textNodeContainingQuery.selectEnd();
-        return;
-      }
       textNodeContainingQuery.remove();
     }
   });
   closeMenu();
-  if (option.cmd.passthrough) return;
   try {
     await option.cmd.run(props.sessionId);
   } catch {

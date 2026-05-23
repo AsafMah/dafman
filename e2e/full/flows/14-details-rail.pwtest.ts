@@ -49,3 +49,67 @@ test("details rail opens by default on session create + cog toggles it", async (
   await cogOpen.click();
   await expect(page.locator(".session-details").first()).toBeVisible({ timeout: 3_000 });
 });
+
+test("composer toolbar icons and edge panel minimum widths stay visible", async ({ page }) => {
+  await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
+  const composer = page.locator(".lex-composer-input").first();
+  await composer.waitFor({ state: "visible", timeout: 15_000 });
+
+  await expect(page.locator(".lex-format-glyph-bold").first()).toHaveText("B");
+  await expect(page.locator(".lex-format-glyph-italic").first()).toHaveText("I");
+  await expect(page.locator(".lex-terminal-glyph").first()).toHaveText(">_");
+
+  const detailsWidth = await page.locator(".session-details").first().evaluate((el) =>
+    el.getBoundingClientRect().width,
+  );
+  expect(detailsWidth).toBeGreaterThanOrEqual(380);
+
+  await page.getByRole("button", { name: /Library — MCP servers/i }).click();
+  const libraryPanel = page.locator(".library-panel").first();
+  await expect(libraryPanel).toBeVisible({ timeout: 3_000 });
+  const libraryWidth = await libraryPanel.evaluate((el) =>
+    el.getBoundingClientRect().width,
+  );
+  expect(libraryWidth).toBeGreaterThanOrEqual(320);
+});
+
+test("composer toolbar switches to compact controls on narrow panes", async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
+  const composer = page.locator(".lex-composer-input").first();
+  await composer.waitFor({ state: "visible", timeout: 15_000 });
+
+  await expect(page.locator(".mode-select-shell").first()).toBeVisible();
+  await expect(page.locator(".mode-button-group").first()).toBeHidden();
+  await expect(page.locator(".lex-markdown-tools").first()).toBeHidden();
+  const formatOverflow = page.locator(".lex-format-overflow").first();
+  await expect(formatOverflow).toBeVisible();
+  await formatOverflow.click();
+  await expect(page.getByRole("button", { name: "Heading 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Code block" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Numbered list" })).toBeVisible();
+  await expect(
+    page.locator(".session-header-controls.area-composer-left .approve-all-button .p-button-label").first(),
+  ).toBeHidden();
+
+  const toolbarSections = await page.locator(".lex-composer-toolbar > div").evaluateAll((els) =>
+    els.map((el) => {
+      const rect = el.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+      };
+    }),
+  );
+  for (let i = 0; i < toolbarSections.length; i++) {
+    for (let j = i + 1; j < toolbarSections.length; j++) {
+      const a = toolbarSections[i]!;
+      const b = toolbarSections[j]!;
+      const overlapX = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const overlapY = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      expect(overlapX * overlapY).toBeLessThan(1);
+    }
+  }
+});

@@ -89,6 +89,53 @@ export function stripLegacyDetailsPanels(layout: unknown): unknown {
   return collapseEmptyEdgeGroups(next);
 }
 
+const EDGE_MINIMUMS: Record<string, Record<string, number>> = {
+  left: {
+    "sessions-manager": 180,
+    "settings-panel": 380,
+    library: 320,
+    "jobs-panel": 380,
+    "log-viewer": 420,
+  },
+  right: {
+    "session-details": 380,
+  },
+};
+
+/// Dockview persists edge-group `size` in JSON. If a user previously
+/// dragged a rail below a newer minimum, restoring the raw JSON makes
+/// the rail visibly start cut off before runtime repair can catch up.
+/// Clamp known edge-group sizes before `fromJSON()`.
+export function enforcePersistedEdgeMinimums(layout: unknown): unknown {
+  if (!layout || typeof layout !== "object") return layout;
+  const obj = layout as Record<string, unknown>;
+  const edgeGroups = obj.edgeGroups;
+  if (!edgeGroups || typeof edgeGroups !== "object") return layout;
+  let changed = false;
+  const nextEdge: Record<string, unknown> = {};
+  for (const [pos, entry] of Object.entries(edgeGroups as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") {
+      nextEdge[pos] = entry;
+      continue;
+    }
+    const e = entry as Record<string, unknown>;
+    const group = e.group as { views?: unknown[] } | undefined;
+    const views = Array.isArray(group?.views) ? group.views : [];
+    const minimum = views.reduce<number>((max, view) => {
+      if (typeof view !== "string") return max;
+      return Math.max(max, EDGE_MINIMUMS[pos]?.[view] ?? 0);
+    }, 0);
+    if (minimum > 0 && typeof e.size === "number" && e.size < minimum) {
+      nextEdge[pos] = { ...e, size: minimum };
+      changed = true;
+    } else {
+      nextEdge[pos] = entry;
+    }
+  }
+  if (!changed) return layout;
+  return { ...obj, edgeGroups: nextEdge };
+}
+
 /// Extract panel ids from a dockview `toJSON()` blob whose
 /// `contentComponent` is `"chat"`. The layout shape is roughly
 /// `{ panels: Record<panelId, { contentComponent, params, ... }>, ... }`.

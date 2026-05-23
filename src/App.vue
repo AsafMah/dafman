@@ -22,6 +22,7 @@ import { resolveIsDark } from "./lib/theme";
 import { registerBuiltinCommands } from "./lib/registerBuiltinCommands";
 import {
   extractChatPanelIds,
+  enforcePersistedEdgeMinimums,
   persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
@@ -253,7 +254,8 @@ async function restoreFromLayout() {
     return;
   }
   const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
-  const sanitized = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
+  const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
+  const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
   const sessionIds = extractChatPanelIds(sanitized);
   console.info(
     `[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`,
@@ -435,8 +437,8 @@ const activityItems = computed<ActivityItem[]>(() => {
       component: "sessionsManager",
       icon: "pi-list",
       title: "Sessions",
-      initialSize: 240,
-      minimumSize: 160,
+      initialSize: 260,
+      minimumSize: 180,
     },
     {
       kind: "panel",
@@ -445,7 +447,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       icon: "pi-book",
       title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
       initialSize: 360,
-      minimumSize: 300,
+      minimumSize: 320,
     },
     {
       kind: "panel",
@@ -454,7 +456,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       icon: "pi-clock",
       title: "Jobs",
       initialSize: 380,
-      minimumSize: 300,
+      minimumSize: 380,
       badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
     },
   ];
@@ -476,7 +478,7 @@ const activityItems = computed<ActivityItem[]>(() => {
     title: "Diagnostics — live log + bundle export",
     group: "bottom",
     initialSize: 480,
-    minimumSize: 320,
+    minimumSize: 420,
   });
   items.push({
     kind: "panel",
@@ -487,10 +489,10 @@ const activityItems = computed<ActivityItem[]>(() => {
     group: "bottom",
     // Settings rows pack an input + 2 icon buttons + a "Request
     // permission" button — 280 px clipped the right edge in
-    // practice. 340 / 300 fits comfortably and still leaves the
+    // practice. 400 / 380 fits comfortably and still leaves the
     // body group ~60 % of a 1280 px viewport.
-    initialSize: 340,
-    minimumSize: 300,
+    initialSize: 400,
+    minimumSize: 380,
   });
   return items;
 });

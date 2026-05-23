@@ -10,6 +10,35 @@
 
 ---
 
+## 2026-05-23 — Terminal regression fixes
+
+### Takeaway
+
+Terminal follow-up fixed the user-reported rough edges before the feature
+gets more terminal planning: the composer footer now has the requested
+left/center/right ordering, markdown controls dispatch real Lexical editor
+commands, visible slash commands run local UI actions instead of being sent
+as chat prompts, and the terminal registry falls back to stdin/stdout pipes
+when a packaged runtime cannot expose Bun's native PTY handle.
+
+### Receipts
+
+- `/mcp`, `/skill(s)`, `/agent`, `/model`, and `/autopilot` are local
+  `SESSION_COMMANDS`; the palette and slash menu call `run()` directly and
+  no longer have a passthrough path.
+- `TerminalRegistry` still prefers `Bun.spawn(..., { terminal })`, but if
+  the runtime reports an unsupported/missing terminal handle it respawns the
+  same shell with piped stdio so Windows packaged builds do not fail with a
+  dead "not supported" terminal pane.
+- `SessionHeaderControls` supports composer-left/composer-right areas, and
+  PrimeVue model/reasoning menus append to `body` to avoid pane clipping.
+- Follow-up after visual review: compact composer now uses icon-only mode
+  select + formatting overflow instead of overlapping controls, formatting
+  covers headings/quote/code/list variants via Lexical commands, and persisted
+  dockview layout JSON clamps both left and right edge rails before restore.
+
+---
+
 ## 2026-05-22 — Phase 23a: Library Instructions + command wiring
 
 ### Takeaway

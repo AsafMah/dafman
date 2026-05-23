@@ -130,7 +130,7 @@ describe("registerBuiltinCommands — Reset Layout", () => {
     expect(visible).not.toContain("session.switch.not-in-dock");
   });
 
-  test("SDK passthrough slash commands send the slash text to the active session", async () => {
+  test("/model palette command is local and does not send a chat message", async () => {
     const calls: Array<{ name: string; args: unknown }> = [];
     setRpcBridge({
       async request(name, args) {
@@ -174,9 +174,6 @@ describe("registerBuiltinCommands — Reset Layout", () => {
 
     await useCommandRegistry().commands.get("session.cmd.model")?.run();
 
-    expect(calls).toContainEqual({
-      name: "sendMessage",
-      args: { sessionId: "s1", text: "/model", mode: "immediate" },
-    });
+    expect(calls.find((c) => c.name === "sendMessage")).toBeUndefined();
   });
 });

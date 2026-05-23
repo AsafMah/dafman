@@ -36,7 +36,7 @@ type FakeGroup = {
 interface FakeDock {
   api: DockviewApi;
   removePanelCalls: string[];
-  addEdgeGroupCalls: Array<{ position: string; id: string; initialSize?: number }>;
+  addEdgeGroupCalls: Array<{ position: string; id: string; initialSize?: number; minimumSize?: number }>;
   removeEdgeGroupCalls: string[];
   groups: FakeGroup[];
 }
@@ -70,7 +70,7 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
   const groups: FakeGroup[] = [];
   const edges: Map<string, FakeGroup> = new Map();
   const removePanelCalls: string[] = [];
-  const addEdgeGroupCalls: Array<{ position: string; id: string; initialSize?: number }> = [];
+  const addEdgeGroupCalls: Array<{ position: string; id: string; initialSize?: number; minimumSize?: number }> = [];
   const removeEdgeGroupCalls: string[] = [];
   let nextId = 100;
 
@@ -164,8 +164,13 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
       const group = edges.get(position);
       return group ? edgeApi(group) : undefined;
     },
-    addEdgeGroup(position: string, opts: { id: string; initialSize?: number }) {
-      addEdgeGroupCalls.push({ position, id: opts.id, initialSize: opts.initialSize });
+    addEdgeGroup(position: string, opts: { id: string; initialSize?: number; minimumSize?: number }) {
+      addEdgeGroupCalls.push({
+        position,
+        id: opts.id,
+        initialSize: opts.initialSize,
+        minimumSize: opts.minimumSize,
+      });
       const g = makeGroup(opts.id, "edge", { width: opts.initialSize });
       groups.push(g);
       edges.set(position, g);
@@ -224,7 +229,7 @@ describe("layoutStore.resetToDefault", () => {
 
     expect(dock.addEdgeGroupCalls).toHaveLength(1);
     expect(dock.addEdgeGroupCalls[0]?.position).toBe("left");
-    expect(dock.addEdgeGroupCalls[0]?.initialSize).toBe(240);
+    expect(dock.addEdgeGroupCalls[0]?.initialSize).toBe(260);
   });
 
   test("no panels open → still opens the Sessions sidebar (idempotent first-launch reset)", () => {
@@ -261,7 +266,7 @@ describe("layoutStore.resetToDefault", () => {
     expect(dock.api.getPanel("sessions-manager")).toBeDefined();
   });
 
-  test("enforceKnownEdgeMinimums restores library and details rails from stale narrow widths", () => {
+  test("enforceKnownEdgeMinimums recreates stale narrow library and details rails with real edge minimums", () => {
     const dock = makeFake({
       edges: {
         left: {
@@ -283,9 +288,61 @@ describe("layoutStore.resetToDefault", () => {
 
     const left = dock.groups.find((g) => g.id === "edge-left");
     const right = dock.groups.find((g) => g.id === "edge-right");
-    expect(left?.width).toBe(300);
-    expect(left?.setConstraintsCalls).toContainEqual({ minimumWidth: 300 });
-    expect(right?.width).toBe(300);
-    expect(right?.setConstraintsCalls).toContainEqual({ minimumWidth: 300 });
+    expect(dock.removeEdgeGroupCalls).toEqual(expect.arrayContaining(["left", "right"]));
+    expect(left?.width).toBe(360);
+    expect(
+      dock.addEdgeGroupCalls.some(
+        (call) =>
+          call.position === "left" &&
+          call.initialSize === 360 &&
+          call.minimumSize === 320,
+      ),
+    ).toBe(true);
+    expect(right?.width).toBe(380);
+    expect(
+      dock.addEdgeGroupCalls.some(
+        (call) =>
+          call.position === "right" &&
+          call.initialSize === 380 &&
+          call.minimumSize === 380,
+      ),
+    ).toBe(true);
+  });
+
+  test("openEdgePanel recreates an already-open stale narrow edge group", () => {
+    const dock = makeFake({
+      edges: {
+        left: {
+          id: "edge-left",
+          width: 160,
+          panelIds: [{ id: "library", component: "library" }],
+        },
+      },
+    });
+    const store = useLayoutStore();
+    store.setApi(dock.api);
+    const staleEdge = dock.groups.find((g) => g.id === "edge-left");
+    if (staleEdge) staleEdge.width = 160;
+
+    store.openEdgePanel("left", {
+      id: "library",
+      component: "library",
+      tabComponent: "sidebarTab",
+      title: "Library",
+      initialSize: 360,
+      minimumSize: 320,
+      exclusive: true,
+    });
+
+    expect(dock.removeEdgeGroupCalls).toContain("left");
+    expect(dock.addEdgeGroupCalls[dock.addEdgeGroupCalls.length - 1]).toMatchObject({
+      position: "left",
+      id: "edge-left",
+      initialSize: 360,
+      minimumSize: 320,
+    });
+    const edge = dock.groups.find((g) => g.id === "edge-left");
+    expect(edge?.width).toBe(360);
+    expect(edge?.panels.map((p) => p.id)).toContain("library");
   });
 });

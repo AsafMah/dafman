@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-width: 300px;
+  min-width: 320px;
   max-width: 100%;
   box-sizing: border-box;
   color: var(--p-text-color);
@@ -130,6 +130,29 @@ onBeforeUnmount(() => {
 
 .library-tabs :deep(.p-tablist) {
   flex-shrink: 0;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.library-tabs :deep(.p-tablist-tab-list),
+.library-tabs :deep(.p-tablist-content) {
+  flex-wrap: wrap;
+  gap: 0.15rem 0.25rem;
+  border-bottom: 0;
+  overflow: visible;
+}
+
+.library-tabs :deep(.p-tab) {
+  flex: 0 0 auto;
+  border-bottom: 2px solid transparent;
+  padding: 0.55rem 0.65rem;
+}
+
+.library-tabs :deep(.p-tab.p-tab-active) {
+  border-bottom-color: var(--p-primary-color);
+}
+
+.library-tabs :deep(.p-tablist-active-bar) {
+  display: none;
 }
 
 .library-tabs :deep(.p-tabpanels) {

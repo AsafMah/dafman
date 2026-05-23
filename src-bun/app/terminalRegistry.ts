@@ -20,13 +20,18 @@ interface TerminalEntry {
 	status: TerminalStatus;
 	createdAt: string;
 	proc: Bun.Subprocess;
-	terminal: NonNullable<Bun.Subprocess["terminal"]>;
+	terminal: {
+		write(data: string | BufferSource): number | void;
+		resize(cols: number, rows: number): void;
+		close(): void;
+	};
 	cols: number;
 	rows: number;
 	outputQueue: string[];
 	flushTimer: ReturnType<typeof setTimeout> | null;
 	exitCode?: number | null;
 	signal?: string | null;
+	backend: "pty" | "pipe";
 }
 
 type EmitTerminal = (payload: TerminalEventPayload) => void;
@@ -75,6 +80,11 @@ function toSummary(entry: TerminalEntry): TerminalSummary {
 	};
 }
 
+function isUnsupportedTerminalError(err: unknown): boolean {
+	const message = err instanceof Error ? err.message : String(err);
+	return /terminal|pty|conpty|unsupported/i.test(message);
+}
+
 export class TerminalRegistry {
 	private readonly entries = new Map<string, TerminalEntry>();
 
@@ -90,64 +100,199 @@ export class TerminalRegistry {
 		const cols = Math.max(10, Math.floor(params.cols ?? 80));
 		const rows = Math.max(3, Math.floor(params.rows ?? 24));
 		const createdAt = new Date().toISOString();
-		let entry: TerminalEntry;
-		try {
-			const proc = Bun.spawn([shell, ...args], {
-				cwd,
-				env: {
-					...process.env,
-					TERM: "xterm-256color",
-				},
-				terminal: {
-					cols,
-					rows,
-					name: "xterm-256color",
-					data: (_terminal, data) => {
-						this.enqueueOutput(id, Buffer.from(data).toString("utf8"));
-					},
-					exit: (_terminal, exitCode, signal) => {
-						this.markExited(id, exitCode, signal);
-					},
-				},
-				onExit: (_proc, exitCode, signalCode, error) => {
-					if (error) {
-						log.warn("terminal child exited with error", {
-							terminalId: id,
-							error: error.message,
-						});
-					}
-					this.markExited(id, exitCode, signalCode);
-				},
-			});
-			if (!proc.terminal) throw new Error("Bun did not return a terminal handle");
-			entry = {
-				id,
-				title,
-				cwd,
-				...(params.sessionId ? { sessionId: params.sessionId } : {}),
-				shell,
-				args,
-				status: "running",
-				createdAt,
-				proc,
-				terminal: proc.terminal,
-				cols,
-				rows,
-				outputQueue: [],
-				flushTimer: null,
-			};
-		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
-		}
+		const options = {
+			id,
+			title,
+			cwd,
+			shell,
+			args,
+			cols,
+			rows,
+			createdAt,
+			sessionId: params.sessionId,
+		};
+		const entry = this.createWithFallback(options);
 		this.entries.set(id, entry);
 		const summary = toSummary(entry);
 		this.emit({ terminalId: id, kind: "status", summary });
-		log.info("terminal created", { terminalId: id, shell, cwd });
+		log.info("terminal created", { terminalId: id, shell, cwd, backend: entry.backend });
 		return summary;
 	}
 
 	list(): TerminalSummary[] {
 		return [...this.entries.values()].map(toSummary);
+	}
+
+	private createWithFallback(options: {
+		id: string;
+		title: string;
+		cwd: string;
+		shell: string;
+		args: string[];
+		cols: number;
+		rows: number;
+		createdAt: string;
+		sessionId?: string;
+	}): TerminalEntry {
+		try {
+			return this.createNativeTerminal(options);
+		} catch (err) {
+			if (!isUnsupportedTerminalError(err)) {
+				throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			}
+			log.warn("Bun native terminal unavailable; using pipe fallback", {
+				terminalId: options.id,
+				error: err instanceof Error ? err.message : String(err),
+			});
+			return this.createPipeTerminal(options);
+		}
+	}
+
+	private createNativeTerminal(options: {
+		id: string;
+		title: string;
+		cwd: string;
+		shell: string;
+		args: string[];
+		cols: number;
+		rows: number;
+		createdAt: string;
+		sessionId?: string;
+	}): TerminalEntry {
+		const { id, title, cwd, shell, args, cols, rows, createdAt } = options;
+		const proc = Bun.spawn([shell, ...args], {
+			cwd,
+			env: { ...process.env, TERM: "xterm-256color" },
+			terminal: {
+				cols,
+				rows,
+				name: "xterm-256color",
+				data: (_terminal, data) => {
+					this.enqueueOutput(id, Buffer.from(data).toString("utf8"));
+				},
+				exit: (_terminal, exitCode, signal) => {
+					this.markExited(id, exitCode, signal);
+				},
+			},
+			onExit: (_proc, exitCode, signalCode, error) => {
+				if (error) {
+					log.warn("terminal child exited with error", {
+						terminalId: id,
+						error: error.message,
+					});
+				}
+				this.markExited(id, exitCode, signalCode);
+			},
+		});
+		if (!proc.terminal) {
+			try {
+				proc.kill();
+			} catch {
+				/* ignore */
+			}
+			throw new Error("Bun native terminal unsupported in this runtime");
+		}
+		return {
+			id,
+			title,
+			cwd,
+			...(options.sessionId ? { sessionId: options.sessionId } : {}),
+			shell,
+			args,
+			status: "running",
+			createdAt,
+			proc,
+			terminal: proc.terminal,
+			cols,
+			rows,
+			outputQueue: [],
+			flushTimer: null,
+			backend: "pty",
+		};
+	}
+
+	private createPipeTerminal(options: {
+		id: string;
+		title: string;
+		cwd: string;
+		shell: string;
+		args: string[];
+		cols: number;
+		rows: number;
+		createdAt: string;
+		sessionId?: string;
+	}): TerminalEntry {
+		const { id, title, cwd, shell, args, cols, rows, createdAt } = options;
+		const proc = Bun.spawn([shell, ...args], {
+			cwd,
+			env: { ...process.env, TERM: "xterm-256color" },
+			stdin: "pipe",
+			stdout: "pipe",
+			stderr: "pipe",
+			onExit: (_proc, exitCode, signalCode, error) => {
+				if (error) {
+					log.warn("pipe terminal child exited with error", {
+						terminalId: id,
+						error: error.message,
+					});
+				}
+				this.markExited(id, exitCode, signalCode);
+			},
+		});
+		this.readPipe(id, proc.stdout);
+		this.readPipe(id, proc.stderr);
+		return {
+			id,
+			title,
+			cwd,
+			...(options.sessionId ? { sessionId: options.sessionId } : {}),
+			shell,
+			args,
+			status: "running",
+			createdAt,
+			proc,
+			terminal: {
+				write: (data) => {
+					if (!proc.stdin) return 0;
+					const written = proc.stdin.write(data);
+					proc.stdin.flush();
+					return written;
+				},
+				resize: () => {},
+				close: () => {
+					try {
+						proc.stdin?.end();
+					} catch {
+						/* ignore */
+					}
+				},
+			},
+			cols,
+			rows,
+			outputQueue: [],
+			flushTimer: null,
+			backend: "pipe",
+		};
+	}
+
+	private async readPipe(
+		id: string,
+		stream: ReadableStream<Uint8Array<ArrayBuffer>> | number | null | undefined,
+	): Promise<void> {
+		if (!stream || typeof stream === "number") return;
+		const reader = stream.getReader();
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				if (value) this.enqueueOutput(id, Buffer.from(value).toString("utf8"));
+			}
+		} catch (err) {
+			log.warn("pipe terminal read failed", {
+				terminalId: id,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
 	}
 
 	write(id: string, data: string): boolean {

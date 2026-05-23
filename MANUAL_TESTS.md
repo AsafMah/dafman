@@ -71,14 +71,15 @@
 
 4. ⏳ **Composer follow-up layout and slash commands.**
    - **Steps:** resize a chat pane from wide to narrow, inspect the
-     composer toolbar, type `/?`, `/mcp`, and `/skill`.
-   - **Expected:** attachment stays on the left, markdown buttons appear
-     in the middle and collapse on narrow width, workspace stays left of
-     the model/settings cluster, Allow all has a visible label and active
-     state, and SDK commands appear in the slash menu but remain editable
-     for the CLI to handle.
-   - **Why not automated:** this is primarily responsive layout and
-     Lexical typeahead behavior inside WebView2.
+      composer toolbar, type `/?`, `/mcp`, and `/skill`.
+   - **Expected:** mode, Allow all, workspace, and shell stay left;
+      upload plus editor formatting stay centered; model/settings stay
+      right. Narrow panes switch mode to an icon select, hide Allow all
+      text, and move formatting commands into an overflow menu. `/mcp`
+      and `/skill` open Library locally rather than sending chat messages.
+   - **Automated coverage:** `e2e/full/flows/14-details-rail.pwtest.ts`
+     asserts toolbar glyphs, compact overflow behavior, and left/right
+     edge minimum widths in prod + HMR.
 
 ---
 
@@ -1065,5 +1066,5 @@ The picker only lets you pick a folder, no files visible.
     - **Why not automated:** OS integration.
 - [ ] ⏳ **/library slash command opens the requested tab**
     - **Steps:** in a session composer, run `/library instructions`, `/library skills`, `/library agents`, `/library mcp`.
-    - **Expected:** Library sidebar opens and switches to the requested tab. `/mcp` and `/skills` still pass through to the SDK if typed directly.
+    - **Expected:** Library sidebar opens and switches to the requested tab. `/mcp`, `/skill`, `/skills`, and `/agent` also open their Library tabs locally.
     - **Why not automated:** end-to-end composer + dockview interaction; unit test covers SDK command registration non-collision.

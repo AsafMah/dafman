@@ -704,7 +704,7 @@ const pendingStyle = computed(() => {
         class="artifact-pill"
         :title="`${commandsRun} shell command(s) executed this session`"
       >
-        <i class="pi pi-terminal" aria-hidden="true" />
+        <i class="pi pi-window-maximize" aria-hidden="true" />
         {{ commandsRun }} command{{ commandsRun === 1 ? "" : "s" }}
       </span>
       <span
@@ -755,8 +755,11 @@ const pendingStyle = computed(() => {
         @submit="sendMessage"
         @update:default-mode="onUpdateDefaultMode"
       >
-        <template #session-controls>
-          <SessionHeaderControls :session-id="props.sessionId" />
+        <template #session-left-controls>
+          <SessionHeaderControls :session-id="props.sessionId" area="composer-left" />
+        </template>
+        <template #session-right-controls>
+          <SessionHeaderControls :session-id="props.sessionId" area="composer-right" />
         </template>
       </MessageComposer>
     </form>

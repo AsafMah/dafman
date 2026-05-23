@@ -434,7 +434,7 @@ function toggle(id: string) {
           :class="collapsed.terminal ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-terminal group-icon" aria-hidden="true" />
+        <i class="pi pi-window-maximize group-icon" aria-hidden="true" />
         <span class="group-label">Terminal</span>
       </button>
       <div v-show="!collapsed.terminal" class="group-body">

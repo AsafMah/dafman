@@ -190,7 +190,7 @@ describe("sessionCommands", () => {
     expect(sessions.sessions[0]?.mode).toBe("plan");
   });
 
-  test("SDK passthrough commands appear but are not intercepted", async () => {
+  test("model/autopilot slash commands are local and do not forward to LLM", async () => {
     const slashes = SESSION_COMMANDS.map((cmd) => cmd.slash);
     expect(slashes).toContain("/skill");
     expect(slashes).toContain("/skills");
@@ -199,7 +199,7 @@ describe("sessionCommands", () => {
 
     const handled = await runLocalSlashCommand("s1", "/model");
 
-    expect(handled).toBe(false);
+    expect(handled).toBe(true);
   });
 
   test("/mcp and /skills are local library commands", async () => {

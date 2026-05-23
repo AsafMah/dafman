@@ -1,5 +1,21 @@
 - [x] Command palette doesn't do anything with slash commands such as /mcp
 - [x] It seems that forwarding /mcp to the session doesn't do anything. Do any of the slash commands work? We need to figure it out, and if not, then remake them.
+- [x] IDK how you messed up my requests on the bottom session bar so much:
+  - [x] The order of things should be:
+    - [x] Left anchored - mode toggle, allow all, working dir, shell
+    - [x] Center anchored - Upload file, then markdown bar.
+    - [x] Right anchored - model, settings
+- [x] The markdown buttons should be the actual markdown buttons from the editor, not a reinvented wheel.
+- [x] The terminal button is missing an icon.
+- [x] IDk what you did with the minimums, but I don't want to menus to be able to be cut off. No cutting off. That's it. You can't shrink them more than a reasonable minimum. Why is this so fucking hard.
+- [x] Getting terminal not supported on this plaform. I'm on windows, it's for me, it's gotta work on windows.
+- [x] When I asked you to audit slash commands, you clearly didn't listen or did a poor job. I don't want them to send messages to the llm and waste tokens. But /model seems to do just that.
+- [x] IDK if any slash commands work through the sdk, that was for you to figure out, but you should only forward them if they are actually distinct from writing a message.
+- [x] When the session window shrinks, composer controls overlap instead of responsive states / overflow fallback.
+- [x] The right panel still doesn't have a real minimum.
+- [x] Wrapped Library tab rows look weird.
+
+Future Ideas:
 - Command Palette should have sub-menus, but still be fully searchable.
 - Pretty much every toggleable setting should be in the command palette.
 - Command palette should support prefixes for different groups of commands, like vscode.

@@ -10,6 +10,7 @@
 
 import { computed } from "vue";
 import SelectButton from "primevue/selectbutton";
+import Select from "primevue/select";
 import type { SessionMode } from "../ipc/types";
 import { useSessionsStore } from "../stores/sessionsStore";
 
@@ -55,6 +56,31 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
       <span class="sr-only">{{ slotProps.option.label }}</span>
     </template>
   </SelectButton>
+  <div v-if="record" class="mode-select-shell">
+    <Select
+      v-model="modeChoice"
+      :options="modeOptions"
+      option-label="label"
+      option-value="value"
+      size="small"
+      aria-label="Agent run mode"
+      class="mode-select"
+      :class="modeClass"
+    >
+      <template #value="{ value }">
+        <span class="mode-select-value">
+          <i :class="modeOptions.find((option) => option.value === value)?.icon" aria-hidden="true" />
+          <span class="mode-select-current-label">{{ modeOptions.find((option) => option.value === value)?.label ?? "Mode" }}</span>
+        </span>
+      </template>
+      <template #option="{ option }">
+        <span class="mode-select-value">
+          <i :class="option.icon" aria-hidden="true" />
+          <span>{{ option.label }}</span>
+        </span>
+      </template>
+    </Select>
+  </div>
 </template>
 
 <style scoped>
@@ -68,6 +94,34 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
   display: inline-flex;
   align-items: stretch;
   align-self: center;
+}
+.mode-select-shell {
+  display: none;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.mode-select {
+  width: 2.4rem;
+  min-width: 2.4rem;
+}
+.mode-select-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.mode-select :deep(.p-select-label) {
+  padding-inline: 0.45rem 0;
+  width: 1.1rem;
+  overflow: hidden;
+}
+.mode-select :deep(.p-select-dropdown) {
+  width: 0.8rem;
+  min-width: 0.8rem;
+  padding-inline: 0;
+}
+.mode-select-current-label {
+  display: none;
 }
 .mode-button-group :deep(.p-selectbutton) {
   display: inline-flex;
@@ -107,6 +161,15 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
 }
 .mode-button-group :deep(.p-selectbutton .p-button .pi) {
   font-size: 0.78rem;
+}
+
+@container (max-width: 36rem) {
+  .mode-button-group {
+    display: none;
+  }
+  .mode-select-shell {
+    display: inline-flex;
+  }
 }
 
 .sr-only {

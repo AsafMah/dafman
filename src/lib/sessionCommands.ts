@@ -6,11 +6,10 @@
 /// "Clear conversation" from Ctrl+K should be the same action. Keeping
 /// these in one place avoids drift between the two surfaces.
 ///
-/// The SDK has its OWN built-in CLI commands (/agent, /model, /mcp,
-/// /skills, …) that are handled internally when the user sends a
-/// message starting with "/". We don't duplicate those here — if the
-/// slash menu doesn't match a typed prefix, the text just falls
-/// through to `sendMessage` and the SDK's command resolver picks it up.
+/// Commands listed here run locally. We only keep a slash command in
+/// this shared palette/menu when Dafman has concrete UI behavior for it;
+/// unknown slash text is left alone so manual SDK commands can still be
+/// sent intentionally.
 
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
@@ -38,9 +37,6 @@ export interface SessionCommand {
 	/// Execute the command against `sessionId`. May return a promise;
 	/// the palette closes optimistically.
 	run(sessionId: string, args?: string): void | Promise<void>;
-	/// SDK-owned slash commands should appear in the composer menu but
-	/// still be sent through to the CLI instead of executed locally.
-	passthrough?: boolean;
 }
 
 function parseSlashCommand(text: string): { slash: string; args: string } | null {
@@ -84,7 +80,7 @@ function openLibraryTab(tab = "mcp"): void {
 		tabComponent: "sidebarTab",
 		title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
 		initialSize: 360,
-		minimumSize: 300,
+		minimumSize: 320,
 		exclusive: true,
 	});
 }
@@ -103,36 +99,11 @@ export async function runLocalSlashCommand(
 		(c) => c.slash.toLowerCase() === parsed.slash,
 	);
 	if (!cmd) return false;
-	if (cmd.passthrough) return false;
 	await cmd.run(sessionId, parsed.args);
 	return true;
 }
 
-const SDK_PASSTHROUGH_COMMANDS: SessionCommand[] = [
-	{
-		slash: "/model",
-		label: "Model",
-		description: "SDK command for switching model from the CLI.",
-		icon: "pi-cpu",
-		group: "SDK",
-		keywords: ["llm", "reasoning"],
-		passthrough: true,
-		run: () => {},
-	},
-	{
-		slash: "/autopilot",
-		label: "Toggle autopilot",
-		description: "SDK command for toggling CLI autopilot mode.",
-		icon: "pi-bolt",
-		group: "SDK",
-		keywords: ["mode", "auto"],
-		passthrough: true,
-		run: () => {},
-	},
-];
-
 export const SESSION_COMMANDS: SessionCommand[] = [
-	...SDK_PASSTHROUGH_COMMANDS,
 	{
 		slash: "/mcp",
 		label: "Open MCP Library",
@@ -168,6 +139,29 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 		group: "Library",
 		keywords: ["subagent", "custom agent"],
 		run: () => openLibraryTab("agents"),
+	},
+	{
+		slash: "/model",
+		label: "Open model controls",
+		description: "Open session details where the model selector lives.",
+		icon: "pi-cpu",
+		group: "Session",
+		keywords: ["llm", "reasoning"],
+		run: () => useLayoutStore().openSessionDetailsPanel(),
+	},
+	{
+		slash: "/autopilot",
+		label: "Toggle autopilot mode",
+		description: "Toggle this session between Autopilot and Interactive.",
+		icon: "pi-bolt",
+		group: "Session",
+		keywords: ["mode", "auto"],
+		run: async (sessionId) => {
+			const sessions = useSessionsStore();
+			const record = sessions.sessions.find((s) => s.id === sessionId);
+			const next = record?.mode === "autopilot" ? "interactive" : "autopilot";
+			await sessions.setSessionMode(sessionId, next);
+		},
 	},
 	{
 		slash: "/compact",

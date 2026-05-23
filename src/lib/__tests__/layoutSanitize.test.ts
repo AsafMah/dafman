@@ -8,6 +8,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   collapseEmptyEdgeGroups,
+  enforcePersistedEdgeMinimums,
   extractChatPanelIds,
   persistedLayoutHasPanel,
   stripLegacyDetailsPanels,
@@ -234,5 +235,49 @@ describe("persistedLayoutHasPanel", () => {
   test("safe on null / non-object", () => {
     expect(persistedLayoutHasPanel(null, "x")).toBe(false);
     expect(persistedLayoutHasPanel({}, "x")).toBe(false);
+  });
+});
+
+describe("enforcePersistedEdgeMinimums", () => {
+  test("clamps known left and right edge panels before dockview restore", () => {
+    const layout = {
+      panels: {
+        library: { id: "library", contentComponent: "library" },
+        "session-details": { id: "session-details", contentComponent: "sessionDetails" },
+      },
+      edgeGroups: {
+        left: {
+          size: 120,
+          visible: true,
+          group: { views: ["library"], activeView: "library", id: "edge-left" },
+        },
+        right: {
+          size: 150,
+          visible: true,
+          group: {
+            views: ["session-details"],
+            activeView: "session-details",
+            id: "edge-right",
+          },
+        },
+      },
+    };
+
+    const out = enforcePersistedEdgeMinimums(layout) as {
+      edgeGroups: { left: { size: number }; right: { size: number } };
+    };
+
+    expect(out.edgeGroups.left.size).toBe(320);
+    expect(out.edgeGroups.right.size).toBe(380);
+  });
+
+  test("returns input by reference when edge sizes are already valid", () => {
+    const layout = {
+      edgeGroups: {
+        left: { size: 360, group: { views: ["library"] } },
+        right: { size: 380, group: { views: ["session-details"] } },
+      },
+    };
+    expect(enforcePersistedEdgeMinimums(layout)).toBe(layout);
   });
 });
