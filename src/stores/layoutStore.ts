@@ -127,18 +127,35 @@ export const useLayoutStore = defineStore("layout", () => {
     return Array.isArray(panels) ? panels : [];
   }
 
+  function edgeId(edge: unknown): string | null {
+    const id = (edge as { id?: unknown }).id;
+    return typeof id === "string" ? id : null;
+  }
+
+  function edgePanelsFromDock(edge: unknown): unknown[] {
+    const direct = edgePanels(edge);
+    if (direct.length > 0) return direct;
+    const id = edgeId(edge);
+    const dock = api.value;
+    if (!id || !dock) return [];
+    const group = dock.groups.find((g) => g.id === id);
+    if (!group) return [];
+    const panels = (group as unknown as { panels?: unknown[] }).panels;
+    return Array.isArray(panels) ? panels : [];
+  }
+
   function minimumForEdgeGroup(
     position: EdgeGroupPosition,
     edge: unknown,
   ): number | undefined {
     if (position === "right") {
-      return edgePanels(edge).some((panel) => panelId(panel) === SESSION_DETAILS_PANEL_ID)
+      return edgePanelsFromDock(edge).some((panel) => panelId(panel) === SESSION_DETAILS_PANEL_ID)
         ? SESSION_DETAILS_MIN_WIDTH
         : undefined;
     }
     if (position !== "left") return undefined;
     let min: number | undefined;
-    for (const panel of edgePanels(edge)) {
+    for (const panel of edgePanelsFromDock(edge)) {
       const id = panelId(panel);
       if (!id) continue;
       const candidate = LEFT_EDGE_MIN_BY_PANEL_ID[id];

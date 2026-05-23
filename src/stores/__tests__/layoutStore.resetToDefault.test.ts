@@ -88,6 +88,20 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
     };
   }
 
+  function edgeApi(group: FakeGroup) {
+    return {
+      id: group.id,
+      get width() {
+        return group.width;
+      },
+      get height() {
+        return group.height;
+      },
+      setSize: group.setSize,
+      setConstraints: group.setConstraints,
+    };
+  }
+
   for (const g of initial.groups ?? []) {
     const group = makeGroup(g.id, g.locationType);
     for (const p of g.panelIds) group.panels.push(makePanel(p.id, p.component, group));
@@ -147,14 +161,15 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
       }
     },
     getEdgeGroup(position: string) {
-      return edges.get(position);
+      const group = edges.get(position);
+      return group ? edgeApi(group) : undefined;
     },
     addEdgeGroup(position: string, opts: { id: string; initialSize?: number }) {
       addEdgeGroupCalls.push({ position, id: opts.id, initialSize: opts.initialSize });
       const g = makeGroup(opts.id, "edge", { width: opts.initialSize });
       groups.push(g);
       edges.set(position, g);
-      return g;
+      return edgeApi(g);
     },
     removeEdgeGroup(position: string) {
       removeEdgeGroupCalls.push(position);
