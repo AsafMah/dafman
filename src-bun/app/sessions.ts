@@ -30,7 +30,6 @@ import {
 } from "./copilotSdk";
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
-import { Buffer } from "node:buffer";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
 import { log } from "./logging";
@@ -87,8 +86,14 @@ const HISTORY_REPLAY_BATCH = 50;
 const SHUTDOWN_TIMEOUT_MS = 2000;
 
 function commandResultMarkdown(result: CommandResultRecord): string {
-	const stripAnsi = (value: string): string =>
-		value.replace(/[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g, "");
+	const clean = (value: string): string =>
+		value
+			.replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
+			.replace(/[\x1B\x9B]\[[0-?]*[ -/]*[@-~]/g, "")
+			.replace(/\x1B[()#;?]*(?:[0-9A-ORZcf-nqry=><~])/g, "")
+			.replace(/\x07/g, "")
+			.replace(/\r/g, "")
+			.trimEnd();
 	const status = result.status === "completed" && result.exitCode === 0
 		? "success"
 		: result.status;
@@ -105,27 +110,16 @@ function commandResultMarkdown(result: CommandResultRecord): string {
 		"",
 		"## stdout",
 		"```text",
-		stripAnsi(result.stdout) || "(empty)",
+		clean(result.stdout) || "(empty)",
 		"```",
 		"",
 		"## stderr",
 		"```text",
-		stripAnsi(result.stderr) || "(empty)",
+		clean(result.stderr) || "(empty)",
 		"```",
 		"",
 	];
 	return lines.join("\n");
-}
-
-function toSdkAttachment(attachment: SendMessageAttachment): Exclude<SendMessageAttachment, { type: "commandResult" }> {
-	if (attachment.type !== "commandResult") return attachment;
-	const markdown = commandResultMarkdown(attachment.result);
-	return {
-		type: "blob",
-		data: Buffer.from(markdown, "utf8").toString("base64"),
-		mimeType: "text/markdown",
-		displayName: attachment.displayName ?? `command-result-${attachment.result.id}.md`,
-	};
 }
 
 /// 19a: normalize the SDK's loose AgentInfo wire shape (everything is
@@ -1005,9 +999,18 @@ export class SessionRegistry {
 			});
 		}
 		try {
-			const sdkAttachments = attachments?.map(toSdkAttachment);
+			const commandResults = attachments?.filter((a) => a.type === "commandResult") ?? [];
+			const sdkAttachments = attachments?.filter((a) => a.type !== "commandResult");
+			const prompt = commandResults.length === 0
+				? text
+				: [
+					text,
+					"",
+					"Attached command result context:",
+					...commandResults.map((a) => commandResultMarkdown(a.result)),
+				].join("\n");
 			return await entry.session.send({
-				prompt: text,
+				prompt,
 				...(mode ? { mode } : {}),
 				...(sdkAttachments && sdkAttachments.length > 0
 					? { attachments: sdkAttachments as Parameters<typeof entry.session.send>[0]["attachments"] }

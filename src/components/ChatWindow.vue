@@ -36,7 +36,7 @@ import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 import type { ComposerSubmitPayload } from "../lexical/plugins";
 import { styleFor } from "../lib/notificationStyles";
-import { stripAnsi } from "../lib/ansi";
+import { cleanTerminalCommandOutput } from "../lib/ansi";
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -90,6 +90,8 @@ const composerRef = ref<{
 const commandTerminalId = ref<string>("");
 const autoAttachedCommandIds = new Set<string>();
 const capturedTerminalCommandIds = new Set<string>();
+const commandModeOpenedAt = ref<number>(0);
+const commandResultOrder = ref<Record<string, number>>({});
 
 /// External "focus my composer" requests arrive as a window event
 /// from the Sessions sidebar (clicking an already-open session row).
@@ -203,6 +205,19 @@ const reasoningVisibility = computed<ReasoningVisibility>(() =>
 
 const accentColor = computed(() => props.accent);
 const commandResults = computed(() => commandResultsStore.recordsBySession[props.sessionId] ?? []);
+const timelineItems = computed(() => {
+  const out: Array<ChatItem | { kind: "commandResult"; id: number; record: CommandResultRecord }> = [
+    ...items.value,
+  ];
+  for (const record of commandResults.value) {
+    out.push({
+      kind: "commandResult",
+      id: commandResultOrder.value[record.id] ?? Number.MAX_SAFE_INTEGER,
+      record,
+    });
+  }
+  return out.sort((a, b) => a.id - b.id);
+});
 
 async function scrollToBottom() {
   await nextTick();
@@ -372,6 +387,7 @@ async function ensureCommandTerminal(): Promise<string | null> {
 }
 
 async function onRequestCommandTerminal(): Promise<void> {
+  commandModeOpenedAt.value = Date.now();
   await ensureCommandTerminal();
 }
 
@@ -397,6 +413,12 @@ async function cancelCommandResult(record: CommandResultRecord): Promise<void> {
 
 watch(commandResults, (records) => {
   for (const record of records) {
+    if (commandResultOrder.value[record.id] === undefined) {
+      commandResultOrder.value = {
+        ...commandResultOrder.value,
+        [record.id]: idCounter.next++,
+      };
+    }
     if (record.status === "running" || autoAttachedCommandIds.has(record.id)) continue;
     autoAttachedCommandIds.add(record.id);
     addCommandResultAttachment(record);
@@ -408,8 +430,10 @@ watch(
   (commands) => {
     for (const command of commands) {
       if (!command.command || capturedTerminalCommandIds.has(command.id)) continue;
+      if (new Date(command.startedAt).getTime() < commandModeOpenedAt.value) continue;
       capturedTerminalCommandIds.add(command.id);
       const now = new Date().toISOString();
+      const output = cleanTerminalCommandOutput(command.output ?? "");
       commandResultsStore.addLocal({
         id: command.id,
         sessionId: props.sessionId,
@@ -417,7 +441,7 @@ watch(
         cwd: command.cwd ?? "",
         shell: "session terminal",
         status: command.exitCode === 0 ? "completed" : "failed",
-        stdout: stripAnsi(command.output ?? ""),
+        stdout: output,
         stderr: "",
         truncated: false,
         createdAt: command.startedAt,
@@ -614,6 +638,10 @@ const commandsRun = computed(() => {
   return total;
 });
 
+function itemIndexById(itemId: number): number {
+  return items.value.findIndex((item) => item.id === itemId);
+}
+
 const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
 /// Type-aware styling for the pending-request banner. Pulls the
 /// color + icon + label from the shared `notificationStyles` so the
@@ -635,8 +663,14 @@ const pendingStyle = computed(() => {
         Start typing below to send a message.
       </p>
 
-      <template v-for="(item, idx) in items" :key="item.id">
-        <div v-if="item.kind === 'reasoning'" class="message-shell">
+      <template v-for="item in timelineItems" :key="`${item.kind}-${item.id}`">
+        <CommandResultCard
+          v-if="item.kind === 'commandResult'"
+          :record="item.record"
+          @add="addCommandResultAttachment"
+          @cancel="cancelCommandResult"
+        />
+        <div v-else-if="item.kind === 'reasoning'" class="message-shell">
           <ReasoningBlock
             :text="item.text"
             :visibility="reasoningVisibility"
@@ -648,7 +682,7 @@ const pendingStyle = computed(() => {
             :text="item.text"
             :event-id="item.eventId"
             @quote="onMessageQuote"
-            @fork="onMessageFork(idx)"
+            @fork="onMessageFork(itemIndexById(item.id))"
           />
         </div>
         <div v-else-if="item.kind === 'tool'" class="message-shell">
@@ -671,7 +705,7 @@ const pendingStyle = computed(() => {
             :event-id="item.eventId"
             :tool-args-text="item.args ? JSON.stringify(item.args, null, 2) : ''"
             :tool-result-text="item.resultContent || item.partialOutput || ''"
-            @fork="onMessageFork(idx)"
+            @fork="onMessageFork(itemIndexById(item.id))"
           />
         </div>
         <SubagentBlock
@@ -732,7 +766,7 @@ const pendingStyle = computed(() => {
           <!-- eventId we can pin the fork to.                          -->
           <MessageEditor
             v-if="
-              item.kind === 'user' &&
+               item.kind === 'user' &&
               editingItemId === item.id
             "
             :original-text="item.text"
@@ -781,20 +815,12 @@ const pendingStyle = computed(() => {
               :event-id="'eventId' in item ? item.eventId : undefined"
               @quote="onMessageQuote"
               @edit="onMessageEdit(item.id)"
-              @retry="onMessageRetry(idx)"
-              @fork="onMessageFork(idx)"
+              @retry="onMessageRetry(itemIndexById(item.id))"
+              @fork="onMessageFork(itemIndexById(item.id))"
             />
           </template>
         </div>
       </template>
-
-      <CommandResultCard
-        v-for="record in commandResults"
-        :key="`command-${record.id}`"
-        :record="record"
-        @add="addCommandResultAttachment"
-        @cancel="cancelCommandResult"
-      />
 
       <!-- Mid-turn indicator inside the chat. Visible whenever the
            record reports `isThinking` (driven by assistant.turn_start

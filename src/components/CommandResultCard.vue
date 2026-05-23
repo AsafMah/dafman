@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Button from "primevue/button";
 import type { CommandResultRecord } from "../ipc/types";
-import { stripAnsi } from "../lib/ansi";
+import { cleanTerminalCommandOutput } from "../lib/ansi";
 
 defineProps<{ record: CommandResultRecord }>();
 const emit = defineEmits<{
@@ -10,8 +10,8 @@ const emit = defineEmits<{
 }>();
 
 function markdownFor(record: CommandResultRecord): string {
-  const stdout = stripAnsi(record.stdout);
-  const stderr = stripAnsi(record.stderr);
+  const stdout = cleanTerminalCommandOutput(record.stdout);
+  const stderr = cleanTerminalCommandOutput(record.stderr);
   return [
     "```shell",
     record.command,
@@ -38,7 +38,7 @@ async function copyText(text: string): Promise<void> {
 }
 
 function clean(value: string): string {
-  return stripAnsi(value);
+  return cleanTerminalCommandOutput(value);
 }
 </script>
 

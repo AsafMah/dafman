@@ -55,6 +55,7 @@ describe("CommandResultRegistry", () => {
 			expect(completed.record.exitCode).toBe(0);
 		}
 
+		await waitForPersistedStdout(dir);
 		const restored = new CommandResultRegistry(join(dir, "command-results.json"), () => {});
 		expect(restored.list("sess-1")[0]?.stdout).toContain("COMMAND_OK");
 	});
@@ -71,3 +72,13 @@ describe("CommandResultRegistry", () => {
 		expect(registry.cancel("sess-1", record.id)).toBe(true);
 	});
 });
+
+async function waitForPersistedStdout(dir: string): Promise<void> {
+	const file = Bun.file(join(dir, "command-results.json"));
+	const start = Date.now();
+	while (Date.now() - start < 1000) {
+		const text = await file.text().catch(() => "");
+		if (text.includes("COMMAND_OK")) return;
+		await new Promise((resolve) => setTimeout(resolve, 20));
+	}
+}
