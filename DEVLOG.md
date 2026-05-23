@@ -59,7 +59,9 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   markers, while cmd gets best-effort OSC 7/133 prompt markers. The xterm
   layer parses OSC 633/133/7/9/1337 into current CWD, active command, command
   history, exit code, and trusted-command metadata for future manual
-  send-to-chat/copy-output actions.
+  send-to-chat/copy-output actions. Follow-up hardening scrubs the nonce from
+  the child process environment after PowerShell captures it and bounds command
+  history per terminal so long-lived shells do not leak memory.
 
 ---
 

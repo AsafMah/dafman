@@ -6,6 +6,7 @@ import { useToastStore } from "./toastStore";
 import { useSessionsStore } from "./sessionsStore";
 
 const MAX_BUFFER = 256_000;
+const MAX_COMMANDS_PER_TERMINAL = 200;
 
 export interface TerminalCommandRecord {
   id: string;
@@ -24,6 +25,7 @@ export const useTerminalStore = defineStore("terminals", () => {
   const commands = ref<Record<string, TerminalCommandRecord[]>>({});
   const currentCwd = ref<Record<string, string>>({});
   const activeCommands = ref<Record<string, TerminalCommandRecord>>({});
+  const droppedCommandCounts = ref<Record<string, number>>({});
   const loaded = ref(false);
   const sessionTerminalIds = ref<Record<string, string>>({});
 
@@ -121,13 +123,14 @@ export const useTerminalStore = defineStore("terminals", () => {
   function startCommand(
     terminalId: string,
     command: Omit<TerminalCommandRecord, "id" | "startedAt"> & { startedAt?: string },
-  ): void {
+  ): TerminalCommandRecord {
     const record: TerminalCommandRecord = {
       id: crypto.randomUUID(),
       startedAt: command.startedAt ?? new Date().toISOString(),
       ...command,
     };
     activeCommands.value = { ...activeCommands.value, [terminalId]: record };
+    return record;
   }
 
   function updateActiveCommand(
@@ -142,9 +145,9 @@ export const useTerminalStore = defineStore("terminals", () => {
     };
   }
 
-  function finishCommand(terminalId: string, exitCode?: number): void {
+  function finishCommand(terminalId: string, exitCode?: number): TerminalCommandRecord | null {
     const record = activeCommands.value[terminalId];
-    if (!record) return;
+    if (!record) return null;
     const finished: TerminalCommandRecord = {
       ...record,
       ...(exitCode !== undefined ? { exitCode } : {}),
@@ -153,10 +156,20 @@ export const useTerminalStore = defineStore("terminals", () => {
     const nextActive = { ...activeCommands.value };
     delete nextActive[terminalId];
     activeCommands.value = nextActive;
+    const existing = commands.value[terminalId] ?? [];
+    const next = [...existing, finished];
+    const overflow = Math.max(0, next.length - MAX_COMMANDS_PER_TERMINAL);
     commands.value = {
       ...commands.value,
-      [terminalId]: [...(commands.value[terminalId] ?? []), finished],
+      [terminalId]: overflow > 0 ? next.slice(overflow) : next,
     };
+    if (overflow > 0) {
+      droppedCommandCounts.value = {
+        ...droppedCommandCounts.value,
+        [terminalId]: (droppedCommandCounts.value[terminalId] ?? 0) + overflow,
+      };
+    }
+    return finished;
   }
 
   let unsubscribe: (() => void) | null = null;
@@ -176,6 +189,7 @@ export const useTerminalStore = defineStore("terminals", () => {
     commands,
     currentCwd,
     activeCommands,
+    droppedCommandCounts,
     loaded,
     running,
     refresh,

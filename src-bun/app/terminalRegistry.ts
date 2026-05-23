@@ -75,6 +75,8 @@ function powerShellIntegrationCommand(): string {
 	return [
 		"$esc=[char]27",
 		"$bel=[char]7",
+		"$global:__dafmanShellNonce=$env:DAFMAN_NONCE",
+		"Remove-Item Env:DAFMAN_NONCE -ErrorAction SilentlyContinue",
 		"$global:__dafmanCommandStarted=$false",
 		"function global:Prompt {",
 		"  if ($global:__dafmanCommandStarted) {",
@@ -91,7 +93,7 @@ function powerShellIntegrationCommand(): string {
 		"  function global:PSConsoleHostReadLine {",
 		"    $line=& $global:__dafmanOriginalReadLine @args",
 		"    $encoded=[Uri]::EscapeDataString($line)",
-		"    [Console]::Write(\"$esc]633;E;$encoded;$env:DAFMAN_NONCE$bel$esc]633;C$bel\")",
+		"    [Console]::Write(\"$esc]633;E;$encoded;$global:__dafmanShellNonce$bel$esc]633;C$bel\")",
 		"    $global:__dafmanCommandStarted=$true",
 		"    return $line",
 		"  }",

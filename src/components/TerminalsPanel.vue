@@ -227,6 +227,9 @@ function activeCommandLabel(terminalId: string): string | null {
             <small v-if="activeCommandLabel(terminal.id)" class="terminal-command">
               {{ activeCommandLabel(terminal.id) }}
             </small>
+            <small v-if="terminalStore.droppedCommandCounts[terminal.id]" class="terminal-history-note">
+              {{ terminalStore.droppedCommandCounts[terminal.id] }} older commands elided
+            </small>
           </div>
           <span class="terminal-status" :class="`status-${terminal.status}`">{{ terminal.status }}</span>
         </div>
@@ -395,8 +398,13 @@ function activeCommandLabel(terminalId: string): string | null {
   font-size: 0.72rem;
 }
 
-.terminal-command {
+.terminal-command,
+.terminal-history-note {
   color: var(--p-primary-color);
+}
+
+.terminal-history-note {
+  color: var(--p-text-muted-color);
 }
 
 .terminal-status {
