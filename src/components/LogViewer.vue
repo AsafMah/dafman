@@ -285,6 +285,8 @@ function formatFields(fields: Record<string, unknown>): string {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
+  container-type: inline-size;
   background: var(--p-content-background);
   color: var(--p-text-color);
 }
@@ -317,8 +319,8 @@ function formatFields(fields: Record<string, unknown>): string {
 }
 
 .logviewer-field-search {
-  flex: 1 1 12rem;
-  min-width: 12rem;
+  flex: 1 1 10rem;
+  min-width: min(10rem, 100%);
 }
 
 .logviewer-label {
@@ -362,11 +364,23 @@ function formatFields(fields: Record<string, unknown>): string {
 
 .logviewer-row-record {
   display: grid;
-  grid-template-columns: 6rem 4rem 1fr;
+  grid-template-columns: minmax(4.5rem, 6rem) minmax(3rem, 4rem) minmax(0, 1fr);
   align-items: baseline;
   gap: 0.4rem;
   padding: 0.15rem 0.75rem;
   border-bottom: 1px solid color-mix(in srgb, var(--p-content-border-color) 30%, transparent);
+}
+
+@container (max-width: 24rem) {
+  .logviewer-row-record {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .logviewer-message,
+  .logviewer-fields {
+    grid-column: 1 / -1;
+  }
 }
 
 .logviewer-row-record:hover {

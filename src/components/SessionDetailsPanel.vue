@@ -1703,7 +1703,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
      tool names) would force the panel wider than its dockview
      container — exactly the "sidebar is cut off, needs crazy
      width" symptom. */
-  min-width: 380px;
+  min-width: 0;
 }
 
 /* Force every direct flex / grid child to honour the parent's

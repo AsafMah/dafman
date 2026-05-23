@@ -224,6 +224,7 @@ export const useLayoutStore = defineStore("layout", () => {
   ): void {
     const edge = api.value?.getEdgeGroup(position);
     if (!edge || minimumSize === undefined) return;
+    const effectiveMinimum = effectiveEdgeMinimum(position, minimumSize);
     const edgeApi = edge as unknown as {
       width?: number;
       height?: number;
@@ -232,24 +233,43 @@ export const useLayoutStore = defineStore("layout", () => {
     };
     if (typeof edgeApi.setConstraints === "function") {
       if (position === "left" || position === "right") {
-        edgeApi.setConstraints.call(edge, { minimumWidth: minimumSize });
+        edgeApi.setConstraints.call(edge, { minimumWidth: effectiveMinimum });
       } else {
-        edgeApi.setConstraints.call(edge, { minimumHeight: minimumSize });
+        edgeApi.setConstraints.call(edge, { minimumHeight: effectiveMinimum });
       }
     }
     const current =
       position === "left" || position === "right" ? edgeApi.width : edgeApi.height;
     if (
       typeof current === "number" &&
-      current < minimumSize &&
+      current < effectiveMinimum &&
       typeof edgeApi.setSize === "function"
     ) {
       if (position === "left" || position === "right") {
-        edgeApi.setSize.call(edge, { width: minimumSize });
+        edgeApi.setSize.call(edge, { width: effectiveMinimum });
       } else {
-        edgeApi.setSize.call(edge, { height: minimumSize });
+        edgeApi.setSize.call(edge, { height: effectiveMinimum });
       }
     }
+  }
+
+  function effectiveEdgeMinimum(
+    position: EdgeGroupPosition,
+    desired: number,
+  ): number {
+    const dock = api.value;
+    const viewportWidth = typeof window === "undefined" ? undefined : window.innerWidth;
+    const viewportHeight = typeof window === "undefined" ? undefined : window.innerHeight;
+    const available =
+      position === "left" || position === "right"
+        ? (dock as unknown as { width?: number } | null)?.width ?? viewportWidth
+        : (dock as unknown as { height?: number } | null)?.height ?? viewportHeight;
+    if (available === undefined || !Number.isFinite(available) || available <= 0) {
+      return desired;
+    }
+    const floor = position === "left" || position === "right" ? 160 : 120;
+    const maxEdge = Math.max(floor, Math.floor(available * 0.46));
+    return Math.min(desired, maxEdge);
   }
 
   function edgeSize(
@@ -269,7 +289,7 @@ export const useLayoutStore = defineStore("layout", () => {
   ): boolean {
     if (minimumSize === undefined) return false;
     const current = edgeSize(position, edge);
-    return typeof current === "number" && current < minimumSize;
+    return typeof current === "number" && current < effectiveEdgeMinimum(position, minimumSize);
   }
 
   function recreateKnownEdgeGroup(
@@ -287,15 +307,18 @@ export const useLayoutStore = defineStore("layout", () => {
       })
       .filter((panel): panel is Omit<EdgePanelOptions, "exclusive"> => !!panel);
     if (knownPanels.length === 0) return false;
+    const effectiveMinimum = effectiveEdgeMinimum(position, minimumSize);
     dock.removeEdgeGroup(position);
     const initialSize = Math.max(
-      minimumSize,
-      ...knownPanels.map((panel) => panel.initialSize ?? minimumSize),
+      effectiveMinimum,
+      ...knownPanels.map((panel) =>
+        Math.min(panel.initialSize ?? effectiveMinimum, effectiveMinimum),
+      ),
     );
     const recreatedEdge = dock.addEdgeGroup(position, {
       id: `edge-${position}`,
       initialSize,
-      minimumSize,
+      minimumSize: effectiveMinimum,
     });
     for (const panel of knownPanels) {
       dock.addPanel({

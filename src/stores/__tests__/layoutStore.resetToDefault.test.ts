@@ -289,12 +289,12 @@ describe("layoutStore.resetToDefault", () => {
     const left = dock.groups.find((g) => g.id === "edge-left");
     const right = dock.groups.find((g) => g.id === "edge-right");
     expect(dock.removeEdgeGroupCalls).toEqual(expect.arrayContaining(["left", "right"]));
-    expect(left?.width).toBe(360);
+    expect(left?.width).toBe(320);
     expect(
       dock.addEdgeGroupCalls.some(
         (call) =>
           call.position === "left" &&
-          call.initialSize === 360 &&
+          call.initialSize === 320 &&
           call.minimumSize === 320,
       ),
     ).toBe(true);

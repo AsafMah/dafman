@@ -162,6 +162,13 @@ function quoteToCommand(text: string): string {
   padding: 0 0.2rem;
   opacity: 0.45;
   transition: opacity 0.15s ease;
+  container-type: inline-size;
+}
+
+@container (max-width: 28rem) {
+  .msg-action :deep(.p-button-label) {
+    display: none;
+  }
 }
 
 .message-actions:hover,

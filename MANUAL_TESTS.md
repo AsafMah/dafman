@@ -79,7 +79,9 @@
       and `/skill` open Library locally rather than sending chat messages.
    - **Automated coverage:** `e2e/full/flows/14-details-rail.pwtest.ts`
      asserts toolbar glyphs, compact overflow behavior, and left/right
-     edge minimum widths in prod + HMR.
+     edge minimum widths in prod + HMR. Unit/E2E responsive checks also
+     cover persisted edge minimum repair, Library tabs, details panels,
+     and compact overflow behavior.
 
 ---
 

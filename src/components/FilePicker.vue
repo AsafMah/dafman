@@ -329,8 +329,9 @@ async function browse(kind: "file" | "directory"): Promise<void> {
 .file-picker {
   display: flex;
   flex-direction: column;
-  min-width: 28rem;
-  max-width: 36rem;
+  width: min(36rem, calc(100vw - 1rem));
+  min-width: min(28rem, calc(100vw - 1rem));
+  max-width: calc(100vw - 1rem);
   max-height: 22rem;
   background: var(--p-content-background);
   border: 1px solid var(--p-surface-border);
@@ -371,6 +372,7 @@ async function browse(kind: "file" | "directory"): Promise<void> {
 
 .file-picker-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
@@ -381,6 +383,7 @@ async function browse(kind: "file" | "directory"): Promise<void> {
 
 .file-picker-toggles {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.7rem;
 }
@@ -411,6 +414,7 @@ async function browse(kind: "file" | "directory"): Promise<void> {
 
 .file-picker-browse-group {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
 }

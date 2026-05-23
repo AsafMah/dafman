@@ -149,6 +149,8 @@ const previewLine = computed(() => {
   background: var(--p-content-background);
   color: var(--p-text-color);
   font-size: 0.875rem;
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .tool-card.status-running {
@@ -190,11 +192,15 @@ const previewLine = computed(() => {
 .tool-name {
   font-family: var(--p-font-family-mono, monospace);
   font-weight: 600;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tool-meta {
+  flex: 0 0 auto;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -218,6 +224,17 @@ const previewLine = computed(() => {
 .tool-toggle {
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+@container (max-width: 28rem) {
+  .tool-header {
+    flex-wrap: wrap;
+  }
+
+  .tool-preview {
+    flex-basis: 100%;
+    order: 4;
+  }
 }
 
 .tool-body {

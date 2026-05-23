@@ -36,6 +36,11 @@ when a packaged runtime cannot expose Bun's native PTY handle.
   select + formatting overflow instead of overlapping controls, formatting
   covers headings/quote/code/list variants via Lexical commands, and persisted
   dockview layout JSON clamps both left and right edge rails before restore.
+- Responsive audit follow-up: removed hard CSS edge-shell floors that fought
+  Dockview state, moved side panel contents to shrinkable/container-query
+  layouts, and added compact behavior for FilePicker, Jobs, Log Viewer,
+  ToolCallBlock, MessageActions, PendingRequestCard, and Library instruction
+  headers.
 
 ---
 

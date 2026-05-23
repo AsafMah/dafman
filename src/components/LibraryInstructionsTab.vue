@@ -221,12 +221,15 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .instructions-summary {
+  min-width: 0;
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
+  overflow-wrap: anywhere;
 }
 
 .hint {

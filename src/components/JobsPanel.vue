@@ -228,7 +228,8 @@ function statusIcon(job: JobRecord): string {
   flex-direction: column;
   gap: 0.8rem;
   height: 100%;
-  min-width: 300px;
+  min-width: 0;
+  container-type: inline-size;
   padding: 0.75rem;
   overflow-y: auto;
   color: var(--p-text-color);
@@ -236,6 +237,7 @@ function statusIcon(job: JobRecord): string {
 
 .jobs-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.75rem;
@@ -385,5 +387,17 @@ function statusIcon(job: JobRecord): string {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.35rem;
+}
+
+@container (max-width: 20rem) {
+  .job-title-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .job-actions :deep(.p-button-label) {
+    display: none;
+  }
 }
 </style>

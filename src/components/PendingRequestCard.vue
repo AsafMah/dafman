@@ -680,7 +680,9 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
 
 .pending-card-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.25rem;
 }

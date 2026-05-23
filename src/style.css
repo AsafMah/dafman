@@ -107,32 +107,3 @@ body.app-dark {
 .dv-edge-group .dv-tabs-and-actions-container {
   display: none !important;
 }
-
-/* Dockview's edge groups can be restored from old layout JSON at sizes
- * below the current app minimum before the store gets a chance to repair
- * them. Put the hard floor on the edge-shell DOM as well so side panels
- * never visually start in a cut-off state. */
-[data-testid="dv-edge-group-edge-right"] {
-  min-width: 380px !important;
-}
-
-.dv-edge-group:has(.session-details) {
-  min-width: 380px !important;
-}
-
-[data-testid="dv-edge-group-edge-left"] {
-  min-width: 180px !important;
-}
-
-.dv-edge-group:has(.library-panel) {
-  min-width: 320px !important;
-}
-
-.dv-edge-group:has(.settings-panel),
-.dv-edge-group:has(.jobs-panel) {
-  min-width: 380px !important;
-}
-
-.dv-edge-group:has(.logviewer) {
-  min-width: 420px !important;
-}

@@ -28,6 +28,9 @@ entry reachability dry-run so dead `src-bun/index.ts` imports fail in
 (`Bun.spawn(..., { terminal })`) plus pipe fallback for runtimes without
 native PTY handles, xterm.js dockview panels, composer shell mode, and
 responsive composer/sidebar polish from the terminal regression sweep.
+The current UI audit pass also removes hard CSS edge-panel floors and
+adds compact responsive states across panels, popovers, tool rows, jobs,
+logs, pending requests, and message actions.
 
 ---
 

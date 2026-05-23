@@ -41,6 +41,11 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Slash menu polish.** Slash command selection stays scrolled into
   view, `/model` has a visible icon, and `/model` opens the session model
   selector directly.
+- **Responsive UI audit pass.** Removed CSS floors that fought Dockview,
+  made edge-panel contents shrink via container/intrinsic sizing, and
+  added compact states for FilePicker, Jobs, Log Viewer, tool rows,
+  message actions, pending-request actions, and Library instruction
+  headers.
 - **Terminal Windows fallback.** If the packaged Bun runtime does not
   expose a native PTY handle, terminals fall back to stdin/stdout pipes
   instead of failing with “terminal not supported on this platform.”
