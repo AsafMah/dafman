@@ -21,7 +21,7 @@
 // `*.completed` (out-of-band, stale-cleanup). SDK `*.requested` are
 // informational no-ops.
 
-import { pickString } from "../chatEvents";
+import { pickString } from "./helpers";
 import type { ChatItem, PendingRequest } from "../chatEvents";
 import type {
   AutoModeSwitchRequestData,

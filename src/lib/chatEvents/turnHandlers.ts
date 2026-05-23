@@ -9,7 +9,7 @@
 // `assistant.intent` is a short "what I'm doing now" hint surfaced
 // above the streaming bubble; cleared on turn_end.
 
-import { pickString } from "../chatEvents";
+import { pickString } from "./helpers";
 import type { Handler } from "./context";
 
 export const turnHandlers: Record<string, Handler> = {

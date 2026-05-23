@@ -23,6 +23,7 @@ import { reasoningHandlers } from "./chatEvents/reasoningHandlers";
 import { sessionMetaHandlers } from "./chatEvents/sessionMetaHandlers";
 import { toolHandlers } from "./chatEvents/toolHandlers";
 import { turnHandlers } from "./chatEvents/turnHandlers";
+export { clampOutput, pickNumber, pickString, TOOL_OUTPUT_CAP_BYTES } from "./chatEvents/helpers";
 
 export type SystemSeverity = "info" | "warn" | "error";
 
@@ -183,17 +184,6 @@ export type ChatItem =
       items: ChatItem[];
     };
 
-/// Maximum bytes of partial / result content we keep in memory and
-/// render per tool call. Streaming shell tools can emit huge blobs;
-/// without a cap the message list grinds to a halt.
-export const TOOL_OUTPUT_CAP_BYTES = 64 * 1024;
-
-export function clampOutput(text: string): string {
-  if (text.length <= TOOL_OUTPUT_CAP_BYTES) return text;
-  const head = text.slice(0, TOOL_OUTPUT_CAP_BYTES);
-  return `${head}\n... [output truncated: ${text.length - TOOL_OUTPUT_CAP_BYTES} more bytes]`;
-}
-
 /// Ambient state derived from the event stream that is shown OUTSIDE the
 /// scrollable message list (header title/model, intent pill above the
 /// streaming bubble, footer usage pill, "thinking" indicator). Kept
@@ -307,32 +297,6 @@ export type ProcessResult = {
 };
 
 export type IdCounter = { next: number };
-
-/// Extracts the first present string field, in order. Used to paper over
-/// minor wire-shape drift across SDK versions (e.g. some events use
-/// `delta` while the generated structs say `deltaContent`).
-export function pickString(data: unknown, keys: readonly string[]): string {
-  if (!data || typeof data !== "object") return "";
-  const obj = data as Record<string, unknown>;
-  for (const key of keys) {
-    const v = obj[key];
-    if (typeof v === "string") return v;
-  }
-  return "";
-}
-
-export function pickNumber(
-  data: unknown,
-  keys: readonly string[],
-): number | null {
-  if (!data || typeof data !== "object") return null;
-  const obj = data as Record<string, unknown>;
-  for (const key of keys) {
-    const v = obj[key];
-    if (typeof v === "number" && Number.isFinite(v)) return v;
-  }
-  return null;
-}
 
 /// Combined dispatch table, built once at module init. Ordering of
 /// the spread doesn't matter — there are no overlapping keys between

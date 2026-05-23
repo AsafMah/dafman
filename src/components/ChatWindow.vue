@@ -867,7 +867,7 @@ const pendingStyle = computed(() => {
         {{ commandsRun }} command{{ commandsRun === 1 ? "" : "s" }}
       </span>
       <span
-        v-if="ambient.usage"
+        v-if="ambient.usage && ambient.usage.tokenLimit > 0"
         class="artifact-pill usage-pill"
         :title="`${ambient.usage.currentTokens.toLocaleString()} / ${ambient.usage.tokenLimit.toLocaleString()} tokens`"
       >

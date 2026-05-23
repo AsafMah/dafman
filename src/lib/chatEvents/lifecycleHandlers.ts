@@ -9,7 +9,7 @@
 // also toast it. The reducer doesn't shut anything down — the SDK
 // handles its own retry / disconnect lifecycle.
 
-import { pickString } from "../chatEvents";
+import { pickString } from "./helpers";
 import type { Handler } from "./context";
 
 export const lifecycleHandlers: Record<string, Handler> = {

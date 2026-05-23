@@ -8,8 +8,16 @@
 //   - identical model+effort signature as the last toasted change
 //     → no toast (the SDK can emit duplicate events on resume)
 
-import { pickNumber, pickString } from "../chatEvents";
+import { pickNumber, pickString } from "./helpers";
 import type { Handler } from "./context";
+
+const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
+
+function normalizeContextLimit(value: number): number | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
+  return value;
+}
 
 export const sessionMetaHandlers: Record<string, Handler> = {
   "session.title_changed": (ctx, data) => {
@@ -94,7 +102,8 @@ function mergeUsage(
   data: unknown,
 ): void {
   const current = pickNumber(data, ["currentTokens", "inputTokens"]);
-  const limit = pickNumber(data, ["tokenLimit"]);
+  const rawLimit = pickNumber(data, ["tokenLimit"]);
+  const limit = rawLimit === null ? null : normalizeContextLimit(rawLimit);
   if (current !== null && limit !== null) {
     ctx.ambient.usage = { currentTokens: current, tokenLimit: limit };
   } else if (current !== null && ctx.ambient.usage) {

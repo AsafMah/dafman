@@ -37,6 +37,14 @@ import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import MessageContent from "./MessageContent.vue";
 
+const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
+
+function normalizeContextLimit(value: number): number | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
+  return value;
+}
+
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
@@ -457,9 +465,9 @@ async function loadUsage() {
             : 0,
       tokenLimit:
         typeof raw.tokenLimit === "number"
-          ? raw.tokenLimit
+          ? normalizeContextLimit(raw.tokenLimit) ?? 0
           : typeof raw.maxTokens === "number"
-            ? raw.maxTokens
+            ? normalizeContextLimit(raw.maxTokens) ?? 0
             : 0,
     };
     const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
@@ -503,7 +511,7 @@ function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<s
       const current = data.currentTokens;
       if (typeof current === "number") currentTokens = current;
       const limit = data.tokenLimit;
-      if (typeof limit === "number") tokenLimit = limit;
+      if (typeof limit === "number") tokenLimit = normalizeContextLimit(limit) ?? 0;
     }
   }
   return {

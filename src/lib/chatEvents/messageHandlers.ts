@@ -9,7 +9,7 @@
 //   for history replay. Without these checks resumed sessions
 //   double-bubble the live send.
 
-import { pickString } from "../chatEvents";
+import { pickString } from "./helpers";
 import type { Handler } from "./context";
 
 export const messageHandlers: Record<string, Handler> = {

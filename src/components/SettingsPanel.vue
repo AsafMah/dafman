@@ -543,7 +543,6 @@ function toggle(id: string) {
                 :model-value="hexNoHash(terminalPrefs.theme.background)"
                 @update:model-value="(value) => setTerminalColor('background', String(value))"
               />
-              <span class="color-swatch" :style="{ background: terminalPrefs.theme.background }" />
               <code>{{ terminalPrefs.theme.background }}</code>
             </div>
           </label>
@@ -555,7 +554,6 @@ function toggle(id: string) {
                 :model-value="hexNoHash(terminalPrefs.theme.foreground)"
                 @update:model-value="(value) => setTerminalColor('foreground', String(value))"
               />
-              <span class="color-swatch" :style="{ background: terminalPrefs.theme.foreground }" />
               <code>{{ terminalPrefs.theme.foreground }}</code>
             </div>
           </label>
@@ -875,14 +873,6 @@ function toggle(id: string) {
 .color-row code {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.color-swatch {
-  width: 1.4rem;
-  height: 1.4rem;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: var(--p-border-radius-sm);
-  flex: 0 0 auto;
 }
 
 /* PrimeVue Select fills its container — let it shrink with the

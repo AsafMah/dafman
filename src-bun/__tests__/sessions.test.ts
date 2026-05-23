@@ -14,7 +14,7 @@ type Handler = (event: { type: string; [k: string]: unknown }) => void;
 interface FakeSession {
 	sessionId: string;
 	on(handler: Handler): () => void;
-	send(args: { prompt: string }): Promise<string>;
+	send(args: { prompt: string; attachments?: unknown[] }): Promise<string>;
 	setModel(model: string, opts?: { reasoningEffort?: string }): Promise<void>;
 	getMessages(): Promise<Array<{ type: string; [k: string]: unknown }>>;
 	disconnect(): Promise<void>;
@@ -86,6 +86,7 @@ interface FakeSession {
 		};
 	};
 	lastSentPrompt?: string;
+	lastSentAttachments?: unknown[];
 	lastModel?: { model: string; opts?: { reasoningEffort?: string } };
 	history: Array<{ type: string; [k: string]: unknown }>;
 	currentMode: string;
@@ -124,8 +125,9 @@ function makeFakeSession(
 				listener = null;
 			};
 		},
-		async send({ prompt }) {
+		async send({ prompt, attachments }) {
 			session.lastSentPrompt = prompt;
+			session.lastSentAttachments = attachments;
 			return "msg-id";
 		},
 		async setModel(model, opts) {
@@ -351,6 +353,40 @@ describe("SessionRegistry", () => {
 			model: "claude",
 			opts: { reasoningEffort: "high" },
 		});
+	});
+
+	test("send converts command result pills into temp file attachments", async () => {
+		const client = new FakeClient();
+		_setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		await reg.send(id, "use this", undefined, [
+			{
+				type: "commandResult",
+				displayName: "cmd-result.md",
+				result: {
+					id: "cmd-1",
+					sessionId: id,
+					command: "echo hi",
+					cwd: process.cwd(),
+					shell: "pwsh.exe",
+					status: "completed",
+					stdout: "hi\n",
+					stderr: "",
+					truncated: false,
+					createdAt: new Date().toISOString(),
+					exitCode: 0,
+				},
+			},
+		]);
+		expect(fake.lastSentPrompt).toBe("use this");
+		expect(fake.lastSentAttachments).toHaveLength(1);
+		expect(fake.lastSentAttachments?.[0]).toMatchObject({
+			type: "file",
+			displayName: "cmd-result.md",
+		});
+		expect((fake.lastSentAttachments?.[0] as { path?: string }).path).toContain("cmd-result.md");
 	});
 
 	test("disconnect on unknown sessionId throws SessionNotFound", async () => {

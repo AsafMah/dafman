@@ -3,7 +3,7 @@
 // severity). Distinct from `assistant.*` so they're styled
 // differently and never confused with model output.
 
-import { pickNumber, pickString } from "../chatEvents";
+import { pickNumber, pickString } from "./helpers";
 import type { ChatItem } from "../chatEvents";
 import type { Handler } from "./context";
 
