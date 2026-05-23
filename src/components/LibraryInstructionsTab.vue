@@ -360,5 +360,19 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
 
 :global(.app-dark) .instruction-content {
   background: var(--p-surface-900);
+  color: var(--p-text-color);
+}
+
+:global(.app-dark) .instruction-content :deep(code) {
+  background: var(--p-surface-800);
+  color: var(--p-text-color);
+}
+
+:global(.app-dark) .instruction-content :deep(pre) {
+  background: var(--p-surface-800);
+}
+
+:global(.app-dark) .instruction-content :deep(a) {
+  color: var(--p-primary-color);
 }
 </style>

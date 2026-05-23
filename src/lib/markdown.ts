@@ -256,8 +256,12 @@ export type MarkdownSegment =
 /// markdown-it highlighting path.
 export function renderMarkdownSegments(source: string): MarkdownSegment[] {
   if (!source) return [];
+  // Strip <system_notification>...</system_notification> XML blocks
+  // that the CLI agent embeds in assistant messages for sub-agent lifecycle.
+  const cleaned = source.replace(/<system_notification>[\s\S]*?<\/system_notification>/g, "").trim();
+  if (!cleaned) return [];
   ensurePurifyHook();
-  const tokens = md.parse(source, {});
+  const tokens = md.parse(cleaned, {});
   const segments: MarkdownSegment[] = [];
   let buffer: typeof tokens = [];
 

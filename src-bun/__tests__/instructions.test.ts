@@ -19,7 +19,7 @@ afterEach(() => {
 describe("listInstructionSources", () => {
 	test("returns global candidates even without a workspace", async () => {
 		const sources = await listInstructionSources({});
-		expect(sources.length).toBeGreaterThanOrEqual(3);
+		expect(sources.length).toBeGreaterThanOrEqual(1);
 		expect(sources.every((s) => s.scope === "global")).toBe(true);
 	});
 

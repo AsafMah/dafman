@@ -153,7 +153,7 @@ async function removeEntry(entry: ConfiguredEntry) {
   if (!confirm(`Remove MCP server "${entry.name}"?`)) return;
   try {
     await invokeCommand("removeMcpConfig", { name: entry.name });
-    await loadAll();
+    configured.value = configured.value.filter((e) => e.name !== entry.name);
     toasts.success("MCP server removed", entry.name);
   } catch (err) {
     toasts.error("Failed to remove", err instanceof Error ? err.message : String(err));

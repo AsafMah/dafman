@@ -114,10 +114,17 @@ function onExternalCloseCommandTerminalRequest(e: Event) {
   composerRef.value?.exitCommandMode?.();
 }
 
+function onExternalScrollToBottom(e: Event) {
+  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+  if (!detail || detail.sessionId !== props.sessionId) return;
+  void scrollToBottom();
+}
+
 onMounted(() => {
   window.addEventListener("dafman:focus-composer", onExternalFocusRequest);
   window.addEventListener("dafman:open-command-terminal", onExternalCommandTerminalRequest);
   window.addEventListener("dafman:close-command-terminal", onExternalCloseCommandTerminalRequest);
+  window.addEventListener("dafman:scroll-to-bottom", onExternalScrollToBottom);
   void commandResultsStore.refresh(props.sessionId)
     .then(() => {
       for (const record of commandResultsStore.recordsBySession[props.sessionId] ?? []) {
@@ -133,6 +140,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("dafman:focus-composer", onExternalFocusRequest);
   window.removeEventListener("dafman:open-command-terminal", onExternalCommandTerminalRequest);
   window.removeEventListener("dafman:close-command-terminal", onExternalCloseCommandTerminalRequest);
+  window.removeEventListener("dafman:scroll-to-bottom", onExternalScrollToBottom);
 });
 /// Live `--tile-height` so the composer can cap itself at a percentage of
 /// the chat tile's height even though the tile lives inside a flex/grid
@@ -680,7 +688,7 @@ const pendingStyle = computed(() => {
           @add="addCommandResultAttachment"
           @cancel="cancelCommandResult"
         />
-        <div v-else-if="item.kind === 'reasoning'" class="message-shell">
+        <div v-else-if="item.kind === 'reasoning' && reasoningVisibility !== 'hidden'" class="message-shell">
           <ReasoningBlock
             :text="item.text"
             :visibility="reasoningVisibility"

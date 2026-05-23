@@ -115,9 +115,7 @@ export async function listInstructionSources(opts: {
 	const out: InstructionSource[] = [];
 
 	const globalCandidates = [
-		{ name: "Copilot user instructions", path: join(home, ".copilot", "instructions.md") },
-		{ name: "GitHub Copilot user instructions", path: join(home, ".github", "copilot-instructions.md") },
-		{ name: "GitHub Copilot config instructions", path: join(home, ".config", "github-copilot", "instructions.md") },
+		{ name: "Copilot user instructions", path: join(home, ".copilot", "copilot-instructions.md") },
 	];
 	for (const candidate of globalCandidates) {
 		out.push(await readSource("global", candidate.name, candidate.path, home));

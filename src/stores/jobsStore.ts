@@ -133,6 +133,12 @@ export const useJobsStore = defineStore("jobs", () => {
     const layout = useLayoutStore();
     if (!layout.isPanelOpen(sessionId)) layout.addPanel(sessionId);
     layout.activatePanel(sessionId);
+    // Scroll to the bottom so the user sees the active work
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("dafman:scroll-to-bottom", {
+        detail: { sessionId },
+      }));
+    }, 100);
   }
 
   async function startAutopilot(sessionId: string, goal: string): Promise<void> {
