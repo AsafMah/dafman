@@ -14,44 +14,17 @@
 > definition-of-done per milestone.
 
 **Active milestone:** **Post-M2 audit burn-down**.
-M1 + M2 shipped (including in-app log viewer, export conversation,
-permissions tab, tools allowlist, MCP OAuth toast). Current work is
-the audit's Phase 23 local slice: Copilot CLI mode parity, the
-2026-05-22 UI problem sweep, and first-pass Long Jobs + Autopilot UI. The
-three-way mode toggle now has native plan/autopilot lifecycle handling,
-`/plan <prompt>` bootstrap behavior, exit-plan approval UI, autopilot
-unavailable-user semantics, polished composer/details/library surfaces
-from `problems.md`, and a global Jobs panel with current-session
-Autopilot launcher. The local check gate also now includes a Bun-side
-entry reachability dry-run so dead `src-bun/index.ts` imports fail in
-`bun run check`. Terminal integration is in progress with Bun native PTY
-(`Bun.spawn(..., { terminal })`) on Electrobun's bundled Bun 1.3.14
-runtime, xterm.js dockview panels, terminal pane commands, and responsive
-composer/sidebar polish from the terminal regression sweep. Terminal panels
-now load the requested xterm addon foundation (search, links, clipboard,
-Unicode, web fonts, progress, ligatures, images, WebGL, serialization).
-The ActivityBar now has a Terminals panel for listing, opening, killing,
-and creating terminals with command/args/cwd; display/addon settings live in
-Settings with proper color pickers/swatches.
-The first shell-integration slice emits/parses OSC 633/133/7/9/1337 markers
-for PowerShell/cmd so terminals can track CWD, active commands, exit codes,
-and nonce-backed trusted command lines without reviving PTY output scraping.
-Terminal header actions now use visible labels instead of icon-only controls,
-Buffer/Paste header buttons are gone, selected-text copy has keyboard
-shortcuts, and terminal Find enables xterm search decorations, focuses the
-search field, and reports match state.
-The first `!!` composer command-mode slice now runs bounded session-cwd
-subprocesses for persisted command-result records, audits command metadata
-without output bytes, and renders/copies command output without ANSI escape
-garbage. The visible composer flow for `!!` now opens the real session terminal
-inside the composer so autocomplete/shortcuts work. The composer exposes
-separate Command and Terminal buttons; the full terminal has a Session button to
-return to the owning chat; duplicate full terminal panels are closed while the
-embedded terminal is active; completed terminal commands auto-add a
-command-result pill by default.
-The current UI audit pass also removes hard CSS edge-panel floors and
-adds compact responsive states across panels, popovers, tool rows, jobs,
-logs, pending requests, and message actions.
+M1 + M2 shipped. Terminal integration is feature-complete for the first pass:
+Bun native PTY, xterm.js panels, shell integration (OSC 633/133/7/9/1337),
+`!!` command mode with session terminal, command-result blob attachments
+(no file-read permission), terminal ownership registry (single renderer),
+container-query responsive composer toolbar, terminal restart recovery,
+double-Esc / Ctrl+Backspace exit from command mode, and consistent
+`pi-chevron-right` icon across command button and activity bar.
+
+All items from the `problems.md` 2026-05-22 sweep are resolved.
+Future ideas moved to `plans/plan-backlog-audit.prompt.md` § User-requested
+future ideas.
 
 ---
 
@@ -339,8 +312,7 @@ estimates (1 d = ~1 working day of focused engineering).
 | Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
 | Real binary E2E | not yet wired | 0 |
 
-Total: **487 `bun test`** passing as of 2026-05-22; **70/70 smoke**
-green across prod + HMR.
+Total: **544 `bun test`** passing as of 2026-05-23.
 
 ---
 
@@ -370,6 +342,17 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
+
+- **2026-05-23** — Terminal integration polish shipped: blob
+  attachments for command results (no file-read permission), terminal
+  ownership registry (single xterm renderer per terminal ID with
+  frozen placeholder + auto-reclaim on pane close), container-query
+  responsive composer toolbar, terminal panel restart recovery via
+  sessionTerminalIds, `(see attachment "<name>")` uniform prompt text
+  for all attachment types, double-Esc / Ctrl+Backspace to exit
+  command mode, command button as toggle with `pi-chevron-right` icon,
+  Terminals moved to 2nd in activity bar. All `problems.md` items
+  resolved; future ideas moved to backlog audit plan. **544 bun tests**.
 
 - **2026-05-22** — Phase 23a shipped: **Library Instructions +
   command wiring**. Library panel now includes a read-only

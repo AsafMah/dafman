@@ -501,3 +501,36 @@ When you pick the next phase:
 4. Manual-test list (AGENTS rule #10) after.
 5. Move the item out of this doc into the appropriate `plan-*.prompt.md`
    when shipped — keep this list lean.
+
+---
+
+## User-requested future ideas (from problems.md, 2026-05-23)
+
+These are user-requested features and ideas not tied to any current phase.
+Pick from here when planning future work.
+
+### Autopilot UX improvements
+- Choose session from the autopilot dialog or start a new one
+- Toggles for auto-approve, model, and mode from the dialog
+
+### Command palette enhancements
+- Sub-menus that are still fully searchable
+- Every toggleable setting should be in the command palette
+- Prefix groups for different command categories (like VS Code)
+- Full search of sessions and session content
+- Tiling / layout commands
+
+### Keyboard shortcuts
+- Configurable shortcut system
+- Editor shortcuts
+- Session shortcuts
+- Command palette shortcuts
+- Tiling / layout shortcuts
+
+### Skills as slash commands
+- Skills should show up as `/skill-name` slash commands in the composer
+  typeahead (autocomplete inserts literal `/<skill>` into the message)
+
+### External integrations
+- **GitHub**: issues list, pull request list
+- **Azure DevOps**: work items, pull requests
