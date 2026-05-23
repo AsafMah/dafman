@@ -32,6 +32,7 @@ export const useTerminalStore = defineStore("terminals", () => {
   const loaded = ref(false);
   const sessionTerminalIds = ref<Record<string, string>>({});
   const sessionTerminalBuffers = ref<Record<string, string>>({});
+  const activeRendererOwner = ref<Record<string, "compact" | "full">>({});
 
   const running = computed(() =>
     terminals.value.filter((t) => t.status === "running" || t.status === "exiting"),
@@ -260,6 +261,17 @@ export const useTerminalStore = defineStore("terminals", () => {
     /* app may be starting; explicit actions surface errors */
   });
 
+  function claimRenderer(terminalId: string, owner: "compact" | "full"): void {
+    activeRendererOwner.value = { ...activeRendererOwner.value, [terminalId]: owner };
+  }
+  function releaseRenderer(terminalId: string, owner: "compact" | "full"): void {
+    if (activeRendererOwner.value[terminalId] === owner) {
+      const next = { ...activeRendererOwner.value };
+      delete next[terminalId];
+      activeRendererOwner.value = next;
+    }
+  }
+
   return {
     terminals,
     buffers,
@@ -269,6 +281,7 @@ export const useTerminalStore = defineStore("terminals", () => {
     droppedCommandCounts,
     sessionTerminalIds,
     sessionTerminalBuffers,
+    activeRendererOwner,
     loaded,
     running,
     refresh,
@@ -282,5 +295,7 @@ export const useTerminalStore = defineStore("terminals", () => {
     startCommand,
     updateActiveCommand,
     finishCommand,
+    claimRenderer,
+    releaseRenderer,
   };
 });

@@ -383,10 +383,11 @@ describe("SessionRegistry", () => {
 		expect(fake.lastSentPrompt).toBe("use this");
 		expect(fake.lastSentAttachments).toHaveLength(1);
 		expect(fake.lastSentAttachments?.[0]).toMatchObject({
-			type: "file",
+			type: "blob",
+			mimeType: "text/markdown",
 			displayName: "cmd-result.md",
 		});
-		expect((fake.lastSentAttachments?.[0] as { path?: string }).path).toContain("cmd-result.md");
+		expect(typeof (fake.lastSentAttachments?.[0] as { data?: string }).data).toBe("string");
 	});
 
 	test("disconnect on unknown sessionId throws SessionNotFound", async () => {

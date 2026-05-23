@@ -124,14 +124,6 @@ const visibleFormatCount = computed(() => {
   if (width >= 390) return 2;
   return 0;
 });
-const toolbarStage = computed(() => {
-  const width = toolbarWidth.value;
-  if (width < 390) return 4;
-  if (width < 500) return 3;
-  if (width < 620) return 2;
-  if (width < 760) return 1;
-  return 0;
-});
 const inlineFormatActions = computed(() => formatActions.value.slice(0, visibleFormatCount.value));
 const overflowFormatActions = computed(() =>
   formatActions.value.slice(visibleFormatCount.value),
@@ -726,7 +718,6 @@ const SubmitButton = defineComponent({
         <footer
           ref="toolbarRef"
           class="lex-composer-toolbar"
-          :class="`lex-toolbar-stage-${toolbarStage}`"
         >
           <div class="lex-toolbar-left">
             <ModeButtonGroup
@@ -924,7 +915,7 @@ const SubmitButton = defineComponent({
 
 .lex-toolbar-right {
   justify-content: flex-end;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   margin-left: auto;
   min-width: 0;
   position: relative;
@@ -1112,93 +1103,73 @@ const SubmitButton = defineComponent({
   color: var(--p-text-muted-color);
 }
 
-.lex-toolbar-stage-2 :deep(.mode-button-group) {
-  display: none;
+/* ── Responsive toolbar via container queries ──
+ * The toolbar has `container-type: inline-size`, so @container
+ * rules react to the actual toolbar width, not the viewport. */
+
+/* Below 760px: shrink approve-all to icon-only */
+@container (max-width: 760px) {
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button) {
+    width: 1.75rem;
+    padding-inline: 0;
+    white-space: nowrap;
+  }
 }
 
-.lex-toolbar-stage-2 :deep(.mode-select-shell) {
-  display: inline-flex;
+/* Below 620px: collapse mode buttons to select */
+@container (max-width: 620px) {
+  .lex-composer-toolbar :deep(.mode-button-group) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.mode-select-shell) {
+    display: inline-flex;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-right .session-terminal-button .p-button-label) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-right .session-terminal-button) {
+    width: 1.75rem;
+    min-width: 1.75rem;
+    padding-inline: 0;
+  }
 }
 
-.lex-toolbar-stage-1 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label),
-.lex-toolbar-stage-2 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
-  display: none;
+/* Below 500px: shrink workspace chip to icon-only */
+@container (max-width: 500px) {
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip) {
+    width: 1.75rem;
+    padding-inline: 0;
+    justify-content: center;
+  }
 }
 
-.lex-toolbar-stage-1 :deep(.session-header-controls.area-composer-left .approve-all-button),
-.lex-toolbar-stage-2 :deep(.session-header-controls.area-composer-left .approve-all-button) {
-  width: 1.75rem;
-  padding-inline: 0;
-  white-space: nowrap;
-}
-
-.lex-toolbar-stage-3 :deep(.mode-button-group),
-.lex-toolbar-stage-4 :deep(.mode-button-group) {
-  display: none;
-}
-
-.lex-toolbar-stage-3 :deep(.mode-select-shell),
-.lex-toolbar-stage-4 :deep(.mode-select-shell) {
-  display: inline-flex;
-}
-
-.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label),
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
-  display: none;
-}
-
-.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .approve-all-button),
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button) {
-  width: 1.75rem;
-  padding-inline: 0;
-  white-space: nowrap;
-}
-
-.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label),
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label) {
-  display: none;
-}
-
-.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .workspace-chip),
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .workspace-chip) {
-  width: 1.75rem;
-  padding-inline: 0;
-  justify-content: center;
-}
-
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button),
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .workspace-chip) {
-  display: none;
-}
-
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .compact-select) {
-  display: none;
-}
-
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .session-terminal-button) {
-  width: 1.45rem;
-  min-width: 1.45rem;
-  height: 1.45rem;
-  padding-inline: 0;
-}
-
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .session-terminal-button .p-button-label) {
-  display: none;
-}
-
-.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right) {
-  gap: 0;
-}
-
-.lex-toolbar-stage-4 .lex-toolbar-btn {
-  width: 1.35rem;
-  height: 1.45rem;
-  padding: 0;
-}
-
-.lex-toolbar-stage-4 {
-  gap: 0.2rem;
-  padding-inline: 0.25rem;
+/* Below 390px: hide approve-all, workspace, model select; compact everything */
+@container (max-width: 390px) {
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button),
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-right .compact-select) {
+    display: none;
+  }
+  .lex-composer-toolbar :deep(.session-header-controls.area-composer-right) {
+    gap: 0;
+  }
+  .lex-composer-toolbar .lex-toolbar-btn {
+    width: 1.35rem;
+    height: 1.45rem;
+    padding: 0;
+  }
+  .lex-composer-toolbar {
+    gap: 0.2rem;
+    padding-inline: 0.25rem;
+  }
 }
 
 </style>

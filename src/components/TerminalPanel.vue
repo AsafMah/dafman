@@ -48,6 +48,11 @@ let commandCaptureBuffer = "";
 let replayingBuffer = false;
 
 const terminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
+const rendererRole = computed<"compact" | "full">(() => compact.value ? "compact" : "full");
+const isOwnedByOther = computed(() => {
+  const owner = terminalStore.activeRendererOwner[terminalId.value];
+  return owner !== undefined && owner !== rendererRole.value;
+});
 const summary = computed(() =>
   terminalStore.terminals.find((t) => t.id === terminalId.value),
 );
@@ -221,6 +226,8 @@ function focusSession(): void {
 onMounted(async () => {
   await nextTick();
   if (!host.value) return;
+  if (isOwnedByOther.value) return;
+  terminalStore.claimRenderer(terminalId.value, rendererRole.value);
   term = new Terminal({
     allowProposedApi: true,
     convertEol: true,
@@ -349,6 +356,7 @@ watch(searchOpen, async (open) => {
 watch(searchQuery, () => scheduleSearch(true), { flush: "post" });
 
 onBeforeUnmount(() => {
+  terminalStore.releaseRenderer(terminalId.value, rendererRole.value);
   window.removeEventListener("dafman:focus-terminal", onFocusTerminal);
   resizeObserver?.disconnect();
   resizeObserver = null;
@@ -463,6 +471,9 @@ function onFocusTerminal(event: Event): void {
       />
     </form>
     <div ref="host" class="terminal-host" />
+    <div v-if="isOwnedByOther" class="terminal-frozen-placeholder">
+      <span>Terminal in use by {{ isOwnedByOther ? (rendererRole === 'full' ? 'editor' : 'terminal tab') : '' }}</span>
+    </div>
   </section>
 </template>
 
@@ -474,6 +485,7 @@ function onFocusTerminal(event: Event): void {
   min-width: 0;
   min-height: 0;
   background: #111827;
+  position: relative;
 }
 
 .terminal-panel.compact {
@@ -582,5 +594,17 @@ function onFocusTerminal(event: Event): void {
 
 .terminal-host :deep(.xterm) {
   height: 100%;
+}
+
+.terminal-frozen-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.9);
+  color: #9ca3af;
+  font-size: 0.85rem;
+  z-index: 10;
 }
 </style>
