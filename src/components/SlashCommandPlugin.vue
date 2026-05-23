@@ -52,11 +52,12 @@ const allOptions = computed(() =>
 
 const filteredOptions = computed(() => {
   const lower = query.value.toLowerCase();
-  if (lower.length === 0) return allOptions.value;
+  if (lower.length === 0 || lower === "?") return allOptions.value;
   return allOptions.value.filter(
     (o) =>
       o.cmd.slash.toLowerCase().includes(lower) ||
       o.cmd.label.toLowerCase().includes(lower) ||
+      o.cmd.description.toLowerCase().includes(lower) ||
       (o.cmd.keywords ?? []).some((k) => k.toLowerCase().includes(lower)),
   );
 });
@@ -78,10 +79,16 @@ async function onSelectOption(payload: {
   const { option, textNodeContainingQuery, closeMenu } = payload;
   editor.update(() => {
     if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
+      if (option.cmd.passthrough) {
+        textNodeContainingQuery.setTextContent(`${option.cmd.slash} `);
+        textNodeContainingQuery.selectEnd();
+        return;
+      }
       textNodeContainingQuery.remove();
     }
   });
   closeMenu();
+  if (option.cmd.passthrough) return;
   try {
     await option.cmd.run(props.sessionId);
   } catch {

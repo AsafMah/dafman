@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type {
 	ModelSummary,
+	JobRecord,
 	PendingRequestPayload,
 	PermissionRequestData,
 	RespondToRequestParams,
@@ -9,6 +10,7 @@ import type {
 	Settings,
 	SessionEventPayload,
 	InstructionSource,
+	TaskInfo,
 } from "../rpc";
 import type { AppErrorPayload } from "../app/errors";
 
@@ -137,6 +139,69 @@ describe("IPC wire contracts", () => {
 		expect(variants).toMatchSnapshot();
 	});
 
+	test("TaskInfo — agent task", () => {
+		const sample: TaskInfo = {
+			id: "agent-1",
+			type: "agent",
+			description: "Investigate CI",
+			status: "running",
+			agentType: "explore",
+			toolCallId: "tool-1",
+			startedAt: "2026-05-22T10:00:00.000Z",
+			executionMode: "background",
+			canPromoteToBackground: false,
+			agentName: "ci-helper",
+			agentDisplayName: "CI Helper",
+			model: "gpt-5.5",
+			prompt: "Find the CI failure",
+			latestResponse: "Checking logs",
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("TaskInfo — shell task", () => {
+		const sample: TaskInfo = {
+			id: "shell-1",
+			type: "shell",
+			description: "Run check",
+			status: "idle",
+			command: "bun run check",
+			startedAt: "2026-05-22T10:00:00.000Z",
+			executionMode: "background",
+			canPromoteToBackground: false,
+			attachmentMode: "detached",
+			logPath: "C:\\logs\\check.log",
+			pid: 1234,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("JobRecord shape", () => {
+		const sample: JobRecord = {
+			id: "sess-1:agent-1",
+			sessionId: "sess-1",
+			source: "sdk-task",
+			kind: "agent",
+			status: "running",
+			title: "CI Helper",
+			description: "Investigate CI",
+			startedAt: "2026-05-22T10:00:00.000Z",
+			activeTimeMs: 1200,
+			agentType: "explore",
+			agentName: "ci-helper",
+			model: "gpt-5.5",
+			prompt: "Find the CI failure",
+			latestResponse: "Checking logs",
+			toolCallId: "tool-1",
+			executionMode: "background",
+			canCancel: true,
+			canRemove: false,
+			canPromoteToBackground: false,
+			canOpenSession: true,
+		};
+		expect(sample).toMatchSnapshot();
+	});
+
 	test("sendMessage request — default mode (omitted)", () => {
 		const sample = { sessionId: "sess-1", text: "hello" };
 		expect(sample).toMatchSnapshot();
@@ -175,6 +240,34 @@ describe("IPC wire contracts", () => {
 			cwd: "D:\\repo\\dafman",
 			model: "gpt-5.5",
 		};
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("promoteTask request shape", () => {
+		const sample = { sessionId: "sess-1", id: "agent-1" };
+		expect(sample).toMatchSnapshot();
+	});
+
+	test("listJobs response shape", () => {
+		const sample: JobRecord[] = [
+			{
+				id: "sess-1:shell-1",
+				sessionId: "sess-1",
+				source: "sdk-task",
+				kind: "shell",
+				status: "idle",
+				title: "bun run check",
+				description: "Run check",
+				command: "bun run check",
+				startedAt: "2026-05-22T10:00:00.000Z",
+				logPath: "C:\\logs\\check.log",
+				pid: 1234,
+				canCancel: true,
+				canRemove: false,
+				canPromoteToBackground: false,
+				canOpenSession: true,
+			},
+		];
 		expect(sample).toMatchSnapshot();
 	});
 

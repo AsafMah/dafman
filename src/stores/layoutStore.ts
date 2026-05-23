@@ -268,7 +268,7 @@ export const useLayoutStore = defineStore("layout", () => {
       tabComponent: "sidebarTab",
       title: "Session",
       initialSize: lastSessionDetailsWidth.value,
-      minimumSize: 200,
+      minimumSize: 300,
     });
     restoreSessionDetailsWidth();
   }
@@ -488,6 +488,18 @@ export const useLayoutStore = defineStore("layout", () => {
       return;
     }
     const existingGroup = dock.getEdgeGroup(position);
+    if (existingGroup && options.minimumSize !== undefined) {
+      const setConstraints = (existingGroup as unknown as {
+        setConstraints?: (value: { minimumWidth?: number; minimumHeight?: number }) => void;
+      }).setConstraints;
+      if (typeof setConstraints === "function") {
+        if (position === "left" || position === "right") {
+          setConstraints.call(existingGroup, { minimumWidth: options.minimumSize });
+        } else {
+          setConstraints.call(existingGroup, { minimumHeight: options.minimumSize });
+        }
+      }
+    }
     if (options.exclusive && existingGroup) {
       const panels = (existingGroup as unknown as { panels?: unknown[] }).panels ?? [];
       for (const panel of [...panels]) {

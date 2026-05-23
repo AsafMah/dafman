@@ -38,6 +38,9 @@ export interface SessionCommand {
 	/// Execute the command against `sessionId`. May return a promise;
 	/// the palette closes optimistically.
 	run(sessionId: string, args?: string): void | Promise<void>;
+	/// SDK-owned slash commands should appear in the composer menu but
+	/// still be sent through to the CLI instead of executed locally.
+	passthrough?: boolean;
 }
 
 function parseSlashCommand(text: string): { slash: string; args: string } | null {
@@ -79,7 +82,7 @@ function openLibraryTab(tab = "mcp"): void {
 		tabComponent: "sidebarTab",
 		title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
 		initialSize: 360,
-		minimumSize: 280,
+		minimumSize: 300,
 		exclusive: true,
 	});
 }
@@ -98,11 +101,76 @@ export async function runLocalSlashCommand(
 		(c) => c.slash.toLowerCase() === parsed.slash,
 	);
 	if (!cmd) return false;
+	if (cmd.passthrough) return false;
 	await cmd.run(sessionId, parsed.args);
 	return true;
 }
 
+const SDK_PASSTHROUGH_COMMANDS: SessionCommand[] = [
+	{
+		slash: "/mcp",
+		label: "MCP servers",
+		description: "SDK command for MCP server status and management.",
+		icon: "pi-sitemap",
+		group: "SDK",
+		keywords: ["server", "tools", "oauth"],
+		passthrough: true,
+		run: () => {},
+	},
+	{
+		slash: "/skill",
+		label: "Skills",
+		description: "SDK skill command. Also try /skills.",
+		icon: "pi-sparkles",
+		group: "SDK",
+		keywords: ["skills", "library"],
+		passthrough: true,
+		run: () => {},
+	},
+	{
+		slash: "/skills",
+		label: "Skills",
+		description: "SDK command for listing and invoking skills.",
+		icon: "pi-sparkles",
+		group: "SDK",
+		keywords: ["skill", "library"],
+		passthrough: true,
+		run: () => {},
+	},
+	{
+		slash: "/agent",
+		label: "Agents",
+		description: "SDK command for selecting custom agents.",
+		icon: "pi-user",
+		group: "SDK",
+		keywords: ["subagent", "custom agent"],
+		passthrough: true,
+		run: () => {},
+	},
+	{
+		slash: "/model",
+		label: "Model",
+		description: "SDK command for switching model from the CLI.",
+		icon: "pi-cpu",
+		group: "SDK",
+		keywords: ["llm", "reasoning"],
+		passthrough: true,
+		run: () => {},
+	},
+	{
+		slash: "/autopilot",
+		label: "Toggle autopilot",
+		description: "SDK command for toggling CLI autopilot mode.",
+		icon: "pi-bolt",
+		group: "SDK",
+		keywords: ["mode", "auto"],
+		passthrough: true,
+		run: () => {},
+	},
+];
+
 export const SESSION_COMMANDS: SessionCommand[] = [
+	...SDK_PASSTHROUGH_COMMANDS,
 	{
 		slash: "/compact",
 		label: "Compact conversation history",
@@ -243,6 +311,22 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 				return;
 			}
 			await sessions.sendMessage(sessionId, `[[PLAN]] ${prompt}`);
+		},
+	},
+	{
+		slash: "/?",
+		label: "Show command help",
+		description: "Show local and SDK slash commands.",
+		icon: "pi-question-circle",
+		group: "Session",
+		keywords: ["commands", "list", "guide"],
+		run: () => {
+			const toasts = useToastStore();
+			const names = SESSION_COMMANDS.map((c) => c.slash).join(", ");
+			toasts.info(
+				"dafman slash commands",
+				`${names}. SDK commands stay editable and are sent to Copilot CLI.`,
+			);
 		},
 	},
 	{

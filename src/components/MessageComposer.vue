@@ -251,6 +251,35 @@ function onPickerSelect(att: SendMessageAttachment): void {
   filePickerPopover.value?.hide();
 }
 
+function insertMarkdown(before: string, after = "", placeholder = "text"): void {
+  const editor = editorRef.value as LexicalEditor | null;
+  if (!editor || props.disabled) return;
+  editor.update(() => {
+    const sel = $getSelection();
+    if ($isRangeSelection(sel)) {
+      const text = sel.getTextContent();
+      sel.insertText(`${before}${text || placeholder}${after}`);
+      return;
+    }
+    const root = $getRoot();
+    let last = root.getLastChild();
+    if (!$isElementNode(last)) {
+      last = $createParagraphNode();
+      root.append(last);
+    }
+    (last as ElementNode).append($createTextNode(`${before}${placeholder}${after}`));
+  });
+  setTimeout(() => editor.focus(), 0);
+}
+
+const markdownActions = [
+  { label: "Bold", icon: "pi pi-bold", title: "Bold", before: "**", after: "**" },
+  { label: "Italic", icon: "pi pi-italic", title: "Italic", before: "*", after: "*" },
+  { label: "Code", icon: "pi pi-code", title: "Inline code", before: "`", after: "`" },
+  { label: "Quote", icon: "pi pi-align-left", title: "Quote", before: "> ", after: "" },
+  { label: "List", icon: "pi pi-list", title: "Bullet list", before: "- ", after: "" },
+] as const;
+
 defineExpose({ focus: focusComposer, setText, appendText });
 
 const editable = computed(() => !props.disabled);
@@ -484,10 +513,24 @@ const SubmitButton = defineComponent({
             v-if="props.sessionId"
             :session-id="props.sessionId"
           />
-          <div class="lex-toolbar-spacer" />
+          <div class="lex-markdown-tools" aria-label="Markdown shortcuts">
+            <button
+              v-for="action in markdownActions"
+              :key="action.label"
+              type="button"
+              class="lex-toolbar-btn"
+              :title="action.title"
+              :aria-label="action.title"
+              :disabled="props.disabled"
+              @click="insertMarkdown(action.before, action.after)"
+            >
+              <i class="pi" :class="action.icon" aria-hidden="true" />
+            </button>
+          </div>
           <!-- Slot for per-session controls (model picker, reasoning
-               effort, options gear). Kept after the spacer so these
-               controls stay right-aligned like the CLI composer. -->
+               effort, options gear). This flexes across remaining
+               width so the workspace chip anchors left while model /
+               settings stay right. -->
           <slot name="session-controls" />
         </footer>
         <EditorRefCapture />
@@ -536,6 +579,16 @@ const SubmitButton = defineComponent({
 .lex-toolbar-spacer {
   flex: 1 1 auto;
   min-width: 0.5rem;
+}
+
+.lex-markdown-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  padding: 0 0.2rem;
+  border-left: 1px solid color-mix(in srgb, var(--p-content-border-color) 70%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--p-content-border-color) 70%, transparent);
 }
 
 .lex-toolbar-btn {
@@ -593,6 +646,8 @@ const SubmitButton = defineComponent({
   gap: 0.2rem;
   padding: 0;
   height: 1.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .lex-composer-toolbar :deep(.session-header-controls .workspace-chip) {
@@ -631,5 +686,11 @@ const SubmitButton = defineComponent({
 .lex-composer-toolbar :deep(.compact-select .p-treeselect-dropdown) {
   width: 1.1rem;
   color: var(--p-text-muted-color);
+}
+
+@container (max-width: 42rem) {
+  .lex-markdown-tools {
+    display: none;
+  }
 }
 </style>

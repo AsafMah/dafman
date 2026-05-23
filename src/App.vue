@@ -15,6 +15,7 @@ import { useToastStore } from "./stores/toastStore";
 import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
 import { useModelsStore } from "./stores/modelsStore";
 import { useBootStore } from "./stores/bootStore";
+import { useJobsStore } from "./stores/jobsStore";
 import { useConfirm } from "primevue/useconfirm";
 import ConfirmDialog from "primevue/confirmdialog";
 import { resolveIsDark } from "./lib/theme";
@@ -33,6 +34,7 @@ const toastStore = useToastStore();
 const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
 const bootStore = useBootStore();
+const jobsStore = useJobsStore();
 const primeToast = useToast();
 const primeConfirm = useConfirm();
 
@@ -355,7 +357,14 @@ function onDockReady(event: DockviewReadyEvent) {
     // but its `group.panels.length` reflects the post-removal count.
     const groupId = panel.api.group.id;
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-      void sessionsStore.closeSession(panel.id);
+      if (jobsStore.hasActiveJobsForSession(panel.id)) {
+        toastStore.info(
+          "Session detached",
+          "Active jobs are still running. Reopen it from the Jobs panel.",
+        );
+      } else {
+        void sessionsStore.closeSession(panel.id);
+      }
     }
     // If this panel was the last one in its edge group (e.g. user
     // closed the Sessions sidebar via dockview's own X), tear down
@@ -409,6 +418,7 @@ const SESSIONS_PANEL_ID = "sessions-manager";
 const SETTINGS_PANEL_ID = "settings-panel";
 const LOG_VIEWER_PANEL_ID = "log-viewer";
 const LIBRARY_PANEL_ID = "library";
+const JOBS_PANEL_ID = "jobs-panel";
 
 /// ActivityBar items.
 /// - Top stack (default `group: "top"`): panel toggles. Sessions today;
@@ -434,7 +444,17 @@ const activityItems = computed<ActivityItem[]>(() => {
       icon: "pi-book",
       title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
       initialSize: 360,
-      minimumSize: 280,
+      minimumSize: 300,
+    },
+    {
+      kind: "panel",
+      id: JOBS_PANEL_ID,
+      component: "jobsPanel",
+      icon: "pi-clock",
+      title: "Jobs",
+      initialSize: 380,
+      minimumSize: 300,
+      badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
     },
   ];
   if (isDev) {

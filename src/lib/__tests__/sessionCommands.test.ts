@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createPinia, setActivePinia } from "pinia";
-import { runLocalSlashCommand } from "../sessionCommands";
+import { runLocalSlashCommand, SESSION_COMMANDS } from "../sessionCommands";
 import { useSessionsStore } from "../../stores/sessionsStore";
 import { setRpcBridge, type RpcBridge } from "../../ipc/invoke";
 
@@ -188,5 +188,18 @@ describe("sessionCommands", () => {
       },
     ]);
     expect(sessions.sessions[0]?.mode).toBe("plan");
+  });
+
+  test("SDK passthrough commands appear but are not intercepted", async () => {
+    const slashes = SESSION_COMMANDS.map((cmd) => cmd.slash);
+    expect(slashes).toContain("/mcp");
+    expect(slashes).toContain("/skill");
+    expect(slashes).toContain("/skills");
+    expect(slashes).toContain("/agent");
+    expect(slashes).toContain("/model");
+
+    const handled = await runLocalSlashCommand("s1", "/mcp list");
+
+    expect(handled).toBe(false);
   });
 });

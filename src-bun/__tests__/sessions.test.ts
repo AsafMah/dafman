@@ -106,6 +106,7 @@ interface FakeSession {
 	tasksList: Array<Record<string, unknown>>;
 	cancelCalls: string[];
 	removeCalls: string[];
+	promoteCalls: string[];
 	fleetStartCalls: Array<string | undefined>;
 }
 
@@ -219,6 +220,14 @@ function makeFakeSession(
 					session.tasksList.splice(idx, 1);
 					return { removed: true };
 				},
+				async promoteToBackground({ id }) {
+					session.promoteCalls.push(id);
+					const t = session.tasksList.find((row) => row.id === id);
+					if (!t) return { promoted: false };
+					t.executionMode = "background";
+					t.canPromoteToBackground = false;
+					return { promoted: true };
+				},
 			},
 			fleet: {
 				async start(params?: { prompt?: string }) {
@@ -233,6 +242,7 @@ function makeFakeSession(
 		tasksList: [],
 		cancelCalls: [],
 		removeCalls: [],
+		promoteCalls: [],
 		fleetStartCalls: [],
 	};
 	return session;
@@ -1009,7 +1019,7 @@ describe("SessionRegistry", () => {
 		await expect(reg.reloadAgents("ghost")).rejects.toBeInstanceOf(AppError);
 	});
 
-	test("19b.1: listTasks filters to type=agent and normalizes the shape", async () => {
+	test("19b.1: listTasks normalizes agent and shell task shapes", async () => {
 		const client = new FakeClient();
 		_setClientForTest(
 			client as unknown as Parameters<typeof _setClientForTest>[0],
@@ -1030,17 +1040,25 @@ describe("SessionRegistry", () => {
 				startedAt: "2026-05-22T10:00:00Z",
 				activeTimeMs: 1234,
 			},
-			// Shell tasks are filtered out (internal bookkeeping).
-			{ type: "shell", id: "shell-1", status: "running", description: "" },
+			{
+				type: "shell",
+				id: "shell-1",
+				status: "idle",
+				description: "Run check",
+				command: "bun run check",
+				logPath: "C:\\logs\\check.log",
+				pid: 1234,
+			},
 			// Type-missing entry also dropped (defensive against SDK drift).
 			{ id: "no-type", status: "running" },
 			// Non-string id dropped.
 			{ type: "agent", id: 42, status: "running" },
 		];
 		const tasks = await reg.listTasks(id);
-		expect(tasks).toHaveLength(1);
+		expect(tasks).toHaveLength(2);
 		expect(tasks[0]).toMatchObject({
 			id: "task-1",
+			type: "agent",
 			description: "Explore the codebase",
 			status: "running",
 			agentType: "explore",
@@ -1048,6 +1066,14 @@ describe("SessionRegistry", () => {
 			agentDisplayName: "Code Explorer",
 			startedAt: "2026-05-22T10:00:00Z",
 			activeTimeMs: 1234,
+		});
+		expect(tasks[1]).toMatchObject({
+			id: "shell-1",
+			type: "shell",
+			status: "idle",
+			command: "bun run check",
+			logPath: "C:\\logs\\check.log",
+			pid: 1234,
 		});
 	});
 
@@ -1102,6 +1128,72 @@ describe("SessionRegistry", () => {
 		expect(await reg.removeTask(id, "ghost")).toBe(false);
 	});
 
+	test("19b.1: promoteTask forwards id and returns boolean", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const id = await reg.create();
+		const fake = client.createdSessions[0]!;
+		fake.tasksList = [
+			{ type: "agent", id: "task-1", status: "running", description: "" },
+		];
+		expect(await reg.promoteTask(id, "task-1")).toBe(true);
+		expect(fake.promoteCalls).toEqual(["task-1"]);
+		expect(await reg.promoteTask(id, "ghost")).toBe(false);
+	});
+
+	test("Long jobs: listJobs aggregates normalized tasks across sessions", async () => {
+		const client = new FakeClient();
+		_setClientForTest(
+			client as unknown as Parameters<typeof _setClientForTest>[0],
+		);
+		const reg = new SessionRegistry(() => {});
+		const first = await reg.create();
+		const second = await reg.create();
+		client.createdSessions[0]!.tasksList = [
+			{
+				type: "agent",
+				id: "agent-1",
+				status: "running",
+				description: "Explore",
+				agentType: "explore",
+				agentDisplayName: "Explorer",
+				canPromoteToBackground: true,
+				startedAt: "2026-05-22T10:00:00Z",
+			},
+		];
+		client.createdSessions[1]!.tasksList = [
+			{
+				type: "shell",
+				id: "shell-1",
+				status: "completed",
+				description: "Check",
+				command: "bun run check",
+				startedAt: "2026-05-22T11:00:00Z",
+			},
+		];
+		const jobs = await reg.listJobs();
+		expect(jobs.map((j) => j.id).sort()).toEqual([
+			`${first}:agent-1`,
+			`${second}:shell-1`,
+		].sort());
+		expect(jobs.find((j) => j.id === `${first}:agent-1`)).toMatchObject({
+			source: "sdk-task",
+			kind: "agent",
+			title: "Explorer",
+			canCancel: true,
+			canPromoteToBackground: true,
+		});
+		expect(jobs.find((j) => j.id === `${second}:shell-1`)).toMatchObject({
+			kind: "shell",
+			title: "bun run check",
+			canCancel: false,
+			canRemove: true,
+		});
+	});
+
 	test("19b.1: task RPCs reject with SessionNotFound on unknown sessionId", async () => {
 		_setClientForTest(
 			new FakeClient() as unknown as Parameters<typeof _setClientForTest>[0],
@@ -1110,6 +1202,7 @@ describe("SessionRegistry", () => {
 		await expect(reg.listTasks("ghost")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.cancelTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
 		await expect(reg.removeTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
+		await expect(reg.promoteTask("ghost", "any")).rejects.toBeInstanceOf(AppError);
 	});
 
 	test("19c: startFleet forwards optional prompt and returns started", async () => {

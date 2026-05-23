@@ -15,6 +15,47 @@
 
 ---
 
+## Phase 23c — Long Jobs + Autopilot UI
+
+1. ⏳ **Jobs panel aggregates active SDK tasks.**
+   - **Steps:** start a session, ask the agent to spawn a background
+     task/fleet, then open the Jobs activity-bar panel.
+   - **Expected:** Jobs shows the active task with session label,
+     elapsed time, latest response/progress when available, and Cancel /
+     Background / Remove actions only when applicable.
+   - **Why not automated:** requires the live SDK task tool to spawn
+     real background work.
+
+2. ⏳ **Autopilot launcher drives the current session.**
+   - **Steps:** open Jobs, enter a goal in Start Autopilot, and click
+     Start Autopilot.
+   - **Expected:** the active session switches to Autopilot, receives
+     the goal as a user message, and Jobs shows a local Autopilot run
+     that completes when the turn ends.
+   - **Why not automated:** unit tests cover the store flow, but live
+     model turn boundaries and UI timing need runtime confirmation.
+
+3. ⏳ **Closing a session with active jobs detaches, not kills.**
+   - **Steps:** while a job is running, close the chat tab, then open
+     Jobs and click the open-session action for that job.
+   - **Expected:** the job remains visible/running and the session can
+     be reopened from Jobs.
+   - **Why not automated:** dockview close lifecycle + live SDK job
+     lifetime is best validated in the running app.
+
+4. ⏳ **Composer follow-up layout and slash commands.**
+   - **Steps:** resize a chat pane from wide to narrow, inspect the
+     composer toolbar, type `/?`, `/mcp`, and `/skill`.
+   - **Expected:** attachment stays on the left, markdown buttons appear
+     in the middle and collapse on narrow width, workspace stays left of
+     the model/settings cluster, Allow all has a visible label and active
+     state, and SDK commands appear in the slash menu but remain editable
+     for the CLI to handle.
+   - **Why not automated:** this is primarily responsive layout and
+     Lexical typeahead behavior inside WebView2.
+
+---
+
 ## 2026-05-22 — UI problem sweep
 
 1. ⏳ **Composer controls alignment + indicators.**

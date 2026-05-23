@@ -302,8 +302,8 @@ function onAgentChipClick() {
     />
     <Button
       icon="pi pi-shield"
+      label="Allow all"
       text
-      rounded
       size="small"
       :aria-label="approveAll ? 'Disable auto-approve all tools' : 'Enable auto-approve all tools'"
       :aria-pressed="approveAll"
@@ -472,6 +472,7 @@ function onAgentChipClick() {
 :deep(.approve-all-active) {
   background: color-mix(in srgb, var(--p-green-500) 20%, transparent);
   color: var(--p-green-500);
+  font-weight: 700;
 }
 
 /* Non-leaf tree rows (provider / type). We render the label inside a

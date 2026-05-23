@@ -335,6 +335,12 @@ function formatTaskElapsed(task: TaskInfo): string {
   return `${h}h ${m % 60}m`;
 }
 
+function taskTitle(task: TaskInfo): string {
+  return task.type === "agent"
+    ? task.agentDisplayName || task.agentName || task.agentType
+    : task.command || task.description || "Shell task";
+}
+
 // ---------- Skills ----------
 type SessionSkill = {
   name: string;
@@ -393,7 +399,19 @@ function openSkillsLibrary() {
     tabComponent: "sidebarTab",
     title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
     initialSize: 360,
-    minimumSize: 280,
+    minimumSize: 300,
+    exclusive: true,
+  });
+}
+
+function openJobsPanel() {
+  layoutStore.openEdgePanel("left", {
+    id: "jobs-panel",
+    component: "jobsPanel",
+    tabComponent: "sidebarTab",
+    title: "Jobs",
+    initialSize: 380,
+    minimumSize: 300,
     exclusive: true,
   });
 }
@@ -1199,7 +1217,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
                 {{ task.status }}
               </span>
               <span class="task-name" :title="task.description || task.id">
-                {{ task.agentDisplayName || task.agentName || task.agentType }}
+                {{ taskTitle(task) }}
               </span>
               <span v-if="formatTaskElapsed(task)" class="task-elapsed">
                 {{ formatTaskElapsed(task) }}
@@ -1234,6 +1252,13 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
             </div>
           </li>
         </ul>
+        <button
+          type="button"
+          class="link-button manage-globally"
+          @click="openJobsPanel"
+        >
+          Open global Jobs →
+        </button>
       </div>
     </section>
 
@@ -1678,7 +1703,7 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
      tool names) would force the panel wider than its dockview
      container — exactly the "sidebar is cut off, needs crazy
      width" symptom. */
-  min-width: 0;
+  min-width: 300px;
 }
 
 /* Force every direct flex / grid child to honour the parent's

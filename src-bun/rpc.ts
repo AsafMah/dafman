@@ -180,23 +180,74 @@ export interface AgentInfo {
 	path?: string;
 }
 
-/// Mirror of `@github/copilot/schemas/api.schema.json#TaskAgentInfo`.
-/// Returned by the @experimental `session.rpc.tasks.list` surface,
-/// filtered to type === "agent" on the bun side (shell tasks are
-/// internal bookkeeping). Status enum is per
-/// #TaskAgentInfoStatus.
-export interface TaskInfo {
+export type TaskStatus = "running" | "idle" | "completed" | "failed" | "cancelled";
+
+interface BaseTaskInfo {
 	id: string;
+	type: "agent" | "shell";
 	description: string;
-	status: "running" | "idle" | "completed" | "failed" | "cancelled";
-	agentType: string;
-	toolCallId?: string;
+	status: TaskStatus;
 	startedAt?: string;
 	completedAt?: string;
 	activeTimeMs?: number;
 	error?: string;
+	executionMode?: "sync" | "background";
+	canPromoteToBackground?: boolean;
+}
+
+/// Mirror of the SDK's TaskInfo union. Returned by the @experimental
+/// `session.rpc.tasks.list` surface.
+export type TaskInfo = TaskAgentInfo | TaskShellInfo;
+
+export interface TaskAgentInfo extends BaseTaskInfo {
+	type: "agent";
+	agentType: string;
+	toolCallId?: string;
 	agentName?: string;
 	agentDisplayName?: string;
+	prompt?: string;
+	result?: string;
+	model?: string;
+	latestResponse?: string;
+	idleSince?: string;
+}
+
+export interface TaskShellInfo extends BaseTaskInfo {
+	type: "shell";
+	command: string;
+	attachmentMode?: "pty" | "detached";
+	logPath?: string;
+	pid?: number;
+}
+
+export interface JobRecord {
+	id: string;
+	sessionId: string;
+	source: "sdk-task" | "fleet" | "autopilot-session";
+	kind: "agent" | "shell" | "fleet" | "autopilot";
+	status: "starting" | TaskStatus;
+	title: string;
+	description: string;
+	startedAt?: string;
+	completedAt?: string;
+	activeTimeMs?: number;
+	agentType?: string;
+	agentName?: string;
+	agentDisplayName?: string;
+	model?: string;
+	prompt?: string;
+	latestResponse?: string;
+	result?: string;
+	error?: string;
+	toolCallId?: string;
+	command?: string;
+	logPath?: string;
+	pid?: number;
+	executionMode?: "sync" | "background";
+	canCancel: boolean;
+	canRemove: boolean;
+	canPromoteToBackground: boolean;
+	canOpenSession: boolean;
 }
 
 /// 19b.2: scope discriminator for filesystem-backed agent CRUD. User
@@ -683,6 +734,14 @@ export type DafmanRPC = {
 			removeTask: {
 				params: { sessionId: string; id: string };
 				response: boolean;
+			};
+			promoteTask: {
+				params: { sessionId: string; id: string };
+				response: boolean;
+			};
+			listJobs: {
+				params: Record<string, never>;
+				response: JobRecord[];
 			};
 			/// Phase 19b.2. Filesystem-backed agent CRUD. Separate from
 			/// `session.rpc.agent.*` because the SDK surface only sees

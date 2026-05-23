@@ -23,6 +23,7 @@ interface ActivityItemBase {
   icon: string;
   /// Hover tooltip + aria-label. Required since the rail is icon-only.
   title: string;
+  badge?: string | number;
   /// `"top"` (default) pins to the upper stack, `"bottom"` pins below
   /// `margin-top: auto`. Bottom is for global actions (settings,
   /// dev tools).
@@ -143,6 +144,7 @@ defineExpose({ sync: syncOpenState });
         @click="activate(item)"
       >
         <i class="pi activity-icon" :class="item.icon" aria-hidden="true" />
+        <span v-if="item.badge" class="activity-badge">{{ item.badge }}</span>
       </button>
     </div>
     <div class="activity-stack activity-stack-bottom">
@@ -158,6 +160,7 @@ defineExpose({ sync: syncOpenState });
         @click="activate(item)"
       >
         <i class="pi activity-icon" :class="item.icon" aria-hidden="true" />
+        <span v-if="item.badge" class="activity-badge">{{ item.badge }}</span>
       </button>
     </div>
   </nav>
@@ -256,5 +259,21 @@ defineExpose({ sync: syncOpenState });
 
 .activity-icon {
   font-size: 1.1rem;
+}
+
+.activity-badge {
+  position: absolute;
+  right: 0.2rem;
+  top: 0.2rem;
+  min-width: 0.85rem;
+  height: 0.85rem;
+  padding: 0 0.18rem;
+  border-radius: 999px;
+  background: var(--p-red-500);
+  color: var(--p-primary-contrast-color);
+  font-size: 0.58rem;
+  line-height: 0.85rem;
+  text-align: center;
+  font-weight: 700;
 }
 </style>

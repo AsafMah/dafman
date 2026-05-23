@@ -264,6 +264,10 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 			removeTask: rpcGuard(async ({ sessionId, id }) =>
 				sessions.removeTask(sessionId, id),
 			),
+			promoteTask: rpcGuard(async ({ sessionId, id }) =>
+				sessions.promoteTask(sessionId, id),
+			),
+			listJobs: rpcGuard(async () => sessions.listJobs()),
 			listAgentFiles: rpcGuard(async ({ sessionId }) =>
 				sessions.listAgentFiles(sessionId),
 			),

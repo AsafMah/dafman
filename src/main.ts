@@ -30,6 +30,7 @@ import App from "./App.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import ChatTab from "./components/ChatTab.vue";
 import ChatTabActions from "./components/ChatTabActions.vue";
+import JobsPanel from "./components/JobsPanel.vue";
 import LibraryPanel from "./components/LibraryPanel.vue";
 import LogViewer from "./components/LogViewer.vue";
 import SessionDetailsPanel from "./components/SessionDetailsPanel.vue";
@@ -130,6 +131,7 @@ async function mountWith(Root: typeof App) {
   // can refer to them by name in `addPanel({ component })` and the
   // `watermark-component` prop.
   app.component("chat", ChatPanel);
+  app.component("jobsPanel", JobsPanel);
   app.component("library", LibraryPanel);
   app.component("sessionDetails", SessionDetailsPanel);
   app.component("sessionsManager", SessionsManager);

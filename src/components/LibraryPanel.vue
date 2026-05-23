@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-width: 0;
+  min-width: 300px;
   max-width: 100%;
   box-sizing: border-box;
   color: var(--p-text-color);

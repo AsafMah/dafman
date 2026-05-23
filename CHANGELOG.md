@@ -3,6 +3,29 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Phase 23c — Long Jobs + Autopilot UI)
+
+- **Global Jobs panel.** New activity-bar Jobs surface aggregates SDK
+  agent and shell tasks across registered sessions, shows active counts,
+  and exposes open-session, cancel, remove, and promote-to-background
+  actions where the SDK supports them.
+- **Current-session Autopilot launcher.** Jobs panel now starts an
+  Autopilot run for the active session by switching mode to Autopilot
+  and sending the goal, with a local running/completed/cancelled job row
+  tied to the session turn.
+- **Detach instead of kill for active jobs.** Closing a chat tab with
+  active jobs now detaches the pane while keeping the session/job handle
+  alive so it can be reopened from Jobs.
+- **Task wire broadening.** `TaskInfo` now mirrors SDK agent and shell
+  task shapes; `JobRecord` is the normalized UI-facing model and the
+  backend exposes aggregate `listJobs` plus `promoteTask`.
+- **Composer/sidebar follow-ups.** Library/details/jobs edge panels now
+  enforce minimum widths, the composer keeps attachments left and the
+  workspace chip anchored left while model/settings stay right, adds a
+  collapsible markdown toolbar, shows a labelled Allow all toggle, and
+  exposes SDK passthrough slash commands (`/mcp`, `/skill(s)`, `/agent`,
+  `/model`, `/autopilot`) in the slash menu.
+
 ### Fixed (2026-05-22 — UI problem sweep)
 
 - **Composer/session controls polish:** model controls now stay

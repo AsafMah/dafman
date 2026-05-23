@@ -16,12 +16,13 @@
 **Active milestone:** **Post-M2 audit burn-down**.
 M1 + M2 shipped (including in-app log viewer, export conversation,
 permissions tab, tools allowlist, MCP OAuth toast). Current work is
-the audit's Phase 23 local slice: Copilot CLI mode parity plus the
-2026-05-22 UI problem sweep before the larger long-jobs/fleet UI. The
+the audit's Phase 23 local slice: Copilot CLI mode parity, the
+2026-05-22 UI problem sweep, and first-pass Long Jobs + Autopilot UI. The
 three-way mode toggle now has native plan/autopilot lifecycle handling,
 `/plan <prompt>` bootstrap behavior, exit-plan approval UI, autopilot
-unavailable-user semantics, and polished composer/details/library
-surfaces from `problems.md`.
+unavailable-user semantics, polished composer/details/library surfaces
+from `problems.md`, and a global Jobs panel with current-session
+Autopilot launcher.
 
 ---
 
@@ -34,10 +35,12 @@ used" call — we will not pursue it speculatively.
 
 Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` §C):
 
-1. **Long jobs registry + Autopilot UI** (audit P23, remaining).
-   Mode semantics are now wired; the remaining work is surfacing
-   SDK/background tasks as a first-class Jobs panel/status indicator
-   instead of relying solely on the rail's Tasks section.
+1. **Long jobs registry + Autopilot UI follow-up** (audit P23, remaining).
+   First pass shipped: global Jobs panel, SDK task aggregation,
+   promote/cancel/remove actions, detach-on-active-job close, and
+   current-session Autopilot launcher. Remaining follow-ups: persisted
+   job history across restart, optional git cleanliness checks,
+   richer completion diff summaries, and commit/PR handoff.
 2. **Library tab consolidation follow-up** (audit P21, remaining).
    Initial slice shipped: Instructions tab + `/library ...` command
    wiring + SDK `CommandDefinition` registration. Remaining optional

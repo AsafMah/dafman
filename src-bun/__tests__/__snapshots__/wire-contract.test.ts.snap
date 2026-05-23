@@ -555,3 +555,92 @@ exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
   },
 }
 `;
+
+exports[`IPC wire contracts TaskInfo — agent task 1`] = `
+{
+  "agentDisplayName": "CI Helper",
+  "agentName": "ci-helper",
+  "agentType": "explore",
+  "canPromoteToBackground": false,
+  "description": "Investigate CI",
+  "executionMode": "background",
+  "id": "agent-1",
+  "latestResponse": "Checking logs",
+  "model": "gpt-5.5",
+  "prompt": "Find the CI failure",
+  "startedAt": "2026-05-22T10:00:00.000Z",
+  "status": "running",
+  "toolCallId": "tool-1",
+  "type": "agent",
+}
+`;
+
+exports[`IPC wire contracts TaskInfo — shell task 1`] = `
+{
+  "attachmentMode": "detached",
+  "canPromoteToBackground": false,
+  "command": "bun run check",
+  "description": "Run check",
+  "executionMode": "background",
+  "id": "shell-1",
+  "logPath": "C:\\logs\\check.log",
+  "pid": 1234,
+  "startedAt": "2026-05-22T10:00:00.000Z",
+  "status": "idle",
+  "type": "shell",
+}
+`;
+
+exports[`IPC wire contracts JobRecord shape 1`] = `
+{
+  "activeTimeMs": 1200,
+  "agentName": "ci-helper",
+  "agentType": "explore",
+  "canCancel": true,
+  "canOpenSession": true,
+  "canPromoteToBackground": false,
+  "canRemove": false,
+  "description": "Investigate CI",
+  "executionMode": "background",
+  "id": "sess-1:agent-1",
+  "kind": "agent",
+  "latestResponse": "Checking logs",
+  "model": "gpt-5.5",
+  "prompt": "Find the CI failure",
+  "sessionId": "sess-1",
+  "source": "sdk-task",
+  "startedAt": "2026-05-22T10:00:00.000Z",
+  "status": "running",
+  "title": "CI Helper",
+  "toolCallId": "tool-1",
+}
+`;
+
+exports[`IPC wire contracts promoteTask request shape 1`] = `
+{
+  "id": "agent-1",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts listJobs response shape 1`] = `
+[
+  {
+    "canCancel": true,
+    "canOpenSession": true,
+    "canPromoteToBackground": false,
+    "canRemove": false,
+    "command": "bun run check",
+    "description": "Run check",
+    "id": "sess-1:shell-1",
+    "kind": "shell",
+    "logPath": "C:\\logs\\check.log",
+    "pid": 1234,
+    "sessionId": "sess-1",
+    "source": "sdk-task",
+    "startedAt": "2026-05-22T10:00:00.000Z",
+    "status": "idle",
+    "title": "bun run check",
+  },
+]
+`;

@@ -15,3 +15,8 @@
 - [x] Color coded indication for normal/plan/autopilot mode.
 - [x] Color coded indication for allow all mode.
 - [x] The x files chip is useless. Maybe add a section to the right pane with all of the files (collapsible).
+- [x] Min-width on the library pane and the right pane are broken again - it's possible to cut them off.
+- [x] The allow all button should say "allow all", and should actually show when it's on.
+- [x] The directory in the bottom session bar should be anchored left.
+- [x] you want to put something in the middle? see if you can get the editor's markdown tools there, and collapse them if the width is too small. put the add attachment button to the left.
+- [x] I thought we hooked up cli commands like /skill and /mcp and yet I don't see them when I write /? they should all be hooked up.

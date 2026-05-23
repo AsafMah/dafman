@@ -82,6 +82,26 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
+      id: "jobs.open",
+      label: "Open Jobs",
+      group: "Navigation",
+      icon: "pi pi-clock",
+      keywords: ["background", "tasks", "autopilot"],
+      run: () => {
+        const id = "jobs-panel";
+        if (layoutStore.isPanelOpen(id)) return;
+        layoutStore.openEdgePanel("left", {
+          id,
+          component: "jobsPanel",
+          tabComponent: "sidebarTab",
+          title: "Jobs",
+          initialSize: 380,
+          minimumSize: 300,
+          exclusive: true,
+        });
+      },
+    },
+    {
       id: "settings.open",
       label: "Open Settings",
       group: "Navigation",

@@ -55,7 +55,9 @@ import type {
 	UserInputRequestData,
 	WorkspaceFileMatch,
 	AgentInfo,
+	JobRecord,
 	TaskInfo,
+	TaskStatus,
 } from "../rpc";
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
@@ -103,26 +105,52 @@ function normalizeAgent(raw: {
 	return out;
 }
 
-/// 19b.1: normalize the SDK's loose TaskAgentInfo wire shape into our
-/// typed `TaskInfo`. Caller has pre-filtered on `type === "agent"`
-/// and `typeof id === "string"`; defensive defaults for everything
-/// else.
+const TASK_STATUSES: TaskStatus[] = [
+	"running",
+	"idle",
+	"completed",
+	"failed",
+	"cancelled",
+];
+
+function normalizeTaskStatus(status: unknown): TaskStatus {
+	return typeof status === "string" && TASK_STATUSES.includes(status as TaskStatus)
+		? (status as TaskStatus)
+		: "running";
+}
+
+/// 19b.1/Long Jobs: normalize the SDK's loose TaskInfo union into our
+/// typed `TaskInfo`. Caller has pre-filtered on `typeof id === "string"`;
+/// defensive defaults for everything else.
 function normalizeTask(raw: Record<string, unknown>): TaskInfo {
-	const status = raw.status;
-	const validStatuses: TaskInfo["status"][] = [
-		"running",
-		"idle",
-		"completed",
-		"failed",
-		"cancelled",
-	];
-	const out: TaskInfo = {
+	const common = {
 		id: String(raw.id),
 		description: typeof raw.description === "string" ? raw.description : "",
-		status:
-			typeof status === "string" && validStatuses.includes(status as TaskInfo["status"])
-				? (status as TaskInfo["status"])
-				: "running",
+		status: normalizeTaskStatus(raw.status),
+	};
+	if (typeof raw.type === "string" && raw.type === "shell") {
+		const out: TaskInfo = {
+			...common,
+			type: "shell",
+			command: typeof raw.command === "string" ? raw.command : "",
+		};
+		if (typeof raw.startedAt === "string") out.startedAt = raw.startedAt;
+		if (typeof raw.completedAt === "string") out.completedAt = raw.completedAt;
+		if (typeof raw.activeTimeMs === "number") out.activeTimeMs = raw.activeTimeMs;
+		if (typeof raw.error === "string") out.error = raw.error;
+		if (raw.executionMode === "sync" || raw.executionMode === "background")
+			out.executionMode = raw.executionMode;
+		if (typeof raw.canPromoteToBackground === "boolean")
+			out.canPromoteToBackground = raw.canPromoteToBackground;
+		if (raw.attachmentMode === "pty" || raw.attachmentMode === "detached")
+			out.attachmentMode = raw.attachmentMode;
+		if (typeof raw.logPath === "string") out.logPath = raw.logPath;
+		if (typeof raw.pid === "number") out.pid = raw.pid;
+		return out;
+	}
+	const out: TaskInfo = {
+		...common,
+		type: "agent",
 		agentType: typeof raw.agentType === "string" ? raw.agentType : "agent",
 	};
 	if (typeof raw.toolCallId === "string") out.toolCallId = raw.toolCallId;
@@ -130,9 +158,65 @@ function normalizeTask(raw: Record<string, unknown>): TaskInfo {
 	if (typeof raw.completedAt === "string") out.completedAt = raw.completedAt;
 	if (typeof raw.activeTimeMs === "number") out.activeTimeMs = raw.activeTimeMs;
 	if (typeof raw.error === "string") out.error = raw.error;
+	if (raw.executionMode === "sync" || raw.executionMode === "background")
+		out.executionMode = raw.executionMode;
+	if (typeof raw.canPromoteToBackground === "boolean")
+		out.canPromoteToBackground = raw.canPromoteToBackground;
 	if (typeof raw.agentName === "string") out.agentName = raw.agentName;
 	if (typeof raw.agentDisplayName === "string") out.agentDisplayName = raw.agentDisplayName;
+	if (typeof raw.prompt === "string") out.prompt = raw.prompt;
+	if (typeof raw.result === "string") out.result = raw.result;
+	if (typeof raw.model === "string") out.model = raw.model;
+	if (typeof raw.latestResponse === "string") out.latestResponse = raw.latestResponse;
+	if (typeof raw.idleSince === "string") out.idleSince = raw.idleSince;
 	return out;
+}
+
+function jobFromTask(sessionId: string, task: TaskInfo): JobRecord {
+	const running = task.status === "running" || task.status === "idle";
+	const terminal = task.status === "completed" || task.status === "failed" || task.status === "cancelled";
+	const base = {
+		id: `${sessionId}:${task.id}`,
+		sessionId,
+		source: "sdk-task" as const,
+		kind: task.type,
+		status: task.status,
+		title:
+			task.type === "agent"
+				? task.agentDisplayName ?? task.agentName ?? task.agentType
+				: task.command || task.description || "Shell task",
+		description: task.description,
+		startedAt: task.startedAt,
+		completedAt: task.completedAt,
+		activeTimeMs: task.activeTimeMs,
+		error: task.error,
+		executionMode: task.executionMode,
+		canCancel: running,
+		canRemove: terminal,
+		canPromoteToBackground: task.canPromoteToBackground === true,
+		canOpenSession: true,
+	};
+	if (task.type === "agent") {
+		return {
+			...base,
+			kind: "agent",
+			agentType: task.agentType,
+			agentName: task.agentName,
+			agentDisplayName: task.agentDisplayName,
+			model: task.model,
+			prompt: task.prompt,
+			latestResponse: task.latestResponse,
+			result: task.result,
+			toolCallId: task.toolCallId,
+		};
+	}
+	return {
+		...base,
+		kind: "shell",
+		command: task.command,
+		logPath: task.logPath,
+		pid: task.pid,
+	};
 }
 
 type Emit = (payload: SessionEventPayload) => void;
@@ -1247,17 +1331,9 @@ export class SessionRegistry {
 
 	// ---------- Tasks (Phase 19b.1) ----------
 	//
-	// Wraps the @experimental `session.rpc.tasks.*` surface. Tasks are
-	// agent-delegated work items started by the main agent via its
-	// built-in `task` tool — this is observational from the rail's
-	// perspective. We don't expose `startTaskAgent` to the renderer
-	// because user-initiated task starts go through the chat composer
-	// (the agent decides), not a rail button. Cancel / remove are
-	// user-facing.
-	//
-	// Wire shape per @github/copilot/schemas/api.schema.json#TaskAgentInfo
-	// + #TaskShellInfo. We filter to type === "agent" because shell
-	// tasks are internal bookkeeping the user shouldn't see.
+	// Wraps the @experimental `session.rpc.tasks.*` surface. Tasks may be
+	// delegated agents or long-running shell tasks. The details rail and
+	// global Jobs panel both consume this normalized union.
 
 	async listTasks(sessionId: string): Promise<TaskInfo[]> {
 		const entry = this.entries.get(sessionId);
@@ -1267,11 +1343,35 @@ export class SessionRegistry {
 				tasks?: Array<Record<string, unknown>>;
 			};
 			return (result.tasks ?? [])
-				.filter((t) => t.type === "agent" && typeof t.id === "string")
+				.filter(
+					(t) =>
+						(t.type === "agent" || t.type === "shell") &&
+						typeof t.id === "string",
+				)
 				.map(normalizeTask);
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
+	}
+
+	async listJobs(): Promise<JobRecord[]> {
+		const jobs: JobRecord[] = [];
+		for (const [sessionId] of this.entries) {
+			try {
+				const tasks = await this.listTasks(sessionId);
+				for (const task of tasks) jobs.push(jobFromTask(sessionId, task));
+			} catch (err) {
+				log.warn("listJobs failed for session", {
+					sessionId,
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+		}
+		return jobs.sort((a, b) => {
+			const at = a.startedAt ? Date.parse(a.startedAt) : 0;
+			const bt = b.startedAt ? Date.parse(b.startedAt) : 0;
+			return bt - at;
+		});
 	}
 
 	async cancelTask(sessionId: string, id: string): Promise<boolean> {
@@ -1295,6 +1395,19 @@ export class SessionRegistry {
 				removed?: boolean;
 			};
 			return result.removed === true;
+		} catch (err) {
+			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+		}
+	}
+
+	async promoteTask(sessionId: string, id: string): Promise<boolean> {
+		const entry = this.entries.get(sessionId);
+		if (!entry) throw AppError.sessionNotFound(sessionId);
+		try {
+			const result = (await entry.session.rpc.tasks.promoteToBackground({ id })) as {
+				promoted?: boolean;
+			};
+			return result.promoted === true;
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));
 		}
