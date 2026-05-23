@@ -45,6 +45,7 @@ const summary = computed(() =>
 );
 const buffer = computed(() => terminalStore.buffers[terminalId.value] ?? "");
 const terminalPrefs = computed(() => settingsStore.settings.terminal);
+const integrationNonce = computed(() => summary.value?.integrationNonce ?? "");
 
 function fitAndNotify(): void {
   if (!fit || !term || !terminalId.value) return;
@@ -68,6 +69,115 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
       /* ignore dispose failures from partially activated addons */
     }
   }
+}
+
+function tryDecodeUriComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function parseExitCode(value: string): number | undefined {
+  const match = value.match(/(?:^|;)(-?\d+)(?:;|$)/);
+  if (!match) return undefined;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOsc633(command: string): void {
+  if (!terminalId.value) return;
+  const [kind = "", ...parts] = command.split(";");
+  if (kind === "C") {
+    if (!terminalStore.activeCommands[terminalId.value]) {
+      terminalStore.startCommand(terminalId.value, {
+        cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
+        protocol: "osc633",
+        trusted: false,
+      });
+    }
+    return;
+  }
+  if (kind === "D") {
+    terminalStore.finishCommand(terminalId.value, parseExitCode(parts.join(";")));
+    return;
+  }
+  if (kind === "E") {
+    const nonce = parts[parts.length - 1];
+    const trusted = Boolean(integrationNonce.value && nonce === integrationNonce.value);
+    const commandLine = tryDecodeUriComponent(parts.slice(0, -1).join(";"));
+    const patch = {
+      command: commandLine,
+      cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
+      protocol: "osc633" as const,
+      trusted,
+    };
+    if (terminalStore.activeCommands[terminalId.value]) terminalStore.updateActiveCommand(terminalId.value, patch);
+    else terminalStore.startCommand(terminalId.value, patch);
+    return;
+  }
+  if (kind === "P") {
+    const cwdPart = parts.find((part) => part.startsWith("Cwd="));
+    if (cwdPart) terminalStore.updateTerminalCwd(terminalId.value, tryDecodeUriComponent(cwdPart.slice(4)));
+  }
+}
+
+function parseOsc133(command: string): void {
+  if (!terminalId.value) return;
+  const [kind = "", ...parts] = command.split(";");
+  if (kind === "C") {
+    if (!terminalStore.activeCommands[terminalId.value]) {
+      terminalStore.startCommand(terminalId.value, {
+        cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
+        protocol: "osc133",
+        trusted: false,
+      });
+    }
+  } else if (kind === "D") {
+    terminalStore.finishCommand(terminalId.value, parseExitCode(parts.join(";")));
+  }
+}
+
+function parseOsc7(uri: string): void {
+  if (!terminalId.value || !uri.startsWith("file://")) return;
+  const pathname = uri
+    .slice("file://".length)
+    .replace(/^[^/]*(\/.*)$/, "$1")
+    .replace(/^\/([A-Za-z]:\/)/, "$1");
+  terminalStore.updateTerminalCwd(terminalId.value, tryDecodeUriComponent(pathname));
+}
+
+function registerShellIntegrationHandlers(): void {
+  if (!term) return;
+  addonDisposables.push(
+    term.parser.registerOscHandler(633, (data) => {
+      parseOsc633(data);
+      return true;
+    }),
+    term.parser.registerOscHandler(133, (data) => {
+      parseOsc133(data);
+      return true;
+    }),
+    term.parser.registerOscHandler(7, (data) => {
+      parseOsc7(data);
+      return true;
+    }),
+    term.parser.registerOscHandler(9, (data) => {
+      if (terminalId.value && data.startsWith("9;")) {
+        terminalStore.updateTerminalCwd(terminalId.value, data.slice(2));
+        return true;
+      }
+      return false;
+    }),
+    term.parser.registerOscHandler(1337, (data) => {
+      if (terminalId.value && data.startsWith("CurrentDir=")) {
+        terminalStore.updateTerminalCwd(terminalId.value, tryDecodeUriComponent(data.slice("CurrentDir=".length)));
+        return true;
+      }
+      return false;
+    }),
+  );
 }
 
 function findNext(): void {
@@ -186,6 +296,7 @@ onMounted(async () => {
   }
   term.open(host.value);
   if (buffer.value) term.write(buffer.value);
+  registerShellIntegrationHandlers();
   term.onData((data) => {
     if (terminalId.value) void terminalStore.writeTerminal(terminalId.value, data);
   });

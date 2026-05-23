@@ -7,9 +7,23 @@ import { useSessionsStore } from "./sessionsStore";
 
 const MAX_BUFFER = 256_000;
 
+export interface TerminalCommandRecord {
+  id: string;
+  command?: string;
+  cwd?: string;
+  startedAt: string;
+  endedAt?: string;
+  exitCode?: number;
+  protocol: "osc633" | "osc133";
+  trusted: boolean;
+}
+
 export const useTerminalStore = defineStore("terminals", () => {
   const terminals = ref<TerminalSummary[]>([]);
   const buffers = ref<Record<string, string>>({});
+  const commands = ref<Record<string, TerminalCommandRecord[]>>({});
+  const currentCwd = ref<Record<string, string>>({});
+  const activeCommands = ref<Record<string, TerminalCommandRecord>>({});
   const loaded = ref(false);
   const sessionTerminalIds = ref<Record<string, string>>({});
 
@@ -100,6 +114,51 @@ export const useTerminalStore = defineStore("terminals", () => {
     }
   }
 
+  function updateTerminalCwd(terminalId: string, cwd: string): void {
+    currentCwd.value = { ...currentCwd.value, [terminalId]: cwd };
+  }
+
+  function startCommand(
+    terminalId: string,
+    command: Omit<TerminalCommandRecord, "id" | "startedAt"> & { startedAt?: string },
+  ): void {
+    const record: TerminalCommandRecord = {
+      id: crypto.randomUUID(),
+      startedAt: command.startedAt ?? new Date().toISOString(),
+      ...command,
+    };
+    activeCommands.value = { ...activeCommands.value, [terminalId]: record };
+  }
+
+  function updateActiveCommand(
+    terminalId: string,
+    patch: Partial<Omit<TerminalCommandRecord, "id" | "startedAt">>,
+  ): void {
+    const record = activeCommands.value[terminalId];
+    if (!record) return;
+    activeCommands.value = {
+      ...activeCommands.value,
+      [terminalId]: { ...record, ...patch },
+    };
+  }
+
+  function finishCommand(terminalId: string, exitCode?: number): void {
+    const record = activeCommands.value[terminalId];
+    if (!record) return;
+    const finished: TerminalCommandRecord = {
+      ...record,
+      ...(exitCode !== undefined ? { exitCode } : {}),
+      endedAt: new Date().toISOString(),
+    };
+    const nextActive = { ...activeCommands.value };
+    delete nextActive[terminalId];
+    activeCommands.value = nextActive;
+    commands.value = {
+      ...commands.value,
+      [terminalId]: [...(commands.value[terminalId] ?? []), finished],
+    };
+  }
+
   let unsubscribe: (() => void) | null = null;
   function ensureSubscription(): void {
     if (unsubscribe) return;
@@ -114,6 +173,9 @@ export const useTerminalStore = defineStore("terminals", () => {
   return {
     terminals,
     buffers,
+    commands,
+    currentCwd,
+    activeCommands,
     loaded,
     running,
     refresh,
@@ -123,5 +185,9 @@ export const useTerminalStore = defineStore("terminals", () => {
     resizeTerminal,
     killTerminal,
     applyEvent,
+    updateTerminalCwd,
+    startCommand,
+    updateActiveCommand,
+    finishCommand,
   };
 });

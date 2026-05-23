@@ -53,6 +53,13 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
 - ActivityBar Terminals panel: lists known terminals, opens/kills them, and
   creates new terminals with optional command/args/cwd. It also persists
   font family, font size, scrollback, theme colors, and per-addon toggles.
+- Shell-integration foundation: `TerminalRegistry` now assigns a nonce and
+  exposes `DAFMAN_SHELL_INTEGRATION`/`DAFMAN_NONCE`; PowerShell/pwsh are
+  wrapped with prompt/readline hooks that emit OSC 633 command/CWD/exit
+  markers, while cmd gets best-effort OSC 7/133 prompt markers. The xterm
+  layer parses OSC 633/133/7/9/1337 into current CWD, active command, command
+  history, exit code, and trusted-command metadata for future manual
+  send-to-chat/copy-output actions.
 
 ---
 

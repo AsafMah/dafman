@@ -32,6 +32,9 @@ now load the requested xterm addon foundation (search, links, clipboard,
 Unicode, web fonts, progress, ligatures, images, WebGL, serialization).
 The ActivityBar now has a Terminals panel for listing, opening, killing,
 and creating terminals with command/args/cwd, plus display/addon settings.
+The first shell-integration slice emits/parses OSC 633/133/7/9/1337 markers
+for PowerShell/cmd so terminals can track CWD, active commands, exit codes,
+and nonce-backed trusted command lines without reviving PTY output scraping.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.
@@ -66,10 +69,11 @@ Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` 
    pass adds Bun native PTY registry/RPC, xterm dockview panels, and
    command palette actions. Electrobun is pinned
    to bundle Bun 1.3.14 because 1.3.13 rejects Windows `terminal`.
-   Terminal addon foundation and the ActivityBar terminal manager are now
-   wired. Remaining follow-ups: richer terminal settings/profile CRUD,
-   shell integration, buffer persistence UX, agent terminal tool, inline
-   terminal blocks, shortcut design, and optional Ghostty Web renderer spike.
+   Terminal addon foundation, the ActivityBar terminal manager, terminal
+   settings, and the first Windows shell-integration parser/emitter are now
+   wired. Remaining follow-ups: richer profile CRUD, bash/zsh/fish shell
+   integration, buffer persistence UX, agent terminal tool, inline terminal
+   blocks, shortcut design, and optional Ghostty Web renderer spike.
 5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
    surface for the composer.
 

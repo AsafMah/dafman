@@ -109,6 +109,7 @@ export interface TerminalSummary {
   cols: number;
   rows: number;
   sessionId?: string;
+  integrationNonce?: string;
   exitCode?: number | null;
   signal?: string | null;
 }

@@ -98,6 +98,16 @@ function setForeground(value: string): void {
 function setAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
   void settingsStore.setTerminalPrefs({ addons: { [key]: value } as Partial<TerminalAddonPrefs> });
 }
+
+function displayCwd(terminalId: string, fallback: string): string {
+  return terminalStore.currentCwd[terminalId] ?? fallback;
+}
+
+function activeCommandLabel(terminalId: string): string | null {
+  const active = terminalStore.activeCommands[terminalId];
+  if (!active) return null;
+  return active.command ? `Running: ${active.command}` : "Running command";
+}
 </script>
 
 <template>
@@ -213,7 +223,10 @@ function setAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
           <div class="terminal-text">
             <strong>{{ terminal.title }}</strong>
             <span>{{ terminal.shell }} {{ terminal.args.join(" ") }}</span>
-            <small>{{ terminal.cwd }}</small>
+            <small>{{ displayCwd(terminal.id, terminal.cwd) }}</small>
+            <small v-if="activeCommandLabel(terminal.id)" class="terminal-command">
+              {{ activeCommandLabel(terminal.id) }}
+            </small>
           </div>
           <span class="terminal-status" :class="`status-${terminal.status}`">{{ terminal.status }}</span>
         </div>
@@ -368,7 +381,8 @@ function setAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
 
 .terminal-text strong,
 .terminal-text span,
-.terminal-text small {
+.terminal-text small,
+.terminal-command {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -379,6 +393,10 @@ function setAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
 .terminal-text small {
   color: var(--p-text-muted-color);
   font-size: 0.72rem;
+}
+
+.terminal-command {
+  color: var(--p-primary-color);
 }
 
 .terminal-status {

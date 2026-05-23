@@ -78,4 +78,32 @@ describe("TerminalRegistry", () => {
 		expect(registry.list()).toEqual([]);
 		expect(events).toEqual([]);
 	});
+
+	test("passes shell integration nonce and wraps interactive PowerShell", () => {
+		let capturedCommand: string[] = [];
+		let capturedEnv: Record<string, string | undefined> = {};
+		(Bun as unknown as { spawn: typeof Bun.spawn }).spawn = ((cmd, options) => {
+			capturedCommand = cmd as string[];
+			const opts = options as { env?: Record<string, string | undefined> };
+			capturedEnv = opts.env ?? {};
+			return {
+				terminal: {
+					write: () => 0,
+					resize: () => undefined,
+					close: () => undefined,
+				},
+				kill: () => true,
+			} as unknown as Bun.Subprocess;
+		}) as typeof Bun.spawn;
+
+		const registry = new TerminalRegistry(() => {});
+		const summary = registry.create({ shell: "pwsh.exe", args: ["-NoLogo"], cols: 80, rows: 24 });
+
+		expect(summary.integrationNonce).toBeTruthy();
+		expect(capturedEnv.DAFMAN_SHELL_INTEGRATION).toBe("1");
+		expect(capturedEnv.DAFMAN_NONCE).toBe(summary.integrationNonce);
+		expect(capturedCommand).toContain("-NoExit");
+		expect(capturedCommand).toContain("-Command");
+		expect(capturedCommand.join(" ")).toContain("]633;E");
+	});
 });

@@ -58,6 +58,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Terminal manager panel.** Added an ActivityBar Terminals panel with
   running terminal list, open/kill actions, a basic new-terminal form for
   command/args/cwd, and terminal display/addon settings.
+- **Terminal shell integration foundation.** New terminals get a per-terminal
+  nonce and shell-integration env. PowerShell/pwsh now emit VS Code-style
+  OSC 633 command/CWD/exit markers; cmd emits best-effort prompt/CWD markers.
+  Terminal panels parse OSC 633/133/7/9/1337 into active command, command
+  history, current CWD, and trusted command metadata for later smart-terminal
+  actions.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

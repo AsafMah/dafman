@@ -17,6 +17,7 @@ interface TerminalEntry {
 	sessionId?: string;
 	shell: string;
 	args: string[];
+	integrationNonce: string;
 	status: TerminalStatus;
 	createdAt: string;
 	proc: Bun.Subprocess;
@@ -62,6 +63,54 @@ function defaultShell(): { shell: string; args: string[] } {
 	return { shell: "sh", args: [] };
 }
 
+function shellName(shell: string): string {
+	return shell.split(/[\\/]/).pop()?.toLowerCase() ?? shell.toLowerCase();
+}
+
+function hasCommandArgs(args: string[]): boolean {
+	return args.some((arg) => /^-?(c|command|encodedcommand)$/i.test(arg));
+}
+
+function powerShellIntegrationCommand(): string {
+	return [
+		"$esc=[char]27",
+		"$bel=[char]7",
+		"$global:__dafmanCommandStarted=$false",
+		"function global:Prompt {",
+		"  if ($global:__dafmanCommandStarted) {",
+		"    $code = if ($global:LASTEXITCODE -is [int]) { $global:LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
+		"    [Console]::Write(\"$esc]633;D;$code$bel\")",
+		"    $global:__dafmanCommandStarted=$false",
+		"  }",
+		"  $cwd=[Uri]::EscapeDataString((Get-Location).ProviderPath)",
+		"  [Console]::Write(\"$esc]633;P;Cwd=$cwd$bel$esc]633;A$bel\")",
+		"  \"PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) \"",
+		"}",
+		"$global:__dafmanOriginalReadLine=(Get-Command PSConsoleHostReadLine -ErrorAction SilentlyContinue).ScriptBlock",
+		"if ($global:__dafmanOriginalReadLine) {",
+		"  function global:PSConsoleHostReadLine {",
+		"    $line=& $global:__dafmanOriginalReadLine @args",
+		"    $encoded=[Uri]::EscapeDataString($line)",
+		"    [Console]::Write(\"$esc]633;E;$encoded;$env:DAFMAN_NONCE$bel$esc]633;C$bel\")",
+		"    $global:__dafmanCommandStarted=$true",
+		"    return $line",
+		"  }",
+		"}",
+	].join("; ");
+}
+
+function withShellIntegration(shell: string, args: string[]): string[] {
+	const name = shellName(shell);
+	if ((name === "pwsh.exe" || name === "pwsh" || name === "powershell.exe" || name === "powershell") && !hasCommandArgs(args)) {
+		return [...args, "-NoExit", "-Command", powerShellIntegrationCommand()];
+	}
+	if ((name === "cmd.exe" || name === "cmd") && !args.some((arg) => /^\/c$/i.test(arg))) {
+		const prompt = "$E]7;file:///$P$E\\$E]133;A$E\\$P$G";
+		return [...args, "/k", `prompt ${prompt}`];
+	}
+	return args;
+}
+
 function toSummary(entry: TerminalEntry): TerminalSummary {
 	return {
 		id: entry.id,
@@ -74,6 +123,7 @@ function toSummary(entry: TerminalEntry): TerminalSummary {
 		cols: entry.cols,
 		rows: entry.rows,
 		...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
+		integrationNonce: entry.integrationNonce,
 		...(entry.exitCode !== undefined ? { exitCode: entry.exitCode } : {}),
 		...(entry.signal !== undefined ? { signal: entry.signal } : {}),
 	};
@@ -89,11 +139,12 @@ export class TerminalRegistry {
 		const cwd = params.cwd?.trim() || process.cwd();
 		const profile = defaultShell();
 		const shell = params.shell?.trim() || profile.shell;
-		const args = params.args ?? profile.args;
+		const args = withShellIntegration(shell, params.args ?? profile.args);
 		const title = params.title?.trim() || shell.split(/[\\/]/).pop() || "Terminal";
 		const cols = Math.max(10, Math.floor(params.cols ?? 80));
 		const rows = Math.max(3, Math.floor(params.rows ?? 24));
 		const createdAt = new Date().toISOString();
+		const integrationNonce = randomUUID();
 		const options = {
 			id,
 			title,
@@ -103,6 +154,7 @@ export class TerminalRegistry {
 			cols,
 			rows,
 			createdAt,
+			integrationNonce,
 			sessionId: params.sessionId,
 		};
 		let entry: TerminalEntry;
@@ -131,12 +183,18 @@ export class TerminalRegistry {
 		cols: number;
 		rows: number;
 		createdAt: string;
+		integrationNonce: string;
 		sessionId?: string;
 	}): TerminalEntry {
-		const { id, title, cwd, shell, args, cols, rows, createdAt } = options;
+		const { id, title, cwd, shell, args, cols, rows, createdAt, integrationNonce } = options;
 		const proc = Bun.spawn([shell, ...args], {
 			cwd,
-			env: { ...process.env, TERM: "xterm-256color" },
+			env: {
+				...process.env,
+				TERM: "xterm-256color",
+				DAFMAN_SHELL_INTEGRATION: "1",
+				DAFMAN_NONCE: integrationNonce,
+			},
 			terminal: {
 				cols,
 				rows,
@@ -175,6 +233,7 @@ export class TerminalRegistry {
 			...(options.sessionId ? { sessionId: options.sessionId } : {}),
 			shell,
 			args,
+			integrationNonce,
 			status: "running",
 			createdAt,
 			proc,
