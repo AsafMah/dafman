@@ -25,9 +25,9 @@ from `problems.md`, and a global Jobs panel with current-session
 Autopilot launcher. The local check gate also now includes a Bun-side
 entry reachability dry-run so dead `src-bun/index.ts` imports fail in
 `bun run check`. Terminal integration is in progress with Bun native PTY
-(`Bun.spawn(..., { terminal })`) plus pipe fallback for runtimes without
-native PTY handles, xterm.js dockview panels, composer shell mode, and
-responsive composer/sidebar polish from the terminal regression sweep.
+(`Bun.spawn(..., { terminal })`) on Electrobun's bundled Bun 1.3.14
+runtime, xterm.js dockview panels, composer shell mode, and responsive
+composer/sidebar polish from the terminal regression sweep.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.
@@ -59,8 +59,9 @@ Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` 
    Replaces the topbar-only chrome with a left activity bar + bottom
    status bar; affects every screen so it's a larger structural lift.
 4. **Terminal integration follow-up** (audit P24, remaining). First
-   pass adds Bun native PTY registry/RPC with pipe fallback, xterm
-   dockview panels, command palette actions, and composer shell mode.
+   pass adds Bun native PTY registry/RPC, xterm dockview panels,
+   command palette actions, and composer shell mode. Electrobun is pinned
+   to bundle Bun 1.3.14 because 1.3.13 rejects Windows `terminal`.
    Remaining follow-ups: profile CRUD, richer command-result
    cards/actions, agent terminal tool, inline terminal blocks, shortcut
    design, and optional Ghostty Web renderer spike.

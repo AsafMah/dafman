@@ -46,9 +46,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   added compact states for FilePicker, Jobs, Log Viewer, tool rows,
   message actions, pending-request actions, and Library instruction
   headers.
-- **Terminal Windows fallback.** If the packaged Bun runtime does not
-  expose a native PTY handle, terminals fall back to stdin/stdout pipes
-  instead of failing with “terminal not supported on this platform.”
+- **Terminal Windows native PTY.** Electrobun now bundles Bun 1.3.14 so
+  Windows ConPTY works in the packaged runtime; the stdin/stdout pipe
+  workaround was removed.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

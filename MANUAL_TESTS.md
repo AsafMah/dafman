@@ -21,8 +21,11 @@
    - **Steps:** run Command Palette → New Terminal, type a command, resize
      the dockview pane, then kill the terminal.
    - **Expected:** terminal opens in a dockview tab, command output
-     renders, resize keeps fitting, and Kill exits the terminal cleanly.
-   - **Why not automated:** uses live OS shell + WebView terminal focus.
+     renders via native PTY/ConPTY (not piped stdio), resize keeps
+     fitting, and Kill exits the terminal cleanly.
+   - **Automated coverage:** `src-bun/__tests__/terminalRegistry.test.ts`
+     covers native PTY create/write/resize/kill; local build validation
+     also runs the bundled Windows Bun 1.3.14 PTY smoke.
 
 2. ⏳ **Session workspace terminal.**
    - **Steps:** open a session with a workspace, run Command Palette →

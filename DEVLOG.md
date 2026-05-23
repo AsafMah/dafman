@@ -18,18 +18,19 @@ Terminal follow-up fixed the user-reported rough edges before the feature
 gets more terminal planning: the composer footer now has the requested
 left/center/right ordering, markdown controls dispatch real Lexical editor
 commands, visible slash commands run local UI actions instead of being sent
-as chat prompts, and the terminal registry falls back to stdin/stdout pipes
-when a packaged runtime cannot expose Bun's native PTY handle.
+as chat prompts, and the packaged Windows runtime now uses a Bun version
+whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
 
 ### Receipts
 
 - `/mcp`, `/skill(s)`, `/agent`, `/model`, and `/autopilot` are local
   `SESSION_COMMANDS`; the palette and slash menu call `run()` directly and
   no longer have a passthrough path.
-- `TerminalRegistry` still prefers `Bun.spawn(..., { terminal })`, but if
-  the runtime reports an unsupported/missing terminal handle it respawns the
-  same shell with piped stdio so Windows packaged builds do not fail with a
-  dead "not supported" terminal pane.
+- Root cause for "terminal not supported" on Windows: Electrobun 1.18.1
+  bundles Bun 1.3.13 by default. That binary exposes `Bun.Terminal` but
+  throws `terminal option is not supported on this platform`; local Bun
+  1.3.14 works. `electrobun.config.ts` now sets `build.bunVersion =
+  "1.3.14"` and `TerminalRegistry` no longer falls back to pipes.
 - `SessionHeaderControls` supports composer-left/composer-right areas, and
   PrimeVue model/reasoning menus append to `body` to avoid pane clipping.
 - Follow-up after visual review: compact composer now uses icon-only mode
