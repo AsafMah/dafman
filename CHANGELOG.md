@@ -25,6 +25,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   collapsible markdown toolbar, shows a labelled Allow all toggle, and
   exposes SDK passthrough slash commands (`/mcp`, `/skill(s)`, `/agent`,
   `/model`, `/autopilot`) in the slash menu.
+- **Bun entry reachability gate.** `bun run check` now runs
+  `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
+  dead Bun-side imports fail before a developer hits `electrobun dev`.
 
 ### Fixed (2026-05-22 — UI problem sweep)
 

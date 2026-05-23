@@ -20,7 +20,8 @@
     "e2e": "vite build && playwright test --config=e2e/full/playwright.config.ts",
     "e2e:run": "playwright test --config=e2e/full/playwright.config.ts",
     "lint": "vue-tsc --noEmit",
-    "check": "bun run lint && bun run test && bun run build && bun run smoke:run"
+    "lint:bun": "bun run tools/check-bun-entry.ts",
+    "check": "bun run lint && bun run lint:bun && bun run test && bun run build && bun run smoke:run"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

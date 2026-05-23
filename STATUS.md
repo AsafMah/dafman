@@ -22,7 +22,9 @@ three-way mode toggle now has native plan/autopilot lifecycle handling,
 `/plan <prompt>` bootstrap behavior, exit-plan approval UI, autopilot
 unavailable-user semantics, polished composer/details/library surfaces
 from `problems.md`, and a global Jobs panel with current-session
-Autopilot launcher.
+Autopilot launcher. The local check gate also now includes a Bun-side
+entry reachability dry-run so dead `src-bun/index.ts` imports fail in
+`bun run check`.
 
 ---
 
