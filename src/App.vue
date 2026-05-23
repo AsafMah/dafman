@@ -443,6 +443,15 @@ const activityItems = computed<ActivityItem[]>(() => {
     },
     {
       kind: "panel",
+      id: TERMINALS_PANEL_ID,
+      component: "terminalsPanel",
+      icon: "pi-chevron-right",
+      title: "Terminals — running shells",
+      initialSize: 360,
+      minimumSize: 320,
+    },
+    {
+      kind: "panel",
       id: LIBRARY_PANEL_ID,
       component: "library",
       icon: "pi-book",
@@ -459,15 +468,6 @@ const activityItems = computed<ActivityItem[]>(() => {
       initialSize: 380,
       minimumSize: 380,
       badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
-    },
-    {
-      kind: "panel",
-      id: TERMINALS_PANEL_ID,
-      component: "terminalsPanel",
-      icon: "pi-window-maximize",
-      title: "Terminals — running shells",
-      initialSize: 360,
-      minimumSize: 320,
     },
   ];
   if (isDev) {
