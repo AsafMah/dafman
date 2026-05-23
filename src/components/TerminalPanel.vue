@@ -47,7 +47,9 @@ let commandCaptureActive = false;
 let commandCaptureBuffer = "";
 let replayingBuffer = false;
 
-const terminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
+const propTerminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
+const overrideTerminalId = ref<string | null>(null);
+const terminalId = computed(() => overrideTerminalId.value ?? propTerminalId.value);
 const rendererRole = computed<"compact" | "full">(() => compact.value ? "compact" : "full");
 const isOwnedByOther = computed(() => {
   const owner = terminalStore.activeRendererOwner[terminalId.value];
@@ -226,6 +228,23 @@ function focusSession(): void {
 onMounted(async () => {
   await nextTick();
   if (!host.value) return;
+
+  // Recovery: if this terminal doesn't exist on the backend (e.g. after restart),
+  // find the session that owned it and create a new terminal
+  if (terminalId.value && !terminalStore.terminals.find((t) => t.id === terminalId.value)) {
+    const sessionId = Object.entries(terminalStore.sessionTerminalIds)
+      .find(([, tid]) => tid === propTerminalId.value)?.[0];
+    if (sessionId) {
+      try {
+        const newTerminal = await terminalStore.getOrCreateSessionTerminal(sessionId);
+        overrideTerminalId.value = newTerminal.id;
+        await nextTick();
+      } catch {
+        /* recovery failed, proceed with stale id */
+      }
+    }
+  }
+
   if (isOwnedByOther.value) return;
   terminalStore.claimRenderer(terminalId.value, rendererRole.value);
   term = new Terminal({
