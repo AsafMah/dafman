@@ -76,11 +76,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   focuses the search box, performs incremental lookup, exposes match/no-match
   status, and clears highlights when closed.
 - **`!!` command result attachments.** Typing `!!` in an empty composer enters
-  a distinct command mode. Enter runs a bounded session-cwd subprocess (1024 KiB
-  output cap, 60 second timeout, one running command per session), streams a
-  command-result card into chat, persists capped results, audits command
-  metadata without stdout/stderr bytes, and lets the user manually add the
-  result back to the composer as a first-class `commandResult` attachment.
+  a distinct command mode backed by the real session terminal, so shell
+  autocomplete and shortcuts still work. The composer also has a visible
+  Session Terminal toolbar button, command mode can jump to the full terminal
+  tab and back to the editor, completed command-result records auto-insert a
+  first-class `commandResult` pill, and command-result rendering/copying strips
+  ANSI escape codes.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

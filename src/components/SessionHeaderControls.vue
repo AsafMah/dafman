@@ -24,6 +24,7 @@ import { useModelsStore } from "../stores/modelsStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useLayoutStore, basename } from "../stores/layoutStore";
+import { useTerminalStore } from "../stores/terminalStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import {
@@ -37,6 +38,7 @@ const props = withDefaults(
 
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
+const terminalStore = useTerminalStore();
 const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
 const settings = storeToRefs(useSettingsStore()).settings;
@@ -234,6 +236,18 @@ const agentChipLabel = computed(() => record.value?.currentAgent?.displayName ??
 function onAgentChipClick() {
   if (!detailsOpen.value) layoutStore.toggleSessionDetailsPanel();
 }
+
+async function openSessionTerminal() {
+  try {
+    const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
+    layoutStore.addTerminalPanel(terminal.id, terminal.title);
+  } catch (err) {
+    useToastStore().error(
+      "Couldn't open terminal",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
 </script>
 
 <template>
@@ -263,6 +277,17 @@ function onAgentChipClick() {
       @click="onWorkspaceClick"
       @keydown.enter.prevent="onWorkspaceClick"
       @keydown.space.prevent="onWorkspaceClick"
+    />
+    <Button
+      v-if="props.area === 'all' || props.area === 'composer-left'"
+      icon="pi pi-window-maximize"
+      label="Terminal"
+      text
+      size="small"
+      class="session-terminal-button"
+      aria-label="Open session terminal"
+      title="Open session terminal"
+      @click="openSessionTerminal"
     />
     <Chip
       v-if="agentChipLabel && props.area === 'all'"

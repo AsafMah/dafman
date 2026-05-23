@@ -218,14 +218,22 @@
 }
 
 .lex-command-mode {
+  display: grid;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 8rem;
+}
+
+.lex-command-mode-header {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  flex: 1 1 auto;
+  gap: 0.4rem;
   min-width: 0;
 }
 
-.lex-command-prefix {
+.lex-command-prefix,
+.lex-command-mode-btn {
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
@@ -234,15 +242,21 @@
   font-weight: 700;
 }
 
-.lex-command-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--p-text-color);
+.lex-command-mode-btn {
+  border: 1px solid color-mix(in srgb, var(--p-orange-500) 35%, transparent);
   font: inherit;
-  font-family: var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lex-command-mode-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lex-command-loading {
+  margin: 0;
+  color: var(--p-text-muted-color);
 }
 
 .lex-composer-editor {

@@ -72,15 +72,16 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   requiring `allowProposedApi`; TerminalPanel now enables it, moves ligatures
   activation after `open()`, focuses the query field, updates incrementally,
   reports match/no-match state, and clears decorations when closed.
-- `!!` command result first slice: the composer now has a guarded direct-key
-  command mode (empty composer `!!`, Enter runs, Esc cancels). It does not scrape
-  PTYs; bun runs a session-cwd subprocess through `CommandResultRegistry`, caps
-  captured stdout+stderr at 1024 KiB, times out at 60 seconds, allows one running
-  command per session, persists capped records, and emits streaming
-  `commandResultEvent`s. Audit records command/cwd/status/duration/exit metadata
-  only. Chat renders command-result cards with copy actions and an explicit
-  "Add to composer" action that inserts a distinct `commandResult` attachment
-  pill; deleting the pill means the result is not sent.
+- `!!` command result first slice: backend support exists through
+  `CommandResultRegistry` (1024 KiB captured stdout+stderr cap, 60 second
+  timeout, one running command per session, persisted capped records, streaming
+  `commandResultEvent`s, audit metadata without stdout/stderr bytes). Follow-up
+  UX correction changed the composer command mode from a plain input into the
+  real session terminal so users keep shell autocomplete and shortcuts. The
+  composer now also has a visible Session Terminal button, command mode has
+  "Open full terminal" and "Back to editor" controls, completed command-result
+  records auto-add a `commandResult` attachment pill, and command-result
+  rendering/copying strips ANSI escape codes before display/serialization.
 
 ---
 

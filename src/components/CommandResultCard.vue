@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from "primevue/button";
 import type { CommandResultRecord } from "../ipc/types";
+import { stripAnsi } from "../lib/ansi";
 
 defineProps<{ record: CommandResultRecord }>();
 const emit = defineEmits<{
@@ -9,6 +10,8 @@ const emit = defineEmits<{
 }>();
 
 function markdownFor(record: CommandResultRecord): string {
+  const stdout = stripAnsi(record.stdout);
+  const stderr = stripAnsi(record.stderr);
   return [
     "```shell",
     record.command,
@@ -20,18 +23,22 @@ function markdownFor(record: CommandResultRecord): string {
     "",
     "stdout:",
     "```text",
-    record.stdout || "(empty)",
+    stdout || "(empty)",
     "```",
     "",
     "stderr:",
     "```text",
-    record.stderr || "(empty)",
+    stderr || "(empty)",
     "```",
   ].filter(Boolean).join("\n");
 }
 
 async function copyText(text: string): Promise<void> {
   if (text) await navigator.clipboard.writeText(text);
+}
+
+function clean(value: string): string {
+  return stripAnsi(value);
 }
 </script>
 
@@ -62,15 +69,15 @@ async function copyText(text: string): Promise<void> {
         <dd>truncated</dd>
       </div>
     </dl>
-    <pre v-if="record.stdout" class="command-output stdout">{{ record.stdout }}</pre>
-    <pre v-if="record.stderr" class="command-output stderr">{{ record.stderr }}</pre>
+    <pre v-if="record.stdout" class="command-output stdout">{{ clean(record.stdout) }}</pre>
+    <pre v-if="record.stderr" class="command-output stderr">{{ clean(record.stderr) }}</pre>
     <p v-if="record.status === 'running' && !record.stdout && !record.stderr" class="command-running">
       <i class="pi pi-spin pi-spinner" aria-hidden="true" />
       Running…
     </p>
     <footer class="command-result-actions">
       <Button label="Copy command" icon="pi pi-copy" size="small" text @click="copyText(record.command)" />
-      <Button label="Copy output" icon="pi pi-align-left" size="small" text @click="copyText(`${record.stdout}${record.stderr}`)" />
+      <Button label="Copy output" icon="pi pi-align-left" size="small" text @click="copyText(clean(`${record.stdout}${record.stderr}`))" />
       <Button label="Copy markdown" icon="pi pi-code" size="small" text @click="copyText(markdownFor(record))" />
       <Button label="Add to composer" icon="pi pi-plus" size="small" text @click="emit('add', record)" />
       <Button

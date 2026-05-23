@@ -8,6 +8,7 @@
 
 import { invokeCommand } from "../ipc/invoke";
 import type { SendMessageAttachment } from "../ipc/types";
+import { stripAnsi } from "./ansi";
 
 export async function openAttachment(a: SendMessageAttachment): Promise<void> {
   if (a.type === "commandResult") {
@@ -22,12 +23,12 @@ export async function openAttachment(a: SendMessageAttachment): Promise<void> {
       "",
       "## stdout",
       "```text",
-      a.result.stdout || "(empty)",
+      stripAnsi(a.result.stdout) || "(empty)",
       "```",
       "",
       "## stderr",
       "```text",
-      a.result.stderr || "(empty)",
+      stripAnsi(a.result.stderr) || "(empty)",
       "```",
     ].join("\n");
     const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));

@@ -286,22 +286,18 @@ test("terminal toolbar supports find without buffer or paste buttons", async ({ 
   });
 });
 
-test("composer !! command mode streams a command result and can attach it", async ({ page }) => {
+test("composer !! command mode opens the session terminal", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
+  await expect(page.getByRole("button", { name: "Open session terminal" }).first()).toBeVisible();
+
   await composer.click();
   await page.keyboard.type("!!");
-  const commandInput = page.getByRole("textbox", { name: "Session command" });
-  await expect(commandInput).toBeVisible();
-  await commandInput.fill("echo COMMAND_ATTACHMENT_OK");
-  await page.keyboard.press("Enter");
-
-  const card = page.locator(".command-result-card").first();
-  await expect(card).toBeVisible({ timeout: 10_000 });
-  await expect(card).toContainText("COMMAND_ATTACHMENT_OK", { timeout: 10_000 });
-  await expect(card).toContainText("completed", { timeout: 10_000 });
-  await card.getByRole("button", { name: "Add to composer" }).click();
-  await expect(page.locator('.composer-attachment-pill[data-attachment-kind="command-result"]').first()).toBeVisible();
+  const terminal = page.locator(".lex-command-mode .terminal-panel").first();
+  await expect(terminal).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Open full terminal" })).toBeVisible();
+  await page.getByRole("button", { name: "Back to editor" }).click();
+  await expect(terminal).toHaveCount(0);
 });

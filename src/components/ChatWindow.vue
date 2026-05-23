@@ -31,6 +31,7 @@ import { useSessionsListStore } from "../stores/sessionsListStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useCommandResultsStore } from "../stores/commandResultsStore";
+import { useTerminalStore } from "../stores/terminalStore";
 import { useToastStore } from "../stores/toastStore";
 import ReasoningBlock from "./ReasoningBlock.vue";
 import type { ComposerSubmitPayload } from "../lexical/plugins";
@@ -71,6 +72,7 @@ const sessionsListStore = useSessionsListStore();
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const commandResultsStore = useCommandResultsStore();
+const terminalStore = useTerminalStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
 
@@ -82,6 +84,8 @@ const composerRef = ref<{
   focus: () => void;
   addAttachment?: (attachment: SendMessageAttachment) => void;
 } | null>(null);
+const commandTerminalId = ref<string>("");
+const autoAttachedCommandIds = new Set<string>();
 
 /// External "focus my composer" requests arrive as a window event
 /// from the Sessions sidebar (clicking an already-open session row).
@@ -94,9 +98,15 @@ function onExternalFocusRequest(e: Event) {
 
 onMounted(() => {
   window.addEventListener("dafman:focus-composer", onExternalFocusRequest);
-  void commandResultsStore.refresh(props.sessionId).catch(() => {
-    /* non-critical persisted command history */
-  });
+  void commandResultsStore.refresh(props.sessionId)
+    .then(() => {
+      for (const record of commandResultsStore.recordsBySession[props.sessionId] ?? []) {
+        autoAttachedCommandIds.add(record.id);
+      }
+    })
+    .catch(() => {
+      /* non-critical persisted command history */
+    });
 });
 
 onBeforeUnmount(() => {
@@ -172,6 +182,7 @@ const reasoningVisibility = computed<ReasoningVisibility>(() =>
 );
 
 const accentColor = computed(() => props.accent);
+const commandResults = computed(() => commandResultsStore.recordsBySession[props.sessionId] ?? []);
 
 async function scrollToBottom() {
   await nextTick();
@@ -326,14 +337,28 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
 
-async function onCommandSubmit(command: string): Promise<void> {
+async function ensureCommandTerminal(): Promise<string | null> {
+  if (commandTerminalId.value) return commandTerminalId.value;
   try {
-    await commandResultsStore.start(props.sessionId, command);
-    await scrollToBottom();
+    const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
+    commandTerminalId.value = terminal.id;
+    return terminal.id;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    toasts.error("Command failed to start", message);
+    toasts.error("Failed to open session terminal", message);
+    return null;
   }
+}
+
+async function onRequestCommandTerminal(): Promise<void> {
+  await ensureCommandTerminal();
+}
+
+async function openFullSessionTerminal(): Promise<void> {
+  const terminalId = await ensureCommandTerminal();
+  if (!terminalId) return;
+  const terminal = terminalStore.terminals.find((t) => t.id === terminalId);
+  layoutStore.addTerminalPanel(terminalId, terminal?.title ?? "Session Shell");
 }
 
 function addCommandResultAttachment(record: CommandResultRecord): void {
@@ -347,6 +372,14 @@ function addCommandResultAttachment(record: CommandResultRecord): void {
 async function cancelCommandResult(record: CommandResultRecord): Promise<void> {
   await commandResultsStore.cancel(props.sessionId, record.id);
 }
+
+watch(commandResults, (records) => {
+  for (const record of records) {
+    if (record.status === "running" || autoAttachedCommandIds.has(record.id)) continue;
+    autoAttachedCommandIds.add(record.id);
+    addCommandResultAttachment(record);
+  }
+});
 
 /// Inline edit mode for user messages: when set, the matching user
 /// bubble is replaced by a MessageEditor in place. Reset on save,
@@ -531,8 +564,6 @@ const commandsRun = computed(() => {
   }
   return total;
 });
-
-const commandResults = computed(() => commandResultsStore.recordsBySession[props.sessionId] ?? []);
 
 const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
 /// Type-aware styling for the pending-request banner. Pulls the
@@ -795,8 +826,10 @@ const pendingStyle = computed(() => {
         ref="composerRef"
         :default-mode="props.defaultSendMode"
         :session-id="props.sendHandler ? undefined : props.sessionId"
+        :command-terminal-id="commandTerminalId"
         @submit="sendMessage"
-        @command-submit="onCommandSubmit"
+        @request-command-terminal="onRequestCommandTerminal"
+        @open-full-terminal="openFullSessionTerminal"
         @update:default-mode="onUpdateDefaultMode"
       >
         <template #session-left-controls>

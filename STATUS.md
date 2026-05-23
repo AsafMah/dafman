@@ -40,9 +40,12 @@ Buffer/Paste header buttons are gone, selected-text copy has keyboard
 shortcuts, and terminal Find enables xterm search decorations, focuses the
 search field, and reports match state.
 The first `!!` composer command-mode slice now runs bounded session-cwd
-subprocesses, streams command-result cards into chat, persists capped results,
-audits command metadata without output bytes, and lets users explicitly attach
-results back to the composer as command-result pills.
+subprocesses for persisted command-result records, audits command metadata
+without output bytes, and renders/copies command output without ANSI escape
+garbage. The visible composer flow for `!!` now opens the real session terminal
+inside the composer so autocomplete/shortcuts work, with controls to jump to the
+full terminal tab and back to the editor. Completed command-result records
+auto-add a command-result pill by default.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.

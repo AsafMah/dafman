@@ -87,6 +87,8 @@ const HISTORY_REPLAY_BATCH = 50;
 const SHUTDOWN_TIMEOUT_MS = 2000;
 
 function commandResultMarkdown(result: CommandResultRecord): string {
+	const stripAnsi = (value: string): string =>
+		value.replace(/[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g, "");
 	const status = result.status === "completed" && result.exitCode === 0
 		? "success"
 		: result.status;
@@ -103,12 +105,12 @@ function commandResultMarkdown(result: CommandResultRecord): string {
 		"",
 		"## stdout",
 		"```text",
-		result.stdout || "(empty)",
+		stripAnsi(result.stdout) || "(empty)",
 		"```",
 		"",
 		"## stderr",
 		"```text",
-		result.stderr || "(empty)",
+		stripAnsi(result.stderr) || "(empty)",
 		"```",
 		"",
 	];

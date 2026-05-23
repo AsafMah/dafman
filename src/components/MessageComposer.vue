@@ -71,6 +71,7 @@ import SlashCommandPlugin from "./SlashCommandPlugin.vue";
 import MentionPlugin from "./MentionPlugin.vue";
 import FilePicker from "./FilePicker.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
+import TerminalPanel from "./TerminalPanel.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -84,6 +85,7 @@ const props = withDefaults(
     /// this session. Omit on synthetic / playground composers that
     /// shouldn't fire real session commands.
     sessionId?: string;
+    commandTerminalId?: string;
   }>(),
   {
     disabled: false,
@@ -91,6 +93,7 @@ const props = withDefaults(
     enableMarkdownShortcuts: true,
     defaultMode: "steer",
     sessionId: undefined,
+    commandTerminalId: undefined,
   },
 );
 
@@ -108,10 +111,8 @@ const diagEnabled =
 /// ref array drifting from the editor state.
 const toasts = useToastStore();
 const toolbarRef = ref<HTMLElement | null>(null);
-const commandInputRef = ref<HTMLInputElement | null>(null);
 const toolbarWidth = ref(1000);
 const commandMode = ref(false);
-const commandDraft = ref("");
 let bangArmed = false;
 const formatActions = computed(() => editorFormatActions);
 const visibleFormatCount = computed(() => {
@@ -258,7 +259,8 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
 /// session-store action.
 const emit = defineEmits<{
   (e: "submit", payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }): void;
-  (e: "commandSubmit", command: string): void;
+  (e: "requestCommandTerminal"): void;
+  (e: "openFullTerminal"): void;
   (e: "update:defaultMode", mode: DefaultSendMode): void;
 }>();
 
@@ -460,27 +462,15 @@ defineExpose({ focus: focusComposer, setText, appendText, addAttachment });
 
 async function enterCommandMode(): Promise<void> {
   clearEditor();
-  commandDraft.value = "";
   commandMode.value = true;
+  emit("requestCommandTerminal");
   await nextTick();
-  commandInputRef.value?.focus();
 }
 
 function exitCommandMode(): void {
   commandMode.value = false;
-  commandDraft.value = "";
   bangArmed = false;
   setTimeout(() => focusComposer(), 0);
-}
-
-function submitCommandMode(): void {
-  const command = commandDraft.value.trim();
-  if (!command) {
-    exitCommandMode();
-    return;
-  }
-  emit("commandSubmit", command);
-  exitCommandMode();
 }
 
 function onComposerKeydown(event: KeyboardEvent): void {
@@ -677,17 +667,25 @@ const SubmitButton = defineComponent({
         />
           <div class="lex-composer-shell" :class="{ 'is-command-mode': commandMode }" @paste="onPaste" @keydown.capture="onComposerKeydown">
           <div v-if="commandMode" class="lex-command-mode">
-            <span class="lex-command-prefix">!!</span>
-            <input
-              ref="commandInputRef"
-              v-model="commandDraft"
-              class="lex-command-input"
-              type="text"
-              placeholder="Run command in session workspace — Enter to run, Esc to cancel"
-              aria-label="Session command"
-              @keydown.enter.prevent="submitCommandMode"
-              @keydown.esc.prevent="exitCommandMode"
+            <div class="lex-command-mode-header">
+              <span class="lex-command-prefix">!! Session terminal</span>
+              <button
+                type="button"
+                class="lex-command-mode-btn"
+                :disabled="!props.commandTerminalId"
+                @click="emit('openFullTerminal')"
+              >
+                Open full terminal
+              </button>
+              <button type="button" class="lex-command-mode-btn" @click="exitCommandMode">
+                Back to editor
+              </button>
+            </div>
+            <TerminalPanel
+              v-if="props.commandTerminalId"
+              :params="{ terminalId: props.commandTerminalId, compact: true }"
             />
+            <p v-else class="lex-command-loading">Starting session terminal…</p>
           </div>
           <div v-show="!commandMode" class="lex-composer-editor">
             <template v-if="richText">
