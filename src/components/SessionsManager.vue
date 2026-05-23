@@ -315,6 +315,11 @@ async function onResume(session: SessionMetadataSummary) {
       layoutStore.addPanel(session.sessionId);
     }
     window.dispatchEvent(
+      new CustomEvent("dafman:scroll-to-bottom", {
+        detail: { sessionId: session.sessionId },
+      }),
+    );
+    window.dispatchEvent(
       new CustomEvent("dafman:focus-composer", {
         detail: { sessionId: session.sessionId },
       }),
