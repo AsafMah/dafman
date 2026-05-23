@@ -20,13 +20,15 @@
 1. ⏳ **Standalone terminal pane.**
    - **Steps:** open ActivityBar → Terminals, create a terminal from the
       panel or run Command Palette → New Terminal, type a command, resize the
-      dockview pane, try Find, Copy, Buffer, Paste, and Kill controls.
+      dockview pane, try Find, Copy, and Kill controls, and verify native
+      paste still works with `Ctrl+V`.
    - **Expected:** terminal opens in a dockview tab, command output
       renders via native PTY/ConPTY (not piped stdio), resize keeps
       fitting, URLs are clickable, the top action buttons have visible
       labels and accessible names, search focuses the query box and reports
-      matches/no matches, clipboard actions work, and Kill exits the
-      terminal cleanly.
+      matches/no matches, Buffer/Paste header buttons are absent, `Ctrl+Shift+C`
+      and `Alt+Insert` copy selected terminal text, and Kill exits the terminal
+      cleanly.
    - **Automated coverage:** `src-bun/__tests__/terminalRegistry.test.ts`
      covers native PTY create/write/resize/kill; local build validation
      also runs the bundled Windows Bun 1.3.14 PTY smoke.

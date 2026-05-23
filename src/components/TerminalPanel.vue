@@ -36,11 +36,11 @@ const progress = ref<IProgressState>({ state: 0, value: 0 });
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
 let search: SearchAddon | null = null;
-let serialize: SerializeAddon | null = null;
 let webFonts: WebFontsAddon | null = null;
 let webgl: WebglAddon | null = null;
 const addonDisposables: Array<{ dispose(): void }> = [];
 let resizeObserver: ResizeObserver | null = null;
+let pendingSearchFrame: number | null = null;
 
 const terminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
 const summary = computed(() =>
@@ -123,34 +123,57 @@ function registerShellIntegrationHandlers(): void {
   );
 }
 
-function findNext(): void {
-  if (!searchQuery.value.trim() || !search) {
+function searchDecorations() {
+  return {
+    matchBackground: "#1f2937",
+    activeMatchBackground: "#0ea5e9",
+    matchOverviewRuler: "#64748b",
+    activeMatchColorOverviewRuler: "#38bdf8",
+  };
+}
+
+function runSearch(direction: "next" | "previous", incremental = false, queryOverride?: string): void {
+  const query = (queryOverride ?? searchQuery.value).trim();
+  if (!query) {
     search?.clearDecorations();
     searchResultLabel.value = "";
     return;
   }
-  const found = search.findNext(searchQuery.value, {
-    decorations: {
-      matchOverviewRuler: "#64748b",
-      activeMatchColorOverviewRuler: "#38bdf8",
-    },
-  });
+  if (!search) {
+    searchResultLabel.value = "Search unavailable";
+    return;
+  }
+  const options = {
+    incremental,
+    decorations: searchDecorations(),
+  };
+  const found = direction === "next"
+    ? search.findNext(query, options)
+    : search.findPrevious(query, options);
   if (!found) searchResultLabel.value = "No matches";
 }
 
-function findPrevious(): void {
-  if (!searchQuery.value.trim() || !search) {
-    search?.clearDecorations();
-    searchResultLabel.value = "";
-    return;
-  }
-  const found = search.findPrevious(searchQuery.value, {
-    decorations: {
-      matchOverviewRuler: "#64748b",
-      activeMatchColorOverviewRuler: "#38bdf8",
-    },
+function scheduleSearch(incremental = true): void {
+  if (!searchOpen.value || !searchQuery.value.trim()) return;
+  if (pendingSearchFrame !== null) cancelAnimationFrame(pendingSearchFrame);
+  pendingSearchFrame = requestAnimationFrame(() => {
+    pendingSearchFrame = null;
+    runSearch("next", incremental);
   });
-  if (!found) searchResultLabel.value = "No matches";
+}
+
+function findNext(): void {
+  runSearch("next");
+}
+
+function findPrevious(): void {
+  runSearch("previous");
+}
+
+function onSearchInput(event: Event): void {
+  const next = (event.target as HTMLInputElement).value;
+  searchQuery.value = next;
+  runSearch("next", true, next);
 }
 
 async function copySelection(): Promise<void> {
@@ -158,21 +181,25 @@ async function copySelection(): Promise<void> {
   if (selected) await navigator.clipboard.writeText(selected);
 }
 
-async function pasteClipboard(): Promise<void> {
-  if (!terminalId.value) return;
-  const text = await navigator.clipboard.readText();
-  if (text) void terminalStore.writeTerminal(terminalId.value, text);
-}
-
-async function copyBuffer(): Promise<void> {
-  const text = serialize?.serialize({ scrollback: 10_000 });
-  if (text) await navigator.clipboard.writeText(text);
+function registerCopyShortcuts(): void {
+  term?.attachCustomKeyEventHandler((event) => {
+    if (event.type !== "keydown") return true;
+    const isCopyShortcut =
+      (event.ctrlKey && event.shiftKey && event.code === "KeyC") ||
+      (event.altKey && event.code === "Insert");
+    if (!isCopyShortcut) return true;
+    const selected = term?.getSelection();
+    if (!selected) return true;
+    void navigator.clipboard.writeText(selected);
+    return false;
+  });
 }
 
 onMounted(async () => {
   await nextTick();
   if (!host.value) return;
   term = new Terminal({
+    allowProposedApi: true,
     convertEol: true,
     cursorBlink: true,
     scrollback: terminalPrefs.value.scrollback,
@@ -194,8 +221,8 @@ onMounted(async () => {
     });
   }
   if (addons.serialize) {
-    serialize = new SerializeAddon();
-    loadAddon(serialize, () => term?.loadAddon(serialize!));
+    const serializeAddon = new SerializeAddon();
+    loadAddon(serializeAddon, () => term?.loadAddon(serializeAddon));
   }
   if (addons.unicode11) {
     const unicode11 = new Unicode11Addon();
@@ -234,10 +261,6 @@ onMounted(async () => {
       }));
     });
   }
-  if (addons.ligatures) {
-    const ligatures = new LigaturesAddon();
-    loadAddon(ligatures, () => term?.loadAddon(ligatures));
-  }
   if (addons.image) {
     const image = new ImageAddon({ storageLimit: 64 });
     loadAddon(image, () => term?.loadAddon(image));
@@ -253,8 +276,13 @@ onMounted(async () => {
     });
   }
   term.open(host.value);
-  if (buffer.value) term.write(buffer.value);
+  if (addons.ligatures) {
+    const ligatures = new LigaturesAddon();
+    loadAddon(ligatures, () => term?.loadAddon(ligatures));
+  }
+  if (buffer.value) term.write(buffer.value, () => scheduleSearch(false));
   registerShellIntegrationHandlers();
+  registerCopyShortcuts();
   term.onData((data) => {
     if (terminalId.value) void terminalStore.writeTerminal(terminalId.value, data);
   });
@@ -267,9 +295,9 @@ watch(buffer, (next, prev) => {
   if (!term) return;
   if (next.length < prev.length) {
     term.reset();
-    term.write(next);
+    term.write(next, () => scheduleSearch(false));
   } else if (next.length > prev.length) {
-    term.write(next.slice(prev.length));
+    term.write(next.slice(prev.length), () => scheduleSearch(false));
   }
 });
 
@@ -285,9 +313,15 @@ watch(searchOpen, async (open) => {
   searchInput.value?.select();
 });
 
+watch(searchQuery, () => scheduleSearch(true), { flush: "post" });
+
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  if (pendingSearchFrame !== null) {
+    cancelAnimationFrame(pendingSearchFrame);
+    pendingSearchFrame = null;
+  }
   while (addonDisposables.length) {
     try {
       addonDisposables.pop()?.dispose();
@@ -336,24 +370,6 @@ onBeforeUnmount(() => {
           title="Copy selected text"
           @click="copySelection"
         />
-        <Button
-          icon="pi pi-list"
-          label="Buffer"
-          text
-          size="small"
-          aria-label="Copy terminal buffer"
-          title="Copy scrollback buffer"
-          @click="copyBuffer"
-        />
-        <Button
-          icon="pi pi-clipboard"
-          label="Paste"
-          text
-          size="small"
-          aria-label="Paste into terminal"
-          title="Paste into terminal"
-          @click="pasteClipboard"
-        />
       </div>
       <Button
         v-if="summary?.status === 'running'"
@@ -371,11 +387,11 @@ onBeforeUnmount(() => {
     >
       <input
         ref="searchInput"
-        v-model="searchQuery"
+        :value="searchQuery"
         type="search"
         placeholder="Search terminal"
         aria-label="Search terminal"
-        @input="findNext"
+        @input="onSearchInput"
       />
       <span class="terminal-search-status" role="status" aria-live="polite">{{ searchResultLabel }}</span>
       <Button

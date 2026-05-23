@@ -36,7 +36,9 @@ The first shell-integration slice emits/parses OSC 633/133/7/9/1337 markers
 for PowerShell/cmd so terminals can track CWD, active commands, exit codes,
 and nonce-backed trusted command lines without reviving PTY output scraping.
 Terminal header actions now use visible labels instead of icon-only controls,
-and terminal find focuses the search field and reports match state.
+Buffer/Paste header buttons are gone, selected-text copy has keyboard
+shortcuts, and terminal Find enables xterm search decorations, focuses the
+search field, and reports match state.
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.

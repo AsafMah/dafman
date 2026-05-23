@@ -70,9 +70,11 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   output copy/send-to-chat remains deferred until command buffer ranges are
   anchored.
 - **Terminal header accessibility/search.** Terminal toolbar actions now use
-  visible text labels with clearer icons/titles, and Find focuses the search
-  box, performs incremental lookup, exposes match/no-match status, and clears
-  highlights when closed.
+  visible text labels with clearer icons/titles. Buffer/Paste header buttons
+  were removed, selected-text copy works from `Ctrl+Shift+C` and `Alt+Insert`,
+  and Find now enables the xterm proposed API needed by search decorations,
+  focuses the search box, performs incremental lookup, exposes match/no-match
+  status, and clears highlights when closed.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

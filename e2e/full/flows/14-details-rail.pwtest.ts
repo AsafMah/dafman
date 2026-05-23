@@ -257,3 +257,31 @@ test("terminals activity panel opens manager without creating a terminal", async
   await expect(panel.getByRole("heading", { name: "New terminal" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "New" })).toBeVisible();
 });
+
+test("terminal toolbar supports find without buffer or paste buttons", async ({ page }) => {
+  await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
+  const composer = page.locator(".lex-composer-input").first();
+  await composer.waitFor({ state: "visible", timeout: 15_000 });
+
+  await page.getByRole("button", { name: /Terminals — running shells/i }).click();
+  const panel = page.locator(".terminals-panel").first();
+  await expect(panel).toBeVisible();
+  const command = process.platform === "win32" ? "cmd.exe" : "printf";
+  const args = process.platform === "win32" ? "/d /c echo SEARCH_NEEDLE" : "SEARCH_NEEDLE";
+  await panel.getByLabel("Command").fill(command);
+  await panel.getByLabel("Args").fill(args);
+  await panel.getByRole("button", { name: "New" }).click();
+
+  const terminalPanel = page.locator(".terminal-panel").first();
+  await expect(terminalPanel).toBeVisible({ timeout: 10_000 });
+  await expect(terminalPanel.getByRole("button", { name: "Search terminal" })).toBeVisible();
+  await expect(terminalPanel.getByRole("button", { name: "Copy selected terminal text" })).toBeVisible();
+  await expect(terminalPanel.getByRole("button", { name: "Copy terminal buffer" })).toHaveCount(0);
+  await expect(terminalPanel.getByRole("button", { name: "Paste into terminal" })).toHaveCount(0);
+
+  await terminalPanel.getByRole("button", { name: "Search terminal" }).click();
+  await terminalPanel.getByRole("searchbox", { name: "Search terminal" }).fill("SEARCH_NEEDLE");
+  await expect(terminalPanel.locator(".terminal-search-status")).toHaveText(/1 \/ \d+/, {
+    timeout: 10_000,
+  });
+});

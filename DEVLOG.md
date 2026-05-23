@@ -66,9 +66,12 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   command lines behind a disclosure and only supports manual copy of the typed
   command; output capture/send-to-chat stays deferred until xterm buffer ranges
   are anchored. Follow-up a11y polish changed the terminal header actions from
-  icon-only controls to visible labels and fixed the Find flow so opening it
-  focuses the query field, updates incrementally, reports match/no-match state,
-  and clears decorations when closed.
+  icon-only controls to visible labels, removed the unnecessary Buffer/Paste
+  header buttons, and added selected-text copy shortcuts (`Ctrl+Shift+C`,
+  `Alt+Insert`). The broken Find flow was caused by xterm search decorations
+  requiring `allowProposedApi`; TerminalPanel now enables it, moves ligatures
+  activation after `open()`, focuses the query field, updates incrementally,
+  reports match/no-match state, and clears decorations when closed.
 
 ---
 
