@@ -25,6 +25,12 @@ type FakeGroup = {
   id: string;
   locationType: "grid" | "edge";
   panels: FakePanel[];
+  width?: number;
+  height?: number;
+  setSizeCalls: Array<{ width?: number; height?: number }>;
+  setConstraintsCalls: Array<{ minimumWidth?: number; minimumHeight?: number }>;
+  setSize: (value: { width?: number; height?: number }) => void;
+  setConstraints: (value: { minimumWidth?: number; minimumHeight?: number }) => void;
 };
 
 interface FakeDock {
@@ -35,7 +41,32 @@ interface FakeDock {
   groups: FakeGroup[];
 }
 
-function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" | "edge"; panelIds: Array<{ id: string; component: string }> }>; edges?: Record<string, { id: string; panelIds: Array<{ id: string; component: string }> }> } = {}): FakeDock {
+function makeGroup(
+  id: string,
+  locationType: "grid" | "edge",
+  size: { width?: number; height?: number } = {},
+): FakeGroup {
+  const group: FakeGroup = {
+    id,
+    locationType,
+    panels: [],
+    width: size.width,
+    height: size.height,
+    setSizeCalls: [],
+    setConstraintsCalls: [],
+    setSize(value) {
+      group.setSizeCalls.push(value);
+      if (value.width !== undefined) group.width = value.width;
+      if (value.height !== undefined) group.height = value.height;
+    },
+    setConstraints(value) {
+      group.setConstraintsCalls.push(value);
+    },
+  };
+  return group;
+}
+
+function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" | "edge"; panelIds: Array<{ id: string; component: string }> }>; edges?: Record<string, { id: string; width?: number; height?: number; panelIds: Array<{ id: string; component: string }> }> } = {}): FakeDock {
   const groups: FakeGroup[] = [];
   const edges: Map<string, FakeGroup> = new Map();
   const removePanelCalls: string[] = [];
@@ -58,12 +89,12 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
   }
 
   for (const g of initial.groups ?? []) {
-    const group: FakeGroup = { id: g.id, locationType: g.locationType, panels: [] };
+    const group = makeGroup(g.id, g.locationType);
     for (const p of g.panelIds) group.panels.push(makePanel(p.id, p.component, group));
     groups.push(group);
   }
   for (const [pos, e] of Object.entries(initial.edges ?? {})) {
-    const group: FakeGroup = { id: e.id, locationType: "edge", panels: [] };
+    const group = makeGroup(e.id, "edge", { width: e.width, height: e.height });
     for (const p of e.panelIds) group.panels.push(makePanel(p.id, p.component, group));
     groups.push(group);
     edges.set(pos, group);
@@ -94,7 +125,7 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
       return undefined;
     },
     addGroup() {
-      const g: FakeGroup = { id: `g${nextId++}`, locationType: "grid", panels: [] };
+      const g = makeGroup(`g${nextId++}`, "grid");
       groups.push(g);
       return { id: g.id };
     },
@@ -102,7 +133,7 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
       const refId = args.position?.referenceGroup;
       const target = refId ? groups.find((g) => g.id === refId) : groups[0];
       if (!target) {
-        const g: FakeGroup = { id: `g${nextId++}`, locationType: "grid", panels: [] };
+        const g = makeGroup(`g${nextId++}`, "grid");
         groups.push(g);
         g.panels.push(makePanel(args.id, args.component, g));
         return;
@@ -120,7 +151,7 @@ function makeFake(initial: { groups?: Array<{ id: string; locationType: "grid" |
     },
     addEdgeGroup(position: string, opts: { id: string; initialSize?: number }) {
       addEdgeGroupCalls.push({ position, id: opts.id, initialSize: opts.initialSize });
-      const g: FakeGroup = { id: opts.id, locationType: "edge", panels: [] };
+      const g = makeGroup(opts.id, "edge", { width: opts.initialSize });
       groups.push(g);
       edges.set(position, g);
       return g;
@@ -213,5 +244,33 @@ describe("layoutStore.resetToDefault", () => {
     // existing one is reused).
     expect(dock.removePanelCalls).toContain("sessions-manager");
     expect(dock.api.getPanel("sessions-manager")).toBeDefined();
+  });
+
+  test("enforceKnownEdgeMinimums restores library and details rails from stale narrow widths", () => {
+    const dock = makeFake({
+      edges: {
+        left: {
+          id: "edge-left",
+          width: 120,
+          panelIds: [{ id: "library", component: "library" }],
+        },
+        right: {
+          id: "edge-right",
+          width: 140,
+          panelIds: [{ id: "session-details", component: "sessionDetails" }],
+        },
+      },
+    });
+    const store = useLayoutStore();
+    store.setApi(dock.api);
+
+    store.enforceKnownEdgeMinimums();
+
+    const left = dock.groups.find((g) => g.id === "edge-left");
+    const right = dock.groups.find((g) => g.id === "edge-right");
+    expect(left?.width).toBe(300);
+    expect(left?.setConstraintsCalls).toContainEqual({ minimumWidth: 300 });
+    expect(right?.width).toBe(300);
+    expect(right?.setConstraintsCalls).toContainEqual({ minimumWidth: 300 });
   });
 });

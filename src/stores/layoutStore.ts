@@ -21,6 +21,19 @@ import type {
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
 const SESSION_DETAILS_PANEL_ID = "session-details";
+const SESSIONS_PANEL_ID = "sessions-manager";
+const SETTINGS_PANEL_ID = "settings-panel";
+const LIBRARY_PANEL_ID = "library";
+const JOBS_PANEL_ID = "jobs-panel";
+const LOG_VIEWER_PANEL_ID = "log-viewer";
+const SESSION_DETAILS_MIN_WIDTH = 300;
+const LEFT_EDGE_MIN_BY_PANEL_ID: Record<string, number> = {
+  [SESSIONS_PANEL_ID]: 160,
+  [SETTINGS_PANEL_ID]: 300,
+  [LIBRARY_PANEL_ID]: 300,
+  [JOBS_PANEL_ID]: 300,
+  [LOG_VIEWER_PANEL_ID]: 320,
+};
 
 /// Short panel title from a session id. The CLI emits `session.title_changed`
 /// when the model summarizes the conversation; until then the tab shows
@@ -101,6 +114,83 @@ export const useLayoutStore = defineStore("layout", () => {
   const detailsOpen = ref<boolean>(false);
   const lastSessionDetailsWidth = ref<number>(360);
   let activeUnsubs: Array<() => void> = [];
+
+  function panelId(panel: unknown): string | null {
+    const api = (panel as { api?: { id?: unknown } }).api;
+    if (typeof api?.id === "string") return api.id;
+    const flat = (panel as { id?: unknown }).id;
+    return typeof flat === "string" ? flat : null;
+  }
+
+  function edgePanels(edge: unknown): unknown[] {
+    const panels = (edge as { panels?: unknown[] }).panels;
+    return Array.isArray(panels) ? panels : [];
+  }
+
+  function minimumForEdgeGroup(
+    position: EdgeGroupPosition,
+    edge: unknown,
+  ): number | undefined {
+    if (position === "right") {
+      return edgePanels(edge).some((panel) => panelId(panel) === SESSION_DETAILS_PANEL_ID)
+        ? SESSION_DETAILS_MIN_WIDTH
+        : undefined;
+    }
+    if (position !== "left") return undefined;
+    let min: number | undefined;
+    for (const panel of edgePanels(edge)) {
+      const id = panelId(panel);
+      if (!id) continue;
+      const candidate = LEFT_EDGE_MIN_BY_PANEL_ID[id];
+      if (candidate === undefined) continue;
+      min = Math.max(min ?? 0, candidate);
+    }
+    return min;
+  }
+
+  function applyEdgeMinimum(
+    position: EdgeGroupPosition,
+    minimumSize: number | undefined,
+  ): void {
+    const edge = api.value?.getEdgeGroup(position);
+    if (!edge || minimumSize === undefined) return;
+    const edgeApi = edge as unknown as {
+      width?: number;
+      height?: number;
+      setSize?: (value: { width?: number; height?: number }) => void;
+      setConstraints?: (value: { minimumWidth?: number; minimumHeight?: number }) => void;
+    };
+    if (typeof edgeApi.setConstraints === "function") {
+      if (position === "left" || position === "right") {
+        edgeApi.setConstraints.call(edge, { minimumWidth: minimumSize });
+      } else {
+        edgeApi.setConstraints.call(edge, { minimumHeight: minimumSize });
+      }
+    }
+    const current =
+      position === "left" || position === "right" ? edgeApi.width : edgeApi.height;
+    if (
+      typeof current === "number" &&
+      current < minimumSize &&
+      typeof edgeApi.setSize === "function"
+    ) {
+      if (position === "left" || position === "right") {
+        edgeApi.setSize.call(edge, { width: minimumSize });
+      } else {
+        edgeApi.setSize.call(edge, { height: minimumSize });
+      }
+    }
+  }
+
+  function enforceKnownEdgeMinimums(): void {
+    const dock = api.value;
+    if (!dock) return;
+    for (const position of ["left", "right"] as const) {
+      const edge = dock.getEdgeGroup(position);
+      if (!edge) continue;
+      applyEdgeMinimum(position, minimumForEdgeGroup(position, edge));
+    }
+  }
 
   function recomputeActiveSession(dock: DockviewApi): void {
     const panel = dock.activeGroup?.activePanel;
@@ -183,6 +273,7 @@ export const useLayoutStore = defineStore("layout", () => {
     }
     recomputeActiveSession(next);
     rescanOpenDetails(next);
+    enforceKnownEdgeMinimums();
     const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
     const panelSub = next.onDidActivePanelChange(() => recomputeActiveSession(next));
     const removeSub = next.onDidRemovePanel(() => {
@@ -267,8 +358,8 @@ export const useLayoutStore = defineStore("layout", () => {
       component: "sessionDetails",
       tabComponent: "sidebarTab",
       title: "Session",
-      initialSize: lastSessionDetailsWidth.value,
-      minimumSize: 300,
+      initialSize: Math.max(lastSessionDetailsWidth.value, SESSION_DETAILS_MIN_WIDTH),
+      minimumSize: SESSION_DETAILS_MIN_WIDTH,
     });
     restoreSessionDetailsWidth();
   }
@@ -289,15 +380,16 @@ export const useLayoutStore = defineStore("layout", () => {
     const edge = api.value?.getEdgeGroup("right");
     if (!edge) return;
     const width = edge.width;
-    if (Number.isFinite(width) && width >= 200) {
+    if (Number.isFinite(width) && width >= SESSION_DETAILS_MIN_WIDTH) {
       lastSessionDetailsWidth.value = width;
     }
   }
 
   function restoreSessionDetailsWidth(): void {
-    const edge = api.value?.getEdgeGroup("right");
-    if (!edge) return;
-    edge.setSize({ width: lastSessionDetailsWidth.value });
+    applyEdgeMinimum(
+      "right",
+      Math.max(lastSessionDetailsWidth.value, SESSION_DETAILS_MIN_WIDTH),
+    );
   }
 
   /// Returns true if the rail singleton is currently open. Reactive
@@ -482,24 +574,17 @@ export const useLayoutStore = defineStore("layout", () => {
   ): void {
     const dock = api.value;
     if (!dock) return;
+    const existingGroup = dock.getEdgeGroup(position);
     const existing = dock.getPanel(options.id);
     if (existing) {
       existing.api.setActive();
+      applyEdgeMinimum(
+        position,
+        options.minimumSize ?? minimumForEdgeGroup(position, existingGroup),
+      );
       return;
     }
-    const existingGroup = dock.getEdgeGroup(position);
-    if (existingGroup && options.minimumSize !== undefined) {
-      const setConstraints = (existingGroup as unknown as {
-        setConstraints?: (value: { minimumWidth?: number; minimumHeight?: number }) => void;
-      }).setConstraints;
-      if (typeof setConstraints === "function") {
-        if (position === "left" || position === "right") {
-          setConstraints.call(existingGroup, { minimumWidth: options.minimumSize });
-        } else {
-          setConstraints.call(existingGroup, { minimumHeight: options.minimumSize });
-        }
-      }
-    }
+    applyEdgeMinimum(position, options.minimumSize);
     if (options.exclusive && existingGroup) {
       const panels = (existingGroup as unknown as { panels?: unknown[] }).panels ?? [];
       for (const panel of [...panels]) {
@@ -554,6 +639,7 @@ export const useLayoutStore = defineStore("layout", () => {
       ...(options.tabComponent ? { tabComponent: options.tabComponent } : {}),
       position: { referenceGroup: edge.id },
     });
+    applyEdgeMinimum(position, options.minimumSize ?? minimumForEdgeGroup(position, edge));
   }
 
   /// Removes the edge group at `position` if the given group id matches
@@ -651,6 +737,7 @@ export const useLayoutStore = defineStore("layout", () => {
     if (!dock || !layout || typeof layout !== "object") return false;
     try {
       dock.fromJSON(layout as Parameters<DockviewApi["fromJSON"]>[0]);
+      enforceKnownEdgeMinimums();
       return true;
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -663,6 +750,7 @@ export const useLayoutStore = defineStore("layout", () => {
     api,
     activeSessionId,
     detailsOpen,
+    enforceKnownEdgeMinimums,
     rememberSessionDetailsWidth,
     restoreSessionDetailsWidth,
     setApi,

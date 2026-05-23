@@ -391,6 +391,7 @@ function onDockReady(event: DockviewReadyEvent) {
   // resize/move/popout/dock — everything dockview considers a layout
   // mutation collapses into this single event.
   event.api.onDidLayoutChange(() => {
+    layoutStore.enforceKnownEdgeMinimums();
     layoutStore.rememberSessionDetailsWidth();
     scheduleLayoutSave();
     // Keep the ActivityBar's pressed-state in sync with reality
