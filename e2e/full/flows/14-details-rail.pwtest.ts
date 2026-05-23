@@ -57,7 +57,6 @@ test("composer toolbar icons and edge panel minimum widths stay visible", async 
 
   await expect(page.locator(".lex-format-glyph-bold").first()).toHaveText("B");
   await expect(page.locator(".lex-format-glyph-italic").first()).toHaveText("I");
-  await expect(page.locator(".lex-terminal-glyph").first()).toHaveText(">_");
 
   const detailsWidth = await page.locator(".session-details").first().evaluate((el) =>
     el.getBoundingClientRect().width,
@@ -90,7 +89,6 @@ test("composer toolbar switches to compact controls on narrow panes", async ({ p
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
   await expect(page.locator(".mode-button-group:visible, .mode-select-shell:visible").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Bold" })).toBeVisible();
   const formatOverflow = page.locator(".lex-format-overflow").first();
   await expect(formatOverflow).toBeVisible();
   const inlineBeforeMenu = await page.locator(".lex-markdown-tools .lex-toolbar-btn").evaluateAll((buttons) =>
@@ -99,6 +97,7 @@ test("composer toolbar switches to compact controls on narrow panes", async ({ p
       .map((button) => button.getAttribute("aria-label")),
   );
   await formatOverflow.click();
+  await expect(page.getByRole("button", { name: "Bold" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Heading 1" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Code block" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Numbered list" })).toBeVisible();

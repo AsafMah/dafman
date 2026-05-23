@@ -42,6 +42,10 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   layouts, and added compact behavior for FilePicker, Jobs, Log Viewer,
   ToolCallBlock, MessageActions, PendingRequestCard, and Library instruction
   headers.
+- Terminal/composer replan follow-up: removed the embedded PTY command
+  capture flow (`runCapturedCommand`, sentinel parsing, the composer shell
+  command form, and the `!` trigger). PTY terminals are now interactive
+  panes only; subprocess command mode remains out of scope per user decision.
 
 ---
 

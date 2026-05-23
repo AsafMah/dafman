@@ -8,7 +8,7 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Terminal panes (Bun native PTY).** Added a Bun `TerminalRegistry`
   backed by `Bun.spawn(..., { terminal })`, terminal RPC/events, xterm.js
   dockview panels, command-palette actions for standalone/session
-  terminals, and a session composer shell mode with command capture.
+  terminals, and session-workspace terminals.
 - **Terminal default profile setting.** Settings now persists a default
   terminal profile id (`platform-default` initially); full profile CRUD
   remains a later slice.
@@ -49,6 +49,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Terminal Windows native PTY.** Electrobun now bundles Bun 1.3.14 so
   Windows ConPTY works in the packaged runtime; the stdin/stdout pipe
   workaround was removed.
+- **Composer terminal capture removed.** The unreliable embedded
+  "send and capture output" PTY flow was removed; `!` no longer opens a
+  capture terminal and terminal usage is via normal terminal panes.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

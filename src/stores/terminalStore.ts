@@ -12,15 +12,6 @@ export const useTerminalStore = defineStore("terminals", () => {
   const buffers = ref<Record<string, string>>({});
   const loaded = ref(false);
   const sessionTerminalIds = ref<Record<string, string>>({});
-  const captureWaiters = new Map<
-    string,
-    {
-      beforeLength: number;
-      marker: string;
-      resolve: (output: string) => void;
-      timer: ReturnType<typeof setTimeout>;
-    }
-  >();
 
   const running = computed(() =>
     terminals.value.filter((t) => t.status === "running" || t.status === "exiting"),
@@ -70,39 +61,6 @@ export const useTerminalStore = defineStore("terminals", () => {
     return invokeCommand("writeTerminal", { terminalId, data });
   }
 
-  async function runCapturedCommand(
-    sessionId: string,
-    command: string,
-    timeoutMs = 30_000,
-  ): Promise<{ terminal: TerminalSummary; output: string }> {
-    const terminal = await getOrCreateSessionTerminal(sessionId);
-    const marker = `__DAFMAN_DONE_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
-    const beforeLength = (buffers.value[terminal.id] ?? "").length;
-    const newline = terminal.shell.toLowerCase().includes("cmd") ? "\r" : "\n";
-    const doneCommand = terminal.shell.toLowerCase().includes("powershell") ||
-      terminal.shell.toLowerCase().includes("pwsh")
-      ? `Write-Output '${marker}'`
-      : `echo ${marker}`;
-    const output = await new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        captureWaiters.delete(terminal.id);
-        reject(new Error("Command is still running"));
-      }, timeoutMs);
-      captureWaiters.set(terminal.id, {
-        beforeLength,
-        marker,
-        resolve,
-        timer,
-      });
-      void writeTerminal(terminal.id, `${command}${newline}${doneCommand}${newline}`).catch((err) => {
-        clearTimeout(timer);
-        captureWaiters.delete(terminal.id);
-        reject(err);
-      });
-    });
-    return { terminal, output };
-  }
-
   async function resizeTerminal(
     terminalId: string,
     cols: number,
@@ -131,15 +89,6 @@ export const useTerminalStore = defineStore("terminals", () => {
         ...buffers.value,
         [event.terminalId]: next.length > MAX_BUFFER ? next.slice(-MAX_BUFFER) : next,
       };
-      const waiter = captureWaiters.get(event.terminalId);
-      if (waiter) {
-        const markerIndex = next.indexOf(waiter.marker, waiter.beforeLength);
-        if (markerIndex >= 0) {
-          clearTimeout(waiter.timer);
-          captureWaiters.delete(event.terminalId);
-          waiter.resolve(next.slice(waiter.beforeLength, markerIndex));
-        }
-      }
       return;
     }
     if (event.kind === "status" || event.kind === "exit") {
@@ -171,7 +120,6 @@ export const useTerminalStore = defineStore("terminals", () => {
     createTerminal,
     getOrCreateSessionTerminal,
     writeTerminal,
-    runCapturedCommand,
     resizeTerminal,
     killTerminal,
     applyEvent,

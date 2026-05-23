@@ -34,13 +34,14 @@
    - **Why not automated:** depends on live shell behavior and platform
      cwd display.
 
-3. ⏳ **Composer shell mode.**
-   - **Steps:** in an empty composer type `!`, or click the terminal
-     toolbar button. Run a command from the shell command capture input.
-   - **Expected:** compact terminal opens in the composer area, output
-     appears, and a shell-completed note appears in the chat stream.
-   - **Why not automated:** Lexical focus + xterm input inside WebView2
-     needs runtime validation.
+3. ⏳ **Composer terminal capture removed.**
+   - **Steps:** in an empty composer type `!`, then inspect the composer
+     toolbar.
+   - **Expected:** `!` remains ordinary composer text and there is no
+     embedded "send and capture output" terminal form. Terminal usage is
+     through normal terminal panes only.
+   - **Why not automated:** Lexical text handling and user-visible
+     toolbar composition are best confirmed in the running app.
 
 ---
 

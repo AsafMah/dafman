@@ -19,7 +19,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from "vue";
 import SplitButton from "primevue/splitbutton";
 import Popover from "primevue/popover";
 import type { MenuItem } from "primevue/menuitem";
@@ -71,9 +71,6 @@ import SlashCommandPlugin from "./SlashCommandPlugin.vue";
 import MentionPlugin from "./MentionPlugin.vue";
 import FilePicker from "./FilePicker.vue";
 import ModeButtonGroup from "./ModeButtonGroup.vue";
-import TerminalPanel from "./TerminalPanel.vue";
-import { useTerminalStore } from "../stores/terminalStore";
-import { useSessionsStore } from "../stores/sessionsStore";
 
 const props = withDefaults(
   defineProps<{
@@ -110,69 +107,40 @@ const diagEnabled =
 /// text" === "attachment index in array" naturally without a parallel
 /// ref array drifting from the editor state.
 const toasts = useToastStore();
-const terminalStore = useTerminalStore();
-const sessionsStore = useSessionsStore();
-const shellMode = ref(false);
-const shellTerminalId = ref<string | null>(null);
-const shellCommandDraft = ref("");
-const shellCommandRunning = ref(false);
 const toolbarRef = ref<HTMLElement | null>(null);
-const toolbarStage = ref(0);
-const visibleFormatCount = ref(0);
+const toolbarWidth = ref(1000);
 const formatActions = computed(() => editorFormatActions);
-const inlineFormatActions = computed(() =>
-  formatActions.value.slice(0, visibleFormatCount.value),
-);
+const visibleFormatCount = computed(() => {
+  const width = toolbarWidth.value;
+  if (width >= 860) return formatActions.value.length;
+  if (width >= 740) return 8;
+  if (width >= 620) return 6;
+  if (width >= 500) return 4;
+  if (width >= 390) return 2;
+  return 0;
+});
+const toolbarStage = computed(() => {
+  const width = toolbarWidth.value;
+  if (width < 390) return 4;
+  if (width < 500) return 3;
+  if (width < 620) return 2;
+  if (width < 760) return 1;
+  return 0;
+});
+const inlineFormatActions = computed(() => formatActions.value.slice(0, visibleFormatCount.value));
 const overflowFormatActions = computed(() =>
   formatActions.value.slice(visibleFormatCount.value),
 );
 let toolbarResizeObserver: ResizeObserver | null = null;
-let fittingToolbar = false;
-let pendingToolbarFit = false;
-
-async function refitToolbar(): Promise<void> {
-  const el = toolbarRef.value;
-  if (!el) return;
-  if (fittingToolbar) {
-    pendingToolbarFit = true;
-    return;
-  }
-  fittingToolbar = true;
-  try {
-    toolbarStage.value = 0;
-    visibleFormatCount.value = formatActions.value.length;
-    await nextTick();
-    for (let stage = 0; stage <= 4; stage++) {
-      toolbarStage.value = stage;
-      visibleFormatCount.value = formatActions.value.length;
-      await nextTick();
-      while (
-        visibleFormatCount.value > 0 &&
-        el.scrollWidth > el.clientWidth + 1
-      ) {
-        visibleFormatCount.value -= 1;
-        await nextTick();
-      }
-      if (el.scrollWidth <= el.clientWidth + 1) return;
-    }
-  } finally {
-    fittingToolbar = false;
-    if (pendingToolbarFit) {
-      pendingToolbarFit = false;
-      void refitToolbar();
-    }
-  }
-}
 
 onMounted(() => {
-  visibleFormatCount.value = formatActions.value.length;
   if (toolbarRef.value) {
+    toolbarWidth.value = toolbarRef.value.clientWidth;
     toolbarResizeObserver = new ResizeObserver(() => {
-      void refitToolbar();
+      if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
     });
     toolbarResizeObserver.observe(toolbarRef.value);
   }
-  void refitToolbar();
 });
 
 onBeforeUnmount(() => {
@@ -180,12 +148,6 @@ onBeforeUnmount(() => {
   toolbarResizeObserver = null;
 });
 
-watch(
-  () => props.sessionId,
-  () => {
-    void nextTick(() => refitToolbar());
-  },
-);
 
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
@@ -501,58 +463,10 @@ const initialConfig = computed(() => ({
 }));
 
 async function onSubmit(payload: ComposerSubmitPayload) {
-  if (payload.text.trim() === "!" && props.sessionId) {
-    await toggleShellMode();
-    return;
-  }
   if (props.sessionId && await runLocalSlashCommand(props.sessionId, payload.text)) {
     return;
   }
   emit("submit", payload);
-}
-
-async function toggleShellMode(): Promise<void> {
-  if (!props.sessionId) return;
-  if (shellMode.value) {
-    shellMode.value = false;
-    return;
-  }
-  try {
-    const summary = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
-    shellTerminalId.value = summary.id;
-    shellMode.value = true;
-  } catch (err) {
-    toasts.error("Failed to open shell", err instanceof Error ? err.message : String(err));
-  }
-}
-
-async function runShellCommand(): Promise<void> {
-  if (!props.sessionId || !shellCommandDraft.value.trim() || shellCommandRunning.value) {
-    return;
-  }
-  const command = shellCommandDraft.value.trim();
-  shellCommandRunning.value = true;
-  try {
-    const { output } = await terminalStore.runCapturedCommand(props.sessionId, command);
-    const record = sessionsStore.sessions.find((s) => s.id === props.sessionId);
-    if (record) {
-      sessionsStore.appendEvent(record, {
-        sessionId: props.sessionId,
-        eventType: "system.notification",
-        data: {
-          content: `Shell command completed:\n\n$ ${command}\n\n${output.trim()}`,
-        },
-      });
-    }
-    shellCommandDraft.value = "";
-  } catch (err) {
-    toasts.warn(
-      "Command still running",
-      err instanceof Error ? err.message : String(err),
-    );
-  } finally {
-    shellCommandRunning.value = false;
-  }
 }
 
 /// Dropdown items for the SplitButton — let the user change the
@@ -702,30 +616,7 @@ const SubmitButton = defineComponent({
           v-if="props.sessionId"
           :session-id="props.sessionId"
         />
-          <div v-if="shellMode && shellTerminalId" class="lex-shell-mode">
-            <div class="lex-shell-toolbar">
-              <span>Session shell</span>
-              <form class="lex-shell-command-form" @submit.prevent="runShellCommand">
-                <input
-                  v-model="shellCommandDraft"
-                  class="lex-shell-command"
-                  placeholder="Run command and capture result..."
-                  :disabled="shellCommandRunning"
-                />
-                <button
-                  type="submit"
-                  :disabled="shellCommandRunning || !shellCommandDraft.trim()"
-                >
-                  Run
-                </button>
-              </form>
-              <button type="button" class="lex-shell-close" @click="toggleShellMode">
-                Back to message
-              </button>
-            </div>
-            <TerminalPanel :params="{ terminalId: shellTerminalId, compact: true }" />
-          </div>
-          <div v-else class="lex-composer-shell" @paste="onPaste">
+          <div class="lex-composer-shell" @paste="onPaste">
           <div class="lex-composer-editor">
             <template v-if="richText">
               <RichTextPlugin>
@@ -787,18 +678,6 @@ const SubmitButton = defineComponent({
               :session-id="props.sessionId"
             />
             <slot name="session-left-controls" />
-            <button
-              v-if="props.sessionId"
-              type="button"
-              class="lex-toolbar-btn lex-session-shell-toggle"
-              :class="{ 'is-active': shellMode }"
-              title="Toggle session shell"
-              aria-label="Toggle session shell"
-              :disabled="props.disabled"
-              @click="toggleShellMode"
-            >
-              <span class="lex-terminal-glyph" aria-hidden="true">&gt;_</span>
-            </button>
           </div>
           <div class="lex-toolbar-center">
             <button
@@ -922,53 +801,6 @@ const SubmitButton = defineComponent({
 .lex-composer-frame:focus-within {
   border-color: var(--accent, var(--p-primary-color));
   box-shadow: 0 0 0 1px var(--accent, var(--p-primary-color));
-}
-
-.lex-shell-mode {
-  height: min(14rem, calc(var(--tile-height, 500px) * 0.38));
-  min-height: 9rem;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: #111827;
-}
-
-.lex-shell-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.25rem 0.45rem;
-  color: #d1d5db;
-  font-size: 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, white 12%, transparent);
-}
-
-.lex-shell-command-form {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.lex-shell-command {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: 1px solid color-mix(in srgb, white 16%, transparent);
-  border-radius: var(--p-border-radius-sm);
-  background: color-mix(in srgb, black 24%, transparent);
-  color: #d1d5db;
-  padding: 0.2rem 0.35rem;
-  font: inherit;
-}
-
-.lex-shell-close {
-  border: 0;
-  background: transparent;
-  color: var(--p-primary-color);
-  cursor: pointer;
-  font: inherit;
 }
 
 .lex-composer-placeholder {
@@ -1114,8 +946,7 @@ const SubmitButton = defineComponent({
   font-size: 0.95rem;
 }
 
-.lex-format-glyph,
-.lex-terminal-glyph {
+.lex-format-glyph {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1144,14 +975,6 @@ const SubmitButton = defineComponent({
 .lex-format-glyph-strikethrough {
   text-decoration: line-through;
   font-weight: 700;
-}
-
-.lex-terminal-glyph {
-  width: auto;
-  min-width: 1.05rem;
-  font-family: "Cascadia Mono", "Consolas", monospace;
-  font-weight: 700;
-  letter-spacing: -0.12em;
 }
 
 /* Send button inside the editor row: icon-only, taller + narrower
@@ -1274,10 +1097,6 @@ const SubmitButton = defineComponent({
   width: 1.75rem;
   padding-inline: 0;
   justify-content: center;
-}
-
-.lex-toolbar-stage-4 .lex-session-shell-toggle {
-  display: none;
 }
 
 .lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button),
