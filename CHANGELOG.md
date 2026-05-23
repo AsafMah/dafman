@@ -52,6 +52,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Composer terminal capture removed.** The unreliable embedded
   "send and capture output" PTY flow was removed; `!` no longer opens a
   capture terminal and terminal usage is via normal terminal panes.
+- **Terminal addon foundation.** Terminal panels now load xterm addons for
+  search, web links, clipboard, Unicode width/grapheme handling, web fonts,
+  progress, ligatures, images, WebGL, and serialization.
 - **Bun entry reachability gate.** `bun run check` now runs
   `bun run lint:bun`, a Bun.build dry-run over `src-bun/index.ts`, so
   dead Bun-side imports fail before a developer hits `electrobun dev`.

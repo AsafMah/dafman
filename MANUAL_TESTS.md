@@ -19,10 +19,12 @@
 
 1. ⏳ **Standalone terminal pane.**
    - **Steps:** run Command Palette → New Terminal, type a command, resize
-     the dockview pane, then kill the terminal.
+     the dockview pane, try the Search, Copy, Paste, Copy buffer, and
+     Kill controls.
    - **Expected:** terminal opens in a dockview tab, command output
      renders via native PTY/ConPTY (not piped stdio), resize keeps
-     fitting, and Kill exits the terminal cleanly.
+     fitting, URLs are clickable, search works, clipboard actions work,
+     and Kill exits the terminal cleanly.
    - **Automated coverage:** `src-bun/__tests__/terminalRegistry.test.ts`
      covers native PTY create/write/resize/kill; local build validation
      also runs the bundled Windows Bun 1.3.14 PTY smoke.

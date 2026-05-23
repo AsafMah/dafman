@@ -46,6 +46,11 @@ whose ConPTY implementation supports `Bun.spawn(..., { terminal })`.
   capture flow (`runCapturedCommand`, sentinel parsing, the composer shell
   command form, and the `!` trigger). PTY terminals are now interactive
   panes only; subprocess command mode remains out of scope per user decision.
+- xterm addon foundation: TerminalPanel now loads search, web-links,
+  clipboard, unicode11, unicode-graphemes, web-fonts, progress, ligatures,
+  image, webgl, and serialize addons. Search/copy/paste/copy-buffer controls
+  are available in the terminal header; addon settings/manager UI remains
+  the next terminal slice.
 
 ---
 

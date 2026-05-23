@@ -27,7 +27,9 @@ entry reachability dry-run so dead `src-bun/index.ts` imports fail in
 `bun run check`. Terminal integration is in progress with Bun native PTY
 (`Bun.spawn(..., { terminal })`) on Electrobun's bundled Bun 1.3.14
 runtime, xterm.js dockview panels, terminal pane commands, and responsive
-composer/sidebar polish from the terminal regression sweep.
+composer/sidebar polish from the terminal regression sweep. Terminal panels
+now load the requested xterm addon foundation (search, links, clipboard,
+Unicode, web fonts, progress, ligatures, images, WebGL, serialization).
 The current UI audit pass also removes hard CSS edge-panel floors and
 adds compact responsive states across panels, popovers, tool rows, jobs,
 logs, pending requests, and message actions.
@@ -62,9 +64,10 @@ Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` 
    pass adds Bun native PTY registry/RPC, xterm dockview panels, and
    command palette actions. Electrobun is pinned
    to bundle Bun 1.3.14 because 1.3.13 rejects Windows `terminal`.
-   Remaining follow-ups: profile CRUD, richer command-result
-   cards/actions, agent terminal tool, inline terminal blocks, shortcut
-   design, and optional Ghostty Web renderer spike.
+   Terminal addon foundation is now wired. Remaining follow-ups:
+   ActivityBar terminal manager/settings, shell integration, buffer
+   persistence UX, profile CRUD, agent terminal tool, inline terminal
+   blocks, shortcut design, and optional Ghostty Web renderer spike.
 5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
    surface for the composer.
 
