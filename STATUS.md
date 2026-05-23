@@ -13,18 +13,10 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **Post-M2 audit burn-down**.
-M1 + M2 shipped. Terminal integration is feature-complete for the first pass:
-Bun native PTY, xterm.js panels, shell integration (OSC 633/133/7/9/1337),
-`!!` command mode with session terminal, command-result blob attachments
-(no file-read permission), terminal ownership registry (single renderer),
-container-query responsive composer toolbar, terminal restart recovery,
-double-Esc / Ctrl+Backspace exit from command mode, and consistent
-`pi-chevron-right` icon across command button and activity bar.
-
-All items from the `problems.md` 2026-05-22 sweep are resolved.
-Future ideas moved to `plans/plan-backlog-audit.prompt.md` § User-requested
-future ideas.
+**Active milestone:** **Post-M2 audit burn-down + manual test bug-bash**.
+M1 + M2 shipped. Terminal integration feature-complete. Manual test pass
+completed 2026-05-23: Phase A (7 renderer fixes) + Phase B (slash Tab UX)
+shipped. Phases C–F (MCP, agents, modes, skills) remain in the plan.
 
 ---
 
@@ -313,6 +305,15 @@ estimates (1 d = ~1 working day of focused engineering).
 | Real binary E2E | not yet wired | 0 |
 
 Total: **544 `bun test`** passing as of 2026-05-23.
+
+Phase A–B shipped (manual test bug-bash):
+- Reasoning: entire shell hidden when visibility=hidden
+- Jobs: spinner visual fix + go-to-session scrolls to bottom
+- Instructions: dark mode text/code colors + correct global path
+- Fleet: system_notification XML stripped from messages
+- MCP: remove stays on configured section
+- View tool: diff header stripped
+- Slash commands: Tab inserts text, Enter executes
 
 ---
 
