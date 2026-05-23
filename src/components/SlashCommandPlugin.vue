@@ -11,7 +11,7 @@
 /// won't show — pressing Enter sends as a normal message, and the
 /// SDK's built-in command resolver picks it up.
 
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, type ComponentPublicInstance } from "vue";
 import { TextNode, $isTextNode } from "lexical";
 import {
   TypeaheadMenuPlugin,
@@ -67,6 +67,25 @@ const triggerFn = useBasicTypeaheadTriggerMatch("/", {
   allowWhitespace: false,
 });
 
+function keepSelectedVisible(
+  el: Element | ComponentPublicInstance | null,
+  index: number,
+  selectedIndex: number | null,
+): void {
+  if (index !== (selectedIndex ?? 0) || !(el instanceof HTMLElement)) return;
+  void nextTick(() => {
+    const menu = el.closest(".slash-menu");
+    if (!(menu instanceof HTMLElement)) return;
+    const menuRect = menu.getBoundingClientRect();
+    const itemRect = el.getBoundingClientRect();
+    if (itemRect.top < menuRect.top) {
+      menu.scrollTop = el.offsetTop;
+    } else if (itemRect.bottom > menuRect.bottom) {
+      menu.scrollTop = el.offsetTop - menu.clientHeight + el.offsetHeight;
+    }
+  });
+}
+
 function onQueryChange(q: string | null) {
   query.value = q ?? "";
 }
@@ -113,6 +132,7 @@ async function onSelectOption(payload: {
         >
           <button
             v-for="(opt, i) in (itemProps.options as SlashOption[])"
+            :ref="(el) => keepSelectedVisible(el, i, itemProps.selectedIndex)"
             :key="opt.cmd.slash"
             type="button"
             class="slash-item"
@@ -150,8 +170,11 @@ async function onSelectOption(payload: {
   display: flex;
   flex-direction: column;
   min-width: 22rem;
-  max-height: 18rem;
+  max-height: min(28rem, calc(100vh - 8rem));
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 0.25rem;
+  scrollbar-gutter: stable;
   padding: 0.25rem;
   background: var(--p-content-background);
   border: 1px solid var(--p-surface-border);

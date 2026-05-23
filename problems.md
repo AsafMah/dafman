@@ -14,6 +14,10 @@
 - [x] When the session window shrinks, composer controls overlap instead of responsive states / overflow fallback.
 - [x] The right panel still doesn't have a real minimum.
 - [x] Wrapped Library tab rows look weird.
+- [x] The slash popup - you can scroll way past the top.
+- [x] The slash popup - doesn't scroll to the bottom.
+- [x] /model is missing an icon
+- [x] /model does nothing - should open the model selector.
 
 Future Ideas:
 - Command Palette should have sub-menus, but still be fully searchable.

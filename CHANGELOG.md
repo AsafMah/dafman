@@ -38,6 +38,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Expanded editor formatting.** Composer formatting now uses Lexical
   commands for bold, italic, underline, strikethrough, inline code,
   headings, quote, code block, bullet list, and numbered list.
+- **Slash menu polish.** Slash command selection stays scrolled into
+  view, `/model` has a visible icon, and `/model` opens the session model
+  selector directly.
 - **Terminal Windows fallback.** If the packaged Bun runtime does not
   expose a native PTY handle, terminals fall back to stdin/stdout pipes
   instead of failing with “terminal not supported on this platform.”

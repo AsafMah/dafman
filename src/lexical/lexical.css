@@ -266,10 +266,14 @@
   position: absolute;
   top: 0.65rem;
   left: 0.75rem;
+  right: 0.75rem;
   color: var(--p-text-muted-color);
   pointer-events: none;
   user-select: none;
   font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Inline attachment pills (AttachmentNode — DecoratorNode). Renders

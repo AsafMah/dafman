@@ -19,7 +19,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import SplitButton from "primevue/splitbutton";
 import Popover from "primevue/popover";
 import type { MenuItem } from "primevue/menuitem";
@@ -116,6 +116,76 @@ const shellMode = ref(false);
 const shellTerminalId = ref<string | null>(null);
 const shellCommandDraft = ref("");
 const shellCommandRunning = ref(false);
+const toolbarRef = ref<HTMLElement | null>(null);
+const toolbarStage = ref(0);
+const visibleFormatCount = ref(0);
+const formatActions = computed(() => editorFormatActions);
+const inlineFormatActions = computed(() =>
+  formatActions.value.slice(0, visibleFormatCount.value),
+);
+const overflowFormatActions = computed(() =>
+  formatActions.value.slice(visibleFormatCount.value),
+);
+let toolbarResizeObserver: ResizeObserver | null = null;
+let fittingToolbar = false;
+let pendingToolbarFit = false;
+
+async function refitToolbar(): Promise<void> {
+  const el = toolbarRef.value;
+  if (!el) return;
+  if (fittingToolbar) {
+    pendingToolbarFit = true;
+    return;
+  }
+  fittingToolbar = true;
+  try {
+    toolbarStage.value = 0;
+    visibleFormatCount.value = formatActions.value.length;
+    await nextTick();
+    for (let stage = 0; stage <= 4; stage++) {
+      toolbarStage.value = stage;
+      visibleFormatCount.value = formatActions.value.length;
+      await nextTick();
+      while (
+        visibleFormatCount.value > 0 &&
+        el.scrollWidth > el.clientWidth + 1
+      ) {
+        visibleFormatCount.value -= 1;
+        await nextTick();
+      }
+      if (el.scrollWidth <= el.clientWidth + 1) return;
+    }
+  } finally {
+    fittingToolbar = false;
+    if (pendingToolbarFit) {
+      pendingToolbarFit = false;
+      void refitToolbar();
+    }
+  }
+}
+
+onMounted(() => {
+  visibleFormatCount.value = formatActions.value.length;
+  if (toolbarRef.value) {
+    toolbarResizeObserver = new ResizeObserver(() => {
+      void refitToolbar();
+    });
+    toolbarResizeObserver.observe(toolbarRef.value);
+  }
+  void refitToolbar();
+});
+
+onBeforeUnmount(() => {
+  toolbarResizeObserver?.disconnect();
+  toolbarResizeObserver = null;
+});
+
+watch(
+  () => props.sessionId,
+  () => {
+    void nextTick(() => refitToolbar());
+  },
+);
 
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
@@ -337,18 +407,20 @@ const editorFormatActions: Array<{
   action: EditorFormatAction;
   icon?: string;
   glyph?: string;
+  inline?: boolean;
+  priority: 1 | 2 | 3 | 4;
 }> = [
-  { label: "Bold", glyph: "B", title: "Bold", action: "bold" },
-  { label: "Italic", glyph: "I", title: "Italic", action: "italic" },
-  { label: "Underline", glyph: "U", title: "Underline", action: "underline" },
-  { label: "Strikethrough", glyph: "S", title: "Strikethrough", action: "strikethrough" },
-  { label: "Code", icon: "pi pi-code", title: "Inline code", action: "code" },
-  { label: "Heading 1", glyph: "H1", title: "Heading 1", action: "h1" },
-  { label: "Heading 2", glyph: "H2", title: "Heading 2", action: "h2" },
-  { label: "Quote", glyph: "❝", title: "Quote block", action: "quote" },
-  { label: "Code block", glyph: "{ }", title: "Code block", action: "codeblock" },
-  { label: "Bullet list", icon: "pi pi-list", title: "Bullet list", action: "bullet" },
-  { label: "Numbered list", icon: "pi pi-list-check", title: "Numbered list", action: "number" },
+  { label: "Bold", glyph: "B", title: "Bold", action: "bold", inline: true, priority: 1 },
+  { label: "Italic", glyph: "I", title: "Italic", action: "italic", inline: true, priority: 1 },
+  { label: "Code", icon: "pi pi-code", title: "Inline code", action: "code", inline: true, priority: 1 },
+  { label: "Bullet list", icon: "pi pi-list", title: "Bullet list", action: "bullet", inline: true, priority: 1 },
+  { label: "Underline", glyph: "U", title: "Underline", action: "underline", priority: 2 },
+  { label: "Numbered list", icon: "pi pi-list-check", title: "Numbered list", action: "number", priority: 2 },
+  { label: "Strikethrough", glyph: "S", title: "Strikethrough", action: "strikethrough", priority: 3 },
+  { label: "Heading 1", glyph: "H1", title: "Heading 1", action: "h1", priority: 3 },
+  { label: "Heading 2", glyph: "H2", title: "Heading 2", action: "h2", priority: 3 },
+  { label: "Quote", glyph: "❝", title: "Quote block", action: "quote", priority: 4 },
+  { label: "Code block", glyph: "{ }", title: "Code block", action: "codeblock", priority: 4 },
 ] as const;
 
 const editorFormatState = ref<Record<EditorFormatAction, boolean>>({
@@ -704,7 +776,11 @@ const SubmitButton = defineComponent({
             />
           </div>
         </div>
-        <footer class="lex-composer-toolbar">
+        <footer
+          ref="toolbarRef"
+          class="lex-composer-toolbar"
+          :class="`lex-toolbar-stage-${toolbarStage}`"
+        >
           <div class="lex-toolbar-left">
             <ModeButtonGroup
               v-if="props.sessionId"
@@ -714,7 +790,7 @@ const SubmitButton = defineComponent({
             <button
               v-if="props.sessionId"
               type="button"
-              class="lex-toolbar-btn"
+              class="lex-toolbar-btn lex-session-shell-toggle"
               :class="{ 'is-active': shellMode }"
               title="Toggle session shell"
               aria-label="Toggle session shell"
@@ -750,7 +826,7 @@ const SubmitButton = defineComponent({
               class="lex-toolbar-btn lex-format-overflow"
               title="Formatting"
               aria-label="Formatting"
-              :disabled="props.disabled"
+              :disabled="props.disabled || overflowFormatActions.length === 0"
               @click="toggleFormatPopover"
             >
               <i class="pi pi-ellipsis-h" aria-hidden="true" />
@@ -758,7 +834,7 @@ const SubmitButton = defineComponent({
             <Popover ref="formatPopover" class="lex-format-popover">
               <div class="lex-format-menu" aria-label="Formatting commands">
                 <button
-                  v-for="action in editorFormatActions"
+                  v-for="action in overflowFormatActions"
                   :key="`menu-${action.label}`"
                   type="button"
                   class="lex-format-menu-item"
@@ -787,15 +863,17 @@ const SubmitButton = defineComponent({
             </Popover>
             <div class="lex-markdown-tools" aria-label="Markdown shortcuts">
               <button
-                v-for="action in editorFormatActions"
+                v-for="action in inlineFormatActions"
                 :key="action.label"
                 type="button"
                 class="lex-toolbar-btn"
+                :class="[
+                  { 'is-active': editorFormatState[action.action] },
+                ]"
                 :title="action.title"
                 :aria-label="action.title"
                 :aria-pressed="editorFormatState[action.action]"
                 :disabled="props.disabled"
-                :class="{ 'is-active': editorFormatState[action.action] }"
                 @click="formatEditor(action.action)"
               >
                 <i
@@ -893,10 +971,19 @@ const SubmitButton = defineComponent({
   font: inherit;
 }
 
+.lex-composer-placeholder {
+  right: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .lex-composer-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 0.45rem;
   padding: 0.25rem 0.4rem;
   min-height: 2.3rem;
@@ -906,10 +993,9 @@ const SubmitButton = defineComponent({
    * children. Give it a container context here so it reacts to the
    * toolbar's width, not the page width. */
   container-type: inline-size;
-  /* No overlap: controls shrink/hide first; if the pane becomes genuinely
-   * too narrow, horizontal scroll is the final fallback. */
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  /* No overlap: controls shrink/hide first; very small panes wrap rows.
+   * Never show a horizontal scrollbar in the composer chrome. */
+  overflow-x: hidden;
   overflow-y: visible;
 }
 
@@ -925,16 +1011,25 @@ const SubmitButton = defineComponent({
 .lex-toolbar-left {
   justify-content: flex-start;
   flex: 0 1 auto;
+  min-width: 0;
+  overflow: visible;
 }
 
 .lex-toolbar-center {
   justify-content: center;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .lex-toolbar-right {
   justify-content: flex-end;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .lex-markdown-tools {
@@ -948,6 +1043,10 @@ const SubmitButton = defineComponent({
 }
 
 .lex-format-overflow {
+  display: inline-flex;
+}
+
+.lex-format-overflow:disabled {
   display: none;
 }
 
@@ -1123,47 +1222,71 @@ const SubmitButton = defineComponent({
   color: var(--p-text-muted-color);
 }
 
-@container (max-width: 46rem) {
-  .lex-composer-toolbar :deep(.mode-button-group) {
-    display: none;
-  }
-  .lex-composer-toolbar :deep(.mode-select-shell) {
-    display: inline-flex;
-  }
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
-    display: none;
-  }
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button) {
-    width: 1.75rem;
-    padding-inline: 0;
-  }
-  .lex-markdown-tools {
-    display: none;
-  }
-  .lex-format-overflow {
-    display: inline-flex;
-  }
+.lex-toolbar-stage-2 :deep(.mode-button-group) {
+  display: none;
 }
 
-@container (max-width: 34rem) {
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip) {
-    display: none;
-  }
+.lex-toolbar-stage-2 :deep(.mode-select-shell) {
+  display: inline-flex;
 }
 
-@container (max-width: 28rem) {
-  .lex-composer-toolbar {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    row-gap: 0.2rem;
-  }
-  .lex-toolbar-left,
-  .lex-toolbar-right {
-    flex: 1 1 auto;
-  }
-  .lex-toolbar-center {
-    order: 3;
-  }
+.lex-toolbar-stage-1 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label),
+.lex-toolbar-stage-2 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
+  display: none;
+}
+
+.lex-toolbar-stage-1 :deep(.session-header-controls.area-composer-left .approve-all-button),
+.lex-toolbar-stage-2 :deep(.session-header-controls.area-composer-left .approve-all-button) {
+  width: 1.75rem;
+  padding-inline: 0;
+  white-space: nowrap;
+}
+
+.lex-toolbar-stage-3 :deep(.mode-button-group),
+.lex-toolbar-stage-4 :deep(.mode-button-group) {
+  display: none;
+}
+
+.lex-toolbar-stage-3 :deep(.mode-select-shell),
+.lex-toolbar-stage-4 :deep(.mode-select-shell) {
+  display: inline-flex;
+}
+
+.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label),
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
+  display: none;
+}
+
+.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .approve-all-button),
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button) {
+  width: 1.75rem;
+  padding-inline: 0;
+  white-space: nowrap;
+}
+
+.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label),
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label) {
+  display: none;
+}
+
+.lex-toolbar-stage-3 :deep(.session-header-controls.area-composer-left .workspace-chip),
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .workspace-chip) {
+  width: 1.75rem;
+  padding-inline: 0;
+  justify-content: center;
+}
+
+.lex-toolbar-stage-4 .lex-session-shell-toggle {
+  display: none;
+}
+
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .approve-all-button),
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-left .workspace-chip) {
+  display: none;
+}
+
+.lex-toolbar-stage-4 :deep(.session-header-controls.area-composer-right .compact-select) {
+  display: none;
 }
 
 </style>

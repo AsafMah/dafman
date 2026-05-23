@@ -163,15 +163,6 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
   font-size: 0.78rem;
 }
 
-@container (max-width: 36rem) {
-  .mode-button-group {
-    display: none;
-  }
-  .mode-select-shell {
-    display: inline-flex;
-  }
-}
-
 .sr-only {
   position: absolute;
   width: 1px;

@@ -9,7 +9,7 @@
 // component just reads + dispatches actions. Self-contained: takes
 // only `sessionId` as a prop.
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import Chip from "primevue/chip";
@@ -40,16 +40,29 @@ const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
 const settings = storeToRefs(useSettingsStore()).settings;
+const modelTreeRef = ref<InstanceType<typeof TreeSelect> | null>(null);
 
 onMounted(() => {
   modelsStore.load().catch(() => {
     /* toast already shown by the store */
   });
+  window.addEventListener("dafman:open-model-selector", onOpenModelSelector);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("dafman:open-model-selector", onOpenModelSelector);
 });
 
 const record = computed(() =>
   sessionsStore.sessions.find((s) => s.id === props.sessionId),
 );
+
+function onOpenModelSelector(event: Event): void {
+  const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
+  if (detail?.sessionId !== props.sessionId) return;
+  if (props.area !== "all" && props.area !== "composer-right") return;
+  modelTreeRef.value?.show();
+}
 
 const effectiveModelId = computed(() =>
   record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
@@ -266,6 +279,7 @@ function onAgentChipClick() {
     />
     <TreeSelect
       v-if="props.area === 'all' || props.area === 'composer-right'"
+      ref="modelTreeRef"
       :input-id="`model-${props.sessionId}`"
       v-model="modelTreeChoice"
       v-model:expanded-keys="expandedKeys"
@@ -403,8 +417,13 @@ function onAgentChipClick() {
   }
 }
 @container (max-width: 18rem) {
-  .workspace-chip {
+  .workspace-chip :deep(.p-chip-label) {
     display: none;
+  }
+  .workspace-chip {
+    width: 1.75rem;
+    padding-inline: 0;
+    justify-content: center;
   }
   .agent-chip {
     display: none;

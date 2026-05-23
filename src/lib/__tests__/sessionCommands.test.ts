@@ -197,9 +197,18 @@ describe("sessionCommands", () => {
     expect(slashes).toContain("/agent");
     expect(slashes).toContain("/model");
 
+    const model = SESSION_COMMANDS.find((cmd) => cmd.slash === "/model");
+    expect(model?.icon).toBe("pi-microchip-ai");
+    const events: Array<{ sessionId?: string }> = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<{ sessionId?: string }>).detail);
+    };
+    window.addEventListener("dafman:open-model-selector", listener);
     const handled = await runLocalSlashCommand("s1", "/model");
+    window.removeEventListener("dafman:open-model-selector", listener);
 
     expect(handled).toBe(true);
+    expect(events).toEqual([{ sessionId: "s1" }]);
   });
 
   test("/mcp and /skills are local library commands", async () => {

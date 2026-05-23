@@ -143,11 +143,16 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 	{
 		slash: "/model",
 		label: "Open model controls",
-		description: "Open session details where the model selector lives.",
-		icon: "pi-cpu",
+		description: "Open the model selector for this session.",
+		icon: "pi-microchip-ai",
 		group: "Session",
 		keywords: ["llm", "reasoning"],
-		run: () => useLayoutStore().openSessionDetailsPanel(),
+		run: (sessionId) => {
+			useLayoutStore().openSessionDetailsPanel();
+			window.dispatchEvent(
+				new CustomEvent("dafman:open-model-selector", { detail: { sessionId } }),
+			);
+		},
 	},
 	{
 		slash: "/autopilot",
