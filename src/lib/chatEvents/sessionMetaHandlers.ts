@@ -10,14 +10,7 @@
 
 import { pickNumber, pickString } from "./helpers";
 import type { Handler } from "./context";
-
-const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
-
-function normalizeContextLimit(value: number): number | null {
-  if (!Number.isFinite(value) || value <= 0) return null;
-  if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
-  return value;
-}
+import { normalizeContextLimit } from "../normalizeContextLimit";
 
 export const sessionMetaHandlers: Record<string, Handler> = {
   "session.title_changed": (ctx, data) => {

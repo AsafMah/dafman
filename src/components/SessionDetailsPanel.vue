@@ -37,14 +37,11 @@ import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import MessageContent from "./MessageContent.vue";
 import { toErrorMessage } from "../lib/errorMessage";
+import { formatElapsed } from "../lib/formatElapsed";
+import { usePersistedSections } from "../lib/usePersistedSections";
+import { useExpandableItems } from "../lib/useExpandableItems";
 
-const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
-
-function normalizeContextLimit(value: number): number | null {
-  if (!Number.isFinite(value) || value <= 0) return null;
-  if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
-  return value;
-}
+import { normalizeContextLimit } from "../lib/normalizeContextLimit";
 
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
@@ -322,9 +319,8 @@ async function removeTask(task: TaskInfo) {
   }
 }
 
-/// Format `activeTimeMs` (or fall back to `startedAt`→now) as a
-/// terse human-readable duration. Tasks rarely live longer than
-/// a few minutes; the precision drops off above an hour.
+/// Derive elapsed ms from a TaskInfo (preferring activeTimeMs, then
+/// startedAt→completedAt/now), then format via shared formatElapsed.
 function formatTaskElapsed(task: TaskInfo): string {
   let ms: number | null = null;
   if (typeof task.activeTimeMs === "number") {
@@ -334,15 +330,7 @@ function formatTaskElapsed(task: TaskInfo): string {
     const end = task.completedAt ? Date.parse(task.completedAt) : Date.now();
     if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
   }
-  if (ms === null) return "";
-  if (ms < 1000) return `${ms}ms`;
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  if (m < 60) return `${m}m ${rem}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
+  return formatElapsed(ms);
 }
 
 function taskTitle(task: TaskInfo): string {
@@ -919,10 +907,6 @@ async function loadQuota() {
 }
 
 // ---------- Collapsible sections (persisted via localStorage) ----------
-//
-// Each section's open/closed state lives in localStorage under a stable
-// key. Defaults: tools collapsed (long); skills + mcp + plan + usage +
-// quota expanded. Toggling persists immediately.
 type SectionKey =
   | "settings"
   | "agents"
@@ -935,74 +919,24 @@ type SectionKey =
   | "usage"
   | "quota";
 
-const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
-  settings: false,
-  agents: true,
-  tasks: false,
-  files: false,
-  skills: true,
-  tools: false,
-  mcp: true,
-  plan: true,
-  usage: true,
-  quota: true,
-};
-
-function readSectionState(key: SectionKey): boolean {
-  if (typeof localStorage === "undefined") return SECTION_DEFAULTS[key];
-  try {
-    const raw = localStorage.getItem(`dafman.details.section.${key}`);
-    if (raw === null) return SECTION_DEFAULTS[key];
-    return raw === "1";
-  } catch {
-    return SECTION_DEFAULTS[key];
-  }
-}
-
-const sectionOpen = ref<Record<SectionKey, boolean>>({
-  settings: readSectionState("settings"),
-  agents: readSectionState("agents"),
-  tasks: readSectionState("tasks"),
-  files: readSectionState("files"),
-  skills: readSectionState("skills"),
-  tools: readSectionState("tools"),
-  mcp: readSectionState("mcp"),
-  plan: readSectionState("plan"),
-  usage: readSectionState("usage"),
-  quota: readSectionState("quota"),
-});
-
-function toggleSection(key: SectionKey): void {
-  const next = !sectionOpen.value[key];
-  sectionOpen.value = { ...sectionOpen.value, [key]: next };
-  try {
-    localStorage.setItem(`dafman.details.section.${key}`, next ? "1" : "0");
-  } catch {
-    /* private mode / quota — ignore, in-memory state still works */
-  }
-}
+const { sectionOpen, toggleSection } = usePersistedSections<SectionKey>(
+  "dafman.details.section",
+  {
+    settings: false,
+    agents: true,
+    tasks: false,
+    files: false,
+    skills: true,
+    tools: false,
+    mcp: true,
+    plan: true,
+    usage: true,
+    quota: true,
+  },
+);
 
 // ---------- Per-item "show more" for long descriptions ----------
-//
-// Both tools and skills carry verbose descriptions. We truncate to
-// one line by default and let the user expand individual rows.
-// Expansion state is keyed by `${kind}:${name}` and lives in-memory
-// (per-panel-mount), not persisted — descriptions don't change often
-// enough to be worth a localStorage hop.
-
-const expandedItems = ref<Set<string>>(new Set());
-
-function isItemExpanded(kind: "tool" | "skill" | "agent", name: string): boolean {
-  return expandedItems.value.has(`${kind}:${name}`);
-}
-
-function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): void {
-  const key = `${kind}:${name}`;
-  const next = new Set(expandedItems.value);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  expandedItems.value = next;
-}
+const { isItemExpanded, toggleItemExpansion } = useExpandableItems();
 </script>
 
 <template>
