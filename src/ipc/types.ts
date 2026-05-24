@@ -170,8 +170,24 @@ export type CommandResultEvent =
       record: CommandResultRecord;
     };
 
+/// A named group (workspace) that owns a set of body panels.
+/// Each group stores its own dockview body layout snapshot (grid +
+/// body panels, without edge groups — those are shared across groups).
+export interface GroupConfig {
+  id: string;
+  name: string;
+  /// Saved body-panel layout (toJSON with edgeGroups stripped).
+  /// null for a fresh/empty group with no panels yet.
+  layout: unknown | null;
+}
+
 export interface Layout {
   dockview: unknown | null;
+  /// Per-group body layouts. Absent on first launch; migration creates
+  /// a single "Default" group from the legacy `dockview` blob.
+  groups?: GroupConfig[];
+  /// Which group is currently visible.
+  activeGroupId?: string;
 }
 
 export interface Workspaces {

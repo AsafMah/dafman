@@ -169,3 +169,105 @@ export function persistedLayoutHasPanel(layout: unknown, panelId: string): boole
   if (!panels || typeof panels !== "object") return false;
   return Object.prototype.hasOwnProperty.call(panels, panelId);
 }
+
+// ────────────────────────────────────────────────────────────────
+// Group layout helpers — pure JSON surgery for group switching.
+// Edge groups are shared across groups; body panels are per-group.
+// ────────────────────────────────────────────────────────────────
+
+/// Collect edge-group panel IDs from a dockview layout.
+function edgePanelIds(layout: Record<string, unknown>): Set<string> {
+  const ids = new Set<string>();
+  const edgeGroups = layout.edgeGroups;
+  if (!edgeGroups || typeof edgeGroups !== "object") return ids;
+  for (const entry of Object.values(edgeGroups as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") continue;
+    const group = (entry as Record<string, unknown>).group;
+    if (!group || typeof group !== "object") continue;
+    const views = (group as Record<string, unknown>).views;
+    if (!Array.isArray(views)) continue;
+    for (const v of views) {
+      if (typeof v === "string") ids.add(v);
+    }
+  }
+  return ids;
+}
+
+/// Strip edge groups and their panel definitions from a full dockview
+/// layout, returning a body-only snapshot suitable for per-group storage.
+export function stripEdges(layout: unknown): unknown {
+  if (!layout || typeof layout !== "object") return layout;
+  const obj = layout as Record<string, unknown>;
+  const eIds = edgePanelIds(obj);
+  const next: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === "edgeGroups") continue;
+    if (k === "panels" && v && typeof v === "object") {
+      const bodyPanels: Record<string, unknown> = {};
+      for (const [pid, pval] of Object.entries(v as Record<string, unknown>)) {
+        if (!eIds.has(pid)) bodyPanels[pid] = pval;
+      }
+      next[k] = bodyPanels;
+    } else {
+      next[k] = v;
+    }
+  }
+  return next;
+}
+
+/// Extract edge groups + their panel definitions from a full layout.
+export function extractEdges(layout: unknown): {
+  edgeGroups: unknown;
+  edgePanels: Record<string, unknown>;
+} {
+  const empty = { edgeGroups: undefined, edgePanels: {} };
+  if (!layout || typeof layout !== "object") return empty;
+  const obj = layout as Record<string, unknown>;
+  const eIds = edgePanelIds(obj);
+  const edgePanels: Record<string, unknown> = {};
+  const panels = obj.panels;
+  if (panels && typeof panels === "object") {
+    for (const [pid, pval] of Object.entries(panels as Record<string, unknown>)) {
+      if (eIds.has(pid)) edgePanels[pid] = pval;
+    }
+  }
+  return { edgeGroups: obj.edgeGroups, edgePanels };
+}
+
+/// Merge a body-only layout snapshot with the current full layout's
+/// edge groups. Returns a complete layout ready for `fromJSON()`.
+export function mergeBodyWithEdges(
+  bodyLayout: unknown,
+  currentFullLayout: unknown,
+): unknown {
+  if (!bodyLayout || typeof bodyLayout !== "object") return currentFullLayout;
+  if (!currentFullLayout || typeof currentFullLayout !== "object") return bodyLayout;
+  const body = bodyLayout as Record<string, unknown>;
+  const { edgeGroups, edgePanels } = extractEdges(currentFullLayout);
+  // Merge panels: body panels + edge panels
+  const mergedPanels: Record<string, unknown> = {
+    ...((body.panels as Record<string, unknown>) ?? {}),
+    ...edgePanels,
+  };
+  const merged: Record<string, unknown> = {
+    ...body,
+    panels: mergedPanels,
+  };
+  if (edgeGroups !== undefined) {
+    merged.edgeGroups = edgeGroups;
+  }
+  return merged;
+}
+
+/// Build a layout that contains ONLY edge groups (empty body).
+/// Used when switching to a fresh/empty group.
+export function edgesOnlyLayout(currentFullLayout: unknown): unknown {
+  if (!currentFullLayout || typeof currentFullLayout !== "object") return currentFullLayout;
+  const full = currentFullLayout as Record<string, unknown>;
+  const { edgeGroups, edgePanels } = extractEdges(currentFullLayout);
+  return {
+    grid: full.grid,
+    panels: edgePanels,
+    edgeGroups,
+  };
+}

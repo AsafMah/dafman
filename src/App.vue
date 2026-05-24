@@ -6,6 +6,7 @@ import { useToast } from "primevue/usetoast";
 import type { ToastMessageOptions } from "primevue/toast";
 import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
 import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
+import GroupsBar from "./components/GroupsBar.vue";
 import BootSplash from "./components/BootSplash.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import { useClientStore } from "./stores/clientStore";
@@ -16,6 +17,7 @@ import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
 import { useModelsStore } from "./stores/modelsStore";
 import { useBootStore } from "./stores/bootStore";
 import { useJobsStore } from "./stores/jobsStore";
+import { useGroupsStore } from "./stores/groupsStore";
 import { useConfirm } from "primevue/useconfirm";
 import ConfirmDialog from "primevue/confirmdialog";
 import { resolveIsDark } from "./lib/theme";
@@ -37,6 +39,7 @@ const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
 const bootStore = useBootStore();
 const jobsStore = useJobsStore();
+const groupsStore = useGroupsStore();
 const primeToast = useToast();
 const primeConfirm = useConfirm();
 
@@ -249,12 +252,23 @@ onMounted(async () => {
 const pendingRestoreLayout = ref<unknown | null>(null);
 
 async function restoreFromLayout() {
-  const layout = settingsStore.settings.layout?.dockview;
-  if (!layout || typeof layout !== "object") {
+  // Hydrate groups from settings — creates "Default" group on migration
+  groupsStore.hydrate(settingsStore.settings.layout);
+
+  // Determine which layout to restore: active group's or legacy dockview
+  const activeGroup = groupsStore.activeGroup;
+  let rawLayout: unknown | null = null;
+  if (activeGroup?.layout) {
+    // Group-aware: merge body with empty edge state (edges auto-open later)
+    rawLayout = activeGroup.layout;
+  } else {
+    rawLayout = settingsStore.settings.layout?.dockview;
+  }
+  if (!rawLayout || typeof rawLayout !== "object") {
     console.info("[boot] restoreFromLayout: no layout to restore");
     return;
   }
-  const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
+  const withoutLegacyDetails = stripLegacyDetailsPanels(rawLayout);
   const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
   const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
   const sessionIds = extractChatPanelIds(sanitized);
@@ -355,6 +369,9 @@ function onDockReady(event: DockviewReadyEvent) {
   // the underlying session too. closeSession is idempotent and safe to
   // call even if the session is already gone.
   event.api.onDidRemovePanel((panel) => {
+    // During a group switch, panels are removed by fromJSON — don't
+    // close the underlying sessions.
+    if (layoutStore.switching) return;
     // Capture the parent group id BEFORE the panel is fully torn down
     // — at this point the panel still has its `api.group` reference,
     // but its `group.panels.length` reflects the post-removal count.
@@ -411,12 +428,17 @@ function onDockReady(event: DockviewReadyEvent) {
 
 /// Debounced write — drag-resize fires `onDidLayoutChange` continuously
 /// at frame rate; we coalesce into one settings write per ~300ms.
+/// Group-aware: saves the active group's body snapshot via groupsStore.
 let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleLayoutSave() {
   if (layoutSaveTimer !== null) clearTimeout(layoutSaveTimer);
   layoutSaveTimer = setTimeout(() => {
     layoutSaveTimer = null;
-    void settingsStore.persistLayout(layoutStore.snapshot());
+    if (groupsStore.groups.length > 0) {
+      void groupsStore.saveLayout();
+    } else {
+      void settingsStore.persistLayout(layoutStore.snapshot());
+    }
   }, 300);
 }
 
@@ -579,16 +601,19 @@ function openSessionsByDefault(attempt = 0) {
          Settings is a panel like Sessions, not a modal. -->
     <div class="app-body">
       <ActivityBar ref="activityBarRef" :items="activityItems" />
-      <div
-        class="dock-wrapper"
-        :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
-      >
-        <DockviewVue
-          class="dock"
-          watermark-component="watermark"
-          default-tab-component="chatTab"
-          @ready="onDockReady"
-        />
+      <div class="dock-area">
+        <GroupsBar />
+        <div
+          class="dock-wrapper"
+          :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
+        >
+          <DockviewVue
+            class="dock"
+            watermark-component="watermark"
+            default-tab-component="chatTab"
+            @ready="onDockReady"
+          />
+        </div>
       </div>
     </div>
   </main>
@@ -614,6 +639,14 @@ function openSessionsByDefault(attempt = 0) {
   min-height: 0;
   display: flex;
   min-width: 0;
+}
+
+.dock-area {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .dock-wrapper {

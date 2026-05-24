@@ -150,10 +150,26 @@ export interface NotificationPrefs {
 	waitingForInput: boolean;
 }
 
+/// A named group (workspace) that owns a set of body panels.
+/// Each group stores its own dockview body layout snapshot.
+export interface GroupConfig {
+	id: string;
+	name: string;
+	/// Saved body-panel layout (toJSON with edgeGroups stripped).
+	/// null for a fresh/empty group.
+	layout: unknown | null;
+}
+
 export interface Layout {
 	/// Serialized dockview state (`api.toJSON()`). `null` means
 	/// "no panes were open last time" — start with an empty dockview.
+	/// Kept for migration from pre-groups settings.
 	dockview: unknown | null;
+	/// Per-group body layouts. Absent on first launch; migration
+	/// creates a single "Default" group from the legacy `dockview` blob.
+	groups?: GroupConfig[];
+	/// Which group is currently visible.
+	activeGroupId?: string;
 }
 
 export interface TerminalCreateParams {
