@@ -3,6 +3,15 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+- **Groups (workspace switching).** Nested dockview instances allow
+  switching between independent sets of open panels. GroupsBar UI shows
+  tabs with session count badges, add/rename/delete actions.
+- **Maximize button** on panel tabs — click to expand a panel to fill
+  the dock area, click again to restore.
+- **Multi-tab sidebar** — left edge panels can show multiple tabs
+  simultaneously instead of exclusive toggle.
+
 ### Changed
 - **Migrated from `copilot-sdk-supercharged` to `@github/copilot` SDK directly.**
   All features used from supercharged are available in the official SDK v1.0.52+.
@@ -10,6 +19,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   supercharged was only a transitive dependency installer.
 
 ### Fixed
+- **Groups boot order.** Fixed race where GroupPanel mounted before
+  groupsStore was initialized, causing blank groups on startup.
+- **New group creation.** Fixed race where creating a new group could
+  inherit all sessions from the previous group due to stale `bodyApi`.
 - **Session tab title.** Session tabs now show the real session title
   instead of the first 8 chars of the GUID. `addPanel()` resolves the
   title from sessionsStore at creation time, and after each turn the

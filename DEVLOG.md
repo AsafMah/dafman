@@ -10,6 +10,72 @@
 
 ---
 
+## 2026-05-24 — Groups boot order fix + code quality pass
+
+**Takeaway:** Fixed 3 critical groups-mode bugs (boot order, session restore,
+new group inheriting sessions) and did first round of code quality
+improvements (composable extraction, helper deduplication).
+
+### Boot order fix (ed5b359)
+
+Root cause: DockviewVue emits `@ready` from its child `onMounted`, which
+runs BEFORE App.vue's `onMounted`. In groups mode, `populateGroupPanels()`
+needs groupsStore to be initialized (by `restoreFromLayout()`), but
+`onDockReady` fired first with empty groups.
+
+Fix: Split `onDockReady` into shell-API-only setup + deferred
+`populateGroupPanels()` called after `restoreFromLayout`. Added a
+`watch(() => layoutStore.bodyApi)` with 2s safety timeout so autosession
+waits for GroupPanel mount. Also fixed `toggleSessionDetailsPanel` to use
+`shellApi` (edge panels live on the shell, not the inner group dockview).
+
+Key discovery: `bun run smoke:run` serves from `dist/` which is NOT
+auto-rebuilt. Must run `bun run vite build` or use `bun run smoke` (which
+includes the build step). This is why prod smoke kept failing while HMR
+passed — the prod build was stale.
+
+### New group fix (98da208)
+
+Race: `addGroupPanel` called `setActive()` which triggered
+`onDidActivePanelChange`, but `getGroupApi(newGroupId)` returned null
+because GroupPanel hadn't mounted yet. `bodyApi` stayed pointing at the
+old group. Layout saves during this window captured old-group sessions
+under the new group's id.
+
+Fix: Snapshot the outgoing group's layout and call `switchTo` before
+adding the shell panel. GroupPanel's `onReady` already sets `bodyApi` if
+it's the active group — this just ensures the timing is right.
+
+### Code quality (06706dc)
+
+Extracted from SessionDetailsPanel.vue (2415 lines):
+- `usePersistedSections` — localStorage-backed collapsible section state
+- `useExpandableItems` — in-memory show-more toggles
+- `formatElapsed` — terse ms→human duration utility
+- `normalizeContextLimit` — was copy-pasted in both
+  SessionDetailsPanel.vue and sessionMetaHandlers.ts
+
+Updated `plans/plan-tech-debt.prompt.md` with 6 new findings (E1–E6)
+from the full codebase audit.
+
+### Files changed
+
+- `src/App.vue` — Boot order split
+- `src/stores/layoutStore.ts` — shellApi for edge panels, group snapshot
+- `src/components/GroupPanel.vue` — updateCount calls
+- `src/components/SessionsManager.vue` — activatePanelAcrossGroups
+- `src/lib/layoutSanitize.ts` + tests — New sanitization utils
+- `src/lib/formatElapsed.ts` — New utility
+- `src/lib/normalizeContextLimit.ts` — Deduplicated utility
+- `src/lib/usePersistedSections.ts` — New composable
+- `src/lib/useExpandableItems.ts` — New composable
+- `src/components/SessionDetailsPanel.vue` — Uses extracted composables
+- `src/lib/chatEvents/sessionMetaHandlers.ts` — Uses shared normalizeContextLimit
+- `plans/plan-tech-debt.prompt.md` — New E1–E6 findings
+- `problems.md` — 3 bugs marked solved
+
+---
+
 ## 2026-05-26 — SDK migration + session/discovery bug fixes
 
 **Takeaway:** Removed `copilot-sdk-supercharged` (dead weight — ALL features

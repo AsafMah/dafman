@@ -194,6 +194,55 @@ fake timers.
 ### D2. Deferred dep bumps — ✅ **shipped in 21d**
 - **Lexical 0.38 → 0.44** (6 minors). Required a `package.json`
   `overrides` block to force `lexical-vue@0.14.1`'s pinned
+
+---
+
+## 2026-05-24 Code Quality Audit — New Findings
+
+### E1. SessionDetailsPanel.vue is 2415 lines (highest priority)
+Split into section sub-components, each with its own composable:
+- `TasksSection.vue` + `useSessionTasks` (~100 lines script + template)
+- `AgentsSection.vue` + `useSessionAgents` (~100 lines)
+- `SkillsSection.vue` + `useSessionSkills` (~75 lines)
+- `UsageSection.vue` + `useSessionUsage` (~180 lines)
+- `ToolsSection.vue` + `useSessionTools` (~170 lines)
+- `PlanSection.vue` + `useSessionPlan` (~45 lines)
+- `QuotaSection.vue` + `useSessionQuota` (~45 lines)
+
+**Partially addressed**: extracted `usePersistedSections`,
+`useExpandableItems`, `formatElapsed`, `normalizeContextLimit`
+as shared composables/utilities (commit `06706dc`).
+
+### E2. sessionsStore.ts event reducer has side effects
+`applyToRecord` (1308 lines total file) mutates records, triggers
+toasts, sends OS notifications, reads other stores. Extract pure
+helpers first: event classification, payload parsing, artifact
+derivation. Only extract the full reducer when effects are isolated.
+
+### E3. layoutStore.ts mixes concerns (1168 lines)
+Dockview registry, edge-panel sizing, persistence, API bridging all
+in one file. Natural seams:
+- Group API registry → `lib/groupDockviewRegistry.ts`
+- Edge panel management → composable or helper module
+- Layout persistence → `lib/layoutPersistence.ts`
+
+### E4. Type-safety escape hatches
+Several `as any` / `as unknown as` casts around dockview panel API
+shapes and SDK payload shapes. These mask real contract drift risks:
+- `ChatTab.vue:116-130` — `watchEffect` through any-casted API
+- `mcpRegistry.ts:56-66` — forced SDK call casts
+- `sessions.ts:299-320` — payload normalizer casts
+
+### E5. Duplicated session header logic
+`SessionHeaderControls.vue` and `SessionDetailsPanel.vue` both
+implement name/mode/reasoning/workspace/approve-all controls.
+Extract a shared `useSessionControls` composable.
+
+### E6. Linear scans in hot paths
+- `sessionById` computed rebuilds full Map on every session mutation
+- `selectedModel` in SessionHeaderControls linearly scans models
+- `TerminalPanel.summary` does linear `.find()` on every reactive read
+Consider indexed lookups (Map/computed Map).
   transitive `@lexical/*` to 0.44.0. Verified clean: 428 unit
   tests + 70/70 E2E + manual composer smoke walked by user.
   Commits `02806ba` → `883aca5` on branch `phase-21d-lexical`,

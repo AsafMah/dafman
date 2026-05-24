@@ -13,59 +13,35 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **Post-M2 audit burn-down + manual test bug-bash**.
+**Active milestone:** **Groups feature + code quality.**
 M1 + M2 shipped. Terminal integration feature-complete. Manual test pass
-completed 2026-05-23: Phase A (7 renderer fixes) + Phase B (slash Tab UX)
-shipped. **Phases C (MCP toggle), E (mode switch — no code fix needed),
-F (skills discovery) now resolved.** SDK migrated from
-`copilot-sdk-supercharged` to `@github/copilot` directly. Session tab
-title and close/detach bugs fixed.
+completed. SDK migrated to `@github/copilot` directly. Groups
+infrastructure with nested dockview is in progress — boot order,
+session restore, and new-group creation bugs fixed.
 
 ---
 
 ## Next concrete steps
 
-**2026-05-25:** Phase 22 complete (MCP OAuth toast + Permissions tab
-+ Tools tri-state allowlist). See DEVLOG for receipts. Image
-generation **stays deferred** per the user's earlier "skip until
-used" call — we will not pursue it speculatively.
+**2026-05-24:** Groups infrastructure working (boot order fix, session
+restore, new-group creation). Code quality audit completed; first round
+of extractions shipped (composables, deduplicated helpers). Tech debt
+plan updated with 6 new findings (E1–E6).
 
-Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` §C):
+Remaining groups work:
+1. **Session-to-group binding** — Track which sessions belong to which
+   group; filter sidebar by active group.
+2. **Groups context menu** — Right-click rename/delete/move.
+3. **Drag-and-drop** between groups.
+4. **Groups sidebar integration** — Sessions sidebar shows per-group sessions.
+5. **Left pane top/bottom split** — User wants multiple left-pane tabs
+   to split vertically instead of tabbing.
 
-1. **Long jobs registry + Autopilot UI follow-up** (audit P23, remaining).
-   First pass shipped: global Jobs panel, SDK task aggregation,
-   promote/cancel/remove actions, detach-on-active-job close, and
-   current-session Autopilot launcher. Remaining follow-ups: persisted
-   job history across restart, optional git cleanliness checks,
-   richer completion diff summaries, and commit/PR handoff.
-2. **Library tab consolidation follow-up** (audit P21, remaining).
-   Initial slice shipped: Instructions tab + `/library ...` command
-   wiring + SDK `CommandDefinition` registration. Remaining optional
-   work: unified Library item grid, in-app instruction editor (must be
-   permissioned), or deeper SDK hook features (`onUserPromptSubmitted`,
-   `onSessionStart`) once there is a concrete use case.
-3. **App shell redesign — sidebar + status bar** (audit P22, ~2 d).
-   Replaces the topbar-only chrome with a left activity bar + bottom
-   status bar; affects every screen so it's a larger structural lift.
-4. **Terminal integration follow-up** (audit P24, remaining). First
-   pass adds Bun native PTY registry/RPC, xterm dockview panels, and
-   command palette actions. Electrobun is pinned
-   to bundle Bun 1.3.14 because 1.3.13 rejects Windows `terminal`.
-   Terminal addon foundation, the ActivityBar terminal manager, terminal
-   settings, and the first Windows shell-integration parser/emitter are now
-   wired. Remaining follow-ups: richer profile CRUD, bash/zsh/fish shell
-   integration, buffer persistence UX, the return of session-bound terminal
-   affordances inside session/editor surfaces, agent terminal tool, inline
-   terminal blocks, shortcut design, and optional Ghostty Web renderer spike.
-5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
-   surface for the composer.
-
-Older candidates (Tier-2 E2E, metrics counters / histograms) stay in
-the backlog but get displaced by the higher-ROI items the audit
-surfaced.
-
-Explicitly **out of scope**:
-- Image generation (deferred per user; un-defer requires explicit ask).
+Code quality (tracked in `plans/plan-tech-debt.prompt.md` §E):
+1. **SessionDetailsPanel decomposition** (E1) — 2415 lines → section components.
+2. **sessionsStore event reducer** (E2) — Extract pure helpers.
+3. **layoutStore concerns** (E3) — Split group registry, persistence.
+4. **Duplicated session controls** (E5) — Extract shared composable.
 
 ---
 
