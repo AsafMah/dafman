@@ -5,7 +5,12 @@
 
 ## Open
 
-- [] clicking on a detached closed session doesn't resume it
+(none — all items solved or moved to plans)
+
+
+## Solved (2026-06-01)
+
+- [x] clicking on a detached closed session doesn't resume it
 
 
 ## Solved (2026-05-22 sweep)
