@@ -12,8 +12,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Fixed
 - **Session tab title.** Session tabs now show the real session title
   instead of the first 8 chars of the GUID. `addPanel()` resolves the
-  title from sessionsStore at creation time, and the App.vue title-sync
-  watcher fires immediately for restored sessions.
+  title from sessionsStore at creation time, and after each turn the
+  backend polls `session.getMetadata()` for the auto-summarised title
+  as a reliable fallback (mirroring the official CLI UI approach).
 - **Session close with active work.** Closing a chat tab now also checks
   `isThinking` and `pendingRequests` in addition to jobs, so sessions
   with active streaming/thinking are properly detached rather than

@@ -26,10 +26,20 @@ discovery).
    installer. Official SDK has features supercharged was missing:
    `onExitPlanMode`, `onAutoModeSwitch`.
 
-2. **Session tab title fix** — `layoutStore.addPanel()` now lazy-imports
-   sessionsStore and resolves existing title at panel creation time. App.vue
-   title-sync watcher made `immediate: true` for restored sessions.
-   Files: `src/stores/layoutStore.ts`, `src/App.vue`.
+2. **Session tab title fix** — Two-layer fix:
+   - `layoutStore.addPanel()` lazy-imports sessionsStore and resolves
+     existing title at panel creation time. App.vue title-sync watcher
+     made `immediate: true` for restored sessions.
+   - **Metadata polling fallback** (`a636fe5`): On every `session.idle`
+     event (end of turn), `pollTitleFromMetadata()` calls
+     `client.getSessionMetadata(sessionId)` and emits a synthetic
+     `session.title_changed` event with `meta.summary`. This mirrors the
+     official CLI UI approach (the idle handler in `app.js` re-reads
+     workspace metadata as a fallback). Root cause: the CLI emits
+     `session.title_changed` via `emitEphemeral()` which may not always
+     reach the SDK's `session.on()` dispatcher (ephemeral events are not
+     guaranteed to be forwarded to app-level handlers).
+   Files: `src/stores/layoutStore.ts`, `src/App.vue`, `src-bun/app/sessions.ts`.
 
 3. **Session close/detach fix** — `onDidRemovePanel` now checks
    `record.isThinking` and `record.pendingRequests` in addition to
