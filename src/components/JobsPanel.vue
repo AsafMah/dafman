@@ -84,7 +84,7 @@ function statusIcon(job: JobRecord): string {
   switch (job.status) {
     case "starting":
     case "running":
-      return "pi pi-spin pi-cog";
+      return "pi pi-spin pi-spinner";
     case "idle":
       return "pi pi-pause-circle";
     case "completed":

@@ -776,7 +776,7 @@ const pendingStyle = computed(() => {
              above, so by the time we reach this branch the type is
              narrowed to user / assistant / system. -->
         <div
-          v-else-if="!(item.kind === 'assistant' && item.text === '')"
+          v-else-if="item.kind !== 'reasoning' && !(item.kind === 'assistant' && item.text === '')"
           class="message-shell"
         >
           <!-- Inline editor swap. Only user messages support editing; -->
