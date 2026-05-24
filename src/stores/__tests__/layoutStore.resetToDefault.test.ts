@@ -331,6 +331,7 @@ describe("layoutStore.resetToDefault", () => {
       title: "Library",
       initialSize: 360,
       minimumSize: 320,
+      exclusive: true,
     });
 
     expect(dock.removeEdgeGroupCalls).toContain("left");

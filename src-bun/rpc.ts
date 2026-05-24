@@ -154,16 +154,6 @@ export interface Layout {
 	/// Serialized dockview state (`api.toJSON()`). `null` means
 	/// "no panes were open last time" — start with an empty dockview.
 	dockview: unknown | null;
-	/// Groups config — multiple workspace groups, each with an independent
-	/// dockview layout. Null on first boot (pre-groups migration).
-	groups?: {
-		activeGroupId: string;
-		groups: Array<{
-			id: string;
-			name: string;
-			layout: unknown | null;
-		}>;
-	} | null;
 }
 
 export interface TerminalCreateParams {

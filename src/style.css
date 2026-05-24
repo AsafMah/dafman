@@ -107,12 +107,3 @@ body.app-dark {
 .dv-edge-group .dv-tabs-and-actions-container {
   display: none !important;
 }
-
-/* In groups mode, the outer (shell) dockview's body group holds group
- * panels whose tab bar is replaced by GroupsBar.vue. Hide body-group
- * tab bars in the shell dockview. The `.shell-dock` class is added to
- * the outer DockviewVue; `.group-dock` is the inner per-group instance
- * whose chat-panel tab bars must remain visible. */
-.shell-dock :not(.dv-edge-group) > .dv-groupview > .dv-tabs-and-actions-container {
-  display: none !important;
-}

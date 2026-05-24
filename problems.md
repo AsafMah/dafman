@@ -5,13 +5,8 @@
 
 ## Open
 
-- When you said multiple tabs open at the same time in the left pane, I thought it would divide them to top/bottom
+(none — all items solved or moved to plans)
 
-## Solved (2026-05-24)
-
-- [x] Sessions are no longer restored in the ui — boot order fix (bodyApi wait + populateGroupPanels after restoreFromLayout)
-- [x] Sessions no longer restore their history after manually opening them — fixed by boot order (drainPending buffering works once bodyApi timing is correct)
-- [x] New group has all of the sessions in the old group, except for one — fixed: snapshot outgoing group + switchTo before adding panel
 
 ## Solved (2026-06-01)
 

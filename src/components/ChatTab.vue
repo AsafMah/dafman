@@ -110,36 +110,6 @@ function onClose(event: MouseEvent) {
   event.stopPropagation();
   panelApi.value?.close();
 }
-
-const maximized = ref(false);
-
-watchEffect((onCleanup) => {
-  const api = panelApi.value;
-  if (!api) return;
-  maximized.value = api.isMaximized();
-  const sub = (api as any).onDidMaximizedChange?.((e: { isMaximized: boolean }) => {
-    maximized.value = e.isMaximized;
-  });
-  // Fallback: dockview 6.x fires onDidDimensionsChange on maximize/restore
-  const dimSub = api.onDidDimensionsChange(() => {
-    maximized.value = api.isMaximized();
-  });
-  onCleanup(() => {
-    sub?.dispose?.();
-    dimSub.dispose();
-  });
-});
-
-function onMaximizeToggle(event: MouseEvent) {
-  event.stopPropagation();
-  const api = panelApi.value;
-  if (!api) return;
-  if (api.isMaximized()) {
-    api.exitMaximized();
-  } else {
-    api.maximize();
-  }
-}
 </script>
 
 <template>
@@ -163,21 +133,7 @@ function onMaximizeToggle(event: MouseEvent) {
     <span class="chat-tab-title">{{ displayTitle }}</span>
     <button
       type="button"
-      class="chat-tab-action"
-      :aria-label="maximized ? 'Restore panel' : 'Maximize panel'"
-      :title="maximized ? 'Restore' : 'Maximize'"
-      @pointerdown.stop
-      @click="onMaximizeToggle"
-    >
-      <i
-        class="pi"
-        :class="maximized ? 'pi-window-minimize' : 'pi-window-maximize'"
-        aria-hidden="true"
-      />
-    </button>
-    <button
-      type="button"
-      class="chat-tab-action chat-tab-close"
+      class="chat-tab-close"
       aria-label="Close session"
       @pointerdown.stop
       @click="onClose"
@@ -254,7 +210,7 @@ function onMaximizeToggle(event: MouseEvent) {
   min-width: 0;
 }
 
-.chat-tab-action {
+.chat-tab-close {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -272,13 +228,13 @@ function onMaximizeToggle(event: MouseEvent) {
   transition: opacity 120ms ease, background 120ms ease;
 }
 
-.chat-tab:hover .chat-tab-action,
-.chat-tab-active .chat-tab-action,
-.chat-tab-action:focus-visible {
+.chat-tab:hover .chat-tab-close,
+.chat-tab-active .chat-tab-close,
+.chat-tab-close:focus-visible {
   opacity: 0.85;
 }
 
-.chat-tab-action:hover {
+.chat-tab-close:hover {
   opacity: 1;
   background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
