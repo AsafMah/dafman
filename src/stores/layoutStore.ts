@@ -11,7 +11,7 @@
 // serialized into the layout JSON for free.
 
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import type {
   DockviewApi,
   EdgeGroupPosition,
@@ -161,7 +161,18 @@ export interface EdgePanelOptions {
 }
 
 export const useLayoutStore = defineStore("layout", () => {
-  const api = ref<DockviewApi | null>(null);
+  /// The outer (shell) dockview API — owns edge groups (sidebars) and
+  /// group tabs. Shared across all groups.
+  const shellApi = ref<DockviewApi | null>(null);
+  /// The active group's inner dockview API — owns chat/terminal panels
+  /// for the currently visible group. Updated when switching groups.
+  const bodyApi = ref<DockviewApi | null>(null);
+  /// Per-group inner dockview APIs, keyed by group id.
+  const groupApis = shallowRef<Map<string, DockviewApi>>(new Map());
+  /// Backward-compatible alias: most chat-panel operations use `api`.
+  /// Points at `bodyApi` when available, falls back to `shellApi` for
+  /// pre-groups code paths (edge panel ops that haven't been migrated).
+  const api = computed(() => bodyApi.value ?? shellApi.value);
   /// Reactive id of the currently-focused chat panel, or `null` when no
   /// chat panel is active (focus on Sessions sidebar, Settings, dev
   /// playground, or nothing at all). Subscribers on dockview's
@@ -199,7 +210,7 @@ export const useLayoutStore = defineStore("layout", () => {
     const direct = edgePanels(edge);
     if (direct.length > 0) return direct;
     const id = edgeId(edge);
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!id || !dock) return [];
     const group = dock.groups.find((g) => g.id === id);
     if (!group) return [];
@@ -232,7 +243,7 @@ export const useLayoutStore = defineStore("layout", () => {
     position: EdgeGroupPosition,
     minimumSize: number | undefined,
   ): void {
-    const edge = api.value?.getEdgeGroup(position);
+    const edge = shellApi.value?.getEdgeGroup(position);
     if (!edge || minimumSize === undefined) return;
     const effectiveMinimum = effectiveEdgeMinimum(position, minimumSize);
     const edgeApi = edge as unknown as {
@@ -267,7 +278,7 @@ export const useLayoutStore = defineStore("layout", () => {
     position: EdgeGroupPosition,
     desired: number,
   ): number {
-    const dock = api.value;
+    const dock = shellApi.value;
     const viewportWidth = typeof window === "undefined" ? undefined : window.innerWidth;
     const viewportHeight = typeof window === "undefined" ? undefined : window.innerHeight;
     const available =
@@ -307,7 +318,7 @@ export const useLayoutStore = defineStore("layout", () => {
     edge: unknown,
     minimumSize: number,
   ): boolean {
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!dock) return false;
     const panels = edgePanelsFromDock(edge);
     const knownPanels = panels
@@ -347,7 +358,7 @@ export const useLayoutStore = defineStore("layout", () => {
   }
 
   function enforceKnownEdgeMinimums(): void {
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!dock) return;
     for (const position of ["left", "right"] as const) {
       const edge = dock.getEdgeGroup(position);
@@ -434,10 +445,74 @@ export const useLayoutStore = defineStore("layout", () => {
     if (detailsOpen.value !== found) detailsOpen.value = found;
   }
 
+  /// Sets the outer (shell) dockview API. Called once from App.vue
+  /// when the outer DockviewVue fires @ready. Edge panel operations
+  /// and group tab management go through this API.
+  function setShellApi(next: DockviewApi | null): void {
+    shellApi.value = next;
+    if (!next) return;
+    rescanOpenDetails(next);
+    enforceKnownEdgeMinimums();
+    // Track session-details panel add/remove on the shell.
+    const removeSub = next.onDidRemovePanel(() => rescanOpenDetails(next));
+    const addSub = next.onDidAddPanel(() => rescanOpenDetails(next));
+    activeUnsubs.push(
+      () => removeSub.dispose(),
+      () => addSub.dispose(),
+    );
+  }
+
+  /// Sets the active group's inner dockview API. Called when switching
+  /// groups or when the active group's DockviewVue fires @ready.
+  /// Active-session tracking hooks are wired to this API.
+  let bodyUnsubs: Array<() => void> = [];
+  function setBodyApi(next: DockviewApi | null): void {
+    for (const unsub of bodyUnsubs) unsub();
+    bodyUnsubs = [];
+    bodyApi.value = next;
+    if (!next) {
+      activeSessionId.value = null;
+      return;
+    }
+    recomputeActiveSession(next);
+    const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
+    const panelSub = next.onDidActivePanelChange(() => recomputeActiveSession(next));
+    const removeSub = next.onDidRemovePanel(() => recomputeActiveSession(next));
+    bodyUnsubs = [
+      () => groupSub.dispose(),
+      () => panelSub.dispose(),
+      () => removeSub.dispose(),
+    ];
+  }
+
+  /// Register a group's inner dockview API (called by GroupPanel on @ready).
+  function registerGroupApi(groupId: string, groupDockApi: DockviewApi): void {
+    const next = new Map(groupApis.value);
+    next.set(groupId, groupDockApi);
+    groupApis.value = next;
+  }
+
+  /// Unregister a group's inner dockview API (called by GroupPanel on unmount).
+  function unregisterGroupApi(groupId: string): void {
+    const current = groupApis.value.get(groupId);
+    if (bodyApi.value === current) {
+      bodyApi.value = null;
+    }
+    const next = new Map(groupApis.value);
+    next.delete(groupId);
+    groupApis.value = next;
+  }
+
+  /// Legacy setApi — for backward compatibility during migration.
+  /// Sets the shell API and (when no groups exist) also the body API.
   function setApi(next: DockviewApi | null): void {
     for (const unsub of activeUnsubs) unsub();
     activeUnsubs = [];
-    api.value = next;
+    // In single-dockview (pre-groups) mode, the shell and body are
+    // the same instance. With groups, App.vue calls setShellApi +
+    // setBodyApi separately.
+    shellApi.value = next;
+    bodyApi.value = next;
     if (!next) {
       activeSessionId.value = null;
       detailsOpen.value = false;
@@ -596,7 +671,7 @@ export const useLayoutStore = defineStore("layout", () => {
   }
 
   function rememberSessionDetailsWidth(): void {
-    const edge = api.value?.getEdgeGroup("right");
+    const edge = shellApi.value?.getEdgeGroup("right");
     if (!edge) return;
     const width = edge.width;
     if (Number.isFinite(width) && width >= SESSION_DETAILS_MIN_WIDTH) {
@@ -790,7 +865,7 @@ export const useLayoutStore = defineStore("layout", () => {
     position: EdgeGroupPosition,
     options: EdgePanelOptions,
   ): void {
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!dock) return;
     let existingGroup = dock.getEdgeGroup(position);
     let existing = dock.getPanel(options.id);
@@ -872,7 +947,7 @@ export const useLayoutStore = defineStore("layout", () => {
   /// tears down the parent shell so the next open gets a fresh
   /// `initialSize`.
   function pruneEmptyEdgeGroup(groupId: string): boolean {
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!dock) return false;
     for (const pos of ["left", "right", "top", "bottom"] as const) {
       const edge = dock.getEdgeGroup(pos);
@@ -892,9 +967,12 @@ export const useLayoutStore = defineStore("layout", () => {
   /// dockview tree. Used by toggle-style toolbar buttons (Sessions
   /// Manager, Library, …) to decide between open/close.
   function isPanelOpen(id: string): boolean {
-    const dock = api.value;
-    if (!dock) return false;
-    return !!dock.getPanel(id);
+    // Check both shell (edge panels) and body (chat panels).
+    const shell = shellApi.value;
+    if (shell?.getPanel(id)) return true;
+    const body = bodyApi.value;
+    if (body?.getPanel(id)) return true;
+    return false;
   }
 
   /// Closes (removes) a panel by id, and also tears down the parent
@@ -903,7 +981,10 @@ export const useLayoutStore = defineStore("layout", () => {
   /// the configured `initialSize` instead of inheriting a residual
   /// collapsed size. Idempotent for unknown ids.
   function closePanel(id: string): void {
-    const dock = api.value;
+    // Try shell (edge panels) first, then body (chat panels).
+    const shell = shellApi.value;
+    const body = bodyApi.value;
+    const dock = shell?.getPanel(id) ? shell : body?.getPanel(id) ? body : null;
     if (!dock) return;
     const panel = dock.getPanel(id);
     if (!panel) return;
@@ -928,7 +1009,7 @@ export const useLayoutStore = defineStore("layout", () => {
   /// Toggles edge-group visibility (e.g. collapse/expand a sidebar
   /// without destroying its contents).
   function toggleEdgeGroup(position: EdgeGroupPosition): void {
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!dock) return;
     if (!dock.getEdgeGroup(position)) return;
     dock.setEdgeGroupVisible(position, !dock.isEdgeGroupVisible(position));
@@ -936,27 +1017,22 @@ export const useLayoutStore = defineStore("layout", () => {
 
   // ---------- Layout serialization (persistence) ----------
 
-  /// Returns dockview's full serialized layout, or null when the api
-  /// isn't ready yet. Callers (settingsStore writers) treat this as an
-  /// opaque blob — only dockview interprets it.
+  /// Returns the shell dockview's full serialized layout (edge panels +
+  /// group tabs), or null when the shell api isn't ready yet.
   function snapshot(): unknown | null {
-    return api.value?.toJSON() ?? null;
+    return shellApi.value?.toJSON() ?? null;
   }
 
-  /// Restores a previously-snapshotted layout. Caller is responsible
+  /// Snapshots the active group's inner dockview layout.
+  function snapshotBody(): unknown | null {
+    return bodyApi.value?.toJSON() ?? null;
+  }
+
+  /// Restores a previously-snapshotted shell layout. Caller is responsible
   /// for ensuring any session-backed panels referenced by the layout
   /// have been resumed first (so the slot can find their record).
-  ///
-  /// Wrapped in try/catch because a malformed persisted JSON
-  /// (legacy panel ids, dangling group refs, schema drift across
-  /// dockview versions) makes `fromJSON` throw — and an unhandled
-  /// throw here propagates up through `App.vue`'s async `onMounted`,
-  /// preventing `bootStore.markReady()` from ever firing and leaving
-  /// the splash stuck on "Applying layout…" / "Restoring sessions…".
-  /// Returns true on success, false on a swallowed failure (caller
-  /// can fall back to opening the Sessions sidebar at default size).
   function restore(layout: unknown): boolean {
-    const dock = api.value;
+    const dock = shellApi.value;
     if (!dock || !layout || typeof layout !== "object") return false;
     try {
       dock.fromJSON(layout as Parameters<DockviewApi["fromJSON"]>[0]);
@@ -969,14 +1045,40 @@ export const useLayoutStore = defineStore("layout", () => {
     }
   }
 
+  /// Restores a group's inner dockview layout.
+  function restoreBody(layout: unknown): boolean {
+    const dock = bodyApi.value;
+    if (!dock || !layout || typeof layout !== "object") return false;
+    try {
+      dock.fromJSON(layout as Parameters<DockviewApi["fromJSON"]>[0]);
+      return true;
+    } catch (err) {
+      console.error("[layoutStore.restoreBody] dockview.fromJSON threw", err);
+      return false;
+    }
+  }
+
+  /// Returns the inner dockview API for a specific group.
+  function getGroupApi(groupId: string): DockviewApi | undefined {
+    return groupApis.value.get(groupId);
+  }
+
   return {
     api,
+    shellApi,
+    bodyApi,
+    groupApis,
     activeSessionId,
     detailsOpen,
     enforceKnownEdgeMinimums,
     rememberSessionDetailsWidth,
     restoreSessionDetailsWidth,
     setApi,
+    setShellApi,
+    setBodyApi,
+    registerGroupApi,
+    unregisterGroupApi,
+    getGroupApi,
     addPanel,
     addTerminalPanel,
     removePanel,
@@ -995,6 +1097,8 @@ export const useLayoutStore = defineStore("layout", () => {
     resetToDefault,
     firstBodyGroupId,
     snapshot,
+    snapshotBody,
     restore,
+    restoreBody,
   };
 });

@@ -245,6 +245,19 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         }
       },
     },
+    // ---- Group commands ----
+    {
+      id: "groups.new",
+      label: "New Group",
+      group: "Groups",
+      icon: "pi pi-plus",
+      keywords: ["group", "workspace", "new", "create"],
+      run: () => {
+        const { useGroupsStore } = require("../stores/groupsStore");
+        const groupsStore = useGroupsStore();
+        groupsStore.createGroup();
+      },
+    },
   ];
 
   if (import.meta.env.DEV) {

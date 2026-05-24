@@ -172,6 +172,16 @@ export type CommandResultEvent =
 
 export interface Layout {
   dockview: unknown | null;
+  /// Groups config — multiple workspace groups, each with an independent
+  /// dockview layout. Null on first boot (pre-groups migration).
+  groups?: {
+    activeGroupId: string;
+    groups: Array<{
+      id: string;
+      name: string;
+      layout: unknown | null;
+    }>;
+  } | null;
 }
 
 export interface Workspaces {

@@ -16,6 +16,7 @@ import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
 import { useModelsStore } from "./stores/modelsStore";
 import { useBootStore } from "./stores/bootStore";
 import { useJobsStore } from "./stores/jobsStore";
+import { useGroupsStore } from "./stores/groupsStore";
 import { useConfirm } from "primevue/useconfirm";
 import ConfirmDialog from "primevue/confirmdialog";
 import { resolveIsDark } from "./lib/theme";
@@ -37,6 +38,7 @@ const layoutStore = useLayoutStore();
 const modelsStore = useModelsStore();
 const bootStore = useBootStore();
 const jobsStore = useJobsStore();
+const groupsStore = useGroupsStore();
 const primeToast = useToast();
 const primeConfirm = useConfirm();
 
@@ -241,71 +243,100 @@ onMounted(async () => {
   }
 });
 
-/// Resumes each session id referenced by the persisted dockview JSON,
-/// then applies the JSON via `layoutStore.restore()` if at least one
-/// resume succeeded. The dockview side won't be `@ready` yet on
-/// startup, so we defer the actual `fromJSON` until the api shows up
-/// (`onDockReady` will check this).
+/// Resumes each session id referenced by all group layouts (or the
+/// legacy single layout), then defers the actual layout restoration
+/// to `onShellReady` → each GroupPanel's `onReady`.
 const pendingRestoreLayout = ref<unknown | null>(null);
 
+/// Whether the app is using nested dockview (groups mode) or the
+/// legacy single-dockview mode. In legacy mode, `onDockReady` uses
+/// `setApi()` and chat panels live directly in the single dockview.
+/// In groups mode, `onDockReady` uses `setShellApi()` and creates
+/// group body panels, each containing its own inner DockviewVue.
+const isGroupsMode = ref(false);
+
+/// Sessions that need to be resumed on boot, gathered from group
+/// layouts or legacy layout. GroupPanel.onReady will restore the
+/// actual panel layout after sessions are available.
+const pendingGroupLayouts = ref<Map<string, unknown>>(new Map());
+
 async function restoreFromLayout() {
-  const layout = settingsStore.settings.layout?.dockview;
-  if (!layout || typeof layout !== "object") {
-    console.info("[boot] restoreFromLayout: no layout to restore");
-    return;
-  }
-  const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
-  const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
-  const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
-  const sessionIds = extractChatPanelIds(sanitized);
-  console.info(
-    `[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`,
-  );
-  if (sessionIds.length === 0) {
-    if (layoutStore.api) {
-      const ok = layoutStore.restore(sanitized);
-      if (!ok) layoutStore.resetToDefault();
-    } else {
-      pendingRestoreLayout.value = sanitized;
+  const settings = settingsStore.settings;
+  const groupsConfig = settings.layout?.groups;
+
+  // Determine if we're in groups mode or legacy mode.
+  if (groupsConfig && groupsConfig.groups.length > 0) {
+    // Groups mode: init groups from persisted config.
+    isGroupsMode.value = true;
+    groupsStore.init(groupsConfig, null);
+    const allSessionIds: string[] = [];
+    for (const group of groupsConfig.groups) {
+      if (group.layout && typeof group.layout === "object") {
+        const sanitized = enforcePersistedEdgeMinimums(
+          stripPanelFromLayout(
+            stripLegacyDetailsPanels(group.layout),
+            SETTINGS_PANEL_ID,
+          ),
+        );
+        const ids = extractChatPanelIds(sanitized);
+        allSessionIds.push(...ids);
+        pendingGroupLayouts.value.set(group.id, sanitized);
+      }
     }
-    return;
+    console.info(
+      `[boot] restoreFromLayout: groups mode, ${groupsConfig.groups.length} groups, ${allSessionIds.length} total sessions`,
+    );
+    if (allSessionIds.length > 0) {
+      bootStore.beginSessions(allSessionIds.length);
+      await Promise.all(
+        allSessionIds.map((id) =>
+          sessionsStore
+            .restoreSession(id)
+            .finally(() => bootStore.markSessionRestored()),
+        ),
+      );
+    }
+    // Shell layout (edge panels) restored in onDockReady.
+    if (settings.layout?.dockview) {
+      pendingRestoreLayout.value = enforcePersistedEdgeMinimums(
+        stripPanelFromLayout(
+          stripLegacyDetailsPanels(settings.layout.dockview),
+          SETTINGS_PANEL_ID,
+        ),
+      );
+    }
+  } else {
+    // Legacy mode: single dockview layout, no nested groups.
+    isGroupsMode.value = false;
+    groupsStore.init(null, null);
+    const layout = settings.layout?.dockview;
+    if (!layout || typeof layout !== "object") {
+      console.info("[boot] restoreFromLayout: no layout to restore");
+      return;
+    }
+    const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
+    const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
+    const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
+    const sessionIds = extractChatPanelIds(sanitized);
+    console.info(
+      `[boot] restoreFromLayout: legacy mode, ${sessionIds.length} chat sessions to resume`,
+    );
+    if (sessionIds.length > 0) {
+      bootStore.beginSessions(sessionIds.length);
+      await Promise.all(
+        sessionIds.map((id) =>
+          sessionsStore
+            .restoreSession(id)
+            .finally(() => bootStore.markSessionRestored()),
+        ),
+      );
+    }
+    pendingRestoreLayout.value = sanitized;
   }
-  bootStore.beginSessions(sessionIds.length);
-  // Parallel resumes — safe again now that rpcGuard throws a real
-  // Error (encoded AppErrorPayload). Previously this hung because
-  // Electrobun's bridge drops non-Error throws (see src-bun/app/
-  // errors.ts comment).
-  await Promise.all(
-    sessionIds.map((id) =>
-      sessionsStore
-        .restoreSession(id)
-        .finally(() => bootStore.markSessionRestored()),
-    ),
-  );
-  console.info("[boot] restoreFromLayout: all resumes settled, applying layout");
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => resolve()),
-  );
   bootStore.beginApplying();
   await new Promise<void>((resolve) =>
     requestAnimationFrame(() => resolve()),
   );
-  if (layoutStore.api) {
-    const ok = layoutStore.restore(sanitized);
-    console.info(`[boot] restoreFromLayout: fromJSON ok=${ok}`);
-    if (!ok) {
-      // fromJSON threw — toast and fall back to a default layout
-      // so the user has something to work with instead of a blank
-      // window.
-      useToastStore().warn(
-        "Layout restore failed",
-        "The persisted dockview JSON was rejected. Resetting to default.",
-      );
-      layoutStore.resetToDefault();
-    }
-  } else {
-    pendingRestoreLayout.value = sanitized;
-  }
 }
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
@@ -348,63 +379,100 @@ watch(
 );
 
 function onDockReady(event: DockviewReadyEvent) {
-  console.info("[boot] onDockReady fired");
-  layoutStore.setApi(event.api);
-  // Whenever the user closes a tab via dockview's own X (we hide the
-  // in-pane close button to keep a single source of truth), tear down
-  // the underlying session too. closeSession is idempotent and safe to
-  // call even if the session is already gone.
-  event.api.onDidRemovePanel((panel) => {
-    // Capture the parent group id BEFORE the panel is fully torn down
-    // — at this point the panel still has its `api.group` reference,
-    // but its `group.panels.length` reflects the post-removal count.
-    const groupId = panel.api.group.id;
-    if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-      const record = sessionsStore.getSession(panel.id);
-      const sessionBusy =
-        jobsStore.hasActiveJobsForSession(panel.id) ||
-        record?.isThinking ||
-        (record?.pendingRequests?.length ?? 0) > 0;
-      if (sessionBusy) {
-        toastStore.info(
-          "Session detached",
-          "Session is still busy. Reopen from the Sessions sidebar.",
-        );
-      } else {
-        void sessionsStore.closeSession(panel.id);
-      }
+  if (isGroupsMode.value) {
+    // ---- Groups mode: outer dockview is the shell ----
+    console.info("[boot] onDockReady (shell/groups mode) fired");
+    layoutStore.setShellApi(event.api);
+
+    // Restore shell layout (edge panels only).
+    if (pendingRestoreLayout.value) {
+      const ok = layoutStore.restore(pendingRestoreLayout.value);
+      if (!ok) layoutStore.resetToDefault();
+      pendingRestoreLayout.value = null;
     }
-    // If this panel was the last one in its edge group (e.g. user
-    // closed the Sessions sidebar via dockview's own X), tear down
-    // the edge group too so the next open recreates at the
-    // configured `initialSize` instead of inheriting a residual
-    // sliver. Safe to call for body groups: it's a no-op when the
-    // group isn't an edge group.
-    layoutStore.pruneEmptyEdgeGroup(groupId);
-  });
-  // If startup-resume already produced a pruned layout, hand it over
-  // now that the api is alive. Done before subscribing to layout
-  // changes so the restore itself doesn't trigger a write.
-  if (pendingRestoreLayout.value) {
-    const ok = layoutStore.restore(pendingRestoreLayout.value);
-    if (!ok) layoutStore.resetToDefault();
-    pendingRestoreLayout.value = null;
+
+    // Create a body panel in the shell for each group.
+    for (const group of groupsStore.groups) {
+      const isActive = group.id === groupsStore.activeGroupId;
+      event.api.addPanel({
+        id: `group-${group.id}`,
+        component: "groupPanel",
+        tabComponent: "groupTab",
+        params: {
+          groupId: group.id,
+          groupName: group.name,
+          pendingLayout: pendingGroupLayouts.value.get(group.id) ?? null,
+        },
+        inactive: !isActive,
+      });
+    }
+    pendingGroupLayouts.value.clear();
+
+    // Wire active group switching.
+    event.api.onDidActivePanelChange((panel) => {
+      if (!panel) return;
+      const groupId = panel.id.startsWith("group-")
+        ? panel.id.slice("group-".length)
+        : null;
+      if (groupId) {
+        groupsStore.switchTo(groupId);
+        const innerApi = layoutStore.getGroupApi(groupId);
+        if (innerApi) {
+          layoutStore.setBodyApi(innerApi);
+        }
+      }
+    });
+
+    // Shell-level panel removal: edge group cleanup and group deletion.
+    event.api.onDidRemovePanel((panel) => {
+      const groupId = panel.api.group.id;
+      if (panel.id.startsWith("group-")) {
+        const gid = panel.id.slice("group-".length);
+        layoutStore.unregisterGroupApi(gid);
+        groupsStore.deleteGroup(gid);
+      }
+      layoutStore.pruneEmptyEdgeGroup(groupId);
+    });
+  } else {
+    // ---- Legacy mode: single dockview, no groups ----
+    console.info("[boot] onDockReady (legacy mode) fired");
+    layoutStore.setApi(event.api);
+
+    // Session teardown on panel removal.
+    event.api.onDidRemovePanel((panel) => {
+      const groupId = panel.api.group.id;
+      if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
+        const record = sessionsStore.getSession(panel.id);
+        const sessionBusy =
+          jobsStore.hasActiveJobsForSession(panel.id) ||
+          record?.isThinking ||
+          (record?.pendingRequests?.length ?? 0) > 0;
+        if (sessionBusy) {
+          toastStore.info(
+            "Session detached",
+            "Session is still busy. Reopen from the Sessions sidebar.",
+          );
+        } else {
+          void sessionsStore.closeSession(panel.id);
+        }
+      }
+      layoutStore.pruneEmptyEdgeGroup(groupId);
+    });
+
+    // Restore pending layout.
+    if (pendingRestoreLayout.value) {
+      const ok = layoutStore.restore(pendingRestoreLayout.value);
+      if (!ok) layoutStore.resetToDefault();
+      pendingRestoreLayout.value = null;
+    }
   }
-  // One-shot rescue: older builds (or a stale persisted layout) could
-  // leave chat panels stuck inside the Sessions sidebar's edge group,
-  // where they have no tab/header chrome and look broken. Move any
-  // such strays out to the body. Safe no-op when the layout is clean.
+
+  // Common: rescue strays and persist on layout change.
   layoutStore.rescueChatPanelsFromEdgeGroups();
-  // Persist on every layout change (debounced). Covers add/remove/
-  // resize/move/popout/dock — everything dockview considers a layout
-  // mutation collapses into this single event.
   event.api.onDidLayoutChange(() => {
     layoutStore.enforceKnownEdgeMinimums();
     layoutStore.rememberSessionDetailsWidth();
     scheduleLayoutSave();
-    // Keep the ActivityBar's pressed-state in sync with reality
-    // (panels closed via their in-panel X, restored from layout,
-    // dragged into popouts, …).
     activityBarRef.value?.sync();
   });
 }
@@ -416,7 +484,11 @@ function scheduleLayoutSave() {
   if (layoutSaveTimer !== null) clearTimeout(layoutSaveTimer);
   layoutSaveTimer = setTimeout(() => {
     layoutSaveTimer = null;
-    void settingsStore.persistLayout(layoutStore.snapshot());
+    const shellSnapshot = layoutStore.snapshot();
+    const groupsConfig = isGroupsMode.value
+      ? groupsStore.toConfig(layoutStore.groupApis)
+      : undefined;
+    void settingsStore.persistLayout(shellSnapshot, groupsConfig);
   }, 300);
 }
 
