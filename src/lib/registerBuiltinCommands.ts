@@ -32,6 +32,7 @@ import { useToastStore } from "../stores/toastStore";
 import { useTerminalStore } from "../stores/terminalStore";
 import { SESSION_COMMANDS } from "./sessionCommands";
 import type { SessionMode } from "../ipc/types";
+import { toErrorMessage } from "./errorMessage";
 
 const SESSIONS_PANEL_ID = "sessions-manager";
 
@@ -195,7 +196,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         } catch (err) {
           toasts.error(
             "Couldn't open log folder",
-            err instanceof Error ? err.message : String(err),
+            toErrorMessage(err),
           );
         }
       },

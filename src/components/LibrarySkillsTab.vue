@@ -14,6 +14,7 @@ import { useToastStore } from "../stores/toastStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import MessageContent from "./MessageContent.vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 type Skill = {
   name: string;
@@ -66,7 +67,7 @@ async function load() {
     }
     loaded.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = toErrorMessage(err);
     loaded.value = true;
   }
 }
@@ -95,7 +96,7 @@ async function toggleSkill(skill: Skill) {
     }
   } catch (err) {
     skill.enabled = !next;
-    toasts.error("Toggle failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Toggle failed", toErrorMessage(err));
   }
 }
 
@@ -117,7 +118,7 @@ async function revealSkillFile(path: string | undefined) {
   } catch (err) {
     toasts.error(
       "Couldn't reveal skill",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }

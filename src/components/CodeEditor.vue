@@ -25,6 +25,7 @@ import {
   resolveLanguageForFile,
 } from "../lib/codeLanguage";
 import { useToastStore } from "../stores/toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const props = withDefaults(
   defineProps<{
@@ -78,7 +79,7 @@ async function copyAll(): Promise<void> {
     await navigator.clipboard.writeText(props.modelValue);
     toasts.success("Code copied");
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     toasts.error("Copy failed", message);
   }
 }

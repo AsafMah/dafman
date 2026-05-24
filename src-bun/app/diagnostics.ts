@@ -33,6 +33,7 @@ import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getLogDir, log, recentLogs } from "./logging";
 import { AppError } from "./errors";
+import { toErrorMessage } from "./errorMessage";
 
 export interface DiagnosticsExportResult {
 	/// Absolute path to the export directory.
@@ -85,7 +86,7 @@ export async function exportDiagnostics(
 		await mkdir(logSubdir, { recursive: true });
 	} catch (err) {
 		throw AppError.io(
-			`failed to create diagnostics dir: ${err instanceof Error ? err.message : String(err)}`,
+			`failed to create diagnostics dir: ${toErrorMessage(err)}`,
 		);
 	}
 
@@ -109,14 +110,14 @@ export async function exportDiagnostics(
 				} catch (err) {
 					log.warn("diagnostics: skipped log file", {
 						name,
-						error: err instanceof Error ? err.message : String(err),
+						error: toErrorMessage(err),
 					});
 				}
 			}
 		} catch (err) {
 			log.warn("diagnostics: failed to list log dir", {
 				path: sourceLogs,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -132,7 +133,7 @@ export async function exportDiagnostics(
 		files.push("logs/recent.json");
 	} catch (err) {
 		log.warn("diagnostics: failed to write recent.json", {
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 
@@ -145,7 +146,7 @@ export async function exportDiagnostics(
 		files.push("settings.json");
 	} catch (err) {
 		log.warn("diagnostics: failed to write settings snapshot", {
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 
@@ -157,7 +158,7 @@ export async function exportDiagnostics(
 		files.push("README.md");
 	} catch (err) {
 		log.warn("diagnostics: failed to write README", {
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 

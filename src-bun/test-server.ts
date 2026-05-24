@@ -39,6 +39,7 @@ import { listInstructionSources } from "./app/instructions";
 import { toModelSummary } from "./app/models";
 import { FakeCopilotClient } from "./app/fakeClient";
 import type { AuditEntry } from "./app/audit";
+import { toErrorMessage } from "./app/errorMessage";
 import type {
 	LogRecord,
 	SessionEventPayload,
@@ -565,7 +566,7 @@ const server = Bun.serve({
 				const result = await handler(msg.args ?? {});
 				ws.send(JSON.stringify({ type: "response", id, result }));
 			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err);
+				const message = toErrorMessage(err);
 				ws.send(
 					JSON.stringify({
 						type: "error",

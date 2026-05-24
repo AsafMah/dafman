@@ -16,6 +16,7 @@ import { useToastStore } from "../stores/toastStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import McpServerForm from "./McpServerForm.vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 type McpConfig = Record<string, unknown>;
 type ConfiguredEntry = {
@@ -115,7 +116,7 @@ async function loadAll() {
     discovered.value = [...merged.values()];
     loaded.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = toErrorMessage(err);
     loaded.value = true;
   }
 }
@@ -156,7 +157,7 @@ async function toggleEnable(entry: ConfiguredEntry) {
   } catch (err) {
     toasts.error(
       "Failed to toggle MCP server",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }
@@ -176,7 +177,7 @@ async function removeEntry(entry: ConfiguredEntry) {
     configured.value = configured.value.filter((e) => e.name !== entry.name);
     toasts.success("MCP server removed", entry.name);
   } catch (err) {
-    toasts.error("Failed to remove", err instanceof Error ? err.message : String(err));
+    toasts.error("Failed to remove", toErrorMessage(err));
   }
 }
 
@@ -212,7 +213,7 @@ async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
     dialogOpen.value = false;
     await loadAll();
   } catch (err) {
-    toasts.error("Save failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Save failed", toErrorMessage(err));
   }
 }
 
@@ -232,7 +233,7 @@ async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
       entry.name,
     );
   } catch (err) {
-    toasts.error("MCP toggle failed", err instanceof Error ? err.message : String(err));
+    toasts.error("MCP toggle failed", toErrorMessage(err));
   }
 }
 
@@ -261,7 +262,7 @@ async function signIn(entry: ConfiguredEntry) {
       toasts.success("Already signed in", entry.name);
     }
   } catch (err) {
-    toasts.error("Sign-in failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Sign-in failed", toErrorMessage(err));
   }
 }
 

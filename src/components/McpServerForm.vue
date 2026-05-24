@@ -18,6 +18,7 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import SelectButton from "primevue/selectbutton";
 import ToggleSwitch from "primevue/toggleswitch";
+import { toErrorMessage } from "../lib/errorMessage";
 
 type McpConfig = Record<string, unknown>;
 type Transport = "local" | "http";
@@ -173,7 +174,7 @@ function onModeChange(next: Mode) {
       structuredFromConfig(parsed);
       jsonError.value = null;
     } catch (err) {
-      jsonError.value = err instanceof Error ? err.message : String(err);
+      jsonError.value = toErrorMessage(err);
       return; // Stay in JSON mode until valid.
     }
   }
@@ -213,7 +214,7 @@ function onSubmit() {
     try {
       config = JSON.parse(jsonDraft.value) as McpConfig;
     } catch (err) {
-      jsonError.value = err instanceof Error ? err.message : String(err);
+      jsonError.value = toErrorMessage(err);
       return;
     }
   } else {

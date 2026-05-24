@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { CopilotClient } from "./copilotSdk";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { toErrorMessage } from "./errorMessage";
 
 let instance: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
@@ -61,7 +62,7 @@ export async function ensureClient(): Promise<CopilotClient> {
 			await client.start();
 		} catch (err) {
 			starting = null;
-			const message = err instanceof Error ? err.message : String(err);
+			const message = toErrorMessage(err);
 			log.error("failed to start copilot client", { error: message });
 			throw AppError.sdk(message);
 		}
@@ -90,7 +91,7 @@ export async function shutdownClient(): Promise<void> {
 		}
 	} catch (err) {
 		log.warn("copilot client stop threw", {
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	} finally {
 		instance = null;

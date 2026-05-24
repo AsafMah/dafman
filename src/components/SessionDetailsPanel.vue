@@ -36,6 +36,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import MessageContent from "./MessageContent.vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 
@@ -125,7 +126,7 @@ function onWorkspaceClick() {
   invokeCommand("revealPath", { path }).catch((err: unknown) => {
     toasts.error(
       "Couldn't open workspace",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   });
 }
@@ -134,7 +135,7 @@ function revealFile(path: string) {
   invokeCommand("revealPath", { path }).catch((err: unknown) => {
     toasts.error(
       "Couldn't open file",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   });
 }
@@ -171,7 +172,7 @@ async function loadAgents() {
     });
     agentsLoaded.value = true;
   } catch (err) {
-    agentsError.value = err instanceof Error ? err.message : String(err);
+    agentsError.value = toErrorMessage(err);
     agentsLoaded.value = true;
   }
 }
@@ -185,10 +186,10 @@ async function reloadAgents() {
     });
     toasts.success("Agents reloaded", `${sessionAgents.value.length} available`);
   } catch (err) {
-    agentsError.value = err instanceof Error ? err.message : String(err);
+    agentsError.value = toErrorMessage(err);
     toasts.error(
       "Failed to reload agents",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }
@@ -206,7 +207,7 @@ async function selectAgent(name: string) {
   } catch (err) {
     toasts.error(
       "Failed to select agent",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   } finally {
     agentBusyName.value = null;
@@ -221,7 +222,7 @@ async function deselectAgent() {
   } catch (err) {
     toasts.error(
       "Failed to deselect agent",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   } finally {
     agentBusyName.value = null;
@@ -277,7 +278,7 @@ async function loadTasks() {
     tasksLoaded.value = true;
   } catch (err) {
     if (token !== tasksRequestToken) return;
-    tasksError.value = err instanceof Error ? err.message : String(err);
+    tasksError.value = toErrorMessage(err);
     tasksLoaded.value = true;
   }
 }
@@ -294,7 +295,7 @@ async function cancelTask(task: TaskInfo) {
   } catch (err) {
     toasts.error(
       "Failed to cancel task",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   } finally {
     taskBusyId.value = null;
@@ -313,7 +314,7 @@ async function removeTask(task: TaskInfo) {
   } catch (err) {
     toasts.error(
       "Failed to remove task",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   } finally {
     taskBusyId.value = null;
@@ -370,7 +371,7 @@ async function loadSkills() {
     });
     skillsLoaded.value = true;
   } catch (err) {
-    skillsError.value = err instanceof Error ? err.message : String(err);
+    skillsError.value = toErrorMessage(err);
     skillsLoaded.value = true;
   }
 }
@@ -482,7 +483,7 @@ async function loadUsage() {
       usage.value = fromEvents;
       return;
     }
-    usageError.value = err instanceof Error ? err.message : String(err);
+    usageError.value = toErrorMessage(err);
   }
 }
 function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<string, unknown> }>) {
@@ -638,7 +639,7 @@ async function onExport(format: "markdown" | "json"): Promise<void> {
       /* best-effort */
     }
   } catch (err) {
-    toasts.error("Export failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Export failed", toErrorMessage(err));
   }
 }
 function onCompactNow() {
@@ -655,7 +656,7 @@ async function onForkSession() {
     layoutStore.addPanel(newId);
     toasts.success("Session forked", `New session: ${newId.slice(0, 8)}`);
   } catch (err) {
-    toasts.error("Fork failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Fork failed", toErrorMessage(err));
   }
 }
 
@@ -686,7 +687,7 @@ async function loadBuiltinTools() {
     }));
     toolsLoaded.value = true;
   } catch (err) {
-    toolsError.value = err instanceof Error ? err.message : String(err);
+    toolsError.value = toErrorMessage(err);
     toolsLoaded.value = true;
   }
 }
@@ -702,7 +703,7 @@ async function loadMcpServers() {
       ...(s.error ? { error: s.error } : {}),
     }));
   } catch (err) {
-    toolsError.value = err instanceof Error ? err.message : String(err);
+    toolsError.value = toErrorMessage(err);
   }
 }
 async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
@@ -723,7 +724,7 @@ async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
   } catch (err) {
     toasts.error(
       "Failed to toggle MCP server",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
     server.status = enabled ? "disabled" : "connected";
   }
@@ -848,7 +849,7 @@ async function loadPlan() {
     planContent.value = result.content ?? "";
     planLoaded.value = true;
   } catch (err) {
-    planError.value = err instanceof Error ? err.message : String(err);
+    planError.value = toErrorMessage(err);
     planLoaded.value = true;
   }
 }
@@ -867,7 +868,7 @@ async function savePlan() {
     planEditing.value = false;
     toasts.success("Plan saved");
   } catch (err) {
-    toasts.error("Plan save failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Plan save failed", toErrorMessage(err));
   }
 }
 function cancelEditPlan() {
@@ -915,7 +916,7 @@ async function loadQuota() {
       }
     }
   } catch (err) {
-    quotaError.value = err instanceof Error ? err.message : String(err);
+    quotaError.value = toErrorMessage(err);
   }
 }
 

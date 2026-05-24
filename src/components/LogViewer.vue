@@ -19,6 +19,7 @@ import { useAuditStore } from "../stores/auditStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import type { AuditEntry, LogLevel, LogRecord } from "../ipc/types";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const logStore = useLogStore();
 const auditStore = useAuditStore();
@@ -45,7 +46,7 @@ const bunLevel = computed<LogLevel>({
     logStore.setLevel(v).catch((err: unknown) => {
       toasts.error(
         "Failed to set log level",
-        err instanceof Error ? err.message : String(err),
+        toErrorMessage(err),
       );
     });
   },
@@ -107,7 +108,7 @@ async function exportNow(): Promise<void> {
       /* best-effort */
     }
   } catch (err) {
-    toasts.error("Diagnostics export failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Diagnostics export failed", toErrorMessage(err));
   }
 }
 

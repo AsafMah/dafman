@@ -26,6 +26,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { toErrorMessage } from "./errorMessage";
 
 /// Per the SDK app.js: `userConfigDir` resolves to `~/.copilot/`
 /// (Linux/macOS) or %APPDATA%/.copilot on Windows in practice. We
@@ -265,7 +266,7 @@ async function scanDir(dir: string, scope: AgentScope, out: DiscoveredAgentFile[
 	} catch (err) {
 		log.warn("listAgentFiles: failed to read dir", {
 			dir,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 		return;
 	}

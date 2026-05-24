@@ -13,6 +13,7 @@ import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
 import MessageContent from "./MessageContent.vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const toasts = useToastStore();
 const layoutStore = useLayoutStore();
@@ -68,7 +69,7 @@ async function load() {
     });
     loaded.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = toErrorMessage(err);
     loaded.value = true;
   }
 }
@@ -78,7 +79,7 @@ async function reveal(src: InstructionSource) {
   try {
     await invokeCommand("revealPath", { path: src.path });
   } catch (err) {
-    toasts.error("Reveal failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Reveal failed", toErrorMessage(err));
   }
 }
 

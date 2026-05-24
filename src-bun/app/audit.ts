@@ -20,6 +20,7 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { log } from "./logging";
+import { toErrorMessage } from "./errorMessage";
 
 type PermissionAuditDecision = "approveOnce" | "approveForSession" | "reject";
 
@@ -125,7 +126,7 @@ async function hydrateRecent(): Promise<void> {
 		} catch (err) {
 			log.warn("audit hydrate failed", {
 				file: path,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -175,7 +176,7 @@ async function append(entry: AuditEntry): Promise<void> {
 	} catch (err) {
 		log.warn("audit append failed", {
 			file,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 }

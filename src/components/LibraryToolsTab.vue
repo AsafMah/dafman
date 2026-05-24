@@ -7,6 +7,7 @@ import { invokeCommand } from "../ipc/invoke";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 import MessageContent from "./MessageContent.vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 type ToolItem = { name: string; description: string; namespacedName?: string };
 type ToolGroup = { label: string; items: ToolItem[] };
@@ -52,7 +53,7 @@ async function load() {
     tools.value = await invokeCommand("listBuiltinTools", {});
     loaded.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = toErrorMessage(err);
     loaded.value = true;
   }
 }

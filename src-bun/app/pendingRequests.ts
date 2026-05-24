@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { recordPermission, type PermissionAuditEntry } from "./audit";
 import { log } from "./logging";
 import type { RespondToRequestParams } from "../rpc";
+import { toErrorMessage } from "./errorMessage";
 
 export type PendingKind =
 	| "permission"
@@ -87,7 +88,7 @@ export class PendingRequestQueue {
 				sessionId,
 				requestId,
 				kind,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 			this.cancel(requestId, "emit-failure");
 		}
@@ -117,7 +118,7 @@ export class PendingRequestQueue {
 		} catch (err) {
 			log.warn("cancelPending resolve threw", {
 				requestId,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -247,7 +248,7 @@ export class PendingRequestQueue {
 		} catch (err) {
 			log.warn("respondToRequest resolve threw", {
 				requestId: params.requestId,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 			return false;
 		}

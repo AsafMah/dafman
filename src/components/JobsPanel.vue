@@ -8,6 +8,7 @@ import { useJobsStore } from "../stores/jobsStore";
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const jobsStore = useJobsStore();
 const layoutStore = useLayoutStore();
@@ -52,7 +53,7 @@ async function startAutopilot(): Promise<void> {
   } catch (err) {
     toasts.error(
       "Failed to start autopilot",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   } finally {
     startingAutopilot.value = false;

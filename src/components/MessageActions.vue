@@ -15,6 +15,7 @@
 import { computed } from "vue";
 import Button from "primevue/button";
 import { useToastStore } from "../stores/toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 type Kind = "user" | "assistant" | "reasoning" | "tool" | "system";
 
@@ -50,7 +51,7 @@ async function copyToClipboard(value: string, label = "Copied"): Promise<void> {
     await navigator.clipboard.writeText(value);
     toasts.success(label);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     toasts.error("Copy failed", message);
   }
 }

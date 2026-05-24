@@ -28,6 +28,7 @@ import { useLayoutStore } from "./layoutStore";
 import { useNotificationsStore } from "./notificationsStore";
 import { useSettingsStore } from "./settingsStore";
 import { useToastStore } from "./toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -775,7 +776,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         });
       return record;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to create session", message);
       throw err;
     } finally {
@@ -879,7 +880,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         });
       return record;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.info(
         "Session not restored",
         `${sessionId.slice(0, 8)}…: ${message}`,
@@ -893,7 +894,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     try {
       await invokeCommand("disconnectSession", { sessionId: id });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to close session", message);
     } finally {
       sessions.value = sessions.value.filter((s) => s.id !== id);
@@ -926,7 +927,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       try {
         await invokeCommand("abortSession", { sessionId });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = toErrorMessage(err);
         useToastStore().warn("Abort failed; sending anyway", message);
       }
       await invokeCommand("sendMessage", {
@@ -950,7 +951,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     try {
       await invokeCommand("abortSession", { sessionId });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to abort turn", message);
       throw err;
     }
@@ -985,7 +986,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         record.reasoningEffort = reasoningEffort;
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to switch model", message);
       throw err;
     }
@@ -1001,7 +1002,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       const record = sessions.value.find((s) => s.id === sessionId);
       if (record) record.mode = mode;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to change run mode", message);
       throw err;
     }
@@ -1025,7 +1026,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       const record = sessions.value.find((s) => s.id === sessionId);
       if (record) record.approveAll = enabled;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to update auto-approval", message);
       throw err;
     }
@@ -1037,7 +1038,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       await invokeCommand("resetSessionApprovals", { sessionId });
       toasts.success("Session approvals cleared", sessionId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to reset approvals", message);
       throw err;
     }
@@ -1074,7 +1075,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       toasts.success("Working directory changed", next);
       return next;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to change working directory", message);
       throw err;
     }
@@ -1102,7 +1103,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         toasts.warn("Compaction did not complete", sessionId);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to compact history", message);
       throw err;
     }
@@ -1130,7 +1131,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       }
       await invokeCommand("sendMessage", { sessionId, text: newText });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to edit message", message);
       throw err;
     }
@@ -1164,7 +1165,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       await restoreSession(result.sessionId);
       return result.sessionId;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to fork session", message);
       throw err;
     }
@@ -1217,7 +1218,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     try {
       await invokeCommand("setSessionName", { sessionId, name });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to rename session", message);
       throw err;
     }
@@ -1301,7 +1302,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       const toasts = useToastStore();
       toasts.error(
         "Failed to send response",
-        err instanceof Error ? err.message : String(err),
+        toErrorMessage(err),
       );
     }
   }

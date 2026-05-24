@@ -25,6 +25,7 @@ import type {
 import { accentForIndex } from "../lib/color";
 import { useSessionsStore, type SessionRecord } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const toastStore = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -898,7 +899,7 @@ function pushCustom() {
       data: parsed.data ?? {},
     });
   } catch (err) {
-    customError.value = err instanceof Error ? err.message : String(err);
+    customError.value = toErrorMessage(err);
   }
 }
 

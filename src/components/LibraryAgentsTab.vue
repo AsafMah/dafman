@@ -23,6 +23,7 @@ import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from "../ipc/types
 import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -56,7 +57,7 @@ async function load() {
     }
     loaded.value = true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = toErrorMessage(err);
     loaded.value = true;
   }
 }
@@ -166,7 +167,7 @@ async function submitForm() {
     closeForm();
     await load();
   } catch (err) {
-    formError.value = err instanceof Error ? err.message : String(err);
+    formError.value = toErrorMessage(err);
   } finally {
     formBusy.value = false;
   }
@@ -199,7 +200,7 @@ async function deleteFile(entry: AgentFileEntry) {
   } catch (err) {
     toasts.error(
       "Delete failed",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }
@@ -208,7 +209,7 @@ async function reveal(path: string) {
   try {
     await invokeCommand("revealPath", { path });
   } catch (err) {
-    toasts.error("Reveal failed", err instanceof Error ? err.message : String(err));
+    toasts.error("Reveal failed", toErrorMessage(err));
   }
 }
 </script>

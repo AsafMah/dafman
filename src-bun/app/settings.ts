@@ -27,6 +27,7 @@ import type {
 } from "../rpc";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { toErrorMessage } from "./errorMessage";
 
 export const SETTINGS_VERSION = 14;
 
@@ -46,7 +47,7 @@ export async function ensureDefaultWorkspace(): Promise<string> {
 		return target;
 	} catch (err) {
 		log.warn("ensureDefaultWorkspace failed", {
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 		return "";
 	}
@@ -318,7 +319,7 @@ export class SettingsService {
 		} catch (err) {
 			log.warn("failed to read settings, falling back to defaults", {
 				path,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 			return new SettingsService(path, defaultSettings());
 		}
@@ -335,7 +336,7 @@ export class SettingsService {
 			await mkdir(dirname(this.path), { recursive: true });
 			await Bun.write(this.path, JSON.stringify(stamped, null, 2));
 		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
+			const message = toErrorMessage(err);
 			throw AppError.settings(message);
 		}
 		return structuredClone(stamped);

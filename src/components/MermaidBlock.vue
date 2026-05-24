@@ -9,6 +9,7 @@
 /// only renders when the gate is already on.
 
 import { computed, onMounted, ref, watch } from "vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const props = defineProps<{
   source: string;
@@ -61,7 +62,7 @@ async function renderDiagram() {
     svg.value = out;
     ready.value = true;
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+    error.value = toErrorMessage(e);
   }
 }
 

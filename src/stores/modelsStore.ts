@@ -10,6 +10,7 @@ import { ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
 import type { ModelSummary } from "../ipc/types";
 import { useToastStore } from "./toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 export const useModelsStore = defineStore("models", () => {
   const models = ref<ModelSummary[]>([]);
@@ -28,7 +29,7 @@ export const useModelsStore = defineStore("models", () => {
         loaded.value = true;
         return next;
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = toErrorMessage(err);
         useToastStore().error("Failed to load models", message);
         throw err;
       } finally {

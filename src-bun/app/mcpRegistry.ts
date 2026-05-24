@@ -14,6 +14,7 @@
 import type { CopilotClient } from "./copilotSdk";
 import { tryGetClient } from "./client";
 import { AppError } from "./errors";
+import { toErrorMessage } from "./errorMessage";
 
 export interface McpDiscoveredServer {
 	name: string;
@@ -39,7 +40,7 @@ export class McpRegistry {
 			return await fn(client);
 		} catch (err) {
 			if (err instanceof AppError) throw err;
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 

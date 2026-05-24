@@ -27,6 +27,7 @@ import {
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
 } from "./lib/layoutSanitize";
+import { toErrorMessage } from "./lib/errorMessage";
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -141,7 +142,7 @@ onMounted(async () => {
       bootStore.markClientReady();
     })
     .catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       bootStore.markFailed(message);
       // Re-throw is unnecessary — Promise.all below will see the
       // failure via clientStore.ready remaining false.
@@ -182,7 +183,7 @@ onMounted(async () => {
   try {
     await restoreFromLayout();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     // eslint-disable-next-line no-console
     console.error("[App] restoreFromLayout threw — continuing to ready", err);
     toastStore.error(

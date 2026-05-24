@@ -43,6 +43,7 @@ import {
 	type AgentFileSpec,
 	type AgentScope as AgentFileScope,
 } from "./agentFiles";
+import { toErrorMessage } from "./errorMessage";
 import type {
 	AutoModeSwitchRequestData,
 	ElicitationRequestData,
@@ -615,7 +616,7 @@ export class SessionRegistry {
 			} catch (err) {
 				log.warn("session unsubscribe threw during removeEntry", {
 					sessionId,
-					error: err instanceof Error ? err.message : String(err),
+					error: toErrorMessage(err),
 				});
 			}
 		}
@@ -721,7 +722,7 @@ export class SessionRegistry {
 				...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
 			});
 		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
+			const message = toErrorMessage(err);
 			log.warn("session resume failed", { sessionId, error: message });
 			throw AppError.sdk(message);
 		}
@@ -762,7 +763,7 @@ export class SessionRegistry {
 		} catch (err) {
 			log.warn("failed to hydrate session history", {
 				sessionId: actualId,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 		return actualId;
@@ -779,7 +780,7 @@ export class SessionRegistry {
 				? current.modelId
 				: null;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -832,7 +833,7 @@ export class SessionRegistry {
 		} catch (err) {
 			log.warn("disconnect-before-cwd-change threw", {
 				sessionId,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 		this.entries.delete(sessionId);
@@ -845,7 +846,7 @@ export class SessionRegistry {
 				workingDirectory: next,
 			});
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		const actualId = resumed.sessionId;
 		const unsubscribe = resumed.on((event) => {
@@ -896,7 +897,7 @@ export class SessionRegistry {
 			} catch (err) {
 				log.warn("disconnect-before-delete threw", {
 					sessionId,
-					error: err instanceof Error ? err.message : String(err),
+					error: toErrorMessage(err),
 				});
 			}
 			// S3: delete AFTER disconnect resolves. Concurrent RPCs see
@@ -910,7 +911,7 @@ export class SessionRegistry {
 		try {
 			await client.deleteSession(sessionId);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		log.info("session deleted", { sessionId });
 		return sessionId;
@@ -1029,7 +1030,7 @@ export class SessionRegistry {
 			log.warn("failed to forward session event", {
 				sessionId,
 				eventType,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -1068,7 +1069,7 @@ export class SessionRegistry {
 					: {}),
 			});
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1148,7 +1149,7 @@ export class SessionRegistry {
 		try {
 			await entry.session.abort();
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		return "Aborted";
 	}
@@ -1166,7 +1167,7 @@ export class SessionRegistry {
 		try {
 			await entry.session.setModel(model, opts);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		return model;
 	}
@@ -1189,7 +1190,7 @@ export class SessionRegistry {
 			return result;
 		} catch (err) {
 			if (err instanceof AppError) throw err;
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1203,7 +1204,7 @@ export class SessionRegistry {
 				this.pending.settleForSession(sessionId, "autopilot-mode");
 			}
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		return mode;
 	}
@@ -1221,7 +1222,7 @@ export class SessionRegistry {
 			);
 		} catch (err) {
 			if (err instanceof AppError) throw err;
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1231,7 +1232,7 @@ export class SessionRegistry {
 		try {
 			await entry.session.rpc.name.set({ name });
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		return name;
 	}
@@ -1257,7 +1258,7 @@ export class SessionRegistry {
 						: null,
 			};
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1276,7 +1277,7 @@ export class SessionRegistry {
 			})) as { eventsRemoved?: number };
 			return { eventsRemoved: result.eventsRemoved ?? 0 };
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1302,7 +1303,7 @@ export class SessionRegistry {
 			return { sessionId: result.sessionId };
 		} catch (err) {
 			if (err instanceof AppError) throw err;
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1319,7 +1320,7 @@ export class SessionRegistry {
 			})) as { success?: boolean };
 			return result.success ?? true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1352,7 +1353,7 @@ export class SessionRegistry {
 				.filter((a) => typeof a.name === "string")
 				.map(normalizeAgent);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1371,7 +1372,7 @@ export class SessionRegistry {
 			if (!result.agent || typeof result.agent.name !== "string") return null;
 			return normalizeAgent(result.agent);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1393,7 +1394,7 @@ export class SessionRegistry {
 			return normalizeAgent(result.agent);
 		} catch (err) {
 			if (err instanceof AppError) throw err;
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1404,7 +1405,7 @@ export class SessionRegistry {
 			await entry.session.rpc.agent.deselect();
 			return true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1424,7 +1425,7 @@ export class SessionRegistry {
 				.filter((a) => typeof a.name === "string")
 				.map(normalizeAgent);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1449,7 +1450,7 @@ export class SessionRegistry {
 				)
 				.map(normalizeTask);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1462,7 +1463,7 @@ export class SessionRegistry {
 			} catch (err) {
 				log.warn("listJobs failed for session", {
 					sessionId,
-					error: err instanceof Error ? err.message : String(err),
+					error: toErrorMessage(err),
 				});
 			}
 		}
@@ -1482,7 +1483,7 @@ export class SessionRegistry {
 			};
 			return result.cancelled === true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1495,7 +1496,7 @@ export class SessionRegistry {
 			};
 			return result.removed === true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1508,7 +1509,7 @@ export class SessionRegistry {
 			};
 			return result.promoted === true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1530,7 +1531,7 @@ export class SessionRegistry {
 			)) as { started?: boolean };
 			return result.started === true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1598,7 +1599,7 @@ export class SessionRegistry {
 		} catch (err) {
 			log.warn("agent.reload after writeAgentFile failed", {
 				sessionId,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 		return path;
@@ -1624,7 +1625,7 @@ export class SessionRegistry {
 			} catch (err) {
 				log.warn("agent.reload after deleteAgentFile failed", {
 					sessionId,
-					error: err instanceof Error ? err.message : String(err),
+					error: toErrorMessage(err),
 				});
 			}
 		}
@@ -1669,7 +1670,7 @@ export class SessionRegistry {
 					...(typeof s.path === "string" ? { path: s.path } : {}),
 				}));
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1688,7 +1689,7 @@ export class SessionRegistry {
 			}
 			return true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1704,7 +1705,7 @@ export class SessionRegistry {
 				unknown
 			>;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1736,7 +1737,7 @@ export class SessionRegistry {
 						typeof t.description === "string" ? t.description : "",
 				}));
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1768,7 +1769,7 @@ export class SessionRegistry {
 					...(typeof s.error === "string" ? { error: s.error } : {}),
 				}));
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1791,7 +1792,7 @@ export class SessionRegistry {
 			}
 			return true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1847,7 +1848,7 @@ export class SessionRegistry {
 			}
 			return out;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1868,7 +1869,7 @@ export class SessionRegistry {
 				path: typeof result.path === "string" ? result.path : null,
 			};
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1879,7 +1880,7 @@ export class SessionRegistry {
 			await entry.session.rpc.plan.update({ content });
 			return true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1890,7 +1891,7 @@ export class SessionRegistry {
 			await entry.session.rpc.plan.delete();
 			return true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1923,7 +1924,7 @@ export class SessionRegistry {
 						: null,
 			};
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1942,7 +1943,7 @@ export class SessionRegistry {
 			};
 			return result.success ?? true;
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 	}
 
@@ -1959,7 +1960,7 @@ export class SessionRegistry {
 		} catch (err) {
 			log.warn("session disconnect threw", {
 				sessionId,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 		// S3: delete AFTER disconnect so concurrent RPCs see the entry
@@ -2003,7 +2004,7 @@ export class SessionRegistry {
 			} catch (err) {
 				log.warn("shutdown disconnect timed out or threw", {
 					sessionId: id,
-					error: err instanceof Error ? err.message : String(err),
+					error: toErrorMessage(err),
 				});
 			}
 			this.entries.delete(id);

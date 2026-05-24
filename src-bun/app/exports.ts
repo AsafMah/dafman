@@ -13,6 +13,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, basename, normalize } from "node:path";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { toErrorMessage } from "./errorMessage";
 
 export interface SaveExportOptions {
 	/// `Utils.paths.userData` from the caller.
@@ -38,7 +39,7 @@ export async function saveExportFile(
 		await mkdir(dir, { recursive: true });
 	} catch (err) {
 		throw AppError.io(
-			`failed to create exports dir: ${err instanceof Error ? err.message : String(err)}`,
+			`failed to create exports dir: ${toErrorMessage(err)}`,
 		);
 	}
 	// Defence in depth: strip any path components from the filename so
@@ -53,7 +54,7 @@ export async function saveExportFile(
 		await writeFile(path, opts.contents);
 	} catch (err) {
 		throw AppError.io(
-			`failed to write export file: ${err instanceof Error ? err.message : String(err)}`,
+			`failed to write export file: ${toErrorMessage(err)}`,
 		);
 	}
 	log.info("conversation export saved", { path, bytes });

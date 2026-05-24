@@ -46,6 +46,7 @@ import { styleFor } from "../lib/notificationStyles";
 import PermissionDetails from "./PermissionDetails.vue";
 import PermissionRuleEditor from "./PermissionRuleEditor.vue";
 import JsonSchemaForm from "./JsonSchemaForm.vue";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const props = defineProps<{
   sessionId: string;
@@ -230,7 +231,7 @@ async function openElicitationUrl(): Promise<void> {
   } catch (err) {
     toasts.error(
       "Couldn't open URL",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }

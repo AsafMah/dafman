@@ -7,6 +7,7 @@ import type {
 } from "../rpc";
 import { AppError } from "./errors";
 import { log } from "./logging";
+import { toErrorMessage } from "./errorMessage";
 
 type TerminalStatus = TerminalSummary["status"];
 
@@ -163,7 +164,7 @@ export class TerminalRegistry {
 		try {
 			entry = this.createNativeTerminal(options);
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 		this.entries.set(id, entry);
 		const summary = toSummary(entry);

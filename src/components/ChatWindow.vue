@@ -37,6 +37,7 @@ import ReasoningBlock from "./ReasoningBlock.vue";
 import type { ComposerSubmitPayload } from "../lexical/plugins";
 import { styleFor } from "../lib/notificationStyles";
 import { cleanTerminalCommandOutput } from "../lib/ansi";
+import { toErrorMessage } from "../lib/errorMessage";
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -368,7 +369,7 @@ async function sendMessage(
       );
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toErrorMessage(error);
     items.value = appendSystemMessage(
       items.value,
       `Error: ${message}`,
@@ -392,7 +393,7 @@ async function ensureCommandTerminal(): Promise<string | null> {
     layoutStore.closePanel(`terminal-${terminal.id}`);
     return terminal.id;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     toasts.error("Failed to open session terminal", message);
     return null;
   }

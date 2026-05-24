@@ -15,6 +15,7 @@ import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
+import { toErrorMessage } from "./errorMessage";
 
 export interface SessionCommand {
 	/// Slash form (with leading "/"). What the user types in the
@@ -271,7 +272,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 			} catch (err) {
 				toasts.error(
 					"Failed to start fleet",
-					err instanceof Error ? err.message : String(err),
+					toErrorMessage(err),
 				);
 			}
 		},

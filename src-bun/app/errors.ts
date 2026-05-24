@@ -1,3 +1,4 @@
+import { toErrorMessage } from "./errorMessage";
 // AppError — discriminated union that crosses the RPC bridge.
 //
 // Mirrors the old `AppError` in `src-tauri/src/app/error.rs` field-for-field.
@@ -75,7 +76,7 @@ export function rpcGuard<TArgs, TResult>(
 			if (err instanceof AppError) {
 				payload = err.payload;
 			} else {
-				const message = err instanceof Error ? err.message : String(err);
+				const message = toErrorMessage(err);
 				payload = { kind: "Sdk", data: message };
 			}
 			throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);

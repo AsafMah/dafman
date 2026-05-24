@@ -44,6 +44,7 @@ import { setRpcBridge } from "./ipc/invoke";
 import { createElectrobunBridge } from "./ipc/electrobunBridge";
 import { createWebSocketBridge } from "./ipc/wsBridge";
 import { installRendererLogBridge } from "./ipc/rendererLog";
+import { toErrorMessage } from "./lib/errorMessage";
 
 const GreenAura = definePreset(Aura, {
   semantic: {
@@ -109,7 +110,7 @@ async function mountWith(Root: typeof App) {
       (instance?.$options?.name as string | undefined) ??
       (instance?.$options?.__name as string | undefined) ??
       "<unknown>";
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     const stack = err instanceof Error ? err.stack : undefined;
     // Single log path via the console interceptor (one bun log entry,
     // visible in devtools).

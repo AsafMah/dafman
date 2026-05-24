@@ -30,6 +30,7 @@ import { invokeCommand } from "../ipc/invoke";
 import {
   buildModelTree,
 } from "../lib/modelTree";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const props = withDefaults(
   defineProps<{ sessionId: string; area?: "all" | "composer-left" | "composer-right" }>(),
@@ -223,7 +224,7 @@ function onWorkspaceClick() {
   invokeCommand("revealPath", { path }).catch((err: unknown) => {
     useToastStore().error(
       "Couldn't open workspace",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   });
 }
@@ -259,7 +260,7 @@ async function openSessionTerminal() {
   } catch (err) {
     useToastStore().error(
       "Couldn't open terminal",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }

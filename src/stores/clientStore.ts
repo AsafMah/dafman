@@ -9,6 +9,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "./toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 export const useClientStore = defineStore("client", () => {
   const ready = ref(false);
@@ -25,7 +26,7 @@ export const useClientStore = defineStore("client", () => {
       ready.value = true;
       toasts.success(status);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       lastError.value = message;
       toasts.error("Failed to start client", message);
       throw err;

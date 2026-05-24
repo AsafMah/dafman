@@ -42,6 +42,7 @@ import { SettingsService, ensureDefaultWorkspace } from "./app/settings";
 import { installStderrFilter } from "./app/stderrFilter";
 import { tryGetClient } from "./app/client";
 import type { CommandResultEvent, DafmanRPC, LogRecord, SessionEventPayload, TerminalEventPayload } from "./rpc";
+import { toErrorMessage } from "./app/errorMessage";
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -77,7 +78,7 @@ void (async () => {
 		})
 		.catch((err) => {
 			log.warn("default workspace backfill failed", {
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		});
 })();
@@ -429,7 +430,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				} catch (err) {
 					log.warn("revealPath failed", {
 						path: trimmed,
-						error: err instanceof Error ? err.message : String(err),
+						error: toErrorMessage(err),
 					});
 					return false;
 				}
@@ -456,12 +457,12 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 				} catch (err) {
 					log.warn("openUrl threw", {
 						url: trimmed,
-						error: err instanceof Error ? err.message : String(err),
+						error: toErrorMessage(err),
 					});
 					recordUrl({
 						url: trimmed,
 						allowed: false,
-						reason: `openExternal-threw: ${err instanceof Error ? err.message : String(err)}`,
+						reason: `openExternal-threw: ${toErrorMessage(err)}`,
 					});
 					return false;
 				}
@@ -637,7 +638,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
 	} catch (err) {
 		log.warn("sessions.shutdownAll threw during signal handler", {
 			signal,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 	try {
@@ -645,7 +646,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
 	} catch (err) {
 		log.warn("terminals.shutdownAll threw during signal handler", {
 			signal,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 	try {
@@ -653,7 +654,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
 	} catch (err) {
 		log.warn("commandResults.shutdownAll threw during signal handler", {
 			signal,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 	try {
@@ -661,7 +662,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
 	} catch (err) {
 		log.warn("shutdownClient threw during signal handler", {
 			signal,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		});
 	}
 	process.exit(0);

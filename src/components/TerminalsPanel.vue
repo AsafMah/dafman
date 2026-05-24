@@ -6,6 +6,7 @@ import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useTerminalStore } from "../stores/terminalStore";
 import { useToastStore } from "../stores/toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const terminalStore = useTerminalStore();
 const sessionsStore = useSessionsStore();
@@ -45,7 +46,7 @@ async function createTerminal(useSessionCwd = false): Promise<void> {
     });
     layoutStore.addTerminalPanel(summary.id, summary.title);
   } catch (err) {
-    toasts.error("Failed to create terminal", err instanceof Error ? err.message : String(err));
+    toasts.error("Failed to create terminal", toErrorMessage(err));
   }
 }
 

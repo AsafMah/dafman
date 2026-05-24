@@ -8,6 +8,7 @@ import { ref } from "vue";
 import { invokeCommand } from "../ipc/invoke";
 import type { NotificationPrefs, ReasoningVisibility, Settings, TerminalPrefs, ThemeChoice } from "../ipc/types";
 import { useToastStore } from "./toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 function defaultSettings(): Settings {
   return {
@@ -68,7 +69,7 @@ export const useSettingsStore = defineStore("settings", () => {
       loaded.value = true;
       return next;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       useToastStore().error("Failed to load settings", message);
       throw err;
     }
@@ -81,7 +82,7 @@ export const useSettingsStore = defineStore("settings", () => {
       settings.value = written;
       return written;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       useToastStore().error("Failed to save settings", message);
       throw err;
     } finally {

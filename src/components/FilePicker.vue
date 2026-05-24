@@ -26,6 +26,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "../stores/toastStore";
 import type { WorkspaceFileMatch, SendMessageAttachment } from "../ipc/types";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const props = withDefaults(
   defineProps<{
@@ -224,7 +225,7 @@ async function browse(kind: "file" | "directory"): Promise<void> {
   } catch (err) {
     useToastStore().error(
       "Picker failed",
-      err instanceof Error ? err.message : String(err),
+      toErrorMessage(err),
     );
   }
 }

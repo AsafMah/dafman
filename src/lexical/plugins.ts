@@ -27,6 +27,7 @@ import { useLexicalComposer } from "lexical-vue/LexicalComposer";
 import { rendererLog } from "../ipc/rendererLog";
 import { $isAttachmentNode } from "./AttachmentNode";
 import type { SendMessageAttachment } from "../ipc/types";
+import { toErrorMessage } from "../lib/errorMessage";
 
 /// Extract the editor content as a markdown string, trim it, clear the
 /// editor, and return the result. Returns `null` when the buffer was
@@ -254,7 +255,7 @@ export const TypingDiagnostic = defineComponent({
         }, 50);
       } catch (err) {
         rendererLog("error", "typing-diagnostic threw", {
-          message: err instanceof Error ? err.message : String(err),
+          message: toErrorMessage(err),
           stack: err instanceof Error ? err.stack : undefined,
         });
       }

@@ -5,6 +5,7 @@ import type { JobRecord } from "../ipc/types";
 import { useLayoutStore } from "./layoutStore";
 import { useSessionsStore } from "./sessionsStore";
 import { useToastStore } from "./toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 type LocalAutopilotMeta = {
   seenThinking: boolean;
@@ -46,7 +47,7 @@ export const useJobsStore = defineStore("jobs", () => {
     try {
       sdkJobs.value = await invokeCommand("listJobs", {});
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = toErrorMessage(err);
       useToastStore().error("Failed to load jobs", error.value);
     } finally {
       isLoading.value = false;
@@ -90,7 +91,7 @@ export const useJobsStore = defineStore("jobs", () => {
     } catch (err) {
       useToastStore().error(
         "Failed to cancel job",
-        err instanceof Error ? err.message : String(err),
+        toErrorMessage(err),
       );
     } finally {
       busyJobId.value = null;
@@ -113,7 +114,7 @@ export const useJobsStore = defineStore("jobs", () => {
     } catch (err) {
       useToastStore().error(
         "Failed to remove job",
-        err instanceof Error ? err.message : String(err),
+        toErrorMessage(err),
       );
     } finally {
       busyJobId.value = null;
@@ -132,7 +133,7 @@ export const useJobsStore = defineStore("jobs", () => {
     } catch (err) {
       useToastStore().error(
         "Failed to promote job",
-        err instanceof Error ? err.message : String(err),
+        toErrorMessage(err),
       );
     } finally {
       busyJobId.value = null;
@@ -184,7 +185,7 @@ export const useJobsStore = defineStore("jobs", () => {
     } catch (err) {
       updateLocalJob(id, {
         status: "failed",
-        error: err instanceof Error ? err.message : String(err),
+        error: toErrorMessage(err),
         completedAt: nowIso(),
         canCancel: false,
         canRemove: true,

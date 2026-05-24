@@ -11,6 +11,7 @@ import { invokeCommand } from "../ipc/invoke";
 import type { SessionMetadataSummary } from "../ipc/types";
 import { basename } from "./layoutStore";
 import { useToastStore } from "./toastStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 export interface WorkspaceGroup {
   /// Stable key for the group — full workspace path, or "" for the
@@ -44,7 +45,7 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
       );
       hasLoaded.value = true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       error.value = message;
       toasts.error("Failed to list sessions", message);
     } finally {
@@ -65,7 +66,7 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
       );
       toasts.success("Session deleted", sessionId.slice(0, 8));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = toErrorMessage(err);
       toasts.error("Failed to delete session", message);
       throw err;
     }

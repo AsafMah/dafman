@@ -23,6 +23,7 @@ import { useToastStore } from "../stores/toastStore";
 import { invokeCommand } from "../ipc/invoke";
 import type { ModelSummary, ReasoningVisibility, TerminalAddonPrefs, ThemeChoice } from "../ipc/types";
 import { useModelsStore } from "../stores/modelsStore";
+import { toErrorMessage } from "../lib/errorMessage";
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelsStore();
@@ -223,7 +224,7 @@ async function openLogFolder() {
     const ok = await invokeCommand("openLogFolder", {});
     if (!ok) toasts.warn("Log folder not available yet");
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     toasts.error("Couldn't open log folder", message);
   }
 }
@@ -263,7 +264,7 @@ async function pickDefaultWorkspace() {
       await settingsStore.setDefaultWorkspace(picked);
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     useToastStore().error("Couldn't pick folder", message);
   } finally {
     isPickingDefault.value = false;
@@ -276,7 +277,7 @@ async function revealDefaultWorkspace() {
   try {
     await invokeCommand("revealPath", { path });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = toErrorMessage(err);
     useToastStore().error("Couldn't reveal folder", message);
   }
 }

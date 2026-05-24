@@ -6,6 +6,7 @@ import type { CommandResultEvent, CommandResultRecord } from "../rpc";
 import { AppError } from "./errors";
 import { log } from "./logging";
 import { recordCommand } from "./audit";
+import { toErrorMessage } from "./errorMessage";
 
 const OUTPUT_CAP_BYTES = 1024 * 1024;
 const TIMEOUT_MS = 60_000;
@@ -95,7 +96,7 @@ export class CommandResultRegistry {
 				stderr: "pipe",
 			});
 		} catch (err) {
-			throw AppError.sdk(err instanceof Error ? err.message : String(err));
+			throw AppError.sdk(toErrorMessage(err));
 		}
 
 		const active: ActiveCommand = {
@@ -186,7 +187,7 @@ export class CommandResultRegistry {
 				sessionId: active.record.sessionId,
 				commandId: active.record.id,
 				stream,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -199,7 +200,7 @@ export class CommandResultRegistry {
 			log.warn("command result process wait failed", {
 				sessionId: active.record.sessionId,
 				commandId: active.record.id,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		} finally {
 			clearTimeout(active.timeout);
@@ -258,7 +259,7 @@ export class CommandResultRegistry {
 			log.warn("command result kill failed", {
 				sessionId: active.record.sessionId,
 				commandId: active.record.id,
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -289,7 +290,7 @@ export class CommandResultRegistry {
 			}
 		} catch (err) {
 			log.warn("command results load failed", {
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
@@ -301,7 +302,7 @@ export class CommandResultRegistry {
 			await writeFile(this.storagePath, JSON.stringify(data, null, 2), "utf8");
 		} catch (err) {
 			log.warn("command results persist failed", {
-				error: err instanceof Error ? err.message : String(err),
+				error: toErrorMessage(err),
 			});
 		}
 	}
