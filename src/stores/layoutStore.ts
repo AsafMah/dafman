@@ -169,6 +169,13 @@ export const useLayoutStore = defineStore("layout", () => {
   const bodyApi = ref<DockviewApi | null>(null);
   /// Per-group inner dockview APIs, keyed by group id.
   const groupApis = shallowRef<Map<string, DockviewApi>>(new Map());
+  /// Monotonically incrementing counter. Watchers can observe this ref
+  /// to know when to persist the layout — GroupPanel bumps it on inner
+  /// `onDidLayoutChange` events that the shell dockview wouldn't see.
+  const layoutSaveGeneration = ref(0);
+  function requestLayoutSave(): void {
+    layoutSaveGeneration.value++;
+  }
   /// Backward-compatible alias: most chat-panel operations use `api`.
   /// Points at `bodyApi` when available, falls back to `shellApi` for
   /// pre-groups code paths (edge panel ops that haven't been migrated).
@@ -544,7 +551,9 @@ export const useLayoutStore = defineStore("layout", () => {
   ): void {
     const dock = api.value;
     if (!dock) return;
+    // If the panel already exists in ANY group, don't create a duplicate.
     if (dock.getPanel(sessionId)) return;
+    if (findPanelGroupId(sessionId)) return;
 
     // Resolve the best available title: explicit `opts.title` first,
     // then fall back to the session's SDK-supplied title from the store,
@@ -599,6 +608,12 @@ export const useLayoutStore = defineStore("layout", () => {
       params: { sessionId },
       position: { referenceGroup, direction },
     });
+    // We just added a chat panel — it's the active session. Set this
+    // eagerly rather than waiting for onDidActivePanelChange which may
+    // fire asynchronously (especially when bodyApi hooks aren't wired
+    // yet during boot, or when the active panel event fires after the
+    // session-details panel renders).
+    activeSessionId.value = sessionId;
     // Auto-open the session-details right-rail singleton alongside
     // the first chat panel (subsequent panels reuse the same rail
     // — it re-binds to whichever chat tab is active). Skips if the
@@ -660,7 +675,9 @@ export const useLayoutStore = defineStore("layout", () => {
 
   /// Toggles the details rail. If open, closes; if closed, opens.
   function toggleSessionDetailsPanel(): void {
-    const dock = api.value;
+    // Session-details lives on the shell dockview (right edge), not
+    // inside a group's inner dockview. Use shellApi, not bodyApi.
+    const dock = shellApi.value;
     if (!dock) return;
     const panel = dock.getPanel(SESSION_DETAILS_PANEL_ID);
     if (panel) {
@@ -822,6 +839,12 @@ export const useLayoutStore = defineStore("layout", () => {
   }
 
   function removePanel(sessionId: string): void {
+    // Search all group dockviews for the panel.
+    for (const groupDock of groupApis.value.values()) {
+      const panel = groupDock.getPanel(sessionId);
+      if (panel) { groupDock.removePanel(panel); return; }
+    }
+    // Fallback: check the api computed.
     const dock = api.value;
     if (!dock) return;
     const panel = dock.getPanel(sessionId);
@@ -835,13 +858,17 @@ export const useLayoutStore = defineStore("layout", () => {
   /// the global PendingRequestModal to surface the owning session
   /// when a pending request fires for a non-active panel.
   function activatePanel(sessionId: string): void {
-    const dock = api.value;
-    if (!dock) return;
-    const panel = dock.getPanel(sessionId);
-    if (panel) panel.api.setActive();
+    // Use cross-group activation so we find the panel wherever it lives.
+    activatePanelAcrossGroups(sessionId);
   }
 
   function renamePanel(sessionId: string, title: string): void {
+    // Search all group dockviews — the panel could be in any group.
+    for (const groupDock of groupApis.value.values()) {
+      const panel = groupDock.getPanel(sessionId);
+      if (panel) { panel.api.setTitle(title); return; }
+    }
+    // Fallback: check the api computed (bodyApi or shellApi).
     const dock = api.value;
     if (!dock) return;
     const panel = dock.getPanel(sessionId);
@@ -967,9 +994,14 @@ export const useLayoutStore = defineStore("layout", () => {
   /// dockview tree. Used by toggle-style toolbar buttons (Sessions
   /// Manager, Library, …) to decide between open/close.
   function isPanelOpen(id: string): boolean {
-    // Check both shell (edge panels) and body (chat panels).
+    // Check shell (edge panels).
     const shell = shellApi.value;
     if (shell?.getPanel(id)) return true;
+    // Check ALL group inner dockviews, not just the active one.
+    for (const groupDock of groupApis.value.values()) {
+      if (groupDock.getPanel(id)) return true;
+    }
+    // Fallback: also check bodyApi in case it's a pre-groups layout.
     const body = bodyApi.value;
     if (body?.getPanel(id)) return true;
     return false;
@@ -981,10 +1013,21 @@ export const useLayoutStore = defineStore("layout", () => {
   /// the configured `initialSize` instead of inheriting a residual
   /// collapsed size. Idempotent for unknown ids.
   function closePanel(id: string): void {
-    // Try shell (edge panels) first, then body (chat panels).
+    // Try shell (edge panels) first, then all group inner dockviews.
     const shell = shellApi.value;
-    const body = bodyApi.value;
-    const dock = shell?.getPanel(id) ? shell : body?.getPanel(id) ? body : null;
+    let dock: DockviewApi | null = null;
+    if (shell && shell.getPanel(id)) {
+      dock = shell as DockviewApi;
+    } else {
+      for (const groupDock of groupApis.value.values()) {
+        if (groupDock.getPanel(id)) { dock = groupDock; break; }
+      }
+    }
+    // Fallback: check bodyApi for pre-groups layouts.
+    if (!dock) {
+      const body = bodyApi.value;
+      if (body && body.getPanel(id)) dock = body as DockviewApi;
+    }
     if (!dock) return;
     const panel = dock.getPanel(id);
     if (!panel) return;
@@ -1063,6 +1106,35 @@ export const useLayoutStore = defineStore("layout", () => {
     return groupApis.value.get(groupId);
   }
 
+  /// Searches all group dockviews for a panel and returns the group id
+  /// it was found in. Returns undefined if the panel isn't in any group.
+  function findPanelGroupId(panelId: string): string | undefined {
+    for (const [groupId, groupDock] of groupApis.value) {
+      if (groupDock.getPanel(panelId)) return groupId;
+    }
+    return undefined;
+  }
+
+  /// Activates a panel that may be in any group. If found in a
+  /// non-active group, switches to that group first, then activates
+  /// the panel. Returns true if the panel was found and activated.
+  function activatePanelAcrossGroups(panelId: string): boolean {
+    const groupId = findPanelGroupId(panelId);
+    if (!groupId) return false;
+    const groupDock = groupApis.value.get(groupId);
+    if (!groupDock) return false;
+    // Switch the shell to show this group's panel.
+    const shell = shellApi.value;
+    if (shell) {
+      const shellPanel = shell.getPanel(`group-${groupId}`);
+      if (shellPanel) shellPanel.api.setActive();
+    }
+    // Activate the panel within the group's inner dockview.
+    const panel = groupDock.getPanel(panelId);
+    if (panel) panel.api.setActive();
+    return true;
+  }
+
   /// Adds a group panel to the shell dockview (outer instance). Used
   /// when a new group is created at runtime from the GroupsBar or the
   /// command palette. The GroupPanel component will create its own inner
@@ -1111,6 +1183,8 @@ export const useLayoutStore = defineStore("layout", () => {
     registerGroupApi,
     unregisterGroupApi,
     getGroupApi,
+    findPanelGroupId,
+    activatePanelAcrossGroups,
     addPanel,
     addTerminalPanel,
     removePanel,
@@ -1134,5 +1208,7 @@ export const useLayoutStore = defineStore("layout", () => {
     restoreBody,
     addGroupPanel,
     removeGroupPanel,
+    layoutSaveGeneration,
+    requestLayoutSave,
   };
 });

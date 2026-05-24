@@ -5,8 +5,10 @@
 
 ## Open
 
-(none — all items solved or moved to plans)
-
+- Sessions are no longer restored in the ui
+- Sessions no longer restore their history after manually opening them
+- When you said multiple tabs open at the same time in the left pane, I thought it would divide them to top/bottom
+- New group has all of the sessions in the old group, except for one
 
 ## Solved (2026-06-01)
 

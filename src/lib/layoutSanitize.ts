@@ -160,6 +160,62 @@ export function extractChatPanelIds(layout: unknown): string[] {
   return out;
 }
 
+/// Strips all non-edge panels from a dockview layout JSON, keeping
+/// only panels referenced in `edgeGroups`. Body panels (chat sessions,
+/// group panels, terminals) are removed from `panels` and the grid is
+/// reset to an empty root so `fromJSON` doesn't recreate them. Edge
+/// groups and their sizes/visibility are preserved.
+///
+/// Used when restoring the shell dockview in groups mode: the shell
+/// should only have edge panels (sidebars); body panels live inside
+/// each group's inner dockview.
+export function stripNonEdgePanels(layout: unknown): unknown {
+  if (!layout || typeof layout !== "object") return layout;
+  const obj = layout as Record<string, unknown>;
+  const panels = obj.panels;
+  const edgeGroups = obj.edgeGroups;
+  if (!panels || typeof panels !== "object") return layout;
+
+  // Collect all panel IDs referenced in edgeGroups.
+  const edgePanelIds = new Set<string>();
+  if (edgeGroups && typeof edgeGroups === "object") {
+    for (const entry of Object.values(edgeGroups as Record<string, unknown>)) {
+      if (!entry || typeof entry !== "object") continue;
+      const group = (entry as Record<string, unknown>).group;
+      if (!group || typeof group !== "object") continue;
+      const views = (group as Record<string, unknown>).views;
+      if (Array.isArray(views)) {
+        for (const v of views) {
+          if (typeof v === "string") edgePanelIds.add(v);
+        }
+      }
+    }
+  }
+
+  // Keep only edge panels.
+  const nextPanels: Record<string, unknown> = {};
+  for (const [id, value] of Object.entries(panels as Record<string, unknown>)) {
+    if (edgePanelIds.has(id)) {
+      nextPanels[id] = value;
+    }
+  }
+
+  // Clear the grid root so fromJSON doesn't try to recreate body
+  // groups/panels. The edge groups are in a separate key and are
+  // preserved as-is.
+  return {
+    ...obj,
+    panels: nextPanels,
+    grid: {
+      root: { type: "branch", data: [] },
+      width: (obj.grid as Record<string, unknown> | undefined)?.width ?? 0,
+      height: (obj.grid as Record<string, unknown> | undefined)?.height ?? 0,
+      orientation: (obj.grid as Record<string, unknown> | undefined)?.orientation ?? "HORIZONTAL",
+    },
+    activeGroup: undefined,
+  };
+}
+
 /// Returns true if the persisted dockview layout JSON contains a
 /// panel with the given id. Used to decide whether to add a default
 /// panel on startup (e.g. Sessions sidebar).

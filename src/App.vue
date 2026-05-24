@@ -27,6 +27,7 @@ import {
   enforcePersistedEdgeMinimums,
   persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
   stripLegacyDetailsPanels,
+  stripNonEdgePanels,
   stripPanelFromLayout,
 } from "./lib/layoutSanitize";
 import { toErrorMessage } from "./lib/errorMessage";
@@ -195,6 +196,36 @@ onMounted(async () => {
     );
   }
 
+  // Now that groupsStore is initialized, create group panels in the
+  // shell dockview and restore edge layout. Must run after
+  // restoreFromLayout so groupsStore.groups is populated.
+  populateGroupPanels();
+
+  // Wait for GroupPanel components to mount and register their inner
+  // dockview APIs (setBodyApi). The GroupPanel → inner DockviewVue mount
+  // chain takes multiple render cycles. We yield until bodyApi is set
+  // (or a timeout elapses) so the autosession creates chat panels in the
+  // correct inner dockview rather than the shell.
+  if (groupsStore.groups.length > 0 && !layoutStore.bodyApi) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(
+        () => layoutStore.bodyApi,
+        (v) => {
+          if (v) {
+            stop();
+            resolve();
+          }
+        },
+        { immediate: true },
+      );
+      // Safety timeout — don't hang boot if something goes wrong.
+      setTimeout(() => {
+        stop();
+        resolve();
+      }, 2000);
+    });
+  }
+
   // Open the Sessions Manager by default. We do this only when the
   // persisted dockview JSON didn't contain it — i.e. first launch, or
   // the user explicitly closed it last time we don't want to reopen it.
@@ -293,12 +324,16 @@ async function restoreFromLayout() {
         ),
       );
     }
-    // Shell layout (edge panels) restored in onDockReady.
+    // Shell layout (edge panels only) restored in onDockReady. Strip
+    // body/group panels so fromJSON doesn't recreate them in the shell —
+    // body panels live inside each group's inner dockview.
     if (settings.layout?.dockview) {
-      pendingRestoreLayout.value = enforcePersistedEdgeMinimums(
-        stripPanelFromLayout(
-          stripLegacyDetailsPanels(settings.layout.dockview),
-          SETTINGS_PANEL_ID,
+      pendingRestoreLayout.value = stripNonEdgePanels(
+        enforcePersistedEdgeMinimums(
+          stripPanelFromLayout(
+            stripLegacyDetailsPanels(settings.layout.dockview),
+            SETTINGS_PANEL_ID,
+          ),
         ),
       );
     }
@@ -328,11 +363,9 @@ async function restoreFromLayout() {
       );
     }
     // The legacy layout has both edge panels and body panels.
-    // We use it as-is for the shell (edge panels will be picked up;
-    // body panels will be ignored since they won't match any registered
-    // component). Store it also as the Default group's layout so the
-    // inner dockview can restore the chat panels from it.
-    pendingRestoreLayout.value = sanitized;
+    // Strip body panels for the shell (only edge panels belong there);
+    // the full layout goes to the Default group's inner dockview.
+    pendingRestoreLayout.value = stripNonEdgePanels(sanitized);
     const defaultGroup = groupsStore.groups[0];
     if (defaultGroup) {
       pendingGroupLayouts.value.set(defaultGroup.id, sanitized);
@@ -345,6 +378,13 @@ async function restoreFromLayout() {
 }
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
+
+// Inner group dockview layout changes don't fire the shell's
+// onDidLayoutChange. Watch the layoutStore counter and trigger a save.
+watch(
+  () => layoutStore.layoutSaveGeneration,
+  () => scheduleLayoutSave(),
+);
 
 // Drain queued toasts into PrimeVue's service. Stores can `push` without a
 // component context; this watcher is the only place that talks to PrimeVue.
@@ -385,32 +425,15 @@ watch(
 
 function onDockReady(event: DockviewReadyEvent) {
   // Shell (outer) dockview ready — groups mode is always active.
+  //
+  // IMPORTANT: This handler fires from DockviewVue's onMounted, which
+  // runs BEFORE App.vue's onMounted. At this point, groupsStore hasn't
+  // been initialized yet (that happens in restoreFromLayout, called from
+  // onMounted). We set up the shell API and event handlers here, but
+  // defer group panel creation to populateGroupPanels() which runs
+  // after restoreFromLayout completes.
   console.info("[boot] onDockReady (shell/groups mode) fired");
   layoutStore.setShellApi(event.api);
-
-  // Restore shell layout (edge panels only).
-  if (pendingRestoreLayout.value) {
-    const ok = layoutStore.restore(pendingRestoreLayout.value);
-    if (!ok) layoutStore.resetToDefault();
-    pendingRestoreLayout.value = null;
-  }
-
-  // Create a body panel in the shell for each group.
-  for (const group of groupsStore.groups) {
-    const isActive = group.id === groupsStore.activeGroupId;
-    event.api.addPanel({
-      id: `group-${group.id}`,
-      component: "groupPanel",
-      tabComponent: "groupTab",
-      params: {
-        groupId: group.id,
-        groupName: group.name,
-        pendingLayout: pendingGroupLayouts.value.get(group.id) ?? null,
-      },
-      inactive: !isActive,
-    });
-  }
-  pendingGroupLayouts.value.clear();
 
   // Wire active group switching.
   event.api.onDidActivePanelChange((panel) => {
@@ -439,13 +462,47 @@ function onDockReady(event: DockviewReadyEvent) {
   });
 
   // Common: rescue strays and persist on layout change.
-  layoutStore.rescueChatPanelsFromEdgeGroups();
   event.api.onDidLayoutChange(() => {
     layoutStore.enforceKnownEdgeMinimums();
     layoutStore.rememberSessionDetailsWidth();
     scheduleLayoutSave();
     activityBarRef.value?.sync();
   });
+}
+
+/// Creates group panels in the shell dockview and restores edge layout.
+/// Called after restoreFromLayout has initialized groupsStore. Separated
+/// from onDockReady because dockview's @ready fires from the child
+/// component's onMounted (before App.vue's onMounted / restoreFromLayout).
+function populateGroupPanels() {
+  const shellDock = layoutStore.shellApi;
+  if (!shellDock) return;
+
+  // Restore shell layout (edge panels only).
+  if (pendingRestoreLayout.value) {
+    const ok = layoutStore.restore(pendingRestoreLayout.value);
+    if (!ok) layoutStore.resetToDefault();
+    pendingRestoreLayout.value = null;
+  }
+
+  // Create a body panel in the shell for each group.
+  for (const group of groupsStore.groups) {
+    const isActive = group.id === groupsStore.activeGroupId;
+    shellDock.addPanel({
+      id: `group-${group.id}`,
+      component: "groupPanel",
+      tabComponent: "groupTab",
+      params: {
+        groupId: group.id,
+        groupName: group.name,
+        pendingLayout: pendingGroupLayouts.value.get(group.id) ?? null,
+      },
+      inactive: !isActive,
+    });
+  }
+  pendingGroupLayouts.value.clear();
+
+  layoutStore.rescueChatPanelsFromEdgeGroups();
 }
 
 /// Debounced write — drag-resize fires `onDidLayoutChange` continuously

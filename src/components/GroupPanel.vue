@@ -89,6 +89,13 @@ function onReady(event: DockviewReadyEvent) {
     updateCount();
   });
 
+  // Signal layout save when the inner dockview changes (tab moves,
+  // additions, removals, resizes). The shell dockview's
+  // onDidLayoutChange won't fire for inner changes.
+  event.api.onDidLayoutChange(() => {
+    layoutStore.requestLayoutSave();
+  });
+
   // Restore the group's layout from the pending data passed via params.
   const pendingLayout = userParams.value.pendingLayout;
   if (pendingLayout && typeof pendingLayout === "object") {

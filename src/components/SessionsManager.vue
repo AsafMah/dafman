@@ -307,15 +307,14 @@ async function onResume(session: SessionMetadataSummary) {
   // Already-open sessions: activate the panel (or re-add if the panel
   // was removed while the session was detached with active jobs).
   if (openSessionIds.value.has(session.sessionId)) {
-    const dock = layoutStore.api;
-    const panel = dock?.getPanel(session.sessionId);
-    if (panel) {
-      panel.api.setActive();
+    // The session is already restored in memory. Try to find its panel
+    // across all groups (it may be in a non-active group).
+    if (layoutStore.activatePanelAcrossGroups(session.sessionId)) {
+      // Panel was found in some group — activated + switched to that group.
     } else {
-      // Panel was removed while session was detached — re-add it.
+      // Panel was removed while session was detached — re-add to the
+      // active group.
       layoutStore.addPanel(session.sessionId);
-      // Explicitly activate after re-add so it's visible even when
-      // another panel grabbed focus during the addPanel flow.
       layoutStore.activatePanel(session.sessionId);
     }
     window.dispatchEvent(

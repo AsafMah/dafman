@@ -281,3 +281,52 @@ describe("enforcePersistedEdgeMinimums", () => {
     expect(enforcePersistedEdgeMinimums(layout)).toBe(layout);
   });
 });
+
+describe("stripNonEdgePanels", () => {
+  const { stripNonEdgePanels } = require("../layoutSanitize");
+
+  test("removes body panels and clears the grid, preserving edge panels", () => {
+    const out = stripNonEdgePanels(USER_LAYOUT_2026_05_22) as {
+      panels: Record<string, unknown>;
+      grid: { root: { data: unknown[] } };
+      edgeGroups: typeof USER_LAYOUT_2026_05_22["edgeGroups"];
+    };
+    // Only the edge panel (sessions-manager) survives.
+    expect(Object.keys(out.panels)).toEqual(["sessions-manager"]);
+    // Grid body is emptied.
+    expect(out.grid.root.data).toEqual([]);
+    // Edge groups are preserved as-is.
+    expect(out.edgeGroups).toEqual(USER_LAYOUT_2026_05_22.edgeGroups);
+  });
+
+  test("handles layout with no edge groups — strips everything", () => {
+    const layout = {
+      grid: { root: { type: "branch", data: [{ type: "leaf" }] }, width: 100, height: 100 },
+      panels: { "session-A": { contentComponent: "chat" } },
+    };
+    const out = stripNonEdgePanels(layout) as { panels: Record<string, unknown> };
+    expect(Object.keys(out.panels)).toEqual([]);
+  });
+
+  test("non-object / null → passthrough", () => {
+    expect(stripNonEdgePanels(null)).toBe(null);
+    expect(stripNonEdgePanels("string")).toBe("string");
+  });
+
+  test("no panels key → passthrough", () => {
+    const layout = { grid: {} };
+    expect(stripNonEdgePanels(layout)).toBe(layout);
+  });
+
+  test("preserves grid dimensions and orientation", () => {
+    const layout = {
+      grid: { root: { type: "branch", data: [{}] }, width: 1000, height: 800, orientation: "VERTICAL" },
+      panels: { x: { contentComponent: "chat" } },
+      edgeGroups: {},
+    };
+    const out = stripNonEdgePanels(layout) as { grid: { width: number; height: number; orientation: string } };
+    expect(out.grid.width).toBe(1000);
+    expect(out.grid.height).toBe(800);
+    expect(out.grid.orientation).toBe("VERTICAL");
+  });
+});
