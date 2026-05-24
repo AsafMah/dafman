@@ -916,6 +916,33 @@ export class SessionRegistry {
 		return sessionId;
 	}
 
+	/// After each turn (session.idle), fetch the session's metadata
+	/// to get the auto-summarised title. The CLI sets the title via
+	/// workspace rename but may not always emit `session.title_changed`
+	/// to the SDK (e.g. when workspaces are disabled or ephemeral events
+	/// are lost). Polling metadata is a reliable fallback.
+	private pollTitleFromMetadata(sessionId: string): void {
+		const client = tryGetClient();
+		client
+			.getSessionMetadata(sessionId)
+			.then((meta) => {
+				if (meta?.summary) {
+					log.info("polled title from metadata", {
+						sessionId,
+						title: meta.summary,
+					});
+					this.emit({
+						sessionId,
+						eventType: "session.title_changed",
+						data: { title: meta.summary },
+					});
+				}
+			})
+			.catch(() => {
+				// Session may have been deleted between idle and poll.
+			});
+	}
+
 	private forward(sessionId: string, event: SessionEvent): void {
 		const eventType = event.type;
 		const isDiagnostic =
@@ -977,6 +1004,17 @@ export class SessionRegistry {
 					this.pending.settleForSession(sessionId, "autopilot-mode");
 				}
 			}
+		}
+		// When the CLI signals idle (turn finished), proactively fetch
+		// the session title from metadata. The CLI auto-summarises the
+		// conversation but may only emit `session.title_changed` inside
+		// workspace-enabled sessions. Polling `getMetadata` on idle
+		// catches the title regardless.
+		if (eventType === "session.idle") {
+			this.pollTitleFromMetadata(sessionId);
+		}
+		if (eventType === "session.title_changed") {
+			log.info("session.title_changed received", { sessionId, title: data.title });
 		}
 		try {
 			this.emit({
