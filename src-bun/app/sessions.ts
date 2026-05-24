@@ -863,22 +863,27 @@ export class SessionRegistry {
 	async list(): Promise<SessionMetadataSummary[]> {
 		const client = tryGetClient();
 		const items = await client.listSessions();
-		return items.map((m) => ({
-			sessionId: m.sessionId,
-			startTime:
-				m.startTime instanceof Date
-					? m.startTime.toISOString()
-					: String(m.startTime),
-			modifiedTime:
-				m.modifiedTime instanceof Date
-					? m.modifiedTime.toISOString()
-					: String(m.modifiedTime),
-			summary: m.summary,
-			isRemote: m.isRemote,
-			cwd: m.context?.workingDirectory,
-			repository: m.context?.repository,
-			branch: m.context?.branch,
-		}));
+		return items.map((m) => {
+			const localEntry = this.entries.get(m.sessionId);
+			return {
+				sessionId: m.sessionId,
+				startTime:
+					m.startTime instanceof Date
+						? m.startTime.toISOString()
+						: String(m.startTime),
+				modifiedTime:
+					m.modifiedTime instanceof Date
+						? m.modifiedTime.toISOString()
+						: String(m.modifiedTime),
+				summary: m.summary,
+				isRemote: m.isRemote,
+				// Enrich cwd from our local entry if the SDK catalog doesn't
+				// include it — the SDK sometimes drops context.workingDirectory.
+				cwd: m.context?.workingDirectory ?? localEntry?.workingDirectory,
+				repository: m.context?.repository,
+				branch: m.context?.branch,
+			};
+		});
 	}
 
 	/// Permanently deletes the CLI-side session data. If the session is

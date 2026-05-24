@@ -480,9 +480,7 @@ export const useLayoutStore = defineStore("layout", () => {
       try {
         const { useSessionsStore } = require("../stores/sessionsStore");
         const sessionsStore = useSessionsStore();
-        const record = sessionsStore.sessions.find(
-          (s: { id: string }) => s.id === sessionId,
-        );
+        const record = sessionsStore.getSession(sessionId);
         if (record?.title) {
           resolvedTitle = composePanelTitle(sessionId, record.title);
         }

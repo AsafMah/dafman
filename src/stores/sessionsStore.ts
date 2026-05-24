@@ -883,6 +883,19 @@ export const useSessionsStore = defineStore("sessions", () => {
         .catch(() => {
           /* agent RPC may be unavailable; ignore */
         });
+      // Hydrate the SDK-stored session name so the tab title shows
+      // something meaningful right away. The history replay may or may
+      // not contain a `session.title_changed` event — fetching the
+      // persisted name closes the gap for sessions whose replay doesn't
+      // include it.
+      void invokeCommand("getSessionName", { sessionId: actualId })
+        .then((name) => {
+          const current = getSession(actualId);
+          if (current && name && !current.title) current.title = name;
+        })
+        .catch(() => {
+          /* name RPC may be unavailable; ignore */
+        });
       return record;
     } catch (err) {
       const message = toErrorMessage(err);
