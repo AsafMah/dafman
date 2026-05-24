@@ -258,7 +258,12 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
   if (!source) return [];
   // Strip <system_notification>...</system_notification> XML blocks
   // that the CLI agent embeds in assistant messages for sub-agent lifecycle.
-  const cleaned = source.replace(/<system_notification>[\s\S]*?<\/system_notification>/g, "").trim();
+  const cleaned = source
+    .replace(/<system_notification>[\s\S]*?<\/system_notification>/g, "")
+    // During streaming, the opening tag may arrive before its close;
+    // strip the dangling open tag so it never flashes in the UI.
+    .replace(/<system_notification>[\s\S]*$/g, "")
+    .trim();
   if (!cleaned) return [];
   ensurePurifyHook();
   const tokens = md.parse(cleaned, {});

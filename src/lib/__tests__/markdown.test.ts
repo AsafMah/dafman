@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fenced, renderMarkdown } from "../markdown";
+import { fenced, renderMarkdown, renderMarkdownSegments } from "../markdown";
 
 describe("renderMarkdown", () => {
   test("returns empty string for empty input", () => {
@@ -243,5 +243,45 @@ describe("fenced", () => {
   test("inline code (single backticks) still uses the minimum 3-backtick fence", () => {
     const out = fenced("use `foo` here", "md");
     expect(out).toBe("```md\nuse `foo` here\n```");
+  });
+});
+
+describe("renderMarkdownSegments — system_notification stripping", () => {
+  test("strips complete system_notification blocks", () => {
+    const segments = renderMarkdownSegments(
+      "Hello\n<system_notification>\nAgent done.\n</system_notification>\nWorld",
+    );
+    const text = segments.map((s) => s.html).join("");
+    expect(text).not.toContain("system_notification");
+    expect(text).not.toContain("Agent done");
+    expect(text).toContain("Hello");
+    expect(text).toContain("World");
+  });
+
+  test("strips unclosed system_notification during streaming", () => {
+    const segments = renderMarkdownSegments(
+      "Some text\n<system_notification>\nAgent started...",
+    );
+    const text = segments.map((s) => s.html).join("");
+    expect(text).not.toContain("system_notification");
+    expect(text).not.toContain("Agent started");
+    expect(text).toContain("Some text");
+  });
+
+  test("strips multiple system_notification blocks", () => {
+    const segments = renderMarkdownSegments(
+      "<system_notification>a</system_notification>middle<system_notification>b</system_notification>end",
+    );
+    const text = segments.map((s) => s.html).join("");
+    expect(text).not.toContain("system_notification");
+    expect(text).toContain("middle");
+    expect(text).toContain("end");
+  });
+
+  test("returns empty for text that is only system_notification", () => {
+    const segments = renderMarkdownSegments(
+      "<system_notification>Agent done.</system_notification>",
+    );
+    expect(segments).toEqual([]);
   });
 });
