@@ -15,6 +15,7 @@ import { useLayoutStore } from "../stores/layoutStore";
 import { useSessionsStore } from "../stores/sessionsStore";
 import { useJobsStore } from "../stores/jobsStore";
 import { useToastStore } from "../stores/toastStore";
+import { useSettingsStore } from "../stores/settingsStore";
 
 type UserParams = { groupId?: string; groupName?: string; pendingLayout?: unknown };
 type WrappedParams = {
@@ -33,6 +34,9 @@ const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
 const jobsStore = useJobsStore();
 const toastStore = useToastStore();
+const settingsStore = useSettingsStore();
+
+const isDarkMode = computed(() => settingsStore.settings.appearance.theme === "dark");
 
 const userParams = computed<UserParams>(() => {
   const p = props.params;
@@ -56,8 +60,14 @@ function onReady(event: DockviewReadyEvent) {
     layoutStore.setBodyApi(event.api);
   }
 
+  // Update session count for this group.
+  function updateCount() {
+    groupsStore.setSessionCount(id, event.api.panels.length);
+  }
+
   // Handle session panel removal inside this group's dockview.
   event.api.onDidRemovePanel((panel) => {
+    updateCount();
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
       const record = sessionsStore.getSession(panel.id);
       const sessionBusy =
@@ -75,6 +85,10 @@ function onReady(event: DockviewReadyEvent) {
     }
   });
 
+  event.api.onDidAddPanel(() => {
+    updateCount();
+  });
+
   // Restore the group's layout from the pending data passed via params.
   const pendingLayout = userParams.value.pendingLayout;
   if (pendingLayout && typeof pendingLayout === "object") {
@@ -86,6 +100,9 @@ function onReady(event: DockviewReadyEvent) {
       console.error(`[GroupPanel] fromJSON failed for group ${id}`, err);
     }
   }
+
+  // Set initial count.
+  updateCount();
 }
 
 onBeforeUnmount(() => {
@@ -97,7 +114,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="group-panel">
+  <div class="group-panel" :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'">
     <DockviewVue
       class="group-dock"
       watermark-component="watermark"

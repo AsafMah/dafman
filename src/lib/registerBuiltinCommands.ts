@@ -254,8 +254,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ["group", "workspace", "new", "create"],
       run: () => {
         const { useGroupsStore } = require("../stores/groupsStore");
+        const { useLayoutStore } = require("../stores/layoutStore");
         const groupsStore = useGroupsStore();
-        groupsStore.createGroup();
+        const layoutStore = useLayoutStore();
+        const g = groupsStore.createGroup();
+        layoutStore.addGroupPanel(g.id, g.name);
       },
     },
   ];

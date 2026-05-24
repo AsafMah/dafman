@@ -8,6 +8,7 @@ import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
 import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
 import BootSplash from "./components/BootSplash.vue";
 import CommandPalette from "./components/CommandPalette.vue";
+import GroupsBar from "./components/GroupsBar.vue";
 import { useClientStore } from "./stores/clientStore";
 import { useSessionsStore } from "./stores/sessionsStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -248,12 +249,10 @@ onMounted(async () => {
 /// to `onShellReady` → each GroupPanel's `onReady`.
 const pendingRestoreLayout = ref<unknown | null>(null);
 
-/// Whether the app is using nested dockview (groups mode) or the
-/// legacy single-dockview mode. In legacy mode, `onDockReady` uses
-/// `setApi()` and chat panels live directly in the single dockview.
-/// In groups mode, `onDockReady` uses `setShellApi()` and creates
-/// group body panels, each containing its own inner DockviewVue.
-const isGroupsMode = ref(false);
+/// Whether the app is using nested dockview (groups mode). Always true
+/// for now — we boot into groups mode unconditionally. Legacy layouts
+/// are migrated to a single Default group on first boot.
+const isGroupsMode = ref(true);
 
 /// Sessions that need to be resumed on boot, gathered from group
 /// layouts or legacy layout. GroupPanel.onReady will restore the
@@ -264,10 +263,8 @@ async function restoreFromLayout() {
   const settings = settingsStore.settings;
   const groupsConfig = settings.layout?.groups;
 
-  // Determine if we're in groups mode or legacy mode.
   if (groupsConfig && groupsConfig.groups.length > 0) {
-    // Groups mode: init groups from persisted config.
-    isGroupsMode.value = true;
+    // Groups config exists — restore from it.
     groupsStore.init(groupsConfig, null);
     const allSessionIds: string[] = [];
     for (const group of groupsConfig.groups) {
@@ -306,12 +303,11 @@ async function restoreFromLayout() {
       );
     }
   } else {
-    // Legacy mode: single dockview layout, no nested groups.
-    isGroupsMode.value = false;
+    // Legacy / first boot — migrate to a Default group.
     groupsStore.init(null, null);
     const layout = settings.layout?.dockview;
     if (!layout || typeof layout !== "object") {
-      console.info("[boot] restoreFromLayout: no layout to restore");
+      console.info("[boot] restoreFromLayout: no layout, creating default group");
       return;
     }
     const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
@@ -319,7 +315,7 @@ async function restoreFromLayout() {
     const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
     const sessionIds = extractChatPanelIds(sanitized);
     console.info(
-      `[boot] restoreFromLayout: legacy mode, ${sessionIds.length} chat sessions to resume`,
+      `[boot] restoreFromLayout: legacy→groups migration, ${sessionIds.length} chat sessions to resume`,
     );
     if (sessionIds.length > 0) {
       bootStore.beginSessions(sessionIds.length);
@@ -331,7 +327,16 @@ async function restoreFromLayout() {
         ),
       );
     }
+    // The legacy layout has both edge panels and body panels.
+    // We use it as-is for the shell (edge panels will be picked up;
+    // body panels will be ignored since they won't match any registered
+    // component). Store it also as the Default group's layout so the
+    // inner dockview can restore the chat panels from it.
     pendingRestoreLayout.value = sanitized;
+    const defaultGroup = groupsStore.groups[0];
+    if (defaultGroup) {
+      pendingGroupLayouts.value.set(defaultGroup.id, sanitized);
+    }
   }
   bootStore.beginApplying();
   await new Promise<void>((resolve) =>
@@ -379,93 +384,59 @@ watch(
 );
 
 function onDockReady(event: DockviewReadyEvent) {
-  if (isGroupsMode.value) {
-    // ---- Groups mode: outer dockview is the shell ----
-    console.info("[boot] onDockReady (shell/groups mode) fired");
-    layoutStore.setShellApi(event.api);
+  // Shell (outer) dockview ready — groups mode is always active.
+  console.info("[boot] onDockReady (shell/groups mode) fired");
+  layoutStore.setShellApi(event.api);
 
-    // Restore shell layout (edge panels only).
-    if (pendingRestoreLayout.value) {
-      const ok = layoutStore.restore(pendingRestoreLayout.value);
-      if (!ok) layoutStore.resetToDefault();
-      pendingRestoreLayout.value = null;
-    }
-
-    // Create a body panel in the shell for each group.
-    for (const group of groupsStore.groups) {
-      const isActive = group.id === groupsStore.activeGroupId;
-      event.api.addPanel({
-        id: `group-${group.id}`,
-        component: "groupPanel",
-        tabComponent: "groupTab",
-        params: {
-          groupId: group.id,
-          groupName: group.name,
-          pendingLayout: pendingGroupLayouts.value.get(group.id) ?? null,
-        },
-        inactive: !isActive,
-      });
-    }
-    pendingGroupLayouts.value.clear();
-
-    // Wire active group switching.
-    event.api.onDidActivePanelChange((panel) => {
-      if (!panel) return;
-      const groupId = panel.id.startsWith("group-")
-        ? panel.id.slice("group-".length)
-        : null;
-      if (groupId) {
-        groupsStore.switchTo(groupId);
-        const innerApi = layoutStore.getGroupApi(groupId);
-        if (innerApi) {
-          layoutStore.setBodyApi(innerApi);
-        }
-      }
-    });
-
-    // Shell-level panel removal: edge group cleanup and group deletion.
-    event.api.onDidRemovePanel((panel) => {
-      const groupId = panel.api.group.id;
-      if (panel.id.startsWith("group-")) {
-        const gid = panel.id.slice("group-".length);
-        layoutStore.unregisterGroupApi(gid);
-        groupsStore.deleteGroup(gid);
-      }
-      layoutStore.pruneEmptyEdgeGroup(groupId);
-    });
-  } else {
-    // ---- Legacy mode: single dockview, no groups ----
-    console.info("[boot] onDockReady (legacy mode) fired");
-    layoutStore.setApi(event.api);
-
-    // Session teardown on panel removal.
-    event.api.onDidRemovePanel((panel) => {
-      const groupId = panel.api.group.id;
-      if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-        const record = sessionsStore.getSession(panel.id);
-        const sessionBusy =
-          jobsStore.hasActiveJobsForSession(panel.id) ||
-          record?.isThinking ||
-          (record?.pendingRequests?.length ?? 0) > 0;
-        if (sessionBusy) {
-          toastStore.info(
-            "Session detached",
-            "Session is still busy. Reopen from the Sessions sidebar.",
-          );
-        } else {
-          void sessionsStore.closeSession(panel.id);
-        }
-      }
-      layoutStore.pruneEmptyEdgeGroup(groupId);
-    });
-
-    // Restore pending layout.
-    if (pendingRestoreLayout.value) {
-      const ok = layoutStore.restore(pendingRestoreLayout.value);
-      if (!ok) layoutStore.resetToDefault();
-      pendingRestoreLayout.value = null;
-    }
+  // Restore shell layout (edge panels only).
+  if (pendingRestoreLayout.value) {
+    const ok = layoutStore.restore(pendingRestoreLayout.value);
+    if (!ok) layoutStore.resetToDefault();
+    pendingRestoreLayout.value = null;
   }
+
+  // Create a body panel in the shell for each group.
+  for (const group of groupsStore.groups) {
+    const isActive = group.id === groupsStore.activeGroupId;
+    event.api.addPanel({
+      id: `group-${group.id}`,
+      component: "groupPanel",
+      tabComponent: "groupTab",
+      params: {
+        groupId: group.id,
+        groupName: group.name,
+        pendingLayout: pendingGroupLayouts.value.get(group.id) ?? null,
+      },
+      inactive: !isActive,
+    });
+  }
+  pendingGroupLayouts.value.clear();
+
+  // Wire active group switching.
+  event.api.onDidActivePanelChange((panel) => {
+    if (!panel) return;
+    const groupId = panel.id.startsWith("group-")
+      ? panel.id.slice("group-".length)
+      : null;
+    if (groupId) {
+      groupsStore.switchTo(groupId);
+      const innerApi = layoutStore.getGroupApi(groupId);
+      if (innerApi) {
+        layoutStore.setBodyApi(innerApi);
+      }
+    }
+  });
+
+  // Shell-level panel removal: edge group cleanup and group deletion.
+  event.api.onDidRemovePanel((panel) => {
+    const groupId = panel.api.group.id;
+    if (panel.id.startsWith("group-")) {
+      const gid = panel.id.slice("group-".length);
+      layoutStore.unregisterGroupApi(gid);
+      groupsStore.deleteGroup(gid);
+    }
+    layoutStore.pruneEmptyEdgeGroup(groupId);
+  });
 
   // Common: rescue strays and persist on layout change.
   layoutStore.rescueChatPanelsFromEdgeGroups();
@@ -485,9 +456,7 @@ function scheduleLayoutSave() {
   layoutSaveTimer = setTimeout(() => {
     layoutSaveTimer = null;
     const shellSnapshot = layoutStore.snapshot();
-    const groupsConfig = isGroupsMode.value
-      ? groupsStore.toConfig(layoutStore.groupApis)
-      : undefined;
+    const groupsConfig = groupsStore.toConfig(layoutStore.groupApis);
     void settingsStore.persistLayout(shellSnapshot, groupsConfig);
   }, 300);
 }
@@ -650,16 +619,19 @@ function openSessionsByDefault(attempt = 0) {
          Settings is a panel like Sessions, not a modal. -->
     <div class="app-body">
       <ActivityBar ref="activityBarRef" :items="activityItems" />
-      <div
-        class="dock-wrapper"
-        :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
-      >
+      <div class="dock-column">
+        <GroupsBar v-if="isGroupsMode" />
+        <div
+          class="dock-wrapper"
+          :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
+        >
         <DockviewVue
-          class="dock"
+          class="dock shell-dock"
           watermark-component="watermark"
           default-tab-component="chatTab"
           @ready="onDockReady"
         />
+      </div>
       </div>
     </div>
   </main>
@@ -685,6 +657,14 @@ function openSessionsByDefault(attempt = 0) {
   min-height: 0;
   display: flex;
   min-width: 0;
+}
+
+.dock-column {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .dock-wrapper {

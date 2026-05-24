@@ -1063,6 +1063,38 @@ export const useLayoutStore = defineStore("layout", () => {
     return groupApis.value.get(groupId);
   }
 
+  /// Adds a group panel to the shell dockview (outer instance). Used
+  /// when a new group is created at runtime from the GroupsBar or the
+  /// command palette. The GroupPanel component will create its own inner
+  /// DockviewVue on mount.
+  function addGroupPanel(groupId: string, groupName: string): void {
+    const shell = shellApi.value;
+    if (!shell) return;
+    shell.addPanel({
+      id: `group-${groupId}`,
+      component: "groupPanel",
+      tabComponent: "groupTab",
+      params: {
+        groupId,
+        groupName,
+        pendingLayout: null,
+      },
+    });
+    // Activate the new group's tab.
+    const panel = shell.getPanel(`group-${groupId}`);
+    if (panel) panel.api.setActive();
+  }
+
+  /// Removes a group panel from the shell dockview.
+  function removeGroupPanel(groupId: string): void {
+    const shell = shellApi.value;
+    if (!shell) return;
+    const panel = shell.getPanel(`group-${groupId}`);
+    if (panel) {
+      panel.api.close();
+    }
+  }
+
   return {
     api,
     shellApi,
@@ -1100,5 +1132,7 @@ export const useLayoutStore = defineStore("layout", () => {
     snapshotBody,
     restore,
     restoreBody,
+    addGroupPanel,
+    removeGroupPanel,
   };
 });
