@@ -79,32 +79,17 @@ function activate(item: ActivityItem) {
   if (layoutStore.isPanelOpen(item.id)) {
     layoutStore.closePanel(item.id);
   } else {
-    // Mutual exclusion: only one activity-bar panel open at a time.
-    // The left edge group is a single slot — opening Settings while
-    // Sessions is open should *swap*, not stack two pressed-state
-    // buttons in the rail. Close any other open panel-kind items
-    // before opening the new one.
-    for (const other of props.items) {
-      if (other.kind !== "panel") continue;
-      if (other.id === item.id) continue;
-      if (layoutStore.isPanelOpen(other.id)) {
-        layoutStore.closePanel(other.id);
-      }
-    }
     layoutStore.openEdgePanel("left", {
       id: item.id,
       component: item.component,
       tabComponent: "sidebarTab",
       title: item.title,
       initialSize: item.initialSize,
-      exclusive: true,
       ...(item.minimumSize !== undefined
         ? { minimumSize: item.minimumSize }
         : {}),
     });
   }
-  // Optimistic flip; the onDidLayoutChange subscription in App.vue
-  // reconciles via `sync()` if the layout disagrees.
   syncOpenState();
 }
 

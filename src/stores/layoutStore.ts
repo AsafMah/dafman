@@ -739,7 +739,6 @@ export const useLayoutStore = defineStore("layout", () => {
         title: "Sessions",
         initialSize: 260,
         minimumSize: 180,
-        exclusive: true,
       });
     } catch (err) {
       // eslint-disable-next-line no-console

@@ -552,7 +552,6 @@ function openSessionsByDefault(attempt = 0) {
     title: "Sessions",
     initialSize: 240,
     minimumSize: 160,
-    exclusive: true,
   });
   activityBarRef.value?.sync();
 }

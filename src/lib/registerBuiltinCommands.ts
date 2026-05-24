@@ -78,7 +78,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             title: "Sessions",
             initialSize: 260,
             minimumSize: 180,
-            exclusive: true,
           });
         }
       },
@@ -99,7 +98,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           title: "Jobs",
           initialSize: 380,
           minimumSize: 380,
-          exclusive: true,
         });
       },
     },
@@ -119,7 +117,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           title: "Terminals — running shells",
           initialSize: 360,
           minimumSize: 320,
-          exclusive: true,
         });
       },
     },
@@ -179,7 +176,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           // width when opened via different surfaces.
           initialSize: 400,
           minimumSize: 380,
-          exclusive: true,
         });
       },
     },
@@ -226,6 +222,27 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         // ref through.
         const next = current === "dark" ? "light" : "dark";
         await settingsStore.setTheme(next);
+      },
+    },
+    {
+      id: "panel.maximize.toggle",
+      label: "Toggle Maximize Panel",
+      group: "Navigation",
+      icon: "pi pi-window-maximize",
+      keywords: ["maximize", "restore", "fullscreen", "panel"],
+      when: () => layoutStore.activeSessionId !== null,
+      run: () => {
+        const dock = layoutStore.api;
+        if (!dock) return;
+        const sid = layoutStore.activeSessionId;
+        if (!sid) return;
+        const panel = dock.getPanel(sid);
+        if (!panel) return;
+        if (panel.api.isMaximized()) {
+          panel.api.exitMaximized();
+        } else {
+          panel.api.maximize();
+        }
       },
     },
   ];

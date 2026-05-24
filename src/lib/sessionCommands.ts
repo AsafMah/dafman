@@ -82,7 +82,6 @@ function openLibraryTab(tab = "mcp"): void {
 		title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
 		initialSize: 360,
 		minimumSize: 320,
-		exclusive: true,
 	});
 }
 
