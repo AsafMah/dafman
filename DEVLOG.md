@@ -41,6 +41,16 @@ discovery).
      guaranteed to be forwarded to app-level handlers).
    Files: `src/stores/layoutStore.ts`, `src/App.vue`, `src-bun/app/sessions.ts`.
 
+2b. **Workspace grouping fix** (`f460121`): The SDK's `toSessionMetadata()`
+   (copilot-sdk/index.js:6737) remaps the raw wire `context.cwd` →
+   `context.workingDirectory`. After the supercharged→official migration,
+   our code was still reading `context?.cwd` which returned `undefined`,
+   making every session appear under "No workspace". Fixed 4 locations in
+   `sessions.ts` (`list()`, `resume()`, `cwdFor()` ×2), plus `fakeClient.ts`
+   and test fixtures.
+   Files: `src-bun/app/sessions.ts`, `src-bun/app/fakeClient.ts`,
+   `src-bun/__tests__/sessions.test.ts`.
+
 3. **Session close/detach fix** — `onDidRemovePanel` now checks
    `record.isThinking` and `record.pendingRequests` in addition to
    `jobsStore.hasActiveJobsForSession`. The jobs check alone was unreliable

@@ -26,6 +26,11 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Skills discovery.** The Library Skills tab now passes the active
   session's `workingDirectory` to `discoverSkills`, matching the MCP
   tab pattern. Previously workspace-level skills were not found.
+- **Session workspace grouping.** Sessions now correctly group by their
+  working directory in the Sessions Manager instead of all appearing
+  under "No workspace". Root cause: the SDK's `toSessionMetadata()`
+  remaps `context.cwd` → `context.workingDirectory`; our code was still
+  reading the old field name after the SDK migration.
 
 ### Added (Phase 23c — Long Jobs + Autopilot UI)
 
