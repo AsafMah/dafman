@@ -87,6 +87,7 @@ class FakeCopilotSession {
 	private readonly state: FakeSessionState;
 	private readonly scriptRef: { current: SendScript };
 	public readonly rpc: Record<string, Record<string, (args?: unknown) => Promise<unknown>>>;
+	private readonly skillsDisabled = new Set<string>();
 
 	constructor(state: FakeSessionState, scriptRef: { current: SendScript }) {
 		this.sessionId = state.sessionId;
@@ -112,10 +113,23 @@ class FakeCopilotSession {
 				resetSessionApprovals: async () => ({ cleared: 0 }),
 			},
 			skills: {
-				list: async () => ({ skills: [] }),
-				enable: async () => undefined,
-				disable: async () => undefined,
-			},
+					list: async () => {
+						const catalog = [
+							{ name: "summarize", description: "Summarize the conversation so far.", source: "builtin", userInvocable: true },
+							{ name: "project-greet", description: "Greet the user with project-specific context.", source: "project", userInvocable: false },
+							{ name: "personal-snippet", description: "Insert a personal code snippet.", source: "personal-copilot", userInvocable: true },
+						];
+						return { skills: catalog.map((s) => ({ ...s, enabled: !this.skillsDisabled.has(s.name) })) };
+					},
+					enable: async (args?: unknown) => {
+						const { name } = (args ?? {}) as { name: string };
+						this.skillsDisabled.delete(name);
+					},
+					disable: async (args?: unknown) => {
+						const { name } = (args ?? {}) as { name: string };
+						this.skillsDisabled.add(name);
+					},
+				},
 			usage: {
 				getMetrics: async () => ({ requests: 0, totalTokens: 0 }),
 			},
