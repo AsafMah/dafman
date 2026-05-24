@@ -20,7 +20,7 @@ across restarts.
 ## What's in it today
 
 **Chat surface**
-- Streaming token deltas via `copilot-sdk-supercharged`.
+- Streaming token deltas via `@github/copilot` SDK.
 - Visible reasoning blocks (compact / expanded / hidden), with proper
   handling of opaque encrypted reasoning (Anthropic + GPT-5.x).
 - Inline tool-call cards: per-tool summary line, args + result blocks with
@@ -82,7 +82,7 @@ across restarts.
 | Layer        | Choice |
 |--------------|--------|
 | Shell        | [Electrobun](https://docs.electrobunny.ai/electrobun/) 1.18 (Windows / macOS / Linux), native webview |
-| Main process | TypeScript + Bun + [`copilot-sdk-supercharged`](https://github.com/jeremiahjordanisaacson/copilot-sdk-supercharged) |
+| Main process | TypeScript + Bun + [`@github/copilot`](https://github.com/github/copilot-sdk) |
 | Renderer     | Vue 3 + Vite + TypeScript |
 | UI kit       | [PrimeVue](https://primevue.org) (Aura preset) + PrimeIcons |
 | Layout       | [dockview-vue](https://dockview.dev) |

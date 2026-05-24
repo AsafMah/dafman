@@ -11,7 +11,7 @@ driven by Bun) with a Vue 3 renderer. Streaming chat with multiple sessions /
 workspaces, visible reasoning and tool calls, real permission gates with rule
 editor, inline file/image attachments, command palette, dark mode.
 
-- Main process (Bun): TypeScript + `copilot-sdk-supercharged`.
+- Main process (Bun): TypeScript + `@github/copilot` SDK.
 - Renderer: Vue 3 + Vite + TypeScript + PrimeVue (Aura preset) + Pinia.
 - One language end-to-end. The repo is **TypeScript + Bun only** — no Rust,
   no Cargo, no Tauri, no Electron.
@@ -38,7 +38,7 @@ If your task touches the IPC wire contract, also read `src-bun/rpc.ts` and
 bun install                   # all deps (renderer + main process + tests)
 ```
 
-The Copilot CLI binary is bundled as a dep of `copilot-sdk-supercharged`;
+The Copilot CLI binary is bundled as a dep of `@github/copilot`;
 nothing else to install.
 
 ## Dev commands

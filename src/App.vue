@@ -343,7 +343,7 @@ watch(
       layoutStore.renamePanel(id, composePanelTitle(id, title));
     }
   },
-  { deep: true },
+  { deep: true, immediate: true },
 );
 
 function onDockReady(event: DockviewReadyEvent) {
@@ -359,10 +359,15 @@ function onDockReady(event: DockviewReadyEvent) {
     // but its `group.panels.length` reflects the post-removal count.
     const groupId = panel.api.group.id;
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-      if (jobsStore.hasActiveJobsForSession(panel.id)) {
+      const record = sessionsStore.sessions.find((s) => s.id === panel.id);
+      const sessionBusy =
+        jobsStore.hasActiveJobsForSession(panel.id) ||
+        record?.isThinking ||
+        (record?.pendingRequests?.length ?? 0) > 0;
+      if (sessionBusy) {
         toastStore.info(
           "Session detached",
-          "Active jobs are still running. Reopen it from the Jobs panel.",
+          "Session is still busy. Reopen from the Sessions sidebar.",
         );
       } else {
         void sessionsStore.closeSession(panel.id);

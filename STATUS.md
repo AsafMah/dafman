@@ -16,7 +16,10 @@
 **Active milestone:** **Post-M2 audit burn-down + manual test bug-bash**.
 M1 + M2 shipped. Terminal integration feature-complete. Manual test pass
 completed 2026-05-23: Phase A (7 renderer fixes) + Phase B (slash Tab UX)
-shipped. Phases C–F (MCP, agents, modes, skills) remain in the plan.
+shipped. **Phases C (MCP toggle), E (mode switch — no code fix needed),
+F (skills discovery) now resolved.** SDK migrated from
+`copilot-sdk-supercharged` to `@github/copilot` directly. Session tab
+title and close/detach bugs fixed.
 
 ---
 

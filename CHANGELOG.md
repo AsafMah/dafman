@@ -3,6 +3,29 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+- **Migrated from `copilot-sdk-supercharged` to `@github/copilot` SDK directly.**
+  All features used from supercharged are available in the official SDK v1.0.52+.
+  The adapter at `copilotSdk.ts` already imported from `@github/copilot/copilot-sdk/index.js`;
+  supercharged was only a transitive dependency installer.
+
+### Fixed
+- **Session tab title.** Session tabs now show the real session title
+  instead of the first 8 chars of the GUID. `addPanel()` resolves the
+  title from sessionsStore at creation time, and the App.vue title-sync
+  watcher fires immediately for restored sessions.
+- **Session close with active work.** Closing a chat tab now also checks
+  `isThinking` and `pendingRequests` in addition to jobs, so sessions
+  with active streaming/thinking are properly detached rather than
+  disconnected.
+- **MCP toggle takes effect immediately.** Toggling an MCP server in the
+  Library now pushes the change to all active sessions via
+  `session.mcp.enable/disable`, not just to the config (which only
+  affected new sessions).
+- **Skills discovery.** The Library Skills tab now passes the active
+  session's `workingDirectory` to `discoverSkills`, matching the MCP
+  tab pattern. Previously workspace-level skills were not found.
+
 ### Added (Phase 23c — Long Jobs + Autopilot UI)
 
 - **Terminal panes (Bun native PTY).** Added a Bun `TerminalRegistry`

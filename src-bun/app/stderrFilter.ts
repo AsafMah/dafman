@@ -7,8 +7,7 @@
 // with `Error: AttachConsole failed` and dumps a multi-line stack
 // trace. It's harmless — node-pty falls back to ConPTY — but the
 // `@github/copilot` SDK relays the CLI's stderr verbatim with a
-// `[CLI subprocess]` prefix (see `copilot-sdk-supercharged`
-// `client.js`), so the trace ends up in our terminal on every run.
+// `[CLI subprocess]` prefix (see SDK `client.js`), so the trace ends up in our terminal on every run.
 //
 // We install a stderr write filter that:
 //   1. Drops lines matching known node-pty / AttachConsole noise.

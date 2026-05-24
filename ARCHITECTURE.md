@@ -17,7 +17,7 @@
 │  └─────────────┘                              └───────────────────────────┘ │
 │         │                                                                   │
 │         ▼                                                                   │
-│  copilot-sdk-supercharged  ──spawns──►  @github/copilot-${platform}-${arch} │
+│  @github/copilot SDK  ──spawns──►  @github/copilot-${platform}-${arch}      │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                        │
@@ -28,7 +28,7 @@
 - **Single language, single runtime.** TypeScript everywhere; Bun on the main
   process; Vue 3 in the webview. No Rust, no Cargo, no Node-in-prod.
 - **One CLI process** (the prebuilt Copilot binary). The SDK spawns it once
-  via `copilot-sdk-supercharged`'s `Client`, then multiplexes sessions over
+  via the `@github/copilot` SDK's `Client`, then multiplexes sessions over
   JSON-RPC.
 - **One typed IPC surface** (`src-bun/rpc.ts`). The renderer never reaches into
   Electrobun globals directly; everything funnels through `src/ipc/invoke.ts`

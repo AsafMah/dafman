@@ -120,6 +120,23 @@ async function loadAll() {
   }
 }
 
+/// After toggling at the config level (which only affects new
+/// sessions), also push the change to every currently-open session
+/// so the toggle takes effect immediately.
+async function syncToggleToActiveSessions(serverName: string, enabled: boolean) {
+  for (const session of sessionsStore.sessions) {
+    try {
+      await invokeCommand("setSessionMcpEnabled", {
+        sessionId: session.id,
+        serverName,
+        enabled,
+      });
+    } catch {
+      // Session may not have this server connected — ignore.
+    }
+  }
+}
+
 async function toggleEnable(entry: ConfiguredEntry) {
   // `discovered.enabled` is the source of truth for the global
   // allowlist (set/cleared by enable/disable RPCs). Mirror locally.
@@ -132,6 +149,9 @@ async function toggleEnable(entry: ConfiguredEntry) {
     } else {
       await invokeCommand("disableMcpServers", { names: [entry.name] });
     }
+    // Push the change to active sessions so it takes effect immediately
+    // (config-level enable/disable only affects new sessions).
+    await syncToggleToActiveSessions(entry.name, next);
     await loadAll();
   } catch (err) {
     toasts.error(
@@ -204,6 +224,8 @@ async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
     } else {
       await invokeCommand("disableMcpServers", { names: [entry.name] });
     }
+    // Push to active sessions so the toggle takes effect immediately.
+    await syncToggleToActiveSessions(entry.name, enabled);
     await loadAll();
     toasts.success(
       enabled ? "MCP server enabled" : "MCP server disabled",

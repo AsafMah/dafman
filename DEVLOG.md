@@ -10,6 +10,65 @@
 
 ---
 
+## 2026-05-26 — SDK migration + session/discovery bug fixes
+
+**Takeaway:** Removed `copilot-sdk-supercharged` (dead weight — ALL features
+exist in `@github/copilot` v1.0.52+), fixed 4 bugs from the manual test
+bug-bash (session tab title, session close/detach, MCP toggle, skills
+discovery).
+
+### Changes
+
+1. **SDK migration** — Replaced `copilot-sdk-supercharged` with direct
+   `@github/copilot@^1.0.52` dependency in `package.json`. The adapter at
+   `src-bun/app/copilotSdk.ts` already imported from
+   `@github/copilot/copilot-sdk/index.js`; supercharged was only a transitive
+   installer. Official SDK has features supercharged was missing:
+   `onExitPlanMode`, `onAutoModeSwitch`.
+
+2. **Session tab title fix** — `layoutStore.addPanel()` now lazy-imports
+   sessionsStore and resolves existing title at panel creation time. App.vue
+   title-sync watcher made `immediate: true` for restored sessions.
+   Files: `src/stores/layoutStore.ts`, `src/App.vue`.
+
+3. **Session close/detach fix** — `onDidRemovePanel` now checks
+   `record.isThinking` and `record.pendingRequests` in addition to
+   `jobsStore.hasActiveJobsForSession`. The jobs check alone was unreliable
+   because `sdkJobs` only loads when the Jobs panel is opened.
+   File: `src/App.vue`.
+
+4. **MCP toggle immediate effect** — `mcp.config.enable/disable` only affects
+   **new** sessions (per SDK docs: "Active sessions keep their current
+   connections until they end"). Added `syncToggleToActiveSessions()` that
+   pushes `session.mcp.enable/disable` to every open session after the
+   config-level toggle.
+   File: `src/components/LibraryMcpTab.vue`.
+   Receipt: `node_modules/@github/copilot/copilot-sdk/generated/rpc.d.ts:2761`
+   ("Active sessions keep their current connections until they end").
+
+5. **Skills discovery fix** — `LibrarySkillsTab.vue` now passes
+   `workingDirectory` from the active session to `discoverSkills`, matching
+   the MCP tab pattern.
+   File: `src/components/LibrarySkillsTab.vue`.
+
+6. **Mode switch (Phase E)** — No code fix needed. Wiring is correct:
+   `session.mode_changed` → sessionsStore → reactive UI. The CLI's plan mode
+   is a behavioral hint, not a hard switch.
+
+### Investigation: supercharged vs official SDK
+
+All 14 features claimed by `copilot-sdk-supercharged` README exist in the
+official `@github/copilot` SDK:
+- Per-session auth, idle timeout, SessionFs, Commands, system prompt,
+  per-agent skills, excludedTools, runtime headers, model capabilities,
+  config discovery, sub-agent streaming, getMetadata, MCP config types,
+  image generation.
+
+`enableConfigDiscovery: true` is already set in `baseSessionConfig()` at
+`src-bun/app/sessions.ts:435`.
+
+---
+
 ## 2026-05-23 — Terminal regression fixes
 
 ### Takeaway

@@ -11,6 +11,8 @@ import Button from "primevue/button";
 import ToggleSwitch from "primevue/toggleswitch";
 import { invokeCommand } from "../ipc/invoke";
 import { useToastStore } from "../stores/toastStore";
+import { useSessionsStore } from "../stores/sessionsStore";
+import { useLayoutStore } from "../stores/layoutStore";
 import MessageContent from "./MessageContent.vue";
 
 type Skill = {
@@ -23,6 +25,7 @@ type Skill = {
 };
 
 const toasts = useToastStore();
+const sessionsStore = useSessionsStore();
 const skills = ref<Skill[]>([]);
 const loaded = ref(false);
 const error = ref<string | null>(null);
@@ -42,7 +45,16 @@ async function load() {
   error.value = null;
   loaded.value = false;
   try {
-    skills.value = await invokeCommand("discoverSkills", {});
+    // Pass the active session's workingDirectory so the SDK discovers
+    // workspace-level skills (.github/skills/, .agents/skills/, etc.).
+    // Mirrors the pattern in LibraryMcpTab.vue.
+    const activeId = useLayoutStore().activeSessionId;
+    const active = sessionsStore.sessions.find((s) => s.id === activeId);
+    const wd =
+      active?.workingDirectory ||
+      sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
+      "";
+    skills.value = await invokeCommand("discoverSkills", wd ? { workingDirectory: wd } : {});
     loaded.value = true;
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);

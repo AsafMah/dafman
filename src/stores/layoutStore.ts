@@ -470,6 +470,27 @@ export const useLayoutStore = defineStore("layout", () => {
     const dock = api.value;
     if (!dock) return;
     if (dock.getPanel(sessionId)) return;
+
+    // Resolve the best available title: explicit `opts.title` first,
+    // then fall back to the session's SDK-supplied title from the store,
+    // then the short GUID prefix. The lazy import avoids a circular
+    // dependency between layoutStore and sessionsStore.
+    let resolvedTitle = opts.title;
+    if (!resolvedTitle) {
+      try {
+        const { useSessionsStore } = require("../stores/sessionsStore");
+        const sessionsStore = useSessionsStore();
+        const record = sessionsStore.sessions.find(
+          (s: { id: string }) => s.id === sessionId,
+        );
+        if (record?.title) {
+          resolvedTitle = composePanelTitle(sessionId, record.title);
+        }
+      } catch {
+        // sessionsStore not available yet — fall through
+      }
+    }
+    resolvedTitle ??= shortPanelTitle(sessionId);
     // Three placement cases:
     //
     // 1. `targetGroupId` supplied (orphan replacement) → drop the panel
@@ -501,7 +522,7 @@ export const useLayoutStore = defineStore("layout", () => {
     dock.addPanel({
       id: sessionId,
       component: "chat",
-      title: opts.title ?? shortPanelTitle(sessionId),
+      title: resolvedTitle,
       params: { sessionId },
       position: { referenceGroup, direction },
     });
