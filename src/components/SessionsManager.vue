@@ -353,6 +353,7 @@ function onDelete(event: Event, session: SessionMetadataSummary) {
   const label =
     session.summary ?? `session ${session.sessionId.slice(0, 8)}…`;
   confirm.require({
+    group: "sessions-manager",
     target: event.currentTarget as HTMLElement,
     message: `Permanently delete "${label}"? This removes all CLI-side data and can't be undone.`,
     icon: "pi pi-exclamation-triangle",
@@ -397,7 +398,7 @@ void toasts; // referenced inside async handlers
 
 <template>
   <div class="sessions-manager">
-    <ConfirmPopup />
+    <ConfirmPopup group="sessions-manager" />
 
     <!-- Create-new-session block. Stays at the top of the panel so
          it's always reachable without scrolling. -->

@@ -16,7 +16,7 @@ interface FakeSession {
 	on(handler: Handler): () => void;
 	send(args: { prompt: string; attachments?: unknown[] }): Promise<string>;
 	setModel(model: string, opts?: { reasoningEffort?: string }): Promise<void>;
-	getMessages(): Promise<Array<{ type: string; [k: string]: unknown }>>;
+	getEvents(): Promise<Array<{ type: string; [k: string]: unknown }>>;
 	disconnect(): Promise<void>;
 	fire(event: { type: string; [k: string]: unknown }): void;
 	rpc: {
@@ -133,7 +133,7 @@ function makeFakeSession(
 		async setModel(model, opts) {
 			session.lastModel = { model, opts };
 		},
-		async getMessages() {
+		async getEvents() {
 			return session.history;
 		},
 		async disconnect() {},
@@ -264,7 +264,7 @@ class FakeClient {
 		context?: { workingDirectory?: string; repository?: string; branch?: string };
 	}> = [];
 	/// Seeds history that the next `resumeSession` call will hand back
-	/// via `getMessages()`. Populated by tests before triggering resume.
+	/// via `getEvents()`. Populated by tests before triggering resume.
 	nextResumeHistory: Array<{ type: string; [k: string]: unknown }> = [];
 	async createSession(config: Record<string, unknown> = {}): Promise<FakeSession> {
 		this.createdConfigs.push(config);

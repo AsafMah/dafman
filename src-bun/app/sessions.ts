@@ -67,7 +67,7 @@ import type {
 /// here. Mismatched values are rejected by the SDK at call time.
 type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
-/// S5: cap replay of `session.getMessages()` history at this many
+/// S5: cap replay of `session.getEvents()` history at this many
 /// events. The SDK returns the full transcript without pagination —
 /// long-lived sessions can produce thousands of events. The renderer
 /// reducer reconstructs the visible state from this slice; events
@@ -673,7 +673,7 @@ export class SessionRegistry {
 	}
 
 	/// Resumes a previously-created session by id. After resume succeeds
-	/// we immediately replay `session.getMessages()` through the same
+	/// we immediately replay `session.getEvents()` through the same
 	/// forwarder so the frontend reducer rebuilds its transcript from
 	/// scratch — the SDK's `session.on` does NOT replay history on its
 	/// own, so without this the restored pane would render empty until
@@ -747,7 +747,7 @@ export class SessionRegistry {
 		// `queueMicrotask` yields so the renderer can paint between
 		// batches instead of receiving one giant IPC flood.
 		try {
-			const history = await session.getMessages();
+			const history = await session.getEvents();
 			const total = history.length;
 			const capped =
 				total > HISTORY_REPLAY_CAP
@@ -766,6 +766,9 @@ export class SessionRegistry {
 				error: toErrorMessage(err),
 			});
 		}
+		// Poll the title immediately after resume so restored sessions show
+		// their persisted title without needing a new turn (session.idle).
+		this.pollTitleFromMetadata(actualId);
 		return actualId;
 	}
 
@@ -928,25 +931,29 @@ export class SessionRegistry {
 	/// to the SDK (e.g. when workspaces are disabled or ephemeral events
 	/// are lost). Polling metadata is a reliable fallback.
 	private pollTitleFromMetadata(sessionId: string): void {
-		const client = tryGetClient();
-		client
-			.getSessionMetadata(sessionId)
-			.then((meta) => {
-				if (meta?.summary) {
-					log.info("polled title from metadata", {
-						sessionId,
-						title: meta.summary,
-					});
-					this.emit({
-						sessionId,
-						eventType: "session.title_changed",
-						data: { title: meta.summary },
-					});
-				}
-			})
-			.catch(() => {
-				// Session may have been deleted between idle and poll.
-			});
+		try {
+			const client = tryGetClient();
+			client
+				.getSessionMetadata(sessionId)
+				.then((meta) => {
+					if (meta?.summary) {
+						log.info("polled title from metadata", {
+							sessionId,
+							title: meta.summary,
+						});
+						this.emit({
+							sessionId,
+							eventType: "session.title_changed",
+							data: { title: meta.summary },
+						});
+					}
+				})
+				.catch(() => {
+					// Session may have been deleted between idle and poll.
+				});
+		} catch {
+			// Client not started or getSessionMetadata unavailable.
+		}
 	}
 
 	private forward(sessionId: string, event: SessionEvent): void {
