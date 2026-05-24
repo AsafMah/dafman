@@ -247,11 +247,15 @@ describe("fenced", () => {
 });
 
 describe("renderMarkdownSegments — system_notification stripping", () => {
+  function segmentText(segments: ReturnType<typeof renderMarkdownSegments>): string {
+    return segments.map((s) => (s.kind === "html" ? s.html : s.code)).join("");
+  }
+
   test("strips complete system_notification blocks", () => {
     const segments = renderMarkdownSegments(
       "Hello\n<system_notification>\nAgent done.\n</system_notification>\nWorld",
     );
-    const text = segments.map((s) => s.html).join("");
+    const text = segmentText(segments);
     expect(text).not.toContain("system_notification");
     expect(text).not.toContain("Agent done");
     expect(text).toContain("Hello");
@@ -262,7 +266,7 @@ describe("renderMarkdownSegments — system_notification stripping", () => {
     const segments = renderMarkdownSegments(
       "Some text\n<system_notification>\nAgent started...",
     );
-    const text = segments.map((s) => s.html).join("");
+    const text = segmentText(segments);
     expect(text).not.toContain("system_notification");
     expect(text).not.toContain("Agent started");
     expect(text).toContain("Some text");
@@ -272,7 +276,7 @@ describe("renderMarkdownSegments — system_notification stripping", () => {
     const segments = renderMarkdownSegments(
       "<system_notification>a</system_notification>middle<system_notification>b</system_notification>end",
     );
-    const text = segments.map((s) => s.html).join("");
+    const text = segmentText(segments);
     expect(text).not.toContain("system_notification");
     expect(text).toContain("middle");
     expect(text).toContain("end");

@@ -290,7 +290,7 @@ async function cancelTask(task: TaskInfo) {
       sessionId: sessionId.value,
       id: task.id,
     });
-    toasts.info("Task cancelled", `Cancelled "${task.name || task.id}".`);
+    toasts.info("Task cancelled", `Cancelled "${task.description || task.id}".`);
   } catch (err) {
     toasts.error(
       "Failed to cancel task",

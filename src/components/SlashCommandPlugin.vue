@@ -12,7 +12,7 @@
 /// SDK's built-in command resolver picks it up.
 
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
-import { TextNode, $isTextNode, $getSelection, $isRangeSelection, $createTextNode, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH } from "lexical";
+import { TextNode, $isTextNode, $getSelection, $isRangeSelection, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH } from "lexical";
 import {
   TypeaheadMenuPlugin,
   MenuOption,
