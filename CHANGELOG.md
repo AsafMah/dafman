@@ -3,6 +3,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+- **Workspace groups.** Create named groups to organize sessions into
+  switchable workspaces. Each group stores its own panel layout; edge
+  panels (sidebars) are shared. GroupsBar appears above the dock when
+  more than one group exists. Right-click to rename or delete groups.
+
 ### Changed
 - **Migrated from `copilot-sdk-supercharged` to `@github/copilot` SDK directly.**
   All features used from supercharged are available in the official SDK v1.0.52+.
