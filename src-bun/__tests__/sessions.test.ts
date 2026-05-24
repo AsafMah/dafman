@@ -261,7 +261,7 @@ class FakeClient {
 		modifiedTime: Date;
 		summary?: string;
 		isRemote: boolean;
-		context?: { cwd?: string; repository?: string; branch?: string };
+		context?: { workingDirectory?: string; repository?: string; branch?: string };
 	}> = [];
 	/// Seeds history that the next `resumeSession` call will hand back
 	/// via `getMessages()`. Populated by tests before triggering resume.
@@ -457,7 +457,7 @@ describe("SessionRegistry", () => {
 				summary: "refactor auth",
 				isRemote: false,
 				context: {
-					cwd: "/repo",
+					workingDirectory: "/repo",
 					repository: "AsafMah/dafman",
 					branch: "main",
 				},

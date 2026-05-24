@@ -700,7 +700,7 @@ export class SessionRegistry {
 		let persistedCwd: string | undefined;
 		try {
 			const meta = await client.getSessionMetadata(sessionId);
-			if (meta?.context?.cwd) persistedCwd = meta.context.cwd;
+			if (meta?.context?.workingDirectory) persistedCwd = meta.context.workingDirectory;
 		} catch {
 			/* non-fatal */
 		}
@@ -874,7 +874,7 @@ export class SessionRegistry {
 					: String(m.modifiedTime),
 			summary: m.summary,
 			isRemote: m.isRemote,
-			cwd: m.context?.cwd,
+			cwd: m.context?.workingDirectory,
 			repository: m.context?.repository,
 			branch: m.context?.branch,
 		}));
@@ -1120,9 +1120,9 @@ export class SessionRegistry {
 			// awaited. Skip the write to avoid a stale overwrite.
 			const current = this.entries.get(sessionId);
 			if (current?.workingDirectory) return current.workingDirectory;
-			if (meta?.context?.cwd) {
-				if (current) current.workingDirectory = meta.context.cwd;
-				return meta.context.cwd;
+			if (meta?.context?.workingDirectory) {
+				if (current) current.workingDirectory = meta.context.workingDirectory;
+				return meta.context.workingDirectory;
 			}
 		} catch {
 			/* fall through to listSessions */
@@ -1132,9 +1132,9 @@ export class SessionRegistry {
 			const current = this.entries.get(sessionId);
 			if (current?.workingDirectory) return current.workingDirectory;
 			const summary = summaries.find((s) => s.sessionId === sessionId);
-			if (summary?.context?.cwd) {
-				if (current) current.workingDirectory = summary.context.cwd;
-				return summary.context.cwd;
+			if (summary?.context?.workingDirectory) {
+				if (current) current.workingDirectory = summary.context.workingDirectory;
+				return summary.context.workingDirectory;
 			}
 		} catch {
 			/* non-fatal */

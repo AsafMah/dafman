@@ -315,18 +315,18 @@ export class FakeCopilotClient {
 		return session;
 	}
 
-	async listSessions(): Promise<Array<{ sessionId: string; startTime: Date; modifiedTime: Date; summary?: string; isRemote: boolean; context?: { cwd?: string } }>> {
+	async listSessions(): Promise<Array<{ sessionId: string; startTime: Date; modifiedTime: Date; summary?: string; isRemote: boolean; context?: { workingDirectory?: string } }>> {
 		const now = new Date();
 		return [...this.sessions.values()].map((s) => ({
 			sessionId: s.sessionId,
 			startTime: now,
 			modifiedTime: now,
 			isRemote: false,
-			...(s.cwd ? { context: { cwd: s.cwd } } : {}),
+			...(s.cwd ? { context: { workingDirectory: s.cwd } } : {}),
 		}));
 	}
 
-	async getSessionMetadata(sessionId: string): Promise<{ sessionId: string; startTime: Date; modifiedTime: Date; isRemote: boolean; context?: { cwd?: string } } | undefined> {
+	async getSessionMetadata(sessionId: string): Promise<{ sessionId: string; startTime: Date; modifiedTime: Date; isRemote: boolean; context?: { workingDirectory?: string } } | undefined> {
 		const s = this.sessions.get(sessionId);
 		if (!s) return undefined;
 		const now = new Date();
@@ -335,7 +335,7 @@ export class FakeCopilotClient {
 			startTime: now,
 			modifiedTime: now,
 			isRemote: false,
-			...(s.cwd ? { context: { cwd: s.cwd } } : {}),
+			...(s.cwd ? { context: { workingDirectory: s.cwd } } : {}),
 		};
 	}
 
