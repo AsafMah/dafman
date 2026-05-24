@@ -1142,6 +1142,22 @@ export const useLayoutStore = defineStore("layout", () => {
   function addGroupPanel(groupId: string, groupName: string): void {
     const shell = shellApi.value;
     if (!shell) return;
+
+    // Snapshot the outgoing group's layout before switching, so the
+    // layout save doesn't accidentally capture a stale snapshot.
+    const { useGroupsStore } = require("../stores/groupsStore");
+    const groupsStore = useGroupsStore();
+    const outgoingId = groupsStore.activeGroupId;
+    if (outgoingId) {
+      const outApi = groupApis.value.get(outgoingId);
+      if (outApi) groupsStore.saveLayout(outgoingId, outApi.toJSON());
+    }
+
+    // Switch group state BEFORE adding the panel so that when
+    // GroupPanel.onReady fires, activeGroupId already matches and
+    // setBodyApi targets the new (empty) dockview.
+    groupsStore.switchTo(groupId);
+
     shell.addPanel({
       id: `group-${groupId}`,
       component: "groupPanel",
@@ -1152,7 +1168,7 @@ export const useLayoutStore = defineStore("layout", () => {
         pendingLayout: null,
       },
     });
-    // Activate the new group's tab.
+    // Activate the new group's tab in the shell dockview.
     const panel = shell.getPanel(`group-${groupId}`);
     if (panel) panel.api.setActive();
   }
