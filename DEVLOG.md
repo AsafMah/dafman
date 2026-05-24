@@ -10,6 +10,52 @@
 
 ---
 
+## 2026-05-24 — Groups revert + session bug fixes
+
+**Takeaway:** Groups feature fully reverted after persistent runtime failures.
+Three pre-existing session bugs fixed: history replay, title polling on
+restore, and duplicate confirm dialog.
+
+### Groups revert
+
+The groups feature (nested dockview, GroupsBar, groupsStore) shipped 9 commits
+but was completely broken at runtime — `require()` calls in browser context
+crashed the layout code. After fixing that, the feature still didn't work
+correctly. User requested full revert.
+
+- Reverted commits `5a1da9e..f30aad6` back to `a4b9f41` (`a1d7a21`)
+- Cherry-picked CI fix for `!!` command mode test skip on Linux (`1077724`)
+- All 551 tests + 90 smoke pass after revert
+
+### Bug fixes (ec1bd4d)
+
+**Bug 1 — Session messages don't load on restore:**
+SDK renamed `session.getMessages()` → `session.getEvents()`. The method was
+still called as `getMessages()` in `replayHistory()`, causing
+`session.getMessages is not a function` at resume time. Fixed in
+`src-bun/app/sessions.ts:750` and test fake.
+
+**Bug 2 — Session titles don't load sometimes:**
+`pollTitleFromMetadata()` only fired on `session.idle` (after a new turn).
+Restored sessions with no new turns never got polled. Added a poll immediately
+after `resume()` completes. Also wrapped the entire poll in try/catch since
+`tryGetClient()` can throw synchronously when the client hasn't initialized.
+
+**Bug 3 — Extra confirm dialog when deleting a session:**
+`SessionsManager.vue` uses `ConfirmPopup` and `App.vue` has a global
+`ConfirmDialog`. Both shared PrimeVue's default confirm group, so any
+`confirm.require()` triggered both simultaneously. Fixed by adding
+`group="sessions-manager"` to both the popup component and the require call.
+
+### SDK rename discovery
+
+The `@github/copilot` SDK renamed `session.getMessages()` to
+`session.getEvents()` at some point. Internally it still sends the same RPC
+(`session.getMessages`) to the CLI process and returns `response.events` with
+the same `SessionEvent[]` shape. Found at
+`node_modules/@github/copilot/copilot-sdk/index.js:5381`.
+
+
 ## 2026-05-26 — SDK migration + session/discovery bug fixes
 
 **Takeaway:** Removed `copilot-sdk-supercharged` (dead weight — ALL features

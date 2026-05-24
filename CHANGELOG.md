@@ -10,6 +10,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   supercharged was only a transitive dependency installer.
 
 ### Fixed
+- **Session history not loading on restore.** SDK renamed `session.getMessages()`
+  to `session.getEvents()` — restored sessions had no messages displayed.
+- **Session titles missing after restore.** Title poll now fires immediately
+  after resume, not only after the next turn completes.
+- **Duplicate confirm dialog on session delete.** The delete popup no longer
+  triggers the global app confirm dialog simultaneously.
 - **Session tab title.** Session tabs now show the real session title
   instead of the first 8 chars of the GUID. `addPanel()` resolves the
   title from sessionsStore at creation time, and after each turn the
