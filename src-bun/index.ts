@@ -408,17 +408,12 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 							// Folder → open it in Explorer.
 							spawn("explorer.exe", [trimmed], { detached: true, stdio: "ignore" }).unref();
 						} else {
-							// File → open with the default app (what
-							// Explorer would do on double-click). `cmd /c
-							// start "" "<path>"` is the standard shell
-							// recipe — the empty title arg is required so
-							// `start` doesn't treat a quoted path as the
-							// title. Previously we used `explorer /select`
-							// which opened the parent folder + highlighted
-							// the file; user feedback (2026-05-22) made
-							// clear that "open the file" is what's actually
-							// wanted everywhere we call this.
-							spawn("cmd.exe", ["/c", "start", "", trimmed], {
+							// File → reveal in Explorer with the file
+							// highlighted. Uses `explorer /select,"path"`
+							// which opens the containing folder and selects
+							// the file — the expected "reveal" behavior for
+							// exports and diagnostics.
+							spawn("explorer.exe", [`/select,${trimmed}`], {
 								detached: true,
 								stdio: "ignore",
 							}).unref();
