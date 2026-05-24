@@ -70,6 +70,7 @@ export const useJobsStore = defineStore("jobs", () => {
           canCancel: false,
           canRemove: true,
         });
+        useToastStore().info("Job cancelled", `Cancelled "${job.title}".`);
       } else {
         await invokeCommand("cancelTask", {
           sessionId: job.sessionId,
@@ -83,6 +84,7 @@ export const useJobsStore = defineStore("jobs", () => {
           canCancel: false,
           canRemove: true,
         });
+        useToastStore().info("Job cancelled", `Cancelled "${job.title}".`);
         await refresh();
       }
     } catch (err) {

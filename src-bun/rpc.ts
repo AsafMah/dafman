@@ -803,6 +803,7 @@ export type DafmanRPC = {
 					source: string;
 					enabled: boolean;
 					userInvocable: boolean;
+					path?: string;
 				}>;
 			};
 			setSessionSkillEnabled: {

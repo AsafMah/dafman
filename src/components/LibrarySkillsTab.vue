@@ -45,16 +45,25 @@ async function load() {
   error.value = null;
   loaded.value = false;
   try {
-    // Pass the active session's workingDirectory so the SDK discovers
-    // workspace-level skills (.github/skills/, .agents/skills/, etc.).
-    // Mirrors the pattern in LibraryMcpTab.vue.
+    // Use session-scoped skills when a session is open — the session's
+    // working directory drives .github/skills/ discovery correctly.
+    // Fall back to the global discover RPC when no session exists.
     const activeId = useLayoutStore().activeSessionId;
-    const active = sessionsStore.sessions.find((s) => s.id === activeId);
-    const wd =
-      active?.workingDirectory ||
-      sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
-      "";
-    skills.value = await invokeCommand("discoverSkills", wd ? { workingDirectory: wd } : {});
+    const active = activeId
+      ? sessionsStore.sessions.find((s) => s.id === activeId)
+      : undefined;
+    const sessionId =
+      active?.id ??
+      sessionsStore.sessions[0]?.id;
+
+    if (sessionId) {
+      skills.value = await invokeCommand("listSessionSkills", { sessionId });
+    } else {
+      const wd =
+        sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
+        "";
+      skills.value = await invokeCommand("discoverSkills", wd ? { workingDirectory: wd } : {});
+    }
     loaded.value = true;
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -64,11 +73,26 @@ async function load() {
 
 async function toggleSkill(skill: Skill) {
   const next = !skill.enabled;
-  // Optimistic: flip the local view, then push the full disabled set.
+  // Optimistic: flip the local view, then push the change.
   skill.enabled = next;
-  const disabled = skills.value.filter((s) => !s.enabled).map((s) => s.name);
   try {
-    await invokeCommand("setGloballyDisabledSkills", { disabledSkills: disabled });
+    // Use session-scoped skill toggle when a session is open, otherwise
+    // push the full global disabled set.
+    const activeId = useLayoutStore().activeSessionId;
+    const sessionId =
+      (activeId ? sessionsStore.sessions.find((s) => s.id === activeId)?.id : undefined) ??
+      sessionsStore.sessions[0]?.id;
+
+    if (sessionId) {
+      await invokeCommand("setSessionSkillEnabled", {
+        sessionId,
+        name: skill.name,
+        enabled: next,
+      });
+    } else {
+      const disabled = skills.value.filter((s) => !s.enabled).map((s) => s.name);
+      await invokeCommand("setGloballyDisabledSkills", { disabledSkills: disabled });
+    }
   } catch (err) {
     skill.enabled = !next;
     toasts.error("Toggle failed", err instanceof Error ? err.message : String(err));

@@ -138,6 +138,9 @@ class FakeCopilotSession {
 			sessions: {
 				fork: async () => ({ sessionId: `fake-session-${Date.now()}` }),
 			},
+			tasks: {
+				list: async () => ({ tasks: [] }),
+			},
 		};
 	}
 

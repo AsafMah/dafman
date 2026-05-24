@@ -1642,6 +1642,7 @@ export class SessionRegistry {
 		source: string;
 		enabled: boolean;
 		userInvocable: boolean;
+		path?: string;
 	}>> {
 		const entry = this.entries.get(sessionId);
 		if (!entry) throw AppError.sessionNotFound(sessionId);
@@ -1653,6 +1654,7 @@ export class SessionRegistry {
 					source?: unknown;
 					enabled?: unknown;
 					userInvocable?: unknown;
+					path?: unknown;
 				}>;
 			};
 			const skills = result.skills ?? [];
@@ -1664,6 +1666,7 @@ export class SessionRegistry {
 					source: typeof s.source === "string" ? s.source : "",
 					enabled: s.enabled === true,
 					userInvocable: s.userInvocable === true,
+					...(typeof s.path === "string" ? { path: s.path } : {}),
 				}));
 		} catch (err) {
 			throw AppError.sdk(err instanceof Error ? err.message : String(err));

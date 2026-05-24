@@ -614,6 +614,7 @@ export type CommandMap = {
       source: string;
       enabled: boolean;
       userInvocable: boolean;
+      path?: string;
     }>;
   };
   setSessionSkillEnabled: {

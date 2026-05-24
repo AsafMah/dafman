@@ -312,7 +312,11 @@ async function onResume(session: SessionMetadataSummary) {
     if (panel) {
       panel.api.setActive();
     } else {
+      // Panel was removed while session was detached — re-add it.
       layoutStore.addPanel(session.sessionId);
+      // Explicitly activate after re-add so it's visible even when
+      // another panel grabbed focus during the addPanel flow.
+      layoutStore.activatePanel(session.sessionId);
     }
     window.dispatchEvent(
       new CustomEvent("dafman:scroll-to-bottom", {
