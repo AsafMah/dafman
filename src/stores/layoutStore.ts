@@ -16,6 +16,13 @@ import type {
   DockviewApi,
   EdgeGroupPosition,
 } from "dockview-core";
+import { useGroupsStore } from "./groupsStore";
+
+// sessionsStore imports layoutStore (circular). With ESM, the import
+// binding resolves by the time any action runs — so a top-level
+// import is safe as long as we only call useSessionsStore() inside
+// functions (never at module-eval time).
+import { useSessionsStore } from "./sessionsStore";
 
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
@@ -562,7 +569,6 @@ export const useLayoutStore = defineStore("layout", () => {
     let resolvedTitle = opts.title;
     if (!resolvedTitle) {
       try {
-        const { useSessionsStore } = require("../stores/sessionsStore");
         const sessionsStore = useSessionsStore();
         const record = sessionsStore.getSession(sessionId);
         if (record?.title) {
@@ -1145,7 +1151,6 @@ export const useLayoutStore = defineStore("layout", () => {
 
     // Snapshot the outgoing group's layout before switching, so the
     // layout save doesn't accidentally capture a stale snapshot.
-    const { useGroupsStore } = require("../stores/groupsStore");
     const groupsStore = useGroupsStore();
     const outgoingId = groupsStore.activeGroupId;
     if (outgoingId) {

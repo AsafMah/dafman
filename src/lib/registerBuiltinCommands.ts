@@ -30,6 +30,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useModelsStore } from "../stores/modelsStore";
 import { useToastStore } from "../stores/toastStore";
 import { useTerminalStore } from "../stores/terminalStore";
+import { useGroupsStore } from "../stores/groupsStore";
 import { SESSION_COMMANDS } from "./sessionCommands";
 import type { SessionMode } from "../ipc/types";
 import { toErrorMessage } from "./errorMessage";
@@ -253,8 +254,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: "pi pi-plus",
       keywords: ["group", "workspace", "new", "create"],
       run: () => {
-        const { useGroupsStore } = require("../stores/groupsStore");
-        const { useLayoutStore } = require("../stores/layoutStore");
         const groupsStore = useGroupsStore();
         const layoutStore = useLayoutStore();
         const g = groupsStore.createGroup();
