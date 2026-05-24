@@ -156,7 +156,7 @@ export const useJobsStore = defineStore("jobs", () => {
     const trimmed = goal.trim();
     if (!trimmed) return;
     const id = `autopilot:${sessionId}:${Date.now()}`;
-    const session = useSessionsStore().sessions.find((s) => s.id === sessionId);
+    const session = useSessionsStore().getSession(sessionId);
     const job: JobRecord = {
       id,
       sessionId,
@@ -226,7 +226,7 @@ export const useJobsStore = defineStore("jobs", () => {
     () => {
       for (const job of localJobs.value) {
         if (job.source !== "autopilot-session" || !isActiveStatus(job.status)) continue;
-        const session = sessionsStore.sessions.find((s) => s.id === job.sessionId);
+        const session = sessionsStore.getSession(job.sessionId);
         if (!session) continue;
         const meta = localMeta.get(job.id);
         if (!meta) continue;

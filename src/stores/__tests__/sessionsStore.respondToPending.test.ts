@@ -104,7 +104,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     const store = useSessionsStore();
     await seedPendingRequest(store, firePending, "s1", "req-1");
 
-    const record = store.sessions.find((s) => s.id === "s1");
+    const record = store.getSession("s1");
     expect(record?.pendingRequests).toHaveLength(1);
     const eventsBefore = record!.events.length;
 
@@ -130,7 +130,7 @@ describe("sessionsStore.respondToPending — rollback on RPC failure", () => {
     const toasts = useToastStore();
     await seedPendingRequest(store, firePending, "s1", "req-1");
 
-    const record = store.sessions.find((s) => s.id === "s1");
+    const record = store.getSession("s1");
     expect(record?.pendingRequests).toHaveLength(1);
     const before = record!.pendingRequests[0];
     const eventsBefore = record!.events.length;

@@ -56,7 +56,7 @@ const toasts = useToastStore();
 const sessionId = computed<string>(() => layoutStore.activeSessionId ?? "");
 
 const record = computed(() =>
-  sessionsStore.sessions.find((s) => s.id === sessionId.value),
+  sessionsStore.getSession(sessionId.value),
 );
 
 // ---------- Name ----------

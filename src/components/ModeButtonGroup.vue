@@ -18,7 +18,7 @@ const props = defineProps<{ sessionId: string }>();
 const sessionsStore = useSessionsStore();
 
 const record = computed(() =>
-  sessionsStore.sessions.find((s) => s.id === props.sessionId),
+  sessionsStore.getSession(props.sessionId),
 );
 
 const modeOptions: { label: string; value: SessionMode; icon: string }[] = [

@@ -77,7 +77,7 @@ export const useTerminalStore = defineStore("terminals", () => {
       setSessionTerminalIds({ ...sessionTerminalIds.value, [sessionId]: linked.id });
       return linked;
     }
-    const session = useSessionsStore().sessions.find((s) => s.id === sessionId);
+    const session = useSessionsStore().getSession(sessionId);
     const summary = await createTerminal({
       cols: 80,
       rows: 8,

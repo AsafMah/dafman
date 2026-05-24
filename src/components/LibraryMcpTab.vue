@@ -77,7 +77,7 @@ async function loadAll() {
     // already auto-connected to) would NOT show up in the Library
     // — the SDK's mcp.discover defaults to user-config only.
     const activeId = useLayoutStore().activeSessionId;
-    const active = sessionsStore.sessions.find((s) => s.id === activeId);
+    const active = sessionsStore.getSession(activeId);
     const wd =
       active?.workingDirectory ||
       sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||

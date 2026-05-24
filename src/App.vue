@@ -360,7 +360,7 @@ function onDockReady(event: DockviewReadyEvent) {
     // but its `group.panels.length` reflects the post-removal count.
     const groupId = panel.api.group.id;
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-      const record = sessionsStore.sessions.find((s) => s.id === panel.id);
+      const record = sessionsStore.getSession(panel.id);
       const sessionBusy =
         jobsStore.hasActiveJobsForSession(panel.id) ||
         record?.isThinking ||

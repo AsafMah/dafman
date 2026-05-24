@@ -51,7 +51,7 @@ async function load() {
     // Fall back to the global discover RPC when no session exists.
     const activeId = useLayoutStore().activeSessionId;
     const active = activeId
-      ? sessionsStore.sessions.find((s) => s.id === activeId)
+      ? sessionsStore.getSession(activeId)
       : undefined;
     const sessionId =
       active?.id ??
@@ -81,7 +81,7 @@ async function toggleSkill(skill: Skill) {
     // push the full global disabled set.
     const activeId = useLayoutStore().activeSessionId;
     const sessionId =
-      (activeId ? sessionsStore.sessions.find((s) => s.id === activeId)?.id : undefined) ??
+      (activeId ? sessionsStore.getSession(activeId)?.id : undefined) ??
       sessionsStore.sessions[0]?.id;
 
     if (sessionId) {

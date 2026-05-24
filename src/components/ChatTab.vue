@@ -39,7 +39,7 @@ const sessionId = computed(() => {
 });
 
 const record = computed(() =>
-  sessionsStore.sessions.find((s) => s.id === sessionId.value),
+  sessionsStore.getSession(sessionId.value),
 );
 
 /// Reactive mirror of `api.title`. Dockview emits `onDidTitleChange`

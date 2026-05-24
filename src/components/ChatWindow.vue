@@ -200,7 +200,7 @@ const isSending = computed(() =>
 /// emit `assistant.turn_start`). Used for the in-chat spinner card
 /// — the tab + sidebar dot read `record.isThinking` directly.
 const recordIsThinking = computed(() => {
-  const r = sessionsStore.sessions.find((s) => s.id === props.sessionId);
+  const r = sessionsStore.getSession(props.sessionId);
   if (!r) return false;
   if (r.sawTurnBoundary) return r.isThinking;
   return isSending.value;

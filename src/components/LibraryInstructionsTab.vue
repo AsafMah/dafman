@@ -27,7 +27,7 @@ const expanded = ref<Set<string>>(new Set());
 const activeSession = computed(() => {
   const id = layoutStore.activeSessionId;
   if (!id) return null;
-  return sessionsStore.sessions.find((s) => s.id === id) ?? null;
+  return sessionsStore.getSession(id) ?? null;
 });
 
 const groups = computed(() => ({

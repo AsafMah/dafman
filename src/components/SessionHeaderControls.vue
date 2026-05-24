@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
 });
 
 const record = computed(() =>
-  sessionsStore.sessions.find((s) => s.id === props.sessionId),
+  sessionsStore.getSession(props.sessionId),
 );
 
 function onOpenModelSelector(event: Event): void {

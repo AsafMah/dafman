@@ -22,7 +22,7 @@ const startingAutopilot = ref(false);
 const activeSession = computed(() => {
   const id = layoutStore.activeSessionId;
   if (!id) return null;
-  return sessionsStore.sessions.find((s) => s.id === id) ?? null;
+  return sessionsStore.getSession(id) ?? null;
 });
 
 const groupedJobs = computed(() => {
@@ -61,7 +61,7 @@ async function startAutopilot(): Promise<void> {
 }
 
 function sessionLabel(sessionId: string): string {
-  const record = sessionsStore.sessions.find((s) => s.id === sessionId);
+  const record = sessionsStore.getSession(sessionId);
   return record?.title ?? record?.workingDirectory ?? sessionId.slice(0, 8);
 }
 

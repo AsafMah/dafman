@@ -147,7 +147,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       when: () => layoutStore.activeSessionId !== null,
       run: async () => {
         const sid = layoutStore.activeSessionId;
-        const record = sessionsStore.sessions.find((s) => s.id === sid);
+        const record = sessionsStore.getSession(sid);
         const terminalStore = useTerminalStore();
         const cwd = record?.workingDirectory ?? undefined;
         const summary = await terminalStore.createTerminal({
@@ -350,7 +350,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             // models (sessionsStore overwrites it otherwise — `null`
             // means "use the SDK default", which would silently drop
             // a "high" preference the user set on the previous model).
-            const record = sessionsStore.sessions.find((s) => s.id === sid);
+            const record = sessionsStore.getSession(sid);
             await sessionsStore.setSessionModel(
               sid,
               m.id,

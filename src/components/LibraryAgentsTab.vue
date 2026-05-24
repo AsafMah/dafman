@@ -36,7 +36,7 @@ const { activeSessionId } = storeToRefs(layoutStore);
 const activeSession = computed(() => {
   const id = activeSessionId.value;
   if (!id) return null;
-  return sessionsStore.sessions.find((s) => s.id === id) ?? null;
+  return sessionsStore.getSession(id) ?? null;
 });
 
 const files = ref<AgentFileEntry[]>([]);

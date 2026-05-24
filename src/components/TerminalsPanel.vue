@@ -22,7 +22,7 @@ const terminals = computed(() =>
 );
 
 const activeSession = computed(() =>
-  sessionsStore.sessions.find((session) => session.id === layoutStore.activeSessionId),
+  sessionsStore.getSession(layoutStore.activeSessionId),
 );
 
 function splitArgs(value: string): string[] {

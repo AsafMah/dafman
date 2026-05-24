@@ -8,7 +8,7 @@
 // reactive data.
 
 import { defineStore } from "pinia";
-import { reactive, ref, watch } from "vue";
+import { reactive, ref, computed, watch } from "vue";
 import { invokeCommand, onPendingRequest, onSessionEvent } from "../ipc/invoke";
 import type {
   AgentInfo,
@@ -238,11 +238,16 @@ export function _resetSessionsStoreForTest(): void {
 
 export const useSessionsStore = defineStore("sessions", () => {
   const sessions = ref<SessionRecord[]>([]);
+  const sessionById = computed(() => new Map(sessions.value.map(s => [s.id, s])));
+  function getSession(id: string | null | undefined): SessionRecord | undefined {
+    if (!id) return undefined;
+    return sessionById.value.get(id);
+  }
   const isCreating = ref(false);
   let creationCount = 0;
 
   function handleEvent(payload: SessionEventPayload): void {
-    const record = sessions.value.find((s) => s.id === payload.sessionId);
+    const record = getSession(payload.sessionId);
     if (!record) {
       // Buffer for later — the SessionRecord is still in flight (see
       // `pendingEvents` comment). `drainPending` will replay these
@@ -558,7 +563,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   /// `sessionEvent` and letting `drainPending` replay through
   /// `applyPendingToRecord`.
   function handlePendingRequest(payload: PendingRequestPayload): void {
-    const record = sessions.value.find((s) => s.id === payload.sessionId);
+    const record = getSession(payload.sessionId);
     if (!record) {
       // Bun's pendingRequest channel can fire before the
       // createSession RPC promise resolves (early-session race —
@@ -673,7 +678,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       () => layoutStore.activeSessionId,
       (sid) => {
         if (!sid) return;
-        const record = sessions.value.find((s) => s.id === sid);
+        const record = getSession(sid);
         if (record && record.unseenTurns > 0) {
           record.unseenTurns = 0;
         }
@@ -756,7 +761,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // `sessions.value` and we must not mutate a stale closure capture.
       void invokeCommand("getSessionMode", { sessionId: id })
         .then((mode) => {
-          const current = sessions.value.find((s) => s.id === id);
+          const current = getSession(id);
           if (current) current.mode = mode;
         })
         .catch(() => {
@@ -768,7 +773,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // previous session). Fire-and-forget like the mode fetch.
       void invokeCommand("getCurrentAgent", { sessionId: id })
         .then((agent) => {
-          const current = sessions.value.find((s) => s.id === id);
+          const current = getSession(id);
           if (current) current.currentAgent = agent;
         })
         .catch(() => {
@@ -807,7 +812,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       const actualId = response.sessionId;
       // Idempotent: if a record for this id is already present (e.g.
       // double-restore), just return it.
-      const existing = sessions.value.find((s) => s.id === actualId);
+      const existing = getSession(actualId);
       if (existing) {
         // Still backfill cwd if the existing record is missing it.
         if (!existing.workingDirectory && response.cwd) existing.workingDirectory = response.cwd;
@@ -863,7 +868,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // restored session — same fire-and-forget shape as createSession.
       void invokeCommand("getSessionMode", { sessionId: actualId })
         .then((mode) => {
-          const current = sessions.value.find((s) => s.id === actualId);
+          const current = getSession(actualId);
           if (current) current.mode = mode;
         })
         .catch(() => {
@@ -872,7 +877,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // 19a: same hydration as createSession.
       void invokeCommand("getCurrentAgent", { sessionId: actualId })
         .then((agent) => {
-          const current = sessions.value.find((s) => s.id === actualId);
+          const current = getSession(actualId);
           if (current) current.currentAgent = agent;
         })
         .catch(() => {
@@ -964,7 +969,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     sessionId: string,
     next: DefaultSendMode,
   ): void {
-    const record = sessions.value.find((s) => s.id === sessionId);
+    const record = getSession(sessionId);
     if (record) record.defaultSendMode = next;
   }
 
@@ -980,7 +985,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         model,
         reasoningEffort,
       });
-      const record = sessions.value.find((s) => s.id === sessionId);
+      const record = getSession(sessionId);
       if (record) {
         record.model = model;
         record.reasoningEffort = reasoningEffort;
@@ -999,7 +1004,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     const toasts = useToastStore();
     try {
       await invokeCommand("setSessionMode", { sessionId, mode });
-      const record = sessions.value.find((s) => s.id === sessionId);
+      const record = getSession(sessionId);
       if (record) record.mode = mode;
     } catch (err) {
       const message = toErrorMessage(err);
@@ -1016,14 +1021,14 @@ export const useSessionsStore = defineStore("sessions", () => {
     // still mirror the flag onto the in-memory record so the UI
     // reflects the toggle for inline testing.
     if (sessionId === PLAYGROUND_PENDING_SESSION_ID) {
-      const record = sessions.value.find((s) => s.id === sessionId);
+      const record = getSession(sessionId);
       if (record) record.approveAll = enabled;
       return;
     }
     const toasts = useToastStore();
     try {
       await invokeCommand("setSessionApproveAll", { sessionId, enabled });
-      const record = sessions.value.find((s) => s.id === sessionId);
+      const record = getSession(sessionId);
       if (record) record.approveAll = enabled;
     } catch (err) {
       const message = toErrorMessage(err);
@@ -1053,7 +1058,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     // (so the RPC has it for relative-path resolution), but DO NOT
     // capture the record reference itself — it may be unmounted by
     // the time the RPC resolves. Re-lookup after.
-    const baseWd = sessions.value.find((s) => s.id === sessionId)?.workingDirectory;
+    const baseWd = getSession(sessionId)?.workingDirectory;
     try {
       const next = await invokeCommand("setSessionWorkingDirectory", {
         sessionId,
@@ -1063,7 +1068,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // Re-lookup the record post-await — it may have been closed
       // mid-RPC, in which case there's nothing to update locally
       // (the SDK side already committed the change).
-      const record = sessions.value.find((s) => s.id === sessionId);
+      const record = getSession(sessionId);
       if (record) {
         record.workingDirectory = next;
         appendEvent(record, {
@@ -1124,7 +1129,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       await invokeCommand("truncateSessionHistory", { sessionId, eventId });
       // Drop local items at the truncation point too — otherwise we
       // double-render the edited message until the SDK echoes it.
-      const record = sessions.value.find((s) => s.id === sessionId);
+      const record = getSession(sessionId);
       if (record) {
         const idx = record.events.findIndex((e) => e.eventId === eventId);
         if (idx >= 0) record.events.splice(idx);
@@ -1231,7 +1236,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     sessionId: string,
     value: ReasoningVisibility | "default",
   ): void {
-    const record = sessions.value.find((s) => s.id === sessionId);
+    const record = getSession(sessionId);
     if (record) record.reasoningVisibilityOverride = value;
   }
 
@@ -1250,7 +1255,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function respondToPending(
     params: RespondToRequestParams,
   ): Promise<void> {
-    const record = sessions.value.find((s) => s.id === params.sessionId);
+    const record = getSession(params.sessionId);
     // Snapshot + remove the pending entry optimistically so the UI's
     // pending card disappears immediately on click. The
     // `dafman.pending_response` event is NOT appended until the RPC
@@ -1309,6 +1314,7 @@ export const useSessionsStore = defineStore("sessions", () => {
 
   return {
     sessions,
+    getSession,
     isCreating,
     createSession,
     restoreSession,

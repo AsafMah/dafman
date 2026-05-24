@@ -50,7 +50,7 @@ function parseSlashCommand(text: string): { slash: string; args: string } | null
 
 function pushLocalSystem(sessionId: string, text: string): void {
 	const sessions = useSessionsStore();
-	const record = sessions.sessions.find((s) => s.id === sessionId);
+	const record = sessions.getSession(sessionId);
 	if (!record) return;
 	sessions.appendEvent(record, {
 		sessionId,
@@ -164,7 +164,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 		keywords: ["mode", "auto"],
 		run: async (sessionId) => {
 			const sessions = useSessionsStore();
-			const record = sessions.sessions.find((s) => s.id === sessionId);
+			const record = sessions.getSession(sessionId);
 			const next = record?.mode === "autopilot" ? "interactive" : "autopilot";
 			await sessions.setSessionMode(sessionId, next);
 		},
@@ -222,7 +222,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
 			const sessions = useSessionsStore();
 			const trimmed = args.trim();
 			if (!trimmed) {
-				const record = sessions.sessions.find((s) => s.id === sessionId);
+				const record = sessions.getSession(sessionId);
 				pushLocalSystem(
 					sessionId,
 					record?.workingDirectory
