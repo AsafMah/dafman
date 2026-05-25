@@ -142,7 +142,7 @@ async function mountWith(Root: typeof App) {
   app.component('LogViewer', LogViewer);
   app.component('Terminal', TerminalPanel);
   app.component('TerminalsPanel', TerminalsPanel);
-  app.component('Watermark', Watermark);
+  app.component('watermark', Watermark);
   app.component('ChatTabActions', ChatTabActions);
   app.component('ChatTab', ChatTab);
   app.component('SidebarTab', SidebarTab);
