@@ -13,6 +13,15 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { DockviewApi, EdgeGroupPosition } from 'dockview-core';
+import {
+  asRemovePanelArg,
+  dockApiHeight,
+  dockApiWidth,
+  groupHeight,
+  groupId,
+  groupPanels,
+  groupWidth,
+} from '@/stores/shell/dockviewTypes';
 
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
@@ -228,9 +237,7 @@ export const useLayoutStore = defineStore('layout', () => {
 
     if (!group) return [];
 
-    const panels = (group as unknown as { panels?: unknown[] }).panels;
-
-    return Array.isArray(panels) ? panels : [];
+    return groupPanels(group);
   }
 
   function minimumForEdgeGroup(position: EdgeGroupPosition, edge: unknown): number | undefined {
@@ -301,8 +308,8 @@ export const useLayoutStore = defineStore('layout', () => {
     const viewportHeight = typeof window === 'undefined' ? undefined : window.innerHeight;
     const available =
       position === 'left' || position === 'right'
-        ? ((dock as unknown as { width?: number } | null)?.width ?? viewportWidth)
-        : ((dock as unknown as { height?: number } | null)?.height ?? viewportHeight);
+        ? (dockApiWidth(dock) ?? viewportWidth)
+        : (dockApiHeight(dock) ?? viewportHeight);
 
     if (available === undefined || !Number.isFinite(available) || available <= 0) {
       return desired;
@@ -836,7 +843,7 @@ export const useLayoutStore = defineStore('layout', () => {
 
     for (const panel of panels) {
       try {
-        dock.removePanel(panel as unknown as Parameters<typeof dock.removePanel>[0]);
+        dock.removePanel(asRemovePanelArg(panel));
       } catch (err) {
         console.error('[layoutStore.resetToDefault] removePanel threw', err);
       }
@@ -937,7 +944,7 @@ export const useLayoutStore = defineStore('layout', () => {
     applyEdgeMinimum(position, options.minimumSize);
 
     if (options.exclusive && existingGroup) {
-      const panels = (existingGroup as unknown as { panels?: unknown[] }).panels ?? [];
+      const panels = groupPanels(existingGroup);
 
       for (const panel of [...panels]) {
         const panelId =
@@ -948,7 +955,7 @@ export const useLayoutStore = defineStore('layout', () => {
               : '';
 
         if (panelId && panelId !== options.id) {
-          dock.removePanel(panel as Parameters<typeof dock.removePanel>[0]);
+          dock.removePanel(asRemovePanelArg(panel));
         }
       }
     }
@@ -960,8 +967,8 @@ export const useLayoutStore = defineStore('layout', () => {
       // existing group as-is.
       const w =
         position === 'left' || position === 'right'
-          ? (existingGroup as unknown as { width?: number }).width
-          : (existingGroup as unknown as { height?: number }).height;
+          ? groupWidth(existingGroup)
+          : groupHeight(existingGroup);
       // Threshold: if the caller declared a `minimumSize`, that's the
       // floor — anything below it (e.g. a stale persisted layout from
       // before a min-size bump) gets torn down + recreated at
@@ -1000,7 +1007,7 @@ export const useLayoutStore = defineStore('layout', () => {
   /// dockview's own X (which doesn't go through `closePanel`) still
   /// tears down the parent shell so the next open gets a fresh
   /// `initialSize`.
-  function pruneEmptyEdgeGroup(groupId: string): boolean {
+  function pruneEmptyEdgeGroup(targetGroupId: string): boolean {
     const dock = api.value;
 
     if (!dock) return false;
@@ -1010,11 +1017,11 @@ export const useLayoutStore = defineStore('layout', () => {
 
       if (!edge) continue;
 
-      if ((edge as unknown as { id?: string }).id !== groupId) continue;
+      if (groupId(edge) !== targetGroupId) continue;
 
-      const panels = (edge as unknown as { panels?: unknown[] }).panels;
+      const panels = groupPanels(edge);
 
-      if (Array.isArray(panels) && panels.length === 0) {
+      if (panels.length === 0) {
         dock.removeEdgeGroup(pos);
 
         return true;
@@ -1064,7 +1071,7 @@ export const useLayoutStore = defineStore('layout', () => {
       for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
         const edge = dock.getEdgeGroup(pos);
 
-        if (edge && (edge as unknown as { id?: string }).id === group.id) {
+        if (edge && groupId(edge) === group.id) {
           dock.removeEdgeGroup(pos);
           break;
         }
