@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { nextTick } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import type { CommandMap, CommandName } from '@/ipc/types';
@@ -158,7 +159,7 @@ describe('terminalStore', () => {
       expect(store.sessionTerminalBuffers.sess1?.length).toBe(256_000);
     });
 
-    test('persists sessionTerminalIds after a status event links session→terminal', () => {
+    test('persists sessionTerminalIds after a status event links session→terminal', async () => {
       const store = useTerminalStore();
       store.applyEvent({
         kind: 'status',
@@ -172,6 +173,8 @@ describe('terminalStore', () => {
           createdAt: new Date().toISOString(),
         },
       } as never);
+
+      await nextTick();
 
       const persisted = JSON.parse(localStorage.getItem(IDS_KEY) ?? '{}') as Record<
         string,

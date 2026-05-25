@@ -4,11 +4,38 @@ import { invokeCommand, onTerminalEvent } from '@/ipc/invoke';
 import type { TerminalEventPayload, TerminalSummary } from '@/ipc/types';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { usePersistedRef } from '@/composables/usePersistedRef';
 
 const MAX_BUFFER = 256_000;
 const MAX_COMMANDS_PER_TERMINAL = 200;
 const SESSION_TERMINALS_KEY = 'dafman.sessionTerminals';
 const SESSION_TERMINAL_BUFFERS_KEY = 'dafman.sessionTerminalBuffers';
+/// Buffers are written on every terminal output frame; coalesce to
+/// one localStorage write per 250 ms so a chatty `ls -R` doesn't
+/// serialise a 256 KB string 200 times in a second.
+const BUFFER_THROTTLE_MS = 250;
+
+function validateStringMap(parsed: unknown): Record<string, string> | null {
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const out: Record<string, string> = {};
+
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof v === 'string') out[k] = v;
+  }
+
+  return out;
+}
+
+function capBuffers(map: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+
+  for (const [k, v] of Object.entries(map)) {
+    out[k] = v.length > MAX_BUFFER ? v.slice(-MAX_BUFFER) : v;
+  }
+
+  return out;
+}
 
 export interface TerminalCommandRecord {
   id: string;
@@ -30,8 +57,23 @@ export const useTerminalStore = defineStore('terminals', () => {
   const activeCommands = ref<Record<string, TerminalCommandRecord>>({});
   const droppedCommandCounts = ref<Record<string, number>>({});
   const loaded = ref(false);
-  const sessionTerminalIds = ref<Record<string, string>>({});
-  const sessionTerminalBuffers = ref<Record<string, string>>({});
+  const sessionTerminalIds = usePersistedRef<Record<string, string>>(
+    SESSION_TERMINALS_KEY,
+    {},
+    { validate: validateStringMap },
+  );
+  const sessionTerminalBuffers = usePersistedRef<Record<string, string>>(
+    SESSION_TERMINAL_BUFFERS_KEY,
+    {},
+    {
+      validate: (parsed) => {
+        const map = validateStringMap(parsed);
+        return map ? capBuffers(map) : null;
+      },
+      cap: capBuffers,
+      throttleMs: BUFFER_THROTTLE_MS,
+    },
+  );
   const activeRendererOwner = ref<Record<string, 'compact' | 'full'>>({});
 
   const running = computed(() =>
@@ -48,7 +90,7 @@ export const useTerminalStore = defineStore('terminals', () => {
       }
     }
 
-    setSessionTerminalIds(nextMap);
+    sessionTerminalIds.value = nextMap;
     loaded.value = true;
   }
 
@@ -81,7 +123,7 @@ export const useTerminalStore = defineStore('terminals', () => {
     );
 
     if (linked) {
-      setSessionTerminalIds({ ...sessionTerminalIds.value, [sessionId]: linked.id });
+      sessionTerminalIds.value = { ...sessionTerminalIds.value, [sessionId]: linked.id };
 
       return linked;
     }
@@ -100,7 +142,7 @@ export const useTerminalStore = defineStore('terminals', () => {
       buffers.value = { ...buffers.value, [summary.id]: restored };
     }
 
-    setSessionTerminalIds({ ...sessionTerminalIds.value, [sessionId]: summary.id });
+    sessionTerminalIds.value = { ...sessionTerminalIds.value, [sessionId]: summary.id };
 
     return summary;
   }
@@ -128,67 +170,10 @@ export const useTerminalStore = defineStore('terminals', () => {
     else terminals.value.push(summary);
 
     if (summary.sessionId && summary.status === 'running') {
-      setSessionTerminalIds({ ...sessionTerminalIds.value, [summary.sessionId]: summary.id });
-    }
-  }
-
-  function setSessionTerminalIds(next: Record<string, string>): void {
-    sessionTerminalIds.value = next;
-
-    try {
-      localStorage.setItem(SESSION_TERMINALS_KEY, JSON.stringify(next));
-    } catch {
-      /* persistence is best-effort */
-    }
-  }
-
-  function hydrateSessionTerminalIds(): void {
-    try {
-      const raw = localStorage.getItem(SESSION_TERMINALS_KEY);
-
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const next: Record<string, string> = {};
-
-      for (const [sessionId, terminalId] of Object.entries(parsed)) {
-        if (typeof terminalId === 'string') next[sessionId] = terminalId;
-      }
-
-      sessionTerminalIds.value = next;
-    } catch {
-      /* ignore malformed persisted map */
-    }
-  }
-
-  function setSessionTerminalBuffer(sessionId: string, buffer: string): void {
-    const next = { ...sessionTerminalBuffers.value, [sessionId]: buffer };
-
-    sessionTerminalBuffers.value = next;
-
-    try {
-      localStorage.setItem(SESSION_TERMINAL_BUFFERS_KEY, JSON.stringify(next));
-    } catch {
-      /* persistence is best-effort */
-    }
-  }
-
-  function hydrateSessionTerminalBuffers(): void {
-    try {
-      const raw = localStorage.getItem(SESSION_TERMINAL_BUFFERS_KEY);
-
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const next: Record<string, string> = {};
-
-      for (const [sessionId, buffer] of Object.entries(parsed)) {
-        if (typeof buffer === 'string') next[sessionId] = buffer.slice(-MAX_BUFFER);
-      }
-
-      sessionTerminalBuffers.value = next;
-    } catch {
-      /* ignore malformed persisted buffers */
+      sessionTerminalIds.value = {
+        ...sessionTerminalIds.value,
+        [summary.sessionId]: summary.id,
+      };
     }
   }
 
@@ -204,7 +189,12 @@ export const useTerminalStore = defineStore('terminals', () => {
       };
       const terminal = terminals.value.find((t) => t.id === event.terminalId);
 
-      if (terminal?.sessionId) setSessionTerminalBuffer(terminal.sessionId, capped);
+      if (terminal?.sessionId) {
+        sessionTerminalBuffers.value = {
+          ...sessionTerminalBuffers.value,
+          [terminal.sessionId]: capped,
+        };
+      }
 
       return;
     }
@@ -298,8 +288,8 @@ export const useTerminalStore = defineStore('terminals', () => {
     unsubscribe = onTerminalEvent(applyEvent);
   }
 
-  hydrateSessionTerminalIds();
-  hydrateSessionTerminalBuffers();
+  // sessionTerminalIds + sessionTerminalBuffers hydrate themselves
+  // via usePersistedRef on construction; no explicit hydrate needed.
   ensureSubscription();
   void refresh().catch(() => {
     /* app may be starting; explicit actions surface errors */
