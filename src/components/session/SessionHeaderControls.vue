@@ -129,9 +129,8 @@ watch(
 /// should expand it" (not just the small caret).
 function toggleGroupExpansion(key: string) {
   if (expandedKeys.value[key]) {
-    const next = { ...expandedKeys.value };
+    const { [key]: _, ...next } = expandedKeys.value;
 
-    delete next[key];
     expandedKeys.value = next;
   } else {
     expandedKeys.value = { ...expandedKeys.value, [key]: true };

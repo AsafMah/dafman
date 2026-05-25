@@ -268,9 +268,8 @@ export const useTerminalStore = defineStore('terminals', () => {
       ...(exitCode !== undefined ? { exitCode } : {}),
       endedAt: new Date().toISOString(),
     };
-    const nextActive = { ...activeCommands.value };
+    const { [terminalId]: _, ...nextActive } = activeCommands.value;
 
-    delete nextActive[terminalId];
     activeCommands.value = nextActive;
     const existing = commands.value[terminalId] ?? [];
     const next = [...existing, finished];
@@ -312,9 +311,8 @@ export const useTerminalStore = defineStore('terminals', () => {
 
   function releaseRenderer(terminalId: string, owner: 'compact' | 'full'): void {
     if (activeRendererOwner.value[terminalId] === owner) {
-      const next = { ...activeRendererOwner.value };
+      const { [terminalId]: _, ...next } = activeRendererOwner.value;
 
-      delete next[terminalId];
       activeRendererOwner.value = next;
     }
   }
