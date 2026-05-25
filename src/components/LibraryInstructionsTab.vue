@@ -11,11 +11,10 @@ import { invokeCommand } from '../ipc/invoke';
 import type { InstructionSource } from '../ipc/types';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useSessionsStore } from '../stores/sessionsStore';
-import { useToastStore } from '../stores/toastStore';
 import MessageContent from './MessageContent.vue';
 import { toErrorMessage } from '../lib/errorMessage';
+import { revealPath } from '../lib/pathActions';
 
-const toasts = useToastStore();
 const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
 
@@ -85,11 +84,7 @@ async function load() {
 async function reveal(src: InstructionSource) {
   if (!src.exists) return;
 
-  try {
-    await invokeCommand('revealPath', { path: src.path });
-  } catch (err) {
-    toasts.error('Reveal failed', toErrorMessage(err));
-  }
+  await revealPath(src.path, 'Reveal failed');
 }
 
 onMounted(load);

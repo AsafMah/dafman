@@ -31,7 +31,7 @@ import { useModelsStore } from '../stores/modelsStore';
 import { useToastStore } from '../stores/toastStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { SESSION_COMMANDS } from './sessionCommands';
-import type { SessionMode } from '../ipc/types';
+import { MODE_OPTIONS } from '../lib/sessionModeOptions';
 import { toErrorMessage } from './errorMessage';
 
 const SESSIONS_PANEL_ID = 'sessions-manager';
@@ -445,13 +445,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   );
 
   // ---------- Static, but session-gated: Run Mode ----------
-  const RUN_MODES: { mode: SessionMode; label: string; icon: string }[] = [
-    { mode: 'interactive', label: 'Interactive', icon: 'pi pi-comments' },
-    { mode: 'plan', label: 'Plan', icon: 'pi pi-list-check' },
-    { mode: 'autopilot', label: 'Autopilot', icon: 'pi pi-bolt' },
-  ];
-
-  for (const { mode, label, icon } of RUN_MODES) {
+  for (const { value: mode, label, icon } of MODE_OPTIONS) {
     registry.register({
       id: `runMode.set.${mode}`,
       label: `Run Mode: ${label}`,

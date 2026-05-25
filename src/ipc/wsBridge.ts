@@ -10,25 +10,9 @@
 /// - response: `{type:"response", id, result}` | `{type:"error", id, error}`
 /// - message:  `{type:"message", name, payload}` (bun → renderer push)
 
-import type {
-  AuditEntry,
-  CommandMap,
-  CommandName,
-  CommandResultEvent,
-  LogRecord,
-  PendingRequestPayload,
-  SessionEventPayload,
-  TerminalEventPayload,
-} from './types';
-import type {
-  AuditEventListener,
-  CommandResultEventListener,
-  LogEventListener,
-  PendingRequestListener,
-  RpcBridge,
-  SessionEventListener,
-  TerminalEventListener,
-} from './invoke';
+import type { CommandMap, CommandName } from './types';
+import type { RpcBridge } from './invoke';
+import { createListenerRegistry } from './listenerRegistry';
 
 interface PendingRpc {
   resolve: (value: unknown) => void;
@@ -61,12 +45,7 @@ interface WireMessage {
 }
 
 export function createWebSocketBridge(url: string): RpcBridge {
-  const sessionListeners = new Set<SessionEventListener>();
-  const pendingListeners = new Set<PendingRequestListener>();
-  const logListeners = new Set<LogEventListener>();
-  const auditListeners = new Set<AuditEventListener>();
-  const terminalListeners = new Set<TerminalEventListener>();
-  const commandResultListeners = new Set<CommandResultEventListener>();
+  const registry = createListenerRegistry();
   const pending = new Map<number, PendingRpc>();
   let nextId = 1;
   let socket: WebSocket | null = null;
@@ -132,19 +111,16 @@ export function createWebSocketBridge(url: string): RpcBridge {
   }
 
   function dispatchMessage(name: string, payload: unknown): void {
-    if (name === 'sessionEvent') {
-      for (const l of sessionListeners) l(payload as SessionEventPayload);
-    } else if (name === 'pendingRequest') {
-      for (const l of pendingListeners) l(payload as PendingRequestPayload);
-    } else if (name === 'logEvent') {
-      for (const l of logListeners) l(payload as LogRecord);
-    } else if (name === 'auditEvent') {
-      for (const l of auditListeners) l(payload as AuditEntry);
-    } else if (name === 'terminalEvent') {
-      for (const l of terminalListeners) l(payload as TerminalEventPayload);
-    } else if (name === 'commandResultEvent') {
-      for (const l of commandResultListeners) l(payload as CommandResultEvent);
-    }
+    const dispatchers: Record<string, ((p: never) => void) | undefined> = {
+      sessionEvent: registry.dispatchSessionEvent,
+      pendingRequest: registry.dispatchPendingRequest,
+      logEvent: registry.dispatchLogEvent,
+      auditEvent: registry.dispatchAuditEvent,
+      terminalEvent: registry.dispatchTerminalEvent,
+      commandResultEvent: registry.dispatchCommandResultEvent,
+    };
+
+    dispatchers[name]?.(payload as never);
   }
 
   async function request<N extends CommandName>(
@@ -177,35 +153,11 @@ export function createWebSocketBridge(url: string): RpcBridge {
 
   return {
     request,
-    onSessionEvent(listener) {
-      sessionListeners.add(listener);
-
-      return () => sessionListeners.delete(listener);
-    },
-    onPendingRequest(listener) {
-      pendingListeners.add(listener);
-
-      return () => pendingListeners.delete(listener);
-    },
-    onLogEvent(listener) {
-      logListeners.add(listener);
-
-      return () => logListeners.delete(listener);
-    },
-    onAuditEvent(listener) {
-      auditListeners.add(listener);
-
-      return () => auditListeners.delete(listener);
-    },
-    onTerminalEvent(listener) {
-      terminalListeners.add(listener);
-
-      return () => terminalListeners.delete(listener);
-    },
-    onCommandResultEvent(listener) {
-      commandResultListeners.add(listener);
-
-      return () => commandResultListeners.delete(listener);
-    },
+    onSessionEvent: registry.onSessionEvent,
+    onPendingRequest: registry.onPendingRequest,
+    onLogEvent: registry.onLogEvent,
+    onAuditEvent: registry.onAuditEvent,
+    onTerminalEvent: registry.onTerminalEvent,
+    onCommandResultEvent: registry.onCommandResultEvent,
   };
 }

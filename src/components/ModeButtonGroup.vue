@@ -10,7 +10,7 @@
 
 import { computed } from 'vue';
 import SelectButton from 'primevue/selectbutton';
-import Select from 'primevue/select';
+import { MODE_OPTIONS } from '../lib/sessionModeOptions';
 import type { SessionMode } from '../ipc/types';
 import { useSessionsStore } from '../stores/sessionsStore';
 
@@ -18,12 +18,6 @@ const props = defineProps<{ sessionId: string }>();
 const sessionsStore = useSessionsStore();
 
 const record = computed(() => sessionsStore.getSession(props.sessionId));
-
-const modeOptions: { label: string; value: SessionMode; icon: string }[] = [
-  { label: 'Interactive', value: 'interactive', icon: 'pi pi-comments' },
-  { label: 'Plan', value: 'plan', icon: 'pi pi-list-check' },
-  { label: 'Autopilot', value: 'autopilot', icon: 'pi pi-bolt' },
-];
 
 const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
@@ -41,7 +35,7 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? 'interactive'}`);
   <SelectButton
     v-if="record"
     v-model="modeChoice"
-    :options="modeOptions"
+    :options="MODE_OPTIONS"
     option-label="label"
     option-value="value"
     :allow-empty="false"
@@ -58,42 +52,6 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? 'interactive'}`);
       <span class="sr-only">{{ slotProps.option.label }}</span>
     </template>
   </SelectButton>
-  <div
-    v-if="record"
-    class="mode-select-shell"
-  >
-    <Select
-      v-model="modeChoice"
-      :options="modeOptions"
-      option-label="label"
-      option-value="value"
-      size="small"
-      aria-label="Agent run mode"
-      class="mode-select"
-      :class="modeClass"
-    >
-      <template #value="{ value }">
-        <span class="mode-select-value">
-          <i
-            :class="modeOptions.find((option) => option.value === value)?.icon"
-            aria-hidden="true"
-          />
-          <span class="mode-select-current-label">{{
-            modeOptions.find((option) => option.value === value)?.label ?? 'Mode'
-          }}</span>
-        </span>
-      </template>
-      <template #option="{ option }">
-        <span class="mode-select-value">
-          <i
-            :class="option.icon"
-            aria-hidden="true"
-          />
-          <span>{{ option.label }}</span>
-        </span>
-      </template>
-    </Select>
-  </div>
 </template>
 
 <style scoped>
@@ -108,34 +66,7 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? 'interactive'}`);
   align-items: stretch;
   align-self: center;
 }
-.mode-select-shell {
-  display: none;
-  flex: 0 0 auto;
-  align-self: center;
-}
 
-.mode-select {
-  width: 2.4rem;
-  min-width: 2.4rem;
-}
-.mode-select-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-.mode-select :deep(.p-select-label) {
-  padding-inline: 0.45rem 0;
-  width: 1.1rem;
-  overflow: hidden;
-}
-.mode-select :deep(.p-select-dropdown) {
-  width: 0.8rem;
-  min-width: 0.8rem;
-  padding-inline: 0;
-}
-.mode-select-current-label {
-  display: none;
-}
 .mode-button-group :deep(.p-selectbutton) {
   display: inline-flex;
   align-items: stretch;

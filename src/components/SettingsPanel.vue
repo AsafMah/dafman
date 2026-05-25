@@ -29,6 +29,7 @@ import type {
 } from '../ipc/types';
 import { useModelsStore } from '../stores/modelsStore';
 import { toErrorMessage } from '../lib/errorMessage';
+import { revealPath } from '../lib/pathActions';
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelsStore();
@@ -296,13 +297,7 @@ async function revealDefaultWorkspace() {
 
   if (!path) return;
 
-  try {
-    await invokeCommand('revealPath', { path });
-  } catch (err) {
-    const message = toErrorMessage(err);
-
-    useToastStore().error("Couldn't reveal folder", message);
-  }
+  await revealPath(path, "Couldn't reveal folder");
 }
 
 /// 22c: Bound to settings.permissions.defaultApproveAll.

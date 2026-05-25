@@ -32,6 +32,8 @@ import { useToastStore } from '../stores/toastStore';
 import { invokeCommand } from '../ipc/invoke';
 import MessageContent from './MessageContent.vue';
 import { toErrorMessage } from '../lib/errorMessage';
+import { revealPath } from '../lib/pathActions';
+import { MODE_OPTIONS } from '../lib/sessionModeOptions';
 
 const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 
@@ -87,11 +89,6 @@ function onRenameSubmit() {
 }
 
 // ---------- Mode ----------
-const modeOptions: { label: string; value: SessionMode; icon: string }[] = [
-  { label: 'Interactive', value: 'interactive', icon: 'pi pi-comments' },
-  { label: 'Plan', value: 'plan', icon: 'pi pi-list-check' },
-  { label: 'Autopilot', value: 'autopilot', icon: 'pi pi-bolt' },
-];
 const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
   set: (value) => {
@@ -128,15 +125,11 @@ function onWorkspaceClick() {
 
   if (!path) return;
 
-  invokeCommand('revealPath', { path }).catch((err: unknown) => {
-    toasts.error("Couldn't open workspace", toErrorMessage(err));
-  });
+  void revealPath(path, "Couldn't open workspace");
 }
 
 function revealFile(path: string) {
-  invokeCommand('revealPath', { path }).catch((err: unknown) => {
-    toasts.error("Couldn't open file", toErrorMessage(err));
-  });
+  void revealPath(path, "Couldn't open file");
 }
 
 // ---------- Approve-all ----------
@@ -1168,7 +1161,7 @@ function toggleItemExpansion(kind: 'tool' | 'skill' | 'agent', name: string): vo
           <span class="row-label">Run mode</span>
           <SelectButton
             v-model="modeChoice"
-            :options="modeOptions"
+            :options="MODE_OPTIONS"
             option-label="label"
             option-value="value"
             :allow-empty="false"

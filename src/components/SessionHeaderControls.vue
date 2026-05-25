@@ -23,9 +23,9 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useLayoutStore, basename } from '../stores/layoutStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useToastStore } from '../stores/toastStore';
-import { invokeCommand } from '../ipc/invoke';
 import { buildModelTree } from '../lib/modelTree';
 import { toErrorMessage } from '../lib/errorMessage';
+import { revealPath } from '../lib/pathActions';
 
 const props = withDefaults(
   defineProps<{ sessionId: string; area?: 'all' | 'composer-left' | 'composer-right' }>(),
@@ -238,9 +238,7 @@ function onWorkspaceClick() {
 
   if (!path) return;
 
-  invokeCommand('revealPath', { path }).catch((err: unknown) => {
-    useToastStore().error("Couldn't open workspace", toErrorMessage(err));
-  });
+  void revealPath(path, "Couldn't open workspace");
 }
 
 /// 19a: header chip surfaces the session's currently-selected custom

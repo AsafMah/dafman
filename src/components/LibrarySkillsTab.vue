@@ -15,6 +15,7 @@ import { useSessionsStore } from '../stores/sessionsStore';
 import { useLayoutStore } from '../stores/layoutStore';
 import MessageContent from './MessageContent.vue';
 import { toErrorMessage } from '../lib/errorMessage';
+import { revealPath } from '../lib/pathActions';
 
 type Skill = {
   name: string;
@@ -119,11 +120,7 @@ function toggleExpansion(name: string) {
 async function revealSkillFile(path: string | undefined) {
   if (!path) return;
 
-  try {
-    await invokeCommand('revealPath', { path });
-  } catch (err) {
-    toasts.error("Couldn't reveal skill", toErrorMessage(err));
-  }
+  await revealPath(path, "Couldn't reveal skill");
 }
 
 onMounted(() => {
