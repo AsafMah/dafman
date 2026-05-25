@@ -193,12 +193,114 @@ Found by manual review and IDE diagnostics.
 ---
 
 
-## 5  Architectural / Design Debt (Deep Review)
+## 5  Build vs Buy — Reinventing the Wheel Analysis
+
+Systematic audit of every hand-rolled pattern in the codebase against available
+libraries and Bun-native APIs. Sorted by replacement ROI (lines deleted × bug
+risk reduced).
+
+### Legend
+
+- 🔴 **Replace** — mature library exists, we maintain buggy/incomplete reimplementation
+- 🟡 **Consider** — library exists, but our version is acceptable or domain-specific
+- 🟢 **Keep** — domain-specific, no library would cover this
+
+### 5.1  Renderer (`src/`)
+
+| What we hand-rolled | File(s) | Lines | Library alternative | Verdict |
+|---|---|---:|---|---|
+| **Event bus** (window.dispatchEvent) | 8 files, 13 dispatchers, 10 listeners | ~80 | **mitt** (200B) or VueUse `useEventBus` | 🔴 Replace — untyped, no cleanup guarantee, untraceable |
+| **localStorage persist** (manual JSON.parse/stringify + try/catch) | terminalStore.ts:135-193 | ~60 | **pinia-plugin-persistedstate** (zero-config) | 🔴 Replace — duplicated 2×, no validation |
+| **Deferred listener queue** (if bridge, register; else queue) | invoke.ts:100-221 | ~120 | Single generic `createDeferredChannel<T>()` or mitt + lazy init | 🔴 Replace — 6 identical blocks |
+| **Pub/sub fan-out** (`Set<Listener>`, subscribe, fanOut) | listenerRegistry.ts:45-95 | ~50 | **mitt** does exactly this in 200B | 🔴 Replace — hand-rolled EventEmitter |
+| **ANSI stripping** (3 regexes) | ansi.ts:1-25 | 25 | **strip-ansi** (npm, 1.2M weekly, battle-tested) | 🔴 Replace — our regexes miss edge cases |
+| **setTimeout focus hacks** (`setTimeout(fn, 0)`) | 6 components, ~10 sites | ~30 | VueUse `useFocus`, `useActiveElement`, `nextTick` | 🟡 Consider — some are legitimate, most are lifecycle hacks |
+| **Scroll management** (manual rAF + double nextTick) | ChatWindow.vue:246-349 | ~100 | VueUse `useScroll`, `useInfiniteScroll` | 🟡 Consider — our scroll logic is custom (event batching + scroll-to-bottom), but the rAF scheduling could use `useDebounceFn`/`useRafFn` |
+| **Resize observer** (raw ResizeObserver in ChatWindow) | ChatWindow.vue:157-190 | ~30 | VueUse `useResizeObserver` | 🔴 Replace — manual cleanup, no throttle |
+| **Debounce** (manual setTimeout timers) | SessionsManager.vue:188-226, App.vue:450-455 | ~40 | VueUse `useDebounceFn` or `watchDebounced` | 🔴 Replace — hand-rolled timer management |
+| **`toErrorMessage()`** (ternary wrapper) | errorMessage.ts:1-5 | 5 | Inline `err instanceof Error ? err.message : String(err)` or **serialize-error** | 🟡 Consider — trivial, but used everywhere; keep as utility, just not a whole file |
+| **CodeMirror language resolver** | codeLanguage.ts:1-148 | 148 | **@codemirror/language-data** (official package) has `languages[]` with load/extensions | 🔴 Replace — we maintain a manual ext→lang map that's incomplete |
+| **Markdown pipeline** (markdown-it + DOMPurify + Prism + class rewrite) | markdown.ts:1-395 | 395 | Keep — this is heavily customized (lex-* classes, KaTeX style hook, system_notification stripping). No drop-in exists | 🟢 Keep |
+| **Tool renderer registry** | toolRenderers.ts:1-296 | 296 | Keep — domain-specific, no library for this | 🟢 Keep |
+| **Diff/patch parser** | diff.ts:1-92 | 92 | Keep — parses the Copilot `apply_patch` format, not standard unified diff | 🟢 Keep |
+| **Terminal shell integration** (OSC 633/133/7/9/1337) | terminalShellIntegration.ts:1-131 | 131 | Keep — VS Code-specific protocol, no npm package for this | 🟢 Keep |
+| **Model tree builder** | modelTree.ts:1-241 | 241 | Keep — PrimeVue TreeSelect-specific, domain logic | 🟢 Keep |
+| **Layout sanitizer** | layoutSanitize.ts:1-217 | 217 | Keep — dockview-specific JSON migration/sanitization | 🟢 Keep |
+| **Session commands** | sessionCommands.ts | 221 | Keep, but should talk through a typed bus instead of window events | 🟡 Consider |
+| **Color palette** | color.ts:1-35 | 35 | Keep — curated palette, 12 hues, trivial code | 🟢 Keep |
+| **Notification styles** | notificationStyles.ts:1-133 | 133 | Keep — domain-specific style mapping | 🟢 Keep |
+| **Export conversation** | exportConversation.ts:1-257 | 257 | Keep — domain-specific format | 🟢 Keep |
+| **Theme resolver** | theme.ts:1-17 | 17 | Keep — trivial, domain-specific | 🟢 Keep |
+| **Path actions** | pathActions.ts:1-22 | 22 | Keep — thin wrapper with toast, specific to our IPC | 🟢 Keep |
+| **Renderer log bridge** | rendererLog.ts:1-91 | 91 | Keep — specific to Electrobun IPC | 🟢 Keep |
+| **Open attachment** | openAttachment.ts:1-69 | 69 | Keep — domain-specific | 🟢 Keep |
+| **Command palette search** | palette.ts:1-29 | 29 | Keep — trivial, adapts vue-command-palette | 🟢 Keep |
+| **Dynamic commands** | dynamicCommands.ts | — | Keep — domain-specific | 🟢 Keep |
+| **Session mode options** | sessionModeOptions.ts | — | Keep — domain-specific | 🟢 Keep |
+
+### 5.2  Backend (`src-bun/`)
+
+| What we hand-rolled | File(s) | Lines | Library/API alternative | Verdict |
+|---|---|---:|---|---|
+| **JSON-lines logger** (file append + ring buffer + subscribers) | logging.ts:1-227 | 227 | **pino** (Bun-compatible, JSON logger, built-in file rotation, child loggers) or **winston** | 🟡 Consider — ours works and has redaction baked in; pino would give us log rotation, pretty-print, and child loggers for free. But migrating redaction hooks is work |
+| **Audit log** (JSONL append + ring buffer + subscribers) | audit.ts:1-234 | 234 | Same pattern as logging — could share infrastructure. Or use pino with separate transport | 🟡 Consider — shares 90% of logging.ts's structure (ring buffer, subscribers, file append). Should at minimum share the generic ring+append pattern |
+| **Redaction** (regex key matching + depth-limited walk) | redact.ts:1-162 | 162 | **pino-noir** / **pino** built-in redaction paths | 🟡 Consider — if we adopt pino, redaction comes free. If we keep custom logger, our redaction is good enough |
+| **File search** (recursive walk + fuzzy match + caching) | fileSearch.ts:1-316 | 316 | **globby** or **fast-glob** + **fuse.js** for fuzzy scoring. Bun also has `Bun.Glob` built-in | 🟡 Consider — our path-navigation mode is domain-specific; but the recursive walk + scoring could use `Bun.Glob` for the walk and fuse.js for fuzzy matching |
+| **Stderr filter** | stderrFilter.ts:1-127 | 127 | Keep — highly specific to Copilot CLI's node-pty noise | 🟢 Keep |
+| **Diagnostics export** | diagnostics.ts:1-188 | 188 | Could use **archiver** or `Bun.zip` (when stable) to produce actual ZIP instead of folder. But current approach works | 🟡 Consider — `Bun.write()` + folder copy is fine for v1 |
+| **Error types** (AppError discriminated union + rpcGuard) | errors.ts:1-89 | 89 | Keep — specific to our RPC bridge | 🟢 Keep |
+| **Settings coercion** | settings.ts | — | **zod** or **valibot** for schema validation + coercion | 🟡 Consider — zod would give us type-safe validation, coercion, and default values. Our manual coercion functions are CC=20+ |
+| **`toErrorMessage()`** (same as renderer) | shared/errorMessage.ts:1-5 | 5 | Same — trivial utility, keep | 🟢 Keep |
+
+### 5.3  Bun-native APIs we're not using
+
+Bun has APIs that could replace some of our code:
+
+| Bun API | What it replaces | Current code |
+|---|---|---|
+| `Bun.Glob` | Part of fileSearch.ts's recursive walk | Hand-rolled `fs.readdir` + recursion |
+| `Bun.file().text()` / `Bun.write()` | Various `readFile`/`writeFile` calls | Using `node:fs/promises` throughout |
+| `Bun.spawn()` with `stdout: 'pipe'` | CLI process management | Already using this, good |
+| `Bun.serve()` + WebSocket | Dev server / HMR bridge | Already using via Electrobun, fine |
+| `Bun.password.hash()` | N/A — we don't do auth | N/A |
+| `Bun.Transpiler` | N/A — Vite handles renderer | N/A |
+
+### 5.4  Summary of recommended replacements
+
+**High-ROI replacements (Phase A — do first):**
+
+| Library | Replaces | Lines deleted | Weekly downloads |
+|---|---|---:|---|
+| **@vueuse/core** | event listeners, debounce, localStorage, resize observer, focus management, rAF helpers | ~300+ | 3.8M |
+| **mitt** | window event bus (13 dispatchers, 10 listeners) + listenerRegistry.ts | ~130 | 3.5M |
+| **pinia-plugin-persistedstate** | terminalStore manual localStorage | ~60 | 800K |
+| **strip-ansi** | ansi.ts regexes | ~25 | 160M |
+| **@codemirror/language-data** | codeLanguage.ts manual ext→lang map | ~100 | 300K |
+
+**Medium-ROI (Phase B — consider after A):**
+
+| Library | Replaces | Benefit |
+|---|---|---|
+| **zod** or **valibot** | settings.ts coercion (CC=20) | Type-safe validation, eliminates complexity warnings |
+| **pino** | logging.ts + audit.ts shared pattern | Log rotation, child loggers, built-in redaction |
+| **fuse.js** | fileSearch.ts scoring logic | Better fuzzy matching, maintained algorithm |
+
+**Keep as-is (domain-specific, no good library):**
+
+markdown.ts, diff.ts, terminalShellIntegration.ts, modelTree.ts,
+layoutSanitize.ts, toolRenderers.ts, exportConversation.ts, errors.ts,
+notificationStyles.ts, stderrFilter.ts, rendererLog.ts
+
+
+---
+
+
+## 6  Architectural / Design Debt (Deep Review)
 
 These are the real problems — not ESLint numbers but structural patterns that
 make the codebase fragile, hard to reason about, and expensive to change.
 
-### 5.0  No utility libraries — everything is hand-rolled
+### 6.0  No utility libraries — everything is hand-rolled
 
 The project has **zero general-purpose utility libraries**: no VueUse, no lodash,
 no mitt, no date-fns, no pinia-plugin-persist. Every common pattern — event
@@ -208,7 +310,7 @@ observers, deferred execution — is reimplemented from scratch.
 This is the root cause of many items below. Adopting VueUse alone would delete
 hundreds of lines of bespoke plumbing.
 
-### 5.1  Window event bus — 8 custom events, untyped, scattered
+### 6.1  Window event bus — 8 custom events, untyped, scattered
 
 The codebase uses `window.dispatchEvent(new CustomEvent('dafman:*'))` as a
 global event bus. **13 dispatch sites** across 8 files, **10 listener sites**
@@ -236,7 +338,7 @@ across 6 files. No type safety, no central registry, no cleanup guarantees.
 **Fix:** Replace with a typed event bus (mitt — 200 bytes gzipped), or
 provide/inject for parent→child, or store subscriptions.
 
-### 5.2  invoke.ts — deferred listener queue (repeated 6×)
+### 6.2  invoke.ts — deferred listener queue (repeated 6×)
 
 `src/ipc/invoke.ts:100–221`: six identical blocks, each following the pattern:
 ```ts
@@ -256,13 +358,13 @@ pattern 6 more times on top. This is ~120 lines of pure boilerplate.
 **Fix:** Single `createDeferredChannel<T>()` factory. Or just use mitt with
 lazy initialization.
 
-### 5.3  listenerRegistry.ts is hand-rolled mitt
+### 6.3  listenerRegistry.ts is hand-rolled mitt
 
 `src/ipc/listenerRegistry.ts:45–95` implements a typed pub/sub with
 `Set<Listener>`, `subscribe()`, and `fanOut()`. This is literally what
 `mitt` does in 200 bytes — but custom, with manual error swallowing.
 
-### 5.4  layoutStore vs dockview — 12 `as unknown as` casts
+### 6.4  layoutStore vs dockview — 12 `as unknown as` casts
 
 `src/stores/shell/layoutStore.ts` has 12 `as unknown as` casts (counted from
 grep, not estimated), all probing dockview-vue's untyped internal objects:
@@ -294,7 +396,7 @@ types but the actual runtime objects have richer shape (`.panels`, `.width`,
 runtime shape we use, and centralize the cast to one `asDockviewInternal()`
 helper. Then when dockview upgrades, there's one place to fix.
 
-### 5.5  Store dependency graph — spaghetti
+### 6.5  Store dependency graph — spaghetti
 
 Direct store-to-store imports (production code only, not tests):
 
@@ -335,7 +437,7 @@ with UI notification side effects.
 notifications, layout commands) should be triggered by watchers/subscribers
 at the App level or in composables that observe store state.
 
-### 5.6  Components bypassing stores for IPC
+### 6.6  Components bypassing stores for IPC
 
 12+ Vue components call `invokeCommand()` directly instead of going through
 stores. Business logic (API calls, error handling, retry) lives in `.vue` files
@@ -344,7 +446,7 @@ where it can't be unit-tested without mounting the component.
 **Fix:** Strict rule: components → stores → IPC. Components only read reactive
 state and call store actions.
 
-### 5.7  terminalStore — hand-rolled localStorage persistence (duplicated 2×)
+### 6.7  terminalStore — hand-rolled localStorage persistence (duplicated 2×)
 
 `src/stores/terminal/terminalStore.ts:135–193`: two nearly-identical
 set/hydrate pairs for `sessionTerminalIds` and `sessionTerminalBuffers`:
@@ -361,7 +463,7 @@ function hydrateSessionTerminalIds(): Record<string, string> {
 **Fix:** Either `pinia-plugin-persistedstate` (zero-config Pinia persistence),
 or a generic `usePersistedRef<T>(key, defaultValue)` composable.
 
-### 5.8  20+ setTimeout / requestAnimationFrame timing hacks
+### 6.8  20+ setTimeout / requestAnimationFrame timing hacks
 
 | File | Count | What they do |
 |---|---:|---|
@@ -382,7 +484,7 @@ focus hacks and double-rAF settle patterns are symptoms of missing lifecycle
 management. VueUse's `useEventListener`, `useDebounceFn`, `useRafFn` would
 formalize these.
 
-### 5.9  God objects — still the core problem
+### 6.9  God objects — still the core problem
 
 | File | Lines | What's mixed together |
 |---|---:|---|
@@ -393,13 +495,13 @@ formalize these.
 | `SessionsManager.vue` | 1,058 | Session list + creation form + workspace picker + sidebar rendering + sorting |
 | `SettingsPanel.vue` | 991 | Every settings category in one template |
 
-### 5.10  Settings type defined twice
+### 6.10  Settings type defined twice
 
 `src/stores/app/settingsStore.ts` and `src-bun/app/config/settings.ts` define
 the same settings shape independently. Changes to one silently break the other
 at runtime. Should be a shared type file imported by both sides.
 
-### 5.11  Missing abstractions
+### 6.11  Missing abstractions
 
 - **No service layer:** Business operations are scattered across stores, components,
   and `src/lib/` utilities with no clear ownership
@@ -410,7 +512,7 @@ at runtime. Should be a shared type file imported by both sides.
 - **Magic strings for panel/component IDs:** `'chat'`, `'sessionsManager'`,
   `'settingsPanel'` etc. scattered across 15+ files instead of a single enum/const
 
-### 5.12  Potential dead/unused state
+### 6.12  Potential dead/unused state
 
 - `terminalStore.droppedCommandCounts` — written in `finishCommand()` but only
   read in `TerminalsPanel.vue` (may be unused in practice if panel doesn't
@@ -418,7 +520,7 @@ at runtime. Should be a shared type file imported by both sides.
 - `dafman:rename-session` event — dispatched in `sessionCommands.ts:221` but
   no corresponding listener found in grep
 
-### 5.13  Cross-boundary duplication summary
+### 6.13  Cross-boundary duplication summary
 
 | Pattern | Where | Impact |
 |---|---|---|
@@ -434,7 +536,7 @@ at runtime. Should be a shared type file imported by both sides.
 ---
 
 
-## 6  What's Been Done ✅
+## 7  What's Been Done ✅
 
 - [x] **Code style:** gts + Prettier adopted, spacious padding lines
 - [x] **ESLint:** 2,354 issues → 31 warnings (0 errors) — dispatch tables, pick helpers, composable extraction
@@ -457,19 +559,29 @@ at runtime. Should be a shared type file imported by both sides.
 ---
 
 
-## 7  Priority Cleanup Plan
+## 8  Priority Cleanup Plan
 
-### Phase A — Foundation: utility libraries + typed constants
+### Phase A — Foundation: library replacements + typed constants
 
-1. **Add VueUse** — replace hand-rolled `useEventListener`, debounce/throttle,
-   `useLocalStorage`, `useResizeObserver`, `useDebounceFn`, `useRafFn`
+Per §5 build-vs-buy analysis, replace hand-rolled implementations with
+battle-tested libraries. This is the highest-ROI phase — it deletes ~600+
+lines of bespoke plumbing and eliminates entire bug categories.
+
+1. **Add @vueuse/core** — replace hand-rolled `useEventListener`, debounce
+   (`useDebounceFn`), localStorage (`useLocalStorage`), resize observer
+   (`useResizeObserver`), focus management (`useFocus`), rAF helpers
+   (`useRafFn`). Estimated ~300 lines deleted across 10+ files
 2. **Add mitt** (or VueUse's `useEventBus`) — replace all 8 `dafman:*` window
-   events with a typed, centrally-registered event bus
+   events (13 dispatchers, 10 listeners) + listenerRegistry.ts with a typed,
+   centrally-registered event bus. Estimated ~130 lines deleted
 3. **Add pinia-plugin-persistedstate** — replace terminalStore's manual
-   localStorage persistence
-4. **Panel ID constants** — single `src/constants/panels.ts` with typed
+   localStorage persistence (2× identical blocks, ~60 lines)
+4. **Add strip-ansi** — replace `src/lib/ansi.ts` hand-rolled regexes (~25 lines)
+5. **Add @codemirror/language-data** — replace `codeLanguage.ts` manual ext→lang
+   map (~100 lines of incomplete mapping)
+6. **Panel ID constants** — single `src/constants/panels.ts` with typed
    string literal union for all panel/component IDs
-5. **Shared settings type** — single `src/shared/settings.ts` imported by
+7. **Shared settings type** — single `src/shared/settings.ts` imported by
    both renderer and backend
 
 ### Phase B — Data flow: decouple stores + kill event bus
