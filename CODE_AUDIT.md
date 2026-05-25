@@ -614,11 +614,24 @@ formalize these.
 | `SessionsManager.vue` | 1,062 | Session list + creation form + workspace picker + sidebar rendering + sorting |
 | `SettingsPanel.vue` | 991 | Every settings category in one template |
 
-### 6.10  Settings type defined twice
+### 6.10  Settings type defined twice — accepted (wire-shape mirror)
 
-`src/stores/app/settingsStore.ts` and `src-bun/app/config/settings.ts` define
-the same settings shape independently. Changes to one silently break the other
-at runtime. Should be a shared type file imported by both sides.
+`src/ipc/types.ts` (renderer) and `src-bun/rpc.ts` (backend) define the
+same `Settings`, `Appearance`, `TerminalPrefs`, `NotificationPrefs`
+interfaces. This is an INTENTIONAL wire-shape mirror per AGENTS.md
+(testing instructions): the two sides MUST stay in sync, and
+`src-bun/__tests__/wire-contract.test.ts` snapshots catch drift.
+
+Sharing the type via a third module would break the simple "one
+tsconfig per side" build boundary (no cross-imports between src/ and
+src-bun/), require either a shared package or path-mapping hacks, and
+remove the explicit wire-contract review point. Net cost > benefit.
+
+This row was a Phase C candidate that the Phase B/C review (2026-05-25)
+declined for the above reasons. Wire-contract snapshots cover the
+synchronization risk — and Phase A.5 confirmed they work (the
+`extension-management` permission kind drift was caught + propagated
+to both sides).
 
 ### 6.11  Missing abstractions
 
@@ -646,7 +659,7 @@ at runtime. Should be a shared type file imported by both sides.
 | Settings type shape | settingsStore + settings.ts (backend) | Runtime drift risk |
 | ~~localStorage set/hydrate~~ | ~~terminalStore (2× identical pairs)~~ | ✅ Fixed — `usePersistedRef` (Phase A) |
 | ~~Deferred listener queue~~ | ~~invoke.ts (6× identical blocks)~~ | ✅ Fixed — `createDeferredChannel<L>()` (Phase A) |
-| `as unknown as` shape probes | layoutStore (12×) + App.vue (1×) | Type safety hole |
+| ~~`as unknown as` shape probes~~ | ~~layoutStore (12×) + App.vue (1×)~~ | ✅ Mostly fixed (Phase C.1) — 12 → 2 in layoutStore via dockviewTypes accessors |
 | ~~Component → IPC direct calls~~ | ~~12 .vue files, ~36 call sites~~ | ✅ Fixed (Phase B) — 3 picker-flow holdouts left, rest moved to composables |
 | ~~Window event bus~~ | ~~9 event names, 13 dispatchers, 9 listeners~~ | ✅ Fixed — mitt + `src/lib/bus.ts` (Phase A) |
 | setTimeout focus hacks | 6+ components, ~10 sites | Missing lifecycle mgmt |
@@ -699,6 +712,10 @@ at runtime. Should be a shared type file imported by both sides.
   - [x] B.2 Library tab composables — useToolsLibrary, useInstructionsLibrary, useSkillsLibrary, useAgentsLibrary, useMcpLibrary (the big one: 13 IPC calls + ~190 lines extracted from LibraryMcpTab.vue) + browseDirectorySafe helper
   - [x] B.3 Killed layoutStore→sessionsStore circular dep (require()-based) with `setSessionTitleResolver(fn)` injected at boot
   - **Net Phase B: .vue direct invokeCommand calls 36 → 3, 5 new composables, 1 real circular dep eliminated, 600 tests pass**
+- [x] **Phase C (2026-05-25):** type safety
+  - [x] C.1 Typed dockview accessor module (`src/stores/shell/dockviewTypes.ts`) — 12 → 2 `as unknown as` casts in layoutStore
+  - [x] C.2 sessionsStore reducer casts — re-examined, already safe (typed shape probes + runtime guards). No-op.
+  - [x] C.3 Shared settings type — declined; wire-shape mirror is intentional and covered by snapshot tests (§6.10).
 
 
 ---
@@ -772,20 +789,30 @@ failure risks. `toastStore` stays as an acceptable cross-cutting concern.
 2. ~~**Decouple stores from toastStore**~~ — declined per critique.
 3. ~~**Kill window event bus**~~ — done in Phase A step 4.
 4. ~~**Deferred listener generic**~~ — done in Phase A step 5.
-### Phase C — Type safety: dockview + IPC + shared settings
+### Phase C — Type safety: dockview + IPC + shared settings ✅ DONE (2026-05-25)
 
-1. **Typed dockview wrapper** — `dockviewTypes.ts` with interfaces for the
-   runtime shape we actually use; centralize all 13 `as unknown as` casts
-2. **Reduce unsafe casts in sessionsStore** — typed discriminated unions for
-   event payloads instead of `payload.data as {...}`
-3. **Shared settings type** — single `src/shared/settings.ts` (or co-located
-   in `src/ipc/types.ts`) imported by both renderer (`settingsStore.ts`)
-   and backend (`src-bun/app/config/settings.ts`). Add wire-shape snapshot
-   test in `src-bun/__tests__/wire-contract.test.ts`. (Moved here from
-   Phase A — this is architecture, not a library swap.)
+- [x] **C.1** Typed dockview accessor module (`src/stores/shell/dockviewTypes.ts`)
+  — interfaces + accessor functions for the dockview-vue runtime shapes
+  the public types don't expose (`group.panels`, `group.id`,
+  `group.width`/`height`, `dock.width`/`height`, structural cast for
+  `removePanel`). Migrated 10 of 12 `as unknown as` shape probes in
+  `layoutStore.ts`; the remaining 2 are intentional local casts
+  (edgeApi 4-property setter, panel.api.moveTo structural).
+- [x] **C.2** sessionsStore reducer casts — **already safe**. Re-examination
+  showed the `payload.data as {field?: unknown}` casts are typed shape
+  probes followed by runtime guards (`typeof d.field === 'string'`).
+  This is the correct pattern for unknown-shaped data; the "cast" only
+  declares the field exists for TS narrowing, runtime guards do the
+  real validation. No work needed.
+- [x] **C.3** Shared settings type — **declined** per §6.10. The duplication
+  is an intentional wire-shape mirror covered by snapshot tests; sharing
+  would break the per-side tsconfig boundary without real benefit.
 
-Also Phase B item 4 ("Deferred listener generic") is **already covered** by
-Phase A item 5, so remove the duplicate when starting Phase B.
+### Phase C — Legacy plan (preserved for reference)
+
+1. ~~Typed dockview wrapper~~ — done in C.1.
+2. ~~Reduce unsafe casts in sessionsStore~~ — already safe (see C.2).
+3. ~~Shared settings type~~ — declined (wire-shape mirror is intentional).
 
 ### Phase D — Split god objects
 
