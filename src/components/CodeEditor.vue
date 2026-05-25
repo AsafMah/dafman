@@ -66,7 +66,7 @@ const headerLabel = computed<string>(() => {
   }
 
   if (props.filename) {
-    const ext = props.filename.replace(/^.*[\\\/.]/, '');
+    const ext = props.filename.replace(/^.*[\\/.]/, '');
 
     if (ext && ext.length <= 5) return ext;
   }

@@ -114,6 +114,8 @@ const hasFocusedView = computed(() => {
       return memoryContent.value !== null;
     case 'hook':
       return hookName.value !== null;
+    default:
+      return false;
   }
 });
 </script>

@@ -154,7 +154,7 @@ export const SubmitOnEnter = defineComponent({
 
         if (!e) return false;
 
-        if (e.isComposing || e.keyCode === 229) return false;
+        if (e.isComposing || e.key === 'Process') return false;
 
         // We only handle modifier chords. Plain Enter / Shift+Enter
         // fall through to Lexical's default paragraph / soft-break

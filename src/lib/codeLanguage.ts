@@ -134,7 +134,7 @@ export async function resolveLanguageForFile(
 ): Promise<Extension | null> {
   if (!fileOrExt) return null;
 
-  const cleaned = fileOrExt.replace(/^.*[\\\/.]/, '').toLowerCase();
+  const cleaned = fileOrExt.replace(/^.*[\\/.]/, '').toLowerCase();
   const langId = extensionMap[cleaned];
 
   return resolveLanguageExtension(langId);

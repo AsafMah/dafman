@@ -17,8 +17,6 @@ export function toModelSummary(model: ModelInfo): ModelSummary {
     name: model.name,
     supportsReasoningEffort: efforts.length > 0,
     supportedReasoningEfforts: efforts.map(String),
-    defaultReasoningEffort: model.defaultReasoningEffort
-      ? String(model.defaultReasoningEffort)
-      : null,
+    defaultReasoningEffort: model.defaultReasoningEffort ?? null,
   };
 }

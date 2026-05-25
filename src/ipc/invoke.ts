@@ -152,7 +152,7 @@ export async function invokeCommand<N extends CommandName>(
   args: CommandMap[N]['args'],
 ): Promise<InvokeResult<N>> {
   if (!bridge) {
-    throw new Error(`RPC bridge not initialized; cannot invoke '${String(name)}'`);
+    throw new Error(`RPC bridge not initialized; cannot invoke '${name}'`);
   }
 
   try {

@@ -558,6 +558,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
   '__test.setSendScript': async (args) => {
     const { script } = args as { script: string };
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval -- test-only dynamic script injection
     const fn = new Function('sendArgs', 'push', 'state', script);
 
     fakeClient.setSendScript(async (sendArgs, push, state) => {

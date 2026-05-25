@@ -173,7 +173,7 @@ function formatFields(fields: Record<string, unknown>): string {
   try {
     return JSON.stringify(fields);
   } catch {
-    return String(fields);
+    return '[object]';
   }
 }
 </script>

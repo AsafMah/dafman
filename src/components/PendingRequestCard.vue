@@ -78,6 +78,8 @@ const title = computed(() => {
       return 'Plan approval';
     case 'autoModeSwitch':
       return 'Auto mode switch';
+    default:
+      return 'Request';
   }
 });
 

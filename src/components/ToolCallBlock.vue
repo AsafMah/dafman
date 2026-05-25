@@ -39,6 +39,8 @@ const statusSeverity = computed<'info' | 'success' | 'danger'>(() => {
       return 'success';
     case 'error':
       return 'danger';
+    default:
+      return 'info';
   }
 });
 
@@ -50,6 +52,8 @@ const statusLabel = computed(() => {
       return 'Done';
     case 'error':
       return 'Failed';
+    default:
+      return props.status;
   }
 });
 

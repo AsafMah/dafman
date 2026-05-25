@@ -58,7 +58,7 @@ function toggle(src: InstructionSource) {
 function sizeLabel(src: InstructionSource): string {
   if (!src.exists) return 'missing';
 
-  if (src.sizeBytes == null) return 'unknown';
+  if (src.sizeBytes === null || src.sizeBytes === undefined) return 'unknown';
 
   if (src.sizeBytes < 1024) return `${src.sizeBytes} B`;
 
