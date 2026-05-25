@@ -18,13 +18,13 @@ import InputText from 'primevue/inputtext';
 import SelectButton from 'primevue/selectbutton';
 import Textarea from 'primevue/textarea';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { invokeCommand } from '@/ipc/invoke';
 import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from '@/ipc/types';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
+import { useAgentsLibrary } from '@/composables/library/useAgentsLibrary';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -42,29 +42,11 @@ const activeSession = computed(() => {
   return sessionsStore.getSession(id) ?? null;
 });
 
-const files = ref<AgentFileEntry[]>([]);
-const loaded = ref(false);
-const error = ref<string | null>(null);
+const { files, loaded, error, load: loadFiles, write: writeAgent, remove: deleteAgent } =
+  useAgentsLibrary();
 
 async function load() {
-  error.value = null;
-  loaded.value = false;
-
-  try {
-    if (activeSession.value) {
-      files.value = await invokeCommand('listAgentFiles', {
-        sessionId: activeSession.value.id,
-      });
-    } else {
-      // No session: user-scope only.
-      files.value = await invokeCommand('listAgentFilesGlobal', {});
-    }
-
-    loaded.value = true;
-  } catch (err) {
-    error.value = toErrorMessage(err);
-    loaded.value = true;
-  }
+  await loadFiles(activeSession.value?.id);
 }
 
 onMounted(load);
@@ -184,10 +166,13 @@ async function submitForm() {
 
     if (formModel.value.trim()) spec.model = formModel.value.trim();
 
-    const path = await invokeCommand('writeAgentFile', {
-      sessionId: activeSession.value.id,
-      spec,
-    });
+    const path = await writeAgent(activeSession.value.id, spec);
+
+    if (!path) {
+      // toast already shown by composable; surface the failure inline too
+      formError.value = 'Save failed';
+      return;
+    }
 
     toasts.success('Agent created', path);
     closeForm();
@@ -215,23 +200,17 @@ async function deleteFile(entry: AgentFileEntry) {
 
   if (!ok) return;
 
-  try {
-    const removed = await invokeCommand('deleteAgentFile', {
-      sessionId: activeSession.value.id,
-      scope: entry.scope,
-      name: entry.name,
-    });
+  const removed = await deleteAgent(activeSession.value.id, entry.scope, entry.name);
 
-    if (removed) {
-      toasts.success('Agent deleted', entry.name);
-    } else {
-      toasts.info('Already gone', `No file at ${entry.path}`);
-    }
+  if (removed === null) return;
 
-    await load();
-  } catch (err) {
-    toasts.error('Delete failed', toErrorMessage(err));
+  if (removed) {
+    toasts.success('Agent deleted', entry.name);
+  } else {
+    toasts.info('Already gone', `No file at ${entry.path}`);
   }
+
+  await load();
 }
 
 async function reveal(path: string) {

@@ -3,22 +3,18 @@ import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { invokeCommand } from '@/ipc/invoke';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
-import { toErrorMessage } from '@/lib/errorMessage';
+import { useToolsLibrary, type ToolItem } from '@/composables/library/useToolsLibrary';
 
-type ToolItem = { name: string; description: string; namespacedName?: string };
 type ToolGroup = { label: string; items: ToolItem[] };
 
 const settingsStore = useSettingsStore();
 const { settings } = storeToRefs(settingsStore);
 const toasts = useToastStore();
 
-const tools = ref<ToolItem[]>([]);
-const loaded = ref(false);
-const error = ref<string | null>(null);
+const { tools, loaded, error, load } = useToolsLibrary();
 const expanded = ref<Set<string>>(new Set());
 
 function toolKey(tool: ToolItem): string {
@@ -52,19 +48,6 @@ const groups = computed<ToolGroup[]>(() => {
 
   return out;
 });
-
-async function load() {
-  error.value = null;
-  loaded.value = false;
-
-  try {
-    tools.value = await invokeCommand('listBuiltinTools', {});
-    loaded.value = true;
-  } catch (err) {
-    error.value = toErrorMessage(err);
-    loaded.value = true;
-  }
-}
 
 function isEnabled(tool: ToolItem): boolean {
   return !(settings.value.tools?.defaultExcluded ?? []).includes(toolKey(tool));

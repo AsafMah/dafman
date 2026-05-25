@@ -9,28 +9,11 @@
 import { computed, onMounted, ref } from 'vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { invokeCommand } from '@/ipc/invoke';
-import { useToastStore } from '@/stores/app/toastStore';
-import { useSessionsStore } from '@/stores/chat/sessionsStore';
-import { useLayoutStore } from '@/stores/shell/layoutStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
-import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
+import { useSkillsLibrary, type Skill } from '@/composables/library/useSkillsLibrary';
 
-type Skill = {
-  name: string;
-  description: string;
-  source: string;
-  userInvocable: boolean;
-  enabled: boolean;
-  path?: string;
-};
-
-const toasts = useToastStore();
-const sessionsStore = useSessionsStore();
-const skills = ref<Skill[]>([]);
-const loaded = ref(false);
-const error = ref<string | null>(null);
+const { skills, loaded, error, load, setEnabled } = useSkillsLibrary();
 const expandedItems = ref<Set<string>>(new Set());
 
 const grouped = computed(() => {
@@ -46,62 +29,8 @@ const grouped = computed(() => {
   return [...out.entries()].sort(([a], [b]) => a.localeCompare(b));
 });
 
-async function load() {
-  error.value = null;
-  loaded.value = false;
-
-  try {
-    // Use session-scoped skills when a session is open — the session's
-    // working directory drives .github/skills/ discovery correctly.
-    // Fall back to the global discover RPC when no session exists.
-    const activeId = useLayoutStore().activeSessionId;
-    const active = activeId ? sessionsStore.getSession(activeId) : undefined;
-    const sessionId = active?.id ?? sessionsStore.sessions[0]?.id;
-
-    if (sessionId) {
-      skills.value = await invokeCommand('listSessionSkills', { sessionId });
-    } else {
-      const wd = sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory || '';
-
-      skills.value = await invokeCommand('discoverSkills', wd ? { workingDirectory: wd } : {});
-    }
-
-    loaded.value = true;
-  } catch (err) {
-    error.value = toErrorMessage(err);
-    loaded.value = true;
-  }
-}
-
 async function toggleSkill(skill: Skill) {
-  const next = !skill.enabled;
-
-  // Optimistic: flip the local view, then push the change.
-  skill.enabled = next;
-
-  try {
-    // Use session-scoped skill toggle when a session is open, otherwise
-    // push the full global disabled set.
-    const activeId = useLayoutStore().activeSessionId;
-    const sessionId =
-      (activeId ? sessionsStore.getSession(activeId)?.id : undefined) ??
-      sessionsStore.sessions[0]?.id;
-
-    if (sessionId) {
-      await invokeCommand('setSessionSkillEnabled', {
-        sessionId,
-        name: skill.name,
-        enabled: next,
-      });
-    } else {
-      const disabled = skills.value.filter((s) => !s.enabled).map((s) => s.name);
-
-      await invokeCommand('setGloballyDisabledSkills', { disabledSkills: disabled });
-    }
-  } catch (err) {
-    skill.enabled = !next;
-    toasts.error('Toggle failed', toErrorMessage(err));
-  }
+  await setEnabled(skill, !skill.enabled);
 }
 
 function isExpanded(name: string): boolean {

@@ -7,20 +7,17 @@
 
 import { computed, onMounted, ref, watch } from 'vue';
 import Button from 'primevue/button';
-import { invokeCommand } from '@/ipc/invoke';
 import type { InstructionSource } from '@/ipc/types';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
-import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
+import { useInstructionsLibrary } from '@/composables/library/useInstructionsLibrary';
 
 const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
 
-const sources = ref<InstructionSource[]>([]);
-const loaded = ref(false);
-const error = ref<string | null>(null);
+const { sources, loaded, error, load: loadSources } = useInstructionsLibrary();
 const expanded = ref<Set<string>>(new Set());
 
 const activeSession = computed(() => {
@@ -65,20 +62,7 @@ function sizeLabel(src: InstructionSource): string {
 }
 
 async function load() {
-  error.value = null;
-  loaded.value = false;
-
-  try {
-    sources.value = await invokeCommand('listInstructionSources', {
-      ...(activeSession.value?.workingDirectory
-        ? { workingDirectory: activeSession.value.workingDirectory }
-        : {}),
-    });
-    loaded.value = true;
-  } catch (err) {
-    error.value = toErrorMessage(err);
-    loaded.value = true;
-  }
+  await loadSources(activeSession.value?.workingDirectory);
 }
 
 async function reveal(src: InstructionSource) {

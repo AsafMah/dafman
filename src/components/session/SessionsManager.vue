@@ -22,7 +22,7 @@ import { useClientStore } from '@/stores/app/clientStore';
 import { useLayoutStore, composePanelTitle } from '@/stores/shell/layoutStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useFolderPicker } from '@/composables/useFolderPicker';
-import { invokeCommand } from '@/ipc/invoke';
+import { browseDirectorySafe } from '@/lib/browseDirectory';
 import type { SessionMetadataSummary } from '@/ipc/types';
 
 const sessionsList = useSessionsListStore();
@@ -228,13 +228,7 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
   browseTimer = setTimeout(() => {
     browseTimer = null;
     void (async () => {
-      let fs: string[] = [];
-
-      try {
-        fs = await invokeCommand('browseDirectory', { prefix: query });
-      } catch {
-        /* expected while typing — keep known-matches-only */
-      }
+      const fs = await browseDirectorySafe(query);
 
       if (seq !== browseSeq) return;
 
