@@ -638,25 +638,54 @@ at runtime. Should be a shared type file imported by both sides.
 ### Phase A — Foundation: library replacements + typed constants
 
 Per §5 build-vs-buy analysis, replace hand-rolled implementations with
-battle-tested libraries. This is the highest-ROI phase — it deletes ~600+
+battle-tested libraries. This is the highest-ROI phase — it deletes ~500+
 lines of bespoke plumbing and eliminates entire bug categories.
 
-1. **Add @vueuse/core** — replace hand-rolled `useEventListener`, debounce
-   (`useDebounceFn`), localStorage (`useLocalStorage`), resize observer
-   (`useResizeObserver`), focus management (`useFocus`), rAF helpers
-   (`useRafFn`). Estimated ~300 lines deleted across 10+ files
-2. **Add mitt** (or VueUse's `useEventBus`) — replace all 8 `dafman:*` window
-   events (13 dispatchers, 9 listeners) + listenerRegistry.ts with a typed,
-   centrally-registered event bus. Estimated ~130 lines deleted
-3. **Add pinia-plugin-persistedstate** — replace terminalStore's manual
-   localStorage persistence (2× identical blocks, ~60 lines)
-4. **Add strip-ansi** — replace `src/lib/ansi.ts` hand-rolled regexes (~25 lines)
-5. **Add @codemirror/language-data** — replace `codeLanguage.ts` manual ext→lang
-   map (~100 lines of incomplete mapping)
-6. **Panel ID constants** — single `src/constants/panels.ts` with typed
-   string literal union for all panel/component IDs
-7. **Shared settings type** — single `src/shared/settings.ts` imported by
-   both renderer and backend
+**Ordering per rubber-duck critique (2026-05-25):** start with the smallest
+blast radius, add regression tests first, defer settings-type split, and
+pick exactly one event-bus abstraction.
+
+1. **Add/strengthen regression tests** — `ansi.test.ts` (OSC 633/133/7,
+   prompt stripping, BEL); `terminalStore.test.ts` (hydration, buffer cap);
+   event-bus tests (sync delivery, unsub, listener-error isolation);
+   `codeLanguage.test.ts` (TS/TSX/Vue/unknown/cache). This is the safety
+   net for every swap below.
+2. **Add strip-ansi** — replace ONLY the inner `stripAnsi()` in
+   `src/lib/ansi.ts`. Keep `cleanTerminalCommandOutput()` (PowerShell prompt
+   stripping is domain-specific). Verify VS Code shell-integration OSCs
+   (633/133/7) still get stripped — vanilla strip-ansi may not cover them.
+3. **CodeMirror language resolver** — `src/lib/codeLanguage.ts` is consumed
+   by `CodeEditor.vue`/`DiffEditor.vue` (NOT markdown.ts / Prism), so
+   `@codemirror/language-data` is the right ecosystem. Verify lazy loading
+   and bundle impact before adopting; keep `Makefile`-style fallbacks.
+4. **Pick ONE event-bus abstraction** — choose `mitt` OR VueUse's
+   `useEventBus`, not both. Recommended: **mitt** (200B, simpler API, plays
+   nicely with the listener-error isolation we need below). Replace all 8
+   `dafman:*` window events (13 dispatchers, 9 listeners). Wrap dispatch
+   with try/catch per-listener to preserve current `listenerRegistry`
+   isolation semantics.
+5. **IPC listener / deferred-channel cleanup** — replace 6 identical
+   "if bridge, register; else queue" blocks in `src/ipc/invoke.ts` with a
+   single `createDeferredChannel<T>()`. Keep separate from the UI event bus
+   (different failure-isolation requirements).
+6. **Terminal persistence** — replace `terminalStore.ts:135-193` manual
+   localStorage with a custom `usePersistedRef<T>(key, default, { throttle,
+   validate, cap })` composable. **Do NOT** adopt
+   `pinia-plugin-persistedstate` — `sessionTerminalBuffers` can be large
+   (scrollback) and the plugin would `JSON.stringify` on every unrelated
+   mutation by default. Custom helper gives us throttle + buffer cap.
+7. **VueUse mechanical cleanups (selective)** — adopt for the obvious
+   wins: `useEventListener`, `useResizeObserver`, `useDebounceFn`. **Avoid**
+   `useFocus` for Lexical/xterm (their `.focus()` semantics aren't ordinary
+   input focus). **Avoid** `useRafFn` for one-shot/double-rAF settle
+   patterns (it's loop-oriented).
+8. **Panel ID constants** — single `src/constants/panels.ts` with typed
+   string-literal union for all panel/component IDs. Independent of every
+   other item; do last to avoid merge conflicts.
+
+**Deferred to Phase C** (was item 7): shared settings type between renderer
+and backend. This is cross-boundary architecture work, not a library swap,
+and needs explicit wire-shape tests.
 
 ### Phase B — Data flow: decouple stores + kill event bus
 
@@ -669,12 +698,20 @@ lines of bespoke plumbing and eliminates entire bug categories.
 4. **Deferred listener generic** — replace 6 identical blocks in invoke.ts with
    a single `createDeferredChannel<T>()` (or just use mitt + lazy init)
 
-### Phase C — Type safety: dockview + IPC
+### Phase C — Type safety: dockview + IPC + shared settings
 
 1. **Typed dockview wrapper** — `dockviewTypes.ts` with interfaces for the
    runtime shape we actually use; centralize all 13 `as unknown as` casts
 2. **Reduce unsafe casts in sessionsStore** — typed discriminated unions for
    event payloads instead of `payload.data as {...}`
+3. **Shared settings type** — single `src/shared/settings.ts` (or co-located
+   in `src/ipc/types.ts`) imported by both renderer (`settingsStore.ts`)
+   and backend (`src-bun/app/config/settings.ts`). Add wire-shape snapshot
+   test in `src-bun/__tests__/wire-contract.test.ts`. (Moved here from
+   Phase A — this is architecture, not a library swap.)
+
+Also Phase B item 4 ("Deferred listener generic") is **already covered** by
+Phase A item 5, so remove the duplicate when starting Phase B.
 
 ### Phase D — Split god objects
 
