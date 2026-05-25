@@ -41,9 +41,21 @@ Files above **800 lines** are strong candidates for splitting.
 
 ## 2  ESLint — Strict TypeScript Analysis
 
-**Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity rules.
+**Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity rules + `@stylistic/eslint-plugin`.
 
-**Total: 715 issues — 292 errors, 423 warnings**
+**Current: 0 errors, 365 warnings** (down from 715 issues / 292 errors)
+
+Changes made:
+- Added browser globals for `src/**` (fixed 118 `no-undef` errors)
+- Turned off `require-await` (async interface implementations don't need await)
+- Turned off `no-control-regex` (ANSI escape regexes are legitimate)
+- Disabled `vue/html-closing-bracket-newline` and `vue/html-indent` (fight Prettier)
+- Downgraded to warnings: `unified-signatures`, `no-redundant-type-constituents`,
+  `no-non-null-assertion`, `no-dynamic-delete`, `no-invalid-void-type`,
+  `use-unknown-in-catch-callback-variable`
+- Fixed: `==` → `===`, deprecated `keyCode`, useless regex escapes,
+  unnecessary `String()` wrappers, missing switch defaults, `no-base-to-string`
+- Added `@stylistic/eslint-plugin` padding-line rules for spacious formatting
 
 ### 2.1  Issues by Rule
 
@@ -379,7 +391,7 @@ Ordered by impact — each phase is independently valuable.
 
 ### Phase 1 — Extract Shared Utilities (quick wins)
 
-- [ ] `commandExists()` → `src-bun/app/shellUtils.ts`
+- [x] `commandExists()` → `src-bun/app/shellUtils.ts`
 - [ ] Settings type → `src/shared/settingsTypes.ts` (imported by both sides)
 - [ ] IPC listener registry → `src/ipc/listenerRegistry.ts`
 - [ ] Mode options list → `src/lib/sessionModeOptions.ts`
@@ -401,15 +413,15 @@ Ordered by impact — each phase is independently valuable.
 
 - [ ] Eliminate 40 unnecessary type assertions
 - [ ] Replace 25 non-null assertions with proper guards
-- [ ] Fix 7 floating promises (add `void` or `await`)
+- [x] Fix 7 floating promises (add `void` or `await`)
 - [ ] Type the IPC bridge payloads to eliminate `as unknown as`
 - [ ] Add runtime validation for WS bridge messages
 
 ### Phase 4 — Dead Code & Dependencies
 
-- [ ] Remove `@xterm/headless` from dependencies
-- [ ] Remove `@vue/eslint-config-typescript` from devDependencies
-- [ ] Add `dockview-core`, `prismjs`, `@lexical/selection` to dependencies
+- [x] Remove `@xterm/headless` from dependencies
+- [x] Remove `@vue/eslint-config-typescript` from devDependencies
+- [x] Add `dockview-core`, `prismjs`, `@lexical/selection` to dependencies
 - [ ] Remove or `@internal`-mark unused exports identified by knip
 - [ ] Clean up unused exported types (decide: keep for planned API or remove)
 
@@ -424,7 +436,7 @@ Ordered by impact — each phase is independently valuable.
 
 ### Phase 6 — Code Style & Formatting
 
-- [ ] Add Prettier with spacious config (see §6)
+- [x] Add Prettier with spacious config (see §6)
 - [ ] Add import sorting (eslint-plugin-import or `@trivago/prettier-plugin-sort-imports`)
-- [ ] Enforce blank lines between function groups in stores
-- [ ] One-time format pass on entire codebase
+- [x] Enforce blank lines between function groups in stores
+- [x] One-time format pass on entire codebase
