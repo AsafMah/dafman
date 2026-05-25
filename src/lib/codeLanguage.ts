@@ -1,116 +1,79 @@
 /// Map a file extension or path → CodeMirror 6 language extension.
 ///
-/// We use `@codemirror/language-data` as the canonical extension→name
-/// resolver (it ships with mappings for ~150 languages), but only
-/// activate the language packs we've explicitly installed. Anything
-/// outside that allowlist resolves to null so we don't pay for grammars
-/// we never need.
-///
-/// Each factory returns a Promise<Extension>; the result is cached
-/// across calls.
+/// We delegate **all** extension/name lookups to `@codemirror/language-data`
+/// and just whitelist which language packs we've actually installed.
+/// Adding a language is two lines: add the dep, then add its
+/// language-data name to `enabledLanguages`.
 
 import type { Extension } from '@codemirror/state';
-import { LanguageDescription } from '@codemirror/language';
+import { LanguageDescription, type LanguageSupport } from '@codemirror/language';
 import { languages as languageData } from '@codemirror/language-data';
 
 let cache = new Map<string, Extension>();
 
-type LangFactory = () => Promise<Extension>;
+/// language-data display names for the language packs we've installed.
+/// Anything not in this set resolves to null, even if language-data
+/// knows the language — keeps us from accidentally trying to import a
+/// missing @codemirror/lang-* package at runtime.
+const enabledLanguages: ReadonlySet<string> = new Set([
+  'JavaScript',
+  'TypeScript',
+  'JSX',
+  'TSX',
+  'JSON',
+  'Markdown',
+  'CSS',
+  'Sass',
+  'SCSS',
+  'HTML',
+  'Python',
+  'Rust',
+  'Go',
+  'Vue',
+]);
 
-const factories: Record<string, LangFactory> = {
-  javascript: async () => {
-    const { javascript } = await import('@codemirror/lang-javascript');
-
-    return javascript();
-  },
-  typescript: async () => {
-    const { javascript } = await import('@codemirror/lang-javascript');
-
-    return javascript({ typescript: true });
-  },
-  jsx: async () => {
-    const { javascript } = await import('@codemirror/lang-javascript');
-
-    return javascript({ jsx: true });
-  },
-  tsx: async () => {
-    const { javascript } = await import('@codemirror/lang-javascript');
-
-    return javascript({ typescript: true, jsx: true });
-  },
-  json: async () => {
-    const { json } = await import('@codemirror/lang-json');
-
-    return json();
-  },
-  markdown: async () => {
-    const { markdown } = await import('@codemirror/lang-markdown');
-
-    return markdown();
-  },
-  css: async () => {
-    const { css } = await import('@codemirror/lang-css');
-
-    return css();
-  },
-  html: async () => {
-    const { html } = await import('@codemirror/lang-html');
-
-    return html();
-  },
-  python: async () => {
-    const { python } = await import('@codemirror/lang-python');
-
-    return python();
-  },
-  rust: async () => {
-    const { rust } = await import('@codemirror/lang-rust');
-
-    return rust();
-  },
-  go: async () => {
-    const { go } = await import('@codemirror/lang-go');
-
-    return go();
-  },
+/// language-data's Python descriptor doesn't include `.pyi`; its JSON
+/// descriptor doesn't include `.jsonc`. Patch them in so a single
+/// table covers every extension we care about. Empty list otherwise.
+const extraExtensionsFor: Record<string, readonly string[]> = {
+  Python: ['pyi'],
+  JSON: ['jsonc'],
 };
 
-/// Resolve a LanguageDescription (from language-data) to our factory
-/// id. The descriptor's `alias[]` already contains lowercase short
-/// names like "ts", "js", "py" so we walk that first, then fall back
-/// to the normalised display name.
-function factoryIdFor(desc: LanguageDescription): string | null {
-  for (const alias of desc.alias) {
-    if (alias in factories) return alias;
-  }
-
-  const lowered = desc.name.toLowerCase();
-
-  return lowered in factories ? lowered : null;
+function isEnabled(desc: LanguageDescription): boolean {
+  return enabledLanguages.has(desc.name);
 }
 
-/// Tiny alias table for extensions language-data doesn't cover or
-/// where we deliberately want different behaviour (vue → html since
-/// we don't ship @codemirror/lang-vue; jsonc → json; pyi → python;
-/// scss → css). Everything else goes through language-data.
-const extensionAliases: Record<string, string> = {
-  jsonc: 'json',
-  pyi: 'python',
-  scss: 'css',
-  vue: 'html',
-};
-
 function extractExtension(fileOrExt: string): string {
-  const cleaned = fileOrExt.replace(/\\/g, '/');
-  const tail = cleaned.split('/').pop() ?? cleaned;
+  const tail = fileOrExt.replace(/\\/g, '/').split('/').pop() ?? fileOrExt;
   const dot = tail.lastIndexOf('.');
 
   return (dot >= 0 ? tail.slice(dot + 1) : tail).toLowerCase();
 }
 
-/// Resolve a CM6 language extension by language id (one of the keys
-/// of `factories`, a short alias known to language-data, or a name
-/// like "TypeScript"). Result is cached across calls.
+function findByExtension(ext: string): LanguageDescription | null {
+  for (const desc of languageData) {
+    if (!isEnabled(desc)) continue;
+
+    if (desc.extensions.includes(ext)) return desc;
+
+    const extras = extraExtensionsFor[desc.name];
+
+    if (extras?.includes(ext)) return desc;
+  }
+
+  return null;
+}
+
+async function loadFromDescription(desc: LanguageDescription): Promise<Extension> {
+  const support: LanguageSupport = await desc.load();
+
+  return support;
+}
+
+/// Resolve a CM6 language extension by language id (a short alias
+/// like `ts`, `tsx`, `py`, or a display name like `TypeScript`).
+/// Result is cached across calls.
 export async function resolveLanguageExtension(
   langId: string | null | undefined,
 ): Promise<Extension | null> {
@@ -120,21 +83,11 @@ export async function resolveLanguageExtension(
 
   if (cache.has(key)) return cache.get(key) as Extension;
 
-  let factory = factories[key];
+  const desc = LanguageDescription.matchLanguageName(languageData, key, true);
 
-  if (!factory) {
-    const desc = LanguageDescription.matchLanguageName(languageData, key, true);
+  if (!desc || !isEnabled(desc)) return null;
 
-    if (desc) {
-      const id = factoryIdFor(desc);
-
-      if (id) factory = factories[id];
-    }
-  }
-
-  if (!factory) return null;
-
-  const ext = await factory();
+  const ext = await loadFromDescription(desc);
 
   cache.set(key, ext);
 
@@ -142,9 +95,7 @@ export async function resolveLanguageExtension(
 }
 
 /// Resolve via a file extension OR full filename (e.g. `foo.ts` or
-/// `ts`). Path separators tolerated, case-insensitive. We let
-/// language-data do the extension→language match; a small alias
-/// table covers the four extensions it doesn't track.
+/// `ts`). Path separators tolerated, case-insensitive.
 export async function resolveLanguageForFile(
   fileOrExt: string | null | undefined,
 ): Promise<Extension | null> {
@@ -154,17 +105,17 @@ export async function resolveLanguageForFile(
 
   if (!ext) return null;
 
-  if (extensionAliases[ext]) {
-    return resolveLanguageExtension(extensionAliases[ext]);
-  }
+  if (cache.has(ext)) return cache.get(ext) as Extension;
 
-  const desc = LanguageDescription.matchFilename(languageData, `_.${ext}`);
+  const desc = findByExtension(ext);
 
   if (!desc) return null;
 
-  const id = factoryIdFor(desc);
+  const result = await loadFromDescription(desc);
 
-  return id ? resolveLanguageExtension(id) : null;
+  cache.set(ext, result);
+
+  return result;
 }
 
 /// Reset the cache. Used by tests; the renderer doesn't hot-reload
