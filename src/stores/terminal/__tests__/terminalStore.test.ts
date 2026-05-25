@@ -29,12 +29,14 @@ function makeBridge(
 
 describe('terminalStore', () => {
   beforeEach(() => {
+    localStorage.clear();
     setActivePinia(createPinia());
     setRpcBridge(makeBridge({ listTerminals: async () => [] }));
   });
 
   afterEach(() => {
     setRpcBridge(null);
+    localStorage.clear();
   });
 
   test('tracks command lifecycle without crossing terminals', () => {
@@ -89,5 +91,94 @@ describe('terminalStore', () => {
     expect(store.commands.t1[0].command).toBe('echo 5');
     expect(store.commands.t1[199].exitCode).toBe(204);
     expect(store.droppedCommandCounts.t1).toBe(5);
+  });
+
+  describe('persistence (pre-Phase-A-swap safety net)', () => {
+    const IDS_KEY = 'dafman.sessionTerminals';
+    const BUFFERS_KEY = 'dafman.sessionTerminalBuffers';
+
+    test('hydrates sessionTerminalIds from localStorage on init', () => {
+      localStorage.setItem(IDS_KEY, JSON.stringify({ sess1: 'term-A', sess2: 'term-B' }));
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalIds.sess1).toBe('term-A');
+      expect(store.sessionTerminalIds.sess2).toBe('term-B');
+    });
+
+    test('hydrates sessionTerminalBuffers from localStorage on init', () => {
+      localStorage.setItem(BUFFERS_KEY, JSON.stringify({ sess1: 'last output' }));
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalBuffers.sess1).toBe('last output');
+    });
+
+    test('silently ignores malformed JSON in stored ids', () => {
+      localStorage.setItem(IDS_KEY, '{not json');
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalIds).toEqual({});
+    });
+
+    test('silently ignores malformed JSON in stored buffers', () => {
+      localStorage.setItem(BUFFERS_KEY, 'garbage');
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalBuffers).toEqual({});
+    });
+
+    test('drops non-string buffer entries on hydration', () => {
+      localStorage.setItem(
+        BUFFERS_KEY,
+        JSON.stringify({ ok: 'string', bad: 123, alsoBad: null }),
+      );
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalBuffers).toEqual({ ok: 'string' });
+    });
+
+    test('drops non-string id entries on hydration', () => {
+      localStorage.setItem(IDS_KEY, JSON.stringify({ ok: 'term-1', bad: 42 }));
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalIds).toEqual({ ok: 'term-1' });
+    });
+
+    test('caps hydrated buffer to MAX_BUFFER (256k)', () => {
+      const giant = 'x'.repeat(300_000);
+      localStorage.setItem(BUFFERS_KEY, JSON.stringify({ sess1: giant }));
+
+      const store = useTerminalStore();
+
+      expect(store.sessionTerminalBuffers.sess1?.length).toBe(256_000);
+    });
+
+    test('persists sessionTerminalIds after a status event links session→terminal', () => {
+      const store = useTerminalStore();
+      store.applyEvent({
+        kind: 'status',
+        terminalId: 't1',
+        summary: {
+          id: 't1',
+          sessionId: 'sess1',
+          status: 'running',
+          cwd: '',
+          shell: 'powershell',
+          createdAt: new Date().toISOString(),
+        },
+      } as never);
+
+      const persisted = JSON.parse(localStorage.getItem(IDS_KEY) ?? '{}') as Record<
+        string,
+        string
+      >;
+
+      expect(persisted.sess1).toBe('t1');
+    });
   });
 });
