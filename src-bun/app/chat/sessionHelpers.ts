@@ -103,6 +103,38 @@ export function normalizeTaskStatus(status: unknown): TaskStatus {
     : 'running';
 }
 
+// Pick helpers — conditionally assign typed fields from an untyped
+// record, reducing per-field `if (typeof ...)` branches and their
+// contribution to cyclomatic complexity.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function pickStr(raw: Record<string, unknown>, out: any, ...keys: string[]): void {
+  for (const k of keys) {
+    if (typeof raw[k] === 'string') out[k] = raw[k];
+  }
+}
+
+function pickNum(raw: Record<string, unknown>, out: any, ...keys: string[]): void {
+  for (const k of keys) {
+    if (typeof raw[k] === 'number') out[k] = raw[k];
+  }
+}
+
+function pickBool(raw: Record<string, unknown>, out: any, ...keys: string[]): void {
+  for (const k of keys) {
+    if (typeof raw[k] === 'boolean') out[k] = raw[k];
+  }
+}
+
+function pickEnum(
+  raw: Record<string, unknown>,
+  out: any,
+  key: string,
+  allowed: readonly string[],
+): void {
+  if (allowed.includes(raw[key] as T)) out[key] = raw[key];
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 /// Normalize the SDK's loose TaskInfo union into our typed `TaskInfo`.
 export function normalizeTask(raw: Record<string, unknown>): TaskInfo {
   const common = {
@@ -118,26 +150,11 @@ export function normalizeTask(raw: Record<string, unknown>): TaskInfo {
       command: typeof raw.command === 'string' ? raw.command : '',
     };
 
-    if (typeof raw.startedAt === 'string') out.startedAt = raw.startedAt;
-
-    if (typeof raw.completedAt === 'string') out.completedAt = raw.completedAt;
-
-    if (typeof raw.activeTimeMs === 'number') out.activeTimeMs = raw.activeTimeMs;
-
-    if (typeof raw.error === 'string') out.error = raw.error;
-
-    if (raw.executionMode === 'sync' || raw.executionMode === 'background')
-      out.executionMode = raw.executionMode;
-
-    if (typeof raw.canPromoteToBackground === 'boolean')
-      out.canPromoteToBackground = raw.canPromoteToBackground;
-
-    if (raw.attachmentMode === 'pty' || raw.attachmentMode === 'detached')
-      out.attachmentMode = raw.attachmentMode;
-
-    if (typeof raw.logPath === 'string') out.logPath = raw.logPath;
-
-    if (typeof raw.pid === 'number') out.pid = raw.pid;
+    pickStr(raw, out, 'startedAt', 'completedAt', 'error', 'logPath');
+    pickNum(raw, out, 'activeTimeMs', 'pid');
+    pickBool(raw, out, 'canPromoteToBackground');
+    pickEnum(raw, out, 'executionMode', ['sync', 'background'] as const);
+    pickEnum(raw, out, 'attachmentMode', ['pty', 'detached'] as const);
 
     return out;
   }
@@ -149,35 +166,24 @@ export function normalizeTask(raw: Record<string, unknown>): TaskInfo {
     agentType: typeof raw.agentType === 'string' ? raw.agentType : 'unknown',
   };
 
-  if (typeof raw.toolCallId === 'string') out.toolCallId = raw.toolCallId;
-
-  if (typeof raw.startedAt === 'string') out.startedAt = raw.startedAt;
-
-  if (typeof raw.completedAt === 'string') out.completedAt = raw.completedAt;
-
-  if (typeof raw.activeTimeMs === 'number') out.activeTimeMs = raw.activeTimeMs;
-
-  if (typeof raw.error === 'string') out.error = raw.error;
-
-  if (raw.executionMode === 'sync' || raw.executionMode === 'background')
-    out.executionMode = raw.executionMode;
-
-  if (typeof raw.canPromoteToBackground === 'boolean')
-    out.canPromoteToBackground = raw.canPromoteToBackground;
-
-  if (typeof raw.agentName === 'string') out.agentName = raw.agentName;
-
-  if (typeof raw.agentDisplayName === 'string') out.agentDisplayName = raw.agentDisplayName;
-
-  if (typeof raw.prompt === 'string') out.prompt = raw.prompt;
-
-  if (typeof raw.result === 'string') out.result = raw.result;
-
-  if (typeof raw.model === 'string') out.model = raw.model;
-
-  if (typeof raw.latestResponse === 'string') out.latestResponse = raw.latestResponse;
-
-  if (typeof raw.idleSince === 'string') out.idleSince = raw.idleSince;
+  pickStr(
+    raw,
+    out,
+    'toolCallId',
+    'startedAt',
+    'completedAt',
+    'error',
+    'agentName',
+    'agentDisplayName',
+    'prompt',
+    'result',
+    'model',
+    'latestResponse',
+    'idleSince',
+  );
+  pickNum(raw, out, 'activeTimeMs');
+  pickBool(raw, out, 'canPromoteToBackground');
+  pickEnum(raw, out, 'executionMode', ['sync', 'background'] as const);
 
   return out;
 }
@@ -243,46 +249,54 @@ export function jobFromTask(sessionId: string, task: TaskInfo): JobRecord {
 /// One-line human-readable summary of a permission request.
 export function summarizePermission(request: PermissionRequest): string {
   const raw = request as unknown as Record<string, unknown>;
-  const path =
-    typeof raw.fileName === 'string'
-      ? raw.fileName
-      : typeof raw.path === 'string'
-        ? raw.path
-        : null;
-  const command =
-    typeof raw.fullCommandText === 'string'
-      ? raw.fullCommandText
-      : typeof raw.command === 'string'
-        ? raw.command
-        : typeof raw.cmd === 'string'
-          ? raw.cmd
-          : null;
-  const url = typeof raw.url === 'string' ? raw.url : null;
-  const server = typeof raw.serverName === 'string' ? raw.serverName : null;
-  const tool = typeof raw.toolName === 'string' ? raw.toolName : null;
 
-  switch (request.kind) {
-    case 'shell':
-      return command ? `Run \`${command}\`` : 'Run a shell command';
-    case 'write':
-      return path ? `Modify ${path}` : 'Modify a file';
-    case 'read':
-      return path ? `Read ${path}` : 'Read a file';
-    case 'url':
-      return url ? `Open ${url}` : 'Open a URL';
-    case 'mcp':
-      return server && tool
-        ? `Call ${server} / ${tool}`
-        : server
-          ? `Call MCP server ${server}`
-          : 'Call an MCP tool';
-    case 'custom-tool':
+  const pick = (...keys: string[]): string | null => {
+    for (const k of keys) {
+      if (typeof raw[k] === 'string') return raw[k] as string;
+    }
+
+    return null;
+  };
+
+  const SUMMARIES: Record<string, () => string> = {
+    shell: () => {
+      const cmd = pick('fullCommandText', 'command', 'cmd');
+
+      return cmd ? `Run \`${cmd}\`` : 'Run a shell command';
+    },
+    write: () => {
+      const p = pick('fileName', 'path');
+
+      return p ? `Modify ${p}` : 'Modify a file';
+    },
+    read: () => {
+      const p = pick('fileName', 'path');
+
+      return p ? `Read ${p}` : 'Read a file';
+    },
+    url: () => {
+      const u = pick('url');
+
+      return u ? `Open ${u}` : 'Open a URL';
+    },
+    mcp: () => {
+      const server = pick('serverName');
+      const tool = pick('toolName');
+
+      if (server && tool) return `Call ${server} / ${tool}`;
+
+      return server ? `Call MCP server ${server}` : 'Call an MCP tool';
+    },
+    'custom-tool': () => {
+      const tool = pick('toolName');
+
       return tool ? `Run ${tool}` : 'Run a custom tool';
-    case 'memory':
-      return 'Save to memory';
-    case 'hook':
-      return 'Run a hook';
-  }
+    },
+    memory: () => 'Save to memory',
+    hook: () => 'Run a hook',
+  };
+
+  return (SUMMARIES[request.kind] ?? (() => `${request.kind} request`))();
 }
 
 // ---------------------------------------------------------------------------
