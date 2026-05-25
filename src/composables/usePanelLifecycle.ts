@@ -24,9 +24,7 @@ export interface PanelLifecycle {
 }
 
 export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
-  const panelApi = computed<DockviewPanelApi | undefined>(
-    () => props.api ?? props.params?.api,
-  );
+  const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
 
   const title = ref<string>(panelApi.value?.title ?? '');
   const isActive = ref<boolean>(panelApi.value?.isActive ?? false);
