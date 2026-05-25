@@ -203,6 +203,14 @@ Concepts we hadn't considered before.
 12. **Plugin hook env vars** (`PLUGIN_ROOT`, `COPILOT_PLUGIN_ROOT`,
     `CLAUDE_PROJECT_DIR`, `CLAUDE_PLUGIN_DATA`) — when we eventually
     do plugin support, pre-canned env contract.
+13. **Canvas / `createCanvas`** (`@github/copilot-sdk@1.0.0-beta.7`,
+    2026-05-24) — new agent-driven interactive UI primitive
+    (`CanvasAction`, `CanvasDeclaration`, `CanvasOpenContext`,
+    `CanvasJsonSchema`, `CanvasLifecycleContext`). The model can open
+    a canvas the client renders inline; the client emits actions back.
+    Likely fits in the chat timeline alongside command-result pills.
+    Defer until Phase B/C decoupling is done so we have a clean place
+    to wire a `canvasRegistry` (analogous to `commandResultRegistry`).
 
 ---
 

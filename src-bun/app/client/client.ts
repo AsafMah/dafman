@@ -15,13 +15,17 @@ let instance: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;
 
 /// Test-mode override: inject a fake client (typed `unknown` because
-/// the SDK class has private members we can't reconstruct). Caller's
-/// responsibility to provide every method `sessions.ts` actually
-/// invokes. Set to `null` to clear.
+/// the SDK class has private members we can't reconstruct; tests pass
+/// either `null` (to clear) or `client as unknown as Parameters<…>[0]`
+/// for a duck-typed fake). Set to `null` to clear.
 export function setClientForTest(c: unknown): void {
   instance = c as CopilotClient | null;
   starting = null;
 }
+
+/// @deprecated Use `setClientForTest` instead. Kept as a re-export so
+/// existing test imports keep compiling without a sweeping rename.
+export const _setClientForTest = setClientForTest;
 
 /// Resolves the prebuilt platform-native `copilot` binary shipped by
 /// `@github/copilot-<platform>-<arch>` (an optional dependency of
@@ -113,10 +117,4 @@ export async function shutdownClient(): Promise<void> {
   } finally {
     instance = null;
   }
-}
-
-/// Test-only seam — inject a fake client for unit tests.
-export function _setClientForTest(client: CopilotClient | null): void {
-  instance = client;
-  starting = null;
 }

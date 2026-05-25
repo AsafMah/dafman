@@ -71,10 +71,10 @@ import type {
   TaskInfo,
 } from '../../rpc';
 
-/// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
-/// type alias isn't re-exported from the package root, so we mirror it
-/// here. Mismatched values are rejected by the SDK at call time.
-type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
+/// Subset of SDK reasoning effort levels. We re-export the SDK's
+/// canonical type via copilotSdk.ts so any future SDK additions
+/// flow through without a silent drift.
+import type { ReasoningEffort } from '../client/copilotSdk';
 
 /// S5: cap replay of `session.getEvents()` history at this many
 /// events. The SDK returns the full transcript without pagination —
