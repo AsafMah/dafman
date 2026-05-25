@@ -98,53 +98,68 @@ export interface RpcBridge {
 }
 
 let bridge: RpcBridge | null = null;
-const pendingSessionListeners = new Set<SessionEventListener>();
-const pendingPendingRequestListeners = new Set<PendingRequestListener>();
-const pendingLogListeners = new Set<LogEventListener>();
-const pendingAuditListeners = new Set<AuditEventListener>();
-const pendingTerminalListeners = new Set<TerminalEventListener>();
-const pendingCommandResultListeners = new Set<CommandResultEventListener>();
+
+/// Channel that queues subscriptions until the bridge is attached.
+/// `bind` is called once on bridge attach to forward every queued
+/// listener; until then, `subscribe` keeps them in a local Set so
+/// no events are missed during the (very brief) gap between Pinia
+/// store init and `setRpcBridge()` being called from main.ts.
+interface DeferredChannel<L> {
+  subscribe(listener: L): () => void;
+  flush(next: RpcBridge): void;
+}
+
+function createDeferredChannel<L>(
+  bind: (next: RpcBridge, listener: L) => (() => void) | undefined,
+): DeferredChannel<L> {
+  const pending = new Set<L>();
+
+  return {
+    subscribe(listener) {
+      if (bridge) {
+        const off = bind(bridge, listener);
+
+        return off ?? (() => undefined);
+      }
+
+      pending.add(listener);
+
+      return () => pending.delete(listener);
+    },
+    flush(next) {
+      for (const listener of pending) bind(next, listener);
+
+      pending.clear();
+    },
+  };
+}
+
+const sessionChannel = createDeferredChannel<SessionEventListener>((b, l) =>
+  b.onSessionEvent(l),
+);
+const pendingRequestChannel = createDeferredChannel<PendingRequestListener>((b, l) =>
+  b.onPendingRequest(l),
+);
+const logChannel = createDeferredChannel<LogEventListener>((b, l) => b.onLogEvent(l));
+const auditChannel = createDeferredChannel<AuditEventListener>((b, l) => b.onAuditEvent(l));
+const terminalChannel = createDeferredChannel<TerminalEventListener>((b, l) =>
+  b.onTerminalEvent?.(l),
+);
+const commandResultChannel = createDeferredChannel<CommandResultEventListener>((b, l) =>
+  b.onCommandResultEvent?.(l),
+);
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
 
   if (!next) return;
 
-  for (const listener of pendingSessionListeners) {
-    next.onSessionEvent(listener);
-  }
-
-  pendingSessionListeners.clear();
-
-  for (const listener of pendingPendingRequestListeners) {
-    next.onPendingRequest(listener);
-  }
-
-  pendingPendingRequestListeners.clear();
-
-  for (const listener of pendingLogListeners) {
-    next.onLogEvent(listener);
-  }
-
-  pendingLogListeners.clear();
-
-  for (const listener of pendingAuditListeners) {
-    next.onAuditEvent(listener);
-  }
-
-  pendingAuditListeners.clear();
-
-  for (const listener of pendingTerminalListeners) {
-    next.onTerminalEvent?.(listener);
-  }
-
-  pendingTerminalListeners.clear();
-
-  for (const listener of pendingCommandResultListeners) {
-    next.onCommandResultEvent?.(listener);
-  }
-
-  pendingCommandResultListeners.clear();
+  sessionChannel.flush(next);
+  pendingRequestChannel.flush(next);
+  logChannel.flush(next);
+  auditChannel.flush(next);
+  terminalChannel.flush(next);
+  commandResultChannel.flush(next);
 }
 
 export async function invokeCommand<N extends CommandName>(
@@ -172,50 +187,9 @@ export async function invokeCommand<N extends CommandName>(
   }
 }
 
-export function onSessionEvent(listener: SessionEventListener): () => void {
-  if (bridge) return bridge.onSessionEvent(listener);
-
-  pendingSessionListeners.add(listener);
-
-  return () => pendingSessionListeners.delete(listener);
-}
-
-export function onPendingRequest(listener: PendingRequestListener): () => void {
-  if (bridge) return bridge.onPendingRequest(listener);
-
-  pendingPendingRequestListeners.add(listener);
-
-  return () => pendingPendingRequestListeners.delete(listener);
-}
-
-export function onLogEvent(listener: LogEventListener): () => void {
-  if (bridge) return bridge.onLogEvent(listener);
-
-  pendingLogListeners.add(listener);
-
-  return () => pendingLogListeners.delete(listener);
-}
-
-export function onAuditEvent(listener: AuditEventListener): () => void {
-  if (bridge) return bridge.onAuditEvent(listener);
-
-  pendingAuditListeners.add(listener);
-
-  return () => pendingAuditListeners.delete(listener);
-}
-
-export function onTerminalEvent(listener: TerminalEventListener): () => void {
-  if (bridge?.onTerminalEvent) return bridge.onTerminalEvent(listener);
-
-  pendingTerminalListeners.add(listener);
-
-  return () => pendingTerminalListeners.delete(listener);
-}
-
-export function onCommandResultEvent(listener: CommandResultEventListener): () => void {
-  if (bridge?.onCommandResultEvent) return bridge.onCommandResultEvent(listener);
-
-  pendingCommandResultListeners.add(listener);
-
-  return () => pendingCommandResultListeners.delete(listener);
-}
+export const onSessionEvent = sessionChannel.subscribe;
+export const onPendingRequest = pendingRequestChannel.subscribe;
+export const onLogEvent = logChannel.subscribe;
+export const onAuditEvent = auditChannel.subscribe;
+export const onTerminalEvent = terminalChannel.subscribe;
+export const onCommandResultEvent = commandResultChannel.subscribe;
