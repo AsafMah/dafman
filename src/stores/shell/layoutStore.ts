@@ -17,13 +17,15 @@ import type { DockviewApi, EdgeGroupPosition } from 'dockview-core';
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
-const SESSION_DETAILS_PANEL_ID = 'session-details';
-const SESSIONS_PANEL_ID = 'sessions-manager';
-const SETTINGS_PANEL_ID = 'settings-panel';
-const LIBRARY_PANEL_ID = 'library';
-const JOBS_PANEL_ID = 'jobs-panel';
-const TERMINALS_PANEL_ID = 'terminals-panel';
-const LOG_VIEWER_PANEL_ID = 'log-viewer';
+import { PANEL_IDS } from '@/constants/panels';
+
+const SESSION_DETAILS_PANEL_ID = PANEL_IDS.sessionDetails;
+const SESSIONS_PANEL_ID = PANEL_IDS.sessionsManager;
+const SETTINGS_PANEL_ID = PANEL_IDS.settings;
+const LIBRARY_PANEL_ID = PANEL_IDS.library;
+const JOBS_PANEL_ID = PANEL_IDS.jobs;
+const TERMINALS_PANEL_ID = PANEL_IDS.terminals;
+const LOG_VIEWER_PANEL_ID = PANEL_IDS.logs;
 const SESSION_DETAILS_MIN_WIDTH = 380;
 const LEFT_EDGE_MIN_BY_PANEL_ID: Record<string, number> = {
   [SESSIONS_PANEL_ID]: 180,

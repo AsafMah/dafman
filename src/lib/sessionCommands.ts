@@ -17,6 +17,7 @@ import { useToastStore } from '@/stores/app/toastStore';
 import { invokeCommand } from '@/ipc/invoke';
 import { emit as busEmit } from '@/lib/bus';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { PANEL_COMPONENTS, PANEL_IDS, TAB_COMPONENTS } from '@/constants/panels';
 
 export interface SessionCommand {
   /// Slash form (with leading "/"). What the user types in the
@@ -82,9 +83,9 @@ function openLibraryTab(tab = 'mcp'): void {
   }
 
   useLayoutStore().openEdgePanel('left', {
-    id: 'library',
-    component: 'library',
-    tabComponent: 'sidebarTab',
+    id: PANEL_IDS.library,
+    component: PANEL_COMPONENTS.library,
+    tabComponent: TAB_COMPONENTS.sidebarTab,
     title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
     initialSize: 360,
     minimumSize: 320,
