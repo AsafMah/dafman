@@ -13,56 +13,35 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **Post-M2 audit burn-down + manual test bug-bash**.
-M1 + M2 shipped. Terminal integration feature-complete. Manual test pass
-completed 2026-05-23: Phase A (7 renderer fixes) + Phase B (slash Tab UX)
-shipped. **Phases C (MCP toggle), E (mode switch — no code fix needed),
-F (skills discovery) now resolved.** SDK migrated from
-`copilot-sdk-supercharged` to `@github/copilot` directly. Session tab
-title and close/detach bugs fixed.
+**Active milestone:** **Code-quality + architecture cleanup follow-through**.
+The 2026-05-25 quality pass is now landed: **gts + Prettier adoption, spacing cleanup,
+`shellUtils` extraction, dependency cleanup, and ESLint reduced to 0 errors**.
+The structural follow-up also landed: stores/components/backend modules were regrouped by
+domain, shared utilities were extracted (`createListenerRegistry`, `revealPath`,
+`MODE_OPTIONS`), and renderer imports now use the `@/` alias consistently.
+
+Renderer imports now resolve through `tsconfig.json` (`@/*` → `src/*`) across 129 files.
+Backend imports intentionally stay relative because `Bun.build` still does not reliably
+honor tsconfig path aliases for the bun entry graph.
 
 ---
 
 ## Next concrete steps
 
-**2026-05-25:** Phase 22 complete (MCP OAuth toast + Permissions tab
-+ Tools tri-state allowlist). See DEVLOG for receipts. Image
-generation **stays deferred** per the user's earlier "skip until
-used" call — we will not pursue it speculatively.
+**Quality-pass follow-up (current):**
 
-Picking from the audit's unshipped phases (`plans/plan-backlog-audit.prompt.md` §C):
-
-1. **Long jobs registry + Autopilot UI follow-up** (audit P23, remaining).
-   First pass shipped: global Jobs panel, SDK task aggregation,
-   promote/cancel/remove actions, detach-on-active-job close, and
-   current-session Autopilot launcher. Remaining follow-ups: persisted
-   job history across restart, optional git cleanliness checks,
-   richer completion diff summaries, and commit/PR handoff.
-2. **Library tab consolidation follow-up** (audit P21, remaining).
-   Initial slice shipped: Instructions tab + `/library ...` command
-   wiring + SDK `CommandDefinition` registration. Remaining optional
-   work: unified Library item grid, in-app instruction editor (must be
-   permissioned), or deeper SDK hook features (`onUserPromptSubmitted`,
-   `onSessionStart`) once there is a concrete use case.
-3. **App shell redesign — sidebar + status bar** (audit P22, ~2 d).
-   Replaces the topbar-only chrome with a left activity bar + bottom
-   status bar; affects every screen so it's a larger structural lift.
-4. **Terminal integration follow-up** (audit P24, remaining). First
-   pass adds Bun native PTY registry/RPC, xterm dockview panels, and
-   command palette actions. Electrobun is pinned
-   to bundle Bun 1.3.14 because 1.3.13 rejects Windows `terminal`.
-   Terminal addon foundation, the ActivityBar terminal manager, terminal
-   settings, and the first Windows shell-integration parser/emitter are now
-   wired. Remaining follow-ups: richer profile CRUD, bash/zsh/fish shell
-   integration, buffer persistence UX, the return of session-bound terminal
-   affordances inside session/editor surfaces, agent terminal tool, inline
-   terminal blocks, shortcut design, and optional Ghostty Web renderer spike.
-5. **Composer toolbar + steering/queueing** (audit P25, ~2 d). WYSIWYG
-   surface for the composer.
-
-Older candidates (Tier-2 E2E, metrics counters / histograms) stay in
-the backlog but get displaced by the higher-ROI items the audit
-surfaced.
+1. **Cleanup Phase 4 — `src/lib/` reorg.**
+   Split the remaining flat helper layer into domain folders so the renderer-side
+   architecture matches the now-grouped stores/components/backend layout.
+2. **Cleanup Phase 5 — remaining god-object splits.**
+   Continue carving down oversized modules after the folder move so the restructure is
+   reflected in actual ownership boundaries, not just import paths.
+3. **Playwright smoke investigation on Windows.**
+   The Windows smoke hangs are still open, are considered pre-existing, and are **not**
+   attributed to the restructure / alias series.
+4. **Roadmap backlog resumes after the cleanup thread closes.**
+   The audit/roadmap phases below remain valid, but the immediate engineering focus is
+   finishing the quality/restructure follow-through first.
 
 Explicitly **out of scope**:
 - Image generation (deferred per user; un-defer requires explicit ask).
@@ -346,6 +325,10 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
+
+- **2026-05-25** — Code-quality + restructure pass shipped: gts/Prettier,
+  spacious control-flow padding, `shellUtils` extraction, ESLint to **0 errors**,
+  shared helpers (`createListenerRegistry`, `revealPath`, `MODE_OPTIONS`), stores/components/backend regrouped by domain, and renderer imports switched to `@/` aliases in 129 files. Backend stays relative because `Bun.build` path aliases are still a limitation; Windows smoke hangs remain a pre-existing follow-up.
 
 - **2026-05-23** — Terminal integration polish shipped: blob
   attachments for command results (no file-read permission), terminal

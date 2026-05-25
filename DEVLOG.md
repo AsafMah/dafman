@@ -10,6 +10,54 @@
 
 ---
 
+## 2026-05-25 — Code-quality audit + domain restructure
+
+**Takeaway:** Landed the code-quality cleanup pass and the large directory restructure without changing runtime behavior: renderer stores/components and bun backend modules are now grouped by domain, shared helpers were extracted, and renderer imports now use `@/` aliases consistently.
+
+### Code-quality sweep
+
+- Adopted **gts + Prettier** (`29236bb`) and followed with a control-flow spacing pass (`8941ae6`).
+- Extracted `shellUtils`, fixed floating promises, and cleaned dependencies (`a62d51b`).
+- Resolved the remaining ESLint issues down to **0 errors** (`2d19640`).
+- Refreshed the audit doc to track cleanup progress (`05c9247`).
+
+### Directory restructure
+
+The codebase is now grouped by domain instead of long flat directories:
+
+- **Stores**: 15 stores moved into 6 folders under `src/stores/` — `chat/`, `terminal/`, `shell/`, `app/`, `library/`, `observability/` (`73df1ea`).
+- **Components**: 47 Vue components moved into 9 feature folders under `src/components/` plus `details/` for tool-detail renderers (`511114b`).
+- **Backend**: 25 bun-side modules moved into 8 folders under `src-bun/app/` — `chat/`, `client/`, `library/`, `terminal/`, `config/`, `observability/`, `filesystem/`, `shared/` (`f657c13`).
+
+### Shared utility extraction
+
+- Extracted `createListenerRegistry()` to `src/ipc/listenerRegistry.ts`.
+- Extracted `revealPath()` UI helper to `src/lib/pathActions.ts`.
+- Extracted `MODE_OPTIONS` to `src/lib/sessionModeOptions.ts`.
+- These landed in `4d002dc` to reduce duplication before the folder move.
+
+### Import aliases
+
+- Renderer imports now use **`@/`** (`tsconfig.json` → `src/*`) across 129 files (`2c327de`).
+- Backend imports intentionally stayed **relative**: `Bun.build` still does not reliably honor tsconfig path aliases for the bun entry graph, so `src-bun/` keeps relative paths for now.
+
+### Validation note
+
+- Playwright smoke hangs on Windows remain a **pre-existing issue** from the quality pass and are not attributed to the restructure series.
+
+### Key commits
+
+- `29236bb` — gts + Prettier adoption
+- `8941ae6` — spacious padding lines
+- `a62d51b` — extract shellUtils, fix floating promises, clean deps
+- `2d19640` — resolve ESLint errors
+- `05c9247` — update `CODE_AUDIT.md`
+- `4d002dc` — extract shared utilities
+- `73df1ea` — group stores into domain folders
+- `511114b` — group components into feature folders
+- `f657c13` — group backend modules into domain folders
+- `2c327de` — add `@/` path aliases for renderer imports
+
 ## 2026-05-24 — Groups revert + session bug fixes
 
 **Takeaway:** Groups feature fully reverted after persistent runtime failures.

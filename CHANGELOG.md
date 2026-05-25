@@ -4,10 +4,19 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ## [Unreleased]
 
 ### Changed
+- **Reorganized the renderer and bun codebase by domain.** Stores now live under 6 `src/stores/` folders, components under 9 `src/components/` feature folders plus `details/`, and bun-side modules under 8 `src-bun/app/` domain folders.
+- **Standardized renderer imports on the `@/` path alias.** `tsconfig.json` now maps `@/*` → `src/*`, and 129 renderer files were updated to use alias imports. Backend imports intentionally remain relative because `Bun.build` does not reliably honor tsconfig path aliases for the bun entry graph.
+- **Extracted shared utilities before the restructure.** `createListenerRegistry()`, `revealPath()`, and `MODE_OPTIONS` now live in shared helpers instead of duplicated call sites.
 - **Migrated from `copilot-sdk-supercharged` to `@github/copilot` SDK directly.**
   All features used from supercharged are available in the official SDK v1.0.52+.
   The adapter at `copilotSdk.ts` already imported from `@github/copilot/copilot-sdk/index.js`;
   supercharged was only a transitive dependency installer.
+
+### Developer Experience
+- Adopted **gts + Prettier** as the formatting baseline.
+- Added a follow-up spacing pass for more readable control-flow / return blocks.
+- Extracted `shellUtils`, fixed floating promises, and cleaned unused dependencies.
+- Resolved the remaining ESLint issues down to **0 errors**.
 
 ### Fixed
 - **Session history not loading on restore.** SDK renamed `session.getMessages()`

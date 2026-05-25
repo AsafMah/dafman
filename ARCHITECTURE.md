@@ -1,6 +1,6 @@
 # Dafman — Architecture
 
-> Snapshot of the live codebase as of 2026-05-21. When this file disagrees with
+> Snapshot of the live codebase as of 2026-05-25. When this file disagrees with
 > a `plans/*.prompt.md` doc, this file wins for "how it is today"; the plan
 > wins for "where we're going". Update both when reality changes.
 
@@ -76,22 +76,20 @@ src-bun/
 ├── index.ts                ← Electrobun bootstrap; registers RPC handlers
 ├── rpc.ts                  ← typed RPC schema (single source of truth)
 └── app/                    ← framework-agnostic domain modules
-    ├── client.ts             ← Copilot SDK client lifecycle, platform binary resolution
-    ├── sessions.ts           ← SessionRegistry: create/resume/list/delete, event forwarding,
-    │                           per-session pending-handler map, approveAll state, skills,
-    │                           usage metrics
-    ├── settings.ts           ← versioned JSON store (current: v8), migrate(),
-    │                           Workspaces MRU
-    ├── models.ts             ← listModels() with capabilities
-    ├── tools.ts              ← (currently minimal) — SDK passthrough
-    ├── fileSearch.ts         ← workspace file ripgrep-style search (for @file mentions)
-    ├── directoryBrowser.ts   ← path autocomplete for the workspace input
-    ├── stderrFilter.ts       ← drops known noise from the CLI subprocess
-    ├── errors.ts             ← AppError discriminated union + rpcGuard wrapper
-    ├── redact.ts             ← shape-only redaction for sensitive/content fields
-    ├── diagnostics.ts        ← bundle export (logs + recent.json + settings + README)
-    └── logging.ts            ← JSON-lines daily-rotated log + live subscribers + ring buffer
+    ├── chat/                 ← `sessions.ts`, `pendingRequests.ts`, `commandResultRegistry.ts`
+    ├── client/               ← Copilot SDK client lifecycle, platform binary resolution, fakes
+    ├── config/               ← settings + export persistence
+    ├── filesystem/           ← workspace search + directory browsing
+    ├── library/              ← models, tools, MCP/skills registries, instructions, agent files
+    ├── observability/        ← logging, diagnostics, audit, stderr filtering
+    ├── shared/               ← app errors, redaction helpers, error-message utilities
+    └── terminal/             ← PTY registry + shell integration helpers
 ```
+
+`src-bun/app/` is now grouped into **8 domain folders**. Renderer-side `@/` aliases
+are intentionally **not** mirrored here because `Bun.build` still does not reliably
+resolve tsconfig path aliases for the bun entry graph, so backend imports stay relative.
+
 
 ### Hard rules
 
@@ -117,15 +115,15 @@ src-bun/
 
 ```
 bun.start
-  └─ initLogger()                            // src-bun/app/logging.ts
+  └─ initLogger()                            // src-bun/app/observability/logging.ts
   └─ installStderrFilter()                   // drops node-pty conpty noise on Windows
-  └─ SettingsService.loadOrDefault()         // reads & migrates settings.json
+  └─ SettingsService.loadOrDefault()         // src-bun/app/config/settings.ts
   └─ defineRPC<DafmanRPC>({ bun: {...} })    // registers ~30 handlers
   └─ Electrobun window open
        └─ renderer boots, calls createClient
             └─ SDK spawns @github/copilot-${platform}-${arch}
             └─ deny-by-default permission model installed
-            └─ existing sessions resumed via session.getMessages()
+            └─ existing sessions resumed via session.getEvents()
 ```
 
 ## 4. Renderer (`src/`)
@@ -137,22 +135,26 @@ src/
 ├── App.vue                       ← shell: <DockviewVue> body + ActivityBar rail + global modals
 ├── main.ts                       ← createApp + Pinia + PrimeVue + dockview CSS
 ├── style.css                     ← global token-anchored styles
-├── components/                   ← Vue SFCs (30+; see "Component map" below)
-├── stores/                       ← Pinia stores (11)
-├── lib/                          ← pure helpers (no Vue runtime)
+├── components/                   ← Vue SFCs grouped by feature
+│   ├── chat/ details/ library/ observability/ permissions/
+│   ├── session/ settings/ shared/ shell/ terminal/
+│   └── ...                       ← 9 feature folders plus `details/` for tool-detail renderers
+├── stores/                       ← Pinia stores grouped by domain
+│   ├── app/ chat/ library/ observability/ shell/ terminal/
+│   └── ...                       ← 15 stores across 6 folders
+├── lib/                          ← pure helpers (still mostly flat; cleanup Phase 4 is next)
 │   ├── chatEvents.ts               ← reducer: SessionEventPayload[] → ChatItem[]
 │   ├── chatEvents/                 ← per-event-family handlers (messages, reasoning, tools, …)
 │   ├── markdown.ts                 ← markdown-it + Prism + DOMPurify pipeline
-│   ├── color.ts                    ← accentForIndex (per-session palette)
-│   ├── toolRenderers.ts            ← per-tool summary + language hint registry
+│   ├── pathActions.ts              ← shared `revealPath()` UI helper
+│   ├── sessionModeOptions.ts       ← shared `MODE_OPTIONS`
 │   ├── sessionCommands.ts          ← local slash commands (/cd, /reset, …)
-│   ├── notificationStyles.ts       ← styleFor() — kind-to-color
-│   ├── openAttachment.ts           ← shared file/blob viewer
 │   ├── registerBuiltinCommands.ts  ← command palette seed
 │   └── markdown helpers
 ├── ipc/
 │   ├── types.ts                    ← CommandMap + payload types (mirrors src-bun/rpc.ts)
 │   ├── invoke.ts                   ← typed invokeCommand + onSessionEvent
+│   ├── listenerRegistry.ts         ← shared listener registration/dispatch helper
 │   ├── electrobunBridge.ts         ← adapter to Electrobun's rpc.request
 │   └── rendererLog.ts              ← renderer → bun log forwarder
 ├── lexical/                      ← composer editor stack
@@ -167,21 +169,34 @@ src/
     └── Playground.vue              ← DEV-only synthetic event harness, echo chat
 ```
 
+Renderer imports now use the **`@/` alias** (`@/*` → `src/*`) as the default style.
+
+
 ### Stores (Pinia)
 
-| Store              | Owns                                                                              |
-|--------------------|-----------------------------------------------------------------------------------|
-| `bootStore`        | startup phase (`loading-settings`, `creating-client`, `resuming`, `ready`, `error`) |
-| `clientStore`      | singleton SDK client lifecycle (`createClient` + status)                          |
-| `logStore`         | live log tail + display filter + bun-level mutation                                |
-| `sessionsStore`    | `SessionRecord[]` — events, model, mode, title, working dir, pending requests, FIFO callback queue, ring-buffer cap |
-| `sessionsListStore`| CLI-side session catalog (for the Sessions Manager edge panel)                    |
-| `modelsStore`      | `listModels()` cache + reasoning effort capabilities                              |
-| `settingsStore`    | versioned settings.json + workspaces MRU + persistLayout()                        |
-| `layoutStore`      | DockviewApi: `addPanel`, `openEdgePanel`, `snapshot`, `restore`, `activeSessionId` |
-| `toastStore`       | PrimeVue toast bridge                                                             |
-| `notificationsStore` | OS notification gating + permission state                                       |
-| `commandRegistry`  | Cmd/Ctrl+K palette contributions (`register` returns a disposer)                  |
+| Folder | Stores | Owns |
+|---|---|---|
+| `app/` | `bootStore`, `clientStore`, `notificationsStore`, `settingsStore`, `toastStore` | startup lifecycle, singleton SDK client, OS notifications, persisted settings/workspaces, toast bridge |
+| `chat/` | `commandResultsStore`, `sessionsListStore`, `sessionsStore` | command-result records, CLI session catalog, runtime `SessionRecord[]` state |
+| `library/` | `modelsStore` | `listModels()` cache + reasoning-effort capabilities |
+| `observability/` | `auditStore`, `jobsStore`, `logStore` | permission/url audit state, background jobs/task aggregation, live log tail |
+| `shell/` | `commandRegistry`, `layoutStore` | Cmd/Ctrl+K contributions and Dockview layout/panel orchestration |
+| `terminal/` | `terminalStore` | terminal registry state, panel ownership, terminal settings |
+
+### Component folders
+
+| Folder | Purpose |
+|---|---|
+| `chat/` | session transcript, composer, reasoning/tool blocks, chat tabs |
+| `details/` | tool-detail renderers (`grep`, `glob`, diffs, commands, path/url chips) |
+| `library/` | global Library tabs (agents, instructions, MCP, skills, tools) |
+| `observability/` | jobs and log viewer surfaces |
+| `permissions/` | pending-request, permission details, rule editor, tool details |
+| `session/` | session-specific side rails / headers / manager |
+| `settings/` | global Settings panel |
+| `shared/` | cross-feature reusable UI (`CodeEditor`, `FilePicker`, JSON schema, mermaid) |
+| `shell/` | app chrome (`ActivityBar`, `BootSplash`, `CommandPalette`, `SidebarTab`, `Watermark`) |
+| `terminal/` | live terminal panels and manager |
 
 ### Component map
 
@@ -231,6 +246,9 @@ src/
   the Pinia store; the dockview JSON is opaque UI shape only.
 - **No raw `electrobun.rpc.request(...)` in components.** Always wrap through
   `src/ipc/invoke.ts`; the typed `CommandMap` is the source of truth.
+- **Use `@/` for renderer imports.** `tsconfig.json` maps `@/*` → `src/*`; keep
+  backend imports relative until `Bun.build` supports the same alias flow for
+  the bun entry graph.
 - **No hardcoded hex colors.** Use `var(--p-*)` PrimeVue tokens. Per-session
   accents (`accentForSession` in `src/lib/color.ts`) are the only exception.
 
