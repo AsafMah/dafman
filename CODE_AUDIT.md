@@ -276,7 +276,7 @@ All remaining warnings require refactoring, not quick fixes:
 
 ### Phase 6 — Additional Cleanup
 
-- [ ] ChatTab/SidebarTab → `usePanelLifecycle` composable
+- [x] ChatTab/SidebarTab → `usePanelLifecycle` composable
 - [ ] Settings type → shared file imported by both sides
 - [ ] Remove/mark unused exports
 - [ ] Add import sorting plugin
