@@ -23,7 +23,7 @@
 ///      us the textNode, then we insert the pill using the
 ///      attachment cached in `pendingAttachment`.
 
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { TextNode, $createTextNode, $isTextNode } from 'lexical';
 import {
   TypeaheadMenuPlugin,
@@ -34,6 +34,7 @@ import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
 import { $createAttachmentNode } from '@/lexical/AttachmentNode';
 import type { SendMessageAttachment } from '@/ipc/types';
 import FilePicker from '@/components/shared/FilePicker.vue';
+import { useEventListener } from '@vueuse/core';
 
 class SentinelOption extends MenuOption {
   constructor() {
@@ -123,8 +124,7 @@ function onWindowKey(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onWindowKey, true));
-onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true));
+useEventListener(window, 'keydown', onWindowKey, true);
 </script>
 
 <template>

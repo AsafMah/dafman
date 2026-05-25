@@ -20,6 +20,7 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { invokeCommand } from '@/ipc/invoke';
 import { emit as busEmit, on as busOn } from '@/lib/bus';
+import { useResizeObserver } from '@vueuse/core';
 import { parseTerminalOsc, type TerminalShellEvent } from '@/lib/terminalShellIntegration';
 
 type UserParams = { terminalId?: string; compact?: boolean };
@@ -46,11 +47,11 @@ let search: SearchAddon | null = null;
 let webFonts: WebFontsAddon | null = null;
 let webgl: WebglAddon | null = null;
 const addonDisposables: Array<{ dispose(): void }> = [];
-let resizeObserver: ResizeObserver | null = null;
 let pendingSearchFrame: number | null = null;
 let commandCaptureActive = false;
 let commandCaptureBuffer = '';
 let replayingBuffer = false;
+let stopResize: (() => void) | null = null;
 
 const propTerminalId = computed(
   () => props.params?.params?.terminalId ?? props.params?.terminalId ?? '',
@@ -400,8 +401,7 @@ function initXterm(): void {
   term.onData((data) => {
     if (terminalId.value) void terminalStore.writeTerminal(terminalId.value, data);
   });
-  resizeObserver = new ResizeObserver(() => fitAndNotify());
-  resizeObserver.observe(host.value);
+  stopResize = useResizeObserver(host, () => fitAndNotify()).stop;
   setTimeout(fitAndNotify, 0);
   setTimeout(() => term?.focus(), 0);
 }
@@ -479,8 +479,8 @@ onBeforeUnmount(() => {
   terminalStore.releaseRenderer(terminalId.value, rendererRole.value);
   offFocusTerminal?.();
   offFocusTerminal = null;
-  resizeObserver?.disconnect();
-  resizeObserver = null;
+  stopResize?.();
+  stopResize = null;
 
   if (pendingSearchFrame !== null) {
     cancelAnimationFrame(pendingSearchFrame);

@@ -37,6 +37,7 @@ import type { ComposerSubmitPayload } from '@/lexical/plugins';
 import { styleFor } from '@/lib/notificationStyles';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { on as busOn } from '@/lib/bus';
+import { useResizeObserver } from '@vueuse/core';
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -136,31 +137,27 @@ onBeforeUnmount(() => {
 /// layout with no fixed height. Resize events fire hundreds of times per
 /// second during a drag; coalesce to one CSS write per frame via rAF so
 /// style recalcs stay bounded.
-let tileResizeObserver: ResizeObserver | null = null;
 let tileResizeRaf: number | null = null;
 
-onMounted(() => {
-  if (typeof ResizeObserver === 'undefined' || !tileEl.value) return;
+const stopTileObserver = useResizeObserver(tileEl, () => {
+  if (tileResizeRaf !== null) return;
 
-  const el = tileEl.value;
-  const update = () => {
+  tileResizeRaf = requestAnimationFrame(() => {
     tileResizeRaf = null;
-    el.style.setProperty('--tile-height', `${el.clientHeight}px`);
-  };
-  const schedule = () => {
-    if (tileResizeRaf !== null) return;
+    const el = tileEl.value;
 
-    tileResizeRaf = requestAnimationFrame(update);
-  };
+    if (el) el.style.setProperty('--tile-height', `${el.clientHeight}px`);
+  });
+});
 
-  update();
-  tileResizeObserver = new ResizeObserver(schedule);
-  tileResizeObserver.observe(el);
+onMounted(() => {
+  const el = tileEl.value;
+
+  if (el) el.style.setProperty('--tile-height', `${el.clientHeight}px`);
 });
 
 onBeforeUnmount(() => {
-  tileResizeObserver?.disconnect();
-  tileResizeObserver = null;
+  stopTileObserver.stop();
 
   if (tileResizeRaf !== null) {
     cancelAnimationFrame(tileResizeRaf);

@@ -74,6 +74,7 @@ import type { DefaultSendMode } from '@/stores/chat/sessionsStore';
 import type { SendMessageAttachment } from '@/ipc/types';
 import { useToastStore } from '@/stores/app/toastStore';
 import { runLocalSlashCommand } from '@/lib/sessionCommands';
+import { useResizeObserver } from '@vueuse/core';
 import SlashCommandPlugin from '@/components/chat/SlashCommandPlugin.vue';
 import MentionPlugin from '@/components/chat/MentionPlugin.vue';
 import FilePicker from '@/components/shared/FilePicker.vue';
@@ -137,21 +138,13 @@ const visibleFormatCount = computed(() => {
 });
 const inlineFormatActions = computed(() => formatActions.value.slice(0, visibleFormatCount.value));
 const overflowFormatActions = computed(() => formatActions.value.slice(visibleFormatCount.value));
-let toolbarResizeObserver: ResizeObserver | null = null;
 
-onMounted(() => {
-  if (toolbarRef.value) {
-    toolbarWidth.value = toolbarRef.value.clientWidth;
-    toolbarResizeObserver = new ResizeObserver(() => {
-      if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
-    });
-    toolbarResizeObserver.observe(toolbarRef.value);
-  }
+useResizeObserver(toolbarRef, () => {
+  if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
 });
 
-onBeforeUnmount(() => {
-  toolbarResizeObserver?.disconnect();
-  toolbarResizeObserver = null;
+onMounted(() => {
+  if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
 });
 
 function addAttachment(a: SendMessageAttachment): void {

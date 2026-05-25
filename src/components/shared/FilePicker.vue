@@ -22,9 +22,10 @@
 /// Single-pick per spec: select dismisses the popup. Multi-select
 /// can be re-opened. Directories attach as `directory` pills.
 
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { invokeCommand } from '@/ipc/invoke';
 import { useToastStore } from '@/stores/app/toastStore';
+import { useEventListener } from '@vueuse/core';
 import type { WorkspaceFileMatch, SendMessageAttachment } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
 
@@ -182,8 +183,7 @@ function onWindowKey(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onWindowKey, true));
-onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true));
+useEventListener(window, 'keydown', onWindowKey, true);
 
 /// Exposed so the @-trigger surface can forward keystrokes from the
 /// editor (where focus actually lives) without re-implementing nav.

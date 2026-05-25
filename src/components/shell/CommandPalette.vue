@@ -34,12 +34,13 @@
 //   be unscoped, and tests must clean teleported nodes between
 //   cases (see `__tests__/CommandPalette.test.ts` afterEach).
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { Command } from 'vue-command-palette';
 import { useCommandRegistry, type Command as CommandDef } from '@/stores/shell/commandRegistry';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { searchValueFor } from '@/lib/palette';
 import { emit as busEmit } from '@/lib/bus';
+import { useEventListener } from '@vueuse/core';
 
 const registry = useCommandRegistry();
 const layoutStore = useLayoutStore();
@@ -164,17 +165,9 @@ function onWindowClick(e: MouseEvent): void {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onHotkey, true);
-  window.addEventListener('keydown', onEscape, true);
-  window.addEventListener('click', onWindowClick, true);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onHotkey, true);
-  window.removeEventListener('keydown', onEscape, true);
-  window.removeEventListener('click', onWindowClick, true);
-});
+useEventListener(window, 'keydown', onHotkey, true);
+useEventListener(window, 'keydown', onEscape, true);
+useEventListener(window, 'click', onWindowClick, true);
 </script>
 
 <template>
