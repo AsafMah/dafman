@@ -265,7 +265,43 @@ Bun has APIs that could replace some of our code:
 | `Bun.password.hash()` | N/A — we don't do auth | N/A |
 | `Bun.Transpiler` | N/A — Vite handles renderer | N/A |
 
-### 5.4  Summary of recommended replacements
+### 5.4  PrimeVue — components we have but don't use
+
+We pay for PrimeVue (~80 components, directives, composables) but only use
+~15 of them: Button, InputText, Select, SelectButton, ToggleSwitch, Chip,
+TreeSelect, Dialog, Popover, SplitButton, RadioButton, Textarea, InputNumber,
+ColorPicker, AutoComplete, Tabs/TabList/Tab/TabPanels/TabPanel, Tag,
+Toast, ConfirmDialog, ConfirmPopup.
+
+Patterns we hand-roll that PrimeVue already provides:
+
+| What we hand-roll | PrimeVue component/directive | Where we reinvent |
+|---|---|---|
+| **Tooltips** (`title="..."` everywhere) | `v-tooltip` directive or `Tooltip` component — animated, themed, positioned | 90+ `title=` attrs across all components |
+| **Badges** (`.badge-pending`, `.open-badge`, `.activity-badge`) | `Badge` / `BadgeDirective` (`v-badge`) — overlay or standalone | SessionsManager, ActivityBar, ChatTab |
+| **Empty states** (`.empty-hint`, `.empty-message`, `.logviewer-empty`, etc.) | `Message` component with `severity="info"` or custom `EmptyMessage` | 30+ hand-styled empty-state `<div>`s |
+| **Loading spinners** (custom `@keyframes` per component) | `ProgressSpinner` or `Skeleton` — consistent, themed | 5 components with custom `@keyframes` |
+| **Copy to clipboard** (raw `navigator.clipboard.writeText`) | VueUse `useClipboard` (not PrimeVue, but ecosystem) | MessageActions, CodeEditor, TerminalPanel |
+| **Scrollable panels** (raw `overflow-y: auto`) | `ScrollPanel` — custom scrollbar, themed | 12+ components with manual overflow |
+| **Accordion sections** (manual v-if toggles) | `Accordion` / `AccordionTab` | SessionDetailsPanel (10+ collapsible sections) |
+| **Virtual scrolling** (none — renders all items) | `VirtualScroller` — built into DataTable/Listbox | ChatWindow (renders all transcript items) |
+| **Keyboard shortcuts** | VueUse `useMagicKeys` / `onKeyStroke` | 6 components with raw addEventListener('keydown') |
+
+### 5.5  Vue ecosystem — broader misses
+
+| Category | What we hand-roll | Ecosystem solution |
+|---|---|---|
+| **Clipboard** | Raw `navigator.clipboard.writeText` + try/catch in 5 files | VueUse `useClipboard` — reactive, fallback support |
+| **Event listeners** | Raw `addEventListener`/`removeEventListener` in 13 files | VueUse `useEventListener` — auto-cleanup on unmount |
+| **Resize/Intersection/Mutation observers** | Raw `new ResizeObserver()` in 4 files | VueUse `useResizeObserver`, `useIntersectionObserver`, `useMutationObserver` |
+| **Dark mode** | Custom `theme.ts` (17 lines) | VueUse `useDark` / `useColorMode` |
+| **Window focus** | Raw `document.hasFocus()` checks | VueUse `useWindowFocus` — reactive |
+| **Local/Session storage** | Manual `JSON.parse(localStorage.getItem(...))` with try/catch | VueUse `useLocalStorage` / `useSessionStorage` — reactive, type-safe |
+| **Debounce/Throttle** | 10+ manual `setTimeout` timers with cleanup | VueUse `useDebounceFn` / `useThrottleFn` / `watchDebounced` |
+| **Transition animations** | 5 custom `@keyframes` blocks | Vue `<Transition>` + PrimeVue animation classes |
+| **Form validation** | None (manual checks scattered) | **vee-validate** + zod/valibot schema — typed, reactive, per-field |
+
+### 5.6  Summary of recommended replacements
 
 **High-ROI replacements (Phase A — do first):**
 
