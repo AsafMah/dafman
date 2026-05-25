@@ -22,10 +22,13 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: ".",
   testMatch: /.*\.pwtest\.ts$/,
-  fullyParallel: false,
+  // Exclude the full E2E tier — those use their own config at full/playwright.config.ts
+  // and spawn bun subprocesses per test. This config is for the fast smoke tier only.
+  testIgnore: /full\//,
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: process.env.CI ? 1 : 2,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
 
   // Two web servers — prod (vite preview) on 4173, dev (vite dev) on 5174.
