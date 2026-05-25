@@ -1,6 +1,6 @@
 # Code Quality Audit
 
-> **Date:** 2026-05-25 (updated after ESLint warning reduction: 92 → 38)
+> **Date:** 2026-05-25 (updated: ESLint warnings 92 → 31, complexity reductions applied)
 > **Codebase:** ~33,000 lines of TypeScript + Vue across `src/` and `src-bun/`
 > **Tools used:** ESLint (strictTypeChecked), jscpd (copy-paste detection), manual review, IDE diagnostics
 
@@ -17,7 +17,7 @@ Files above **800 lines** are strong candidates for splitting.
 | 1,929 | `src-bun/app/chat/sessions.ts`                    | ↓304 — helpers to sessionHelpers |
 | 1,635 | `src/dev/Playground.vue`                          | Dev-only, not shipped            |
 | 1,396 | `src/components/chat/MessageComposer.vue`         | Lexical editor + toolbar         |
-| 1,319 | `src/components/chat/ChatWindow.vue`              | Message list + scroll            |
+| 1,319 | `src/components/chat/ChatWindow.vue`              | ↓110 — terminal extracted |
 | 1,239 | `src-bun/rpc.ts`                                  | IPC handler registry             |
 | 1,149 | `src/stores/chat/sessionsStore.ts`                | ↓317 — reducer extracted         |
 | 1,145 | `src/stores/shell/layoutStore.ts`                 | Dockview orchestration           |
@@ -38,7 +38,7 @@ Files above **800 lines** are strong candidates for splitting.
 |   545 | `src/components/shared/FilePicker.vue`            | File picker component            |
 |   540 | `src/components/shell/CommandPalette.vue`         | Command palette                  |
 |   528 | `src/components/library/LibraryMcpTab.vue`        | MCP library tab                  |
-|   522 | `src/lib/registerBuiltinCommands.ts`              | Builtin command registry         |
+|   522 | `src/lib/registerBuiltinCommands.ts`              | ↓62 — dynamicCommands extracted  |
 |   521 | `src/components/observability/LogViewer.vue`      | Log viewer                       |
 
 
@@ -49,18 +49,19 @@ Files above **800 lines** are strong candidates for splitting.
 
 **Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity + `@stylistic/eslint-plugin`
 
-**Current: 0 errors, 38 warnings** (down from 92 → fixed types, emits, catch callbacks, nullish config)
+**Current: 0 errors, 31 warnings** (down from 92 → dispatch tables, pick helpers, composable extraction, no-dynamic-delete fixes)
 
 ### 2.1  Issues by Rule
 
 | Count | Rule                                           | What It Means                                  |
 | ----: | ---------------------------------------------- | ---------------------------------------------- |
-|    21 | `complexity`                                   | Cyclomatic complexity above 15                 |
+|    14 | `complexity`                                   | Cyclomatic complexity above 15                 |
 |     6 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
-|     5 | `max-lines-per-function`                       | Function body > 200 lines                      |
-|     3 | `no-dynamic-delete`                            | `delete obj[key]` on dynamic key               |
+|     4 | `max-lines-per-function`                       | Function body > 200 lines                      |
 |     2 | `max-depth`                                    | Nesting > 4 levels deep                        |
 |     1 | `no-redundant-type-constituents`               | ESLint parser resolves AgentInfo as error type  |
+|     1 | `no-unnecessary-type-assertion`                | Assertion doesn't change the type              |
+|     3 | misc complexity variants                       | CC 16–18 in smaller functions                  |
 
 ### Rules disabled (with rationale)
 
@@ -97,27 +98,27 @@ Files above **800 lines** are strong candidates for splitting.
 
 ### 2.3  Complexity Violations (Cyclomatic > 15)
 
-| CC | File                                                     | Function              |
-| -: | -------------------------------------------------------- | --------------------- |
-| 60 | `src/stores/chat/sessionsStore.ts`                       | `applyToRecord`       |
-| 40 | `src/components/shared/JsonSchemaForm.vue`               | `validateNode`        |
-| 33 | `src/lib/chatEvents.ts`                                  | `processEvents`       |
-| 32 | `src-bun/app/chat/sessions.ts`                           | `normalizeTask`       |
-| 29 | `src/stores/shell/layoutStore.ts`                        | `openEdgePanel`       |
-| 28 | `src/components/permissions/ToolDetails.vue`             | (arrow fn)            |
-| 25 | `src-bun/app/chat/sessions.ts`                           | `summarizePermission` |
-| 24 | `src-bun/app/chat/sessions.ts`                           | `forward`             |
-| 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`        |
-| 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`           |
-| 22 | `src-bun/app/chat/pendingRequests.ts`                    | (handler)             |
-| 20 | `src-bun/app/config/settings.ts`                         | (handler)             |
-| 19 | `src/lib/chatEvents/messageHandlers.ts`                  | (handler)             |
-| 19 | `src/stores/chat/sessionsStore.ts`                       | (handler)             |
-| 18 | `src-bun/app/chat/sessions.ts`                           | (handler)             |
-| 18 | `src-bun/app/observability/stderrFilter.ts`              | (filter)              |
-| 18 | `src/stores/chat/sessionsStore.ts`                       | (handler)             |
-| 17 | `src/components/library/McpServerForm.vue`               | (form logic)          |
-| 17 | `src/lexical/plugins.ts`                                 | (plugin)              |
+| CC | File                                                     | Function                    | Status        |
+| -: | -------------------------------------------------------- | --------------------------- | ------------- |
+| 40 | `src/components/shared/JsonSchemaForm.vue`               | `validateNode`              | Open          |
+| 29 | `src/stores/shell/layoutStore.ts`                        | `openEdgePanel`             | Open          |
+| 28 | `src/components/permissions/ToolDetails.vue`             | (arrow fn)                  | Open          |
+| 24 | `src-bun/app/chat/sessions.ts`                           | `forward`                   | Open          |
+| 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`              | Open          |
+| 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`                 | Open          |
+| 22 | `src-bun/app/chat/sessions.ts`                           | `respond`                   | Open          |
+| 20 | `src-bun/app/config/settings.ts`                         | `coerceTerminal`            | Open          |
+| 19 | `src/lib/chatEvents/messageHandlers.ts`                  | `normalizeAttachments`      | Open          |
+| 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      | Open          |
+| 18 | `src-bun/app/chat/sessions.ts`                           | `createSession`/`cwdFor`    | Open          |
+| 17 | `src-bun/app/config/settings.ts`                         | `structuredFromConfig`      | Open          |
+| 17 | `src/lexical/plugins.ts`                                 | (plugin)                    | Open          |
+| 16 | `src/components/terminal/TerminalPanel.vue`              | `initXterm`                 | Open          |
+| 16 | `src-bun/app/chat/sessions.ts`                           | `resume`                    | Open          |
+| ~~60~~ | ~~`src/stores/chat/sessionsStore.ts`~~               | ~~`applyToRecord`~~         | ✅ Fixed (→ ~4) |
+| ~~33~~ | ~~`src/lib/chatEvents.ts`~~                          | ~~`processEvents`~~         | ✅ Fixed (→ ~10)|
+| ~~32~~ | ~~`src-bun/app/chat/sessionHelpers.ts`~~             | ~~`normalizeTask`~~         | ✅ Fixed (→ ~6) |
+| ~~25~~ | ~~`src-bun/app/chat/sessionHelpers.ts`~~             | ~~`summarizePermission`~~   | ✅ Fixed (→ ~4) |
 | 16 | `src-bun/app/chat/sessions.ts`                           | (handler)             |
 | 16 | `src/components/terminal/TerminalPanel.vue`              | (handler)             |
 

@@ -16,7 +16,11 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - Adopted **gts + Prettier** as the formatting baseline.
 - Added a follow-up spacing pass for more readable control-flow / return blocks.
 - Extracted `shellUtils`, fixed floating promises, and cleaned unused dependencies.
-- Resolved the remaining ESLint issues down to **0 errors**.
+- Resolved the remaining ESLint issues down to **0 errors, 31 warnings** (down from 92).
+- Extracted `useCommandTerminal` composable and `watchDynamicCommands` helper to reduce duplication.
+- Applied dispatch table pattern to sessionReducer, chatEvents, and sessionHelpers for complexity reduction.
+- Added `pickStr/pickNum/pickBool/pickEnum` typed field extraction helpers.
+- Fixed recurring dockview component casing regression with ESLint disable block.
 
 ### Fixed
 - **Session history not loading on restore.** SDK renamed `session.getMessages()`

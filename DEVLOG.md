@@ -10,6 +10,60 @@
 
 ---
 
+## 2026-05-25 — Complexity reduction + composable extraction (session 2)
+
+**Takeaway:** ESLint warnings dropped from 38 → 31 (92 at start of audit). Extracted
+shared patterns, applied dispatch tables, and fixed a recurring dockview component
+casing regression.
+
+### Commits pushed
+
+- `f4cfcd3` — extract `useCommandTerminal` composable from ChatWindow.vue (−110 lines)
+  and `watchDynamicCommands` helper from registerBuiltinCommands.ts (−62 lines)
+- `db2e2d8` — fix prettier CRLF → LF formatting (327 errors → 0)
+- `2d0425c` — dispatch table refactor for `applyToRecord` (CC 60→~4) and
+  `processEvents` (CC 33→~10) in sessionReducer.ts and chatEvents.ts
+- `876c376` — `pickStr/pickNum/pickBool/pickEnum` helpers for `normalizeTask` (CC 32→~6)
+  and `summarizePermission` (CC 25→~4)
+- `8ddbb09` — fix `no-dynamic-delete` warnings (3 → 0) using destructuring rest
+- `a00bd47` — suppress `vue/component-definition-name-casing` for dockview registrations
+
+### dockview component casing — third regression
+
+The `watermark` component registration regressed AGAIN to PascalCase. This is a
+recurring problem: ESLint's `vue/component-definition-name-casing` rule auto-fixes
+camelCase back to PascalCase, but dockview-vue's `findComponent()` does exact
+case-sensitive lookup on `app._context.components`. The registrations in `main.ts`
+MUST be camelCase.
+
+**Fix:** Added `/* eslint-disable vue/component-definition-name-casing */` block
+around all component registrations to prevent ESLint from ever changing the casing.
+
+### Dispatch table pattern
+
+Replaced large if/else chains dispatching on event type strings with
+`Record<string, Handler>` objects:
+- `applyToRecord` in sessionReducer.ts: one handler per SDK event type
+- `processEvents` in chatEvents.ts: extracted subagent routing helpers
+- `summarizePermission` in sessionHelpers.ts: permission type → label
+
+### Pick helpers for untyped SDK data
+
+Created `pickStr/pickNum/pickBool/pickEnum` in sessionHelpers.ts for batch-assigning
+typed fields from `Record<string, unknown>`. Dramatically reduces CC by eliminating
+per-field `if (typeof ...)` branches.
+
+### Remaining warnings (31)
+
+- 14 complexity (CC > 15) — openEdgePanel CC=29, validateNode CC=40 are biggest
+- 4 max-lines-per-function — Pinia store bodies (false positive from arrow fn)
+- 6 no-non-null-assertion — xterm addon closures in TerminalPanel
+- 2 max-depth — deeply nested conditionals
+- 1 no-redundant-type-constituents, 1 no-unnecessary-type-assertion
+- 3 misc
+
+---
+
 ## 2026-05-25 — Code-quality audit + domain restructure
 
 **Takeaway:** Landed the code-quality cleanup pass and the large directory restructure without changing runtime behavior: renderer stores/components and bun backend modules are now grouped by domain, shared helpers were extracted, and renderer imports now use `@/` aliases consistently.
