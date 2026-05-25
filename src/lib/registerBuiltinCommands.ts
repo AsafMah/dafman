@@ -19,10 +19,10 @@
 // in `commandRegistry.visibleCommands` updates reactively when the
 // active session changes / models load / MRU changes.
 
-import { watch } from 'vue';
 import type { ConfirmationOptions } from 'primevue/confirmationoptions';
 import { invokeCommand } from '@/ipc/invoke';
 import { useCommandRegistry, type Command } from '@/stores/shell/commandRegistry';
+import { watchDynamicCommands } from '@/lib/dynamicCommands';
 import { useClientStore } from '@/stores/app/clientStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
@@ -305,144 +305,82 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   }
 
   // ---------- Dynamic: New Session in <workspace> (MRU) ----------
-  const workspaceCommandIds = new Set<string>();
-
-  watch(
-    () => settingsStore.settings.workspaces.recent,
-    (recent) => {
-      const nextIds = new Set<string>();
-
-      for (const path of recent) {
-        const id = `session.new.workspace.${path}`;
-
-        nextIds.add(id);
-        registry.register({
-          id,
-          label: `New Session in ${shortPath(path)}`,
-          hint: path,
-          group: 'Sessions',
-          icon: 'pi pi-folder-plus',
-          keywords: ['workspace', 'folder', path],
-          run: async () => {
-            const record = await sessionsStore.createSession({
-              workingDirectory: path,
-            });
-
-            if (record) {
-              void settingsStore.recordWorkspaceUse(path);
-              layoutStore.addPanel(record.id);
-            }
-          },
-          when: () => clientStore.ready,
+  watchDynamicCommands({
+    source: () => settingsStore.settings.workspaces.recent,
+    toCommand: (path) => ({
+      id: `session.new.workspace.${path}`,
+      label: `New Session in ${shortPath(path)}`,
+      hint: path,
+      group: 'Sessions',
+      icon: 'pi pi-folder-plus',
+      keywords: ['workspace', 'folder', path],
+      when: () => clientStore.ready,
+      run: async () => {
+        const record = await sessionsStore.createSession({
+          workingDirectory: path,
         });
-      }
 
-      // Sweep entries that fell off the MRU.
-      for (const id of workspaceCommandIds) {
-        if (!nextIds.has(id)) registry.unregister(id);
-      }
-
-      workspaceCommandIds.clear();
-
-      for (const id of nextIds) workspaceCommandIds.add(id);
-    },
-    { immediate: true, deep: true },
-  );
+        if (record) {
+          void settingsStore.recordWorkspaceUse(path);
+          layoutStore.addPanel(record.id);
+        }
+      },
+    }),
+    register: (cmd) => registry.register(cmd),
+    unregister: (id) => registry.unregister(id),
+  });
 
   // ---------- Dynamic: Switch Model: <model> ----------
-  const modelCommandIds = new Set<string>();
+  watchDynamicCommands({
+    source: () => modelsStore.models,
+    toCommand: (m) => ({
+      id: `model.switch.${m.id}`,
+      label: `Switch Model: ${m.name}`,
+      hint: m.id,
+      group: 'Active Session',
+      icon: 'pi pi-server',
+      keywords: ['model', m.id, m.name],
+      when: () => clientStore.ready && layoutStore.activeSessionId !== null,
+      run: async () => {
+        const sid = layoutStore.activeSessionId;
 
-  watch(
-    () => modelsStore.models,
-    (models) => {
-      const nextIds = new Set<string>();
+        if (!sid) return;
 
-      for (const m of models) {
-        const id = `model.switch.${m.id}`;
+        const record = sessionsStore.getSession(sid);
 
-        nextIds.add(id);
-        registry.register({
-          id,
-          label: `Switch Model: ${m.name}`,
-          hint: m.id,
-          group: 'Active Session',
-          icon: 'pi pi-server',
-          keywords: ['model', m.id, m.name],
-          when: () => clientStore.ready && layoutStore.activeSessionId !== null,
-          run: async () => {
-            const sid = layoutStore.activeSessionId;
-
-            if (!sid) return;
-
-            // Preserve the current reasoning effort when switching
-            // models (sessionsStore overwrites it otherwise — `null`
-            // means "use the SDK default", which would silently drop
-            // a "high" preference the user set on the previous model).
-            const record = sessionsStore.getSession(sid);
-
-            await sessionsStore.setSessionModel(sid, m.id, record?.reasoningEffort ?? null);
-          },
-        });
-      }
-
-      for (const id of modelCommandIds) {
-        if (!nextIds.has(id)) registry.unregister(id);
-      }
-
-      modelCommandIds.clear();
-
-      for (const id of nextIds) modelCommandIds.add(id);
-    },
-    { immediate: true, deep: true },
-  );
+        await sessionsStore.setSessionModel(sid, m.id, record?.reasoningEffort ?? null);
+      },
+    }),
+    register: (cmd) => registry.register(cmd),
+    unregister: (id) => registry.unregister(id),
+  });
 
   // ---------- Dynamic: Switch to Session: <title> ----------
-  const sessionCommandIds = new Set<string>();
+  watchDynamicCommands({
+    source: () =>
+      sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
+    toCommand: (r) => {
+      const label = r.title ?? `Session ${r.id.slice(0, 8)}…`;
 
-  watch(
-    () => sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
-    (records) => {
-      const nextIds = new Set<string>();
+      return {
+        id: `session.switch.${r.id}`,
+        label: `Switch to: ${label}`,
+        hint: r.id.slice(0, 8),
+        group: 'Sessions',
+        icon: 'pi pi-comments',
+        accent: r.accent,
+        keywords: [r.id, r.id.slice(0, 8), label],
+        when: () => Boolean(layoutStore.api?.getPanel(r.id)),
+        run: () => {
+          const panel = layoutStore.api?.getPanel(r.id);
 
-      for (const r of records) {
-        const id = `session.switch.${r.id}`;
-
-        nextIds.add(id);
-        const label = r.title ?? `Session ${r.id.slice(0, 8)}…`;
-
-        registry.register({
-          id,
-          label: `Switch to: ${label}`,
-          hint: r.id.slice(0, 8),
-          group: 'Sessions',
-          icon: 'pi pi-comments',
-          accent: r.accent,
-          // Include both the short and full id in the searchable
-          // keywords so users can paste a session id from
-          // logs/URLs and still find it.
-          keywords: [r.id, r.id.slice(0, 8), label],
-          // Disabled when the panel isn't currently in the dock —
-          // we'd need to restore-then-switch, which the Sessions
-          // Manager already does better.
-          when: () => Boolean(layoutStore.api?.getPanel(r.id)),
-          run: () => {
-            const panel = layoutStore.api?.getPanel(r.id);
-
-            panel?.api.setActive();
-          },
-        });
-      }
-
-      for (const id of sessionCommandIds) {
-        if (!nextIds.has(id)) registry.unregister(id);
-      }
-
-      sessionCommandIds.clear();
-
-      for (const id of nextIds) sessionCommandIds.add(id);
+          panel?.api.setActive();
+        },
+      };
     },
-    { immediate: true, deep: true },
-  );
+    register: (cmd) => registry.register(cmd),
+    unregister: (id) => registry.unregister(id),
+  });
 
   // ---------- Static, but session-gated: Run Mode ----------
   for (const { value: mode, label, icon } of MODE_OPTIONS) {

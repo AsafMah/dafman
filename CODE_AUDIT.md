@@ -217,7 +217,7 @@ Found by manual review and IDE diagnostics.
 ### 5.2  Cross-Boundary Duplication
 
 - **Settings type shape** defined twice: `src/stores/app/settingsStore.ts` + `src-bun/app/config/settings.ts` — 36 lines identical
-- **ChatTab / SidebarTab** — 36 lines / 346 tokens of identical panel lifecycle logic → needs `usePanelLifecycle` composable
+- **ChatTab / SidebarTab** — ~~36 lines / 346 tokens of identical panel lifecycle logic~~ → extracted to `usePanelLifecycle` composable ✅
 
 
 ---
@@ -270,6 +270,7 @@ All remaining warnings require refactoring, not quick fixes:
 - [x] Fix event listener leak in `App.vue` (HMR `dafman:focus-session`)
 - [x] Add `.catch()` to unguarded IPC calls (TerminalPanel `openUrl`)
 - [x] Clear `flushTimer` on terminal kill/exit
+- [x] Fix `onBeforeUnmount` in async `onMounted` (moved to setup scope)
 - [ ] Type IPC bridge payloads — eliminate `as unknown as` in wsBridge
 - [ ] Add runtime validation for WS bridge messages
 - [ ] Deduplicate `addConfig`/`updateConfig` in mcpRegistry

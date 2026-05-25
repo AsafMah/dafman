@@ -30,13 +30,11 @@ import { useSessionsStore, type DefaultSendMode } from '@/stores/chat/sessionsSt
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
-import { useCommandResultsStore } from '@/stores/chat/commandResultsStore';
-import { useTerminalStore } from '@/stores/terminal/terminalStore';
 import { useToastStore } from '@/stores/app/toastStore';
+import { useCommandTerminal } from '@/composables/useCommandTerminal';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import type { ComposerSubmitPayload } from '@/lexical/plugins';
 import { styleFor } from '@/lib/notificationStyles';
-import { cleanTerminalCommandOutput } from '@/lib/ansi';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 // Per-session header controls (model, effort, options gear, rename,
@@ -73,8 +71,6 @@ const sessionsStore = useSessionsStore();
 const sessionsListStore = useSessionsListStore();
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
-const commandResultsStore = useCommandResultsStore();
-const terminalStore = useTerminalStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
 
@@ -89,11 +85,20 @@ const composerRef = ref<{
   exitCommandMode?: () => void;
   enterCommandMode?: () => void;
 } | null>(null);
-const commandTerminalId = ref<string>('');
-const autoAttachedCommandIds = new Set<string>();
-const capturedTerminalCommandIds = new Set<string>();
-const commandModeOpenedAt = ref<number>(0);
-const commandResultOrder = ref<Record<string, number>>({});
+
+const sessionIdRef = computed(() => props.sessionId);
+const idCounter: IdCounter = { next: 1 };
+
+const {
+  commandTerminalId,
+  commandResults,
+  commandResultOrder,
+  onRequestCommandTerminal,
+  openFullSessionTerminal,
+  addCommandResultAttachment,
+  cancelCommandResult,
+  initCommandResults,
+} = useCommandTerminal(sessionIdRef, idCounter, { composerRef });
 
 /// External "focus my composer" requests arrive as a window event
 /// from the Sessions sidebar (clicking an already-open session row).
@@ -135,16 +140,7 @@ onMounted(() => {
   window.addEventListener('dafman:open-command-terminal', onExternalCommandTerminalRequest);
   window.addEventListener('dafman:close-command-terminal', onExternalCloseCommandTerminalRequest);
   window.addEventListener('dafman:scroll-to-bottom', onExternalScrollToBottom);
-  void commandResultsStore
-    .refresh(props.sessionId)
-    .then(() => {
-      for (const record of commandResultsStore.recordsBySession[props.sessionId] ?? []) {
-        autoAttachedCommandIds.add(record.id);
-      }
-    })
-    .catch(() => {
-      /* non-critical persisted command history */
-    });
+  initCommandResults();
 });
 
 onBeforeUnmount(() => {
@@ -196,7 +192,6 @@ onBeforeUnmount(() => {
 /// Fallback "thinking" flag used until we observe a turn boundary; after
 /// the first `assistant.turn_start` we trust `ambient.turnActive` exclusively.
 const isSendingFallback = ref(false);
-const idCounter: IdCounter = { next: 1 };
 /// Absolute position in the session's event stream that we've already
 /// reduced into `items`. Computed as `droppedEventCount + events.length`
 /// AFTER the reducer pass, so the next flush picks up only events
@@ -233,7 +228,6 @@ const reasoningVisibility = computed<ReasoningVisibility>(() =>
 );
 
 const accentColor = computed(() => props.accent);
-const commandResults = computed(() => commandResultsStore.recordsBySession[props.sessionId] ?? []);
 const timelineItems = computed(() => {
   const out: Array<ChatItem | { kind: 'commandResult'; id: number; record: CommandResultRecord }> =
     [...items.value];
@@ -419,110 +413,6 @@ async function sendMessage(
 function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
-
-async function ensureCommandTerminal(): Promise<string | null> {
-  if (commandTerminalId.value) return commandTerminalId.value;
-
-  try {
-    const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
-
-    commandTerminalId.value = terminal.id;
-    layoutStore.closePanel(`terminal-${terminal.id}`);
-
-    return terminal.id;
-  } catch (err) {
-    const message = toErrorMessage(err);
-
-    toasts.error('Failed to open session terminal', message);
-
-    return null;
-  }
-}
-
-async function onRequestCommandTerminal(): Promise<void> {
-  commandModeOpenedAt.value = Date.now();
-  await ensureCommandTerminal();
-  await nextTick();
-
-  if (commandTerminalId.value) {
-    window.dispatchEvent(
-      new CustomEvent('dafman:focus-terminal', {
-        detail: { terminalId: commandTerminalId.value },
-      }),
-    );
-  }
-}
-
-async function openFullSessionTerminal(): Promise<void> {
-  const terminalId = await ensureCommandTerminal();
-
-  if (!terminalId) return;
-
-  composerRef.value?.exitCommandMode?.();
-  const terminal = terminalStore.terminals.find((t) => t.id === terminalId);
-
-  layoutStore.addTerminalPanel(terminalId, terminal?.title ?? 'Session Shell');
-}
-
-function addCommandResultAttachment(record: CommandResultRecord): void {
-  composerRef.value?.addAttachment?.({
-    type: 'commandResult',
-    result: record,
-    displayName: `command-result-${record.id.slice(0, 8)}.md`,
-  });
-}
-
-async function cancelCommandResult(record: CommandResultRecord): Promise<void> {
-  await commandResultsStore.cancel(props.sessionId, record.id);
-}
-
-watch(commandResults, (records) => {
-  for (const record of records) {
-    if (commandResultOrder.value[record.id] === undefined) {
-      commandResultOrder.value = {
-        ...commandResultOrder.value,
-        [record.id]: idCounter.next++,
-      };
-    }
-
-    if (record.status === 'running' || autoAttachedCommandIds.has(record.id)) continue;
-
-    autoAttachedCommandIds.add(record.id);
-    addCommandResultAttachment(record);
-  }
-});
-
-watch(
-  () => (commandTerminalId.value ? (terminalStore.commands[commandTerminalId.value] ?? []) : []),
-  (commands) => {
-    for (const command of commands) {
-      if (!command.command || capturedTerminalCommandIds.has(command.id)) continue;
-
-      if (new Date(command.startedAt).getTime() < commandModeOpenedAt.value) continue;
-
-      capturedTerminalCommandIds.add(command.id);
-      const now = new Date().toISOString();
-      const output = cleanTerminalCommandOutput(command.output ?? '');
-
-      commandResultsStore.addLocal({
-        id: command.id,
-        sessionId: props.sessionId,
-        command: command.command,
-        cwd: command.cwd ?? '',
-        shell: 'session terminal',
-        status: command.exitCode === 0 ? 'completed' : 'failed',
-        stdout: output,
-        stderr: '',
-        truncated: false,
-        createdAt: command.startedAt,
-        completedAt: command.endedAt ?? now,
-        exitCode: command.exitCode ?? null,
-      });
-      composerRef.value?.exitCommandMode?.();
-    }
-  },
-  { deep: true },
-);
 
 /// Inline edit mode for user messages: when set, the matching user
 /// bubble is replaced by a MessageEditor in place. Reset on save,
