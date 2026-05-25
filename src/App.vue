@@ -19,6 +19,7 @@ import { useConfirm } from 'primevue/useconfirm';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { resolveIsDark } from '@/lib/theme';
 import { registerBuiltinCommands } from '@/lib/registerBuiltinCommands';
+import { on as busOn } from '@/lib/bus';
 import {
   extractChatPanelIds,
   enforcePersistedEdgeMinimums,
@@ -89,22 +90,23 @@ function applyThemeClass(isDark: boolean) {
   document.documentElement.classList.toggle('app-dark', isDark);
 }
 
-// Focus-session handler for OS notification clicks. Declared at
-// script-setup scope so onBeforeUnmount can capture the instance
-// (it's lost after awaits inside onMounted).
-const handleFocusSession = (e: Event) => {
-  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+// Focus-session handler for OS notification clicks. Subscribed via
+// the typed app bus inside onMounted; cleanup is stored at script
+// scope so onBeforeUnmount can call it.
+let offFocusSession: (() => void) | null = null;
 
-  if (!detail?.sessionId) return;
+function handleFocusSession({ sessionId }: { sessionId: string }): void {
+  if (!sessionId) return;
 
   const dock = layoutStore.api;
-  const panel = dock?.getPanel(detail.sessionId);
+  const panel = dock?.getPanel(sessionId);
 
   panel?.api.setActive();
-};
+}
 
 onBeforeUnmount(() => {
-  window.removeEventListener('dafman:focus-session', handleFocusSession);
+  offFocusSession?.();
+  offFocusSession = null;
 });
 
 onMounted(async () => {
@@ -239,10 +241,10 @@ onMounted(async () => {
   window.clearTimeout(splashWatchdog);
 
   // Click-on-OS-notification handler. The `notificationsStore`
-  // dispatches `dafman:focus-session` from a Notification's onclick;
-  // we activate the matching panel here. Window focus is already
-  // attempted on the store side.
-  window.addEventListener('dafman:focus-session', handleFocusSession);
+  // emits `focus-session` on the app bus from a Notification's
+  // onclick; we activate the matching panel here. Window focus is
+  // already attempted on the store side.
+  offFocusSession = busOn('focus-session', handleFocusSession);
 
   // NOTE: cleanup is registered at top-level <script setup> scope
   // (not here) because onBeforeUnmount loses the component instance

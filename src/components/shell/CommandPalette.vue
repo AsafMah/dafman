@@ -39,6 +39,7 @@ import { Command } from 'vue-command-palette';
 import { useCommandRegistry, type Command as CommandDef } from '@/stores/shell/commandRegistry';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { searchValueFor } from '@/lib/palette';
+import { emit as busEmit } from '@/lib/bus';
 
 const registry = useCommandRegistry();
 const layoutStore = useLayoutStore();
@@ -122,11 +123,7 @@ function closePalette(): void {
     if (prevFocus && document.contains(prevFocus)) {
       prevFocus.focus();
     } else if (layoutStore.activeSessionId) {
-      window.dispatchEvent(
-        new CustomEvent('dafman:focus-composer', {
-          detail: { sessionId: layoutStore.activeSessionId },
-        }),
-      );
+      busEmit('focus-composer', { sessionId: layoutStore.activeSessionId });
     }
 
     prevFocus = null;

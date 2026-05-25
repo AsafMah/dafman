@@ -20,6 +20,7 @@ import LibraryToolsTab from '@/components/library/LibraryToolsTab.vue';
 import LibrarySkillsTab from '@/components/library/LibrarySkillsTab.vue';
 import LibraryAgentsTab from '@/components/library/LibraryAgentsTab.vue';
 import LibraryInstructionsTab from '@/components/library/LibraryInstructionsTab.vue';
+import { on as busOn } from '@/lib/bus';
 
 // Persist the last-active tab across panel re-mounts so toggling the
 // activity bar doesn't lose the user's place.
@@ -49,22 +50,21 @@ function onTabChange(value: string | number) {
   }
 }
 
-// Cross-component activation: the right-rail Skills section dispatches
-// `dafman:library-activate-tab` so a "Manage globally" click can both
+// Cross-component activation: the right-rail Skills section emits
+// `library-activate-tab` so a "Manage globally" click can both
 // open the Library panel AND focus the right tab even when Library is
 // already mounted (a localStorage write alone would only take effect
 // on next reload).
-function onActivateRequest(e: Event) {
-  const detail = (e as CustomEvent<{ tab?: string }>).detail;
-
-  if (detail?.tab) onTabChange(detail.tab);
-}
+let offActivate: (() => void) | null = null;
 
 onMounted(() => {
-  window.addEventListener('dafman:library-activate-tab', onActivateRequest);
+  offActivate = busOn('library-activate-tab', ({ tab }) => {
+    if (tab) onTabChange(tab);
+  });
 });
 onBeforeUnmount(() => {
-  window.removeEventListener('dafman:library-activate-tab', onActivateRequest);
+  offActivate?.();
+  offActivate = null;
 });
 </script>
 

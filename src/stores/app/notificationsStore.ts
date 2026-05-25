@@ -14,13 +14,14 @@
 //      notify about something the user can already see.
 //
 // Click handler: focuses the app window via `window.focus()` and
-// dispatches a `dafman:focus-session` CustomEvent that App.vue can
-// listen for to activate the relevant panel. The receiver is wired
+// emits a `focus-session` event on the app bus that App.vue listens
+// for to activate the relevant panel. The receiver is wired
 // up at component mount.
 
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '@/stores/app/settingsStore';
+import { emit as busEmit } from '@/lib/bus';
 
 export type NotificationKind = 'turnEnd' | 'waitingForInput';
 
@@ -116,11 +117,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
         }
 
         if (options.sessionId) {
-          window.dispatchEvent(
-            new CustomEvent('dafman:focus-session', {
-              detail: { sessionId: options.sessionId },
-            }),
-          );
+          busEmit('focus-session', { sessionId: options.sessionId });
         }
 
         n.close();

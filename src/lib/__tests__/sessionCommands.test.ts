@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { runLocalSlashCommand, SESSION_COMMANDS } from '@/lib/sessionCommands';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
+import { on as busOn } from '@/lib/bus';
 
 describe('sessionCommands', () => {
   beforeEach(() => {
@@ -199,13 +200,12 @@ describe('sessionCommands', () => {
 
     const model = SESSION_COMMANDS.find((cmd) => cmd.slash === '/model');
     expect(model?.icon).toBe('pi-microchip-ai');
-    const events: Array<{ sessionId?: string }> = [];
-    const listener = (event: Event) => {
-      events.push((event as CustomEvent<{ sessionId?: string }>).detail);
-    };
-    window.addEventListener('dafman:open-model-selector', listener);
+    const events: Array<{ sessionId: string }> = [];
+    const off = busOn('open-model-selector', (payload) => {
+      events.push(payload);
+    });
     const handled = await runLocalSlashCommand('s1', '/model');
-    window.removeEventListener('dafman:open-model-selector', listener);
+    off();
 
     expect(handled).toBe(true);
     expect(events).toEqual([{ sessionId: 's1' }]);

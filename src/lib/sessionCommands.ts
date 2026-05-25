@@ -15,6 +15,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { invokeCommand } from '@/ipc/invoke';
+import { emit as busEmit } from '@/lib/bus';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 export interface SessionCommand {
@@ -77,11 +78,7 @@ function openLibraryTab(tab = 'mcp'): void {
   }
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent('dafman:library-activate-tab', {
-        detail: { tab: normalized },
-      }),
-    );
+    busEmit('library-activate-tab', { tab: normalized });
   }
 
   useLayoutStore().openEdgePanel('left', {
@@ -159,9 +156,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['llm', 'reasoning'],
     run: (sessionId) => {
       useLayoutStore().openSessionDetailsPanel();
-      window.dispatchEvent(
-        new CustomEvent('dafman:open-model-selector', { detail: { sessionId } }),
-      );
+      busEmit('open-model-selector', { sessionId });
     },
   },
   {
@@ -216,9 +211,9 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     group: 'Session',
     keywords: ['title', 'name'],
     run: (sessionId) => {
-      // Surface the rename popover via a window event that
+      // Surface the rename popover via the typed app bus that
       // SessionHeaderControls listens for.
-      window.dispatchEvent(new CustomEvent('dafman:rename-session', { detail: { sessionId } }));
+      busEmit('rename-session', { sessionId });
     },
   },
   {

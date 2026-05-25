@@ -16,6 +16,7 @@ import ConfirmPopup from 'primevue/confirmpopup';
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { indicatorStyle, type NotificationStyle } from '@/lib/notificationStyles';
+import { emit as busEmit } from '@/lib/bus';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useClientStore } from '@/stores/app/clientStore';
 import { useLayoutStore, composePanelTitle } from '@/stores/shell/layoutStore';
@@ -353,16 +354,8 @@ async function onResume(session: SessionMetadataSummary) {
       layoutStore.activatePanel(session.sessionId);
     }
 
-    window.dispatchEvent(
-      new CustomEvent('dafman:scroll-to-bottom', {
-        detail: { sessionId: session.sessionId },
-      }),
-    );
-    window.dispatchEvent(
-      new CustomEvent('dafman:focus-composer', {
-        detail: { sessionId: session.sessionId },
-      }),
-    );
+    busEmit('scroll-to-bottom', { sessionId: session.sessionId });
+    busEmit('focus-composer', { sessionId: session.sessionId });
 
     return;
   }

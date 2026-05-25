@@ -12,6 +12,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useTerminalStore } from '@/stores/terminal/terminalStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { cleanTerminalCommandOutput } from '@/lib/ansi';
+import { emit as busEmit } from '@/lib/bus';
 import { toErrorMessage } from '@/lib/errorMessage';
 import type { CommandResultRecord, SendMessageAttachment } from '@/ipc/types';
 
@@ -90,11 +91,7 @@ export function useCommandTerminal(
     await nextTick();
 
     if (commandTerminalId.value) {
-      window.dispatchEvent(
-        new CustomEvent('dafman:focus-terminal', {
-          detail: { terminalId: commandTerminalId.value },
-        }),
-      );
+      busEmit('focus-terminal', { terminalId: commandTerminalId.value });
     }
   }
 

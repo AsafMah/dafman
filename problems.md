@@ -7,6 +7,7 @@
 
 - The word "attachment" triggers an issue with the sql, we need to reword "see attachment"
 - Sessions still don't get their title sometimes when they are resumed
+- The "modes" button no longer shrinks to a select - it's just gone.
 
 ## Solved (2026-05-22 sweep)
 

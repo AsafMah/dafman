@@ -19,6 +19,7 @@ import { useTerminalStore } from '@/stores/terminal/terminalStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { invokeCommand } from '@/ipc/invoke';
+import { emit as busEmit, on as busOn } from '@/lib/bus';
 import { parseTerminalOsc, type TerminalShellEvent } from '@/lib/terminalShellIntegration';
 
 type UserParams = { terminalId?: string; compact?: boolean };
@@ -262,11 +263,7 @@ function focusSession(): void {
   layoutStore.addPanel(sessionId);
   layoutStore.activatePanel(sessionId);
   setTimeout(() => {
-    window.dispatchEvent(
-      new CustomEvent('dafman:focus-composer', {
-        detail: { sessionId },
-      }),
-    );
+    busEmit('focus-composer', { sessionId });
   }, 0);
 }
 
@@ -434,7 +431,10 @@ onMounted(async () => {
   }
 
   initXterm();
-  window.addEventListener('dafman:focus-terminal', onFocusTerminal);
+  offFocusTerminal = busOn('focus-terminal', ({ terminalId: id }) => {
+    if (id !== terminalId.value) return;
+    term?.focus();
+  });
 });
 
 // When ownership is released by another renderer, initialize xterm
@@ -477,7 +477,8 @@ watch(searchQuery, () => scheduleSearch(true), { flush: 'post' });
 
 onBeforeUnmount(() => {
   terminalStore.releaseRenderer(terminalId.value, rendererRole.value);
-  window.removeEventListener('dafman:focus-terminal', onFocusTerminal);
+  offFocusTerminal?.();
+  offFocusTerminal = null;
   resizeObserver?.disconnect();
   resizeObserver = null;
 
@@ -499,13 +500,7 @@ onBeforeUnmount(() => {
   fit = null;
 });
 
-function onFocusTerminal(event: Event): void {
-  const detail = (event as CustomEvent<{ terminalId?: string }>).detail;
-
-  if (detail?.terminalId !== terminalId.value) return;
-
-  term?.focus();
-}
+let offFocusTerminal: (() => void) | null = null;
 </script>
 
 <template>

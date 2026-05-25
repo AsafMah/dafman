@@ -4,6 +4,7 @@ import { ref, type ComputedRef } from 'vue';
 import { invokeCommand } from '@/ipc/invoke';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { emit as busEmit } from '@/lib/bus';
 
 export type SessionSkill = {
   name: string;
@@ -60,9 +61,7 @@ export function useSessionSkills(sessionId: ComputedRef<string>) {
       /* private mode — ignore */
     }
 
-    window.dispatchEvent(
-      new CustomEvent('dafman:library-activate-tab', { detail: { tab: 'skills' } }),
-    );
+    busEmit('library-activate-tab', { tab: 'skills' });
     layoutStore.openEdgePanel('left', {
       id: 'library',
       component: 'library',

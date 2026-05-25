@@ -5,6 +5,7 @@ import type { JobRecord } from '@/ipc/types';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
+import { emit as busEmit } from '@/lib/bus';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 type LocalAutopilotMeta = {
@@ -145,11 +146,7 @@ export const useJobsStore = defineStore('jobs', () => {
     layout.activatePanel(sessionId);
     // Scroll to the bottom so the user sees the active work
     setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent('dafman:scroll-to-bottom', {
-          detail: { sessionId },
-        }),
-      );
+      busEmit('scroll-to-bottom', { sessionId });
     }, 100);
   }
 

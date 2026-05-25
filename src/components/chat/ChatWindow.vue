@@ -36,6 +36,7 @@ import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import type { ComposerSubmitPayload } from '@/lexical/plugins';
 import { styleFor } from '@/lib/notificationStyles';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { on as busOn } from '@/lib/bus';
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -100,57 +101,35 @@ const {
   initCommandResults,
 } = useCommandTerminal(sessionIdRef, idCounter, { composerRef });
 
-/// External "focus my composer" requests arrive as a window event
-/// from the Sessions sidebar (clicking an already-open session row).
-/// Filter by sessionId so the event only acts on the matching tile.
-function onExternalFocusRequest(e: Event) {
-  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
-
-  if (!detail || detail.sessionId !== props.sessionId) return;
-
-  void scrollToBottom().then(() => composerRef.value?.focus());
-}
-
-function onExternalCommandTerminalRequest(e: Event) {
-  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
-
-  if (!detail || detail.sessionId !== props.sessionId) return;
-
-  composerRef.value?.enterCommandMode?.();
-}
-
-function onExternalCloseCommandTerminalRequest(e: Event) {
-  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
-
-  if (!detail || detail.sessionId !== props.sessionId) return;
-
-  composerRef.value?.exitCommandMode?.();
-}
-
-function onExternalScrollToBottom(e: Event) {
-  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
-
-  if (!detail || detail.sessionId !== props.sessionId) return;
-
-  void scrollToBottom();
-}
+/// External "focus my composer" requests arrive from the Sessions
+/// sidebar (clicking an already-open session row). Filter by sessionId
+/// so the event only acts on the matching tile.
+const busSubscriptions: Array<() => void> = [];
 
 onMounted(() => {
-  window.addEventListener('dafman:focus-composer', onExternalFocusRequest);
-  window.addEventListener('dafman:open-command-terminal', onExternalCommandTerminalRequest);
-  window.addEventListener('dafman:close-command-terminal', onExternalCloseCommandTerminalRequest);
-  window.addEventListener('dafman:scroll-to-bottom', onExternalScrollToBottom);
+  busSubscriptions.push(
+    busOn('focus-composer', ({ sessionId }) => {
+      if (sessionId !== props.sessionId) return;
+      void scrollToBottom().then(() => composerRef.value?.focus());
+    }),
+    busOn('open-command-terminal', ({ sessionId }) => {
+      if (sessionId !== props.sessionId) return;
+      composerRef.value?.enterCommandMode?.();
+    }),
+    busOn('close-command-terminal', ({ sessionId }) => {
+      if (sessionId !== props.sessionId) return;
+      composerRef.value?.exitCommandMode?.();
+    }),
+    busOn('scroll-to-bottom', ({ sessionId }) => {
+      if (sessionId !== props.sessionId) return;
+      void scrollToBottom();
+    }),
+  );
   initCommandResults();
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('dafman:focus-composer', onExternalFocusRequest);
-  window.removeEventListener('dafman:open-command-terminal', onExternalCommandTerminalRequest);
-  window.removeEventListener(
-    'dafman:close-command-terminal',
-    onExternalCloseCommandTerminalRequest,
-  );
-  window.removeEventListener('dafman:scroll-to-bottom', onExternalScrollToBottom);
+  for (const off of busSubscriptions.splice(0)) off();
 });
 /// Live `--tile-height` so the composer can cap itself at a percentage of
 /// the chat tile's height even though the tile lives inside a flex/grid

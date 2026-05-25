@@ -26,6 +26,7 @@ import { useToastStore } from '@/stores/app/toastStore';
 import { buildModelTree } from '@/lib/modelTree';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
+import { emit as busEmit, on as busOn } from '@/lib/bus';
 
 const props = withDefaults(
   defineProps<{ sessionId: string; area?: 'all' | 'composer-left' | 'composer-right' }>(),
@@ -40,28 +41,25 @@ const { models } = storeToRefs(modelsStore);
 const settings = storeToRefs(useSettingsStore()).settings;
 const modelTreeRef = ref<InstanceType<typeof TreeSelect> | null>(null);
 
+let offOpenModelSelector: (() => void) | null = null;
+
 onMounted(() => {
   modelsStore.load().catch(() => {
     /* toast already shown by the store */
   });
-  window.addEventListener('dafman:open-model-selector', onOpenModelSelector);
+  offOpenModelSelector = busOn('open-model-selector', ({ sessionId }) => {
+    if (sessionId !== props.sessionId) return;
+    if (props.area !== 'all' && props.area !== 'composer-right') return;
+    modelTreeRef.value?.show();
+  });
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('dafman:open-model-selector', onOpenModelSelector);
+  offOpenModelSelector?.();
+  offOpenModelSelector = null;
 });
 
 const record = computed(() => sessionsStore.getSession(props.sessionId));
-
-function onOpenModelSelector(event: Event): void {
-  const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
-
-  if (detail?.sessionId !== props.sessionId) return;
-
-  if (props.area !== 'all' && props.area !== 'composer-right') return;
-
-  modelTreeRef.value?.show();
-}
 
 const effectiveModelId = computed(
   () => record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
@@ -253,22 +251,14 @@ function onAgentChipClick() {
 function requestTerminalFocus(terminalId: string): void {
   for (const delay of [0, 50, 150]) {
     setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent('dafman:focus-terminal', {
-          detail: { terminalId },
-        }),
-      );
+      busEmit('focus-terminal', { terminalId });
     }, delay);
   }
 }
 
 async function openSessionTerminal() {
   try {
-    window.dispatchEvent(
-      new CustomEvent('dafman:close-command-terminal', {
-        detail: { sessionId: props.sessionId },
-      }),
-    );
+    busEmit('close-command-terminal', { sessionId: props.sessionId });
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
 
     layoutStore.addTerminalPanel(terminal.id, terminal.title);
