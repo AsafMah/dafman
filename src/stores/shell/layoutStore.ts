@@ -160,6 +160,22 @@ export interface EdgePanelOptions {
 
 export const useLayoutStore = defineStore('layout', () => {
   const api = ref<DockviewApi | null>(null);
+
+  /// Caller-injected title resolver. Set once at boot by App.vue so
+  /// `addPanel(sessionId)` (and any other layout call that needs a
+  /// session title) can look up the canonical title from the
+  /// sessions store WITHOUT layoutStore importing it directly.
+  /// Returns `null`/`undefined` when no session record is available;
+  /// addPanel falls back to the short GUID prefix in that case.
+  const sessionTitleResolver = ref<((sessionId: string) => string | null | undefined) | null>(
+    null,
+  );
+
+  function setSessionTitleResolver(
+    resolver: ((sessionId: string) => string | null | undefined) | null,
+  ): void {
+    sessionTitleResolver.value = resolver;
+  }
   /// Reactive id of the currently-focused chat panel, or `null` when no
   /// chat panel is active (focus on Sessions sidebar, Settings, dev
   /// playground, or nothing at all). Subscribers on dockview's
@@ -532,27 +548,17 @@ export const useLayoutStore = defineStore('layout', () => {
     if (dock.getPanel(sessionId)) return;
 
     // Resolve the best available title: explicit `opts.title` first,
-    // then fall back to the session's SDK-supplied title from the store,
-    // then the short GUID prefix. The lazy import avoids a circular
-    // dependency between layoutStore and sessionsStore.
+    // then fall back to the title resolver (typically registered at
+    // boot to look up session titles from `sessionsStore`), then the
+    // short GUID prefix. Using a callback rather than importing the
+    // sessions store avoids the circular-import problem that the
+    // require()-hack previously worked around.
     let resolvedTitle = opts.title;
 
-    if (!resolvedTitle) {
-      try {
-        // Dynamic import avoids circular dependency between layoutStore and sessionsStore
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { useSessionsStore } = require('../chat/sessionsStore') as {
-          useSessionsStore: () => { getSession: (id: string) => { title?: string } | undefined };
-        };
-        const sessionsStore = useSessionsStore();
-        const record = sessionsStore.getSession(sessionId);
+    if (!resolvedTitle && sessionTitleResolver.value) {
+      const title = sessionTitleResolver.value(sessionId);
 
-        if (record?.title) {
-          resolvedTitle = composePanelTitle(sessionId, record.title);
-        }
-      } catch {
-        // sessionsStore not available yet — fall through
-      }
+      if (title) resolvedTitle = composePanelTitle(sessionId, title);
     }
 
     resolvedTitle ??= shortPanelTitle(sessionId);
@@ -1124,6 +1130,7 @@ export const useLayoutStore = defineStore('layout', () => {
     rememberSessionDetailsWidth,
     restoreSessionDetailsWidth,
     setApi,
+    setSessionTitleResolver,
     addPanel,
     addTerminalPanel,
     removePanel,

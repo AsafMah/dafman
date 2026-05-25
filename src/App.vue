@@ -381,6 +381,12 @@ watch(
 function onDockReady(event: DockviewReadyEvent) {
   console.info('[boot] onDockReady fired');
   layoutStore.setApi(event.api);
+  // Wire layoutStore -> sessionsStore title lookup via a callback so
+  // layoutStore doesn't need to import sessionsStore (would create a
+  // circular import that previously needed a require() workaround).
+  layoutStore.setSessionTitleResolver((sessionId) =>
+    sessionsStore.getSession(sessionId)?.title ?? null,
+  );
   // Whenever the user closes a tab via dockview's own X (we hide the
   // in-pane close button to keep a single source of truth), tear down
   // the underlying session too. closeSession is idempotent and safe to
