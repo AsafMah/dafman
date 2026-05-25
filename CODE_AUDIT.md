@@ -684,7 +684,38 @@ lines of bespoke plumbing and eliminates entire bug categories.
 - [ ] `layoutStore.ts` → edge panel module, panel tracking module
 - [ ] `SettingsPanel.vue` → per-category sub-components
 
-### Phase E — Clean up timing hacks + remaining ESLint
+### Phase E — Deduplication: extract repeated patterns
+
+Per §3 jscpd scan. Pure refactors with no dependency on Phases A–D.
+
+1. **`JsonSchemaField.vue`** — 4 near-identical type branches (string/number/bool/enum)
+   at lines 164/222/275/339 (~90 dup lines) → polymorphic per-type sub-component
+   (`JsonSchemaFieldString.vue`, etc.) dispatched from a single switch
+2. **Library tabs** — `LibraryAgentsTab`, `LibraryInstructionsTab`, `LibrarySkillsTab`,
+   `LibraryMcpTab`, `LibraryToolsTab` all share the user/project two-section pattern
+   (~110 dup lines) → `<LibraryTabPanel :user :project :renderItem>` slot wrapper
+3. **Task aggregation** — `SubagentBlock.vue:64`, `useSessionTasks.ts:105-110`,
+   `JobsPanel.vue:78` (~33 dup lines) → single `useTaskAggregation()` composable
+4. **Lexical trigger plugins** — `MentionPlugin.vue` ↔ `SlashCommandPlugin.vue` share
+   trigger scaffolding (~12 dup lines) → `createTriggerPlugin({ trigger, query, render })`
+   factory
+5. **CodeMirror setup** — `DiffEditor.vue` ↔ `CodeEditor.vue` (~11 dup lines) →
+   `useCodeMirror(opts)` composable
+6. **Permission/Tool detail render** — `PermissionDetails.vue` ↔ `ToolDetails.vue`
+   share argument-row rendering (~11 dup lines) → shared `<ArgRow>` component
+7. **`CommandPalette.vue`** — intra-file keyboard-nav blocks at 206/246 (~33 dup
+   lines) → single nav helper
+8. **`ActivityBar.vue`** — intra-file button-group render at 146/170 (~23 dup lines)
+   → `<ActivityButton>` sub-component
+9. **`McpServerForm.vue`** / **`ToolDetails.vue`** / **`JsonValueView.vue`** —
+   remaining intra-file paste sites (~50 dup lines combined) → smaller sub-components
+
+**Expected impact:** ~250 production lines deleted, jscpd duplication drops
+from 2.56% → ~1.2%. Intra-file dedups (#1, #7, #8, #9) are independent of
+each other; cross-file dedups (#2–#6) touch multiple files but are still
+narrow in scope.
+
+### Phase F — Clean up timing hacks + remaining ESLint
 
 - [ ] Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
 - [ ] Replace double-rAF patterns with proper settle helpers
