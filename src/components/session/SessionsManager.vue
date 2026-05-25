@@ -223,31 +223,33 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
 
   const seq = ++browseSeq;
 
-  browseTimer = setTimeout(async () => {
+  browseTimer = setTimeout(() => {
     browseTimer = null;
-    let fs: string[] = [];
+    void (async () => {
+      let fs: string[] = [];
 
-    try {
-      fs = await invokeCommand('browseDirectory', { prefix: query });
-    } catch {
-      /* expected while typing — keep known-matches-only */
-    }
+      try {
+        fs = await invokeCommand('browseDirectory', { prefix: query });
+      } catch {
+        /* expected while typing — keep known-matches-only */
+      }
 
-    if (seq !== browseSeq) return;
+      if (seq !== browseSeq) return;
 
-    const seenLower = new Set(knownMatches.map((p) => p.toLowerCase()));
-    const merged = [...knownMatches];
+      const seenLower = new Set(knownMatches.map((p) => p.toLowerCase()));
+      const merged = [...knownMatches];
 
-    for (const candidate of fs) {
-      const k = candidate.toLowerCase();
+      for (const candidate of fs) {
+        const k = candidate.toLowerCase();
 
-      if (seenLower.has(k)) continue;
+        if (seenLower.has(k)) continue;
 
-      seenLower.add(k);
-      merged.push(candidate);
-    }
+        seenLower.add(k);
+        merged.push(candidate);
+      }
 
-    workspaceSuggestions.value = merged;
+      workspaceSuggestions.value = merged;
+    })();
   }, 120);
 }
 
@@ -400,16 +402,18 @@ function onDelete(event: Event, session: SessionMetadataSummary) {
     rejectLabel: 'Cancel',
     acceptProps: { severity: 'danger', size: 'small' },
     rejectProps: { severity: 'secondary', text: true, size: 'small' },
-    accept: async () => {
-      if (openSessionIds.value.has(session.sessionId)) {
-        layoutStore.removePanel(session.sessionId);
-      }
+    accept: () => {
+      void (async () => {
+        if (openSessionIds.value.has(session.sessionId)) {
+          layoutStore.removePanel(session.sessionId);
+        }
 
-      try {
-        await sessionsList.deleteSession(session.sessionId);
-      } catch {
-        /* toast already shown */
-      }
+        try {
+          await sessionsList.deleteSession(session.sessionId);
+        } catch {
+          /* toast already shown */
+        }
+      })();
     },
   });
 }

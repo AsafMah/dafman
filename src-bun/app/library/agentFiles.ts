@@ -165,7 +165,7 @@ function resolveTargetPath(
 
     root = projectAgentsDir(workingDirectory);
   } else {
-    throw AppError.sdk(`unknown agent scope: ${scope}`);
+    throw AppError.sdk(`unknown agent scope: ${scope as string}`);
   }
 
   const normalizedRoot = normalize(root);

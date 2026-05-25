@@ -145,7 +145,7 @@ function onSelectItem(item: { key: string; value: string }): void {
       const result = cmd.run();
 
       if (result && typeof result.then === 'function') {
-        void result.catch((err) => {
+        void result.catch((err: unknown) => {
           console.error(`[command palette] ${cmd.id} failed`, err);
         });
       }

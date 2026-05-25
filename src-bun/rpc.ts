@@ -1111,7 +1111,7 @@ export type DafmanRPC = {
           message: string;
           extra?: Record<string, unknown>;
         };
-        response: void;
+        response: undefined;
       };
       /// Returns the configured log level + the last N recent
       /// log records (capped at 1000). The renderer uses this

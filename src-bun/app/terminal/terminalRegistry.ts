@@ -19,7 +19,7 @@ interface TerminalEntry {
   createdAt: string;
   proc: Bun.Subprocess;
   terminal: {
-    write(data: string | BufferSource): number | void;
+    write(data: string | BufferSource): number | undefined;
     resize(cols: number, rows: number): void;
     close(): void;
   };

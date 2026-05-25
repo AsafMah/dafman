@@ -134,7 +134,7 @@ onMounted(async () => {
 
       return s;
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       // Don't fail the whole boot for settings — the defaults are
       // good enough to get the user into the app. Toast already
       // surfaced by the store.
@@ -149,7 +149,7 @@ onMounted(async () => {
     .then(() => {
       bootStore.markClientReady();
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       const message = toErrorMessage(err);
 
       bootStore.markFailed(message);

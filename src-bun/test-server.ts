@@ -681,13 +681,11 @@ log.info('dafman test-server listening', {
 // Print marker on stdout so the Playwright harness can await "ready".
 console.log(`__TEST_SERVER_READY__::port=${server.port}`);
 
-process.on('SIGINT', async () => {
-  await sessions.shutdownAll();
-  process.exit(0);
+process.on('SIGINT', () => {
+  void sessions.shutdownAll().then(() => process.exit(0));
 });
-process.on('SIGTERM', async () => {
-  await sessions.shutdownAll();
-  process.exit(0);
+process.on('SIGTERM', () => {
+  void sessions.shutdownAll().then(() => process.exit(0));
 });
 
 // keep existsSync import alive (used implicitly by mkdirSync recursive)

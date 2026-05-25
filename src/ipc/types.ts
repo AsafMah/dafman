@@ -836,7 +836,7 @@ export type CommandMap = {
       message: string;
       extra?: Record<string, unknown>;
     };
-    result: void;
+    result: undefined;
   };
   getLogState: {
     args: { recentLimit?: number };

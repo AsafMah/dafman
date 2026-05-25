@@ -86,7 +86,7 @@ void (async () => {
       ...snap,
       workspaces: { ...snap.workspaces, defaultWorkspace: resolved },
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       log.warn('default workspace backfill failed', {
         error: toErrorMessage(err),
       });
