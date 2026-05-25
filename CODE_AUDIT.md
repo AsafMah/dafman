@@ -612,7 +612,7 @@ formalize these.
 | `ChatWindow.vue` | 1,185 | Transcript rendering + scroll management + command terminal + event processing + selection (↓24 — Phase A) |
 | `layoutStore.ts` | 1,145 | Dockview API + edge panels + session tracking + panel lifecycle + size management |
 | `SessionsManager.vue` | 1,062 | Session list + creation form + workspace picker + sidebar rendering + sorting |
-| `SettingsPanel.vue` | 991 | Every settings category in one template |
+| `SettingsPanel.vue` | 339 | ~~Every settings category~~ ✅ shell + 4 sections (D.1) |
 
 ### 6.10  Settings type defined twice — accepted (wire-shape mirror)
 
@@ -716,6 +716,17 @@ to both sides).
   - [x] C.1 Typed dockview accessor module (`src/stores/shell/dockviewTypes.ts`) — 12 → 2 `as unknown as` casts in layoutStore
   - [x] C.2 sessionsStore reducer casts — re-examined, already safe (typed shape probes + runtime guards). No-op.
   - [x] C.3 Shared settings type — declined; wire-shape mirror is intentional and covered by snapshot tests (§6.10).
+- [x] **Phase D.1 (2026-05-25):** SettingsPanel split (`9125e50`)
+  - [x] 968 → 339 lines for the orchestrator shell
+  - [x] New `SettingsGroup.vue` wrapper for repeated section chrome
+  - [x] 4 section components extracted: AppearanceSettingsSection (206),
+    TerminalSettingsSection (203), WorkspaceSettingsSection (111),
+    NotificationSettingsSection (110)
+  - [x] Smaller categories (Permissions/Diagnostics/About) kept inline
+    via shared `<SettingsGroup>` chrome
+  - [x] All bindings route through typed setters on `settingsStore`
+    (`setTheme`, `setReasoningVisibility`, `setTerminalPrefs`, etc.) —
+    no more inline `update(...)` calls
 
 
 ---
@@ -814,13 +825,38 @@ failure risks. `toastStore` stays as an acceptable cross-cutting concern.
 2. ~~Reduce unsafe casts in sessionsStore~~ — already safe (see C.2).
 3. ~~Shared settings type~~ — declined (wire-shape mirror is intentional).
 
-### Phase D — Split god objects
+### Phase D — Split god objects 🟡 IN PROGRESS (2026-05-25)
 
-- [ ] `sessions.ts` → session CRUD, event forwarding, agent lifecycle modules
-- [ ] `MessageComposer.vue` → toolbar composable, attachment composable, send logic
-- [ ] `ChatWindow.vue` → scroll composable, event processing composable
-- [ ] `layoutStore.ts` → edge panel module, panel tracking module
-- [ ] `SettingsPanel.vue` → per-category sub-components
+Per rubber-duck (Phase D critique, 2026-05-25): work each target as a
+separate vertical slice with its own pre-split rubber-duck pass, test
+scaffolding, and audit refresh. Do NOT run them straight through —
+the risk profiles differ too much (Lexical state, dockview restore
+logic, SessionRegistry public API, etc.).
+
+- [x] **D.1 `SettingsPanel.vue`** ✅ done (commit `9125e50`): 968 → 339
+  lines via 4 section components + shared `SettingsGroup` chrome. Small
+  categories (Permissions / Diagnostics / About) stay inline.
+- [ ] **D.2 `ChatWindow.vue`** (1,185 lines): per critique, add direct
+  unit tests FIRST (event-stream flush, timeline merge, send optimistic
+  message, retry/fork anchor, pending banner) — currently has 0 unit
+  tests. Then extract `useChatEventFlush`, `useChatScroll`,
+  `useMessageActions`, optionally `<ChatTranscript>`.
+- [ ] **D.3 `sessions.ts`** (1,929 lines): keep `SessionRegistry` as the
+  public boundary; extract sibling SDK-wrapper services (Agents, Mcp,
+  Tasks, Plan, Skills, Model). Each receives a tiny context
+  (`getEntry(sessionId)`, `getClient()`, `wrapSdkError()`) — do NOT let
+  services mutate `this.entries`. Lifecycle (`create`/`resume`/`forward`)
+  stays in `SessionRegistry`.
+- [ ] **D.4 `MessageComposer.vue`** (1,389 lines): add rubber-duck
+  regression tests FIRST (submit payload, focus, paste/drop, command
+  mode, toolbar state). Prefer subcomponents (`<ComposerToolbar>`,
+  `<ComposerFilePickerButton>`, `<ComposerCommandMode>`) over giant
+  composables. Avoid prop-drilling the Lexical editor.
+- [ ] **D.5 `SessionsManager.vue`** (1,062 lines): defer — large but
+  understandable. Split when sidebar work resumes.
+- [ ] **D.6 `layoutStore.ts`** (1,145 lines): defer/drop. Recent
+  dockview-types extraction (Phase C.1) means another touch is
+  high blast radius. Split only if a Dockview feature/bug forces it.
 
 ### Phase E — Deduplication: extract repeated patterns
 
