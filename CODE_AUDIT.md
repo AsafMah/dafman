@@ -1,8 +1,8 @@
 # Code Quality Audit
 
-> **Date:** 2026-05-25 (deep review: architectural debt with receipts)
-> **Codebase:** ~33,000 lines of TypeScript + Vue across `src/` and `src-bun/`
-> **Tools used:** ESLint (strictTypeChecked), jscpd (copy-paste detection), deep manual code review, IDE diagnostics
+> **Date:** 2026-05-25 (refreshed: all tables verified against codebase)
+> **Codebase:** ~47,200 lines of production TypeScript + Vue across `src/` and `src-bun/` (58,500 including tests)
+> **Tools used:** ESLint (strictTypeChecked), deep manual code review, IDE diagnostics, build-vs-buy analysis
 
 ---
 
@@ -17,29 +17,34 @@ Files above **800 lines** are strong candidates for splitting.
 | 1,929 | `src-bun/app/chat/sessions.ts`                    | ↓304 — helpers to sessionHelpers |
 | 1,635 | `src/dev/Playground.vue`                          | Dev-only, not shipped            |
 | 1,396 | `src/components/chat/MessageComposer.vue`         | Lexical editor + toolbar         |
-| 1,319 | `src/components/chat/ChatWindow.vue`              | ↓110 — terminal extracted |
 | 1,239 | `src-bun/rpc.ts`                                  | IPC handler registry             |
+| 1,209 | `src/components/chat/ChatWindow.vue`              | ↓110 — terminal extracted        |
 | 1,149 | `src/stores/chat/sessionsStore.ts`                | ↓317 — reducer extracted         |
 | 1,145 | `src/stores/shell/layoutStore.ts`                 | Dockview orchestration           |
-| 1,058 | `src/components/session/SessionsManager.vue`      | Sidebar session list             |
+| 1,062 | `src/components/session/SessionsManager.vue`      | Sidebar session list             |
 |   991 | `src/components/settings/SettingsPanel.vue`       | Settings UI                      |
-|   921 | `src/components/session/SessionHeaderControls.vue`| Header bar controls              |
+|   920 | `src/components/session/SessionHeaderControls.vue`| Header bar controls              |
 |   904 | `src/ipc/types.ts`                                | Shared type defs (expected big)  |
-|   760 | `src/components/terminal/TerminalPanel.vue`       | Terminal container               |
+|   762 | `src/components/terminal/TerminalPanel.vue`       | Terminal container               |
 |   721 | `src/components/library/LibraryAgentsTab.vue`     | Agent library UI                 |
 |   712 | `src/components/permissions/PendingRequestCard.vue`| Permission card                 |
-|   694 | `src-bun/test-server.ts`                          | Dev test server                  |
-|   668 | `src/App.vue`                                     | Root component                   |
+|   692 | `src-bun/test-server.ts`                          | Dev test server                  |
+|   685 | `src/lib/chatEvents.ts`                           | Chat event barrel + legacy       |
+|   681 | `src/App.vue`                                     | Root component                   |
 |   657 | `src-bun/index.ts`                                | Main process entry               |
-|   631 | `src/lib/chatEvents.ts`                           | Chat event reducer               |
 |   614 | `src/components/library/McpServerForm.vue`        | MCP server form                  |
 |   605 | `src-bun/app/client/fakeClient.ts`                | Fake SDK client                  |
 |   575 | `src/components/permissions/ToolDetails.vue`      | Tool detail view                 |
 |   545 | `src/components/shared/FilePicker.vue`            | File picker component            |
 |   540 | `src/components/shell/CommandPalette.vue`         | Command palette                  |
 |   528 | `src/components/library/LibraryMcpTab.vue`        | MCP library tab                  |
-|   522 | `src/lib/registerBuiltinCommands.ts`              | ↓62 — dynamicCommands extracted  |
 |   521 | `src/components/observability/LogViewer.vue`      | Log viewer                       |
+|   473 | `src/components/permissions/PermissionRuleEditor.vue` | Permission rule editor       |
+|   461 | `src/components/observability/JobsPanel.vue`      | Jobs panel                       |
+|   460 | `src/lib/registerBuiltinCommands.ts`              | ↓62 — dynamicCommands extracted  |
+|   454 | `src/components/shared/JsonSchemaField.vue`       | JSON schema form field           |
+|   432 | `src/components/terminal/TerminalsPanel.vue`      | Terminals list panel             |
+|   424 | `src/components/library/LibraryInstructionsTab.vue`| Instructions library tab        |
 
 
 ---
@@ -55,13 +60,12 @@ Files above **800 lines** are strong candidates for splitting.
 
 | Count | Rule                                           | What It Means                                  |
 | ----: | ---------------------------------------------- | ---------------------------------------------- |
-|    14 | `complexity`                                   | Cyclomatic complexity above 15                 |
+|    17 | `complexity`                                   | Cyclomatic complexity above 15                 |
 |     6 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
-|     4 | `max-lines-per-function`                       | Function body > 200 lines                      |
-|     2 | `max-depth`                                    | Nesting > 4 levels deep                        |
+|     5 | `max-lines-per-function`                       | Function body > 200 lines                      |
+|     1 | `max-depth`                                    | Nesting > 4 levels deep                        |
 |     1 | `no-redundant-type-constituents`               | ESLint parser resolves AgentInfo as error type  |
 |     1 | `no-unnecessary-type-assertion`                | Assertion doesn't change the type              |
-|     3 | misc complexity variants                       | CC 16–18 in smaller functions                  |
 
 ### Rules disabled (with rationale)
 
@@ -82,10 +86,12 @@ Files above **800 lines** are strong candidates for splitting.
 | 24 | `src-bun/app/chat/sessions.ts`                           | `forward`                   |
 | 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`              |
 | 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`                 |
-| 22 | `src-bun/app/chat/sessions.ts`                           | `respond`                   |
+| 22 | `src-bun/app/chat/pendingRequests.ts`                    | `respond`                   |
 | 20 | `src-bun/app/config/settings.ts`                         | `coerceTerminal`            |
 | 19 | `src/lib/chatEvents/messageHandlers.ts`                  | `normalizeAttachments`      |
 | 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      |
+| 18 | `src-bun/app/terminal/stderrFilter.ts`                   | (arrow fn CC=18)            |
+| 17 | `src/components/library/McpServerForm.vue`               | `structuredFromConfig`      |
 
 ### 2.3  Complexity Violations (Cyclomatic > 15)
 
@@ -97,11 +103,13 @@ Files above **800 lines** are strong candidates for splitting.
 | 24 | `src-bun/app/chat/sessions.ts`                           | `forward`                   | Open          |
 | 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`              | Open          |
 | 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`                 | Open          |
-| 22 | `src-bun/app/chat/sessions.ts`                           | `respond`                   | Open          |
+| 22 | `src-bun/app/chat/pendingRequests.ts`                    | `respond`                   | Open          |
 | 20 | `src-bun/app/config/settings.ts`                         | `coerceTerminal`            | Open          |
 | 19 | `src/lib/chatEvents/messageHandlers.ts`                  | `normalizeAttachments`      | Open          |
 | 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      | Open          |
+| 18 | `src-bun/app/terminal/stderrFilter.ts`                   | (arrow fn)                  | Open          |
 | 18 | `src-bun/app/chat/sessions.ts`                           | `createSession`/`cwdFor`    | Open          |
+| 17 | `src/components/library/McpServerForm.vue`               | `structuredFromConfig`      | Open          |
 | 17 | `src-bun/app/config/settings.ts`                         | `structuredFromConfig`      | Open          |
 | 17 | `src/lexical/plugins.ts`                                 | (plugin)                    | Open          |
 | 16 | `src/components/terminal/TerminalPanel.vue`              | `initXterm`                 | Open          |
@@ -110,18 +118,16 @@ Files above **800 lines** are strong candidates for splitting.
 | ~~33~~ | ~~`src/lib/chatEvents.ts`~~                          | ~~`processEvents`~~         | ✅ Fixed (→ ~10)|
 | ~~32~~ | ~~`src-bun/app/chat/sessionHelpers.ts`~~             | ~~`normalizeTask`~~         | ✅ Fixed (→ ~6) |
 | ~~25~~ | ~~`src-bun/app/chat/sessionHelpers.ts`~~             | ~~`summarizePermission`~~   | ✅ Fixed (→ ~4) |
-| 16 | `src-bun/app/chat/sessions.ts`                           | (handler)             |
-| 16 | `src/components/terminal/TerminalPanel.vue`              | (handler)             |
 
 ### 2.4  Oversized Functions (> 200 lines)
 
 | Lines | File                                                | Function                    |
 | ----: | --------------------------------------------------- | --------------------------- |
-|   866 | `src/stores/chat/sessionsStore.ts`                  | Entire store body           |
+|   614 | `src/stores/chat/sessionsStore.ts`                  | Entire store body (↓252)    |
 |   598 | `src/stores/shell/layoutStore.ts`                   | Entire store body           |
-|   379 | `src/lib/registerBuiltinCommands.ts`                | `registerBuiltinCommands()` |
-|   251 | `src/stores/terminal/terminalStore.ts`              | Entire store body           |
-|   240 | `src/stores/observability/jobsStore.ts`             | Entire store body           |
+|   334 | `src/lib/registerBuiltinCommands.ts`                | `registerBuiltinCommands()` (↓45) |
+|   249 | `src/stores/terminal/terminalStore.ts`              | Entire store body           |
+|   225 | `src/stores/observability/jobsStore.ts`             | Entire store body           |
 
 
 ---
@@ -160,8 +166,8 @@ Found by manual review and IDE diagnostics.
 | -------- | -------------------------------------------- | -------- | ---------------------------------------------------- |
 | HIGH     | `src/ipc/wsBridge.ts`                        | 123, 141 | `payload as never` dispatch + `socket!` non-null     |
 | MEDIUM   | `src/stores/chat/sessionsStore.ts`           | 310+     | Repeated `payload.data as {...}` casts in reducer    |
-| MEDIUM   | `src-bun/app/chat/sessions.ts`               | 341      | `request as unknown as Record<string, unknown>`      |
-| MEDIUM   | `src-bun/app/chat/sessions.ts`               | 717, 790 | `opts.reasoningEffort as ReasoningEffort`             |
+| MEDIUM   | `src-bun/app/chat/sessions.ts`               | 777      | `event as unknown as Record<string, unknown>`        |
+| MEDIUM   | `src-bun/app/chat/sessions.ts`               | 413, 486, 1000 | `opts.reasoningEffort as ReasoningEffort`       |
 | LOW      | `src/components/terminal/TerminalPanel.vue`  | 30, 225  | `as { compact? }`, `as HTMLInputElement`             |
 | LOW      | `src/ipc/rendererLog.ts`                     | 58       | `console[method]` reassigned via `as unknown as`     |
 
@@ -170,21 +176,21 @@ Found by manual review and IDE diagnostics.
 | Severity | File                                         | Line(s) | Issue                                                 |
 | -------- | -------------------------------------------- | ------- | ----------------------------------------------------- |
 | MEDIUM   | `src/components/terminal/TerminalPanel.vue`  | 327     | `invokeCommand('openUrl')` — no `.catch()`            |
-| MEDIUM   | `src/App.vue`                                | 228     | `dafman:focus-session` listener never removed (HMR)   |
-| MEDIUM   | `src-bun/app/terminal/terminalRegistry.ts`   | 311     | `flushTimer` never cleared on kill/exit               |
+| ~~MEDIUM~~   | ~~`src/App.vue`~~                        | ~~228~~ | ~~`dafman:focus-session` listener never removed (HMR)~~ ✅ Fixed |
+| ~~MEDIUM~~   | ~~`src-bun/app/terminal/terminalRegistry.ts`~~ | ~~311~~ | ~~`flushTimer` never cleared on kill/exit~~ ✅ Fixed |
 
 ### 4.3  Performance
 
 | Severity | File                                    | Line(s)  | Issue                                                  |
 | -------- | --------------------------------------- | -------- | ------------------------------------------------------ |
-| MEDIUM   | `src/components/chat/ChatWindow.vue`    | 237-249  | `timelineItems` rebuilds + sorts array every update    |
-| MEDIUM   | `src/App.vue`                           | 73       | Double cast `as unknown as` on dockview group          |
+| MEDIUM   | `src/components/chat/ChatWindow.vue`    | 231-244  | `timelineItems` rebuilds + sorts array every update    |
+| MEDIUM   | `src/App.vue`                           | 72       | Double cast `as unknown as` on dockview group          |
 
 ### 4.4  Backend Specific
 
 | Severity | File                                       | Line(s)    | Issue                                              |
 | -------- | ------------------------------------------ | ---------- | -------------------------------------------------- |
-| HIGH     | `src-bun/app/chat/sessions.ts`             | (entire)   | 2,233-line god object — CRUD+events+agents+MCP     |
+| HIGH     | `src-bun/app/chat/sessions.ts`             | (entire)   | 1,929-line god object — CRUD+events+agents+MCP     |
 | MEDIUM   | `src-bun/app/library/mcpRegistry.ts`       | 59-73      | Duplicated RPC wrapper (addConfig/updateConfig)    |
 | MEDIUM   | `src-bun/app/client/fakeClient.ts`         | 287-290    | Raw `Error` throws (inconsistent with AppError)    |
 | LOW      | `src-bun/app/client/client.ts`             | 21-24, 116 | Duplicate test seams (`setClientForTest` × 2)      |
@@ -209,7 +215,7 @@ risk reduced).
 
 | What we hand-rolled | File(s) | Lines | Library alternative | Verdict |
 |---|---|---:|---|---|
-| **Event bus** (window.dispatchEvent) | 8 files, 13 dispatchers, 10 listeners | ~80 | **mitt** (200B) or VueUse `useEventBus` | 🔴 Replace — untyped, no cleanup guarantee, untraceable |
+| **Event bus** (window.dispatchEvent) | 9 files, 13 dispatchers, 9 listeners | ~80 | **mitt** (200B) or VueUse `useEventBus` | 🔴 Replace — untyped, no cleanup guarantee, untraceable |
 | **localStorage persist** (manual JSON.parse/stringify + try/catch) | terminalStore.ts:135-193 | ~60 | **pinia-plugin-persistedstate** (zero-config) | 🔴 Replace — duplicated 2×, no validation |
 | **Deferred listener queue** (if bridge, register; else queue) | invoke.ts:100-221 | ~120 | Single generic `createDeferredChannel<T>()` or mitt + lazy init | 🔴 Replace — 6 identical blocks |
 | **Pub/sub fan-out** (`Set<Listener>`, subscribe, fanOut) | listenerRegistry.ts:45-95 | ~50 | **mitt** does exactly this in 200B | 🔴 Replace — hand-rolled EventEmitter |
@@ -475,8 +481,8 @@ at the App level or in composables that observe store state.
 
 ### 6.6  Components bypassing stores for IPC
 
-12+ Vue components call `invokeCommand()` directly instead of going through
-stores. Business logic (API calls, error handling, retry) lives in `.vue` files
+12 Vue components call `invokeCommand()` directly (36 call sites) instead of going
+through stores. Business logic (API calls, error handling, retry) lives in `.vue` files
 where it can't be unit-tested without mounting the component.
 
 **Fix:** Strict rule: components → stores → IPC. Components only read reactive
@@ -526,9 +532,9 @@ formalize these.
 |---|---:|---|
 | `sessions.ts` (backend) | 1,929 | Session CRUD + event forwarding + agent lifecycle + MCP + pending requests + workspace |
 | `MessageComposer.vue` | 1,396 | Lexical editor setup + toolbar + attachments + slash commands + file picker + send logic |
-| `ChatWindow.vue` | 1,319 | Transcript rendering + scroll management + command terminal + event processing + selection |
+| `ChatWindow.vue` | 1,209 | Transcript rendering + scroll management + command terminal + event processing + selection |
 | `layoutStore.ts` | 1,145 | Dockview API + edge panels + session tracking + panel lifecycle + size management |
-| `SessionsManager.vue` | 1,058 | Session list + creation form + workspace picker + sidebar rendering + sorting |
+| `SessionsManager.vue` | 1,062 | Session list + creation form + workspace picker + sidebar rendering + sorting |
 | `SettingsPanel.vue` | 991 | Every settings category in one template |
 
 ### 6.10  Settings type defined twice
@@ -564,8 +570,8 @@ at runtime. Should be a shared type file imported by both sides.
 | localStorage set/hydrate | terminalStore (2× identical pairs) | Boilerplate |
 | Deferred listener queue | invoke.ts (6× identical blocks) | Boilerplate |
 | `as unknown as` shape probes | layoutStore (12×) + App.vue (1×) | Type safety hole |
-| Component → IPC direct calls | 12 .vue files, ~35 call sites | Architecture bypass |
-| Window event bus | 8 event names, 13 dispatchers, 10 listeners | Untyped global coupling |
+| Component → IPC direct calls | 12 .vue files, ~36 call sites | Architecture bypass |
+| Window event bus | 8 event names, 13 dispatchers, 9 listeners | Untyped global coupling |
 | setTimeout focus hacks | 6+ components, ~10 sites | Missing lifecycle mgmt |
 
 
@@ -608,7 +614,7 @@ lines of bespoke plumbing and eliminates entire bug categories.
    (`useResizeObserver`), focus management (`useFocus`), rAF helpers
    (`useRafFn`). Estimated ~300 lines deleted across 10+ files
 2. **Add mitt** (or VueUse's `useEventBus`) — replace all 8 `dafman:*` window
-   events (13 dispatchers, 10 listeners) + listenerRegistry.ts with a typed,
+   events (13 dispatchers, 9 listeners) + listenerRegistry.ts with a typed,
    centrally-registered event bus. Estimated ~130 lines deleted
 3. **Add pinia-plugin-persistedstate** — replace terminalStore's manual
    localStorage persistence (2× identical blocks, ~60 lines)
@@ -650,8 +656,8 @@ lines of bespoke plumbing and eliminates entire bug categories.
 
 - [ ] Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
 - [ ] Replace double-rAF patterns with proper settle helpers
-- [ ] 14 `complexity` — CC > 15 functions
+- [ ] 17 `complexity` — CC > 15 functions
 - [ ] 6 `no-non-null-assertion` — xterm addon closures
-- [ ] 4 `max-lines-per-function` — Pinia store bodies (structural, low priority)
-- [ ] 2 `max-depth` — nested conditionals
+- [ ] 5 `max-lines-per-function` — Pinia store bodies (structural, low priority)
+- [ ] 1 `max-depth` — nested conditional
 - [ ] 5 misc
