@@ -21,16 +21,16 @@
 // `*.completed` (out-of-band, stale-cleanup). SDK `*.requested` are
 // informational no-ops.
 
-import { pickString } from './helpers';
-import type { ChatItem, PendingRequest } from '../chatEvents';
+import { pickString } from '@/lib/chatEvents/helpers';
+import type { ChatItem, PendingRequest } from '@/lib/chatEvents';
 import type {
   AutoModeSwitchRequestData,
   ElicitationRequestData,
   ExitPlanModeRequestData,
   PermissionRequestData,
   UserInputRequestData,
-} from '../../ipc/types';
-import type { Handler, ReducerContext } from './context';
+} from '@/ipc/types';
+import type { Handler, ReducerContext } from '@/lib/chatEvents/context';
 
 function describePermission(data: PermissionRequestData | unknown): string {
   if (

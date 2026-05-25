@@ -2,9 +2,9 @@
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
-import type { ToolStatus } from '../../lib/chatEvents';
-import { getToolRenderer } from '../../lib/toolRenderers';
-import ToolDetails from '../permissions/ToolDetails.vue';
+import type { ToolStatus } from '@/lib/chatEvents';
+import { getToolRenderer } from '@/lib/toolRenderers';
+import ToolDetails from '@/components/permissions/ToolDetails.vue';
 
 const props = defineProps<{
   toolName: string;

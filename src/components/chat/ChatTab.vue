@@ -11,8 +11,8 @@
 
 import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
 import type { DockviewPanelApi } from 'dockview-core';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { indicatorStyle } from '../../lib/notificationStyles';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { indicatorStyle } from '@/lib/notificationStyles';
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {

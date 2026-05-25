@@ -9,7 +9,7 @@
 
 import { defineStore } from 'pinia';
 import { reactive, ref, computed, watch } from 'vue';
-import { invokeCommand, onPendingRequest, onSessionEvent } from '../../ipc/invoke';
+import { invokeCommand, onPendingRequest, onSessionEvent } from '@/ipc/invoke';
 import type {
   AgentInfo,
   AutoModeSwitchRequestData,
@@ -22,13 +22,13 @@ import type {
   SessionEventPayload,
   SessionMode,
   UserInputRequestData,
-} from '../../ipc/types';
-import { accentForIndex } from '../../lib/color';
-import { useLayoutStore } from '../shell/layoutStore';
-import { useNotificationsStore } from '../app/notificationsStore';
-import { useSettingsStore } from '../app/settingsStore';
-import { useToastStore } from '../app/toastStore';
-import { toErrorMessage } from '../../lib/errorMessage';
+} from '@/ipc/types';
+import { accentForIndex } from '@/lib/color';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useNotificationsStore } from '@/stores/app/notificationsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -997,7 +997,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     sessionId: string,
     text: string,
     mode: SendMode = 'steer',
-    attachments?: import('../../ipc/types').SendMessageAttachment[],
+    attachments?: import('@/ipc/types').SendMessageAttachment[],
   ): Promise<void> {
     // Vue reactive proxies don't always survive structured-clone /
     // JSON serialization through the Electrobun bridge — fields can
@@ -1005,9 +1005,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     // strip the proxy wrappers and guarantee plain-object payloads.
     const atts =
       attachments && attachments.length > 0
-        ? (JSON.parse(
-            JSON.stringify(attachments),
-          ) as import('../../ipc/types').SendMessageAttachment[])
+        ? (JSON.parse(JSON.stringify(attachments)) as import('@/ipc/types').SendMessageAttachment[])
         : undefined;
 
     if (mode === 'interrupt') {

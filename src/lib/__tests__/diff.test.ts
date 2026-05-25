@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseApplyPatch } from '../diff';
+import { parseApplyPatch } from '@/lib/diff';
 
 describe('parseApplyPatch', () => {
   test('parses an Update File hunk', () => {

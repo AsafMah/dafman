@@ -15,8 +15,8 @@
 //     collide (separate per-buffer indices).
 
 import { describe, expect, test } from 'bun:test';
-import { defaultAmbient, processEvents, type ChatItem } from '../../chatEvents';
-import type { SessionEventPayload } from '../../../ipc/types';
+import { defaultAmbient, processEvents, type ChatItem } from '@/lib/chatEvents';
+import type { SessionEventPayload } from '@/ipc/types';
 
 function make(
   eventType: string,

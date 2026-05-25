@@ -16,7 +16,7 @@
 // state (including all panels closed).
 
 import { computed, onMounted, ref } from 'vue';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 
 interface ActivityItemBase {
   id: string;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { indicatorStyle, styleFor } from '../notificationStyles';
+import { indicatorStyle, styleFor } from '@/lib/notificationStyles';
 
 describe('notificationStyles.styleFor', () => {
   test('each event type has a distinct color', () => {

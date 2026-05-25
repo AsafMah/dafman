@@ -4,8 +4,8 @@ import {
   processEvents,
   TOOL_OUTPUT_CAP_BYTES,
   type IdCounter,
-} from '../chatEvents';
-import type { SessionEventPayload } from '../../ipc/types';
+} from '@/lib/chatEvents';
+import type { SessionEventPayload } from '@/ipc/types';
 
 function event(data: Record<string, unknown>): SessionEventPayload {
   return {

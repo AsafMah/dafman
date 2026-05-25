@@ -12,8 +12,8 @@
 
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { invokeCommand, onLogEvent } from '../../ipc/invoke';
-import type { LogLevel, LogRecord } from '../../ipc/types';
+import { invokeCommand, onLogEvent } from '@/ipc/invoke';
+import type { LogLevel, LogRecord } from '@/ipc/types';
 
 /// How many records we keep in the renderer ring buffer. Display-side
 /// only; the bun side has its own (smaller) buffer for "recent" replay.

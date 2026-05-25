@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { cleanTerminalCommandOutput, stripAnsi } from '../ansi';
+import { cleanTerminalCommandOutput, stripAnsi } from '@/lib/ansi';
 
 describe('terminal ANSI cleanup', () => {
   test('strips CSI and OSC sequences', () => {

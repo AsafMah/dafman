@@ -24,10 +24,10 @@ import {
 } from 'lexical';
 import { defineComponent, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
-import { rendererLog } from '../ipc/rendererLog';
-import { $isAttachmentNode } from './AttachmentNode';
-import type { SendMessageAttachment } from '../ipc/types';
-import { toErrorMessage } from '../lib/errorMessage';
+import { rendererLog } from '@/ipc/rendererLog';
+import { $isAttachmentNode } from '@/lexical/AttachmentNode';
+import type { SendMessageAttachment } from '@/ipc/types';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 /// Extract the editor content as a markdown string, trim it, clear the
 /// editor, and return the result. Returns `null` when the buffer was

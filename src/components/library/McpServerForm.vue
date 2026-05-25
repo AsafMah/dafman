@@ -18,7 +18,7 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import SelectButton from 'primevue/selectbutton';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 type McpConfig = Record<string, unknown>;
 type Transport = 'local' | 'http';

@@ -13,7 +13,7 @@
 //      command-by-value map (the command id satisfies both — it's
 //      unique by construction).
 
-import type { Command } from '../stores/shell/commandRegistry';
+import type { Command } from '@/stores/shell/commandRegistry';
 
 export function searchValueFor(cmd: Command): string {
   const parts: string[] = [cmd.id, cmd.label];

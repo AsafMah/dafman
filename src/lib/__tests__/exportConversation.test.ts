@@ -7,8 +7,8 @@
 // snapshot.
 
 import { describe, expect, test } from 'bun:test';
-import { exportFilenameStem, formatConversation } from '../exportConversation';
-import type { ChatItem } from '../chatEvents';
+import { exportFilenameStem, formatConversation } from '@/lib/exportConversation';
+import type { ChatItem } from '@/lib/chatEvents';
 
 const FIXED_NOW = '2026-05-22T00:00:00.000Z';
 

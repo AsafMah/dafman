@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { fenced, renderMarkdown, renderMarkdownSegments } from '../markdown';
+import { fenced, renderMarkdown, renderMarkdownSegments } from '@/lib/markdown';
 
 describe('renderMarkdown', () => {
   test('returns empty string for empty input', () => {

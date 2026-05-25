@@ -13,7 +13,7 @@
 /// `AppError`. This test exercises BOTH halves of that contract.
 
 import { describe, expect, test, beforeEach } from 'bun:test';
-import { AppError, invokeCommand, setRpcBridge, type RpcBridge } from '../invoke';
+import { AppError, invokeCommand, setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 
 const APP_ERROR_PREFIX = 'AppErrorPayload:';
 

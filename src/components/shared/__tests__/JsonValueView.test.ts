@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { render, fireEvent, cleanup } from '@testing-library/vue';
 import { nextTick, h } from 'vue';
 import PrimeVue from 'primevue/config';
-import JsonValueView from '../JsonValueView.vue';
+import JsonValueView from '@/components/shared/JsonValueView.vue';
 
 function mount(value: unknown, depth = 0) {
   return render(

@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { render, fireEvent, cleanup } from '@testing-library/vue';
 import { nextTick, h } from 'vue';
 import PrimeVue from 'primevue/config';
-import MessageActions from '../MessageActions.vue';
+import MessageActions from '@/components/chat/MessageActions.vue';
 
 function mount(
   props: {

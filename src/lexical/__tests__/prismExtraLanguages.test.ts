@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import Prism from 'prismjs';
-import { PRISM_EXTRA_LANGUAGES_LOADED } from '../prismExtraLanguages';
+import { PRISM_EXTRA_LANGUAGES_LOADED } from '@/lexical/prismExtraLanguages';
 
 // Regression pin: a previous edit re-ordered prism component imports
 // such that `prism-markup-templating` was imported before `prism-markup`,

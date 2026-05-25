@@ -17,7 +17,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
-} from './types';
+} from '@/ipc/types';
 
 export type InvokeResult<N extends CommandName> = CommandMap[N]['result'];
 

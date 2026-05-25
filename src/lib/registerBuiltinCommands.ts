@@ -21,18 +21,18 @@
 
 import { watch } from 'vue';
 import type { ConfirmationOptions } from 'primevue/confirmationoptions';
-import { invokeCommand } from '../ipc/invoke';
-import { useCommandRegistry, type Command } from '../stores/shell/commandRegistry';
-import { useClientStore } from '../stores/app/clientStore';
-import { useLayoutStore } from '../stores/shell/layoutStore';
-import { useSessionsStore } from '../stores/chat/sessionsStore';
-import { useSettingsStore } from '../stores/app/settingsStore';
-import { useModelsStore } from '../stores/library/modelsStore';
-import { useToastStore } from '../stores/app/toastStore';
-import { useTerminalStore } from '../stores/terminal/terminalStore';
-import { SESSION_COMMANDS } from './sessionCommands';
-import { MODE_OPTIONS } from '../lib/sessionModeOptions';
-import { toErrorMessage } from './errorMessage';
+import { invokeCommand } from '@/ipc/invoke';
+import { useCommandRegistry, type Command } from '@/stores/shell/commandRegistry';
+import { useClientStore } from '@/stores/app/clientStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useModelsStore } from '@/stores/library/modelsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { useTerminalStore } from '@/stores/terminal/terminalStore';
+import { SESSION_COMMANDS } from '@/lib/sessionCommands';
+import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const SESSIONS_PANEL_ID = 'sessions-manager';
 

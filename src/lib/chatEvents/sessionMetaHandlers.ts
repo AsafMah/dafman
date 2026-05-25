@@ -8,8 +8,8 @@
 //   - identical model+effort signature as the last toasted change
 //     → no toast (the SDK can emit duplicate events on resume)
 
-import { pickNumber, pickString } from './helpers';
-import type { Handler } from './context';
+import { pickNumber, pickString } from '@/lib/chatEvents/helpers';
+import type { Handler } from '@/lib/chatEvents/context';
 
 const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 

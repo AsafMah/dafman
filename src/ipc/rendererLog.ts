@@ -2,7 +2,7 @@
 // so we can debug WebView2 issues by tailing `dafman-*.log` instead of
 // requiring devtools to be open.
 
-import { invokeCommand } from './invoke';
+import { invokeCommand } from '@/ipc/invoke';
 
 export type RendererLogLevel = 'debug' | 'info' | 'warn' | 'error';
 

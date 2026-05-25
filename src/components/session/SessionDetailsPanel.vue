@@ -24,16 +24,16 @@ import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import SelectButton from 'primevue/selectbutton';
 import ToggleSwitch from 'primevue/toggleswitch';
-import type { AgentInfo, ReasoningVisibility, SessionMode, TaskInfo } from '../../ipc/types';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import { useSettingsStore } from '../../stores/app/settingsStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import { invokeCommand } from '../../ipc/invoke';
-import MessageContent from '../chat/MessageContent.vue';
-import { toErrorMessage } from '../../lib/errorMessage';
-import { revealPath } from '../../lib/pathActions';
-import { MODE_OPTIONS } from '../../lib/sessionModeOptions';
+import type { AgentInfo, ReasoningVisibility, SessionMode, TaskInfo } from '@/ipc/types';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { invokeCommand } from '@/ipc/invoke';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import { toErrorMessage } from '@/lib/errorMessage';
+import { revealPath } from '@/lib/pathActions';
+import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
 
 const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 
@@ -652,8 +652,8 @@ async function onExport(format: 'markdown' | 'json'): Promise<void> {
   if (!rec) return;
 
   try {
-    const { processEvents, defaultAmbient } = await import('../../lib/chatEvents');
-    const { formatConversation, exportFilenameStem } = await import('../../lib/exportConversation');
+    const { processEvents, defaultAmbient } = await import('@/lib/chatEvents');
+    const { formatConversation, exportFilenameStem } = await import('@/lib/exportConversation');
     const counter = { next: 1 };
     const result = processEvents([], defaultAmbient(), rec.events, counter, { live: false });
     const title = rec.title?.trim() || `Session ${rec.id.slice(0, 8)}`;

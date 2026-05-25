@@ -3,9 +3,9 @@
 // severity). Distinct from `assistant.*` so they're styled
 // differently and never confused with model output.
 
-import { pickNumber, pickString } from './helpers';
-import type { ChatItem } from '../chatEvents';
-import type { Handler } from './context';
+import { pickNumber, pickString } from '@/lib/chatEvents/helpers';
+import type { ChatItem } from '@/lib/chatEvents';
+import type { Handler } from '@/lib/chatEvents/context';
 
 const COMPACTION_START = 'Compacting conversation...';
 const COMPACTION_COMPLETE = 'Compaction complete.';

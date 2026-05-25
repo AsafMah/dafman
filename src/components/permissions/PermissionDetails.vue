@@ -12,12 +12,12 @@
 // tool-execution counterpart) can reuse the same visual language.
 
 import { computed } from 'vue';
-import type { PermissionRequestData } from '../../ipc/types';
-import { renderMarkdown } from '../../lib/markdown';
-import PathChip from './details/PathChip.vue';
-import CommandBlock from './details/CommandBlock.vue';
-import UrlChip from './details/UrlChip.vue';
-import ToolChip from './details/ToolChip.vue';
+import type { PermissionRequestData } from '@/ipc/types';
+import { renderMarkdown } from '@/lib/markdown';
+import PathChip from '@/components/details/PathChip.vue';
+import CommandBlock from '@/components/details/CommandBlock.vue';
+import UrlChip from '@/components/details/UrlChip.vue';
+import ToolChip from '@/components/details/ToolChip.vue';
 
 const props = defineProps<{ request: PermissionRequestData }>();
 

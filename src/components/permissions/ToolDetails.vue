@@ -9,15 +9,15 @@
 // Each layout is a thin composition of `details/*` primitives.
 
 import { computed } from 'vue';
-import PathChip from './details/PathChip.vue';
-import CommandBlock from './details/CommandBlock.vue';
-import UrlChip from './details/UrlChip.vue';
-import ToolChip from './details/ToolChip.vue';
-import DiffEditor from './details/DiffEditor.vue';
-import ApplyPatchView from './details/ApplyPatchView.vue';
-import GrepResults from './details/GrepResults.vue';
-import GlobResults from './details/GlobResults.vue';
-import JsonValueView from '../shared/JsonValueView.vue';
+import PathChip from '@/components/details/PathChip.vue';
+import CommandBlock from '@/components/details/CommandBlock.vue';
+import UrlChip from '@/components/details/UrlChip.vue';
+import ToolChip from '@/components/details/ToolChip.vue';
+import DiffEditor from '@/components/details/DiffEditor.vue';
+import ApplyPatchView from '@/components/details/ApplyPatchView.vue';
+import GrepResults from '@/components/details/GrepResults.vue';
+import GlobResults from '@/components/details/GlobResults.vue';
+import JsonValueView from '@/components/shared/JsonValueView.vue';
 
 const props = defineProps<{
   toolName: string;

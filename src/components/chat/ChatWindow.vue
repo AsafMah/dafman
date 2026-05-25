@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import MessageComposer from './MessageComposer.vue';
-import MessageContent from './MessageContent.vue';
-import UserMessageBody from './UserMessageBody.vue';
-import MessageActions from './MessageActions.vue';
-import MessageEditor from './MessageEditor.vue';
-import SessionHeaderControls from '../session/SessionHeaderControls.vue';
-import ToolCallBlock from './ToolCallBlock.vue';
-import SubagentBlock from './SubagentBlock.vue';
-import PendingRequestCard from '../permissions/PendingRequestCard.vue';
-import CommandResultCard from './CommandResultCard.vue';
+import MessageComposer from '@/components/chat/MessageComposer.vue';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import UserMessageBody from '@/components/chat/UserMessageBody.vue';
+import MessageActions from '@/components/chat/MessageActions.vue';
+import MessageEditor from '@/components/chat/MessageEditor.vue';
+import SessionHeaderControls from '@/components/session/SessionHeaderControls.vue';
+import ToolCallBlock from '@/components/chat/ToolCallBlock.vue';
+import SubagentBlock from '@/components/chat/SubagentBlock.vue';
+import PendingRequestCard from '@/components/permissions/PendingRequestCard.vue';
+import CommandResultCard from '@/components/chat/CommandResultCard.vue';
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -19,25 +19,25 @@ import {
   type ChatAmbient,
   type ChatItem,
   type IdCounter,
-} from '../../lib/chatEvents';
+} from '@/lib/chatEvents';
 import type {
   CommandResultRecord,
   ReasoningVisibility,
   SendMessageAttachment,
   SessionEventPayload,
-} from '../../ipc/types';
-import { useSessionsStore, type DefaultSendMode } from '../../stores/chat/sessionsStore';
-import { useSessionsListStore } from '../../stores/chat/sessionsListStore';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import { useSettingsStore } from '../../stores/app/settingsStore';
-import { useCommandResultsStore } from '../../stores/chat/commandResultsStore';
-import { useTerminalStore } from '../../stores/terminal/terminalStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import ReasoningBlock from './ReasoningBlock.vue';
-import type { ComposerSubmitPayload } from '../../lexical/plugins';
-import { styleFor } from '../../lib/notificationStyles';
-import { cleanTerminalCommandOutput } from '../../lib/ansi';
-import { toErrorMessage } from '../../lib/errorMessage';
+} from '@/ipc/types';
+import { useSessionsStore, type DefaultSendMode } from '@/stores/chat/sessionsStore';
+import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useCommandResultsStore } from '@/stores/chat/commandResultsStore';
+import { useTerminalStore } from '@/stores/terminal/terminalStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
+import type { ComposerSubmitPayload } from '@/lexical/plugins';
+import { styleFor } from '@/lib/notificationStyles';
+import { cleanTerminalCommandOutput } from '@/lib/ansi';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -384,7 +384,7 @@ watch(
 /// reconciles it with the eventual `user.message` echo.
 async function sendMessage(
   payload: ComposerSubmitPayload & {
-    attachments?: import('../../ipc/types').SendMessageAttachment[];
+    attachments?: import('@/ipc/types').SendMessageAttachment[];
   },
 ) {
   if (!payload.text) return;

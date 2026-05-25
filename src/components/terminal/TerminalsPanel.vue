@@ -2,11 +2,11 @@
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { useTerminalStore } from '../../stores/terminal/terminalStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useTerminalStore } from '@/stores/terminal/terminalStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const terminalStore = useTerminalStore();
 const sessionsStore = useSessionsStore();

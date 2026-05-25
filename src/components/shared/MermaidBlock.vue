@@ -9,7 +9,7 @@
 /// only renders when the gate is already on.
 
 import { computed, onMounted, ref, watch } from 'vue';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const props = defineProps<{
   source: string;

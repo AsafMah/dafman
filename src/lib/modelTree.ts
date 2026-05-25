@@ -17,7 +17,7 @@
 /// the original `name` is preserved verbatim in the leaf label so e.g.
 /// "(1M context)" suffixes stay visible.
 
-import type { ModelSummary } from '../ipc/types';
+import type { ModelSummary } from '@/ipc/types';
 
 export interface ModelTreeLeaf {
   key: string;

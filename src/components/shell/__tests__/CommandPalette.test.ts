@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import { cleanup, render, fireEvent } from '@testing-library/vue';
 import { nextTick } from 'vue';
-import CommandPalette from '../CommandPalette.vue';
-import { searchValueFor } from '../../../lib/palette';
-import { useCommandRegistry } from '../../../stores/shell/commandRegistry';
+import CommandPalette from '@/components/shell/CommandPalette.vue';
+import { searchValueFor } from '@/lib/palette';
+import { useCommandRegistry } from '@/stores/shell/commandRegistry';
 
 /// Mounts the palette and pops it open via the test-only `__testOpen`
 /// expose. Returns the test-library handle + the dialog root element

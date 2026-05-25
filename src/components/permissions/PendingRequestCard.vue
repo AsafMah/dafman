@@ -37,16 +37,16 @@ import type {
   PermissionApprovalRule,
   PermissionRequestData,
   UserInputRequestData,
-} from '../../ipc/types';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import MessageContent from '../chat/MessageContent.vue';
-import { useToastStore } from '../../stores/app/toastStore';
-import { invokeCommand } from '../../ipc/invoke';
-import { styleFor } from '../../lib/notificationStyles';
-import PermissionDetails from './PermissionDetails.vue';
-import PermissionRuleEditor from './PermissionRuleEditor.vue';
-import JsonSchemaForm from '../shared/JsonSchemaForm.vue';
-import { toErrorMessage } from '../../lib/errorMessage';
+} from '@/ipc/types';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import { useToastStore } from '@/stores/app/toastStore';
+import { invokeCommand } from '@/ipc/invoke';
+import { styleFor } from '@/lib/notificationStyles';
+import PermissionDetails from '@/components/permissions/PermissionDetails.vue';
+import PermissionRuleEditor from '@/components/permissions/PermissionRuleEditor.vue';
+import JsonSchemaForm from '@/components/shared/JsonSchemaForm.vue';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const props = defineProps<{
   sessionId: string;

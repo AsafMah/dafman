@@ -58,7 +58,7 @@ import {
   consumeComposerText,
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
-} from '../../lexical/plugins';
+} from '@/lexical/plugins';
 import {
   $getRoot,
   $getSelection,
@@ -69,18 +69,18 @@ import {
   type ElementNode,
   type TextFormatType,
 } from 'lexical';
-import { markdownNodes } from '../../lexical/nodes';
-import { $createAttachmentNode } from '../../lexical/AttachmentNode';
-import { lexicalTheme } from '../../lexical/theme';
-import type { DefaultSendMode } from '../../stores/chat/sessionsStore';
-import type { SendMessageAttachment } from '../../ipc/types';
-import { useToastStore } from '../../stores/app/toastStore';
-import { runLocalSlashCommand } from '../../lib/sessionCommands';
-import SlashCommandPlugin from './SlashCommandPlugin.vue';
-import MentionPlugin from './MentionPlugin.vue';
-import FilePicker from '../shared/FilePicker.vue';
-import ModeButtonGroup from './ModeButtonGroup.vue';
-import TerminalPanel from '../terminal/TerminalPanel.vue';
+import { markdownNodes } from '@/lexical/nodes';
+import { $createAttachmentNode } from '@/lexical/AttachmentNode';
+import { lexicalTheme } from '@/lexical/theme';
+import type { DefaultSendMode } from '@/stores/chat/sessionsStore';
+import type { SendMessageAttachment } from '@/ipc/types';
+import { useToastStore } from '@/stores/app/toastStore';
+import { runLocalSlashCommand } from '@/lib/sessionCommands';
+import SlashCommandPlugin from '@/components/chat/SlashCommandPlugin.vue';
+import MentionPlugin from '@/components/chat/MentionPlugin.vue';
+import FilePicker from '@/components/shared/FilePicker.vue';
+import ModeButtonGroup from '@/components/chat/ModeButtonGroup.vue';
+import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
 
 const props = withDefaults(
   defineProps<{

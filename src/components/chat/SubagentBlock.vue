@@ -14,11 +14,11 @@
 
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
-import MessageContent from './MessageContent.vue';
-import ReasoningBlock from './ReasoningBlock.vue';
-import ToolCallBlock from './ToolCallBlock.vue';
-import type { ChatItem } from '../../lib/chatEvents';
-import type { ReasoningVisibility } from '../../ipc/types';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
+import ToolCallBlock from '@/components/chat/ToolCallBlock.vue';
+import type { ChatItem } from '@/lib/chatEvents';
+import type { ReasoningVisibility } from '@/ipc/types';
 
 const props = defineProps<{
   agentId: string;

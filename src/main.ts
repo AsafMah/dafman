@@ -26,25 +26,25 @@ import './lexical/lexical.css';
 // markdown-it-texmath plugin emits HTML that depends on these classes).
 // ~80 KB minified; only paid once.
 import 'katex/dist/katex.min.css';
-import App from './App.vue';
-import ChatPanel from './components/chat/ChatPanel.vue';
-import ChatTab from './components/chat/ChatTab.vue';
-import ChatTabActions from './components/chat/ChatTabActions.vue';
-import JobsPanel from './components/observability/JobsPanel.vue';
-import LibraryPanel from './components/library/LibraryPanel.vue';
-import LogViewer from './components/observability/LogViewer.vue';
-import SessionDetailsPanel from './components/session/SessionDetailsPanel.vue';
-import SessionsManager from './components/session/SessionsManager.vue';
-import SettingsPanel from './components/settings/SettingsPanel.vue';
-import SidebarTab from './components/shell/SidebarTab.vue';
-import TerminalPanel from './components/terminal/TerminalPanel.vue';
-import TerminalsPanel from './components/terminal/TerminalsPanel.vue';
-import Watermark from './components/shell/Watermark.vue';
-import { setRpcBridge } from './ipc/invoke';
-import { createElectrobunBridge } from './ipc/electrobunBridge';
-import { createWebSocketBridge } from './ipc/wsBridge';
-import { installRendererLogBridge } from './ipc/rendererLog';
-import { toErrorMessage } from './lib/errorMessage';
+import App from '@/App.vue';
+import ChatPanel from '@/components/chat/ChatPanel.vue';
+import ChatTab from '@/components/chat/ChatTab.vue';
+import ChatTabActions from '@/components/chat/ChatTabActions.vue';
+import JobsPanel from '@/components/observability/JobsPanel.vue';
+import LibraryPanel from '@/components/library/LibraryPanel.vue';
+import LogViewer from '@/components/observability/LogViewer.vue';
+import SessionDetailsPanel from '@/components/session/SessionDetailsPanel.vue';
+import SessionsManager from '@/components/session/SessionsManager.vue';
+import SettingsPanel from '@/components/settings/SettingsPanel.vue';
+import SidebarTab from '@/components/shell/SidebarTab.vue';
+import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
+import TerminalsPanel from '@/components/terminal/TerminalsPanel.vue';
+import Watermark from '@/components/shell/Watermark.vue';
+import { setRpcBridge } from '@/ipc/invoke';
+import { createElectrobunBridge } from '@/ipc/electrobunBridge';
+import { createWebSocketBridge } from '@/ipc/wsBridge';
+import { installRendererLogBridge } from '@/ipc/rendererLog';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const GreenAura = definePreset(Aura, {
   semantic: {
@@ -71,12 +71,12 @@ const GreenAura = definePreset(Aura, {
 // loading with `?testBridge=ws://host:port` which switches to the
 // WebSocket transport (used by the real-E2E harness in `e2e/full/`).
 type TestBridgeWindow = Window & {
-  __DAFMAN_TEST_RPC__?: import('./ipc/invoke').RpcBridge;
+  __DAFMAN_TEST_RPC__?: import('@/ipc/invoke').RpcBridge;
 };
 const testBridge =
   typeof window !== 'undefined' ? (window as TestBridgeWindow).__DAFMAN_TEST_RPC__ : undefined;
 
-function pickBridge(): import('./ipc/invoke').RpcBridge {
+function pickBridge(): import('@/ipc/invoke').RpcBridge {
   if (testBridge) return testBridge;
 
   if (typeof window !== 'undefined') {
@@ -148,7 +148,7 @@ async function mountWith(Root: typeof App) {
   app.component('SidebarTab', SidebarTab);
 
   if (import.meta.env.DEV) {
-    const mod = await import('./dev/Playground.vue');
+    const mod = await import('@/dev/Playground.vue');
 
     app.component('Playground', mod.default);
   }

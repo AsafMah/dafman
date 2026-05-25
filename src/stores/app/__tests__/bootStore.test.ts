@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
-import { useBootStore } from '../bootStore';
+import { useBootStore } from '@/stores/app/bootStore';
 
 describe('bootStore', () => {
   beforeEach(() => {

@@ -6,9 +6,9 @@
 // blob -> object-URL viewer window. Best-effort: errors are swallowed
 // because this is an inspect convenience, not a critical path.
 
-import { invokeCommand } from '../ipc/invoke';
-import type { SendMessageAttachment } from '../ipc/types';
-import { cleanTerminalCommandOutput } from './ansi';
+import { invokeCommand } from '@/ipc/invoke';
+import type { SendMessageAttachment } from '@/ipc/types';
+import { cleanTerminalCommandOutput } from '@/lib/ansi';
 
 export async function openAttachment(a: SendMessageAttachment): Promise<void> {
   if (a.type === 'commandResult') {

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { render, fireEvent, cleanup } from '@testing-library/vue';
 import { ref, nextTick, h } from 'vue';
 import PrimeVue from 'primevue/config';
-import JsonSchemaForm from '../JsonSchemaForm.vue';
+import JsonSchemaForm from '@/components/shared/JsonSchemaForm.vue';
 
 /// JsonSchemaForm renders inputs per JSON-Schema and validates required.
 ///

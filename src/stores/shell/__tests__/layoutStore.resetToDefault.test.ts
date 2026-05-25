@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import type { DockviewApi } from 'dockview-core';
-import { useLayoutStore } from '../layoutStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 
 // More featureful fake than addPanel.test.ts's — adds `panels`,
 // `removePanel`, edge-group helpers so we can exercise `resetToDefault`.

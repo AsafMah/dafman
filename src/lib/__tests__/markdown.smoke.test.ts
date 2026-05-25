@@ -7,7 +7,7 @@ import { describe, expect, test } from 'bun:test';
 
 describe('markdown module-load smoke', () => {
   test('renderMarkdown chain loads without throwing on a fresh import', async () => {
-    const mod = await import('../markdown');
+    const mod = await import('@/lib/markdown');
     expect(typeof mod.renderMarkdown).toBe('function');
     // Light render to exercise every plugin's transformer path so a
     // plugin that throws on first invocation (rather than at module

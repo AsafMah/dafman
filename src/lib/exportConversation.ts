@@ -12,7 +12,7 @@
 // is included but folded under a `<details>` block so the assistant's
 // final message reads as the headline.
 
-import type { ChatItem } from './chatEvents';
+import type { ChatItem } from '@/lib/chatEvents';
 
 export type ExportFormat = 'markdown' | 'json';
 
@@ -146,7 +146,7 @@ function renderUser(item: ChatItem & { kind: 'user' }): string {
   return parts.join('\n');
 }
 
-function attachmentLabel(a: import('../ipc/types').SendMessageAttachment): string {
+function attachmentLabel(a: import('@/ipc/types').SendMessageAttachment): string {
   if (a.type === 'file' || a.type === 'directory') {
     return `\`${a.displayName ?? a.path}\` (${a.type})`;
   }

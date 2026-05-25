@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import { ref } from 'vue';
-import { useCommandRegistry } from '../commandRegistry';
+import { useCommandRegistry } from '@/stores/shell/commandRegistry';
 
 describe('commandRegistry', () => {
   beforeEach(() => {

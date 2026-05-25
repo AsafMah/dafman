@@ -4,7 +4,7 @@
 /// arguments, command output, file content, JSON, etc.
 
 import { computed } from 'vue';
-import CodeEditor from '../CodeEditor.vue';
+import CodeEditor from '@/components/shared/CodeEditor.vue';
 
 const props = withDefaults(
   defineProps<{

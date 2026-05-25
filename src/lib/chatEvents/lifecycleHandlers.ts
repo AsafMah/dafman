@@ -9,8 +9,8 @@
 // also toast it. The reducer doesn't shut anything down — the SDK
 // handles its own retry / disconnect lifecycle.
 
-import { pickString } from './helpers';
-import type { Handler } from './context';
+import { pickString } from '@/lib/chatEvents/helpers';
+import type { Handler } from '@/lib/chatEvents/context';
 
 export const lifecycleHandlers: Record<string, Handler> = {
   'session.idle': (ctx) => {

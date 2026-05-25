@@ -3,7 +3,7 @@
 /// Shared by ModeButtonGroup, SessionDetailsPanel, and the command palette
 /// so the labels, icons, and ordering stay in sync.
 
-import type { SessionMode } from '../ipc/types';
+import type { SessionMode } from '@/ipc/types';
 
 export interface ModeOption {
   label: string;

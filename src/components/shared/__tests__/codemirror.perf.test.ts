@@ -11,10 +11,10 @@ import { render, cleanup } from '@testing-library/vue';
 import { setActivePinia, createPinia } from 'pinia';
 import { nextTick, h } from 'vue';
 import PrimeVue from 'primevue/config';
-import CodeEditor from '../CodeEditor.vue';
-import DiffEditor from '../../details/DiffEditor.vue';
-import MessageContent from '../../chat/MessageContent.vue';
-import { renderMarkdown, renderMarkdownSegments } from '../../../lib/markdown';
+import CodeEditor from '@/components/shared/CodeEditor.vue';
+import DiffEditor from '@/components/details/DiffEditor.vue';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import { renderMarkdown, renderMarkdownSegments } from '@/lib/markdown';
 
 const SAMPLE_TS = `import { computed, ref } from "vue";
 import { EditorView } from "@codemirror/view";

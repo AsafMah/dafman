@@ -7,10 +7,10 @@
 
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { invokeCommand } from '../../ipc/invoke';
-import type { ModelSummary } from '../../ipc/types';
-import { useToastStore } from '../app/toastStore';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { invokeCommand } from '@/ipc/invoke';
+import type { ModelSummary } from '@/ipc/types';
+import { useToastStore } from '@/stores/app/toastStore';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 export const useModelsStore = defineStore('models', () => {
   const models = ref<ModelSummary[]>([]);

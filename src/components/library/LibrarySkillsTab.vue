@@ -9,13 +9,13 @@
 import { computed, onMounted, ref } from 'vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { invokeCommand } from '../../ipc/invoke';
-import { useToastStore } from '../../stores/app/toastStore';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import MessageContent from '../chat/MessageContent.vue';
-import { toErrorMessage } from '../../lib/errorMessage';
-import { revealPath } from '../../lib/pathActions';
+import { invokeCommand } from '@/ipc/invoke';
+import { useToastStore } from '@/stores/app/toastStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import { toErrorMessage } from '@/lib/errorMessage';
+import { revealPath } from '@/lib/pathActions';
 
 type Skill = {
   name: string;

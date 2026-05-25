@@ -33,7 +33,7 @@ import {
   useBasicTypeaheadTriggerMatch,
 } from 'lexical-vue/LexicalTypeaheadMenuPlugin';
 import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
-import { SESSION_COMMANDS, type SessionCommand } from '../../lib/sessionCommands';
+import { SESSION_COMMANDS, type SessionCommand } from '@/lib/sessionCommands';
 
 class SlashOption extends MenuOption {
   cmd: SessionCommand;

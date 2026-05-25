@@ -13,10 +13,10 @@
 /// natural-language references rather than heavily formatted markdown.
 
 import { computed } from 'vue';
-import MessageContent from './MessageContent.vue';
-import type { SendMessageAttachment } from '../../ipc/types';
-import { labelForAttachment } from '../../lexical/AttachmentNode';
-import { openAttachment } from '../../lib/openAttachment';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import type { SendMessageAttachment } from '@/ipc/types';
+import { labelForAttachment } from '@/lexical/AttachmentNode';
+import { openAttachment } from '@/lib/openAttachment';
 
 const props = defineProps<{
   text: string;

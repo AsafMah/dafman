@@ -10,9 +10,9 @@
 /// - response: `{type:"response", id, result}` | `{type:"error", id, error}`
 /// - message:  `{type:"message", name, payload}` (bun → renderer push)
 
-import type { CommandMap, CommandName } from './types';
-import type { RpcBridge } from './invoke';
-import { createListenerRegistry } from './listenerRegistry';
+import type { CommandMap, CommandName } from '@/ipc/types';
+import type { RpcBridge } from '@/ipc/invoke';
+import { createListenerRegistry } from '@/ipc/listenerRegistry';
 
 interface PendingRpc {
   resolve: (value: unknown) => void;

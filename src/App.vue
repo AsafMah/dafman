@@ -5,29 +5,29 @@ import Toast from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
 import type { ToastMessageOptions } from 'primevue/toast';
 import { DockviewVue, type DockviewReadyEvent } from 'dockview-vue';
-import ActivityBar, { type ActivityItem } from './components/shell/ActivityBar.vue';
-import BootSplash from './components/shell/BootSplash.vue';
-import CommandPalette from './components/shell/CommandPalette.vue';
-import { useClientStore } from './stores/app/clientStore';
-import { useSessionsStore } from './stores/chat/sessionsStore';
-import { useSettingsStore } from './stores/app/settingsStore';
-import { useToastStore } from './stores/app/toastStore';
-import { useLayoutStore, composePanelTitle } from './stores/shell/layoutStore';
-import { useModelsStore } from './stores/library/modelsStore';
-import { useBootStore } from './stores/app/bootStore';
-import { useJobsStore } from './stores/observability/jobsStore';
+import ActivityBar, { type ActivityItem } from '@/components/shell/ActivityBar.vue';
+import BootSplash from '@/components/shell/BootSplash.vue';
+import CommandPalette from '@/components/shell/CommandPalette.vue';
+import { useClientStore } from '@/stores/app/clientStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { useLayoutStore, composePanelTitle } from '@/stores/shell/layoutStore';
+import { useModelsStore } from '@/stores/library/modelsStore';
+import { useBootStore } from '@/stores/app/bootStore';
+import { useJobsStore } from '@/stores/observability/jobsStore';
 import { useConfirm } from 'primevue/useconfirm';
 import ConfirmDialog from 'primevue/confirmdialog';
-import { resolveIsDark } from './lib/theme';
-import { registerBuiltinCommands } from './lib/registerBuiltinCommands';
+import { resolveIsDark } from '@/lib/theme';
+import { registerBuiltinCommands } from '@/lib/registerBuiltinCommands';
 import {
   extractChatPanelIds,
   enforcePersistedEdgeMinimums,
   persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
-} from './lib/layoutSanitize';
-import { toErrorMessage } from './lib/errorMessage';
+} from '@/lib/layoutSanitize';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();

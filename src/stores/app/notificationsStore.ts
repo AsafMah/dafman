@@ -20,7 +20,7 @@
 
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { useSettingsStore } from './settingsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
 
 export type NotificationKind = 'turnEnd' | 'waitingForInput';
 

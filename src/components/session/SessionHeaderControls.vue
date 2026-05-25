@@ -16,16 +16,16 @@ import Chip from 'primevue/chip';
 import Select from 'primevue/select';
 import TreeSelect from 'primevue/treeselect';
 import type { TreeNode } from 'primevue/treenode';
-import type { ModelSummary, ReasoningVisibility } from '../../ipc/types';
-import { useModelsStore } from '../../stores/library/modelsStore';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { useSettingsStore } from '../../stores/app/settingsStore';
-import { useLayoutStore, basename } from '../../stores/shell/layoutStore';
-import { useTerminalStore } from '../../stores/terminal/terminalStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import { buildModelTree } from '../../lib/modelTree';
-import { toErrorMessage } from '../../lib/errorMessage';
-import { revealPath } from '../../lib/pathActions';
+import type { ModelSummary, ReasoningVisibility } from '@/ipc/types';
+import { useModelsStore } from '@/stores/library/modelsStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useLayoutStore, basename } from '@/stores/shell/layoutStore';
+import { useTerminalStore } from '@/stores/terminal/terminalStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { buildModelTree } from '@/lib/modelTree';
+import { toErrorMessage } from '@/lib/errorMessage';
+import { revealPath } from '@/lib/pathActions';
 
 const props = withDefaults(
   defineProps<{ sessionId: string; area?: 'all' | 'composer-left' | 'composer-right' }>(),

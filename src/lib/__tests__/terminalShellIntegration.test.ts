@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseTerminalOsc } from '../terminalShellIntegration';
+import { parseTerminalOsc } from '@/lib/terminalShellIntegration';
 
 describe('terminal shell integration OSC parser', () => {
   test('parses trusted VS Code command lifecycle markers', () => {

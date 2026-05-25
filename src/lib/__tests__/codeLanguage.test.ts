@@ -3,7 +3,7 @@ import {
   resolveLanguageExtension,
   resolveLanguageForFile,
   _resetLanguageCache,
-} from '../codeLanguage';
+} from '@/lib/codeLanguage';
 
 describe('codeLanguage', () => {
   beforeEach(() => {

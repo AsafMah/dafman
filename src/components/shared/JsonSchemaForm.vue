@@ -23,7 +23,7 @@
 /// or null. The card wires "Submit" through that gate.
 
 import { computed, ref, watch } from 'vue';
-import JsonSchemaField from './JsonSchemaField.vue';
+import JsonSchemaField from '@/components/shared/JsonSchemaField.vue';
 
 type JsonSchema = {
   type?: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array';

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { cleanup, render, fireEvent, waitFor } from '@testing-library/vue';
 import { nextTick } from 'vue';
-import FilePicker from '../FilePicker.vue';
-import { setRpcBridge, type RpcBridge } from '../../../ipc/invoke';
-import type { CommandName, CommandMap, WorkspaceFileMatch } from '../../../ipc/types';
+import FilePicker from '@/components/shared/FilePicker.vue';
+import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
+import type { CommandName, CommandMap, WorkspaceFileMatch } from '@/ipc/types';
 
 /// FilePicker tests cover the renderer-side behavior of the new
 /// @-picker / paperclip popover:

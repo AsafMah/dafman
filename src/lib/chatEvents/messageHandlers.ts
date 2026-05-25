@@ -9,8 +9,8 @@
 //   for history replay. Without these checks resumed sessions
 //   double-bubble the live send.
 
-import { pickString } from './helpers';
-import type { Handler } from './context';
+import { pickString } from '@/lib/chatEvents/helpers';
+import type { Handler } from '@/lib/chatEvents/context';
 
 export const messageHandlers: Record<string, Handler> = {
   'assistant.message_start': (ctx, data, payload) => {
@@ -151,12 +151,12 @@ export const messageHandlers: Record<string, Handler> = {
 /// text, just without an interactive chip.
 function normalizeAttachments(
   data: Record<string, unknown>,
-): import('../../ipc/types').SendMessageAttachment[] | undefined {
+): import('@/ipc/types').SendMessageAttachment[] | undefined {
   const raw = (data as { attachments?: unknown }).attachments;
 
   if (!Array.isArray(raw)) return undefined;
 
-  const out: import('../../ipc/types').SendMessageAttachment[] = [];
+  const out: import('@/ipc/types').SendMessageAttachment[] = [];
 
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;

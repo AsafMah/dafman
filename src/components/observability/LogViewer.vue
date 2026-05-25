@@ -14,12 +14,12 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import SelectButton from 'primevue/selectbutton';
-import { useLogStore, LEVEL_NAMES } from '../../stores/observability/logStore';
-import { useAuditStore } from '../../stores/observability/auditStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import { invokeCommand } from '../../ipc/invoke';
-import type { AuditEntry, LogLevel, LogRecord } from '../../ipc/types';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { useLogStore, LEVEL_NAMES } from '@/stores/observability/logStore';
+import { useAuditStore } from '@/stores/observability/auditStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { invokeCommand } from '@/ipc/invoke';
+import type { AuditEntry, LogLevel, LogRecord } from '@/ipc/types';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const logStore = useLogStore();
 const auditStore = useAuditStore();

@@ -6,8 +6,8 @@
 // selection).
 
 import { describe, expect, test } from 'bun:test';
-import { defaultAmbient, processEvents, type ChatAmbient } from '../../chatEvents';
-import type { SessionEventPayload } from '../../../ipc/types';
+import { defaultAmbient, processEvents, type ChatAmbient } from '@/lib/chatEvents';
+import type { SessionEventPayload } from '@/ipc/types';
 
 const TAG: Partial<SessionEventPayload> = { sessionId: 's1' };
 

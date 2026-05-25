@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
-import type { ReasoningVisibility } from '../../ipc/types';
-import MessageContent from './MessageContent.vue';
+import type { ReasoningVisibility } from '@/ipc/types';
+import MessageContent from '@/components/chat/MessageContent.vue';
 
 const props = defineProps<{
   text: string;

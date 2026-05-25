@@ -13,18 +13,23 @@
 // and the `TOOL_OUTPUT_CAP_BYTES` constant are exported from here so
 // the handler modules can reuse them without circular imports.
 
-import type { SessionEventPayload } from '../ipc/types';
-import { calloutHandlers } from './chatEvents/calloutHandlers';
-import type { Handler, ReducerContext } from './chatEvents/context';
-import { lifecycleHandlers } from './chatEvents/lifecycleHandlers';
-import { messageHandlers } from './chatEvents/messageHandlers';
-import { notificationHandlers } from './chatEvents/notificationHandlers';
-import { reasoningHandlers } from './chatEvents/reasoningHandlers';
-import { sessionMetaHandlers } from './chatEvents/sessionMetaHandlers';
-import { toolHandlers } from './chatEvents/toolHandlers';
-import { turnHandlers } from './chatEvents/turnHandlers';
+import type { SessionEventPayload } from '@/ipc/types';
+import { calloutHandlers } from '@/lib/chatEvents/calloutHandlers';
+import type { Handler, ReducerContext } from '@/lib/chatEvents/context';
+import { lifecycleHandlers } from '@/lib/chatEvents/lifecycleHandlers';
+import { messageHandlers } from '@/lib/chatEvents/messageHandlers';
+import { notificationHandlers } from '@/lib/chatEvents/notificationHandlers';
+import { reasoningHandlers } from '@/lib/chatEvents/reasoningHandlers';
+import { sessionMetaHandlers } from '@/lib/chatEvents/sessionMetaHandlers';
+import { toolHandlers } from '@/lib/chatEvents/toolHandlers';
+import { turnHandlers } from '@/lib/chatEvents/turnHandlers';
 
-export { clampOutput, pickNumber, pickString, TOOL_OUTPUT_CAP_BYTES } from './chatEvents/helpers';
+export {
+  clampOutput,
+  pickNumber,
+  pickString,
+  TOOL_OUTPUT_CAP_BYTES,
+} from '@/lib/chatEvents/helpers';
 
 export type SystemSeverity = 'info' | 'warn' | 'error';
 
@@ -49,7 +54,7 @@ export type ChatItem =
       /// in the transcript bubble by `UserMessageBody.vue`; pill order
       /// in the text matches array order (the composer's
       /// document-order extraction in `consumeComposerText`).
-      attachments?: import('../ipc/types').SendMessageAttachment[];
+      attachments?: import('@/ipc/types').SendMessageAttachment[];
     }
   | {
       id: number;
@@ -123,11 +128,11 @@ export type ChatItem =
       message: string;
       /// Full typed payload for the per-kind layout.
       request:
-        | import('../ipc/types').PermissionRequestData
-        | import('../ipc/types').UserInputRequestData
-        | import('../ipc/types').ElicitationRequestData
-        | import('../ipc/types').ExitPlanModeRequestData
-        | import('../ipc/types').AutoModeSwitchRequestData;
+        | import('@/ipc/types').PermissionRequestData
+        | import('@/ipc/types').UserInputRequestData
+        | import('@/ipc/types').ElicitationRequestData
+        | import('@/ipc/types').ExitPlanModeRequestData
+        | import('@/ipc/types').AutoModeSwitchRequestData;
     }
   | {
       id: number;
@@ -217,7 +222,7 @@ export type ChatAmbient = {
   /// Currently-selected custom agent for the session, or null when the
   /// default agent is in use. Driven by `subagent.selected` /
   /// `.deselected` events; reflected in the header chip + rail.
-  currentAgent: import('../ipc/types').AgentInfo | null;
+  currentAgent: import('@/ipc/types').AgentInfo | null;
 };
 
 /// A single SDK-blocking pending callback. `requestId` is generated
@@ -230,31 +235,31 @@ export type PendingRequest =
       kind: 'permission';
       requestId: string;
       message: string;
-      request: import('../ipc/types').PermissionRequestData;
+      request: import('@/ipc/types').PermissionRequestData;
     }
   | {
       kind: 'userInput';
       requestId: string;
       message: string;
-      request: import('../ipc/types').UserInputRequestData;
+      request: import('@/ipc/types').UserInputRequestData;
     }
   | {
       kind: 'elicitation';
       requestId: string;
       message: string;
-      request: import('../ipc/types').ElicitationRequestData;
+      request: import('@/ipc/types').ElicitationRequestData;
     }
   | {
       kind: 'exitPlanMode';
       requestId: string;
       message: string;
-      request: import('../ipc/types').ExitPlanModeRequestData;
+      request: import('@/ipc/types').ExitPlanModeRequestData;
     }
   | {
       kind: 'autoModeSwitch';
       requestId: string;
       message: string;
-      request: import('../ipc/types').AutoModeSwitchRequestData;
+      request: import('@/ipc/types').AutoModeSwitchRequestData;
     };
 
 export function defaultAmbient(): ChatAmbient {
@@ -603,7 +608,7 @@ export function appendUserMessage(
   current: ChatItem[],
   text: string,
   counter: IdCounter,
-  attachments?: import('../ipc/types').SendMessageAttachment[],
+  attachments?: import('@/ipc/types').SendMessageAttachment[],
 ): ChatItem[] {
   return [
     ...current,

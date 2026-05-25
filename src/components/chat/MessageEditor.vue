@@ -15,9 +15,9 @@
 import { ref } from 'vue';
 import Button from 'primevue/button';
 import { LexicalComposer } from 'lexical-vue/LexicalComposer';
-import { markdownNodes } from '../../lexical/nodes';
-import { lexicalTheme } from '../../lexical/theme';
-import MessageEditorBody from './MessageEditorBody.vue';
+import { markdownNodes } from '@/lexical/nodes';
+import { lexicalTheme } from '@/lexical/theme';
+import MessageEditorBody from '@/components/chat/MessageEditorBody.vue';
 
 const props = defineProps<{
   originalText: string;

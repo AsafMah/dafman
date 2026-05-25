@@ -7,13 +7,13 @@
 
 import { computed, onMounted, ref, watch } from 'vue';
 import Button from 'primevue/button';
-import { invokeCommand } from '../../ipc/invoke';
-import type { InstructionSource } from '../../ipc/types';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import MessageContent from '../chat/MessageContent.vue';
-import { toErrorMessage } from '../../lib/errorMessage';
-import { revealPath } from '../../lib/pathActions';
+import { invokeCommand } from '@/ipc/invoke';
+import type { InstructionSource } from '@/ipc/types';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import { toErrorMessage } from '@/lib/errorMessage';
+import { revealPath } from '@/lib/pathActions';
 
 const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();

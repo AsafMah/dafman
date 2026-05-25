@@ -17,19 +17,19 @@ import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { useNotificationsStore } from '../../stores/app/notificationsStore';
-import { useSettingsStore } from '../../stores/app/settingsStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import { invokeCommand } from '../../ipc/invoke';
+import { useNotificationsStore } from '@/stores/app/notificationsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { invokeCommand } from '@/ipc/invoke';
 import type {
   ModelSummary,
   ReasoningVisibility,
   TerminalAddonPrefs,
   ThemeChoice,
-} from '../../ipc/types';
-import { useModelsStore } from '../../stores/library/modelsStore';
-import { toErrorMessage } from '../../lib/errorMessage';
-import { revealPath } from '../../lib/pathActions';
+} from '@/ipc/types';
+import { useModelsStore } from '@/stores/library/modelsStore';
+import { toErrorMessage } from '@/lib/errorMessage';
+import { revealPath } from '@/lib/pathActions';
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelsStore();

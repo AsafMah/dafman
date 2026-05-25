@@ -5,8 +5,8 @@ import {
   type ModelTreeGroup,
   type ModelTreeLeaf,
   type ModelTreeNode,
-} from '../modelTree';
-import type { ModelSummary } from '../../ipc/types';
+} from '@/lib/modelTree';
+import type { ModelSummary } from '@/ipc/types';
 
 function model(id: string, name: string): ModelSummary {
   return {

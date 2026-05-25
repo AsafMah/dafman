@@ -14,7 +14,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
-} from './types';
+} from '@/ipc/types';
 import type {
   AuditEventListener,
   CommandResultEventListener,
@@ -22,7 +22,7 @@ import type {
   PendingRequestListener,
   SessionEventListener,
   TerminalEventListener,
-} from './invoke';
+} from '@/ipc/invoke';
 
 export interface ListenerMethods {
   onSessionEvent: (listener: SessionEventListener) => () => void;
@@ -50,7 +50,10 @@ function subscribe<T>(set: Set<T>): (listener: T) => () => void {
   };
 }
 
-function fanOut<T>(set: Set<T>, label: string): (payload: Parameters<Extract<T, (...a: never[]) => void>>[0]) => void {
+function fanOut<T>(
+  set: Set<T>,
+  label: string,
+): (payload: Parameters<Extract<T, (...a: never[]) => void>>[0]) => void {
   return (payload) => {
     for (const listener of set) {
       try {

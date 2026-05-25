@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { invokeCommand, onCommandResultEvent } from '../../ipc/invoke';
-import type { CommandResultEvent, CommandResultRecord } from '../../ipc/types';
-import { useToastStore } from '../app/toastStore';
+import { invokeCommand, onCommandResultEvent } from '@/ipc/invoke';
+import type { CommandResultEvent, CommandResultRecord } from '@/ipc/types';
+import { useToastStore } from '@/stores/app/toastStore';
 
 export const useCommandResultsStore = defineStore('commandResults', () => {
   const recordsBySession = ref<Record<string, CommandResultRecord[]>>({});

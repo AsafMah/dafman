@@ -10,8 +10,8 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
-import { useNotificationsStore } from '../notificationsStore';
-import { useSettingsStore } from '../settingsStore';
+import { useNotificationsStore } from '@/stores/app/notificationsStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
 
 interface FakeNotification {
   title: string;

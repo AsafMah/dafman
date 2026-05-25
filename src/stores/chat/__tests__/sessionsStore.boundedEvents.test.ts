@@ -9,9 +9,9 @@
 
 import { describe, expect, test, beforeEach } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
-import { useSessionsStore, MAX_EVENTS_PER_SESSION } from '../sessionsStore';
-import type { SessionRecord } from '../sessionsStore';
-import type { SessionEventPayload } from '../../../ipc/types';
+import { useSessionsStore, MAX_EVENTS_PER_SESSION } from '@/stores/chat/sessionsStore';
+import type { SessionRecord } from '@/stores/chat/sessionsStore';
+import type { SessionEventPayload } from '@/ipc/types';
 
 function makeRecord(id: string): SessionRecord {
   return {

@@ -28,8 +28,8 @@ import {
   type SerializedLexicalNode,
   type Spread,
 } from 'lexical';
-import type { SendMessageAttachment } from '../ipc/types';
-import { openAttachment } from '../lib/openAttachment';
+import type { SendMessageAttachment } from '@/ipc/types';
+import { openAttachment } from '@/lib/openAttachment';
 
 export type SerializedAttachmentNode = Spread<
   { attachment: SendMessageAttachment },

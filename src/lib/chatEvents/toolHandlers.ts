@@ -10,8 +10,8 @@
 // TOOL_OUTPUT_CAP_BYTES); `_progress` overwrites the latest progress
 // message (no accumulation — that's an MCP-style status line).
 
-import { clampOutput, pickString } from './helpers';
-import type { Handler } from './context';
+import { clampOutput, pickString } from '@/lib/chatEvents/helpers';
+import type { Handler } from '@/lib/chatEvents/context';
 
 // Shared between `tool.user_requested` and `tool.execution_start` —
 // they have identical wire shapes for our purposes.

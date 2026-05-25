@@ -31,9 +31,9 @@ import {
   useBasicTypeaheadTriggerMatch,
 } from 'lexical-vue/LexicalTypeaheadMenuPlugin';
 import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
-import { $createAttachmentNode } from '../../lexical/AttachmentNode';
-import type { SendMessageAttachment } from '../../ipc/types';
-import FilePicker from '../shared/FilePicker.vue';
+import { $createAttachmentNode } from '@/lexical/AttachmentNode';
+import type { SendMessageAttachment } from '@/ipc/types';
+import FilePicker from '@/components/shared/FilePicker.vue';
 
 class SentinelOption extends MenuOption {
   constructor() {

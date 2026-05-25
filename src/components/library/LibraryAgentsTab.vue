@@ -18,12 +18,12 @@ import InputText from 'primevue/inputtext';
 import SelectButton from 'primevue/selectbutton';
 import Textarea from 'primevue/textarea';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { invokeCommand } from '../../ipc/invoke';
-import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from '../../ipc/types';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { invokeCommand } from '@/ipc/invoke';
+import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from '@/ipc/types';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();

@@ -11,11 +11,11 @@
 /// unknown slash text is left alone so manual SDK commands can still be
 /// sent intentionally.
 
-import { useLayoutStore } from '../stores/shell/layoutStore';
-import { useSessionsStore } from '../stores/chat/sessionsStore';
-import { useToastStore } from '../stores/app/toastStore';
-import { invokeCommand } from '../ipc/invoke';
-import { toErrorMessage } from './errorMessage';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { invokeCommand } from '@/ipc/invoke';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 export interface SessionCommand {
   /// Slash form (with leading "/"). What the user types in the

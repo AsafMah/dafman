@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick, reactive } from 'vue';
-import { setRpcBridge, type RpcBridge } from '../../../ipc/invoke';
-import type { CommandMap, CommandName, JobRecord } from '../../../ipc/types';
-import { useJobsStore } from '../jobsStore';
-import { useSessionsStore, _resetSessionsStoreForTest, type SessionRecord } from '../../chat/sessionsStore';
+import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
+import type { CommandMap, CommandName, JobRecord } from '@/ipc/types';
+import { useJobsStore } from '@/stores/observability/jobsStore';
+import {
+  useSessionsStore,
+  _resetSessionsStoreForTest,
+  type SessionRecord,
+} from '@/stores/chat/sessionsStore';
 
 function makeBridge(
   handlers: Partial<{

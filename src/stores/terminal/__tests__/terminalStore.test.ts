@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createPinia, setActivePinia } from 'pinia';
-import { setRpcBridge, type RpcBridge } from '../../../ipc/invoke';
-import type { CommandMap, CommandName } from '../../../ipc/types';
-import { useTerminalStore } from '../terminalStore';
+import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
+import type { CommandMap, CommandName } from '@/ipc/types';
+import { useTerminalStore } from '@/stores/terminal/terminalStore';
 
 function makeBridge(
   handlers: Partial<{

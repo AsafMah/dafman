@@ -10,9 +10,9 @@
 
 import { computed } from 'vue';
 import SelectButton from 'primevue/selectbutton';
-import { MODE_OPTIONS } from '../../lib/sessionModeOptions';
-import type { SessionMode } from '../../ipc/types';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
+import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
+import type { SessionMode } from '@/ipc/types';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
 
 const props = defineProps<{ sessionId: string }>();
 const sessionsStore = useSessionsStore();

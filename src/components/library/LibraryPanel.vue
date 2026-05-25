@@ -15,11 +15,11 @@ import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
-import LibraryMcpTab from './LibraryMcpTab.vue';
-import LibraryToolsTab from './LibraryToolsTab.vue';
-import LibrarySkillsTab from './LibrarySkillsTab.vue';
-import LibraryAgentsTab from './LibraryAgentsTab.vue';
-import LibraryInstructionsTab from './LibraryInstructionsTab.vue';
+import LibraryMcpTab from '@/components/library/LibraryMcpTab.vue';
+import LibraryToolsTab from '@/components/library/LibraryToolsTab.vue';
+import LibrarySkillsTab from '@/components/library/LibrarySkillsTab.vue';
+import LibraryAgentsTab from '@/components/library/LibraryAgentsTab.vue';
+import LibraryInstructionsTab from '@/components/library/LibraryInstructionsTab.vue';
 
 // Persist the last-active tab across panel re-mounts so toggling the
 // activity bar doesn't lose the user's place.

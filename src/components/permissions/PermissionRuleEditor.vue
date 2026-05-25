@@ -27,7 +27,7 @@
 import { computed, ref } from 'vue';
 import RadioButton from 'primevue/radiobutton';
 import InputText from 'primevue/inputtext';
-import type { PermissionApprovalRule, PermissionRequestData } from '../../ipc/types';
+import type { PermissionApprovalRule, PermissionRequestData } from '@/ipc/types';
 
 const props = defineProps<{
   request: PermissionRequestData;

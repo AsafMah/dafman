@@ -3,11 +3,11 @@ import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { invokeCommand } from '../../ipc/invoke';
-import { useSettingsStore } from '../../stores/app/settingsStore';
-import { useToastStore } from '../../stores/app/toastStore';
-import MessageContent from '../chat/MessageContent.vue';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { invokeCommand } from '@/ipc/invoke';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import MessageContent from '@/components/chat/MessageContent.vue';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 type ToolItem = { name: string; description: string; namespacedName?: string };
 type ToolGroup = { label: string; items: ToolItem[] };

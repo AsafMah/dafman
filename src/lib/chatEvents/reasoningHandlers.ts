@@ -6,8 +6,8 @@
 // `_delta` events stream in chunks like the message stream;
 // `assistant.reasoning` is the non-streaming variant.
 
-import { pickString } from './helpers';
-import type { Handler } from './context';
+import { pickString } from '@/lib/chatEvents/helpers';
+import type { Handler } from '@/lib/chatEvents/context';
 
 const REASONING_SINGLETON_KEY = '_reasoning_singleton';
 

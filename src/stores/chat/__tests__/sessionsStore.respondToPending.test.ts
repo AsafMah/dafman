@@ -17,15 +17,15 @@ import {
   type RpcBridge,
   type PendingRequestListener,
   type SessionEventListener,
-} from '../../../ipc/invoke';
-import { useSessionsStore, _resetSessionsStoreForTest } from '../sessionsStore';
-import { useToastStore } from '../../app/toastStore';
+} from '@/ipc/invoke';
+import { useSessionsStore, _resetSessionsStoreForTest } from '@/stores/chat/sessionsStore';
+import { useToastStore } from '@/stores/app/toastStore';
 import type {
   CommandMap,
   CommandName,
   PendingRequestPayload,
   SessionEventPayload,
-} from '../../../ipc/types';
+} from '@/ipc/types';
 
 function makeBridge(opts: { respondToRequestShouldThrow?: boolean }): {
   bridge: RpcBridge;

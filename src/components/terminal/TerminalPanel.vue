@@ -15,11 +15,11 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import '@xterm/xterm/css/xterm.css';
 import Button from 'primevue/button';
-import { useTerminalStore } from '../../stores/terminal/terminalStore';
-import { useSettingsStore } from '../../stores/app/settingsStore';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import { invokeCommand } from '../../ipc/invoke';
-import { parseTerminalOsc, type TerminalShellEvent } from '../../lib/terminalShellIntegration';
+import { useTerminalStore } from '@/stores/terminal/terminalStore';
+import { useSettingsStore } from '@/stores/app/settingsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { invokeCommand } from '@/ipc/invoke';
+import { parseTerminalOsc, type TerminalShellEvent } from '@/lib/terminalShellIntegration';
 
 type UserParams = { terminalId?: string; compact?: boolean };
 type WrappedParams = { params?: UserParams };

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import type { DockviewApi } from 'dockview-core';
-import { useLayoutStore } from '../layoutStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 
 // Minimal fake dockview API. Covers only the methods the layoutStore
 // addPanel path actually touches; everything else throws so a future

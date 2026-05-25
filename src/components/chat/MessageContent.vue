@@ -17,14 +17,14 @@
 
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { renderMarkdownSegments } from '../../lib/markdown';
+import { renderMarkdownSegments } from '@/lib/markdown';
 // Side-effect import: registers extra prism grammars for the inline /
 // nested code path that still goes through markdown-it's highlight
 // hook. See prismExtraLanguages.ts for the language list.
 import '../../lexical/prismExtraLanguages';
-import CodeEditor from '../shared/CodeEditor.vue';
-import MermaidBlock from '../shared/MermaidBlock.vue';
-import { useSettingsStore } from '../../stores/app/settingsStore';
+import CodeEditor from '@/components/shared/CodeEditor.vue';
+import MermaidBlock from '@/components/shared/MermaidBlock.vue';
+import { useSettingsStore } from '@/stores/app/settingsStore';
 
 const props = withDefaults(
   defineProps<{

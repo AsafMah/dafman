@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { render, cleanup } from '@testing-library/vue';
-import UserMessageBody from '../UserMessageBody.vue';
-import type { SendMessageAttachment } from '../../../ipc/types';
+import UserMessageBody from '@/components/chat/UserMessageBody.vue';
+import type { SendMessageAttachment } from '@/ipc/types';
 
 describe('UserMessageBody', () => {
   test('renders plain markdown via MessageContent when no attachments', () => {

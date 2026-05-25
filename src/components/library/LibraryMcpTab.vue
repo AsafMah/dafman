@@ -11,12 +11,12 @@ import { computed, onMounted, ref } from 'vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Dialog from 'primevue/dialog';
-import { invokeCommand } from '../../ipc/invoke';
-import { useToastStore } from '../../stores/app/toastStore';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { useLayoutStore } from '../../stores/shell/layoutStore';
-import McpServerForm from './McpServerForm.vue';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { invokeCommand } from '@/ipc/invoke';
+import { useToastStore } from '@/stores/app/toastStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import McpServerForm from '@/components/library/McpServerForm.vue';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 type McpConfig = Record<string, unknown>;
 type ConfiguredEntry = {

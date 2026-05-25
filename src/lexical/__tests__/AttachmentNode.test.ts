@@ -9,8 +9,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import { createEditor, $getRoot, $createParagraphNode, $isElementNode } from 'lexical';
-import { AttachmentNode, $createAttachmentNode, $isAttachmentNode } from '../AttachmentNode';
-import type { SendMessageAttachment } from '../../ipc/types';
+import { AttachmentNode, $createAttachmentNode, $isAttachmentNode } from '@/lexical/AttachmentNode';
+import type { SendMessageAttachment } from '@/ipc/types';
 
 function makeEditor() {
   // No `theme` / `onError` — we only care that construction + state

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createPinia, setActivePinia } from 'pinia';
-import { runLocalSlashCommand, SESSION_COMMANDS } from '../sessionCommands';
-import { useSessionsStore } from '../../stores/chat/sessionsStore';
-import { setRpcBridge, type RpcBridge } from '../../ipc/invoke';
+import { runLocalSlashCommand, SESSION_COMMANDS } from '@/lib/sessionCommands';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 
 describe('sessionCommands', () => {
   beforeEach(() => {

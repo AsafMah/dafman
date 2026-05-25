@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import { calloutHandlers } from '../calloutHandlers';
-import { IGNORED_EVENTS } from '../ignored';
-import { lifecycleHandlers } from '../lifecycleHandlers';
-import { messageHandlers } from '../messageHandlers';
-import { notificationHandlers } from '../notificationHandlers';
-import { reasoningHandlers } from '../reasoningHandlers';
-import { sessionMetaHandlers } from '../sessionMetaHandlers';
-import { toolHandlers } from '../toolHandlers';
-import { turnHandlers } from '../turnHandlers';
-import { HANDLED_EVENT_TYPES } from '../../chatEvents';
+import { calloutHandlers } from '@/lib/chatEvents/calloutHandlers';
+import { IGNORED_EVENTS } from '@/lib/chatEvents/ignored';
+import { lifecycleHandlers } from '@/lib/chatEvents/lifecycleHandlers';
+import { messageHandlers } from '@/lib/chatEvents/messageHandlers';
+import { notificationHandlers } from '@/lib/chatEvents/notificationHandlers';
+import { reasoningHandlers } from '@/lib/chatEvents/reasoningHandlers';
+import { sessionMetaHandlers } from '@/lib/chatEvents/sessionMetaHandlers';
+import { toolHandlers } from '@/lib/chatEvents/toolHandlers';
+import { turnHandlers } from '@/lib/chatEvents/turnHandlers';
+import { HANDLED_EVENT_TYPES } from '@/lib/chatEvents';
 
 const FAMILIES: Array<[string, Record<string, unknown>]> = [
   ['message', messageHandlers],

@@ -20,7 +20,7 @@ import type { Extension } from '@codemirror/state';
 import { MergeView, unifiedMergeView } from '@codemirror/merge';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
-import { resolveLanguageExtension, resolveLanguageForFile } from '../../lib/codeLanguage';
+import { resolveLanguageExtension, resolveLanguageForFile } from '@/lib/codeLanguage';
 
 type Mode = 'inline' | 'side-by-side';
 

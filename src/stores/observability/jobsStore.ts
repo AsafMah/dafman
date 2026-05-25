@@ -1,11 +1,11 @@
 import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
-import { invokeCommand } from '../../ipc/invoke';
-import type { JobRecord } from '../../ipc/types';
-import { useLayoutStore } from '../shell/layoutStore';
-import { useSessionsStore } from '../chat/sessionsStore';
-import { useToastStore } from '../app/toastStore';
-import { toErrorMessage } from '../../lib/errorMessage';
+import { invokeCommand } from '@/ipc/invoke';
+import type { JobRecord } from '@/ipc/types';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 type LocalAutopilotMeta = {
   seenThinking: boolean;

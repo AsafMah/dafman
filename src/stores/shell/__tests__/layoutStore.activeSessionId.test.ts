@@ -10,7 +10,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import type { DockviewApi } from 'dockview-core';
-import { useLayoutStore } from '../layoutStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 
 type FakePanel = {
   id: string;

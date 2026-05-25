@@ -11,7 +11,7 @@
 
 import { computed } from 'vue';
 import type { DockviewApi, DockviewGroupPanel, IDockviewPanel } from 'dockview-core';
-import SessionHeaderControls from '../session/SessionHeaderControls.vue';
+import SessionHeaderControls from '@/components/session/SessionHeaderControls.vue';
 
 interface HeaderActionsParams {
   group: DockviewGroupPanel;

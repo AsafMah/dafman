@@ -6,7 +6,7 @@
 /// without scrolling.
 
 import { computed } from 'vue';
-import PathChip from './PathChip.vue';
+import PathChip from '@/components/details/PathChip.vue';
 
 const props = defineProps<{
   output: string;

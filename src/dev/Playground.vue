@@ -15,17 +15,17 @@ import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
-import ChatWindow from '../components/chat/ChatWindow.vue';
+import ChatWindow from '@/components/chat/ChatWindow.vue';
 import type {
   ElicitationRequestData,
   PermissionRequestData,
   SessionEventPayload,
   UserInputRequestData,
-} from '../ipc/types';
-import { accentForIndex } from '../lib/color';
-import { useSessionsStore, type SessionRecord } from '../stores/chat/sessionsStore';
-import { useToastStore } from '../stores/app/toastStore';
-import { toErrorMessage } from '../lib/errorMessage';
+} from '@/ipc/types';
+import { accentForIndex } from '@/lib/color';
+import { useSessionsStore, type SessionRecord } from '@/stores/chat/sessionsStore';
+import { useToastStore } from '@/stores/app/toastStore';
+import { toErrorMessage } from '@/lib/errorMessage';
 
 const toastStore = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -328,7 +328,7 @@ const SCRIPTS: Script[] = [
           result: {
             content: 'ok',
             detailedContent:
-              "import { createApp } from 'vue';\nimport { createPinia } from 'pinia';\nimport App from './App.vue';\n\nconst app = createApp(App);\napp.use(createPinia());\napp.mount('#app');\n",
+              "import { createApp } from 'vue';\nimport { createPinia } from 'pinia';\nimport App from '@/dev/App.vue';\n\nconst app = createApp(App);\napp.use(createPinia());\napp.mount('#app');\n",
           },
         },
       },

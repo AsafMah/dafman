@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { defaultAmbient, processEvents, type IdCounter } from '../../chatEvents';
-import type {
-  PermissionRequestData,
-  SessionEventPayload,
-  UserInputRequestData,
-} from '../../../ipc/types';
+import { defaultAmbient, processEvents, type IdCounter } from '@/lib/chatEvents';
+import type { PermissionRequestData, SessionEventPayload, UserInputRequestData } from '@/ipc/types';
 
 function payload(eventType: string, data: Record<string, unknown>): SessionEventPayload {
   return { sessionId: 'sess-1', eventType, data };

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { getToolRenderer } from '../toolRenderers';
+import { getToolRenderer } from '@/lib/toolRenderers';
 
 describe('getToolRenderer', () => {
   test('shell renderer surfaces command as the summary', () => {

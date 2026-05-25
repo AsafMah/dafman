@@ -13,7 +13,7 @@ import {
   persistedLayoutHasPanel,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
-} from '../layoutSanitize';
+} from '@/lib/layoutSanitize';
 
 // Real-user fixture (redacted to use placeholder session ids).
 const USER_LAYOUT_2026_05_22 = {

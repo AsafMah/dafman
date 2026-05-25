@@ -7,9 +7,9 @@
 /// can show real language-aware syntax highlighting.
 
 import { computed } from 'vue';
-import { parseApplyPatch } from '../../lib/diff';
-import PathChip from './PathChip.vue';
-import DiffEditor from './DiffEditor.vue';
+import { parseApplyPatch } from '@/lib/diff';
+import PathChip from '@/components/details/PathChip.vue';
+import DiffEditor from '@/components/details/DiffEditor.vue';
 
 const props = defineProps<{
   patch: string;

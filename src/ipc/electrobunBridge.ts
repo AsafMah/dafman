@@ -15,9 +15,9 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
-} from './types';
-import type { RpcBridge } from './invoke';
-import { createListenerRegistry } from './listenerRegistry';
+} from '@/ipc/types';
+import type { RpcBridge } from '@/ipc/invoke';
+import { createListenerRegistry } from '@/ipc/listenerRegistry';
 
 interface ElectrobunRpcType {
   bun: {

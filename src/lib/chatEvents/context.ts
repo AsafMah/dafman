@@ -1,5 +1,5 @@
-import type { ChatAmbient, ChatItem, ChatToast, IdCounter, SystemSeverity } from '../chatEvents';
-import type { SessionEventPayload } from '../../ipc/types';
+import type { ChatAmbient, ChatItem, ChatToast, IdCounter, SystemSeverity } from '@/lib/chatEvents';
+import type { SessionEventPayload } from '@/ipc/types';
 
 export interface ReducerContext {
   items: ChatItem[];
