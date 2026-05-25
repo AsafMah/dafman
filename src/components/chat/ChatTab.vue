@@ -2,33 +2,27 @@
 // Custom dockview tab renderer for chat session panels. Replaces
 // dockview's default tab so each tab can carry its session's accent
 // colour and match the chat tile's rounded design language.
-//
-// dockview-vue uses the same `VueRenderer` for tabs and panels, so the
-// prop-shape gotcha applies: on first mount we get
-// `{ params, api, containerApi }` at the top level, on any later
-// `update()` everything is re-wrapped into a single `params` prop. See
-// stored memory "dockview-vue panel props".
 
-import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
-import type { DockviewPanelApi } from 'dockview-core';
+import { computed } from 'vue';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { indicatorStyle } from '@/lib/notificationStyles';
+import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {
   params?: UserParams;
-  api?: DockviewPanelApi;
+  api?: import('dockview-core').DockviewPanelApi;
 };
 type IncomingParams = UserParams & WrappedParams;
 
 const props = defineProps<{
   params: IncomingParams;
-  api?: DockviewPanelApi;
+  api?: import('dockview-core').DockviewPanelApi;
 }>();
 
-const sessionsStore = useSessionsStore();
+const { panelApi, title, isActive, close: onClose } = usePanelLifecycle(props);
 
-const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
+const sessionsStore = useSessionsStore();
 
 const sessionId = computed(() => {
   const fromUserParams = props.params?.params?.sessionId ?? props.params?.sessionId;
@@ -37,49 +31,6 @@ const sessionId = computed(() => {
 });
 
 const record = computed(() => sessionsStore.getSession(sessionId.value));
-
-/// Reactive mirror of `api.title`. Dockview emits `onDidTitleChange`
-/// when the layout-side title updates (we drive it from
-/// `layoutStore.renamePanel` on `session.title_changed`), so we'd miss
-/// changes if we just read `api.title` once.
-const title = ref<string>(panelApi.value?.title ?? '');
-/// Reactive `api.isActive`. Drives the active/inactive styling without
-/// reaching for the parent `.dv-active-tab` class.
-const isActive = ref<boolean>(panelApi.value?.isActive ?? false);
-
-let unsubTitle: (() => void) | null = null;
-let unsubActive: (() => void) | null = null;
-
-watchEffect((onCleanup) => {
-  const api = panelApi.value;
-
-  if (!api) return;
-
-  title.value = api.title ?? '';
-  isActive.value = api.isActive;
-  unsubTitle?.();
-  unsubActive?.();
-  const titleSub = api.onDidTitleChange((e) => {
-    title.value = e.title ?? '';
-  });
-  const activeSub = api.onDidActiveChange(() => {
-    isActive.value = api.isActive;
-  });
-
-  unsubTitle = () => titleSub.dispose();
-  unsubActive = () => activeSub.dispose();
-  onCleanup(() => {
-    unsubTitle?.();
-    unsubActive?.();
-    unsubTitle = null;
-    unsubActive = null;
-  });
-});
-
-onBeforeUnmount(() => {
-  unsubTitle?.();
-  unsubActive?.();
-});
 
 const accent = computed(() => record.value?.accent ?? 'var(--p-primary-color)');
 
@@ -91,10 +42,7 @@ const displayTitle = computed(() => {
 
 /// Status indicator for this session. Maps the record's
 /// `pendingRequest.type` + `isThinking` + `unseenTurns` to one of
-/// five semantic styles via the shared `indicatorStyle` helper —
-/// kept centralised so the dot color, icon, and pulse behavior
-/// stay consistent with the Sessions sidebar row + composer
-/// banner. `null` when nothing's worth surfacing.
+/// five semantic styles via the shared `indicatorStyle` helper.
 const indicator = computed(() =>
   indicatorStyle(
     record.value?.pendingRequests[0]?.kind,
@@ -102,14 +50,6 @@ const indicator = computed(() =>
     record.value?.unseenTurns ?? 0,
   ),
 );
-
-/// `pointerdown.stop` keeps the close click from bubbling into
-/// dockview's drag-start handler on the tab; `click.stop` keeps it
-/// from re-activating the panel right before we close it.
-function onClose(event: MouseEvent) {
-  event.stopPropagation();
-  panelApi.value?.close();
-}
 </script>
 
 <template>

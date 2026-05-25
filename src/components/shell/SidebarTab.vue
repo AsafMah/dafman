@@ -3,73 +3,20 @@
 // (Sessions Manager, future Library, Log viewer, …). Replaces
 // dockview's default tab so the X lives on the right and the chrome
 // matches the rest of the app instead of dockview's stock styling.
-//
-// Same dockview-vue prop-shape gotcha as ChatTab — on first mount we
-// get `{ params, api, containerApi }` at the top level, on any later
-// `update()` everything is re-wrapped into a single `params` prop.
 
-import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
-import type { DockviewPanelApi } from 'dockview-core';
+import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
 
 type WrappedParams = {
   params?: Record<string, unknown>;
-  api?: DockviewPanelApi;
+  api?: import('dockview-core').DockviewPanelApi;
 };
 
 const props = defineProps<{
   params: WrappedParams;
-  api?: DockviewPanelApi;
+  api?: import('dockview-core').DockviewPanelApi;
 }>();
 
-const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
-
-/// Reactive mirror of `api.title` — dockview emits `onDidTitleChange`
-/// when the title is updated via `setTitle`, so a one-time read of
-/// `api.title` would miss later changes.
-const title = ref<string>(panelApi.value?.title ?? '');
-const isActive = ref<boolean>(panelApi.value?.isActive ?? false);
-
-let unsubTitle: (() => void) | null = null;
-let unsubActive: (() => void) | null = null;
-
-watchEffect((onCleanup) => {
-  const api = panelApi.value;
-
-  if (!api) return;
-
-  title.value = api.title ?? '';
-  isActive.value = api.isActive;
-  unsubTitle?.();
-  unsubActive?.();
-  const titleSub = api.onDidTitleChange((e) => {
-    title.value = e.title ?? '';
-  });
-  const activeSub = api.onDidActiveChange(() => {
-    isActive.value = api.isActive;
-  });
-
-  unsubTitle = () => titleSub.dispose();
-  unsubActive = () => activeSub.dispose();
-  onCleanup(() => {
-    unsubTitle?.();
-    unsubActive?.();
-    unsubTitle = null;
-    unsubActive = null;
-  });
-});
-
-onBeforeUnmount(() => {
-  unsubTitle?.();
-  unsubActive?.();
-});
-
-/// `pointerdown.stop` keeps the close click from triggering dockview's
-/// drag-start; `click.stop` keeps it from re-activating the panel
-/// right before we close.
-function onClose(event: MouseEvent) {
-  event.stopPropagation();
-  panelApi.value?.close();
-}
+const { title, isActive, close: onClose } = usePanelLifecycle(props);
 </script>
 
 <template>

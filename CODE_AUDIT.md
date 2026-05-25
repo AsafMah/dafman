@@ -267,11 +267,11 @@ All remaining warnings require refactoring, not quick fixes:
 
 ### Phase 5 — Runtime Safety
 
+- [x] Fix event listener leak in `App.vue` (HMR `dafman:focus-session`)
+- [x] Add `.catch()` to unguarded IPC calls (TerminalPanel `openUrl`)
+- [x] Clear `flushTimer` on terminal kill/exit
 - [ ] Type IPC bridge payloads — eliminate `as unknown as` in wsBridge
 - [ ] Add runtime validation for WS bridge messages
-- [ ] Fix event listener leak in `App.vue`
-- [ ] Add `.catch()` to unguarded IPC calls
-- [ ] Clear `flushTimer` on terminal kill/exit
 - [ ] Deduplicate `addConfig`/`updateConfig` in mcpRegistry
 
 ### Phase 6 — Additional Cleanup
