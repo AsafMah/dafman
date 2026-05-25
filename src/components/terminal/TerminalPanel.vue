@@ -325,7 +325,9 @@ function initXterm(): void {
 
   if (addons.webLinks) {
     const links = new WebLinksAddon((_event, uri) => {
-      void invokeCommand('openUrl', { url: uri });
+      void invokeCommand('openUrl', { url: uri }).catch(() => {
+        /* best-effort link open */
+      });
     });
 
     loadAddon(links, () => term?.loadAddon(links));

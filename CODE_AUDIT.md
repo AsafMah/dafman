@@ -1,6 +1,6 @@
 # Code Quality Audit
 
-> **Date:** 2026-05-25 (updated after composable extraction + ESLint cleanup)
+> **Date:** 2026-05-25 (updated after ESLint warning reduction: 92 → 38)
 > **Codebase:** ~33,000 lines of TypeScript + Vue across `src/` and `src-bun/`
 > **Tools used:** ESLint (strictTypeChecked), jscpd (copy-paste detection), manual review, IDE diagnostics
 
@@ -49,24 +49,18 @@ Files above **800 lines** are strong candidates for splitting.
 
 **Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity + `@stylistic/eslint-plugin`
 
-**Current: 0 errors, 92 warnings** (down from 756 → tuned rules + fixed imports)
+**Current: 0 errors, 38 warnings** (down from 92 → fixed types, emits, catch callbacks, nullish config)
 
 ### 2.1  Issues by Rule
 
 | Count | Rule                                           | What It Means                                  |
 | ----: | ---------------------------------------------- | ---------------------------------------------- |
 |    21 | `complexity`                                   | Cyclomatic complexity above 15                 |
-|    18 | `prefer-nullish-coalescing`                    | `||` where `??` is safer                       |
-|    13 | `no-redundant-type-constituents`               | Union/intersection with redundant members      |
-|     9 | `unified-signatures`                           | Overloads that can be a single signature       |
-|     9 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
+|     6 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
 |     5 | `max-lines-per-function`                       | Function body > 200 lines                      |
-|     4 | `use-unknown-in-catch-callback-variable`       | `catch(e)` without `unknown` type              |
-|     4 | `no-misused-promises`                          | Promise used in non-async context              |
-|     3 | `no-invalid-void-type`                         | `void` used outside return type                |
 |     3 | `no-dynamic-delete`                            | `delete obj[key]` on dynamic key               |
 |     2 | `max-depth`                                    | Nesting > 4 levels deep                        |
-|     1 | `restrict-template-expressions`                | Unsafe types in template literals              |
+|     1 | `no-redundant-type-constituents`               | ESLint parser resolves AgentInfo as error type  |
 
 ### Rules disabled (with rationale)
 
@@ -232,7 +226,7 @@ Found by manual review and IDE diagnostics.
 ## 6  What's Been Done ✅
 
 - [x] **Code style:** gts + Prettier adopted, spacious padding lines
-- [x] **ESLint:** 2,354 issues → 92 warnings (0 errors) — tuned rules, fixed imports
+- [x] **ESLint:** 2,354 issues → 38 warnings (0 errors) — tuned rules, fixed types/emits/catches
 - [x] **Shared utilities:** `createListenerRegistry`, `revealPath`, `MODE_OPTIONS`, `shellUtils`
 - [x] **Directory restructure:** stores (6 folders), components (9 folders), backend (8 folders)
 - [x] **Path aliases:** `@/` configured for all renderer imports (129 files)
@@ -241,6 +235,9 @@ Found by manual review and IDE diagnostics.
 - [x] **Backend helpers:** pure functions extracted to `sessionHelpers.ts`
 - [x] **Session reducer:** `applyToRecord` extracted to `sessionReducer.ts`
 - [x] **Duplicate imports:** merged across 7 files
+- [x] **Type cleanup:** removed redundant `| unknown`, `| null`; fixed `void` in IPC; annotated catch callbacks
+- [x] **Vue emit modernization:** converted 5 components to tuple emit syntax
+- [x] **Nullish coalescing:** configured `ignorePrimitives` for intentional `||` on strings/booleans
 
 
 ---
@@ -258,14 +255,15 @@ Found by manual review and IDE diagnostics.
 - [ ] `registerBuiltinCommands.ts` → split by command group
 - [ ] `layoutStore.ts` (1,145 lines) → separate edge panel logic
 
-### Phase 4 — Fix Remaining Warnings (92 total)
+### Phase 4 — Reduce Remaining Warnings (38 total — structural)
 
-- [ ] 21 `complexity` — reduce CC on functions above 15
-- [ ] 18 `prefer-nullish-coalescing` — `||` → `??`
-- [ ] 13 `no-redundant-type-constituents` — clean up union types
-- [ ] 9 `no-non-null-assertion` — replace `!` with guards
-- [ ] 9 `unified-signatures` — merge overloads
-- [ ] Remaining ~22 warnings across 6 rules
+All remaining warnings require refactoring, not quick fixes:
+- [ ] 21 `complexity` — reduce CC on functions above 15 (split switch/if chains)
+- [ ] 6 `no-non-null-assertion` — safe patterns in addon closures, needs API redesign
+- [ ] 5 `max-lines-per-function` — large store bodies, needs god object splitting
+- [ ] 3 `no-dynamic-delete` — terminal cleanup, needs Map-based alternative
+- [ ] 2 `max-depth` — deeply nested conditionals, needs early returns
+- [ ] 1 `no-redundant-type-constituents` — ESLint parser error type (not fixable)
 
 ### Phase 5 — Runtime Safety
 

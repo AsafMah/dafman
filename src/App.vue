@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Toast, { type ToastMessageOptions } from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
@@ -224,7 +224,7 @@ onMounted(async () => {
   // dispatches `dafman:focus-session` from a Notification's onclick;
   // we activate the matching panel here. Window focus is already
   // attempted on the store side.
-  window.addEventListener('dafman:focus-session', (e: Event) => {
+  const handleFocusSession = (e: Event) => {
     const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
 
     if (!detail?.sessionId) return;
@@ -233,6 +233,12 @@ onMounted(async () => {
     const panel = dock?.getPanel(detail.sessionId);
 
     panel?.api.setActive();
+  };
+
+  window.addEventListener('dafman:focus-session', handleFocusSession);
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('dafman:focus-session', handleFocusSession);
   });
 
   // Auto-create a session when none exist and the URL carries

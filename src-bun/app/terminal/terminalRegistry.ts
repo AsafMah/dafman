@@ -329,6 +329,11 @@ export class TerminalRegistry {
 
     if (!entry || entry.status === 'exited') return;
 
+    if (entry.flushTimer) {
+      clearTimeout(entry.flushTimer);
+      entry.flushTimer = null;
+    }
+
     this.flushOutput(id);
     entry.status = 'exited';
     entry.exitCode = exitCode;
