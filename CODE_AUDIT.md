@@ -534,26 +534,36 @@ modelsStore ──→ toastStore
 commandResultsStore ──→ toastStore
 ```
 
-**Circular conceptual dependency:** `sessionsStore → layoutStore` and
-`sessionReducer → layoutStore`, but `layoutStore` exposes `activeSessionId`
-which is derived from session panel state. Who owns "current session"?
+**Circular dependency:** ✅ Resolved in Phase B (commit `c63b36a`).
+Previously `layoutStore` did a `require('../chat/sessionsStore')` at
+runtime to look up panel titles (commented as "Dynamic import avoids
+circular dependency" — a workaround, not a fix). Now `layoutStore`
+exposes `setSessionTitleResolver(fn)` injected at boot by App.vue;
+neither store imports the other.
 
-**toastStore is a universal dependency** — 8 stores import it. This is
-technically fine (it's a leaf node) but means every store mixes data logic
-with UI notification side effects.
+`sessionsStore → layoutStore` for `activeSessionId` READS (unseen-dot
+watcher, sessionReducer's `shouldFireForRecord` and `handleTurnEnd`)
+is acceptable one-way coupling — layoutStore already publishes that
+value and pulling it via injection would be overkill for the cost.
 
-**Fix:** Stores should be pure data layers. Side effects (toasts,
-notifications, layout commands) should be triggered by watchers/subscribers
-at the App level or in composables that observe store state.
+**toastStore is a universal dependency** — 8 stores import it. Per the
+2026-05-25 rubber-duck on Phase B, this is acceptable as-is: stores
+catch + toast + (optionally) rethrow per documented contract; decoupling
+to App-level watchers would create silent-failure risks. Treated as a
+legitimate cross-cutting concern (same as the `log` import).
 
-### 6.6  Components bypassing stores for IPC
+**Fix (legacy):** ~~Stores should be pure data layers.~~ Superseded:
+layout/session coupling is resolved; toast coupling stays.
 
-12 Vue components call `invokeCommand()` directly (36 call sites) instead of going
-through stores. Business logic (API calls, error handling, retry) lives in `.vue` files
-where it can't be unit-tested without mounting the component.
+### 6.6  Components bypassing stores for IPC ✅ Mostly fixed (Phase B, 2026-05-25)
 
-**Fix:** Strict rule: components → stores → IPC. Components only read reactive
-state and call store actions.
+Before: 12 Vue components called `invokeCommand()` directly (36 call sites).
+
+After Phase B: **3 calls remaining** in 2 files, all per-instance picker
+flows that the rubber-duck explicitly recommended NOT extracting
+(SessionDetailsPanel `saveExportFile`, FilePicker `searchWorkspaceFiles`
++ `pickAttachment`). Everything else moved into composables or shared
+helpers — see §7 Phase B entry for the new module layout.
 
 ### 6.7  terminalStore — hand-rolled localStorage persistence (duplicated 2×)
 
@@ -637,7 +647,7 @@ at runtime. Should be a shared type file imported by both sides.
 | ~~localStorage set/hydrate~~ | ~~terminalStore (2× identical pairs)~~ | ✅ Fixed — `usePersistedRef` (Phase A) |
 | ~~Deferred listener queue~~ | ~~invoke.ts (6× identical blocks)~~ | ✅ Fixed — `createDeferredChannel<L>()` (Phase A) |
 | `as unknown as` shape probes | layoutStore (12×) + App.vue (1×) | Type safety hole |
-| Component → IPC direct calls | 12 .vue files, ~36 call sites | Architecture bypass |
+| ~~Component → IPC direct calls~~ | ~~12 .vue files, ~36 call sites~~ | ✅ Fixed (Phase B) — 3 picker-flow holdouts left, rest moved to composables |
 | ~~Window event bus~~ | ~~9 event names, 13 dispatchers, 9 listeners~~ | ✅ Fixed — mitt + `src/lib/bus.ts` (Phase A) |
 | setTimeout focus hacks | 6+ components, ~10 sites | Missing lifecycle mgmt |
 
@@ -678,6 +688,17 @@ at runtime. Should be a shared type file imported by both sides.
   - [x] Fixed all 63: stale paths (`../rpc`, `./app/audit`), unused locals, missing `?.` on `Tool.handler`, test fixtures, SDK shape drift (UserInputRequest/Response export, extension-* permission kinds, account.getQuota signature, cliPath → RuntimeConnection.forStdio, SessionRegistry.delete → deleteCliSession), Bun.Terminal write signature, Node Dirent typing
   - [x] Wired `lint:tsc-bun` into `bun run check` so future regressions fail CI
   - [x] AGENTS.md rule 22 updated to reflect the gate is now active
+- [x] **SDK simplification (2026-05-25):** swapped deep node_modules imports for `@github/copilot-sdk@1.0.0-beta.7`
+  - [x] 3 `'../../../node_modules/...'` deep paths → clean `from '@github/copilot-sdk'`
+  - [x] `ReasoningEffort` no longer hand-mirrored — derived from `SessionConfig['reasoningEffort']`
+  - [x] `UserInputRequest`/`Response` derived from `SessionConfig.onUserInputRequest` (package exports map blocks sub-paths)
+  - [x] Duplicate `setClientForTest`/`_setClientForTest` collapsed to one impl
+  - [x] Tracked Canvas API (new in beta.7) for post-Phase-B wiring
+- [x] **Phase B (2026-05-25):** data-flow decoupling
+  - [x] B.1 OS-helper centralization — pathActions.openUrl/revealPath/openLogFolder + useFolderPicker composable (7 callsites)
+  - [x] B.2 Library tab composables — useToolsLibrary, useInstructionsLibrary, useSkillsLibrary, useAgentsLibrary, useMcpLibrary (the big one: 13 IPC calls + ~190 lines extracted from LibraryMcpTab.vue) + browseDirectorySafe helper
+  - [x] B.3 Killed layoutStore→sessionsStore circular dep (require()-based) with `setSessionTitleResolver(fn)` injected at boot
+  - **Net Phase B: .vue direct invokeCommand calls 36 → 3, 5 new composables, 1 real circular dep eliminated, 600 tests pass**
 
 
 ---
@@ -717,17 +738,40 @@ All 63 src-bun TS errors cleared in commits following the §2.5 audit
 discovery. `lint:tsc-bun` is now part of `bun run check`. See §2.5 for
 the full breakdown of what was fixed.
 
-### Phase B — Data flow: decouple stores + kill event bus
+### Phase B — Data flow: decouple stores + kill event bus ✅ DONE (2026-05-25)
 
-1. **Store-only IPC rule** — move all `invokeCommand` calls from 12 .vue files
-   into stores/composables
-2. **Decouple stores** — extract cross-store side effects (toasts, notifications,
-   layout commands) into App-level watchers or composables
-3. **Kill window event bus** — replace 13 dispatch sites + 10 listener sites
-   with mitt bus or provide/inject
-4. **Deferred listener generic** — replace 6 identical blocks in invoke.ts with
-   a single `createDeferredChannel<T>()` (or just use mitt + lazy init)
+Reshaped per rubber-duck critique before execution. Original plan
+("store-only IPC rule") risked replacing component god objects with
+store god objects. Final shape:
 
+- [x] **B.1** OS-helper centralization — `pathActions.openUrl`/`revealPath`/
+  `openLogFolder` + `useFolderPicker` composable. 7 callsites migrated.
+- [x] **B.2** Library tab composables — `useToolsLibrary`,
+  `useInstructionsLibrary`, `useSkillsLibrary`, `useAgentsLibrary`,
+  `useMcpLibrary` (the big one — 13 IPC calls + ~190 lines extracted from
+  `LibraryMcpTab.vue`). Plus `browseDirectorySafe` for SessionsManager.
+- [x] **B.3** Killed the layoutStore→sessionsStore `require()`-based
+  circular dep — replaced with `setSessionTitleResolver(fn)` injected at
+  boot (commit `c63b36a`).
+- [x] **B.4** Window event bus — ✅ already done in Phase A step 4 (mitt).
+- [x] **B.5** Deferred listener generic — ✅ already done in Phase A step 5.
+
+**Skipped per critique:** global toast-decoupling — would create silent-
+failure risks. `toastStore` stays as an acceptable cross-cutting concern.
+
+**Skipped per critique:** moving 3 picker flows (SessionDetailsPanel
+`saveExportFile`, FilePicker `searchWorkspaceFiles` + `pickAttachment`)
+— per-instance, no shared state, would be thin shims.
+
+**Result:** .vue direct invokeCommand calls 36 → 3. Tests 600 pass.
+
+### Phase B — Legacy plan (preserved for reference)
+
+1. ~~**Store-only IPC rule**~~ — replaced with composable-first approach
+   per critique (see actual items above).
+2. ~~**Decouple stores from toastStore**~~ — declined per critique.
+3. ~~**Kill window event bus**~~ — done in Phase A step 4.
+4. ~~**Deferred listener generic**~~ — done in Phase A step 5.
 ### Phase C — Type safety: dockview + IPC + shared settings
 
 1. **Typed dockview wrapper** — `dockviewTypes.ts` with interfaces for the
