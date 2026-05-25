@@ -135,22 +135,54 @@ Files above **800 lines** are strong candidates for splitting.
 
 ## 3  Copy-Paste Detection (jscpd)
 
-**16 clones detected** (down from 23 — extracted listener registry, mode options, revealPath)
+**70 clones detected** in `src/` (up from 16 — earlier number was scoped narrowly)
 
-Duplication rate: **1.05%** tokens, **1.13%** lines
+Duplication rate: **2.86%** tokens, **2.56%** lines (895 / 34,992 lines)
 
-### 3.1  Cross-File Clones
+Of the 70, ~32 are in production code (excluding `__tests__/`); the rest are
+boilerplate in test setup (acceptable). 14 cross-file + 18 intra-file are
+addressable.
 
-| Tokens | Lines | Source A                 | Source B                     | What's Duplicated               |
-| -----: | ----: | ------------------------ | ---------------------------- | ------------------------------- |
-|    346 |    36 | `ChatTab.vue`            | `SidebarTab.vue`             | Panel lifecycle (title, active) |
+### 3.1  Cross-File Clones (Production)
 
-### 3.2  Intra-File Clones
+| Lines | Source A | Source B | What's Duplicated |
+| ----: | -------- | -------- | ----------------- |
+| 17 | `SubagentBlock.vue:64` | `useSessionTasks.ts:110` | Sub-agent task aggregation |
+| 16 | `JsonSchemaField.vue:23` | `JsonSchemaForm.vue:35` | Schema field type narrowing |
+| 16 | `JobsPanel.vue:78` | `useSessionTasks.ts:105` | Task list rendering |
+| 16 | `LibraryInstructionsTab.vue:337` | `LibrarySkillsTab.vue:279` | Library tab boilerplate |
+| 15 | `PermissionDetails.vue:22` | `PermissionRuleEditor.vue:39` | Permission shape mapping |
+| 15 | `LibraryMcpTab.vue:315` | `LibraryToolsTab.vue:153` | Library tab boilerplate |
+| 13 | `sessionMetaHandlers.ts:12` | `useSessionUsage.ts:7` | Usage parsing |
+| 12 | `MentionPlugin.vue:133` | `SlashCommandPlugin.vue:184` | Lexical trigger plugin scaffolding |
+| 11 | `JsonSchemaField.vue:85` | `JsonSchemaForm.vue:246` | Field validation |
+| 11 | `PermissionDetails.vue:54` | `ToolDetails.vue:182` | Permission/tool detail render |
+| 11 | `DiffEditor.vue:52` | `CodeEditor.vue:99` | CodeMirror setup |
+| 11 | `ModeButtonGroup.vue:116` | `SessionHeaderControls.vue:625` | Mode button rendering |
+| 7  | `sessionMetaHandlers.ts:101` | `sessionReducer.ts:179` | Session meta merge logic |
 
-| Tokens | Lines | File                    | What's Duplicated                    |
-| -----: | ----: | ----------------------- | ------------------------------------ |
-|    217 |    41 | `LibraryAgentsTab.vue`  | User vs project agent sections       |
-|    147 |    10 | `layoutSanitize.ts`     | Panel sanitize logic                 |
+### 3.2  Intra-File Clones (Production, top 12)
+
+| Lines | File | What's Duplicated |
+| ----: | ---- | ----------------- |
+| 42 | `LibraryAgentsTab.vue:284,333` | User vs project agent sections |
+| 33 | `CommandPalette.vue:206,246` | Keyboard nav blocks |
+| 26 | `LibraryInstructionsTab.vue:149,204` | User vs project instructions |
+| 25 | `LibraryInstructionsTab.vue:174,229` | (same — 2 paste sites) |
+| 23 | `ActivityBar.vue:146,170` | Button group render |
+| 23 | `JsonSchemaField.vue:164,222` | Field type rendering (string/number/bool) |
+| 22 | `JsonSchemaField.vue:164,275` | (same field, repeated 3× total) |
+| 22 | `JsonSchemaField.vue:164,339` | (same — 4 type-branches identical) |
+| 16 | `McpServerForm.vue:360,422` | Env var entry blocks |
+| 16 | `ToolDetails.vue:273,288,434,458` | Tool category headers (2 pairs) |
+| 16 | `JsonValueView.vue:128,164` | Value render branches |
+
+**High-ROI extraction candidates:**
+1. `JsonSchemaField.vue` — 4 near-identical type branches (~70 lines) → polymorphic per-type sub-component
+2. `LibraryAgentsTab` / `LibraryInstructionsTab` / `LibrarySkillsTab` / `LibraryMcpTab` / `LibraryToolsTab` — all share user/project tab pattern → `<LibraryTabPanel :user :project>` wrapper
+3. `SubagentBlock` ↔ `useSessionTasks` ↔ `JobsPanel` — task aggregation in 3 places → single `useTaskAggregation` composable
+4. `MentionPlugin` ↔ `SlashCommandPlugin` — Lexical trigger plugin scaffolding → shared `createTriggerPlugin()`
+5. `DiffEditor` ↔ `CodeEditor` — CodeMirror setup → shared `useCodeMirror()` composable
 
 
 ---
