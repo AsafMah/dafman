@@ -136,24 +136,24 @@ async function mountWith(Root: typeof App) {
   // dockview-vue's findComponent() does an exact case-sensitive lookup
   // in Vue's appContext.components. Names here MUST match the strings
   // used in addPanel({ component: '...' }) and the watermark/tab props.
-  app.component('chat', ChatPanel);
-  app.component('jobsPanel', JobsPanel);
-  app.component('library', LibraryPanel);
-  app.component('sessionDetails', SessionDetailsPanel);
-  app.component('sessionsManager', SessionsManager);
-  app.component('settingsPanel', SettingsPanel);
-  app.component('logViewer', LogViewer);
-  app.component('terminal', TerminalPanel);
-  app.component('terminalsPanel', TerminalsPanel);
-  app.component('watermark', Watermark);
-  app.component('chatTabActions', ChatTabActions);
-  app.component('chatTab', ChatTab);
-  app.component('sidebarTab', SidebarTab);
+  app.component('Chat', ChatPanel);
+  app.component('JobsPanel', JobsPanel);
+  app.component('Library', LibraryPanel);
+  app.component('SessionDetails', SessionDetailsPanel);
+  app.component('SessionsManager', SessionsManager);
+  app.component('SettingsPanel', SettingsPanel);
+  app.component('LogViewer', LogViewer);
+  app.component('Terminal', TerminalPanel);
+  app.component('TerminalsPanel', TerminalsPanel);
+  app.component('Watermark', Watermark);
+  app.component('ChatTabActions', ChatTabActions);
+  app.component('ChatTab', ChatTab);
+  app.component('SidebarTab', SidebarTab);
 
   if (import.meta.env.DEV) {
     const mod = await import('@/dev/Playground.vue');
 
-    app.component('playground', mod.default);
+    app.component('Playground', mod.default);
   }
 
   app.mount('#app');

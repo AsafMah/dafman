@@ -24,10 +24,10 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'save', text: string): void;
-  (e: 'saveAndFork', text: string): void;
-  (e: 'cancel'): void;
-  (e: 'draftChange', text: string): void;
+  save: [text: string];
+  saveAndFork: [text: string];
+  cancel: [];
+  draftChange: [text: string];
 }>();
 
 const editor = useLexicalComposer();

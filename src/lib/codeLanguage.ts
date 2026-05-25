@@ -104,7 +104,7 @@ export async function resolveLanguageExtension(
 
   const key = langId.toLowerCase();
 
-  if (cache.has(key)) return cache.get(key)!;
+  if (cache.has(key)) return cache.get(key) as Extension;
 
   // Direct factory lookup first…
   let factory = factories[key];

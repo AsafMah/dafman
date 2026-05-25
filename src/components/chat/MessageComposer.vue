@@ -280,10 +280,10 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
 /// the user invoked. The parent (`ChatWindow`) maps it to the
 /// session-store action.
 const emit = defineEmits<{
-  (e: 'submit', payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }): void;
-  (e: 'requestCommandTerminal'): void;
-  (e: 'openFullTerminal'): void;
-  (e: 'update:defaultMode', mode: DefaultSendMode): void;
+  submit: [payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }];
+  requestCommandTerminal: [];
+  openFullTerminal: [];
+  'update:defaultMode': [mode: DefaultSendMode];
 }>();
 
 /// Imperatively focus the editor. Used by ChatWindow when an external

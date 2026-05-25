@@ -166,7 +166,7 @@ export type CommandResultEvent =
     };
 
 export interface Layout {
-  dockview: unknown | null;
+  dockview: unknown;
 }
 
 export interface Workspaces {

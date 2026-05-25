@@ -81,7 +81,10 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
-      '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+      '@typescript-eslint/prefer-nullish-coalescing': [
+        'warn',
+        { ignorePrimitives: { string: true, boolean: true } },
+      ],
       '@typescript-eslint/no-misused-promises': 'warn',
       '@typescript-eslint/restrict-template-expressions': ['warn', { allowNumber: true }],
       // Defensive runtime checks are fine — SDK shapes drift and external

@@ -32,7 +32,7 @@ import type {
 } from '@/ipc/types';
 import type { Handler, ReducerContext } from '@/lib/chatEvents/context';
 
-function describePermission(data: PermissionRequestData | unknown): string {
+function describePermission(data: unknown): string {
   if (
     data &&
     typeof data === 'object' &&
@@ -48,7 +48,7 @@ function describePermission(data: PermissionRequestData | unknown): string {
   );
 }
 
-function describeInput(data: UserInputRequestData | unknown): string {
+function describeInput(data: unknown): string {
   if (
     data &&
     typeof data === 'object' &&
@@ -63,7 +63,7 @@ function describeInput(data: UserInputRequestData | unknown): string {
   );
 }
 
-function describeElicitation(data: ElicitationRequestData | unknown): string {
+function describeElicitation(data: unknown): string {
   if (
     data &&
     typeof data === 'object' &&
@@ -77,7 +77,7 @@ function describeElicitation(data: ElicitationRequestData | unknown): string {
   );
 }
 
-function describeExitPlan(data: ExitPlanModeRequestData | unknown): string {
+function describeExitPlan(data: unknown): string {
   if (
     data &&
     typeof data === 'object' &&
@@ -89,7 +89,7 @@ function describeExitPlan(data: ExitPlanModeRequestData | unknown): string {
   return 'Plan ready for approval';
 }
 
-function describeAutoModeSwitch(data: AutoModeSwitchRequestData | unknown): string {
+function describeAutoModeSwitch(data: unknown): string {
   if (
     data &&
     typeof data === 'object' &&
@@ -145,13 +145,7 @@ export const notificationHandlers: Record<string, Handler> = {
       | {
           requestId?: unknown;
           kind?: unknown;
-          request?:
-            | PermissionRequestData
-            | UserInputRequestData
-            | ElicitationRequestData
-            | ExitPlanModeRequestData
-            | AutoModeSwitchRequestData
-            | unknown;
+          request?: unknown;
         }
       | undefined;
 

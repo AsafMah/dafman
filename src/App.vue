@@ -259,7 +259,7 @@ onMounted(async () => {
 /// resume succeeded. The dockview side won't be `@ready` yet on
 /// startup, so we defer the actual `fromJSON` until the api shows up
 /// (`onDockReady` will check this).
-const pendingRestoreLayout = ref<unknown | null>(null);
+const pendingRestoreLayout = ref<unknown>(null);
 
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;

@@ -214,7 +214,7 @@ const hasResult = computed(() => liveResult.value.length > 0);
 // array, we render through JsonValueView; primitives or non-JSON
 // strings keep the CommandBlock path. Streaming partials are often
 // truncated JSON, so failure is expected and silent.
-const parsedResult = computed<unknown | undefined>(() => {
+const parsedResult = computed<unknown>(() => {
   if (!hasResult.value) return undefined;
 
   const trimmed = liveResult.value.trim();

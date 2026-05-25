@@ -153,7 +153,7 @@ export interface NotificationPrefs {
 export interface Layout {
   /// Serialized dockview state (`api.toJSON()`). `null` means
   /// "no panes were open last time" — start with an empty dockview.
-  dockview: unknown | null;
+  dockview: unknown;
 }
 
 export interface TerminalCreateParams {

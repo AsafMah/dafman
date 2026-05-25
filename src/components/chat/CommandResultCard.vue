@@ -5,8 +5,8 @@ import { cleanTerminalCommandOutput } from '@/lib/ansi';
 
 defineProps<{ record: CommandResultRecord }>();
 const emit = defineEmits<{
-  (e: 'add', record: CommandResultRecord): void;
-  (e: 'cancel', record: CommandResultRecord): void;
+  add: [record: CommandResultRecord];
+  cancel: [record: CommandResultRecord];
 }>();
 
 function markdownFor(record: CommandResultRecord): string {

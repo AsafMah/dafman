@@ -35,10 +35,10 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'edit'): void;
-  (e: 'quote', text: string): void;
-  (e: 'retry'): void;
-  (e: 'fork'): void;
+  edit: [];
+  quote: [text: string];
+  retry: [];
+  fork: [];
 }>();
 
 const toasts = useToastStore();

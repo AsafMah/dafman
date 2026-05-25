@@ -1081,7 +1081,7 @@ export const useLayoutStore = defineStore('layout', () => {
   /// Returns dockview's full serialized layout, or null when the api
   /// isn't ready yet. Callers (settingsStore writers) treat this as an
   /// opaque blob — only dockview interprets it.
-  function snapshot(): unknown | null {
+  function snapshot(): unknown {
     return api.value?.toJSON() ?? null;
   }
 

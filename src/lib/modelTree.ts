@@ -156,7 +156,10 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
   });
 
   for (const provKey of providers) {
-    const provBucket = buckets.get(provKey)!;
+    const provBucket = buckets.get(provKey);
+
+    if (!provBucket) continue;
+
     const provLabel = providerLabel.get(provKey) ?? provKey;
     const providerChildren: (ModelTreeGroup | ModelTreeLeaf)[] = [];
 
@@ -177,7 +180,9 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
     });
 
     for (const typeKey of types) {
-      const leaves = provBucket.get(typeKey)!;
+      const leaves = provBucket.get(typeKey);
+
+      if (!leaves) continue;
 
       leaves.sort((a, b) => compareVersionDesc(a.label, b.label));
 

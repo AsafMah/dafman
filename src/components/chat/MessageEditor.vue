@@ -25,9 +25,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'save', text: string): void;
-  (e: 'saveAndFork', text: string): void;
-  (e: 'cancel'): void;
+  save: [text: string];
+  saveAndFork: [text: string];
+  cancel: [];
 }>();
 
 const draftText = ref(props.originalText);

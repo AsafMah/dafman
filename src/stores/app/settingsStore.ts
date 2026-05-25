@@ -181,7 +181,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /// App.vue on every `onDidLayoutChange` once the api is ready. Errors
   /// are intentionally swallowed — a layout-save failure should not
   /// disrupt the user's workflow.
-  async function persistLayout(dockview: unknown | null): Promise<void> {
+  async function persistLayout(dockview: unknown): Promise<void> {
     try {
       await update({
         ...settings.value,
