@@ -25,9 +25,9 @@ import type {
   ToolsPrefs,
   Workspaces,
 } from '../rpc';
-import { AppError } from './errors';
-import { log } from './logging';
-import { toErrorMessage } from './errorMessage';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
+import { toErrorMessage } from '../shared/errorMessage';
 
 export const SETTINGS_VERSION = 14;
 

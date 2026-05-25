@@ -2,9 +2,9 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { _setClientForTest } from '../app/client';
-import { SessionRegistry } from '../app/sessions';
-import { AppError } from '../app/errors';
+import { _setClientForTest } from '../app/client/client';
+import { SessionRegistry } from '../app/chat/sessions';
+import { AppError } from '../app/shared/errors';
 import type { SessionEventPayload } from '../rpc';
 
 type Handler = (event: { type: string; [k: string]: unknown }) => void;
@@ -641,7 +641,7 @@ describe('SessionRegistry', () => {
   });
 
   test('respondToRequest records an audit entry with the right kind + decision + summary', async () => {
-    const { _resetAudit, recentAudit, initAudit } = await import('../app/audit');
+    const { _resetAudit, recentAudit, initAudit } = await import('../app/observability/audit');
     _resetAudit();
     const { tmpdir } = await import('node:os');
     const { mkdtemp } = await import('node:fs/promises');

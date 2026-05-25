@@ -27,23 +27,23 @@ import {
   type SessionEvent,
   type UserInputRequest,
   type UserInputResponse,
-} from './copilotSdk';
+} from '../client/copilotSdk';
 import { stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
-import { tryGetClient } from './client';
-import { AppError } from './errors';
-import { log } from './logging';
+import { tryGetClient } from '../client/client';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
 import { PendingRequestQueue } from './pendingRequests';
-import { buildBuiltInTools } from './tools';
-import { searchWorkspaceFiles } from './fileSearch';
+import { buildBuiltInTools } from '../library/tools';
+import { searchWorkspaceFiles } from '../filesystem/fileSearch';
 import {
   listAgentFiles,
   writeAgent,
   deleteAgent,
   type AgentFileSpec,
   type AgentScope as AgentFileScope,
-} from './agentFiles';
-import { toErrorMessage } from './errorMessage';
+} from '../library/agentFiles';
+import { toErrorMessage } from '../shared/errorMessage';
 import type {
   AutoModeSwitchRequestData,
   ElicitationRequestData,

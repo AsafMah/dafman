@@ -11,9 +11,9 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, basename, normalize } from 'node:path';
-import { AppError } from './errors';
-import { log } from './logging';
-import { toErrorMessage } from './errorMessage';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
+import { toErrorMessage } from '../shared/errorMessage';
 
 export interface SaveExportOptions {
   /// `Utils.paths.userData` from the caller.

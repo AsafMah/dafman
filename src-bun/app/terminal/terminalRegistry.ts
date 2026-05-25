@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { TerminalCreateParams, TerminalEventPayload, TerminalSummary } from '../rpc';
-import { AppError } from './errors';
-import { log } from './logging';
-import { toErrorMessage } from './errorMessage';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
+import { toErrorMessage } from '../shared/errorMessage';
 import { defaultShell } from './shellUtils';
 
 type TerminalStatus = TerminalSummary['status'];

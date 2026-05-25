@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isNoiseLine } from '../app/stderrFilter';
+import { isNoiseLine } from '../app/observability/stderrFilter';
 
 describe('stderrFilter.isNoiseLine', () => {
   test('drops node-pty AttachConsole stack frames', () => {

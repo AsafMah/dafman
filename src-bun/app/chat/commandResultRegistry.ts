@@ -3,11 +3,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { CommandResultEvent, CommandResultRecord } from '../rpc';
-import { AppError } from './errors';
-import { log } from './logging';
-import { recordCommand } from './audit';
-import { toErrorMessage } from './errorMessage';
-import { resolveShellForCommand } from './shellUtils';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
+import { recordCommand } from '../observability/audit';
+import { toErrorMessage } from '../shared/errorMessage';
+import { resolveShellForCommand } from '../terminal/shellUtils';
 
 const OUTPUT_CAP_BYTES = 1024 * 1024;
 const TIMEOUT_MS = 60_000;

@@ -8,9 +8,9 @@
 // shape filter.
 
 import { describe, expect, test } from 'bun:test';
-import { McpRegistry } from '../app/mcpRegistry';
-import { AppError } from '../app/errors';
-import type { CopilotClient } from '../app/copilotSdk';
+import { McpRegistry } from '../app/library/mcpRegistry';
+import { AppError } from '../app/shared/errors';
+import type { CopilotClient } from '../app/client/copilotSdk';
 
 /// Minimal fake client that satisfies the McpRegistry surface. Lets
 /// each test script its own behavior without instantiating the real

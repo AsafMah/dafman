@@ -7,9 +7,9 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CopilotClient } from './copilotSdk';
-import { AppError } from './errors';
-import { log } from './logging';
-import { toErrorMessage } from './errorMessage';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
+import { toErrorMessage } from '../shared/errorMessage';
 
 let instance: CopilotClient | null = null;
 let starting: Promise<CopilotClient> | null = null;

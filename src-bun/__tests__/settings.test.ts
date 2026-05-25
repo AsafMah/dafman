@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SETTINGS_VERSION, SettingsService, defaultSettings, migrate } from '../app/settings';
+import { SETTINGS_VERSION, SettingsService, defaultSettings, migrate } from '../app/config/settings';
 
 const tempDirs: string[] = [];
 

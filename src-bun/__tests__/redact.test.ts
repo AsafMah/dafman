@@ -5,8 +5,8 @@
 // the redaction policy is a deliberate review item.
 
 import { describe, expect, test } from 'bun:test';
-import { redactFields } from '../app/redact';
-import { buildRecord } from '../app/logging';
+import { redactFields } from '../app/shared/redact';
+import { buildRecord } from '../app/observability/logging';
 
 describe('redactFields — sensitive keys', () => {
   test('gitHubToken is replaced with ***', () => {

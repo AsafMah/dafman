@@ -20,7 +20,7 @@ import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from './logging';
-import { toErrorMessage } from './errorMessage';
+import { toErrorMessage } from '../shared/errorMessage';
 
 type PermissionAuditDecision = 'approveOnce' | 'approveForSession' | 'reject';
 

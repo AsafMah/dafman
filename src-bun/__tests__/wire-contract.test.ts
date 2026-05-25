@@ -18,7 +18,7 @@ import type {
   CommandResultRecord,
   SendMessageAttachment,
 } from '../rpc';
-import type { AppErrorPayload } from '../app/errors';
+import type { AppErrorPayload } from '../app/shared/errors';
 
 // Wire-shape snapshots — equivalent to the old `insta` snapshots in
 // `src-tauri/tests/ipc_contract.rs`. The whole point is that if anyone

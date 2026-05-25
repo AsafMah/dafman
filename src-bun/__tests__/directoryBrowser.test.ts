@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
-import { browseDirectorySync } from '../app/directoryBrowser';
+import { browseDirectorySync } from '../app/filesystem/directoryBrowser';
 
 const tempDirs: string[] = [];
 

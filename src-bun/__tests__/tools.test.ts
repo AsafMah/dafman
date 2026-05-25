@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildBuiltInTools } from '../app/tools';
+import { buildBuiltInTools } from '../app/library/tools';
 
 /// Built-in tools registered on every session config. Currently just
 /// `request_form_input` for triggering MCP-style elicitation from any

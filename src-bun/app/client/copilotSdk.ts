@@ -13,7 +13,7 @@ export {
   createSessionFsAdapter,
   defineTool,
   SYSTEM_PROMPT_SECTIONS,
-} from '../../node_modules/@github/copilot/copilot-sdk/index.js';
+} from '../../../node_modules/@github/copilot/copilot-sdk/index.js';
 
 export type {
   AutoModeSwitchHandler,
@@ -48,4 +48,4 @@ export type {
   ToolResultObject,
   UserInputRequest,
   UserInputResponse,
-} from '../../node_modules/@github/copilot/copilot-sdk/index.js';
+} from '../../../node_modules/@github/copilot/copilot-sdk/index.js';

@@ -16,7 +16,7 @@
 
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { redactFields } from './redact';
+import { redactFields } from '../shared/redact';
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
 

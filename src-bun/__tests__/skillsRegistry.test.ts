@@ -5,9 +5,9 @@
 // argument forwarding, discover() shape normalization.
 
 import { describe, expect, test } from 'bun:test';
-import { SkillsRegistry } from '../app/skillsRegistry';
-import { AppError } from '../app/errors';
-import type { CopilotClient } from '../app/copilotSdk';
+import { SkillsRegistry } from '../app/library/skillsRegistry';
+import { AppError } from '../app/shared/errors';
+import type { CopilotClient } from '../app/client/copilotSdk';
 
 function makeFakeClient(
   overrides: Partial<{

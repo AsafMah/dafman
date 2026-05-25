@@ -11,8 +11,8 @@ import { describe, expect, test, beforeEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { initLogger, log, _resetLogger } from '../app/logging';
-import { exportDiagnostics } from '../app/diagnostics';
+import { initLogger, log, _resetLogger } from '../app/observability/logging';
+import { exportDiagnostics } from '../app/observability/diagnostics';
 
 describe('exportDiagnostics', () => {
   beforeEach(() => {

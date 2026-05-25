@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { toModelSummary } from '../app/models';
-import type { ModelInfo } from '../app/copilotSdk';
+import { toModelSummary } from '../app/library/models';
+import type { ModelInfo } from '../app/client/copilotSdk';
 
 function baseModel(over: Partial<ModelInfo> = {}): ModelInfo {
   return {

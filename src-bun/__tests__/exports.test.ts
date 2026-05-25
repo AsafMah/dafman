@@ -6,7 +6,7 @@ import { describe, expect, test } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { saveExportFile } from '../app/exports';
+import { saveExportFile } from '../app/config/exports';
 
 describe('saveExportFile', () => {
   test('writes the file under <root>/exports/ and returns its path + bytes', async () => {

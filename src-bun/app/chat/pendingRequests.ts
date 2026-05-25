@@ -12,10 +12,10 @@
 // before calling `enqueue`; this class never knows about approve-all.
 
 import { randomUUID } from 'node:crypto';
-import { recordPermission, type PermissionAuditEntry } from './audit';
-import { log } from './logging';
+import { recordPermission, type PermissionAuditEntry } from '../observability/audit';
+import { log } from '../observability/logging';
 import type { RespondToRequestParams } from '../rpc';
-import { toErrorMessage } from './errorMessage';
+import { toErrorMessage } from '../shared/errorMessage';
 
 export type PendingKind =
   | 'permission'

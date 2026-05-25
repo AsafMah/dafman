@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { AppError, rpcGuard } from '../app/errors';
+import { AppError, rpcGuard } from '../app/shared/errors';
 
 describe('AppError', () => {
   test('formats ClientNotStarted', () => {

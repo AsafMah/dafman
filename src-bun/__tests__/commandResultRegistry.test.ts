@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { CommandResultRegistry } from '../app/commandResultRegistry';
+import { CommandResultRegistry } from '../app/chat/commandResultRegistry';
 import type { CommandResultEvent } from '../rpc';
 
 function waitFor(

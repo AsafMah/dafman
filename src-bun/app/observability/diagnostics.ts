@@ -32,8 +32,8 @@
 import { copyFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getLogDir, log, recentLogs } from './logging';
-import { AppError } from './errors';
-import { toErrorMessage } from './errorMessage';
+import { AppError } from '../shared/errors';
+import { toErrorMessage } from '../shared/errorMessage';
 
 export interface DiagnosticsExportResult {
   /// Absolute path to the export directory.

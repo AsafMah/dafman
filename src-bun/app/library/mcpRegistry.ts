@@ -11,10 +11,10 @@
 // need entry lookup. If MCP grows substantially, revisit by passing a
 // `getSession(sessionId)` accessor here.
 
-import type { CopilotClient } from './copilotSdk';
-import { tryGetClient } from './client';
-import { AppError } from './errors';
-import { toErrorMessage } from './errorMessage';
+import type { CopilotClient } from '../client/copilotSdk';
+import { tryGetClient } from '../client/client';
+import { AppError } from '../shared/errors';
+import { toErrorMessage } from '../shared/errorMessage';
 
 export interface McpDiscoveredServer {
   name: string;

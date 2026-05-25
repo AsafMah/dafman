@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { searchWorkspaceFiles, _resetForTest, invalidate } from '../app/fileSearch';
+import { searchWorkspaceFiles, _resetForTest, invalidate } from '../app/filesystem/fileSearch';
 
 /// fileSearch tests build a temp workspace, then exercise the two
 /// modes (fuzzy + path-nav), the two split toggles (`includeHidden`

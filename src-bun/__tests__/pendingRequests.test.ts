@@ -6,9 +6,9 @@
 // audit hand-off, and the `settleForSession` / `settleAll` drains.
 
 import { afterEach, describe, expect, test } from 'bun:test';
-import { PendingRequestQueue, type AuditPermission } from '../app/pendingRequests';
+import { PendingRequestQueue, type AuditPermission } from '../app/chat/pendingRequests';
 import type { RespondToRequestParams } from '../rpc';
-import type { PermissionAuditEntry } from '../app/audit';
+import type { PermissionAuditEntry } from '../app/observability/audit';
 
 interface CapturedAudit {
   calls: Array<Omit<PermissionAuditEntry, 'ts' | 'kind'>>;

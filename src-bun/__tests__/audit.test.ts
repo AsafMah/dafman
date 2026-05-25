@@ -12,8 +12,8 @@ import {
   recordPermission,
   recordUrl,
   subscribeAudit,
-} from '../app/audit';
-import type { AuditEntry } from '../app/audit';
+} from '../app/observability/audit';
+import type { AuditEntry } from '../app/observability/audit';
 
 describe('audit log writer', () => {
   beforeEach(() => {

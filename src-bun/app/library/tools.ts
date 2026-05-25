@@ -7,8 +7,8 @@
 /// way to trigger an elicitation request in dafman until someone
 /// connects an MCP server that elicits.
 
-import type { Tool, ToolInvocation } from './copilotSdk';
-import type { SessionRegistry } from './sessions';
+import type { Tool, ToolInvocation } from '../client/copilotSdk';
+import type { SessionRegistry } from '../chat/sessions';
 
 /// Loose JSON-Schema-ish shape that mirrors what the MCP elicitation
 /// spec accepts. We don't validate — the renderer + SDK handle that.

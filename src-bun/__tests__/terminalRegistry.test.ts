@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { TerminalRegistry } from '../app/terminalRegistry';
+import { TerminalRegistry } from '../app/terminal/terminalRegistry';
 import type { TerminalEventPayload } from '../rpc';
-import { AppError } from '../app/errors';
+import { AppError } from '../app/shared/errors';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

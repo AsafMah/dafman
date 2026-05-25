@@ -10,8 +10,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
-import { AppError } from '../app/errors';
-import { listAgentFiles, validateAgentName, writeAgent, deleteAgent } from '../app/agentFiles';
+import { AppError } from '../app/shared/errors';
+import { listAgentFiles, validateAgentName, writeAgent, deleteAgent } from '../app/library/agentFiles';
 
 let workspaceDir: string;
 

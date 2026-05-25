@@ -10,9 +10,9 @@
 
 import { join } from 'node:path';
 import { BrowserView, BrowserWindow, Updater, Utils } from 'electrobun/bun';
-import { ensureClient, shutdownClient } from './app/client';
-import { browseDirectorySync } from './app/directoryBrowser';
-import { rpcGuard } from './app/errors';
+import { ensureClient, shutdownClient } from './app/client/client';
+import { browseDirectorySync } from './app/filesystem/directoryBrowser';
+import { rpcGuard } from './app/shared/errors';
 import {
   getLogDir as currentLogDir,
   getLogLevel,
@@ -21,21 +21,21 @@ import {
   recentLogs,
   setLogLevel,
   subscribeLogs,
-} from './app/logging';
-import { exportDiagnostics } from './app/diagnostics';
-import { saveExportFile } from './app/exports';
-import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/audit';
-import type { AuditEntry } from './app/audit';
-import { toModelSummary } from './app/models';
-import { SessionRegistry } from './app/sessions';
-import { McpRegistry } from './app/mcpRegistry';
-import { SkillsRegistry } from './app/skillsRegistry';
-import { TerminalRegistry } from './app/terminalRegistry';
-import { CommandResultRegistry } from './app/commandResultRegistry';
-import { listInstructionSources } from './app/instructions';
-import { SettingsService, ensureDefaultWorkspace } from './app/settings';
-import { installStderrFilter } from './app/stderrFilter';
-import { tryGetClient } from './app/client';
+} from './app/observability/logging';
+import { exportDiagnostics } from './app/observability/diagnostics';
+import { saveExportFile } from './app/config/exports';
+import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/observability/audit';
+import type { AuditEntry } from './app/observability/audit';
+import { toModelSummary } from './app/library/models';
+import { SessionRegistry } from './app/chat/sessions';
+import { McpRegistry } from './app/library/mcpRegistry';
+import { SkillsRegistry } from './app/library/skillsRegistry';
+import { TerminalRegistry } from './app/terminal/terminalRegistry';
+import { CommandResultRegistry } from './app/chat/commandResultRegistry';
+import { listInstructionSources } from './app/library/instructions';
+import { SettingsService, ensureDefaultWorkspace } from './app/config/settings';
+import { installStderrFilter } from './app/observability/stderrFilter';
+import { tryGetClient } from './app/client/client';
 import type {
   CommandResultEvent,
   DafmanRPC,
@@ -43,7 +43,7 @@ import type {
   SessionEventPayload,
   TerminalEventPayload,
 } from './rpc';
-import { toErrorMessage } from './app/errorMessage';
+import { toErrorMessage } from './app/shared/errorMessage';
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { toErrorMessage } from '../errorMessage';
+import { toErrorMessage } from '../shared/errorMessage';
 
 describe('toErrorMessage', () => {
   test('extracts message from Error instance', () => {

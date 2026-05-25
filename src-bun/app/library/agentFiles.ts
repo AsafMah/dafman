@@ -24,9 +24,9 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join, normalize, relative, resolve } from 'node:path';
-import { AppError } from './errors';
-import { log } from './logging';
-import { toErrorMessage } from './errorMessage';
+import { AppError } from '../shared/errors';
+import { log } from '../observability/logging';
+import { toErrorMessage } from '../shared/errorMessage';
 
 /// Per the SDK app.js: `userConfigDir` resolves to `~/.copilot/`
 /// (Linux/macOS) or %APPDATA%/.copilot on Windows in practice. We

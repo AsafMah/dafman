@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { listInstructionSources } from '../app/instructions';
+import { listInstructionSources } from '../app/library/instructions';
 
 let workspaceDir: string;
 

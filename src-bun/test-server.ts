@@ -15,7 +15,7 @@
 
 import { join } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
-import { rpcGuard } from './app/errors';
+import { rpcGuard } from './app/shared/errors';
 import {
   initLogger,
   getLogLevel,
@@ -23,23 +23,23 @@ import {
   recentLogs,
   subscribeLogs,
   log,
-} from './app/logging';
-import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/audit';
-import { saveExportFile } from './app/exports';
-import { exportDiagnostics } from './app/diagnostics';
-import { browseDirectorySync } from './app/directoryBrowser';
-import { tryGetClient, setClientForTest } from './app/client';
-import { SessionRegistry } from './app/sessions';
-import { McpRegistry } from './app/mcpRegistry';
-import { SkillsRegistry } from './app/skillsRegistry';
-import { TerminalRegistry } from './app/terminalRegistry';
-import { CommandResultRegistry } from './app/commandResultRegistry';
-import { SettingsService } from './app/settings';
-import { listInstructionSources } from './app/instructions';
-import { toModelSummary } from './app/models';
-import { FakeCopilotClient } from './app/fakeClient';
-import type { AuditEntry } from './app/audit';
-import { toErrorMessage } from './app/errorMessage';
+} from './app/observability/logging';
+import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/observability/audit';
+import { saveExportFile } from './app/config/exports';
+import { exportDiagnostics } from './app/observability/diagnostics';
+import { browseDirectorySync } from './app/filesystem/directoryBrowser';
+import { tryGetClient, setClientForTest } from './app/client/client';
+import { SessionRegistry } from './app/chat/sessions';
+import { McpRegistry } from './app/library/mcpRegistry';
+import { SkillsRegistry } from './app/library/skillsRegistry';
+import { TerminalRegistry } from './app/terminal/terminalRegistry';
+import { CommandResultRegistry } from './app/chat/commandResultRegistry';
+import { SettingsService } from './app/config/settings';
+import { listInstructionSources } from './app/library/instructions';
+import { toModelSummary } from './app/library/models';
+import { FakeCopilotClient } from './app/client/fakeClient';
+import type { AuditEntry } from './app/observability/audit';
+import { toErrorMessage } from './app/shared/errorMessage';
 import type {
   LogRecord,
   SessionEventPayload,

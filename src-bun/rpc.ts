@@ -10,7 +10,7 @@
 // and `src/ipc/invoke.ts` import the type from here.
 
 import type { RPCSchema } from 'electrobun/bun';
-import type { AppErrorPayload } from './app/errors';
+import type { AppErrorPayload } from './app/shared/errors';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 export type ReasoningVisibility = 'hidden' | 'compact' | 'expanded';
