@@ -11,15 +11,29 @@
 /// won't show — pressing Enter sends as a normal message, and the
 /// SDK's built-in command resolver picks it up.
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
-import { TextNode, $isTextNode, $getSelection, $isRangeSelection, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH } from "lexical";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  type ComponentPublicInstance,
+} from 'vue';
+import {
+  TextNode,
+  $isTextNode,
+  $getSelection,
+  $isRangeSelection,
+  KEY_TAB_COMMAND,
+  COMMAND_PRIORITY_HIGH,
+} from 'lexical';
 import {
   TypeaheadMenuPlugin,
   MenuOption,
   useBasicTypeaheadTriggerMatch,
-} from "lexical-vue/LexicalTypeaheadMenuPlugin";
-import { useLexicalComposer } from "lexical-vue/LexicalComposer";
-import { SESSION_COMMANDS, type SessionCommand } from "../lib/sessionCommands";
+} from 'lexical-vue/LexicalTypeaheadMenuPlugin';
+import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
+import { SESSION_COMMANDS, type SessionCommand } from '../lib/sessionCommands';
 
 class SlashOption extends MenuOption {
   cmd: SessionCommand;
@@ -34,7 +48,7 @@ const props = defineProps<{
 }>();
 
 const editor = useLexicalComposer();
-const query = ref("");
+const query = ref('');
 const menuOpen = ref(false);
 
 // Intercept Tab when the slash menu is open: replace the typed query
@@ -53,10 +67,10 @@ const unregisterTab = editor.registerCommand(
       const anchor = sel.anchor.getNode();
       if ($isTextNode(anchor)) {
         const text = anchor.getTextContent();
-        const slashIdx = text.lastIndexOf("/");
+        const slashIdx = text.lastIndexOf('/');
         if (slashIdx >= 0) {
           const before = text.slice(0, slashIdx);
-          anchor.setTextContent(before + selected.cmd.slash + " ");
+          anchor.setTextContent(before + selected.cmd.slash + ' ');
           anchor.select(before.length + selected.cmd.slash.length + 1);
         }
       }
@@ -75,16 +89,14 @@ onBeforeUnmount(() => unregisterTab());
 /// to a ref so it's safe in SSR (body is undefined at module load).
 const menuParent = ref<HTMLElement | null>(null);
 onMounted(() => {
-  if (typeof document !== "undefined") menuParent.value = document.body;
+  if (typeof document !== 'undefined') menuParent.value = document.body;
 });
 
-const allOptions = computed(() =>
-  SESSION_COMMANDS.map((c) => new SlashOption(c)),
-);
+const allOptions = computed(() => SESSION_COMMANDS.map((c) => new SlashOption(c)));
 
 const filteredOptions = computed(() => {
   const lower = query.value.toLowerCase();
-  if (lower.length === 0 || lower === "?") return allOptions.value;
+  if (lower.length === 0 || lower === '?') return allOptions.value;
   return allOptions.value.filter(
     (o) =>
       o.cmd.slash.toLowerCase().includes(lower) ||
@@ -94,7 +106,7 @@ const filteredOptions = computed(() => {
   );
 });
 
-const triggerFn = useBasicTypeaheadTriggerMatch("/", {
+const triggerFn = useBasicTypeaheadTriggerMatch('/', {
   minLength: 0,
   allowWhitespace: false,
 });
@@ -106,7 +118,7 @@ function keepSelectedVisible(
 ): void {
   if (index !== (selectedIndex ?? 0) || !(el instanceof HTMLElement)) return;
   void nextTick(() => {
-    const menu = el.closest(".slash-menu");
+    const menu = el.closest('.slash-menu');
     if (!(menu instanceof HTMLElement)) return;
     const menuRect = menu.getBoundingClientRect();
     const itemRect = el.getBoundingClientRect();
@@ -119,7 +131,7 @@ function keepSelectedVisible(
 }
 
 function onQueryChange(q: string | null) {
-  query.value = q ?? "";
+  query.value = q ?? '';
   menuOpen.value = q !== null;
 }
 
@@ -165,7 +177,7 @@ async function onSelectOption(payload: {
           role="listbox"
         >
           <button
-            v-for="(opt, i) in (itemProps.options as SlashOption[])"
+            v-for="(opt, i) in itemProps.options as SlashOption[]"
             :ref="(el) => keepSelectedVisible(el, i, itemProps.selectedIndex)"
             :key="opt.cmd.slash"
             type="button"

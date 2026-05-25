@@ -14,18 +14,15 @@
 /// "editable but immutable" surface — confusing and slow on long
 /// outputs).
 
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { EditorState, Compartment } from "@codemirror/state";
-import type { Extension } from "@codemirror/state";
-import { EditorView, lineNumbers } from "@codemirror/view";
-import { oneDark } from "@codemirror/theme-one-dark";
-import Button from "primevue/button";
-import {
-  resolveLanguageExtension,
-  resolveLanguageForFile,
-} from "../lib/codeLanguage";
-import { useToastStore } from "../stores/toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { EditorState, Compartment } from '@codemirror/state';
+import type { Extension } from '@codemirror/state';
+import { EditorView, lineNumbers } from '@codemirror/view';
+import { oneDark } from '@codemirror/theme-one-dark';
+import Button from 'primevue/button';
+import { resolveLanguageExtension, resolveLanguageForFile } from '../lib/codeLanguage';
+import { useToastStore } from '../stores/toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const props = withDefaults(
   defineProps<{
@@ -50,7 +47,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: "update:modelValue", value: string): void;
+  (e: 'update:modelValue', value: string): void;
 }>();
 
 const host = ref<HTMLDivElement | null>(null);
@@ -68,19 +65,19 @@ const headerLabel = computed<string>(() => {
     return props.language;
   }
   if (props.filename) {
-    const ext = props.filename.replace(/^.*[\\\/.]/, "");
+    const ext = props.filename.replace(/^.*[\\\/.]/, '');
     if (ext && ext.length <= 5) return ext;
   }
-  return "code";
+  return 'code';
 });
 
 async function copyAll(): Promise<void> {
   try {
     await navigator.clipboard.writeText(props.modelValue);
-    toasts.success("Code copied");
+    toasts.success('Code copied');
   } catch (err) {
     const message = toErrorMessage(err);
-    toasts.error("Copy failed", message);
+    toasts.error('Copy failed', message);
   }
 }
 
@@ -94,25 +91,24 @@ function baseExtensions(): Extension[] {
     oneDark,
     EditorView.updateListener.of((update) => {
       if (update.docChanged && !props.readonly) {
-        emit("update:modelValue", update.state.doc.toString());
+        emit('update:modelValue', update.state.doc.toString());
       }
     }),
     EditorView.theme({
-      "&": {
-        fontSize: "0.82rem",
-        backgroundColor: "transparent",
+      '&': {
+        fontSize: '0.82rem',
+        backgroundColor: 'transparent',
       },
-      ".cm-scroller": {
-        fontFamily:
-          "var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
-        maxHeight: props.maxHeight > 0 ? `${props.maxHeight}px` : "none",
+      '.cm-scroller': {
+        fontFamily: 'var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+        maxHeight: props.maxHeight > 0 ? `${props.maxHeight}px` : 'none',
       },
-      ".cm-content": {
-        padding: "0.4rem 0.6rem",
+      '.cm-content': {
+        padding: '0.4rem 0.6rem',
       },
-      ".cm-gutters": {
-        backgroundColor: "transparent",
-        borderRight: "1px solid var(--p-surface-border, rgba(255,255,255,0.08))",
+      '.cm-gutters': {
+        backgroundColor: 'transparent',
+        borderRight: '1px solid var(--p-surface-border, rgba(255,255,255,0.08))',
       },
     }),
   ];
@@ -181,7 +177,10 @@ watch(
 
 <template>
   <div class="code-editor-wrap">
-    <header v-if="showHeader" class="code-header">
+    <header
+      v-if="showHeader"
+      class="code-header"
+    >
       <span class="code-lang">{{ headerLabel }}</span>
       <Button
         icon="pi pi-copy"
@@ -192,7 +191,10 @@ watch(
         @click="copyAll"
       />
     </header>
-    <div ref="host" class="code-editor" />
+    <div
+      ref="host"
+      class="code-editor"
+    />
   </div>
 </template>
 

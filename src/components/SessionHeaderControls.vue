@@ -9,32 +9,27 @@
 // component just reads + dispatches actions. Self-contained: takes
 // only `sessionId` as a prop.
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
-import Button from "primevue/button";
-import Chip from "primevue/chip";
-import Select from "primevue/select";
-import TreeSelect from "primevue/treeselect";
-import type { TreeNode } from "primevue/treenode";
-import type {
-  ModelSummary,
-  ReasoningVisibility,
-} from "../ipc/types";
-import { useModelsStore } from "../stores/modelsStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useLayoutStore, basename } from "../stores/layoutStore";
-import { useTerminalStore } from "../stores/terminalStore";
-import { useToastStore } from "../stores/toastStore";
-import { invokeCommand } from "../ipc/invoke";
-import {
-  buildModelTree,
-} from "../lib/modelTree";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import Button from 'primevue/button';
+import Chip from 'primevue/chip';
+import Select from 'primevue/select';
+import TreeSelect from 'primevue/treeselect';
+import type { TreeNode } from 'primevue/treenode';
+import type { ModelSummary, ReasoningVisibility } from '../ipc/types';
+import { useModelsStore } from '../stores/modelsStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useLayoutStore, basename } from '../stores/layoutStore';
+import { useTerminalStore } from '../stores/terminalStore';
+import { useToastStore } from '../stores/toastStore';
+import { invokeCommand } from '../ipc/invoke';
+import { buildModelTree } from '../lib/modelTree';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const props = withDefaults(
-  defineProps<{ sessionId: string; area?: "all" | "composer-left" | "composer-right" }>(),
-  { area: "all" },
+  defineProps<{ sessionId: string; area?: 'all' | 'composer-left' | 'composer-right' }>(),
+  { area: 'all' },
 );
 
 const sessionsStore = useSessionsStore();
@@ -49,26 +44,24 @@ onMounted(() => {
   modelsStore.load().catch(() => {
     /* toast already shown by the store */
   });
-  window.addEventListener("dafman:open-model-selector", onOpenModelSelector);
+  window.addEventListener('dafman:open-model-selector', onOpenModelSelector);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("dafman:open-model-selector", onOpenModelSelector);
+  window.removeEventListener('dafman:open-model-selector', onOpenModelSelector);
 });
 
-const record = computed(() =>
-  sessionsStore.getSession(props.sessionId),
-);
+const record = computed(() => sessionsStore.getSession(props.sessionId));
 
 function onOpenModelSelector(event: Event): void {
   const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
   if (detail?.sessionId !== props.sessionId) return;
-  if (props.area !== "all" && props.area !== "composer-right") return;
+  if (props.area !== 'all' && props.area !== 'composer-right') return;
   modelTreeRef.value?.show();
 }
 
-const effectiveModelId = computed(() =>
-  record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
+const effectiveModelId = computed(
+  () => record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
 );
 
 const selectedModel = computed<ModelSummary | undefined>(() => {
@@ -78,9 +71,7 @@ const selectedModel = computed<ModelSummary | undefined>(() => {
 
 /// Hierarchical model picker — see `lib/modelTree.ts` for the
 /// taxonomy (Auto pinned on top, provider → optional type → version).
-const modelTree = computed<TreeNode[]>(() =>
-  buildModelTree(models.value) as unknown as TreeNode[],
-);
+const modelTree = computed<TreeNode[]>(() => buildModelTree(models.value) as unknown as TreeNode[]);
 
 /// All group (non-leaf) keys in the tree. Used to expand the whole
 /// tree by default so the user sees every option without manually
@@ -153,7 +144,7 @@ const modelTreeChoice = computed<Record<string, unknown> | null>({
     const fresh = models.value.find((m) => m.id === id);
     if (!fresh) return;
     const effort = fresh.supportsReasoningEffort
-      ? record.value.reasoningEffort ?? fresh.defaultReasoningEffort ?? null
+      ? (record.value.reasoningEffort ?? fresh.defaultReasoningEffort ?? null)
       : null;
     void sessionsStore.setSessionModel(props.sessionId, id, effort);
   },
@@ -179,9 +170,9 @@ const effortChoice = computed<string | null>({
 });
 
 const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
-  { label: "Hidden", value: "hidden" },
-  { label: "Compact", value: "compact" },
-  { label: "Expanded", value: "expanded" },
+  { label: 'Hidden', value: 'hidden' },
+  { label: 'Compact', value: 'compact' },
+  { label: 'Expanded', value: 'expanded' },
 ];
 
 /// When the session record still carries the legacy `"default"`
@@ -192,7 +183,7 @@ const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
 const reasoningChoice = computed<ReasoningVisibility>({
   get: () => {
     const v = record.value?.reasoningVisibilityOverride;
-    if (!v || v === "default") return settings.value.appearance.reasoningVisibility;
+    if (!v || v === 'default') return settings.value.appearance.reasoningVisibility;
     return v;
   },
   set: (value) => {
@@ -221,11 +212,8 @@ const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
 function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
   if (!path) return;
-  invokeCommand("revealPath", { path }).catch((err: unknown) => {
-    useToastStore().error(
-      "Couldn't open workspace",
-      toErrorMessage(err),
-    );
+  invokeCommand('revealPath', { path }).catch((err: unknown) => {
+    useToastStore().error("Couldn't open workspace", toErrorMessage(err));
   });
 }
 
@@ -241,33 +229,38 @@ function onAgentChipClick() {
 function requestTerminalFocus(terminalId: string): void {
   for (const delay of [0, 50, 150]) {
     setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("dafman:focus-terminal", {
-        detail: { terminalId },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('dafman:focus-terminal', {
+          detail: { terminalId },
+        }),
+      );
     }, delay);
   }
 }
 
 async function openSessionTerminal() {
   try {
-    window.dispatchEvent(new CustomEvent("dafman:close-command-terminal", {
-      detail: { sessionId: props.sessionId },
-    }));
+    window.dispatchEvent(
+      new CustomEvent('dafman:close-command-terminal', {
+        detail: { sessionId: props.sessionId },
+      }),
+    );
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
     layoutStore.addTerminalPanel(terminal.id, terminal.title);
     await nextTick();
     requestTerminalFocus(terminal.id);
   } catch (err) {
-    useToastStore().error(
-      "Couldn't open terminal",
-      toErrorMessage(err),
-    );
+    useToastStore().error("Couldn't open terminal", toErrorMessage(err));
   }
 }
 </script>
 
 <template>
-  <div v-if="record" class="session-header-controls" :class="`area-${props.area}`">
+  <div
+    v-if="record"
+    class="session-header-controls"
+    :class="`area-${props.area}`"
+  >
     <Button
       v-if="props.area === 'composer-left'"
       icon="pi pi-shield"
@@ -349,7 +342,10 @@ async function openSessionTerminal() {
       </template>
     </TreeSelect>
     <Select
-      v-if="selectedModel?.supportsReasoningEffort && (props.area === 'all' || props.area === 'composer-right')"
+      v-if="
+        selectedModel?.supportsReasoningEffort &&
+        (props.area === 'all' || props.area === 'composer-right')
+      "
       :input-id="`effort-${props.sessionId}`"
       v-model="effortChoice"
       :options="effortOptions"
@@ -397,7 +393,9 @@ async function openSessionTerminal() {
       size="small"
       :aria-label="detailsOpen ? 'Close session details' : 'Open session details'"
       :aria-pressed="detailsOpen"
-      :title="detailsOpen ? 'Close session details (right rail)' : 'Open session details (right rail)'"
+      :title="
+        detailsOpen ? 'Close session details (right rail)' : 'Open session details (right rail)'
+      "
       :class="{ 'cog-active': detailsOpen }"
       @click="toggleDetails"
     />
@@ -530,7 +528,10 @@ async function openSessionTerminal() {
   color: var(--p-text-secondary-color);
   background: transparent;
   border: 1px dashed color-mix(in srgb, var(--p-text-color) 25%, transparent);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .agent-chip:hover {

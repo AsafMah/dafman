@@ -19,22 +19,22 @@
 // in `commandRegistry.visibleCommands` updates reactively when the
 // active session changes / models load / MRU changes.
 
-import { watch } from "vue";
-import type { ConfirmationOptions } from "primevue/confirmationoptions";
-import { invokeCommand } from "../ipc/invoke";
-import { useCommandRegistry, type Command } from "../stores/commandRegistry";
-import { useClientStore } from "../stores/clientStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useModelsStore } from "../stores/modelsStore";
-import { useToastStore } from "../stores/toastStore";
-import { useTerminalStore } from "../stores/terminalStore";
-import { SESSION_COMMANDS } from "./sessionCommands";
-import type { SessionMode } from "../ipc/types";
-import { toErrorMessage } from "./errorMessage";
+import { watch } from 'vue';
+import type { ConfirmationOptions } from 'primevue/confirmationoptions';
+import { invokeCommand } from '../ipc/invoke';
+import { useCommandRegistry, type Command } from '../stores/commandRegistry';
+import { useClientStore } from '../stores/clientStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useModelsStore } from '../stores/modelsStore';
+import { useToastStore } from '../stores/toastStore';
+import { useTerminalStore } from '../stores/terminalStore';
+import { SESSION_COMMANDS } from './sessionCommands';
+import type { SessionMode } from '../ipc/types';
+import { toErrorMessage } from './errorMessage';
 
-const SESSIONS_PANEL_ID = "sessions-manager";
+const SESSIONS_PANEL_ID = 'sessions-manager';
 
 /// Confirmation surface — usually `primevue/useconfirm`'s instance.
 /// Typed minimally so tests can pass a stub without dragging PrimeVue
@@ -62,20 +62,20 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   // ---------- Static: navigation / app actions ----------
   const statics: Command[] = [
     {
-      id: "sessions-manager.toggle",
-      label: "Toggle Sessions Manager",
-      group: "Navigation",
-      icon: "pi pi-list",
-      keywords: ["sidebar", "panel"],
+      id: 'sessions-manager.toggle',
+      label: 'Toggle Sessions Manager',
+      group: 'Navigation',
+      icon: 'pi pi-list',
+      keywords: ['sidebar', 'panel'],
       run: () => {
         if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) {
           layoutStore.closePanel(SESSIONS_PANEL_ID);
         } else {
-          layoutStore.openEdgePanel("left", {
+          layoutStore.openEdgePanel('left', {
             id: SESSIONS_PANEL_ID,
-            component: "sessionsManager",
-            tabComponent: "sidebarTab",
-            title: "Sessions",
+            component: 'sessionsManager',
+            tabComponent: 'sidebarTab',
+            title: 'Sessions',
             initialSize: 260,
             minimumSize: 180,
             exclusive: true,
@@ -84,19 +84,19 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      id: "jobs.open",
-      label: "Open Jobs",
-      group: "Navigation",
-      icon: "pi pi-clock",
-      keywords: ["background", "tasks", "autopilot"],
+      id: 'jobs.open',
+      label: 'Open Jobs',
+      group: 'Navigation',
+      icon: 'pi pi-clock',
+      keywords: ['background', 'tasks', 'autopilot'],
       run: () => {
-        const id = "jobs-panel";
+        const id = 'jobs-panel';
         if (layoutStore.isPanelOpen(id)) return;
-        layoutStore.openEdgePanel("left", {
+        layoutStore.openEdgePanel('left', {
           id,
-          component: "jobsPanel",
-          tabComponent: "sidebarTab",
-          title: "Jobs",
+          component: 'jobsPanel',
+          tabComponent: 'sidebarTab',
+          title: 'Jobs',
           initialSize: 380,
           minimumSize: 380,
           exclusive: true,
@@ -104,19 +104,19 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      id: "terminals.open",
-      label: "Open Terminals",
-      group: "Terminal",
-      icon: "pi pi-window-maximize",
-      keywords: ["shell", "terminal", "pty", "settings"],
+      id: 'terminals.open',
+      label: 'Open Terminals',
+      group: 'Terminal',
+      icon: 'pi pi-window-maximize',
+      keywords: ['shell', 'terminal', 'pty', 'settings'],
       run: () => {
-        const id = "terminals-panel";
+        const id = 'terminals-panel';
         if (layoutStore.isPanelOpen(id)) return;
-        layoutStore.openEdgePanel("left", {
+        layoutStore.openEdgePanel('left', {
           id,
-          component: "terminalsPanel",
-          tabComponent: "sidebarTab",
-          title: "Terminals — running shells",
+          component: 'terminalsPanel',
+          tabComponent: 'sidebarTab',
+          title: 'Terminals — running shells',
           initialSize: 360,
           minimumSize: 320,
           exclusive: true,
@@ -124,11 +124,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      id: "terminal.new",
-      label: "New Terminal",
-      group: "Terminal",
-      icon: "pi pi-window-maximize",
-      keywords: ["shell", "pty", "command"],
+      id: 'terminal.new',
+      label: 'New Terminal',
+      group: 'Terminal',
+      icon: 'pi pi-window-maximize',
+      keywords: ['shell', 'pty', 'command'],
       run: async () => {
         const terminalStore = useTerminalStore();
         const summary = await terminalStore.createTerminal({
@@ -139,11 +139,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      id: "terminal.newSession",
-      label: "New Terminal in Session Workspace",
-      group: "Terminal",
-      icon: "pi pi-folder-open",
-      keywords: ["shell", "pty", "cwd"],
+      id: 'terminal.newSession',
+      label: 'New Terminal in Session Workspace',
+      group: 'Terminal',
+      icon: 'pi pi-folder-open',
+      keywords: ['shell', 'pty', 'cwd'],
       when: () => layoutStore.activeSessionId !== null,
       run: async () => {
         const sid = layoutStore.activeSessionId;
@@ -155,25 +155,25 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           rows: 24,
           ...(cwd ? { cwd } : {}),
           ...(record ? { sessionId: record.id } : {}),
-          title: cwd ? `Terminal · ${cwd.split(/[\\/]/).pop()}` : "Session Terminal",
+          title: cwd ? `Terminal · ${cwd.split(/[\\/]/).pop()}` : 'Session Terminal',
         });
         layoutStore.addTerminalPanel(summary.id, summary.title);
       },
     },
     {
-      id: "settings.open",
-      label: "Open Settings",
-      group: "Navigation",
-      icon: "pi pi-cog",
-      keywords: ["preferences", "config"],
+      id: 'settings.open',
+      label: 'Open Settings',
+      group: 'Navigation',
+      icon: 'pi pi-cog',
+      keywords: ['preferences', 'config'],
       run: () => {
-        const id = "settings-panel";
+        const id = 'settings-panel';
         if (layoutStore.isPanelOpen(id)) return;
-        layoutStore.openEdgePanel("left", {
+        layoutStore.openEdgePanel('left', {
           id,
-          component: "settingsPanel",
-          tabComponent: "sidebarTab",
-          title: "Settings",
+          component: 'settingsPanel',
+          tabComponent: 'sidebarTab',
+          title: 'Settings',
           // Keep in sync with App.vue's ActivityBar settings item —
           // both paths must use the same size or the panel jumps
           // width when opened via different surfaces.
@@ -184,29 +184,26 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      id: "logs.openFolder",
-      label: "Open Log Folder",
-      group: "Diagnostics",
-      icon: "pi pi-folder-open",
-      keywords: ["logging", "debug", "diagnostics"],
+      id: 'logs.openFolder',
+      label: 'Open Log Folder',
+      group: 'Diagnostics',
+      icon: 'pi pi-folder-open',
+      keywords: ['logging', 'debug', 'diagnostics'],
       run: async () => {
         try {
-          const ok = await invokeCommand("openLogFolder", {});
-          if (!ok) toasts.warn("Couldn't open log folder", "Path was returned as falsy.");
+          const ok = await invokeCommand('openLogFolder', {});
+          if (!ok) toasts.warn("Couldn't open log folder", 'Path was returned as falsy.');
         } catch (err) {
-          toasts.error(
-            "Couldn't open log folder",
-            toErrorMessage(err),
-          );
+          toasts.error("Couldn't open log folder", toErrorMessage(err));
         }
       },
     },
     {
-      id: "session.new",
-      label: "New Session",
-      group: "Sessions",
-      icon: "pi pi-plus",
-      keywords: ["create", "start", "chat"],
+      id: 'session.new',
+      label: 'New Session',
+      group: 'Sessions',
+      icon: 'pi pi-plus',
+      keywords: ['create', 'start', 'chat'],
       when: () => clientStore.ready,
       run: async () => {
         const record = await sessionsStore.createSession();
@@ -214,17 +211,17 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      id: "appearance.darkMode.toggle",
-      label: "Toggle Dark Mode",
-      group: "Appearance",
-      icon: "pi pi-moon",
-      keywords: ["theme", "light", "dark"],
+      id: 'appearance.darkMode.toggle',
+      label: 'Toggle Dark Mode',
+      group: 'Appearance',
+      icon: 'pi pi-moon',
+      keywords: ['theme', 'light', 'dark'],
       run: async () => {
         const current = settingsStore.settings.appearance.theme;
         // "system" → pick the opposite of the resolved value; "light" →
         // "dark"; "dark" → "light". Simpler than threading the resolved
         // ref through.
-        const next = current === "dark" ? "light" : "dark";
+        const next = current === 'dark' ? 'light' : 'dark';
         await settingsStore.setTheme(next);
       },
     },
@@ -232,16 +229,16 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
   if (import.meta.env.DEV) {
     statics.push({
-      id: "dev.openPlayground",
-      label: "Open Dev Playground",
-      group: "Diagnostics",
-      icon: "pi pi-wrench",
-      keywords: ["dev", "test", "tools"],
+      id: 'dev.openPlayground',
+      label: 'Open Dev Playground',
+      group: 'Diagnostics',
+      icon: 'pi pi-wrench',
+      keywords: ['dev', 'test', 'tools'],
       run: () => {
         // The dock api is the source of truth; reach in via layoutStore.
         const dock = layoutStore.api;
         if (!dock) return;
-        const existing = dock.getPanel("playground");
+        const existing = dock.getPanel('playground');
         if (existing) {
           existing.api.setActive();
           return;
@@ -249,16 +246,16 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         const bodyId = layoutStore.firstBodyGroupId();
         if (bodyId) {
           dock.addPanel({
-            id: "playground",
-            component: "playground",
-            title: "Dev Playground",
-            position: { referenceGroup: bodyId, direction: "within" },
+            id: 'playground',
+            component: 'playground',
+            title: 'Dev Playground',
+            position: { referenceGroup: bodyId, direction: 'within' },
           });
         } else {
           dock.addPanel({
-            id: "playground",
-            component: "playground",
-            title: "Dev Playground",
+            id: 'playground',
+            component: 'playground',
+            title: 'Dev Playground',
           });
         }
       },
@@ -273,7 +270,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   // list so Ctrl+K and "/" stay in sync.
   for (const sc of SESSION_COMMANDS) {
     registry.register({
-      id: `session.cmd.${sc.slash.replace(/^\//, "")}`,
+      id: `session.cmd.${sc.slash.replace(/^\//, '')}`,
       label: sc.label,
       hint: sc.slash,
       group: sc.group,
@@ -301,9 +298,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           id,
           label: `New Session in ${shortPath(path)}`,
           hint: path,
-          group: "Sessions",
-          icon: "pi pi-folder-plus",
-          keywords: ["workspace", "folder", path],
+          group: 'Sessions',
+          icon: 'pi pi-folder-plus',
+          keywords: ['workspace', 'folder', path],
           run: async () => {
             const record = await sessionsStore.createSession({
               workingDirectory: path,
@@ -339,9 +336,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           id,
           label: `Switch Model: ${m.name}`,
           hint: m.id,
-          group: "Active Session",
-          icon: "pi pi-server",
-          keywords: ["model", m.id, m.name],
+          group: 'Active Session',
+          icon: 'pi pi-server',
+          keywords: ['model', m.id, m.name],
           when: () => clientStore.ready && layoutStore.activeSessionId !== null,
           run: async () => {
             const sid = layoutStore.activeSessionId;
@@ -351,11 +348,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             // means "use the SDK default", which would silently drop
             // a "high" preference the user set on the previous model).
             const record = sessionsStore.getSession(sid);
-            await sessionsStore.setSessionModel(
-              sid,
-              m.id,
-              record?.reasoningEffort ?? null,
-            );
+            await sessionsStore.setSessionModel(sid, m.id, record?.reasoningEffort ?? null);
           },
         });
       }
@@ -382,8 +375,8 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           id,
           label: `Switch to: ${label}`,
           hint: r.id.slice(0, 8),
-          group: "Sessions",
-          icon: "pi pi-comments",
+          group: 'Sessions',
+          icon: 'pi pi-comments',
           accent: r.accent,
           // Include both the short and full id in the searchable
           // keywords so users can paste a session id from
@@ -410,17 +403,17 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
   // ---------- Static, but session-gated: Run Mode ----------
   const RUN_MODES: { mode: SessionMode; label: string; icon: string }[] = [
-    { mode: "interactive", label: "Interactive", icon: "pi pi-comments" },
-    { mode: "plan", label: "Plan", icon: "pi pi-list-check" },
-    { mode: "autopilot", label: "Autopilot", icon: "pi pi-bolt" },
+    { mode: 'interactive', label: 'Interactive', icon: 'pi pi-comments' },
+    { mode: 'plan', label: 'Plan', icon: 'pi pi-list-check' },
+    { mode: 'autopilot', label: 'Autopilot', icon: 'pi pi-bolt' },
   ];
   for (const { mode, label, icon } of RUN_MODES) {
     registry.register({
       id: `runMode.set.${mode}`,
       label: `Run Mode: ${label}`,
-      group: "Active Session",
+      group: 'Active Session',
       icon,
-      keywords: ["mode", mode],
+      keywords: ['mode', mode],
       when: () => clientStore.ready && layoutStore.activeSessionId !== null,
       run: async () => {
         const sid = layoutStore.activeSessionId;
@@ -432,22 +425,22 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
   // ---------- Static: Reset Layout ----------
   registry.register({
-    id: "layout.reset",
-    label: "Reset Layout",
-    group: "Diagnostics",
-    icon: "pi pi-refresh",
-    keywords: ["close all", "default", "restore", "factory"],
+    id: 'layout.reset',
+    label: 'Reset Layout',
+    group: 'Diagnostics',
+    icon: 'pi pi-refresh',
+    keywords: ['close all', 'default', 'restore', 'factory'],
     run: () => {
       const openSessionCount = sessionsStore.sessions.length;
       const doReset = () => {
         layoutStore.resetToDefault();
         if (openSessionCount > 0) {
           toasts.info(
-            "Layout reset",
-            `Closed ${openSessionCount} open session${openSessionCount === 1 ? "" : "s"}. Resume any of them from the Sessions sidebar.`,
+            'Layout reset',
+            `Closed ${openSessionCount} open session${openSessionCount === 1 ? '' : 's'}. Resume any of them from the Sessions sidebar.`,
           );
         } else {
-          toasts.info("Layout reset", "Sessions sidebar re-opened.");
+          toasts.info('Layout reset', 'Sessions sidebar re-opened.');
         }
       };
       // Confirm when 2+ sessions are open. The action is reversible
@@ -459,10 +452,10 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       if (openSessionCount >= 2 && confirm) {
         confirm.require({
           message: `Reset layout? This will close ${openSessionCount} open sessions. They'll still be available in the Sessions Manager and can be resumed from there.`,
-          header: "Reset Layout",
-          icon: "pi pi-refresh",
-          acceptLabel: "Reset",
-          rejectLabel: "Cancel",
+          header: 'Reset Layout',
+          icon: 'pi pi-refresh',
+          acceptLabel: 'Reset',
+          rejectLabel: 'Cancel',
           accept: doReset,
         });
       } else {
@@ -476,8 +469,8 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 /// reads better than the full absolute path; the full path is kept in
 /// the `hint` (right column) and fuzzy-search corpus.
 function shortPath(path: string): string {
-  if (!path) return "";
-  const sep = path.includes("\\") ? "\\" : "/";
+  if (!path) return '';
+  const sep = path.includes('\\') ? '\\' : '/';
   const parts = path.split(sep).filter(Boolean);
   if (parts.length <= 2) return path;
   return `${parts[0]}${sep}…${sep}${parts[parts.length - 1]}`;

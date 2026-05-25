@@ -1,5 +1,5 @@
-import type { ChatAmbient, ChatItem, ChatToast, IdCounter, SystemSeverity } from "../chatEvents";
-import type { SessionEventPayload } from "../../ipc/types";
+import type { ChatAmbient, ChatItem, ChatToast, IdCounter, SystemSeverity } from '../chatEvents';
+import type { SessionEventPayload } from '../../ipc/types';
 
 export interface ReducerContext {
   items: ChatItem[];
@@ -13,16 +13,8 @@ export interface ReducerContext {
 
   upsertAssistant(messageId: string, eventId?: string): ChatItem;
   upsertReasoning(reasoningId: string, eventId?: string): ChatItem;
-  upsertTool(
-    toolCallId: string,
-    fallbackName?: string,
-    eventId?: string,
-  ): ChatItem;
+  upsertTool(toolCallId: string, fallbackName?: string, eventId?: string): ChatItem;
   pushSystem(text: string, severity: SystemSeverity): void;
 }
 
-export type Handler = (
-  ctx: ReducerContext,
-  data: unknown,
-  payload: SessionEventPayload,
-) => void;
+export type Handler = (ctx: ReducerContext, data: unknown, payload: SessionEventPayload) => void;

@@ -32,482 +32,534 @@
 /// so the rest of the dafman pipeline (reducer, audit, log) sees
 /// indistinguishable input.
 
-import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 interface FakeSessionState {
-	sessionId: string;
-	cwd?: string;
-	model?: string;
-	listeners: Set<(event: Record<string, unknown>) => void>;
-	history: Record<string, unknown>[];
-	disposed: boolean;
-	/// `onPermissionRequest` from `baseSessionConfig`. Captured at
-	/// create-time so test scripts can invoke the handler to drive
-	/// permission flows.
-	onPermissionRequest?: (req: unknown) => Promise<unknown>;
+  sessionId: string;
+  cwd?: string;
+  model?: string;
+  listeners: Set<(event: Record<string, unknown>) => void>;
+  history: Record<string, unknown>[];
+  disposed: boolean;
+  /// `onPermissionRequest` from `baseSessionConfig`. Captured at
+  /// create-time so test scripts can invoke the handler to drive
+  /// permission flows.
+  onPermissionRequest?: (req: unknown) => Promise<unknown>;
 }
 
 export type SendScript = (
-	args: { prompt: string; mode?: string; attachments?: unknown[] },
-	push: (event: Record<string, unknown>) => void,
-	state: FakeSessionState,
+  args: { prompt: string; mode?: string; attachments?: unknown[] },
+  push: (event: Record<string, unknown>) => void,
+  state: FakeSessionState,
 ) => void | Promise<void>;
 
 function defaultSendScript(
-	args: { prompt: string },
-	push: (event: Record<string, unknown>) => void,
+  args: { prompt: string },
+  push: (event: Record<string, unknown>) => void,
 ): void {
-	// SDK event envelope is { type, data, id, timestamp }. Reducer
-	// expects messageId on data.* + content on data.content.
-	const ts = new Date().toISOString();
-	push({
-		type: "user.message",
-		id: randomUUID(),
-		timestamp: ts,
-		data: { messageId: randomUUID(), content: args.prompt },
-	});
-	push({
-		type: "assistant.message",
-		id: randomUUID(),
-		timestamp: ts,
-		data: { messageId: randomUUID(), content: `ok: ${args.prompt}` },
-	});
-	push({
-		type: "assistant.turn_complete",
-		id: randomUUID(),
-		timestamp: ts,
-		data: {},
-	});
+  // SDK event envelope is { type, data, id, timestamp }. Reducer
+  // expects messageId on data.* + content on data.content.
+  const ts = new Date().toISOString();
+  push({
+    type: 'user.message',
+    id: randomUUID(),
+    timestamp: ts,
+    data: { messageId: randomUUID(), content: args.prompt },
+  });
+  push({
+    type: 'assistant.message',
+    id: randomUUID(),
+    timestamp: ts,
+    data: { messageId: randomUUID(), content: `ok: ${args.prompt}` },
+  });
+  push({
+    type: 'assistant.turn_complete',
+    id: randomUUID(),
+    timestamp: ts,
+    data: {},
+  });
 }
 
 class FakeCopilotSession {
-	public readonly sessionId: string;
-	private readonly state: FakeSessionState;
-	private readonly scriptRef: { current: SendScript };
-	public readonly rpc: Record<string, Record<string, (args?: unknown) => Promise<unknown>>>;
-	private readonly skillsDisabled = new Set<string>();
+  public readonly sessionId: string;
+  private readonly state: FakeSessionState;
+  private readonly scriptRef: { current: SendScript };
+  public readonly rpc: Record<string, Record<string, (args?: unknown) => Promise<unknown>>>;
+  private readonly skillsDisabled = new Set<string>();
 
-	constructor(state: FakeSessionState, scriptRef: { current: SendScript }) {
-		this.sessionId = state.sessionId;
-		this.state = state;
-		this.scriptRef = scriptRef;
-		// Stub rpc surface — every namespace returns empty/defaulted
-		// payloads. Individual flows can override via setSendScript.
-		this.rpc = {
-			mode: {
-				get: async () => ({ mode: "interactive" }),
-				set: async () => undefined,
-			},
-			name: {
-				get: async () => ({ name: null }),
-				set: async () => undefined,
-			},
-			history: {
-				compact: async () => ({ removed: 0 }),
-				truncate: async () => ({ removed: 0 }),
-			},
-			permissions: {
-				setApproveAll: async () => ({ ok: true }),
-				resetSessionApprovals: async () => ({ cleared: 0 }),
-			},
-			skills: {
-					list: async () => {
-						const catalog = [
-							{ name: "summarize", description: "Summarize the conversation so far.", source: "builtin", userInvocable: true },
-							{ name: "project-greet", description: "Greet the user with project-specific context.", source: "project", userInvocable: false },
-							{ name: "personal-snippet", description: "Insert a personal code snippet.", source: "personal-copilot", userInvocable: true },
-						];
-						return { skills: catalog.map((s) => ({ ...s, enabled: !this.skillsDisabled.has(s.name) })) };
-					},
-					enable: async (args?: unknown) => {
-						const { name } = (args ?? {}) as { name: string };
-						this.skillsDisabled.delete(name);
-					},
-					disable: async (args?: unknown) => {
-						const { name } = (args ?? {}) as { name: string };
-						this.skillsDisabled.add(name);
-					},
-				},
-			usage: {
-				getMetrics: async () => ({ requests: 0, totalTokens: 0 }),
-			},
-			plan: {
-				read: async () => ({ exists: false, content: null, path: null }),
-				update: async () => undefined,
-				delete: async () => undefined,
-			},
-			mcp: {
-				list: async () => ({ servers: [] }),
-				enable: async () => undefined,
-				disable: async () => undefined,
-				reload: async () => undefined,
-				oauth: {
-					login: async () => ({
-						authorizationUrl: "https://example.invalid/oauth/test",
-					}),
-				},
-			},
-			sessions: {
-				fork: async () => ({ sessionId: `fake-session-${Date.now()}` }),
-			},
-			tasks: {
-				list: async () => ({ tasks: [] }),
-			},
-		};
-	}
+  constructor(state: FakeSessionState, scriptRef: { current: SendScript }) {
+    this.sessionId = state.sessionId;
+    this.state = state;
+    this.scriptRef = scriptRef;
+    // Stub rpc surface — every namespace returns empty/defaulted
+    // payloads. Individual flows can override via setSendScript.
+    this.rpc = {
+      mode: {
+        get: async () => ({ mode: 'interactive' }),
+        set: async () => undefined,
+      },
+      name: {
+        get: async () => ({ name: null }),
+        set: async () => undefined,
+      },
+      history: {
+        compact: async () => ({ removed: 0 }),
+        truncate: async () => ({ removed: 0 }),
+      },
+      permissions: {
+        setApproveAll: async () => ({ ok: true }),
+        resetSessionApprovals: async () => ({ cleared: 0 }),
+      },
+      skills: {
+        list: async () => {
+          const catalog = [
+            {
+              name: 'summarize',
+              description: 'Summarize the conversation so far.',
+              source: 'builtin',
+              userInvocable: true,
+            },
+            {
+              name: 'project-greet',
+              description: 'Greet the user with project-specific context.',
+              source: 'project',
+              userInvocable: false,
+            },
+            {
+              name: 'personal-snippet',
+              description: 'Insert a personal code snippet.',
+              source: 'personal-copilot',
+              userInvocable: true,
+            },
+          ];
+          return {
+            skills: catalog.map((s) => ({ ...s, enabled: !this.skillsDisabled.has(s.name) })),
+          };
+        },
+        enable: async (args?: unknown) => {
+          const { name } = (args ?? {}) as { name: string };
+          this.skillsDisabled.delete(name);
+        },
+        disable: async (args?: unknown) => {
+          const { name } = (args ?? {}) as { name: string };
+          this.skillsDisabled.add(name);
+        },
+      },
+      usage: {
+        getMetrics: async () => ({ requests: 0, totalTokens: 0 }),
+      },
+      plan: {
+        read: async () => ({ exists: false, content: null, path: null }),
+        update: async () => undefined,
+        delete: async () => undefined,
+      },
+      mcp: {
+        list: async () => ({ servers: [] }),
+        enable: async () => undefined,
+        disable: async () => undefined,
+        reload: async () => undefined,
+        oauth: {
+          login: async () => ({
+            authorizationUrl: 'https://example.invalid/oauth/test',
+          }),
+        },
+      },
+      sessions: {
+        fork: async () => ({ sessionId: `fake-session-${Date.now()}` }),
+      },
+      tasks: {
+        list: async () => ({ tasks: [] }),
+      },
+    };
+  }
 
-	on(callback: (event: Record<string, unknown>) => void): () => void {
-		this.state.listeners.add(callback);
-		return () => this.state.listeners.delete(callback);
-	}
+  on(callback: (event: Record<string, unknown>) => void): () => void {
+    this.state.listeners.add(callback);
+    return () => this.state.listeners.delete(callback);
+  }
 
-	async send(args: { prompt: string; mode?: string; attachments?: unknown[] }): Promise<void> {
-		const push = (event: Record<string, unknown>) => {
-			this.state.history.push(event);
-			for (const cb of this.state.listeners) cb(event);
-		};
-		await this.scriptRef.current(args, push, this.state);
-	}
+  async send(args: { prompt: string; mode?: string; attachments?: unknown[] }): Promise<void> {
+    const push = (event: Record<string, unknown>) => {
+      this.state.history.push(event);
+      for (const cb of this.state.listeners) cb(event);
+    };
+    await this.scriptRef.current(args, push, this.state);
+  }
 
-	async getMessages(): Promise<Record<string, unknown>[]> {
-		return [...this.state.history];
-	}
+  async getMessages(): Promise<Record<string, unknown>[]> {
+    return [...this.state.history];
+  }
 
-	async abort(): Promise<void> {
-		// no-op for the fake; tests that need abort semantics push a
-		// custom script.
-	}
+  async abort(): Promise<void> {
+    // no-op for the fake; tests that need abort semantics push a
+    // custom script.
+  }
 
-	async disconnect(): Promise<void> {
-		this.state.disposed = true;
-		this.state.listeners.clear();
-	}
+  async disconnect(): Promise<void> {
+    this.state.disposed = true;
+    this.state.listeners.clear();
+  }
 
-	async setModel(model: string, _opts?: Record<string, unknown>): Promise<void> {
-		this.state.model = model;
-	}
+  async setModel(model: string, _opts?: Record<string, unknown>): Promise<void> {
+    this.state.model = model;
+  }
 }
 
 export class FakeCopilotClient {
-	private readonly sessions = new Map<string, FakeSessionState>();
-	private readonly sendScriptRef: { current: SendScript } = { current: defaultSendScript };
-	private nextSeq = 1;
-	private readonly catalogPath?: string;
-	// Phase 19a fake state: in-memory MCP config + global disabled set
-	// so E2E flows can mutate without spawning a real CLI.
-	private readonly mcpConfigs = new Map<string, Record<string, unknown>>();
-	private readonly mcpDisabled = new Set<string>();
-	// Phase 19b fake state: global disabled-skills set.
-	private readonly skillsDisabled = new Set<string>();
+  private readonly sessions = new Map<string, FakeSessionState>();
+  private readonly sendScriptRef: { current: SendScript } = { current: defaultSendScript };
+  private nextSeq = 1;
+  private readonly catalogPath?: string;
+  // Phase 19a fake state: in-memory MCP config + global disabled set
+  // so E2E flows can mutate without spawning a real CLI.
+  private readonly mcpConfigs = new Map<string, Record<string, unknown>>();
+  private readonly mcpDisabled = new Set<string>();
+  // Phase 19b fake state: global disabled-skills set.
+  private readonly skillsDisabled = new Set<string>();
 
-	constructor(opts: { catalogPath?: string } = {}) {
-		this.catalogPath = opts.catalogPath;
-		this.loadCatalog();
-	}
+  constructor(opts: { catalogPath?: string } = {}) {
+    this.catalogPath = opts.catalogPath;
+    this.loadCatalog();
+  }
 
-	private loadCatalog(): void {
-		if (!this.catalogPath || !existsSync(this.catalogPath)) return;
-		try {
-			const raw = readFileSync(this.catalogPath, "utf8");
-			const parsed = JSON.parse(raw) as {
-				nextSeq?: number;
-				sessions?: Array<{ sessionId: string; cwd?: string; model?: string }>;
-			};
-			if (typeof parsed.nextSeq === "number") this.nextSeq = parsed.nextSeq;
-			for (const s of parsed.sessions ?? []) {
-				this.sessions.set(s.sessionId, {
-					sessionId: s.sessionId,
-					...(s.cwd ? { cwd: s.cwd } : {}),
-					...(s.model ? { model: s.model } : {}),
-					listeners: new Set(),
-					history: [],
-					disposed: false,
-				});
-			}
-		} catch {
-			/* corrupted catalog → start fresh */
-		}
-	}
+  private loadCatalog(): void {
+    if (!this.catalogPath || !existsSync(this.catalogPath)) return;
+    try {
+      const raw = readFileSync(this.catalogPath, 'utf8');
+      const parsed = JSON.parse(raw) as {
+        nextSeq?: number;
+        sessions?: Array<{ sessionId: string; cwd?: string; model?: string }>;
+      };
+      if (typeof parsed.nextSeq === 'number') this.nextSeq = parsed.nextSeq;
+      for (const s of parsed.sessions ?? []) {
+        this.sessions.set(s.sessionId, {
+          sessionId: s.sessionId,
+          ...(s.cwd ? { cwd: s.cwd } : {}),
+          ...(s.model ? { model: s.model } : {}),
+          listeners: new Set(),
+          history: [],
+          disposed: false,
+        });
+      }
+    } catch {
+      /* corrupted catalog → start fresh */
+    }
+  }
 
-	private saveCatalog(): void {
-		if (!this.catalogPath) return;
-		try {
-			mkdirSync(dirname(this.catalogPath), { recursive: true });
-			const data = {
-				nextSeq: this.nextSeq,
-				sessions: [...this.sessions.values()].map((s) => ({
-					sessionId: s.sessionId,
-					...(s.cwd ? { cwd: s.cwd } : {}),
-					...(s.model ? { model: s.model } : {}),
-				})),
-			};
-			writeFileSync(this.catalogPath, JSON.stringify(data, null, 2));
-		} catch {
-			/* non-fatal */
-		}
-	}
+  private saveCatalog(): void {
+    if (!this.catalogPath) return;
+    try {
+      mkdirSync(dirname(this.catalogPath), { recursive: true });
+      const data = {
+        nextSeq: this.nextSeq,
+        sessions: [...this.sessions.values()].map((s) => ({
+          sessionId: s.sessionId,
+          ...(s.cwd ? { cwd: s.cwd } : {}),
+          ...(s.model ? { model: s.model } : {}),
+        })),
+      };
+      writeFileSync(this.catalogPath, JSON.stringify(data, null, 2));
+    } catch {
+      /* non-fatal */
+    }
+  }
 
-	/// Test seam: drive a permission request through a live session's
-	/// captured onPermissionRequest handler. Returns the handler's
-	/// resolved value so tests can assert the decision shape.
-	async triggerPermission(sessionId: string, request: unknown): Promise<unknown> {
-		const state = this.sessions.get(sessionId);
-		if (!state) throw new Error(`fake session not found: ${sessionId}`);
-		if (!state.onPermissionRequest) {
-			throw new Error(`session ${sessionId} has no onPermissionRequest handler`);
-		}
-		return state.onPermissionRequest(request);
-	}
+  /// Test seam: drive a permission request through a live session's
+  /// captured onPermissionRequest handler. Returns the handler's
+  /// resolved value so tests can assert the decision shape.
+  async triggerPermission(sessionId: string, request: unknown): Promise<unknown> {
+    const state = this.sessions.get(sessionId);
+    if (!state) throw new Error(`fake session not found: ${sessionId}`);
+    if (!state.onPermissionRequest) {
+      throw new Error(`session ${sessionId} has no onPermissionRequest handler`);
+    }
+    return state.onPermissionRequest(request);
+  }
 
-	setSendScript(script: SendScript): void {
-		this.sendScriptRef.current = script;
-	}
+  setSendScript(script: SendScript): void {
+    this.sendScriptRef.current = script;
+  }
 
-	resetSendScript(): void {
-		this.sendScriptRef.current = defaultSendScript;
-	}
+  resetSendScript(): void {
+    this.sendScriptRef.current = defaultSendScript;
+  }
 
-	async start(): Promise<void> {
-		/* no-op */
-	}
+  async start(): Promise<void> {
+    /* no-op */
+  }
 
-	async stop(): Promise<Error[]> {
-		this.sessions.clear();
-		return [];
-	}
+  async stop(): Promise<Error[]> {
+    this.sessions.clear();
+    return [];
+  }
 
-	async createSession(opts: { workingDirectory?: string; onEvent?: (e: Record<string, unknown>) => void; onPermissionRequest?: (req: unknown) => Promise<unknown> } = {}): Promise<FakeCopilotSession> {
-		const sessionId = `fake-session-${this.nextSeq++}`;
-		const state: FakeSessionState = {
-			sessionId,
-			...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
-			listeners: new Set(),
-			history: [],
-			disposed: false,
-			...(opts.onPermissionRequest ? { onPermissionRequest: opts.onPermissionRequest } : {}),
-		};
-		this.sessions.set(sessionId, state);
-		this.saveCatalog();
-		const session = new FakeCopilotSession(state, this.sendScriptRef);
-		if (opts.onEvent) {
-			state.listeners.add(opts.onEvent);
-		}
-		// Push a session-ready event so dafman's reducer sees one.
-		const ts = new Date().toISOString();
-		const ready = {
-			type: "session.ready",
-			id: randomUUID(),
-			timestamp: ts,
-			data: { sessionId },
-		};
-		state.history.push(ready);
-		for (const cb of state.listeners) cb(ready);
-		return session;
-	}
+  async createSession(
+    opts: {
+      workingDirectory?: string;
+      onEvent?: (e: Record<string, unknown>) => void;
+      onPermissionRequest?: (req: unknown) => Promise<unknown>;
+    } = {},
+  ): Promise<FakeCopilotSession> {
+    const sessionId = `fake-session-${this.nextSeq++}`;
+    const state: FakeSessionState = {
+      sessionId,
+      ...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
+      listeners: new Set(),
+      history: [],
+      disposed: false,
+      ...(opts.onPermissionRequest ? { onPermissionRequest: opts.onPermissionRequest } : {}),
+    };
+    this.sessions.set(sessionId, state);
+    this.saveCatalog();
+    const session = new FakeCopilotSession(state, this.sendScriptRef);
+    if (opts.onEvent) {
+      state.listeners.add(opts.onEvent);
+    }
+    // Push a session-ready event so dafman's reducer sees one.
+    const ts = new Date().toISOString();
+    const ready = {
+      type: 'session.ready',
+      id: randomUUID(),
+      timestamp: ts,
+      data: { sessionId },
+    };
+    state.history.push(ready);
+    for (const cb of state.listeners) cb(ready);
+    return session;
+  }
 
-	async resumeSession(sessionId: string, opts: { workingDirectory?: string; onEvent?: (e: Record<string, unknown>) => void; onPermissionRequest?: (req: unknown) => Promise<unknown> } = {}): Promise<FakeCopilotSession> {
-		let state = this.sessions.get(sessionId);
-		if (!state) {
-			state = {
-				sessionId,
-				...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
-				listeners: new Set(),
-				history: [],
-				disposed: false,
-			};
-			this.sessions.set(sessionId, state);
-			this.saveCatalog();
-		}
-		if (opts.onPermissionRequest) state.onPermissionRequest = opts.onPermissionRequest;
-		// Resume keeps the persisted cwd unless caller explicitly
-		// overrides — same semantics dafman expects from the real SDK.
-		if (opts.workingDirectory) {
-			state.cwd = opts.workingDirectory;
-			this.saveCatalog();
-		}
-		const session = new FakeCopilotSession(state, this.sendScriptRef);
-		if (opts.onEvent) state.listeners.add(opts.onEvent);
-		return session;
-	}
+  async resumeSession(
+    sessionId: string,
+    opts: {
+      workingDirectory?: string;
+      onEvent?: (e: Record<string, unknown>) => void;
+      onPermissionRequest?: (req: unknown) => Promise<unknown>;
+    } = {},
+  ): Promise<FakeCopilotSession> {
+    let state = this.sessions.get(sessionId);
+    if (!state) {
+      state = {
+        sessionId,
+        ...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
+        listeners: new Set(),
+        history: [],
+        disposed: false,
+      };
+      this.sessions.set(sessionId, state);
+      this.saveCatalog();
+    }
+    if (opts.onPermissionRequest) state.onPermissionRequest = opts.onPermissionRequest;
+    // Resume keeps the persisted cwd unless caller explicitly
+    // overrides — same semantics dafman expects from the real SDK.
+    if (opts.workingDirectory) {
+      state.cwd = opts.workingDirectory;
+      this.saveCatalog();
+    }
+    const session = new FakeCopilotSession(state, this.sendScriptRef);
+    if (opts.onEvent) state.listeners.add(opts.onEvent);
+    return session;
+  }
 
-	async listSessions(): Promise<Array<{ sessionId: string; startTime: Date; modifiedTime: Date; summary?: string; isRemote: boolean; context?: { workingDirectory?: string } }>> {
-		const now = new Date();
-		return [...this.sessions.values()].map((s) => ({
-			sessionId: s.sessionId,
-			startTime: now,
-			modifiedTime: now,
-			isRemote: false,
-			...(s.cwd ? { context: { workingDirectory: s.cwd } } : {}),
-		}));
-	}
+  async listSessions(): Promise<
+    Array<{
+      sessionId: string;
+      startTime: Date;
+      modifiedTime: Date;
+      summary?: string;
+      isRemote: boolean;
+      context?: { workingDirectory?: string };
+    }>
+  > {
+    const now = new Date();
+    return [...this.sessions.values()].map((s) => ({
+      sessionId: s.sessionId,
+      startTime: now,
+      modifiedTime: now,
+      isRemote: false,
+      ...(s.cwd ? { context: { workingDirectory: s.cwd } } : {}),
+    }));
+  }
 
-	async getSessionMetadata(sessionId: string): Promise<{ sessionId: string; startTime: Date; modifiedTime: Date; isRemote: boolean; context?: { workingDirectory?: string } } | undefined> {
-		const s = this.sessions.get(sessionId);
-		if (!s) return undefined;
-		const now = new Date();
-		return {
-			sessionId: s.sessionId,
-			startTime: now,
-			modifiedTime: now,
-			isRemote: false,
-			...(s.cwd ? { context: { workingDirectory: s.cwd } } : {}),
-		};
-	}
+  async getSessionMetadata(
+    sessionId: string,
+  ): Promise<
+    | {
+        sessionId: string;
+        startTime: Date;
+        modifiedTime: Date;
+        isRemote: boolean;
+        context?: { workingDirectory?: string };
+      }
+    | undefined
+  > {
+    const s = this.sessions.get(sessionId);
+    if (!s) return undefined;
+    const now = new Date();
+    return {
+      sessionId: s.sessionId,
+      startTime: now,
+      modifiedTime: now,
+      isRemote: false,
+      ...(s.cwd ? { context: { workingDirectory: s.cwd } } : {}),
+    };
+  }
 
-	async deleteSession(sessionId: string): Promise<void> {
-		this.sessions.delete(sessionId);
-		this.saveCatalog();
-	}
+  async deleteSession(sessionId: string): Promise<void> {
+    this.sessions.delete(sessionId);
+    this.saveCatalog();
+  }
 
-	async listModels(): Promise<Array<{ id: string; name: string; vendor: string; reasoning?: boolean }>> {
-		return [
-			{ id: "fake-gpt-5", name: "Fake GPT-5", vendor: "fake", reasoning: false },
-			{ id: "fake-claude", name: "Fake Claude", vendor: "fake", reasoning: true },
-		];
-	}
+  async listModels(): Promise<
+    Array<{ id: string; name: string; vendor: string; reasoning?: boolean }>
+  > {
+    return [
+      { id: 'fake-gpt-5', name: 'Fake GPT-5', vendor: 'fake', reasoning: false },
+      { id: 'fake-claude', name: 'Fake Claude', vendor: 'fake', reasoning: true },
+    ];
+  }
 
-	get rpc(): Record<string, Record<string, (args?: unknown) => Promise<unknown>>> {
-		return {
-			sessions: {
-				fork: async (args) => {
-					const opts = (args ?? {}) as { sessionId?: string };
-					const src = opts.sessionId ? this.sessions.get(opts.sessionId) : undefined;
-					const newId = `fake-session-${this.nextSeq++}`;
-					this.sessions.set(newId, {
-						sessionId: newId,
-						...(src?.cwd ? { cwd: src.cwd } : {}),
-						listeners: new Set(),
-						history: src ? [...src.history] : [],
-						disposed: false,
-					});
-					return { sessionId: newId };
-				},
-			},
-			tools: {
-				list: async () => ({
-					tools: [
-						{ name: "bash", description: "Run shell commands" },
-						{ name: "str_replace_editor", description: "Edit files" },
-						{ name: "grep", description: "Search file contents" },
-					],
-				}),
-			},
-			account: {
-				getQuota: async () => ({
-					quotaSnapshots: {
-						chat: {
-							isUnlimitedEntitlement: false,
-							entitlementRequests: 300,
-							usedRequests: 42,
-							remainingPercentage: 86,
-							overage: 0,
-							resetDate: "2026-06-01T00:00:00.000Z",
-						},
-						premium_interactions: {
-							isUnlimitedEntitlement: false,
-							entitlementRequests: 50,
-							usedRequests: 47,
-							remainingPercentage: 6,
-							overage: 0,
-							resetDate: "2026-06-01T00:00:00.000Z",
-						},
-					},
-				}),
-			},
-			mcp: {
-				config: {
-					list: async () => ({
-						servers: Object.fromEntries(this.mcpConfigs.entries()),
-					}),
-					add: async (args) => {
-						const { name, config } = (args ?? {}) as {
-							name: string;
-							config: Record<string, unknown>;
-						};
-						this.mcpConfigs.set(name, config);
-					},
-					update: async (args) => {
-						const { name, config } = (args ?? {}) as {
-							name: string;
-							config: Record<string, unknown>;
-						};
-						this.mcpConfigs.set(name, config);
-					},
-					remove: async (args) => {
-						const { name } = (args ?? {}) as { name: string };
-						this.mcpConfigs.delete(name);
-						this.mcpDisabled.delete(name);
-					},
-					enable: async (args) => {
-						const { names } = (args ?? {}) as { names: string[] };
-						for (const n of names ?? []) this.mcpDisabled.delete(n);
-					},
-					disable: async (args) => {
-						const { names } = (args ?? {}) as { names: string[] };
-						for (const n of names ?? []) this.mcpDisabled.add(n);
-					},
-				},
-				discover: async () => ({
-					servers: [
-						{
-							name: "playwright",
-							type: "local",
-							source: "plugin",
-							enabled: !this.mcpDisabled.has("playwright"),
-						},
-						{
-							name: "github",
-							type: "http",
-							source: "personal-copilot",
-							enabled: !this.mcpDisabled.has("github"),
-						},
-					],
-				}),
-			},
-			skills: {
-				config: {
-					setDisabledSkills: async (args) => {
-						const { disabledSkills } = (args ?? {}) as { disabledSkills: string[] };
-						this.skillsDisabled.clear();
-						for (const n of disabledSkills ?? []) this.skillsDisabled.add(n);
-					},
-				},
-				discover: async () => {
-					const catalog: Array<{
-						name: string;
-						description: string;
-						source: string;
-						userInvocable: boolean;
-					}> = [
-						{
-							name: "summarize",
-							description: "Summarize the conversation so far.",
-							source: "builtin",
-							userInvocable: true,
-						},
-						{
-							name: "project-greet",
-							description: "Greet the user with project-specific context.",
-							source: "project",
-							userInvocable: false,
-						},
-						{
-							name: "personal-snippet",
-							description: "Insert a personal code snippet.",
-							source: "personal-copilot",
-							userInvocable: true,
-						},
-					];
-					return {
-						skills: catalog.map((s) => ({
-							...s,
-							enabled: !this.skillsDisabled.has(s.name),
-						})),
-					};
-				},
-			},
-		};
-	}
+  get rpc(): Record<string, Record<string, (args?: unknown) => Promise<unknown>>> {
+    return {
+      sessions: {
+        fork: async (args) => {
+          const opts = (args ?? {}) as { sessionId?: string };
+          const src = opts.sessionId ? this.sessions.get(opts.sessionId) : undefined;
+          const newId = `fake-session-${this.nextSeq++}`;
+          this.sessions.set(newId, {
+            sessionId: newId,
+            ...(src?.cwd ? { cwd: src.cwd } : {}),
+            listeners: new Set(),
+            history: src ? [...src.history] : [],
+            disposed: false,
+          });
+          return { sessionId: newId };
+        },
+      },
+      tools: {
+        list: async () => ({
+          tools: [
+            { name: 'bash', description: 'Run shell commands' },
+            { name: 'str_replace_editor', description: 'Edit files' },
+            { name: 'grep', description: 'Search file contents' },
+          ],
+        }),
+      },
+      account: {
+        getQuota: async () => ({
+          quotaSnapshots: {
+            chat: {
+              isUnlimitedEntitlement: false,
+              entitlementRequests: 300,
+              usedRequests: 42,
+              remainingPercentage: 86,
+              overage: 0,
+              resetDate: '2026-06-01T00:00:00.000Z',
+            },
+            premium_interactions: {
+              isUnlimitedEntitlement: false,
+              entitlementRequests: 50,
+              usedRequests: 47,
+              remainingPercentage: 6,
+              overage: 0,
+              resetDate: '2026-06-01T00:00:00.000Z',
+            },
+          },
+        }),
+      },
+      mcp: {
+        config: {
+          list: async () => ({
+            servers: Object.fromEntries(this.mcpConfigs.entries()),
+          }),
+          add: async (args) => {
+            const { name, config } = (args ?? {}) as {
+              name: string;
+              config: Record<string, unknown>;
+            };
+            this.mcpConfigs.set(name, config);
+          },
+          update: async (args) => {
+            const { name, config } = (args ?? {}) as {
+              name: string;
+              config: Record<string, unknown>;
+            };
+            this.mcpConfigs.set(name, config);
+          },
+          remove: async (args) => {
+            const { name } = (args ?? {}) as { name: string };
+            this.mcpConfigs.delete(name);
+            this.mcpDisabled.delete(name);
+          },
+          enable: async (args) => {
+            const { names } = (args ?? {}) as { names: string[] };
+            for (const n of names ?? []) this.mcpDisabled.delete(n);
+          },
+          disable: async (args) => {
+            const { names } = (args ?? {}) as { names: string[] };
+            for (const n of names ?? []) this.mcpDisabled.add(n);
+          },
+        },
+        discover: async () => ({
+          servers: [
+            {
+              name: 'playwright',
+              type: 'local',
+              source: 'plugin',
+              enabled: !this.mcpDisabled.has('playwright'),
+            },
+            {
+              name: 'github',
+              type: 'http',
+              source: 'personal-copilot',
+              enabled: !this.mcpDisabled.has('github'),
+            },
+          ],
+        }),
+      },
+      skills: {
+        config: {
+          setDisabledSkills: async (args) => {
+            const { disabledSkills } = (args ?? {}) as { disabledSkills: string[] };
+            this.skillsDisabled.clear();
+            for (const n of disabledSkills ?? []) this.skillsDisabled.add(n);
+          },
+        },
+        discover: async () => {
+          const catalog: Array<{
+            name: string;
+            description: string;
+            source: string;
+            userInvocable: boolean;
+          }> = [
+            {
+              name: 'summarize',
+              description: 'Summarize the conversation so far.',
+              source: 'builtin',
+              userInvocable: true,
+            },
+            {
+              name: 'project-greet',
+              description: 'Greet the user with project-specific context.',
+              source: 'project',
+              userInvocable: false,
+            },
+            {
+              name: 'personal-snippet',
+              description: 'Insert a personal code snippet.',
+              source: 'personal-copilot',
+              userInvocable: true,
+            },
+          ];
+          return {
+            skills: catalog.map((s) => ({
+              ...s,
+              enabled: !this.skillsDisabled.has(s.name),
+            })),
+          };
+        },
+      },
+    };
+  }
 }

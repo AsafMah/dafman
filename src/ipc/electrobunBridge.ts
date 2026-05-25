@@ -5,7 +5,7 @@
 // fan-out listeners so multiple stores can all subscribe without the
 // renderer needing to re-register handlers.
 
-import { Electroview } from "electrobun/view";
+import { Electroview } from 'electrobun/view';
 import type {
   AuditEntry,
   CommandMap,
@@ -15,7 +15,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
-} from "./types";
+} from './types';
 import type {
   AuditEventListener,
   CommandResultEventListener,
@@ -24,14 +24,14 @@ import type {
   RpcBridge,
   SessionEventListener,
   TerminalEventListener,
-} from "./invoke";
+} from './invoke';
 
 interface ElectrobunRpcType {
   bun: {
     requests: {
       [K in CommandName]: {
-        params: CommandMap[K]["args"];
-        response: CommandMap[K]["result"];
+        params: CommandMap[K]['args'];
+        response: CommandMap[K]['result'];
       };
     };
     messages: Record<string, never>;
@@ -70,7 +70,7 @@ export function createElectrobunBridge(): {
             try {
               listener(payload);
             } catch (err) {
-              console.error("[sessionEvent listener threw]", err);
+              console.error('[sessionEvent listener threw]', err);
             }
           }
         },
@@ -79,7 +79,7 @@ export function createElectrobunBridge(): {
             try {
               listener(payload);
             } catch (err) {
-              console.error("[pendingRequest listener threw]", err);
+              console.error('[pendingRequest listener threw]', err);
             }
           }
         },
@@ -88,7 +88,7 @@ export function createElectrobunBridge(): {
             try {
               listener(payload);
             } catch (err) {
-              console.error("[logEvent listener threw]", err);
+              console.error('[logEvent listener threw]', err);
             }
           }
         },
@@ -97,7 +97,7 @@ export function createElectrobunBridge(): {
             try {
               listener(payload);
             } catch (err) {
-              console.error("[auditEvent listener threw]", err);
+              console.error('[auditEvent listener threw]', err);
             }
           }
         },
@@ -106,7 +106,7 @@ export function createElectrobunBridge(): {
             try {
               listener(payload);
             } catch (err) {
-              console.error("[terminalEvent listener threw]", err);
+              console.error('[terminalEvent listener threw]', err);
             }
           }
         },
@@ -115,7 +115,7 @@ export function createElectrobunBridge(): {
             try {
               listener(payload);
             } catch (err) {
-              console.error("[commandResultEvent listener threw]", err);
+              console.error('[commandResultEvent listener threw]', err);
             }
           }
         },
@@ -128,10 +128,10 @@ export function createElectrobunBridge(): {
   const bridge: RpcBridge = {
     request: ((name, args) => {
       const requester = (
-        (electroview as { rpc: { request: Record<CommandName, (a: unknown) => Promise<unknown>> } }).rpc
-      ).request[name];
+        electroview as { rpc: { request: Record<CommandName, (a: unknown) => Promise<unknown>> } }
+      ).rpc.request[name];
       return requester(args);
-    }) as RpcBridge["request"],
+    }) as RpcBridge['request'],
     onSessionEvent(listener) {
       sessionListeners.add(listener);
       return () => sessionListeners.delete(listener);

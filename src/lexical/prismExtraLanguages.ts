@@ -22,7 +22,7 @@
 //      avoids running grammar registrations during the early app boot
 //      where they wouldn't be useful yet.
 
-import "prismjs";
+import 'prismjs';
 
 // IMPORTANT: dependency order matters. Each prism component file
 // expects its prerequisites already registered on the global `Prism`
@@ -37,33 +37,33 @@ import "prismjs";
 //   tier 3  — depends on tier 2
 
 // tier 0
-import "prismjs/components/prism-markup";
-import "prismjs/components/prism-clike";
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-clike';
 
 // tier 1 — need markup OR clike
-import "prismjs/components/prism-markup-templating"; // → markup
-import "prismjs/components/prism-css";               // → markup
-import "prismjs/components/prism-c";                 // → clike
-import "prismjs/components/prism-javascript";        // → clike
-import "prismjs/components/prism-sql";               // → clike
-import "prismjs/components/prism-java";              // → clike
-import "prismjs/components/prism-csharp";            // → clike
-import "prismjs/components/prism-go";                // → clike
-import "prismjs/components/prism-bash";              // standalone
-import "prismjs/components/prism-python";            // standalone
-import "prismjs/components/prism-rust";              // standalone
-import "prismjs/components/prism-yaml";              // standalone
-import "prismjs/components/prism-toml";              // standalone
-import "prismjs/components/prism-diff";              // standalone
-import "prismjs/components/prism-json";              // standalone
-import "prismjs/components/prism-powershell";        // standalone
-import "prismjs/components/prism-ruby";              // standalone
+import 'prismjs/components/prism-markup-templating'; // → markup
+import 'prismjs/components/prism-css'; // → markup
+import 'prismjs/components/prism-c'; // → clike
+import 'prismjs/components/prism-javascript'; // → clike
+import 'prismjs/components/prism-sql'; // → clike
+import 'prismjs/components/prism-java'; // → clike
+import 'prismjs/components/prism-csharp'; // → clike
+import 'prismjs/components/prism-go'; // → clike
+import 'prismjs/components/prism-bash'; // standalone
+import 'prismjs/components/prism-python'; // standalone
+import 'prismjs/components/prism-rust'; // standalone
+import 'prismjs/components/prism-yaml'; // standalone
+import 'prismjs/components/prism-toml'; // standalone
+import 'prismjs/components/prism-diff'; // standalone
+import 'prismjs/components/prism-json'; // standalone
+import 'prismjs/components/prism-powershell'; // standalone
+import 'prismjs/components/prism-ruby'; // standalone
 // tier 2 — need a tier-1 lang
-import "prismjs/components/prism-cpp";               // → c
-import "prismjs/components/prism-typescript";        // → javascript
-import "prismjs/components/prism-kotlin";            // → java/clike
-import "prismjs/components/prism-php";               // → markup-templating + clike
-import "prismjs/components/prism-markdown";          // → markup-templating
+import 'prismjs/components/prism-cpp'; // → c
+import 'prismjs/components/prism-typescript'; // → javascript
+import 'prismjs/components/prism-kotlin'; // → java/clike
+import 'prismjs/components/prism-php'; // → markup-templating + clike
+import 'prismjs/components/prism-markdown'; // → markup-templating
 
 // NOTE: prism-objectivec and prism-swift are imported here NOT because
 // we care about highlighting them (Windows-only dev tool, no Apple
@@ -76,11 +76,11 @@ import "prismjs/components/prism-markdown";          // → markup-templating
 // like the other prism components, which means they get loaded
 // after the others (proper order). prism-c (tier 1 above) is
 // guaranteed registered first.
-import "prismjs/components/prism-objectivec";        // → c
-import "prismjs/components/prism-swift";             // standalone
+import 'prismjs/components/prism-objectivec'; // → c
+import 'prismjs/components/prism-swift'; // standalone
 
 // tier 3 — need a tier-2 lang
-import "prismjs/components/prism-jsx";               // → markup + javascript
-import "prismjs/components/prism-tsx";               // → jsx + typescript
+import 'prismjs/components/prism-jsx'; // → markup + javascript
+import 'prismjs/components/prism-tsx'; // → jsx + typescript
 
 export const PRISM_EXTRA_LANGUAGES_LOADED = true;

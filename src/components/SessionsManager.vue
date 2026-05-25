@@ -7,23 +7,21 @@
 // the primary control surface for sessions; the activity-bar item just
 // toggles its visibility.
 
-import { computed, onMounted, reactive, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
-import AutoComplete, {
-  type AutoCompleteCompleteEvent,
-} from "primevue/autocomplete";
-import Button from "primevue/button";
-import { useConfirm } from "primevue/useconfirm";
-import ConfirmPopup from "primevue/confirmpopup";
-import { useSessionsListStore } from "../stores/sessionsListStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { indicatorStyle, type NotificationStyle } from "../lib/notificationStyles";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useClientStore } from "../stores/clientStore";
-import { useLayoutStore, composePanelTitle } from "../stores/layoutStore";
-import { useToastStore } from "../stores/toastStore";
-import { invokeCommand } from "../ipc/invoke";
-import type { SessionMetadataSummary } from "../ipc/types";
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete';
+import Button from 'primevue/button';
+import { useConfirm } from 'primevue/useconfirm';
+import ConfirmPopup from 'primevue/confirmpopup';
+import { useSessionsListStore } from '../stores/sessionsListStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { indicatorStyle, type NotificationStyle } from '../lib/notificationStyles';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useClientStore } from '../stores/clientStore';
+import { useLayoutStore, composePanelTitle } from '../stores/layoutStore';
+import { useToastStore } from '../stores/toastStore';
+import { invokeCommand } from '../ipc/invoke';
+import type { SessionMetadataSummary } from '../ipc/types';
 
 const sessionsList = useSessionsListStore();
 const sessionsStore = useSessionsStore();
@@ -34,14 +32,11 @@ const toasts = useToastStore();
 const confirm = useConfirm();
 
 const { grouped, isLoading, hasLoaded, error } = storeToRefs(sessionsList);
-const { ready: clientReady, isCreating: isCreatingClient } =
-  storeToRefs(clientStore);
+const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
 const { isCreating: isCreatingSession } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
 
-const openSessionIds = computed(
-  () => new Set(sessionsStore.sessions.map((s) => s.id)),
-);
+const openSessionIds = computed(() => new Set(sessionsStore.sessions.map((s) => s.id)));
 
 /// Quick lookup: session-id → its live record (if currently open).
 /// Used by the row template to look up pendingRequest / unseenTurns
@@ -72,25 +67,25 @@ function sessionKindIcon(sessionId: string): {
 } {
   const open = openSessionIds.value.has(sessionId);
   if (!open) {
-    return { iconClass: "pi-comments", tooltip: "Closed session", muted: true };
+    return { iconClass: 'pi-comments', tooltip: 'Closed session', muted: true };
   }
   const r = recordsById.value.get(sessionId);
   if (!r) {
-    return { iconClass: "pi-comments", tooltip: "Open session", muted: false };
+    return { iconClass: 'pi-comments', tooltip: 'Open session', muted: false };
   }
   // Heuristic: a session with zero user/assistant message events is
   // still a "draft". We don't count tool/reasoning events because
   // those can fire mid-creation before any user typing.
   const hasUserOrAssistantMessage = r.events.some(
-    (e) => e.eventType === "user.message" || e.eventType === "assistant.message",
+    (e) => e.eventType === 'user.message' || e.eventType === 'assistant.message',
   );
   if (!hasUserOrAssistantMessage) {
-    return { iconClass: "pi-pencil", tooltip: "Draft — no messages yet", muted: false };
+    return { iconClass: 'pi-pencil', tooltip: 'Draft — no messages yet', muted: false };
   }
   if (r.isThinking) {
-    return { iconClass: "pi-bolt", tooltip: "Turn active", muted: false };
+    return { iconClass: 'pi-bolt', tooltip: 'Turn active', muted: false };
   }
-  return { iconClass: "pi-comments", tooltip: "Open session", muted: false };
+  return { iconClass: 'pi-comments', tooltip: 'Open session', muted: false };
 }
 
 /// Number of SDK-blocking pending requests beyond the first (the
@@ -118,13 +113,11 @@ function sortedGroupSessions(group: { sessions: SessionMetadataSummary[] }) {
 
 // ---------- New-session form ----------
 
-const workspaceDraft = ref("");
+const workspaceDraft = ref('');
 const workspaceSuggestions = ref<string[]>([]);
 const isPickingFolder = ref(false);
 
-const recentWorkspaces = computed(
-  () => settings.value.workspaces?.recent ?? [],
-);
+const recentWorkspaces = computed(() => settings.value.workspaces?.recent ?? []);
 
 /// Workspaces that have at least one CLI-side session. Pulled from
 /// `sessionsListStore.grouped` so even users who never recorded an MRU
@@ -135,7 +128,7 @@ const recentWorkspaces = computed(
 const sessionWorkspaces = computed<string[]>(() =>
   grouped.value
     .map((g) => g.path)
-    .filter((p): p is string => typeof p === "string" && p.length > 0),
+    .filter((p): p is string => typeof p === 'string' && p.length > 0),
 );
 
 /// All known workspaces, ordered MRU first → session-derived (recency
@@ -156,14 +149,14 @@ const allKnownWorkspaces = computed<string[]>(() => {
 // falling back to the most-recently-used path. Only when the user
 // hasn't typed anything yet (empty → non-empty transition).
 const initialWorkspaceCandidate = computed<string>(() => {
-  const def = settings.value.workspaces?.defaultWorkspace ?? "";
+  const def = settings.value.workspaces?.defaultWorkspace ?? '';
   if (def) return def;
-  return allKnownWorkspaces.value[0] ?? "";
+  return allKnownWorkspaces.value[0] ?? '';
 });
 watch(
   initialWorkspaceCandidate,
   (next) => {
-    if (workspaceDraft.value === "" && next) {
+    if (workspaceDraft.value === '' && next) {
       workspaceDraft.value = next;
     }
   },
@@ -174,7 +167,7 @@ let browseTimer: ReturnType<typeof setTimeout> | null = null;
 let browseSeq = 0;
 
 async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
-  const query = (event.query ?? "").trim();
+  const query = (event.query ?? '').trim();
   const lowerQuery = query.toLowerCase();
   const known = allKnownWorkspaces.value;
 
@@ -206,7 +199,7 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
     browseTimer = null;
     let fs: string[] = [];
     try {
-      fs = await invokeCommand("browseDirectory", { prefix: query });
+      fs = await invokeCommand('browseDirectory', { prefix: query });
     } catch {
       /* expected while typing — keep known-matches-only */
     }
@@ -227,10 +220,8 @@ async function onPickFolder() {
   if (isPickingFolder.value) return;
   isPickingFolder.value = true;
   try {
-    const picked = await invokeCommand("pickFolder", {
-      ...(workspaceDraft.value.trim()
-        ? { startingFolder: workspaceDraft.value.trim() }
-        : {}),
+    const picked = await invokeCommand('pickFolder', {
+      ...(workspaceDraft.value.trim() ? { startingFolder: workspaceDraft.value.trim() } : {}),
     });
     if (picked) workspaceDraft.value = picked;
   } catch {
@@ -243,9 +234,7 @@ async function onPickFolder() {
 async function onCreateSession() {
   const wd = workspaceDraft.value.trim();
   try {
-    const record = await sessionsStore.createSession(
-      wd ? { workingDirectory: wd } : {},
-    );
+    const record = await sessionsStore.createSession(wd ? { workingDirectory: wd } : {});
     if (record) {
       if (wd) void settingsStore.recordWorkspaceUse(wd);
       layoutStore.addPanel(record.id, {
@@ -260,9 +249,7 @@ async function onCreateSession() {
 async function onNewInWorkspace(workspacePath: string) {
   const wd = workspacePath.trim();
   try {
-    const record = await sessionsStore.createSession(
-      wd ? { workingDirectory: wd } : {},
-    );
+    const record = await sessionsStore.createSession(wd ? { workingDirectory: wd } : {});
     if (record) {
       if (wd) void settingsStore.recordWorkspaceUse(wd);
       layoutStore.addPanel(record.id, {
@@ -319,12 +306,12 @@ async function onResume(session: SessionMetadataSummary) {
       layoutStore.activatePanel(session.sessionId);
     }
     window.dispatchEvent(
-      new CustomEvent("dafman:scroll-to-bottom", {
+      new CustomEvent('dafman:scroll-to-bottom', {
         detail: { sessionId: session.sessionId },
       }),
     );
     window.dispatchEvent(
-      new CustomEvent("dafman:focus-composer", {
+      new CustomEvent('dafman:focus-composer', {
         detail: { sessionId: session.sessionId },
       }),
     );
@@ -350,17 +337,16 @@ async function onResume(session: SessionMetadataSummary) {
 }
 
 function onDelete(event: Event, session: SessionMetadataSummary) {
-  const label =
-    session.summary ?? `session ${session.sessionId.slice(0, 8)}…`;
+  const label = session.summary ?? `session ${session.sessionId.slice(0, 8)}…`;
   confirm.require({
-    group: "sessions-manager",
+    group: 'sessions-manager',
     target: event.currentTarget as HTMLElement,
     message: `Permanently delete "${label}"? This removes all CLI-side data and can't be undone.`,
-    icon: "pi pi-exclamation-triangle",
-    acceptLabel: "Delete",
-    rejectLabel: "Cancel",
-    acceptProps: { severity: "danger", size: "small" },
-    rejectProps: { severity: "secondary", text: true, size: "small" },
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Delete',
+    rejectLabel: 'Cancel',
+    acceptProps: { severity: 'danger', size: 'small' },
+    rejectProps: { severity: 'secondary', text: true, size: 'small' },
     accept: async () => {
       if (openSessionIds.value.has(session.sessionId)) {
         layoutStore.removePanel(session.sessionId);
@@ -378,7 +364,7 @@ function relativeTime(iso: string): string {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) return iso;
   const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (diffSec < 60) return "just now";
+  if (diffSec < 60) return 'just now';
   const m = Math.floor(diffSec / 60);
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
@@ -403,7 +389,10 @@ void toasts; // referenced inside async handlers
     <!-- Create-new-session block. Stays at the top of the panel so
          it's always reachable without scrolling. -->
     <section class="new-session-block">
-      <form class="new-session-form" @submit.prevent="onCreateSession">
+      <form
+        class="new-session-form"
+        @submit.prevent="onCreateSession"
+      >
         <AutoComplete
           v-model="workspaceDraft"
           :suggestions="workspaceSuggestions"
@@ -455,8 +444,14 @@ void toasts; // referenced inside async handlers
     </div>
 
     <div class="manager-body">
-      <p v-if="error" class="state-message error-message">
-        <i class="pi pi-exclamation-circle" aria-hidden="true" />
+      <p
+        v-if="error"
+        class="state-message error-message"
+      >
+        <i
+          class="pi pi-exclamation-circle"
+          aria-hidden="true"
+        />
         {{ error }}
       </p>
       <p
@@ -466,7 +461,10 @@ void toasts; // referenced inside async handlers
       >
         Loading sessions…
       </p>
-      <p v-else-if="hasLoaded && grouped.length === 0" class="state-message">
+      <p
+        v-else-if="hasLoaded && grouped.length === 0"
+        class="state-message"
+      >
         No sessions yet.
       </p>
 
@@ -486,12 +484,13 @@ void toasts; // referenced inside async handlers
           >
             <i
               class="pi group-chevron"
-              :class="
-                collapsedGroups[group.key] ? 'pi-chevron-right' : 'pi-chevron-down'
-              "
+              :class="collapsedGroups[group.key] ? 'pi-chevron-right' : 'pi-chevron-down'"
               aria-hidden="true"
             />
-            <i class="pi pi-folder group-folder" aria-hidden="true" />
+            <i
+              class="pi pi-folder group-folder"
+              aria-hidden="true"
+            />
             <span class="group-label">{{ group.label }}</span>
             <span class="group-count">{{ group.sessions.length }}</span>
           </button>
@@ -502,15 +501,9 @@ void toasts; // referenced inside async handlers
             size="small"
             class="group-new"
             :aria-label="
-              group.path
-                ? `New session in ${group.label}`
-                : 'New session (no workspace)'
+              group.path ? `New session in ${group.label}` : 'New session (no workspace)'
             "
-            :title="
-              group.path
-                ? `New session in ${group.path}`
-                : 'New session (no workspace)'
-            "
+            :title="group.path ? `New session in ${group.path}` : 'New session (no workspace)'"
             :disabled="!clientReady"
             @click.stop="onNewInWorkspace(group.path)"
           />
@@ -529,7 +522,10 @@ void toasts; // referenced inside async handlers
           </span>
         </div>
 
-        <ul v-show="!collapsedGroups[group.key]" class="session-list">
+        <ul
+          v-show="!collapsedGroups[group.key]"
+          class="session-list"
+        >
           <li
             v-for="session in sortedGroupSessions(group)"
             :key="session.sessionId"
@@ -581,7 +577,10 @@ void toasts; // referenced inside async handlers
                   class="resuming-pill"
                   aria-label="Resuming"
                 >
-                  <i class="pi pi-spin pi-spinner" aria-hidden="true" />
+                  <i
+                    class="pi pi-spin pi-spinner"
+                    aria-hidden="true"
+                  />
                   Resuming…
                 </span>
                 <template v-else>
@@ -953,8 +952,15 @@ void toasts; // referenced inside async handlers
 }
 
 @keyframes session-state-dot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
 }
 
 .badge-pending {

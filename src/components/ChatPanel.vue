@@ -13,12 +13,12 @@
 // `props.params.api` is the panel api). The wrap happens before our
 // component reads in practice, so we have to normalize both shapes.
 
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import type { DockviewPanelApi } from "dockview-core";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import ChatWindow from "./ChatWindow.vue";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import type { DockviewPanelApi } from 'dockview-core';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import ChatWindow from './ChatWindow.vue';
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {
@@ -39,23 +39,17 @@ const layoutStore = useLayoutStore();
 /// is currently using.
 const userParams = computed<UserParams>(() => {
   const p = props.params;
-  if (p && typeof p === "object" && "params" in p && p.params) {
+  if (p && typeof p === 'object' && 'params' in p && p.params) {
     return p.params;
   }
   return (p as UserParams) ?? {};
 });
 
-const panelApi = computed<DockviewPanelApi | undefined>(
-  () => props.api ?? props.params?.api,
-);
+const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
 
-const sessionId = computed(
-  () => userParams.value.sessionId ?? panelApi.value?.id ?? "",
-);
+const sessionId = computed(() => userParams.value.sessionId ?? panelApi.value?.id ?? '');
 
-const record = computed(() =>
-  sessionsStore.getSession(sessionId.value),
-);
+const record = computed(() => sessionsStore.getSession(sessionId.value));
 
 const replacing = ref(false);
 
@@ -96,12 +90,18 @@ function dismissPanel() {
     :reasoning-visibility-override="record.reasoningVisibilityOverride"
     :default-send-mode="record.defaultSendMode"
   />
-  <div v-else class="missing-pane">
-    <i class="pi pi-inbox missing-icon" aria-hidden="true" />
+  <div
+    v-else
+    class="missing-pane"
+  >
+    <i
+      class="pi pi-inbox missing-icon"
+      aria-hidden="true"
+    />
     <h2 class="missing-title">Session no longer available</h2>
     <p class="missing-detail">
-      <code>{{ sessionId.slice(0, 8) }}…</code> couldn't be resumed. It
-      may have been deleted by the Copilot CLI or never finished saving.
+      <code>{{ sessionId.slice(0, 8) }}…</code> couldn't be resumed. It may have been deleted by the
+      Copilot CLI or never finished saving.
     </p>
     <div class="missing-actions">
       <Button

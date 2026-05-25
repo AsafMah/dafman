@@ -17,26 +17,21 @@
 /// `toJSON()`/`fromJSON()` in `layoutStore.snapshot/restore`, so no
 /// settings v9 bump is required.
 
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import Select from "primevue/select";
-import SelectButton from "primevue/selectbutton";
-import ToggleSwitch from "primevue/toggleswitch";
-import type {
-  AgentInfo,
-  ReasoningVisibility,
-  SessionMode,
-  TaskInfo,
-} from "../ipc/types";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useToastStore } from "../stores/toastStore";
-import { invokeCommand } from "../ipc/invoke";
-import MessageContent from "./MessageContent.vue";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Select from 'primevue/select';
+import SelectButton from 'primevue/selectbutton';
+import ToggleSwitch from 'primevue/toggleswitch';
+import type { AgentInfo, ReasoningVisibility, SessionMode, TaskInfo } from '../ipc/types';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useToastStore } from '../stores/toastStore';
+import { invokeCommand } from '../ipc/invoke';
+import MessageContent from './MessageContent.vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 
@@ -53,18 +48,16 @@ const toasts = useToastStore();
 // Singleton rail: bind to whichever chat panel is active. The
 // component is mounted ONCE; the watch on `sessionId` below tears
 // down + re-loads per-session data when the user switches tabs.
-const sessionId = computed<string>(() => layoutStore.activeSessionId ?? "");
+const sessionId = computed<string>(() => layoutStore.activeSessionId ?? '');
 
-const record = computed(() =>
-  sessionsStore.getSession(sessionId.value),
-);
+const record = computed(() => sessionsStore.getSession(sessionId.value));
 
 // ---------- Name ----------
-const nameDraft = ref<string>(record.value?.title ?? "");
+const nameDraft = ref<string>(record.value?.title ?? '');
 watch(
   () => sessionId.value,
   () => {
-    nameDraft.value = record.value?.title ?? "";
+    nameDraft.value = record.value?.title ?? '';
   },
 );
 watch(
@@ -74,8 +67,8 @@ watch(
     // the draft so the input stays in sync when not actively
     // edited. Skip if the input has user-pending edits.
     const trimmed = nameDraft.value.trim();
-    if (!trimmed || trimmed === (next ?? "")) {
-      nameDraft.value = next ?? "";
+    if (!trimmed || trimmed === (next ?? '')) {
+      nameDraft.value = next ?? '';
     }
   },
 );
@@ -88,9 +81,9 @@ function onRenameSubmit() {
 
 // ---------- Mode ----------
 const modeOptions: { label: string; value: SessionMode; icon: string }[] = [
-  { label: "Interactive", value: "interactive", icon: "pi pi-comments" },
-  { label: "Plan", value: "plan", icon: "pi pi-list-check" },
-  { label: "Autopilot", value: "autopilot", icon: "pi pi-bolt" },
+  { label: 'Interactive', value: 'interactive', icon: 'pi pi-comments' },
+  { label: 'Plan', value: 'plan', icon: 'pi pi-list-check' },
+  { label: 'Autopilot', value: 'autopilot', icon: 'pi pi-bolt' },
 ];
 const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
@@ -99,19 +92,19 @@ const modeChoice = computed<SessionMode | null>({
     void sessionsStore.setSessionMode(sessionId.value, value);
   },
 });
-const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
+const modeClass = computed(() => `mode-${modeChoice.value ?? 'interactive'}`);
 
 // ---------- Reasoning visibility override ----------
 const settings = storeToRefs(useSettingsStore()).settings;
 const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
-  { label: "Hidden", value: "hidden" },
-  { label: "Compact", value: "compact" },
-  { label: "Expanded", value: "expanded" },
+  { label: 'Hidden', value: 'hidden' },
+  { label: 'Compact', value: 'compact' },
+  { label: 'Expanded', value: 'expanded' },
 ];
 const reasoningChoice = computed<ReasoningVisibility>({
   get: () => {
     const v = record.value?.reasoningVisibilityOverride;
-    if (!v || v === "default") return settings.value.appearance.reasoningVisibility;
+    if (!v || v === 'default') return settings.value.appearance.reasoningVisibility;
     return v;
   },
   set: (value) => {
@@ -123,20 +116,14 @@ const reasoningChoice = computed<ReasoningVisibility>({
 function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
   if (!path) return;
-  invokeCommand("revealPath", { path }).catch((err: unknown) => {
-    toasts.error(
-      "Couldn't open workspace",
-      toErrorMessage(err),
-    );
+  invokeCommand('revealPath', { path }).catch((err: unknown) => {
+    toasts.error("Couldn't open workspace", toErrorMessage(err));
   });
 }
 
 function revealFile(path: string) {
-  invokeCommand("revealPath", { path }).catch((err: unknown) => {
-    toasts.error(
-      "Couldn't open file",
-      toErrorMessage(err),
-    );
+  invokeCommand('revealPath', { path }).catch((err: unknown) => {
+    toasts.error("Couldn't open file", toErrorMessage(err));
   });
 }
 
@@ -167,7 +154,7 @@ async function loadAgents() {
   if (!sessionId.value) return;
   agentsError.value = null;
   try {
-    sessionAgents.value = await invokeCommand("listAgents", {
+    sessionAgents.value = await invokeCommand('listAgents', {
       sessionId: sessionId.value,
     });
     agentsLoaded.value = true;
@@ -181,16 +168,13 @@ async function reloadAgents() {
   if (!sessionId.value) return;
   agentsError.value = null;
   try {
-    sessionAgents.value = await invokeCommand("reloadAgents", {
+    sessionAgents.value = await invokeCommand('reloadAgents', {
       sessionId: sessionId.value,
     });
-    toasts.success("Agents reloaded", `${sessionAgents.value.length} available`);
+    toasts.success('Agents reloaded', `${sessionAgents.value.length} available`);
   } catch (err) {
     agentsError.value = toErrorMessage(err);
-    toasts.error(
-      "Failed to reload agents",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to reload agents', toErrorMessage(err));
   }
 }
 
@@ -198,17 +182,14 @@ async function selectAgent(name: string) {
   if (!sessionId.value || agentBusyName.value) return;
   agentBusyName.value = name;
   try {
-    await invokeCommand("selectAgent", {
+    await invokeCommand('selectAgent', {
       sessionId: sessionId.value,
       name,
     });
     // currentAgent updates via the subagent.selected event handler in
     // sessionsStore.applySessionEvent — no manual store mutation here.
   } catch (err) {
-    toasts.error(
-      "Failed to select agent",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to select agent', toErrorMessage(err));
   } finally {
     agentBusyName.value = null;
   }
@@ -216,14 +197,11 @@ async function selectAgent(name: string) {
 
 async function deselectAgent() {
   if (!sessionId.value || agentBusyName.value) return;
-  agentBusyName.value = "__deselect__";
+  agentBusyName.value = '__deselect__';
   try {
-    await invokeCommand("deselectAgent", { sessionId: sessionId.value });
+    await invokeCommand('deselectAgent', { sessionId: sessionId.value });
   } catch (err) {
-    toasts.error(
-      "Failed to deselect agent",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to deselect agent', toErrorMessage(err));
   } finally {
     agentBusyName.value = null;
   }
@@ -232,15 +210,15 @@ async function deselectAgent() {
 /// Derive "Project" vs "User" source from the agent's absolute path.
 /// Returns `null` when the agent has no path (remote/inline — none in
 /// our case but defensive).
-function agentSourceLabel(agent: AgentInfo): "Project" | "User" | null {
+function agentSourceLabel(agent: AgentInfo): 'Project' | 'User' | null {
   if (!agent.path) return null;
   const wd = record.value?.workingDirectory;
-  if (!wd) return "User";
+  if (!wd) return 'User';
   // Case-insensitive on Windows; the path may use forward or back
   // slashes. Normalize both.
-  const norm = (s: string) => s.replace(/\\/g, "/").toLowerCase();
+  const norm = (s: string) => s.replace(/\\/g, '/').toLowerCase();
   const projectPrefix = `${norm(wd)}/.github/agents/`;
-  return norm(agent.path).startsWith(projectPrefix) ? "Project" : "User";
+  return norm(agent.path).startsWith(projectPrefix) ? 'Project' : 'User';
 }
 
 // ---------- Tasks (19b.1) ----------
@@ -270,7 +248,7 @@ async function loadTasks() {
   tasksError.value = null;
   const token = ++tasksRequestToken;
   try {
-    const tasks = await invokeCommand("listTasks", {
+    const tasks = await invokeCommand('listTasks', {
       sessionId: sessionId.value,
     });
     if (token !== tasksRequestToken) return;
@@ -287,16 +265,13 @@ async function cancelTask(task: TaskInfo) {
   if (!sessionId.value || taskBusyId.value) return;
   taskBusyId.value = task.id;
   try {
-    await invokeCommand("cancelTask", {
+    await invokeCommand('cancelTask', {
       sessionId: sessionId.value,
       id: task.id,
     });
-    toasts.info("Task cancelled", `Cancelled "${task.description || task.id}".`);
+    toasts.info('Task cancelled', `Cancelled "${task.description || task.id}".`);
   } catch (err) {
-    toasts.error(
-      "Failed to cancel task",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to cancel task', toErrorMessage(err));
   } finally {
     taskBusyId.value = null;
     void loadTasks();
@@ -307,15 +282,12 @@ async function removeTask(task: TaskInfo) {
   if (!sessionId.value || taskBusyId.value) return;
   taskBusyId.value = task.id;
   try {
-    await invokeCommand("removeTask", {
+    await invokeCommand('removeTask', {
       sessionId: sessionId.value,
       id: task.id,
     });
   } catch (err) {
-    toasts.error(
-      "Failed to remove task",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to remove task', toErrorMessage(err));
   } finally {
     taskBusyId.value = null;
     void loadTasks();
@@ -327,14 +299,14 @@ async function removeTask(task: TaskInfo) {
 /// a few minutes; the precision drops off above an hour.
 function formatTaskElapsed(task: TaskInfo): string {
   let ms: number | null = null;
-  if (typeof task.activeTimeMs === "number") {
+  if (typeof task.activeTimeMs === 'number') {
     ms = task.activeTimeMs;
   } else if (task.startedAt) {
     const start = Date.parse(task.startedAt);
     const end = task.completedAt ? Date.parse(task.completedAt) : Date.now();
     if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
   }
-  if (ms === null) return "";
+  if (ms === null) return '';
   if (ms < 1000) return `${ms}ms`;
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -346,9 +318,9 @@ function formatTaskElapsed(task: TaskInfo): string {
 }
 
 function taskTitle(task: TaskInfo): string {
-  return task.type === "agent"
+  return task.type === 'agent'
     ? task.agentDisplayName || task.agentName || task.agentType
-    : task.command || task.description || "Shell task";
+    : task.command || task.description || 'Shell task';
 }
 
 // ---------- Skills ----------
@@ -366,7 +338,7 @@ async function loadSkills() {
   if (!sessionId.value) return;
   skillsError.value = null;
   try {
-    sessionSkills.value = await invokeCommand("listSessionSkills", {
+    sessionSkills.value = await invokeCommand('listSessionSkills', {
       sessionId: sessionId.value,
     });
     skillsLoaded.value = true;
@@ -379,7 +351,7 @@ async function toggleSkill(skill: SessionSkill) {
   const next = !skill.enabled;
   skill.enabled = next;
   try {
-    await invokeCommand("setSessionSkillEnabled", {
+    await invokeCommand('setSessionSkillEnabled', {
       sessionId: sessionId.value,
       name: skill.name,
       enabled: next,
@@ -396,18 +368,18 @@ async function toggleSkill(skill: SessionSkill) {
 /// next reload).
 function openSkillsLibrary() {
   try {
-    localStorage.setItem("dafman.library.activeTab", "skills");
+    localStorage.setItem('dafman.library.activeTab', 'skills');
   } catch {
     /* private mode — ignore */
   }
   window.dispatchEvent(
-    new CustomEvent("dafman:library-activate-tab", { detail: { tab: "skills" } }),
+    new CustomEvent('dafman:library-activate-tab', { detail: { tab: 'skills' } }),
   );
-  layoutStore.openEdgePanel("left", {
-    id: "library",
-    component: "library",
-    tabComponent: "sidebarTab",
-    title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
+  layoutStore.openEdgePanel('left', {
+    id: 'library',
+    component: 'library',
+    tabComponent: 'sidebarTab',
+    title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
     initialSize: 360,
     minimumSize: 320,
     exclusive: true,
@@ -415,11 +387,11 @@ function openSkillsLibrary() {
 }
 
 function openJobsPanel() {
-  layoutStore.openEdgePanel("left", {
-    id: "jobs-panel",
-    component: "jobsPanel",
-    tabComponent: "sidebarTab",
-    title: "Jobs",
+  layoutStore.openEdgePanel('left', {
+    id: 'jobs-panel',
+    component: 'jobsPanel',
+    tabComponent: 'sidebarTab',
+    title: 'Jobs',
     initialSize: 380,
     minimumSize: 380,
     exclusive: true,
@@ -441,35 +413,29 @@ async function loadUsage() {
   if (!sessionId.value) return;
   usageError.value = null;
   try {
-    const raw = await invokeCommand("getSessionUsageMetrics", {
+    const raw = await invokeCommand('getSessionUsageMetrics', {
       sessionId: sessionId.value,
     });
     const fromRpc = {
-      totalUserRequests:
-        typeof raw.totalUserRequests === "number" ? raw.totalUserRequests : 0,
+      totalUserRequests: typeof raw.totalUserRequests === 'number' ? raw.totalUserRequests : 0,
       totalPremiumRequestCost:
-        typeof raw.totalPremiumRequestCost === "number"
-          ? raw.totalPremiumRequestCost
-          : 0,
-      totalApiDurationMs:
-        typeof raw.totalApiDurationMs === "number" ? raw.totalApiDurationMs : 0,
+        typeof raw.totalPremiumRequestCost === 'number' ? raw.totalPremiumRequestCost : 0,
+      totalApiDurationMs: typeof raw.totalApiDurationMs === 'number' ? raw.totalApiDurationMs : 0,
       lastCallInputTokens:
-        typeof raw.lastCallInputTokens === "number" ? raw.lastCallInputTokens : 0,
+        typeof raw.lastCallInputTokens === 'number' ? raw.lastCallInputTokens : 0,
       lastCallOutputTokens:
-        typeof raw.lastCallOutputTokens === "number"
-          ? raw.lastCallOutputTokens
-          : 0,
+        typeof raw.lastCallOutputTokens === 'number' ? raw.lastCallOutputTokens : 0,
       currentTokens:
-        typeof raw.currentTokens === "number"
+        typeof raw.currentTokens === 'number'
           ? raw.currentTokens
-          : typeof raw.inputTokens === "number"
+          : typeof raw.inputTokens === 'number'
             ? raw.inputTokens
             : 0,
       tokenLimit:
-        typeof raw.tokenLimit === "number"
-          ? normalizeContextLimit(raw.tokenLimit) ?? 0
-          : typeof raw.maxTokens === "number"
-            ? normalizeContextLimit(raw.maxTokens) ?? 0
+        typeof raw.tokenLimit === 'number'
+          ? (normalizeContextLimit(raw.tokenLimit) ?? 0)
+          : typeof raw.maxTokens === 'number'
+            ? (normalizeContextLimit(raw.maxTokens) ?? 0)
             : 0,
     };
     const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
@@ -486,7 +452,9 @@ async function loadUsage() {
     usageError.value = toErrorMessage(err);
   }
 }
-function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<string, unknown> }>) {
+function deriveUsageFromEvents(
+  events: Array<{ eventType: string; data: Record<string, unknown> }>,
+) {
   let totalUserRequests = 0;
   let totalPremiumRequestCost = 0;
   let totalApiDurationMs = 0;
@@ -496,24 +464,24 @@ function deriveUsageFromEvents(events: Array<{ eventType: string; data: Record<s
   let tokenLimit = 0;
   for (const event of events) {
     const data = event.data;
-    if (event.eventType === "assistant.usage") {
+    if (event.eventType === 'assistant.usage') {
       totalUserRequests += 1;
       const cost = data.cost;
-      if (typeof cost === "number") totalPremiumRequestCost += cost;
+      if (typeof cost === 'number') totalPremiumRequestCost += cost;
       const duration = data.duration;
-      if (typeof duration === "number") totalApiDurationMs += duration;
+      if (typeof duration === 'number') totalApiDurationMs += duration;
       const input = data.inputTokens;
-      if (typeof input === "number") {
+      if (typeof input === 'number') {
         lastCallInputTokens = input;
         currentTokens = input;
       }
       const output = data.outputTokens;
-      if (typeof output === "number") lastCallOutputTokens = output;
-    } else if (event.eventType === "session.usage_info") {
+      if (typeof output === 'number') lastCallOutputTokens = output;
+    } else if (event.eventType === 'session.usage_info') {
       const current = data.currentTokens;
-      if (typeof current === "number") currentTokens = current;
+      if (typeof current === 'number') currentTokens = current;
       const limit = data.tokenLimit;
-      if (typeof limit === "number") tokenLimit = normalizeContextLimit(limit) ?? 0;
+      if (typeof limit === 'number') tokenLimit = normalizeContextLimit(limit) ?? 0;
     }
   }
   return {
@@ -572,7 +540,7 @@ watch(
     usageError.value = null;
     mcpServers.value = [];
     planExists.value = false;
-    planContent.value = "";
+    planContent.value = '';
     planEditing.value = false;
     planError.value = null;
     planLoaded.value = false;
@@ -608,12 +576,12 @@ watch(
 );
 
 // ---------- Actions ----------
-async function onExport(format: "markdown" | "json"): Promise<void> {
+async function onExport(format: 'markdown' | 'json'): Promise<void> {
   const rec = record.value;
   if (!rec) return;
   try {
-    const { processEvents, defaultAmbient } = await import("../lib/chatEvents");
-    const { formatConversation, exportFilenameStem } = await import("../lib/exportConversation");
+    const { processEvents, defaultAmbient } = await import('../lib/chatEvents');
+    const { formatConversation, exportFilenameStem } = await import('../lib/exportConversation');
     const counter = { next: 1 };
     const result = processEvents([], defaultAmbient(), rec.events, counter, { live: false });
     const title = rec.title?.trim() || `Session ${rec.id.slice(0, 8)}`;
@@ -628,18 +596,18 @@ async function onExport(format: "markdown" | "json"): Promise<void> {
       format,
     );
     const fileName = exportFilenameStem(title, format);
-    const saved = await invokeCommand("saveExportFile", { fileName, contents });
+    const saved = await invokeCommand('saveExportFile', { fileName, contents });
     toasts.success(
-      `Conversation exported (${format === "markdown" ? "MD" : "JSON"})`,
+      `Conversation exported (${format === 'markdown' ? 'MD' : 'JSON'})`,
       `${(saved.bytes / 1024).toFixed(1)} KiB`,
     );
     try {
-      await invokeCommand("revealPath", { path: saved.path });
+      await invokeCommand('revealPath', { path: saved.path });
     } catch {
       /* best-effort */
     }
   } catch (err) {
-    toasts.error("Export failed", toErrorMessage(err));
+    toasts.error('Export failed', toErrorMessage(err));
   }
 }
 function onCompactNow() {
@@ -654,9 +622,9 @@ async function onForkSession() {
     // forkSession internally calls restoreSession, which creates the
     // SessionRecord. We still need to open the dockview panel.
     layoutStore.addPanel(newId);
-    toasts.success("Session forked", `New session: ${newId.slice(0, 8)}`);
+    toasts.success('Session forked', `New session: ${newId.slice(0, 8)}`);
   } catch (err) {
-    toasts.error("Fork failed", toErrorMessage(err));
+    toasts.error('Fork failed', toErrorMessage(err));
   }
 }
 
@@ -679,7 +647,7 @@ const settingsStore = useSettingsStore();
 async function loadBuiltinTools() {
   toolsError.value = null;
   try {
-    const tools = await invokeCommand("listBuiltinTools", {});
+    const tools = await invokeCommand('listBuiltinTools', {});
     builtinTools.value = tools.map((t) => ({
       name: t.name,
       description: t.description,
@@ -694,7 +662,7 @@ async function loadBuiltinTools() {
 async function loadMcpServers() {
   if (!sessionId.value) return;
   try {
-    const servers = await invokeCommand("listSessionMcpServers", {
+    const servers = await invokeCommand('listSessionMcpServers', {
       sessionId: sessionId.value,
     });
     mcpServers.value = servers.map((s) => ({
@@ -710,9 +678,9 @@ async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
   if (!sessionId.value) return;
   // Optimistic local flip so the toggle responds immediately;
   // reload to pick up the SDK-side status change.
-  server.status = enabled ? "connected" : "disabled";
+  server.status = enabled ? 'connected' : 'disabled';
   try {
-    await invokeCommand("setSessionMcpEnabled", {
+    await invokeCommand('setSessionMcpEnabled', {
       sessionId: sessionId.value,
       serverName: server.name,
       enabled,
@@ -722,11 +690,8 @@ async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
     // the static built-in tools.
     await loadMcpServers();
   } catch (err) {
-    toasts.error(
-      "Failed to toggle MCP server",
-      toErrorMessage(err),
-    );
-    server.status = enabled ? "disabled" : "connected";
+    toasts.error('Failed to toggle MCP server', toErrorMessage(err));
+    server.status = enabled ? 'disabled' : 'connected';
   }
 }
 
@@ -734,7 +699,7 @@ function mcpEnabled(s: McpItem): boolean {
   // SDK's McpServerStatus uses "disabled" specifically for the
   // user-toggled-off state; anything else (connected, pending,
   // disconnected, error) counts as enabled.
-  return s.status !== "disabled";
+  return s.status !== 'disabled';
 }
 
 /// 22b: canonical tool key. SDK filters use `namespacedName` when
@@ -748,42 +713,38 @@ function toolKey(t: ToolItem): string {
 /// "forbidden" = in `defaultExcluded`. "only-allow" = in
 /// `defaultAllowed`. Mutually exclusive — setting one removes the
 /// other so the persisted state stays clean.
-type ToolState = "default" | "forbidden" | "only-allow";
+type ToolState = 'default' | 'forbidden' | 'only-allow';
 function toolState(t: ToolItem): ToolState {
   const key = toolKey(t);
-  if (settings.value.tools?.defaultExcluded?.includes(key)) return "forbidden";
-  if (settings.value.tools?.defaultAllowed?.includes(key)) return "only-allow";
-  return "default";
+  if (settings.value.tools?.defaultExcluded?.includes(key)) return 'forbidden';
+  if (settings.value.tools?.defaultAllowed?.includes(key)) return 'only-allow';
+  return 'default';
 }
 async function setToolState(t: ToolItem, next: ToolState) {
   const key = toolKey(t);
-  const excluded = (settings.value.tools?.defaultExcluded ?? []).filter(
-    (n) => n !== key,
-  );
-  const allowed = (settings.value.tools?.defaultAllowed ?? []).filter(
-    (n) => n !== key,
-  );
-  if (next === "forbidden") excluded.push(key);
-  if (next === "only-allow") allowed.push(key);
+  const excluded = (settings.value.tools?.defaultExcluded ?? []).filter((n) => n !== key);
+  const allowed = (settings.value.tools?.defaultAllowed ?? []).filter((n) => n !== key);
+  if (next === 'forbidden') excluded.push(key);
+  if (next === 'only-allow') allowed.push(key);
   await settingsStore.update({
     ...settings.value,
     tools: { defaultExcluded: excluded, defaultAllowed: allowed },
   });
   toasts.info(
-    "Tool change recorded",
-    "Restart or recreate the session to apply (SDK does not support runtime tool mutation).",
+    'Tool change recorded',
+    'Restart or recreate the session to apply (SDK does not support runtime tool mutation).',
   );
 }
 
 /// 22b: critical built-in tools — disabling these makes the agent
 /// effectively unusable. Surface a warning badge, don't block.
 const CRITICAL_TOOLS: ReadonlySet<string> = new Set([
-  "bash",
-  "shell",
-  "str_replace_editor",
-  "write_file",
-  "create_file",
-  "edit_file",
+  'bash',
+  'shell',
+  'str_replace_editor',
+  'write_file',
+  'create_file',
+  'edit_file',
 ]);
 function isCriticalTool(t: ToolItem): boolean {
   return CRITICAL_TOOLS.has(t.name);
@@ -801,14 +762,13 @@ const toolGroups = computed<ToolGroup[]>(() => {
       builtins.push(t);
       continue;
     }
-    const prefix = t.namespacedName.split("/")[0] || "namespaced";
+    const prefix = t.namespacedName.split('/')[0] || 'namespaced';
     const list = byPrefix.get(prefix) ?? [];
     list.push(t);
     byPrefix.set(prefix, list);
   }
   const groups: ToolGroup[] = [];
-  if (builtins.length > 0)
-    groups.push({ label: "Built-in", items: builtins, isBuiltin: true });
+  if (builtins.length > 0) groups.push({ label: 'Built-in', items: builtins, isBuiltin: true });
   for (const prefix of Array.from(byPrefix.keys()).sort()) {
     groups.push({
       label: prefix,
@@ -819,34 +779,32 @@ const toolGroups = computed<ToolGroup[]>(() => {
   return groups;
 });
 
-const allowlistActive = computed(
-  () => (settings.value.tools?.defaultAllowed ?? []).length > 0,
-);
+const allowlistActive = computed(() => (settings.value.tools?.defaultAllowed ?? []).length > 0);
 
 /// 22b: tri-state SelectButton options. Order matches the visual
 /// left→right of the segmented control.
 const toolStateOptions: { label: string; value: ToolState }[] = [
-  { label: "Default", value: "default" },
-  { label: "Only allow", value: "only-allow" },
-  { label: "Forbid", value: "forbidden" },
+  { label: 'Default', value: 'default' },
+  { label: 'Only allow', value: 'only-allow' },
+  { label: 'Forbid', value: 'forbidden' },
 ];
 
 // ---------- Plan (18b) ----------
 const planExists = ref(false);
-const planContent = ref<string>("");
+const planContent = ref<string>('');
 const planEditing = ref(false);
-const planDraft = ref<string>("");
+const planDraft = ref<string>('');
 const planError = ref<string | null>(null);
 const planLoaded = ref(false);
 async function loadPlan() {
   if (!sessionId.value) return;
   planError.value = null;
   try {
-    const result = await invokeCommand("readSessionPlan", {
+    const result = await invokeCommand('readSessionPlan', {
       sessionId: sessionId.value,
     });
     planExists.value = result.exists;
-    planContent.value = result.content ?? "";
+    planContent.value = result.content ?? '';
     planLoaded.value = true;
   } catch (err) {
     planError.value = toErrorMessage(err);
@@ -859,16 +817,16 @@ function startEditPlan() {
 }
 async function savePlan() {
   try {
-    await invokeCommand("writeSessionPlan", {
+    await invokeCommand('writeSessionPlan', {
       sessionId: sessionId.value,
       content: planDraft.value,
     });
     planContent.value = planDraft.value;
     planExists.value = true;
     planEditing.value = false;
-    toasts.success("Plan saved");
+    toasts.success('Plan saved');
   } catch (err) {
-    toasts.error("Plan save failed", toErrorMessage(err));
+    toasts.error('Plan save failed', toErrorMessage(err));
   }
 }
 function cancelEditPlan() {
@@ -891,7 +849,7 @@ const warnedThresholds = new Set<string>();
 async function loadQuota() {
   quotaError.value = null;
   try {
-    const raw = await invokeCommand("getAccountQuota", {});
+    const raw = await invokeCommand('getAccountQuota', {});
     const snapshots: QuotaSnapshot[] = Object.entries(raw).map(([type, snap]) => ({
       type,
       ...snap,
@@ -906,7 +864,7 @@ async function loadQuota() {
         const key = `${snap.type}:${threshold}`;
         if (usedPct >= threshold && !warnedThresholds.has(key)) {
           warnedThresholds.add(key);
-          const severity = threshold === 90 ? "warn" : "info";
+          const severity = threshold === 90 ? 'warn' : 'info';
           toasts[severity](
             `Quota at ${usedPct.toFixed(0)}%`,
             `${snap.type}: ${snap.usedRequests}/${snap.entitlementRequests} used`,
@@ -926,16 +884,16 @@ async function loadQuota() {
 // key. Defaults: tools collapsed (long); skills + mcp + plan + usage +
 // quota expanded. Toggling persists immediately.
 type SectionKey =
-  | "settings"
-  | "agents"
-  | "tasks"
-  | "files"
-  | "skills"
-  | "tools"
-  | "mcp"
-  | "plan"
-  | "usage"
-  | "quota";
+  | 'settings'
+  | 'agents'
+  | 'tasks'
+  | 'files'
+  | 'skills'
+  | 'tools'
+  | 'mcp'
+  | 'plan'
+  | 'usage'
+  | 'quota';
 
 const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
   settings: false,
@@ -951,34 +909,34 @@ const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
 };
 
 function readSectionState(key: SectionKey): boolean {
-  if (typeof localStorage === "undefined") return SECTION_DEFAULTS[key];
+  if (typeof localStorage === 'undefined') return SECTION_DEFAULTS[key];
   try {
     const raw = localStorage.getItem(`dafman.details.section.${key}`);
     if (raw === null) return SECTION_DEFAULTS[key];
-    return raw === "1";
+    return raw === '1';
   } catch {
     return SECTION_DEFAULTS[key];
   }
 }
 
 const sectionOpen = ref<Record<SectionKey, boolean>>({
-  settings: readSectionState("settings"),
-  agents: readSectionState("agents"),
-  tasks: readSectionState("tasks"),
-  files: readSectionState("files"),
-  skills: readSectionState("skills"),
-  tools: readSectionState("tools"),
-  mcp: readSectionState("mcp"),
-  plan: readSectionState("plan"),
-  usage: readSectionState("usage"),
-  quota: readSectionState("quota"),
+  settings: readSectionState('settings'),
+  agents: readSectionState('agents'),
+  tasks: readSectionState('tasks'),
+  files: readSectionState('files'),
+  skills: readSectionState('skills'),
+  tools: readSectionState('tools'),
+  mcp: readSectionState('mcp'),
+  plan: readSectionState('plan'),
+  usage: readSectionState('usage'),
+  quota: readSectionState('quota'),
 });
 
 function toggleSection(key: SectionKey): void {
   const next = !sectionOpen.value[key];
   sectionOpen.value = { ...sectionOpen.value, [key]: next };
   try {
-    localStorage.setItem(`dafman.details.section.${key}`, next ? "1" : "0");
+    localStorage.setItem(`dafman.details.section.${key}`, next ? '1' : '0');
   } catch {
     /* private mode / quota — ignore, in-memory state still works */
   }
@@ -994,11 +952,11 @@ function toggleSection(key: SectionKey): void {
 
 const expandedItems = ref<Set<string>>(new Set());
 
-function isItemExpanded(kind: "tool" | "skill" | "agent", name: string): boolean {
+function isItemExpanded(kind: 'tool' | 'skill' | 'agent', name: string): boolean {
   return expandedItems.value.has(`${kind}:${name}`);
 }
 
-function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): void {
+function toggleItemExpansion(kind: 'tool' | 'skill' | 'agent', name: string): void {
   const key = `${kind}:${name}`;
   const next = new Set(expandedItems.value);
   if (next.has(key)) next.delete(key);
@@ -1008,7 +966,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
 </script>
 
 <template>
-  <div v-if="record" class="session-details">
+  <div
+    v-if="record"
+    class="session-details"
+  >
     <header class="section-header section-header-top">
       <span class="section-title">Session</span>
       <Button
@@ -1037,12 +998,21 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         <span class="row-label">Session settings</span>
         <span class="section-count">collapsed</span>
       </button>
-      <div v-if="sectionOpen.settings" class="section-body">
+      <div
+        v-if="sectionOpen.settings"
+        class="section-body"
+      >
         <section class="row row-stack">
-          <label class="row-label" :for="`details-name-${sessionId}`">
+          <label
+            class="row-label"
+            :for="`details-name-${sessionId}`"
+          >
             Session name
           </label>
-          <form class="rename-form" @submit.prevent="onRenameSubmit">
+          <form
+            class="rename-form"
+            @submit.prevent="onRenameSubmit"
+          >
             <InputText
               :id="`details-name-${sessionId}`"
               v-model="nameDraft"
@@ -1059,7 +1029,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
           </form>
         </section>
 
-        <section class="row details-mode-row" :class="modeClass">
+        <section
+          class="row details-mode-row"
+          :class="modeClass"
+        >
           <span class="row-label">Run mode</span>
           <SelectButton
             v-model="modeChoice"
@@ -1071,13 +1044,19 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
             aria-label="Agent run mode"
           >
             <template #option="slotProps">
-              <i :class="slotProps.option.icon" :title="slotProps.option.label" />
+              <i
+                :class="slotProps.option.icon"
+                :title="slotProps.option.label"
+              />
               <span class="sr-only">{{ slotProps.option.label }}</span>
             </template>
           </SelectButton>
         </section>
 
-        <label class="row" :for="`details-reasoning-${sessionId}`">
+        <label
+          class="row"
+          :for="`details-reasoning-${sessionId}`"
+        >
           <span class="row-label">Reasoning view</span>
           <Select
             :input-id="`details-reasoning-${sessionId}`"
@@ -1100,18 +1079,37 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
             :aria-label="`Open workspace folder ${record.workingDirectory}`"
             @click="onWorkspaceClick"
           >
-            <i class="pi pi-folder" aria-hidden="true" />
+            <i
+              class="pi pi-folder"
+              aria-hidden="true"
+            />
             <span class="workspace-path-text">{{ record.workingDirectory }}</span>
-            <i class="pi pi-external-link workspace-path-hint" aria-hidden="true" />
+            <i
+              class="pi pi-external-link workspace-path-hint"
+              aria-hidden="true"
+            />
           </button>
-          <div v-else class="workspace-path" title="Default (cli process cwd)">
-            <i class="pi pi-folder" aria-hidden="true" />
+          <div
+            v-else
+            class="workspace-path"
+            title="Default (cli process cwd)"
+          >
+            <i
+              class="pi pi-folder"
+              aria-hidden="true"
+            />
             <span class="workspace-path-text">Default</span>
           </div>
         </section>
 
-        <section class="row row-toggle" :class="{ 'approve-all-on': approveAll }">
-          <span class="row-toggle-title" title="Skip permission prompts for the rest of this session.">
+        <section
+          class="row row-toggle"
+          :class="{ 'approve-all-on': approveAll }"
+        >
+          <span
+            class="row-toggle-title"
+            title="Skip permission prompts for the rest of this session."
+          >
             Auto-approve all tools
           </span>
           <ToggleSwitch
@@ -1136,19 +1134,41 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
           aria-hidden="true"
         />
         <span class="row-label">Agents</span>
-        <span v-if="agentsLoaded && !agentsError" class="section-count">
+        <span
+          v-if="agentsLoaded && !agentsError"
+          class="section-count"
+        >
           {{ sessionAgents.length }}
         </span>
       </button>
-      <div v-if="sectionOpen.agents" class="section-body">
-        <div v-if="!agentsLoaded" class="empty-hint">Loading…</div>
-        <div v-else-if="agentsError" class="empty-hint error">{{ agentsError }}</div>
-        <div v-else-if="sessionAgents.length === 0" class="empty-hint">
+      <div
+        v-if="sectionOpen.agents"
+        class="section-body"
+      >
+        <div
+          v-if="!agentsLoaded"
+          class="empty-hint"
+        >
+          Loading…
+        </div>
+        <div
+          v-else-if="agentsError"
+          class="empty-hint error"
+        >
+          {{ agentsError }}
+        </div>
+        <div
+          v-else-if="sessionAgents.length === 0"
+          class="empty-hint"
+        >
           No custom agents. Add markdown files under
           <code>.github/agents/</code> in your workspace or in
           <code>&lt;userConfigDir&gt;/agents/</code>, then click Reload.
         </div>
-        <ul v-else class="agent-list compact-list">
+        <ul
+          v-else
+          class="agent-list compact-list"
+        >
           <li
             v-for="agent in sessionAgents"
             :key="agent.name"
@@ -1167,7 +1187,9 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               <i
                 v-if="agent.description"
                 class="pi compact-chevron"
-                :class="isItemExpanded('agent', agent.name) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                :class="
+                  isItemExpanded('agent', agent.name) ? 'pi-chevron-down' : 'pi-chevron-right'
+                "
                 aria-hidden="true"
               />
               <span class="compact-name">{{ agent.displayName }}</span>
@@ -1212,7 +1234,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               v-if="agent.description && isItemExpanded('agent', agent.name)"
               class="compact-desc"
             >
-              <MessageContent :text="agent.description" label="Agent description" />
+              <MessageContent
+                :text="agent.description"
+                label="Agent description"
+              />
             </div>
           </li>
         </ul>
@@ -1241,18 +1266,40 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
           aria-hidden="true"
         />
         <span class="row-label">Background tasks</span>
-        <span v-if="tasksLoaded && !tasksError" class="section-count">
+        <span
+          v-if="tasksLoaded && !tasksError"
+          class="section-count"
+        >
           {{ sessionTasks.length }}
         </span>
       </button>
-      <div v-if="sectionOpen.tasks" class="section-body">
-        <div v-if="!tasksLoaded" class="empty-hint">Loading…</div>
-        <div v-else-if="tasksError" class="empty-hint error">{{ tasksError }}</div>
-        <div v-else-if="sessionTasks.length === 0" class="empty-hint">
-          No background tasks. The agent will spawn one here when it
-          delegates work via the <code>task</code> tool.
+      <div
+        v-if="sectionOpen.tasks"
+        class="section-body"
+      >
+        <div
+          v-if="!tasksLoaded"
+          class="empty-hint"
+        >
+          Loading…
         </div>
-        <ul v-else class="task-list compact-list">
+        <div
+          v-else-if="tasksError"
+          class="empty-hint error"
+        >
+          {{ tasksError }}
+        </div>
+        <div
+          v-else-if="sessionTasks.length === 0"
+          class="empty-hint"
+        >
+          No background tasks. The agent will spawn one here when it delegates work via the
+          <code>task</code> tool.
+        </div>
+        <ul
+          v-else
+          class="task-list compact-list"
+        >
           <li
             v-for="task in sessionTasks"
             :key="task.id"
@@ -1260,20 +1307,37 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
             :class="`task-status-${task.status}`"
           >
             <div class="task-line">
-              <span class="task-status-pill" :title="task.status">
+              <span
+                class="task-status-pill"
+                :title="task.status"
+              >
                 {{ task.status }}
               </span>
-              <span class="task-name" :title="task.description || task.id">
+              <span
+                class="task-name"
+                :title="task.description || task.id"
+              >
                 {{ taskTitle(task) }}
               </span>
-              <span v-if="formatTaskElapsed(task)" class="task-elapsed">
+              <span
+                v-if="formatTaskElapsed(task)"
+                class="task-elapsed"
+              >
                 {{ formatTaskElapsed(task) }}
               </span>
             </div>
-            <div v-if="task.description" class="task-desc">
+            <div
+              v-if="task.description"
+              class="task-desc"
+            >
               {{ task.description }}
             </div>
-            <div v-if="task.error" class="task-error">{{ task.error }}</div>
+            <div
+              v-if="task.error"
+              class="task-error"
+            >
+              {{ task.error }}
+            </div>
             <div class="task-actions">
               <Button
                 v-if="task.status === 'running' || task.status === 'idle'"
@@ -1325,11 +1389,20 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         <span class="row-label">Files touched</span>
         <span class="section-count">{{ record.touchedFiles.length }}</span>
       </button>
-      <div v-if="sectionOpen.files" class="section-body">
-        <div v-if="record.touchedFiles.length === 0" class="empty-hint">
+      <div
+        v-if="sectionOpen.files"
+        class="section-body"
+      >
+        <div
+          v-if="record.touchedFiles.length === 0"
+          class="empty-hint"
+        >
           No file writes or edits seen in this session.
         </div>
-        <ul v-else class="file-list compact-list">
+        <ul
+          v-else
+          class="file-list compact-list"
+        >
           <li
             v-for="path in record.touchedFiles"
             :key="path"
@@ -1341,7 +1414,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               :title="`Open ${path}`"
               @click="revealFile(path)"
             >
-              <i class="pi pi-file" aria-hidden="true" />
+              <i
+                class="pi pi-file"
+                aria-hidden="true"
+              />
               <span>{{ path }}</span>
             </button>
           </li>
@@ -1363,18 +1439,44 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
           aria-hidden="true"
         />
         <span class="row-label">Skills</span>
-        <span v-if="skillsLoaded && !skillsError" class="section-count">
+        <span
+          v-if="skillsLoaded && !skillsError"
+          class="section-count"
+        >
           {{ sessionSkills.length }}
         </span>
       </button>
-      <div v-if="sectionOpen.skills" class="section-body">
-        <div v-if="!skillsLoaded" class="empty-hint">Loading…</div>
-        <div v-else-if="skillsError" class="empty-hint error">{{ skillsError }}</div>
-        <div v-else-if="sessionSkills.length === 0" class="empty-hint">
+      <div
+        v-if="sectionOpen.skills"
+        class="section-body"
+      >
+        <div
+          v-if="!skillsLoaded"
+          class="empty-hint"
+        >
+          Loading…
+        </div>
+        <div
+          v-else-if="skillsError"
+          class="empty-hint error"
+        >
+          {{ skillsError }}
+        </div>
+        <div
+          v-else-if="sessionSkills.length === 0"
+          class="empty-hint"
+        >
           No skills configured for this session.
         </div>
-        <ul v-else class="skill-list compact-list">
-          <li v-for="skill in sessionSkills" :key="skill.name" class="compact-row">
+        <ul
+          v-else
+          class="skill-list compact-list"
+        >
+          <li
+            v-for="skill in sessionSkills"
+            :key="skill.name"
+            class="compact-row"
+          >
             <button
               type="button"
               class="compact-name-button"
@@ -1385,11 +1487,17 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               <i
                 v-if="skill.description"
                 class="pi compact-chevron"
-                :class="isItemExpanded('skill', skill.name) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                :class="
+                  isItemExpanded('skill', skill.name) ? 'pi-chevron-down' : 'pi-chevron-right'
+                "
                 aria-hidden="true"
               />
               <span class="compact-name">{{ skill.name }}</span>
-              <small v-if="skill.userInvocable" class="compact-tag">/</small>
+              <small
+                v-if="skill.userInvocable"
+                class="compact-tag"
+                >/</small
+              >
             </button>
             <ToggleSwitch
               :model-value="skill.enabled"
@@ -1400,7 +1508,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               v-if="skill.description && isItemExpanded('skill', skill.name)"
               class="compact-desc"
             >
-              <MessageContent :text="skill.description" label="Skill description" />
+              <MessageContent
+                :text="skill.description"
+                label="Skill description"
+              />
             </div>
           </li>
         </ul>
@@ -1428,29 +1539,50 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
           aria-hidden="true"
         />
         <span class="row-label">Tools</span>
-        <span v-if="toolsLoaded && !toolsError" class="section-count">
+        <span
+          v-if="toolsLoaded && !toolsError"
+          class="section-count"
+        >
           {{ builtinTools.length }}
         </span>
       </button>
-      <div v-if="sectionOpen.tools" class="section-body">
-        <div v-if="!toolsLoaded" class="empty-hint">Loading…</div>
-        <div v-else-if="toolsError" class="empty-hint error">{{ toolsError }}</div>
+      <div
+        v-if="sectionOpen.tools"
+        class="section-body"
+      >
+        <div
+          v-if="!toolsLoaded"
+          class="empty-hint"
+        >
+          Loading…
+        </div>
+        <div
+          v-else-if="toolsError"
+          class="empty-hint error"
+        >
+          {{ toolsError }}
+        </div>
         <template v-else>
           <div class="row-hint">
-            Per-tool restriction applies to NEW sessions only. Restart
-            or recreate the session to apply changes here.
+            Per-tool restriction applies to NEW sessions only. Restart or recreate the session to
+            apply changes here.
           </div>
           <div
             v-if="allowlistActive"
             class="row-hint allowlist-banner"
             role="status"
           >
-            <i class="pi pi-info-circle" aria-hidden="true" />
-            Allowlist active — sessions are restricted to the tools
-            marked "Only allow". The exclude list is ignored when
-            allowlist is non-empty.
+            <i
+              class="pi pi-info-circle"
+              aria-hidden="true"
+            />
+            Allowlist active — sessions are restricted to the tools marked "Only allow". The exclude
+            list is ignored when allowlist is non-empty.
           </div>
-          <template v-for="group in toolGroups" :key="`group-${group.label}`">
+          <template
+            v-for="group in toolGroups"
+            :key="`group-${group.label}`"
+          >
             <div class="tool-group-header">
               <span>{{ group.label }}</span>
               <span class="section-count">{{ group.items.length }}</span>
@@ -1471,7 +1603,9 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
                   <i
                     v-if="t.description"
                     class="pi compact-chevron"
-                    :class="isItemExpanded('tool', toolKey(t)) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                    :class="
+                      isItemExpanded('tool', toolKey(t)) ? 'pi-chevron-down' : 'pi-chevron-right'
+                    "
                     aria-hidden="true"
                   />
                   <span class="compact-name">{{ t.name }}</span>
@@ -1480,7 +1614,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
                     class="critical-warning"
                     title="Disabling this tool makes the agent unable to perform core actions."
                   >
-                    <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+                    <i
+                      class="pi pi-exclamation-triangle"
+                      aria-hidden="true"
+                    />
                   </span>
                 </button>
                 <SelectButton
@@ -1498,7 +1635,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
                   v-if="t.description && isItemExpanded('tool', toolKey(t))"
                   class="compact-desc"
                 >
-                  <MessageContent :text="t.description" label="Tool description" />
+                  <MessageContent
+                    :text="t.description"
+                    label="Tool description"
+                  />
                 </div>
               </li>
             </ul>
@@ -1508,7 +1648,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
     </section>
 
     <!-- MCP servers (18b) ----------------------------------------- -->
-    <section v-if="toolsLoaded && mcpServers.length > 0" class="row row-stack section">
+    <section
+      v-if="toolsLoaded && mcpServers.length > 0"
+      class="row row-stack section"
+    >
       <button
         type="button"
         class="section-toggle"
@@ -1523,14 +1666,20 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         <span class="row-label">MCP servers</span>
         <span class="section-count">{{ mcpServers.length }}</span>
       </button>
-      <div v-if="sectionOpen.mcp" class="section-body">
+      <div
+        v-if="sectionOpen.mcp"
+        class="section-body"
+      >
         <ul class="tool-list compact-list">
           <li
             v-for="s in mcpServers"
             :key="`mcp-${s.name}`"
             class="compact-row"
           >
-            <div class="compact-name-button compact-name-static" :title="s.error || s.name">
+            <div
+              class="compact-name-button compact-name-static"
+              :title="s.error || s.name"
+            >
               <span class="compact-name">{{ s.name }}</span>
               <small class="compact-tag">{{ s.status }}</small>
             </div>
@@ -1539,7 +1688,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               :aria-label="`Enable MCP server ${s.name}`"
               @update:model-value="(v: boolean) => setMcpServerEnabled(s, v)"
             />
-            <div v-if="s.error" class="compact-desc compact-desc-error">
+            <div
+              v-if="s.error"
+              class="compact-desc compact-desc-error"
+            >
               {{ s.error }}
             </div>
           </li>
@@ -1562,9 +1714,22 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         />
         <span class="row-label">Plan</span>
       </button>
-      <div v-if="sectionOpen.plan" class="section-body">
-        <div v-if="!planLoaded" class="empty-hint">Loading…</div>
-        <div v-else-if="planError" class="empty-hint error">{{ planError }}</div>
+      <div
+        v-if="sectionOpen.plan"
+        class="section-body"
+      >
+        <div
+          v-if="!planLoaded"
+          class="empty-hint"
+        >
+          Loading…
+        </div>
+        <div
+          v-else-if="planError"
+          class="empty-hint error"
+        >
+          {{ planError }}
+        </div>
         <template v-else>
           <template v-if="planEditing">
             <textarea
@@ -1574,7 +1739,11 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               aria-label="Plan content (markdown)"
             ></textarea>
             <div class="plan-actions">
-              <Button label="Save" size="small" @click="savePlan" />
+              <Button
+                label="Save"
+                size="small"
+                @click="savePlan"
+              />
               <Button
                 label="Cancel"
                 size="small"
@@ -1585,10 +1754,21 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
             </div>
           </template>
           <template v-else>
-            <div v-if="planExists && planContent" class="plan-preview">
-              <MessageContent :text="planContent" label="Plan markdown" />
+            <div
+              v-if="planExists && planContent"
+              class="plan-preview"
+            >
+              <MessageContent
+                :text="planContent"
+                label="Plan markdown"
+              />
             </div>
-            <div v-else class="empty-hint">No plan yet.</div>
+            <div
+              v-else
+              class="empty-hint"
+            >
+              No plan yet.
+            </div>
             <Button
               :label="planExists ? 'Edit plan' : 'Create plan'"
               icon="pi pi-pencil"
@@ -1602,7 +1782,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
     </section>
 
     <!-- Usage ----------------------------------------------------- -->
-    <section v-if="usage || usageError" class="row row-stack section">
+    <section
+      v-if="usage || usageError"
+      class="row row-stack section"
+    >
       <button
         type="button"
         class="section-toggle"
@@ -1616,9 +1799,20 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         />
         <span class="row-label">Usage</span>
       </button>
-      <div v-if="sectionOpen.usage" class="section-body">
-        <div v-if="usageError" class="empty-hint error">{{ usageError }}</div>
-        <dl v-else-if="usage" class="usage">
+      <div
+        v-if="sectionOpen.usage"
+        class="section-body"
+      >
+        <div
+          v-if="usageError"
+          class="empty-hint error"
+        >
+          {{ usageError }}
+        </div>
+        <dl
+          v-else-if="usage"
+          class="usage"
+        >
           <div class="usage-row">
             <dt>Requests</dt>
             <dd>{{ usage.totalUserRequests }}</dd>
@@ -1638,7 +1832,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               {{ usage.lastCallOutputTokens.toLocaleString() }}
             </dd>
           </div>
-          <div v-if="usage.tokenLimit > 0" class="usage-row">
+          <div
+            v-if="usage.tokenLimit > 0"
+            class="usage-row"
+          >
             <dt>Context tokens</dt>
             <dd>
               {{ usage.currentTokens.toLocaleString() }} /
@@ -1650,7 +1847,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
     </section>
 
     <!-- Quota (18b) ---------------------------------------------- -->
-    <section v-if="quota.length > 0 || quotaError" class="row row-stack section">
+    <section
+      v-if="quota.length > 0 || quotaError"
+      class="row row-stack section"
+    >
       <button
         type="button"
         class="section-toggle"
@@ -1664,21 +1864,42 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
         />
         <span class="row-label">Account quota</span>
       </button>
-      <div v-if="sectionOpen.quota" class="section-body">
-        <div v-if="quotaError" class="empty-hint error">{{ quotaError }}</div>
-        <ul v-else class="quota-list">
-          <li v-for="q in quota" :key="q.type" class="quota-row">
+      <div
+        v-if="sectionOpen.quota"
+        class="section-body"
+      >
+        <div
+          v-if="quotaError"
+          class="empty-hint error"
+        >
+          {{ quotaError }}
+        </div>
+        <ul
+          v-else
+          class="quota-list"
+        >
+          <li
+            v-for="q in quota"
+            :key="q.type"
+            class="quota-row"
+          >
             <div class="quota-name">
               {{ q.type }}
-              <small v-if="q.isUnlimitedEntitlement" class="quota-tag">
+              <small
+                v-if="q.isUnlimitedEntitlement"
+                class="quota-tag"
+              >
                 unlimited
               </small>
             </div>
             <template v-if="!q.isUnlimitedEntitlement">
-              <div class="quota-bar" :class="{
-                warn: 100 - q.remainingPercentage >= 75,
-                danger: 100 - q.remainingPercentage >= 90,
-              }">
+              <div
+                class="quota-bar"
+                :class="{
+                  warn: 100 - q.remainingPercentage >= 75,
+                  danger: 100 - q.remainingPercentage >= 90,
+                }"
+              >
                 <div
                   class="quota-fill"
                   :style="{ width: `${100 - q.remainingPercentage}%` }"
@@ -1686,7 +1907,10 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
               </div>
               <div class="quota-meta">
                 {{ q.usedRequests }} / {{ q.entitlementRequests }}
-                <span v-if="q.resetDate" class="quota-reset">
+                <span
+                  v-if="q.resetDate"
+                  class="quota-reset"
+                >
                   · resets {{ new Date(q.resetDate).toLocaleDateString() }}
                 </span>
               </div>
@@ -1732,10 +1956,16 @@ function toggleItemExpansion(kind: "tool" | "skill" | "agent", name: string): vo
       />
     </section>
   </div>
-  <div v-else-if="!sessionId" class="session-details session-details-empty">
+  <div
+    v-else-if="!sessionId"
+    class="session-details session-details-empty"
+  >
     <p class="empty-hint">No active session.</p>
   </div>
-  <div v-else class="session-details session-details-empty">
+  <div
+    v-else
+    class="session-details session-details-empty"
+  >
     <p class="empty-hint">Session not found.</p>
   </div>
 </template>

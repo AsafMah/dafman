@@ -18,11 +18,11 @@
 // listen for to activate the relevant panel. The receiver is wired
 // up at component mount.
 
-import { defineStore } from "pinia";
-import { computed, ref } from "vue";
-import { useSettingsStore } from "./settingsStore";
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
+import { useSettingsStore } from './settingsStore';
 
-export type NotificationKind = "turnEnd" | "waitingForInput";
+export type NotificationKind = 'turnEnd' | 'waitingForInput';
 
 export interface NotifyOptions {
   /// Which settings toggle gates this notification.
@@ -39,28 +39,28 @@ export interface NotifyOptions {
   tag?: string;
 }
 
-type PermissionState = NotificationPermission | "unsupported";
+type PermissionState = NotificationPermission | 'unsupported';
 
-export const useNotificationsStore = defineStore("notifications", () => {
+export const useNotificationsStore = defineStore('notifications', () => {
   const settingsStore = useSettingsStore();
 
   const permission = ref<PermissionState>(detectInitialPermission());
 
   function detectInitialPermission(): PermissionState {
-    if (typeof Notification === "undefined") return "unsupported";
+    if (typeof Notification === 'undefined') return 'unsupported';
     return Notification.permission;
   }
 
   /// Async — pops the OS prompt. Returns the resulting state.
   /// No-ops when notifications aren't supported.
   async function requestPermission(): Promise<PermissionState> {
-    if (typeof Notification === "undefined") {
-      permission.value = "unsupported";
-      return "unsupported";
+    if (typeof Notification === 'undefined') {
+      permission.value = 'unsupported';
+      return 'unsupported';
     }
-    if (Notification.permission === "granted") {
-      permission.value = "granted";
-      return "granted";
+    if (Notification.permission === 'granted') {
+      permission.value = 'granted';
+      return 'granted';
     }
     try {
       const result = await Notification.requestPermission();
@@ -69,21 +69,19 @@ export const useNotificationsStore = defineStore("notifications", () => {
     } catch {
       // Some browsers throw on the legacy callback path; treat as
       // denied so the UI can show the right state.
-      permission.value = "denied";
-      return "denied";
+      permission.value = 'denied';
+      return 'denied';
     }
   }
 
   /// True when we can actually fire a notification right now (kind
   /// is enabled in settings, permission is granted).
-  const canFire = computed(
-    () => (kind: NotificationKind): boolean => {
-      if (permission.value !== "granted") return false;
-      const prefs = settingsStore.settings.notifications;
-      if (!prefs) return false;
-      return prefs[kind];
-    },
-  );
+  const canFire = computed(() => (kind: NotificationKind): boolean => {
+    if (permission.value !== 'granted') return false;
+    const prefs = settingsStore.settings.notifications;
+    if (!prefs) return false;
+    return prefs[kind];
+  });
 
   /// Fire a notification, honoring settings + permission. Returns
   /// `false` if the call was suppressed (toggle off / permission
@@ -105,7 +103,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
         }
         if (options.sessionId) {
           window.dispatchEvent(
-            new CustomEvent("dafman:focus-session", {
+            new CustomEvent('dafman:focus-session', {
               detail: { sessionId: options.sessionId },
             }),
           );
@@ -115,7 +113,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
       return true;
     } catch (err) {
       // Don't toast — this fires from a hot path (every turn_end).
-      console.error("[notifications] new Notification threw", err);
+      console.error('[notifications] new Notification threw', err);
       return false;
     }
   }

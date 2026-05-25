@@ -7,9 +7,9 @@
 // `Channel<SessionEventPayload>` and lets us keep `SessionRecord` plain
 // reactive data.
 
-import { defineStore } from "pinia";
-import { reactive, ref, computed, watch } from "vue";
-import { invokeCommand, onPendingRequest, onSessionEvent } from "../ipc/invoke";
+import { defineStore } from 'pinia';
+import { reactive, ref, computed, watch } from 'vue';
+import { invokeCommand, onPendingRequest, onSessionEvent } from '../ipc/invoke';
 import type {
   AgentInfo,
   AutoModeSwitchRequestData,
@@ -22,13 +22,13 @@ import type {
   SessionEventPayload,
   SessionMode,
   UserInputRequestData,
-} from "../ipc/types";
-import { accentForIndex } from "../lib/color";
-import { useLayoutStore } from "./layoutStore";
-import { useNotificationsStore } from "./notificationsStore";
-import { useSettingsStore } from "./settingsStore";
-import { useToastStore } from "./toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+} from '../ipc/types';
+import { accentForIndex } from '../lib/color';
+import { useLayoutStore } from './layoutStore';
+import { useNotificationsStore } from './notificationsStore';
+import { useSettingsStore } from './settingsStore';
+import { useToastStore } from './toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -37,8 +37,8 @@ import { toErrorMessage } from "../lib/errorMessage";
 ///   "interrupt" -> session.abort() then session.send()
 /// Only "steer" and "queue" are valid *default* modes (selectable from
 /// the composer's SplitButton dropdown). Interrupt is always explicit.
-export type SendMode = "steer" | "queue" | "interrupt";
-export type DefaultSendMode = "steer" | "queue";
+export type SendMode = 'steer' | 'queue' | 'interrupt';
+export type DefaultSendMode = 'steer' | 'queue';
 
 export type SessionRecord = {
   id: string;
@@ -70,7 +70,7 @@ export type SessionRecord = {
   /// Per-session override for reasoning visibility. `"default"` means
   /// fall back to `settings.appearance.reasoningVisibility`. In-memory
   /// only (we don't yet persist per-session UI preferences).
-  reasoningVisibilityOverride: ReasoningVisibility | "default";
+  reasoningVisibilityOverride: ReasoningVisibility | 'default';
   /// Absolute filesystem path the SDK uses as `cwd` for tool invocations
   /// in this session. Populated either from the user's choice at
   /// creation time, or from the `session.start` event's
@@ -144,31 +144,31 @@ export type SessionRecord = {
 /// need the rest of the reducer).
 export type PendingRecordRequest =
   | {
-      kind: "permission";
+      kind: 'permission';
       requestId: string;
       message: string;
       request: PermissionRequestData;
     }
   | {
-      kind: "userInput";
+      kind: 'userInput';
       requestId: string;
       message: string;
       request: UserInputRequestData;
     }
   | {
-      kind: "elicitation";
+      kind: 'elicitation';
       requestId: string;
       message: string;
       request: ElicitationRequestData;
     }
   | {
-      kind: "exitPlanMode";
+      kind: 'exitPlanMode';
       requestId: string;
       message: string;
       request: ExitPlanModeRequestData;
     }
   | {
-      kind: "autoModeSwitch";
+      kind: 'autoModeSwitch';
       requestId: string;
       message: string;
       request: AutoModeSwitchRequestData;
@@ -209,7 +209,7 @@ export const MAX_EVENTS_PER_SESSION = 5000;
 /// `sessionId` matches this constant so the modal can be tested in
 /// isolation. Not exported — the playground constructs the same
 /// string literal.
-const PLAYGROUND_PENDING_SESSION_ID = "playground-pending";
+const PLAYGROUND_PENDING_SESSION_ID = 'playground-pending';
 
 /// Test-only seam: clears module-level state (subscription, buffered
 /// events) so each unit test starts from a clean slate. Production
@@ -236,9 +236,9 @@ export function _resetSessionsStoreForTest(): void {
   pendingRequestBuffer.clear();
 }
 
-export const useSessionsStore = defineStore("sessions", () => {
+export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref<SessionRecord[]>([]);
-  const sessionById = computed(() => new Map(sessions.value.map(s => [s.id, s])));
+  const sessionById = computed(() => new Map(sessions.value.map((s) => [s.id, s])));
   function getSession(id: string | null | undefined): SessionRecord | undefined {
     if (!id) return undefined;
     return sessionById.value.get(id);
@@ -258,11 +258,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         pendingEvents.set(payload.sessionId, list);
       }
       if (import.meta.env.DEV) {
-        console.debug(
-          "[session-event] buffered",
-          payload.eventType,
-          payload.sessionId,
-        );
+        console.debug('[session-event] buffered', payload.eventType, payload.sessionId);
       }
       return;
     }
@@ -288,7 +284,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     appendEvent(record, payload);
 
     if (import.meta.env.DEV) {
-      console.debug("[session-event]", payload.eventType, payload.data);
+      console.debug('[session-event]', payload.eventType, payload.data);
     }
 
     trackSessionArtifact(record, payload);
@@ -296,35 +292,35 @@ export const useSessionsStore = defineStore("sessions", () => {
     // Keep model + reasoning effort in sync with backend-initiated changes
     // (rate-limit auto-switch, /model commands, etc.). The session.model_change
     // event ships both fields when applicable.
-    if (payload.eventType === "session.model_change") {
+    if (payload.eventType === 'session.model_change') {
       const data = payload.data as {
         newModel?: unknown;
         reasoningEffort?: unknown;
       };
-      if (typeof data.newModel === "string") {
+      if (typeof data.newModel === 'string') {
         record.model = data.newModel;
       }
-      if (typeof data.reasoningEffort === "string") {
+      if (typeof data.reasoningEffort === 'string') {
         record.reasoningEffort = data.reasoningEffort;
       }
     }
 
     // Backend may auto-switch the agent run mode (e.g. /plan command).
-    if (payload.eventType === "session.mode_changed") {
+    if (payload.eventType === 'session.mode_changed') {
       const data = payload.data as { newMode?: unknown };
       if (
-        data.newMode === "interactive" ||
-        data.newMode === "plan" ||
-        data.newMode === "autopilot"
+        data.newMode === 'interactive' ||
+        data.newMode === 'plan' ||
+        data.newMode === 'autopilot'
       ) {
         record.mode = data.newMode;
-        if (data.newMode === "autopilot" && record.pendingRequests.length > 0) {
+        if (data.newMode === 'autopilot' && record.pendingRequests.length > 0) {
           const requestIds = record.pendingRequests.map((p) => p.requestId);
           record.pendingRequests.splice(0, record.pendingRequests.length);
           for (const requestId of requestIds) {
             appendEvent(record, {
               sessionId: record.id,
-              eventType: "dafman.pending_response",
+              eventType: 'dafman.pending_response',
               data: { requestId },
             });
           }
@@ -334,9 +330,9 @@ export const useSessionsStore = defineStore("sessions", () => {
 
     // Track the SDK's auto-summarised title so the dockview tab can
     // show something meaningful instead of the raw uuid.
-    if (payload.eventType === "session.title_changed") {
+    if (payload.eventType === 'session.title_changed') {
       const title = (payload.data as { title?: unknown }).title;
-      if (typeof title === "string" && title.length > 0) {
+      if (typeof title === 'string' && title.length > 0) {
         record.title = title;
       }
     }
@@ -347,7 +343,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     // events that carry `agentName` as session-level selection
     // (transient delegation during fleet/task runs has a
     // `parentToolCallId`).
-    if (payload.eventType === "subagent.selected") {
+    if (payload.eventType === 'subagent.selected') {
       const d = (payload.data ?? {}) as {
         agentName?: unknown;
         agentDisplayName?: unknown;
@@ -356,20 +352,17 @@ export const useSessionsStore = defineStore("sessions", () => {
         parentToolCallId?: unknown;
       };
       if (
-        typeof d.agentName === "string" &&
-        (typeof d.parentToolCallId !== "string" ||
-          d.parentToolCallId.length === 0)
+        typeof d.agentName === 'string' &&
+        (typeof d.parentToolCallId !== 'string' || d.parentToolCallId.length === 0)
       ) {
         record.currentAgent = {
           name: d.agentName,
-          displayName:
-            typeof d.agentDisplayName === "string" ? d.agentDisplayName : d.agentName,
-          description:
-            typeof d.agentDescription === "string" ? d.agentDescription : "",
-          ...(typeof d.agentPath === "string" ? { path: d.agentPath } : {}),
+          displayName: typeof d.agentDisplayName === 'string' ? d.agentDisplayName : d.agentName,
+          description: typeof d.agentDescription === 'string' ? d.agentDescription : '',
+          ...(typeof d.agentPath === 'string' ? { path: d.agentPath } : {}),
         };
       }
-    } else if (payload.eventType === "subagent.deselected") {
+    } else if (payload.eventType === 'subagent.deselected') {
       record.currentAgent = null;
     }
 
@@ -379,14 +372,14 @@ export const useSessionsStore = defineStore("sessions", () => {
     // doesn't carry the full TaskInfo shape, so we just bump the
     // counter and let the rail re-read via `listTasks`.
     if (
-      payload.eventType === "subagent.started" ||
-      payload.eventType === "subagent.completed" ||
-      payload.eventType === "subagent.failed" ||
-      payload.eventType === "session.background_tasks_changed"
+      payload.eventType === 'subagent.started' ||
+      payload.eventType === 'subagent.completed' ||
+      payload.eventType === 'subagent.failed' ||
+      payload.eventType === 'session.background_tasks_changed'
     ) {
       record.tasksRefreshCounter += 1;
     }
-    if (payload.eventType === "session.plan_changed") {
+    if (payload.eventType === 'session.plan_changed') {
       record.planRefreshCounter += 1;
     }
 
@@ -398,48 +391,43 @@ export const useSessionsStore = defineStore("sessions", () => {
     // user. `mcp.oauth_completed` fires on success and we
     // de-dup by requestId so we don't show duplicate completion
     // toasts on resume / replay.
-    if (payload.eventType === "mcp.oauth_required") {
+    if (payload.eventType === 'mcp.oauth_required') {
       const d = (payload.data ?? {}) as {
         serverName?: unknown;
         requestId?: unknown;
       };
-      if (typeof d.serverName === "string") {
+      if (typeof d.serverName === 'string') {
         const toasts = useToastStore();
-        const key =
-          typeof d.requestId === "string" ? `${record.id}:oauth:${d.requestId}` : null;
+        const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
         if (!key || !record._toastedOauthRequests.has(key)) {
           if (key) record._toastedOauthRequests.add(key);
           toasts.info(
-            "MCP server needs sign-in",
+            'MCP server needs sign-in',
             `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
           );
         }
       }
-    } else if (payload.eventType === "mcp.oauth_completed") {
+    } else if (payload.eventType === 'mcp.oauth_completed') {
       const d = (payload.data ?? {}) as { requestId?: unknown };
       const toasts = useToastStore();
-      const key =
-        typeof d.requestId === "string" ? `${record.id}:oauth:${d.requestId}` : null;
+      const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
       // Only fire if we toasted the matching `_required`; suppresses
       // stray `_completed` events on resume + the case where another
       // client (e.g. CLI) drove the OAuth flow.
       if (key && record._toastedOauthRequests.has(key)) {
         record._toastedOauthRequests.delete(key);
-        toasts.success("MCP signed in", "Connection established");
+        toasts.success('MCP signed in', 'Connection established');
       }
     }
-// Both `session.start` (fresh create) and `session.resume` carry
+    // Both `session.start` (fresh create) and `session.resume` carry
     // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
     // Resumed sessions don't fire `session.start` again, so we have
     // to listen on both — otherwise the workspace would only appear
     // on freshly-created sessions and never on restored ones.
-    if (
-      payload.eventType === "session.start" ||
-      payload.eventType === "session.resume"
-    ) {
+    if (payload.eventType === 'session.start' || payload.eventType === 'session.resume') {
       const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
       const cwd = ctx?.cwd;
-      if (typeof cwd === "string" && cwd.length > 0) {
+      if (typeof cwd === 'string' && cwd.length > 0) {
         record.workingDirectory = cwd;
       }
     }
@@ -449,10 +437,10 @@ export const useSessionsStore = defineStore("sessions", () => {
     // tracks the same thing inside the chat panel; this mirror lives
     // on the record so the tab + sidebar dot react without the
     // panel being mounted.
-    if (payload.eventType === "assistant.turn_start") {
+    if (payload.eventType === 'assistant.turn_start') {
       record.isThinking = true;
       record.sawTurnBoundary = true;
-    } else if (payload.eventType === "assistant.turn_end") {
+    } else if (payload.eventType === 'assistant.turn_end') {
       record.isThinking = false;
       // Unseen-activity dot + optional OS notification when the
       // session ISN'T the dock's active panel. Cleared on focus by
@@ -463,9 +451,9 @@ export const useSessionsStore = defineStore("sessions", () => {
         if (shouldFireForRecord(record)) {
           const notifications = useNotificationsStore();
           notifications.notify({
-            kind: "turnEnd",
+            kind: 'turnEnd',
             title: record.title ?? `Session ${record.id.slice(0, 8)}`,
-            body: "Turn complete.",
+            body: 'Turn complete.',
             sessionId: record.id,
             // Same tag → multiple turn-ends collapse to one entry
             // in the OS tray.
@@ -473,10 +461,7 @@ export const useSessionsStore = defineStore("sessions", () => {
           });
         }
       }
-    } else if (
-      payload.eventType === "session.idle" ||
-      payload.eventType === "session.error"
-    ) {
+    } else if (payload.eventType === 'session.idle' || payload.eventType === 'session.error') {
       record.isThinking = false;
     }
 
@@ -487,25 +472,22 @@ export const useSessionsStore = defineStore("sessions", () => {
     // callback out-of-band (e.g. resume-with-continue-pending-work
     // re-emits). Best-effort match: remove the OLDEST entry of the
     // same kind since SDK events lack our generated requestId.
-    let completedKind: PendingRecordRequest["kind"] | null = null;
-    if (payload.eventType === "permission.completed") completedKind = "permission";
-    else if (payload.eventType === "user_input.completed") completedKind = "userInput";
-    else if (payload.eventType === "elicitation.completed") completedKind = "elicitation";
-    else if (payload.eventType === "exit_plan_mode.completed") completedKind = "exitPlanMode";
-    else if (payload.eventType === "auto_mode_switch.completed") completedKind = "autoModeSwitch";
+    let completedKind: PendingRecordRequest['kind'] | null = null;
+    if (payload.eventType === 'permission.completed') completedKind = 'permission';
+    else if (payload.eventType === 'user_input.completed') completedKind = 'userInput';
+    else if (payload.eventType === 'elicitation.completed') completedKind = 'elicitation';
+    else if (payload.eventType === 'exit_plan_mode.completed') completedKind = 'exitPlanMode';
+    else if (payload.eventType === 'auto_mode_switch.completed') completedKind = 'autoModeSwitch';
     if (completedKind) {
       const idx = record.pendingRequests.findIndex((p) => p.kind === completedKind);
       if (idx >= 0) record.pendingRequests.splice(idx, 1);
     }
   }
 
-  function trackSessionArtifact(
-    record: SessionRecord,
-    payload: SessionEventPayload,
-  ): void {
+  function trackSessionArtifact(record: SessionRecord, payload: SessionEventPayload): void {
     if (
-      payload.eventType !== "tool.user_requested" &&
-      payload.eventType !== "tool.execution_start"
+      payload.eventType !== 'tool.user_requested' &&
+      payload.eventType !== 'tool.execution_start'
     ) {
       return;
     }
@@ -514,28 +496,27 @@ export const useSessionsStore = defineStore("sessions", () => {
       toolName?: unknown;
       arguments?: unknown;
     };
-    const toolCallId = typeof d.toolCallId === "string" ? d.toolCallId : null;
+    const toolCallId = typeof d.toolCallId === 'string' ? d.toolCallId : null;
     if (toolCallId && record._artifactToolCallIds.has(toolCallId)) return;
     if (toolCallId) record._artifactToolCallIds.add(toolCallId);
 
-    const toolName = typeof d.toolName === "string" ? d.toolName.toLowerCase() : "";
-    if (["shell", "bash", "exec", "execute"].includes(toolName)) {
+    const toolName = typeof d.toolName === 'string' ? d.toolName.toLowerCase() : '';
+    if (['shell', 'bash', 'exec', 'execute'].includes(toolName)) {
       record.commandsRun += 1;
       return;
     }
     if (
-      !["edit", "write", "apply_patch", "create", "str_replace"].some((needle) =>
+      !['edit', 'write', 'apply_patch', 'create', 'str_replace'].some((needle) =>
         toolName.includes(needle),
       )
     ) {
       return;
     }
     const args = d.arguments;
-    if (!args || typeof args !== "object") return;
+    if (!args || typeof args !== 'object') return;
     const obj = args as Record<string, unknown>;
-    const path =
-      obj.path ?? obj.filePath ?? obj.fileName ?? obj.filename ?? obj.targetFile;
-    if (typeof path !== "string" || !path.trim()) return;
+    const path = obj.path ?? obj.filePath ?? obj.fileName ?? obj.filename ?? obj.targetFile;
+    if (typeof path !== 'string' || !path.trim()) return;
     const trimmed = path.trim();
     if (!record.touchedFiles.includes(trimmed)) {
       record.touchedFiles.push(trimmed);
@@ -550,8 +531,8 @@ export const useSessionsStore = defineStore("sessions", () => {
   function shouldFireForRecord(record: SessionRecord): boolean {
     const layoutStore = useLayoutStore();
     if (layoutStore.activeSessionId !== record.id) return true;
-    if (typeof document !== "undefined" && document.hidden) return true;
-    if (typeof document !== "undefined" && !document.hasFocus()) return true;
+    if (typeof document !== 'undefined' && document.hidden) return true;
+    if (typeof document !== 'undefined' && !document.hasFocus()) return true;
     return false;
   }
 
@@ -577,55 +558,52 @@ export const useSessionsStore = defineStore("sessions", () => {
     applyPendingToRecord(record, payload);
   }
 
-  function applyPendingToRecord(
-    record: SessionRecord,
-    payload: PendingRequestPayload,
-  ): void {
+  function applyPendingToRecord(record: SessionRecord, payload: PendingRequestPayload): void {
     // Idempotency: drop duplicate pushes of the same requestId.
     if (record.pendingRequests.some((p) => p.requestId === payload.requestId)) {
       return;
     }
     let entry: PendingRecordRequest;
     switch (payload.kind) {
-      case "permission":
+      case 'permission':
         entry = {
-          kind: "permission",
+          kind: 'permission',
           requestId: payload.requestId,
           message: payload.request.summary,
           request: payload.request,
         };
         break;
-      case "userInput":
+      case 'userInput':
         entry = {
-          kind: "userInput",
+          kind: 'userInput',
           requestId: payload.requestId,
           message: payload.request.question,
           request: payload.request,
         };
         break;
-      case "elicitation":
+      case 'elicitation':
         entry = {
-          kind: "elicitation",
+          kind: 'elicitation',
           requestId: payload.requestId,
           message: payload.request.message,
           request: payload.request,
         };
         break;
-      case "exitPlanMode":
+      case 'exitPlanMode':
         entry = {
-          kind: "exitPlanMode",
+          kind: 'exitPlanMode',
           requestId: payload.requestId,
-          message: payload.request.summary || "Plan ready for approval",
+          message: payload.request.summary || 'Plan ready for approval',
           request: payload.request,
         };
         break;
-      case "autoModeSwitch":
+      case 'autoModeSwitch':
         entry = {
-          kind: "autoModeSwitch",
+          kind: 'autoModeSwitch',
           requestId: payload.requestId,
           message: payload.request.errorCode
             ? `Switch to auto mode after rate limit: ${payload.request.errorCode}`
-            : "Switch to auto mode?",
+            : 'Switch to auto mode?',
           request: payload.request,
         };
         break;
@@ -636,13 +614,13 @@ export const useSessionsStore = defineStore("sessions", () => {
     // event stream) builds the same queue inside `ChatAmbient`.
     appendEvent(record, {
       sessionId: record.id,
-      eventType: "dafman.pending_request",
+      eventType: 'dafman.pending_request',
       data: payload as unknown as Record<string, unknown>,
     });
     if (shouldFireForRecord(record)) {
       const notifications = useNotificationsStore();
       notifications.notify({
-        kind: "waitingForInput",
+        kind: 'waitingForInput',
         title: record.title ?? `Session ${record.id.slice(0, 8)}`,
         body: entry.message,
         sessionId: record.id,
@@ -702,12 +680,10 @@ export const useSessionsStore = defineStore("sessions", () => {
       const wd = opts.workingDirectory?.trim();
       const settingsStore = useSettingsStore();
       const defaultModel =
-        opts.model ?? settingsStore.settings.appearance.defaultModelId?.trim() ?? "";
+        opts.model ?? settingsStore.settings.appearance.defaultModelId?.trim() ?? '';
       const defaultReasoning =
-        opts.reasoningEffort ??
-        settingsStore.settings.appearance.defaultReasoningEffort ??
-        null;
-      const id = await invokeCommand("createSession", {
+        opts.reasoningEffort ?? settingsStore.settings.appearance.defaultReasoningEffort ?? null;
+      const id = await invokeCommand('createSession', {
         ...(wd ? { workingDirectory: wd } : {}),
         ...(defaultModel ? { model: defaultModel } : {}),
         ...(defaultReasoning ? { reasoningEffort: defaultReasoning } : {}),
@@ -723,9 +699,9 @@ export const useSessionsStore = defineStore("sessions", () => {
         title: null,
         mode: null,
         approveAll: false, // dafman handler now drives permissions; default is interactive
-        reasoningVisibilityOverride: "default",
+        reasoningVisibilityOverride: 'default',
         workingDirectory: wd && wd.length > 0 ? wd : null,
-        defaultSendMode: "steer",
+        defaultSendMode: 'steer',
 
         pendingRequests: [],
         unseenTurns: 0,
@@ -742,14 +718,13 @@ export const useSessionsStore = defineStore("sessions", () => {
       });
       sessions.value.push(record);
       drainPending(id, record);
-      toasts.success("Session created", id);
+      toasts.success('Session created', id);
       // 22c: apply the global `defaultApproveAll` setting to brand-new
       // sessions. The flag lives in the renderer's settings store so
       // we don't need a backend RPC change — just call the existing
       // per-session setter. Skipped when false (default) so we don't
       // emit a spurious approve-all flip on every session create.
-      const defaultApprove =
-        settingsStore.settings.permissions?.defaultApproveAll === true;
+      const defaultApprove = settingsStore.settings.permissions?.defaultApproveAll === true;
       if (defaultApprove) {
         void setSessionApproveAll(id, true).catch(() => {
           /* toast already surfaced by the setter */
@@ -759,7 +734,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // Re-look up the record by id when the RPC resolves — if the
       // session was closed in the meantime it's no longer in
       // `sessions.value` and we must not mutate a stale closure capture.
-      void invokeCommand("getSessionMode", { sessionId: id })
+      void invokeCommand('getSessionMode', { sessionId: id })
         .then((mode) => {
           const current = getSession(id);
           if (current) current.mode = mode;
@@ -771,7 +746,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // accurate from the first paint (subagent.selected may not
       // fire post-create if the SDK's selection persists from a
       // previous session). Fire-and-forget like the mode fetch.
-      void invokeCommand("getCurrentAgent", { sessionId: id })
+      void invokeCommand('getCurrentAgent', { sessionId: id })
         .then((agent) => {
           const current = getSession(id);
           if (current) current.currentAgent = agent;
@@ -782,7 +757,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       return record;
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to create session", message);
+      toasts.error('Failed to create session', message);
       throw err;
     } finally {
       isCreating.value = false;
@@ -804,7 +779,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // comes from the session catalog, not the event stream —
       // `getMessages()` history doesn't include `session.resume`, so
       // the workspace chip would otherwise stay hidden after restore.
-      const response = await invokeCommand("resumeSession", {
+      const response = await invokeCommand('resumeSession', {
         sessionId,
         model: null,
         reasoningEffort: null,
@@ -830,9 +805,9 @@ export const useSessionsStore = defineStore("sessions", () => {
         title: null,
         mode: null,
         approveAll: false,
-        reasoningVisibilityOverride: "default",
+        reasoningVisibilityOverride: 'default',
         workingDirectory: response.cwd ?? null,
-        defaultSendMode: "steer",
+        defaultSendMode: 'steer',
 
         pendingRequests: [],
         unseenTurns: 0,
@@ -854,19 +829,16 @@ export const useSessionsStore = defineStore("sessions", () => {
       // otherwise be lost and the pane would render blank.
       const drained = drainPending(actualId, record);
       if (import.meta.env.DEV) {
-        console.debug(
-          "[restoreSession] resumed",
-          {
-            requestedId: sessionId,
-            actualId,
-            drainedEvents: drained,
-            recordEvents: record.events.length,
-          },
-        );
+        console.debug('[restoreSession] resumed', {
+          requestedId: sessionId,
+          actualId,
+          drainedEvents: drained,
+          recordEvents: record.events.length,
+        });
       }
       // Pick up the run mode the SDK is currently using for the
       // restored session — same fire-and-forget shape as createSession.
-      void invokeCommand("getSessionMode", { sessionId: actualId })
+      void invokeCommand('getSessionMode', { sessionId: actualId })
         .then((mode) => {
           const current = getSession(actualId);
           if (current) current.mode = mode;
@@ -875,7 +847,7 @@ export const useSessionsStore = defineStore("sessions", () => {
           /* mode RPC may be unavailable on older CLI hosts; ignore */
         });
       // 19a: same hydration as createSession.
-      void invokeCommand("getCurrentAgent", { sessionId: actualId })
+      void invokeCommand('getCurrentAgent', { sessionId: actualId })
         .then((agent) => {
           const current = getSession(actualId);
           if (current) current.currentAgent = agent;
@@ -888,7 +860,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       // not contain a `session.title_changed` event — fetching the
       // persisted name closes the gap for sessions whose replay doesn't
       // include it.
-      void invokeCommand("getSessionName", { sessionId: actualId })
+      void invokeCommand('getSessionName', { sessionId: actualId })
         .then((name) => {
           const current = getSession(actualId);
           if (current && name && !current.title) current.title = name;
@@ -899,10 +871,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       return record;
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.info(
-        "Session not restored",
-        `${sessionId.slice(0, 8)}…: ${message}`,
-      );
+      toasts.info('Session not restored', `${sessionId.slice(0, 8)}…: ${message}`);
       return null;
     }
   }
@@ -910,10 +879,10 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function closeSession(id: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("disconnectSession", { sessionId: id });
+      await invokeCommand('disconnectSession', { sessionId: id });
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to close session", message);
+      toasts.error('Failed to close session', message);
     } finally {
       sessions.value = sessions.value.filter((s) => s.id !== id);
     }
@@ -931,32 +900,35 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function sendMessage(
     sessionId: string,
     text: string,
-    mode: SendMode = "steer",
-    attachments?: import("../ipc/types").SendMessageAttachment[],
+    mode: SendMode = 'steer',
+    attachments?: import('../ipc/types').SendMessageAttachment[],
   ): Promise<void> {
     // Vue reactive proxies don't always survive structured-clone /
     // JSON serialization through the Electrobun bridge — fields can
     // be silently dropped on the bun side. Deep-clone via JSON to
     // strip the proxy wrappers and guarantee plain-object payloads.
-    const atts = attachments && attachments.length > 0
-      ? (JSON.parse(JSON.stringify(attachments)) as import("../ipc/types").SendMessageAttachment[])
-      : undefined;
-    if (mode === "interrupt") {
+    const atts =
+      attachments && attachments.length > 0
+        ? (JSON.parse(
+            JSON.stringify(attachments),
+          ) as import('../ipc/types').SendMessageAttachment[])
+        : undefined;
+    if (mode === 'interrupt') {
       try {
-        await invokeCommand("abortSession", { sessionId });
+        await invokeCommand('abortSession', { sessionId });
       } catch (err) {
         const message = toErrorMessage(err);
-        useToastStore().warn("Abort failed; sending anyway", message);
+        useToastStore().warn('Abort failed; sending anyway', message);
       }
-      await invokeCommand("sendMessage", {
+      await invokeCommand('sendMessage', {
         sessionId,
         text,
         ...(atts ? { attachments: atts } : {}),
       });
       return;
     }
-    const sdkMode = mode === "steer" ? "immediate" : "enqueue";
-    await invokeCommand("sendMessage", {
+    const sdkMode = mode === 'steer' ? 'immediate' : 'enqueue';
+    await invokeCommand('sendMessage', {
       sessionId,
       text,
       mode: sdkMode,
@@ -967,10 +939,10 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function abortSession(sessionId: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("abortSession", { sessionId });
+      await invokeCommand('abortSession', { sessionId });
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to abort turn", message);
+      toasts.error('Failed to abort turn', message);
       throw err;
     }
   }
@@ -978,10 +950,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   /// In-memory only — the per-session default for the composer's primary
   /// send action. Mutating this updates `SessionRecord.defaultSendMode`,
   /// which the composer subscribes to.
-  function setDefaultSendMode(
-    sessionId: string,
-    next: DefaultSendMode,
-  ): void {
+  function setDefaultSendMode(sessionId: string, next: DefaultSendMode): void {
     const record = getSession(sessionId);
     if (record) record.defaultSendMode = next;
   }
@@ -993,7 +962,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   ): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("setSessionModel", {
+      await invokeCommand('setSessionModel', {
         sessionId,
         model,
         reasoningEffort,
@@ -1005,31 +974,25 @@ export const useSessionsStore = defineStore("sessions", () => {
       }
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to switch model", message);
+      toasts.error('Failed to switch model', message);
       throw err;
     }
   }
 
-  async function setSessionMode(
-    sessionId: string,
-    mode: SessionMode,
-  ): Promise<void> {
+  async function setSessionMode(sessionId: string, mode: SessionMode): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("setSessionMode", { sessionId, mode });
+      await invokeCommand('setSessionMode', { sessionId, mode });
       const record = getSession(sessionId);
       if (record) record.mode = mode;
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to change run mode", message);
+      toasts.error('Failed to change run mode', message);
       throw err;
     }
   }
 
-  async function setSessionApproveAll(
-    sessionId: string,
-    enabled: boolean,
-  ): Promise<void> {
+  async function setSessionApproveAll(sessionId: string, enabled: boolean): Promise<void> {
     // Playground sentinel: skip the RPC (no real bun session) but
     // still mirror the flag onto the in-memory record so the UI
     // reflects the toggle for inline testing.
@@ -1040,12 +1003,12 @@ export const useSessionsStore = defineStore("sessions", () => {
     }
     const toasts = useToastStore();
     try {
-      await invokeCommand("setSessionApproveAll", { sessionId, enabled });
+      await invokeCommand('setSessionApproveAll', { sessionId, enabled });
       const record = getSession(sessionId);
       if (record) record.approveAll = enabled;
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to update auto-approval", message);
+      toasts.error('Failed to update auto-approval', message);
       throw err;
     }
   }
@@ -1053,11 +1016,11 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function resetSessionApprovals(sessionId: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("resetSessionApprovals", { sessionId });
-      toasts.success("Session approvals cleared", sessionId);
+      await invokeCommand('resetSessionApprovals', { sessionId });
+      toasts.success('Session approvals cleared', sessionId);
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to reset approvals", message);
+      toasts.error('Failed to reset approvals', message);
       throw err;
     }
   }
@@ -1073,7 +1036,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     // the time the RPC resolves. Re-lookup after.
     const baseWd = getSession(sessionId)?.workingDirectory;
     try {
-      const next = await invokeCommand("setSessionWorkingDirectory", {
+      const next = await invokeCommand('setSessionWorkingDirectory', {
         sessionId,
         workingDirectory,
         ...(baseWd ? { baseWorkingDirectory: baseWd } : {}),
@@ -1086,15 +1049,15 @@ export const useSessionsStore = defineStore("sessions", () => {
         record.workingDirectory = next;
         appendEvent(record, {
           sessionId,
-          eventType: "system.notification",
+          eventType: 'system.notification',
           data: { content: `Working directory changed to ${next}` },
         });
       }
-      toasts.success("Working directory changed", next);
+      toasts.success('Working directory changed', next);
       return next;
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to change working directory", message);
+      toasts.error('Failed to change working directory', message);
       throw err;
     }
   }
@@ -1102,7 +1065,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   async function compactSessionHistory(sessionId: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      const result = await invokeCommand("compactSessionHistory", {
+      const result = await invokeCommand('compactSessionHistory', {
         sessionId,
       });
       if (result.success) {
@@ -1113,16 +1076,13 @@ export const useSessionsStore = defineStore("sessions", () => {
         if (result.messagesRemoved !== null) {
           parts.push(`${result.messagesRemoved} messages removed`);
         }
-        toasts.success(
-          "History compacted",
-          parts.length > 0 ? parts.join(", ") : undefined,
-        );
+        toasts.success('History compacted', parts.length > 0 ? parts.join(', ') : undefined);
       } else {
-        toasts.warn("Compaction did not complete", sessionId);
+        toasts.warn('Compaction did not complete', sessionId);
       }
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to compact history", message);
+      toasts.error('Failed to compact history', message);
       throw err;
     }
   }
@@ -1139,7 +1099,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   ): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("truncateSessionHistory", { sessionId, eventId });
+      await invokeCommand('truncateSessionHistory', { sessionId, eventId });
       // Drop local items at the truncation point too — otherwise we
       // double-render the edited message until the SDK echoes it.
       const record = getSession(sessionId);
@@ -1147,10 +1107,10 @@ export const useSessionsStore = defineStore("sessions", () => {
         const idx = record.events.findIndex((e) => e.eventId === eventId);
         if (idx >= 0) record.events.splice(idx);
       }
-      await invokeCommand("sendMessage", { sessionId, text: newText });
+      await invokeCommand('sendMessage', { sessionId, text: newText });
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to edit message", message);
+      toasts.error('Failed to edit message', message);
       throw err;
     }
   }
@@ -1170,13 +1130,10 @@ export const useSessionsStore = defineStore("sessions", () => {
   /// Fork the session at an optional event boundary. When the new
   /// session id resolves, restoreSession opens it as a panel. Returns
   /// the new session id so the caller can route to it / focus it.
-  async function forkSession(
-    sessionId: string,
-    toEventId?: string,
-  ): Promise<string> {
+  async function forkSession(sessionId: string, toEventId?: string): Promise<string> {
     const toasts = useToastStore();
     try {
-      const result = await invokeCommand("forkSession", {
+      const result = await invokeCommand('forkSession', {
         sessionId,
         ...(toEventId ? { toEventId } : {}),
       });
@@ -1184,7 +1141,7 @@ export const useSessionsStore = defineStore("sessions", () => {
       return result.sessionId;
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to fork session", message);
+      toasts.error('Failed to fork session', message);
       throw err;
     }
   }
@@ -1213,11 +1170,9 @@ export const useSessionsStore = defineStore("sessions", () => {
     const trimmed = name.trim();
     const lower = trimmed.toLowerCase();
     const records = sessions.value;
-    const exact = records.find((s) => (s.title ?? "").toLowerCase() === lower);
+    const exact = records.find((s) => (s.title ?? '').toLowerCase() === lower);
     if (exact) return exact;
-    const titleStarts = records.find((s) =>
-      (s.title ?? "").toLowerCase().startsWith(lower),
-    );
+    const titleStarts = records.find((s) => (s.title ?? '').toLowerCase().startsWith(lower));
     if (titleStarts) return titleStarts;
     const m = trimmed.match(/([0-9a-f]{4,})/i);
     if (m && m[1]) {
@@ -1228,16 +1183,13 @@ export const useSessionsStore = defineStore("sessions", () => {
     return undefined;
   }
 
-  async function setSessionName(
-    sessionId: string,
-    name: string,
-  ): Promise<void> {
+  async function setSessionName(sessionId: string, name: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("setSessionName", { sessionId, name });
+      await invokeCommand('setSessionName', { sessionId, name });
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to rename session", message);
+      toasts.error('Failed to rename session', message);
       throw err;
     }
   }
@@ -1247,7 +1199,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   /// In-memory only — not persisted across reloads. No backend RPC.
   function setSessionReasoningOverride(
     sessionId: string,
-    value: ReasoningVisibility | "default",
+    value: ReasoningVisibility | 'default',
   ): void {
     const record = getSession(sessionId);
     if (record) record.reasoningVisibilityOverride = value;
@@ -1265,9 +1217,7 @@ export const useSessionsStore = defineStore("sessions", () => {
   /// the RPC call so the dev playground can exercise the card
   /// without a real bun-side handler (which would reject with
   /// `Session ${id} not found`).
-  async function respondToPending(
-    params: RespondToRequestParams,
-  ): Promise<void> {
+  async function respondToPending(params: RespondToRequestParams): Promise<void> {
     const record = getSession(params.sessionId);
     // Snapshot + remove the pending entry optimistically so the UI's
     // pending card disappears immediately on click. The
@@ -1278,9 +1228,7 @@ export const useSessionsStore = defineStore("sessions", () => {
     let restoredEntry: PendingRecordRequest | null = null;
     let restoredIdx = -1;
     if (record) {
-      restoredIdx = record.pendingRequests.findIndex(
-        (p) => p.requestId === params.requestId,
-      );
+      restoredIdx = record.pendingRequests.findIndex((p) => p.requestId === params.requestId);
       if (restoredIdx >= 0) {
         restoredEntry = record.pendingRequests[restoredIdx] ?? null;
         record.pendingRequests.splice(restoredIdx, 1);
@@ -1292,21 +1240,21 @@ export const useSessionsStore = defineStore("sessions", () => {
       if (record) {
         appendEvent(record, {
           sessionId: record.id,
-          eventType: "dafman.pending_response",
+          eventType: 'dafman.pending_response',
           data: { requestId: params.requestId, kind: params.response.kind },
         });
       }
       return;
     }
     try {
-      await invokeCommand("respondToRequest", params);
+      await invokeCommand('respondToRequest', params);
       // Only emit the response event after the RPC succeeds — the
       // chat reducer uses it to clear the pending card from the
       // transcript view.
       if (record) {
         appendEvent(record, {
           sessionId: record.id,
-          eventType: "dafman.pending_response",
+          eventType: 'dafman.pending_response',
           data: { requestId: params.requestId, kind: params.response.kind },
         });
       }
@@ -1318,10 +1266,7 @@ export const useSessionsStore = defineStore("sessions", () => {
         record.pendingRequests.splice(restoredIdx, 0, restoredEntry);
       }
       const toasts = useToastStore();
-      toasts.error(
-        "Failed to send response",
-        toErrorMessage(err),
-      );
+      toasts.error('Failed to send response', toErrorMessage(err));
     }
   }
 
@@ -1361,4 +1306,3 @@ export const useSessionsStore = defineStore("sessions", () => {
     applySessionEvent: handleEvent,
   };
 });
-

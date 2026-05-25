@@ -1,4 +1,4 @@
-import { createApp } from "vue";
+import { createApp } from 'vue';
 // Prism grammar registrations MUST happen before any module that
 // imports @lexical/code. In HMR (Vite dev) mode esbuild's dep
 // optimizer chunks the @lexical/code imports of `prism-objectivec`
@@ -11,55 +11,55 @@ import { createApp } from "vue";
 // and MessageComposer paths that pull @lexical/code in eagerly.
 // Re-imports from MessageContent.vue / src/lib/markdown.ts are
 // module-cache no-ops.
-import "./lexical/prismExtraLanguages";
-import { createPinia } from "pinia";
-import PrimeVue from "primevue/config";
-import ToastService from "primevue/toastservice";
-import ConfirmationService from "primevue/confirmationservice";
-import Aura from "@primeuix/themes/aura";
-import { definePreset } from "@primeuix/themes";
-import "primeicons/primeicons.css";
-import "dockview-vue/dist/styles/dockview.css";
-import "./style.css";
-import "./lexical/lexical.css";
+import './lexical/prismExtraLanguages';
+import { createPinia } from 'pinia';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
+import ConfirmationService from 'primevue/confirmationservice';
+import Aura from '@primeuix/themes/aura';
+import { definePreset } from '@primeuix/themes';
+import 'primeicons/primeicons.css';
+import 'dockview-vue/dist/styles/dockview.css';
+import './style.css';
+import './lexical/lexical.css';
 // KaTeX styles for math rendering inside MessageContent.vue (the
 // markdown-it-texmath plugin emits HTML that depends on these classes).
 // ~80 KB minified; only paid once.
-import "katex/dist/katex.min.css";
-import App from "./App.vue";
-import ChatPanel from "./components/ChatPanel.vue";
-import ChatTab from "./components/ChatTab.vue";
-import ChatTabActions from "./components/ChatTabActions.vue";
-import JobsPanel from "./components/JobsPanel.vue";
-import LibraryPanel from "./components/LibraryPanel.vue";
-import LogViewer from "./components/LogViewer.vue";
-import SessionDetailsPanel from "./components/SessionDetailsPanel.vue";
-import SessionsManager from "./components/SessionsManager.vue";
-import SettingsPanel from "./components/SettingsPanel.vue";
-import SidebarTab from "./components/SidebarTab.vue";
-import TerminalPanel from "./components/TerminalPanel.vue";
-import TerminalsPanel from "./components/TerminalsPanel.vue";
-import Watermark from "./components/Watermark.vue";
-import { setRpcBridge } from "./ipc/invoke";
-import { createElectrobunBridge } from "./ipc/electrobunBridge";
-import { createWebSocketBridge } from "./ipc/wsBridge";
-import { installRendererLogBridge } from "./ipc/rendererLog";
-import { toErrorMessage } from "./lib/errorMessage";
+import 'katex/dist/katex.min.css';
+import App from './App.vue';
+import ChatPanel from './components/ChatPanel.vue';
+import ChatTab from './components/ChatTab.vue';
+import ChatTabActions from './components/ChatTabActions.vue';
+import JobsPanel from './components/JobsPanel.vue';
+import LibraryPanel from './components/LibraryPanel.vue';
+import LogViewer from './components/LogViewer.vue';
+import SessionDetailsPanel from './components/SessionDetailsPanel.vue';
+import SessionsManager from './components/SessionsManager.vue';
+import SettingsPanel from './components/SettingsPanel.vue';
+import SidebarTab from './components/SidebarTab.vue';
+import TerminalPanel from './components/TerminalPanel.vue';
+import TerminalsPanel from './components/TerminalsPanel.vue';
+import Watermark from './components/Watermark.vue';
+import { setRpcBridge } from './ipc/invoke';
+import { createElectrobunBridge } from './ipc/electrobunBridge';
+import { createWebSocketBridge } from './ipc/wsBridge';
+import { installRendererLogBridge } from './ipc/rendererLog';
+import { toErrorMessage } from './lib/errorMessage';
 
 const GreenAura = definePreset(Aura, {
   semantic: {
     primary: {
-      50: "{emerald.50}",
-      100: "{emerald.100}",
-      200: "{emerald.200}",
-      300: "{emerald.300}",
-      400: "{emerald.400}",
-      500: "{emerald.500}",
-      600: "{emerald.600}",
-      700: "{emerald.700}",
-      800: "{emerald.800}",
-      900: "{emerald.900}",
-      950: "{emerald.950}",
+      50: '{emerald.50}',
+      100: '{emerald.100}',
+      200: '{emerald.200}',
+      300: '{emerald.300}',
+      400: '{emerald.400}',
+      500: '{emerald.500}',
+      600: '{emerald.600}',
+      700: '{emerald.700}',
+      800: '{emerald.800}',
+      900: '{emerald.900}',
+      950: '{emerald.950}',
     },
   },
 });
@@ -71,18 +71,16 @@ const GreenAura = definePreset(Aura, {
 // loading with `?testBridge=ws://host:port` which switches to the
 // WebSocket transport (used by the real-E2E harness in `e2e/full/`).
 type TestBridgeWindow = Window & {
-  __DAFMAN_TEST_RPC__?: import("./ipc/invoke").RpcBridge;
+  __DAFMAN_TEST_RPC__?: import('./ipc/invoke').RpcBridge;
 };
 const testBridge =
-  typeof window !== "undefined"
-    ? (window as TestBridgeWindow).__DAFMAN_TEST_RPC__
-    : undefined;
+  typeof window !== 'undefined' ? (window as TestBridgeWindow).__DAFMAN_TEST_RPC__ : undefined;
 
-function pickBridge(): import("./ipc/invoke").RpcBridge {
+function pickBridge(): import('./ipc/invoke').RpcBridge {
   if (testBridge) return testBridge;
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
-    const wsUrl = params.get("testBridge");
+    const wsUrl = params.get('testBridge');
     if (wsUrl) return createWebSocketBridge(wsUrl);
   }
   return createElectrobunBridge().bridge;
@@ -109,7 +107,7 @@ async function mountWith(Root: typeof App) {
     const componentName =
       (instance?.$options?.name as string | undefined) ??
       (instance?.$options?.__name as string | undefined) ??
-      "<unknown>";
+      '<unknown>';
     const message = toErrorMessage(err);
     const stack = err instanceof Error ? err.stack : undefined;
     // Single log path via the console interceptor (one bun log entry,
@@ -121,7 +119,7 @@ async function mountWith(Root: typeof App) {
     theme: {
       preset: GreenAura,
       options: {
-        darkModeSelector: ".app-dark",
+        darkModeSelector: '.app-dark',
       },
     },
   });
@@ -133,24 +131,24 @@ async function mountWith(Root: typeof App) {
   // every consumer (App.vue, Playground if it ever uses dockview, …)
   // can refer to them by name in `addPanel({ component })` and the
   // `watermark-component` prop.
-  app.component("chat", ChatPanel);
-  app.component("jobsPanel", JobsPanel);
-  app.component("library", LibraryPanel);
-  app.component("sessionDetails", SessionDetailsPanel);
-  app.component("sessionsManager", SessionsManager);
-  app.component("settingsPanel", SettingsPanel);
-  app.component("logViewer", LogViewer);
-  app.component("terminal", TerminalPanel);
-  app.component("terminalsPanel", TerminalsPanel);
-  app.component("watermark", Watermark);
-  app.component("chatTabActions", ChatTabActions);
-  app.component("chatTab", ChatTab);
-  app.component("sidebarTab", SidebarTab);
+  app.component('chat', ChatPanel);
+  app.component('jobsPanel', JobsPanel);
+  app.component('library', LibraryPanel);
+  app.component('sessionDetails', SessionDetailsPanel);
+  app.component('sessionsManager', SessionsManager);
+  app.component('settingsPanel', SettingsPanel);
+  app.component('logViewer', LogViewer);
+  app.component('terminal', TerminalPanel);
+  app.component('terminalsPanel', TerminalsPanel);
+  app.component('watermark', Watermark);
+  app.component('chatTabActions', ChatTabActions);
+  app.component('chatTab', ChatTab);
+  app.component('sidebarTab', SidebarTab);
   if (import.meta.env.DEV) {
-    const mod = await import("./dev/Playground.vue");
-    app.component("playground", mod.default);
+    const mod = await import('./dev/Playground.vue');
+    app.component('playground', mod.default);
   }
-  app.mount("#app");
+  app.mount('#app');
 }
 
 void mountWith(App);

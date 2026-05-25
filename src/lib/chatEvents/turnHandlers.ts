@@ -9,24 +9,24 @@
 // `assistant.intent` is a short "what I'm doing now" hint surfaced
 // above the streaming bubble; cleared on turn_end.
 
-import { pickString } from "./helpers";
-import type { Handler } from "./context";
+import { pickString } from './helpers';
+import type { Handler } from './context';
 
 export const turnHandlers: Record<string, Handler> = {
-  "assistant.turn_start": (ctx) => {
+  'assistant.turn_start': (ctx) => {
     ctx.ambient.turnActive = true;
     ctx.ambient.sawTurnBoundary = true;
     ctx.ambient.intent = null;
   },
 
-  "assistant.turn_end": (ctx) => {
+  'assistant.turn_end': (ctx) => {
     ctx.ambient.turnActive = false;
     ctx.ambient.sawTurnBoundary = true;
     ctx.ambient.intent = null;
   },
 
-  "assistant.intent": (ctx, data) => {
-    const intent = pickString(data, ["intent"]);
+  'assistant.intent': (ctx, data) => {
+    const intent = pickString(data, ['intent']);
     if (intent) ctx.ambient.intent = intent;
   },
 };

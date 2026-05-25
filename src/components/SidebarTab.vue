@@ -8,8 +8,8 @@
 // get `{ params, api, containerApi }` at the top level, on any later
 // `update()` everything is re-wrapped into a single `params` prop.
 
-import { computed, onBeforeUnmount, ref, watchEffect } from "vue";
-import type { DockviewPanelApi } from "dockview-core";
+import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
+import type { DockviewPanelApi } from 'dockview-core';
 
 type WrappedParams = {
   params?: Record<string, unknown>;
@@ -21,14 +21,12 @@ const props = defineProps<{
   api?: DockviewPanelApi;
 }>();
 
-const panelApi = computed<DockviewPanelApi | undefined>(
-  () => props.api ?? props.params?.api,
-);
+const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
 
 /// Reactive mirror of `api.title` — dockview emits `onDidTitleChange`
 /// when the title is updated via `setTitle`, so a one-time read of
 /// `api.title` would miss later changes.
-const title = ref<string>(panelApi.value?.title ?? "");
+const title = ref<string>(panelApi.value?.title ?? '');
 const isActive = ref<boolean>(panelApi.value?.isActive ?? false);
 
 let unsubTitle: (() => void) | null = null;
@@ -37,12 +35,12 @@ let unsubActive: (() => void) | null = null;
 watchEffect((onCleanup) => {
   const api = panelApi.value;
   if (!api) return;
-  title.value = api.title ?? "";
+  title.value = api.title ?? '';
   isActive.value = api.isActive;
   unsubTitle?.();
   unsubActive?.();
   const titleSub = api.onDidTitleChange((e) => {
-    title.value = e.title ?? "";
+    title.value = e.title ?? '';
   });
   const activeSub = api.onDidActiveChange(() => {
     isActive.value = api.isActive;
@@ -72,7 +70,11 @@ function onClose(event: MouseEvent) {
 </script>
 
 <template>
-  <div class="sidebar-tab" :class="{ 'is-active': isActive }" :title="title">
+  <div
+    class="sidebar-tab"
+    :class="{ 'is-active': isActive }"
+    :title="title"
+  >
     <span class="sidebar-tab-title">{{ title }}</span>
     <button
       type="button"
@@ -81,7 +83,10 @@ function onClose(event: MouseEvent) {
       @pointerdown.stop
       @click="onClose"
     >
-      <i class="pi pi-times" aria-hidden="true" />
+      <i
+        class="pi pi-times"
+        aria-hidden="true"
+      />
     </button>
   </div>
 </template>
@@ -133,7 +138,10 @@ function onClose(event: MouseEvent) {
   font-size: 0.75rem;
   cursor: pointer;
   opacity: 0.7;
-  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .sidebar-tab:hover .sidebar-tab-close,

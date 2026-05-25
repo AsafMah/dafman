@@ -7,19 +7,16 @@
 // trim. This pins both invariants so a future store refactor can't
 // silently let the buffer grow unbounded again.
 
-import { describe, expect, test, beforeEach } from "bun:test";
-import { setActivePinia, createPinia } from "pinia";
-import {
-  useSessionsStore,
-  MAX_EVENTS_PER_SESSION,
-} from "../../stores/sessionsStore";
-import type { SessionRecord } from "../../stores/sessionsStore";
-import type { SessionEventPayload } from "../../ipc/types";
+import { describe, expect, test, beforeEach } from 'bun:test';
+import { setActivePinia, createPinia } from 'pinia';
+import { useSessionsStore, MAX_EVENTS_PER_SESSION } from '../../stores/sessionsStore';
+import type { SessionRecord } from '../../stores/sessionsStore';
+import type { SessionEventPayload } from '../../ipc/types';
 
 function makeRecord(id: string): SessionRecord {
   return {
     id,
-    accent: "#000",
+    accent: '#000',
     events: [],
     droppedEventCount: 0,
     model: null,
@@ -27,9 +24,9 @@ function makeRecord(id: string): SessionRecord {
     title: null,
     mode: null,
     approveAll: false,
-    reasoningVisibilityOverride: "default",
+    reasoningVisibilityOverride: 'default',
     workingDirectory: null,
-    defaultSendMode: "steer",
+    defaultSendMode: 'steer',
     pendingRequests: [],
     unseenTurns: 0,
     isThinking: false,
@@ -47,33 +44,32 @@ function makeRecord(id: string): SessionRecord {
 function makeEvent(i: number, sid: string): SessionEventPayload {
   return {
     sessionId: sid,
-    eventType: "system.notification",
+    eventType: 'system.notification',
     data: { seq: i },
   };
 }
 
-describe("sessionsStore — bounded events", () => {
+describe('sessionsStore — bounded events', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  test("appendEvent pushes below the cap without trimming", () => {
+  test('appendEvent pushes below the cap without trimming', () => {
     const sessions = useSessionsStore();
-    const rec = makeRecord("s1");
+    const rec = makeRecord('s1');
     sessions.sessions.push(rec);
-    for (let i = 0; i < 10; i++) sessions.appendEvent(rec, makeEvent(i, "s1"));
+    for (let i = 0; i < 10; i++) sessions.appendEvent(rec, makeEvent(i, 's1'));
     expect(rec.events.length).toBe(10);
     expect(rec.droppedEventCount).toBe(0);
   });
 
-  test("appendEvent trims the front and bumps droppedEventCount past the cap", () => {
+  test('appendEvent trims the front and bumps droppedEventCount past the cap', () => {
     const sessions = useSessionsStore();
-    const rec = makeRecord("s1");
+    const rec = makeRecord('s1');
     sessions.sessions.push(rec);
     const overflow = 25;
     const total = MAX_EVENTS_PER_SESSION + overflow;
-    for (let i = 0; i < total; i++)
-      sessions.appendEvent(rec, makeEvent(i, "s1"));
+    for (let i = 0; i < total; i++) sessions.appendEvent(rec, makeEvent(i, 's1'));
     expect(rec.events.length).toBe(MAX_EVENTS_PER_SESSION);
     expect(rec.droppedEventCount).toBe(overflow);
     // The earliest still-kept event must be `overflow` — the front
@@ -85,20 +81,18 @@ describe("sessionsStore — bounded events", () => {
     expect(last?.seq).toBe(total - 1);
   });
 
-  test("absolute progress = droppedEventCount + events.length stays monotonic across trims", () => {
+  test('absolute progress = droppedEventCount + events.length stays monotonic across trims', () => {
     const sessions = useSessionsStore();
-    const rec = makeRecord("s1");
+    const rec = makeRecord('s1');
     sessions.sessions.push(rec);
     let prev = 0;
     for (let i = 0; i < MAX_EVENTS_PER_SESSION + 200; i++) {
-      sessions.appendEvent(rec, makeEvent(i, "s1"));
+      sessions.appendEvent(rec, makeEvent(i, 's1'));
       const abs = rec.droppedEventCount + rec.events.length;
       expect(abs).toBe(prev + 1);
       prev = abs;
     }
     // Total absolute progress matches total pushes.
-    expect(rec.droppedEventCount + rec.events.length).toBe(
-      MAX_EVENTS_PER_SESSION + 200,
-    );
+    expect(rec.droppedEventCount + rec.events.length).toBe(MAX_EVENTS_PER_SESSION + 200);
   });
 });

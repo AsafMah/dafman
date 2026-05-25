@@ -4,7 +4,7 @@
 // Falls back to a single muted code block when the URL doesn't
 // parse — defensive against odd CLI inputs.
 
-import { computed } from "vue";
+import { computed } from 'vue';
 
 const props = defineProps<{ url: string }>();
 
@@ -13,7 +13,7 @@ const parts = computed(() => {
     const p = new URL(props.url);
     return {
       origin: `${p.protocol}//${p.host}`,
-      path: p.pathname || "/",
+      path: p.pathname || '/',
       search: p.search,
       hash: p.hash,
     };
@@ -25,11 +25,22 @@ const parts = computed(() => {
 
 <template>
   <span class="url-chip">
-    <i class="pi pi-external-link url-chip-icon" aria-hidden="true" />
-    <span v-if="parts" class="url-chip-parts">
-      <span class="url-chip-origin">{{ parts.origin }}</span><span class="url-chip-path">{{ parts.path }}{{ parts.search }}{{ parts.hash }}</span>
+    <i
+      class="pi pi-external-link url-chip-icon"
+      aria-hidden="true"
+    />
+    <span
+      v-if="parts"
+      class="url-chip-parts"
+    >
+      <span class="url-chip-origin">{{ parts.origin }}</span
+      ><span class="url-chip-path">{{ parts.path }}{{ parts.search }}{{ parts.hash }}</span>
     </span>
-    <code v-else class="url-chip-raw">{{ url }}</code>
+    <code
+      v-else
+      class="url-chip-raw"
+      >{{ url }}</code
+    >
   </span>
 </template>
 

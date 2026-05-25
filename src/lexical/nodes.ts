@@ -7,13 +7,13 @@
 // can promote a paragraph to a heading/list/etc. as the user types) and
 // the read-only display (so streamed assistant markdown renders).
 
-import { CodeNode, CodeHighlightNode } from "@lexical/code";
-import { LinkNode } from "@lexical/link";
-import { ListItemNode, ListNode } from "@lexical/list";
-import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import type { Klass, LexicalNode } from "lexical";
-import { HorizontalRuleNode } from "lexical-vue/LexicalHorizontalRuleNode";
-import { AttachmentNode } from "./AttachmentNode";
+import { CodeNode, CodeHighlightNode } from '@lexical/code';
+import { LinkNode } from '@lexical/link';
+import { ListItemNode, ListNode } from '@lexical/list';
+import { HeadingNode, QuoteNode } from '@lexical/rich-text';
+import type { Klass, LexicalNode } from 'lexical';
+import { HorizontalRuleNode } from 'lexical-vue/LexicalHorizontalRuleNode';
+import { AttachmentNode } from './AttachmentNode';
 
 export const markdownNodes: ReadonlyArray<Klass<LexicalNode>> = [
   HeadingNode,
@@ -26,4 +26,3 @@ export const markdownNodes: ReadonlyArray<Klass<LexicalNode>> = [
   HorizontalRuleNode,
   AttachmentNode,
 ];
-

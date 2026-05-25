@@ -1,29 +1,27 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useTerminalStore } from "../stores/terminalStore";
-import { useToastStore } from "../stores/toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useTerminalStore } from '../stores/terminalStore';
+import { useToastStore } from '../stores/toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const terminalStore = useTerminalStore();
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
 
-const shell = ref("");
-const args = ref("");
-const cwd = ref("");
+const shell = ref('');
+const args = ref('');
+const cwd = ref('');
 
 const terminals = computed(() =>
   [...terminalStore.terminals].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
 );
 
-const activeSession = computed(() =>
-  sessionsStore.getSession(layoutStore.activeSessionId),
-);
+const activeSession = computed(() => sessionsStore.getSession(layoutStore.activeSessionId));
 
 function splitArgs(value: string): string[] {
   return value
@@ -34,7 +32,9 @@ function splitArgs(value: string): string[] {
 
 async function createTerminal(useSessionCwd = false): Promise<void> {
   try {
-    const sessionCwd = useSessionCwd ? activeSession.value?.workingDirectory ?? undefined : undefined;
+    const sessionCwd = useSessionCwd
+      ? (activeSession.value?.workingDirectory ?? undefined)
+      : undefined;
     const summary = await terminalStore.createTerminal({
       cols: 80,
       rows: 24,
@@ -42,11 +42,11 @@ async function createTerminal(useSessionCwd = false): Promise<void> {
       ...(args.value.trim() ? { args: splitArgs(args.value) } : {}),
       ...(cwd.value.trim() || sessionCwd ? { cwd: cwd.value.trim() || sessionCwd } : {}),
       ...(useSessionCwd && activeSession.value ? { sessionId: activeSession.value.id } : {}),
-      title: shell.value.trim() || (useSessionCwd ? "Session Terminal" : "Terminal"),
+      title: shell.value.trim() || (useSessionCwd ? 'Session Terminal' : 'Terminal'),
     });
     layoutStore.addTerminalPanel(summary.id, summary.title);
   } catch (err) {
-    toasts.error("Failed to create terminal", toErrorMessage(err));
+    toasts.error('Failed to create terminal', toErrorMessage(err));
   }
 }
 
@@ -61,7 +61,7 @@ function displayCwd(terminalId: string, fallback: string): string {
 function activeCommandLabel(terminalId: string): string | null {
   const active = terminalStore.activeCommands[terminalId];
   if (!active) return null;
-  return active.command ? `Running: ${active.command}` : "Running command";
+  return active.command ? `Running: ${active.command}` : 'Running command';
 }
 
 function recentCommands(terminalId: string) {
@@ -71,7 +71,7 @@ function recentCommands(terminalId: string) {
 async function copyCommand(command: string | undefined): Promise<void> {
   if (!command) return;
   await navigator.clipboard.writeText(command);
-  toasts.success("Command copied");
+  toasts.success('Command copied');
 }
 </script>
 
@@ -80,7 +80,7 @@ async function copyCommand(command: string | undefined): Promise<void> {
     <header class="terminals-header">
       <div>
         <h2>Terminals</h2>
-        <p>{{ terminals.length }} terminal{{ terminals.length === 1 ? "" : "s" }}</p>
+        <p>{{ terminals.length }} terminal{{ terminals.length === 1 ? '' : 's' }}</p>
       </div>
       <Button
         icon="pi pi-refresh"
@@ -96,18 +96,35 @@ async function copyCommand(command: string | undefined): Promise<void> {
       <h3>New terminal</h3>
       <label class="field">
         <span>Command</span>
-        <InputText v-model="shell" size="small" placeholder="Platform default" />
+        <InputText
+          v-model="shell"
+          size="small"
+          placeholder="Platform default"
+        />
       </label>
       <label class="field">
         <span>Args</span>
-        <InputText v-model="args" size="small" placeholder="-NoLogo" />
+        <InputText
+          v-model="args"
+          size="small"
+          placeholder="-NoLogo"
+        />
       </label>
       <label class="field">
         <span>CWD</span>
-        <InputText v-model="cwd" size="small" placeholder="Current app directory" />
+        <InputText
+          v-model="cwd"
+          size="small"
+          placeholder="Current app directory"
+        />
       </label>
       <div class="create-actions">
-        <Button label="New" icon="pi pi-plus" size="small" @click="createTerminal(false)" />
+        <Button
+          label="New"
+          icon="pi pi-plus"
+          size="small"
+          @click="createTerminal(false)"
+        />
         <Button
           label="From session"
           icon="pi pi-folder-open"
@@ -120,21 +137,38 @@ async function copyCommand(command: string | undefined): Promise<void> {
     </section>
 
     <ul class="terminal-list">
-      <li v-for="terminal in terminals" :key="terminal.id" class="terminal-row">
+      <li
+        v-for="terminal in terminals"
+        :key="terminal.id"
+        class="terminal-row"
+      >
         <div class="terminal-main">
-          <i class="pi pi-window-maximize" aria-hidden="true" />
+          <i
+            class="pi pi-window-maximize"
+            aria-hidden="true"
+          />
           <div class="terminal-text">
             <strong>{{ terminal.title }}</strong>
-            <span>{{ terminal.shell }} {{ terminal.args.join(" ") }}</span>
+            <span>{{ terminal.shell }} {{ terminal.args.join(' ') }}</span>
             <small>{{ displayCwd(terminal.id, terminal.cwd) }}</small>
-            <small v-if="activeCommandLabel(terminal.id)" class="terminal-command">
+            <small
+              v-if="activeCommandLabel(terminal.id)"
+              class="terminal-command"
+            >
               {{ activeCommandLabel(terminal.id) }}
             </small>
-            <small v-if="terminalStore.droppedCommandCounts[terminal.id]" class="terminal-history-note">
+            <small
+              v-if="terminalStore.droppedCommandCounts[terminal.id]"
+              class="terminal-history-note"
+            >
               {{ terminalStore.droppedCommandCounts[terminal.id] }} older commands elided
             </small>
           </div>
-          <span class="terminal-status" :class="`status-${terminal.status}`">{{ terminal.status }}</span>
+          <span
+            class="terminal-status"
+            :class="`status-${terminal.status}`"
+            >{{ terminal.status }}</span
+          >
         </div>
         <div class="terminal-actions">
           <Button
@@ -154,14 +188,20 @@ async function copyCommand(command: string | undefined): Promise<void> {
             @click="terminalStore.killTerminal(terminal.id)"
           />
         </div>
-        <details v-if="recentCommands(terminal.id).length" class="command-history">
+        <details
+          v-if="recentCommands(terminal.id).length"
+          class="command-history"
+        >
           <summary>Recent commands</summary>
           <ul>
-            <li v-for="command in recentCommands(terminal.id)" :key="command.id">
+            <li
+              v-for="command in recentCommands(terminal.id)"
+              :key="command.id"
+            >
               <span class="command-meta">
-                {{ command.exitCode === undefined ? "?" : command.exitCode }}
+                {{ command.exitCode === undefined ? '?' : command.exitCode }}
               </span>
-              <code>{{ command.command || "Command line unavailable" }}</code>
+              <code>{{ command.command || 'Command line unavailable' }}</code>
               <Button
                 v-if="command.command"
                 icon="pi pi-copy"
@@ -177,7 +217,12 @@ async function copyCommand(command: string | undefined): Promise<void> {
       </li>
     </ul>
 
-    <p v-if="terminals.length === 0" class="empty">No terminals yet.</p>
+    <p
+      v-if="terminals.length === 0"
+      class="empty"
+    >
+      No terminals yet.
+    </p>
   </section>
 </template>
 

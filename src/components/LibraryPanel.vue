@@ -9,27 +9,27 @@
 /// Each tab body is its own component so loading / state stays
 /// scoped — switching tabs doesn't re-fetch the other tab's data.
 
-import { onBeforeUnmount, onMounted, ref } from "vue";
-import Tabs from "primevue/tabs";
-import TabList from "primevue/tablist";
-import Tab from "primevue/tab";
-import TabPanels from "primevue/tabpanels";
-import TabPanel from "primevue/tabpanel";
-import LibraryMcpTab from "./LibraryMcpTab.vue";
-import LibraryToolsTab from "./LibraryToolsTab.vue";
-import LibrarySkillsTab from "./LibrarySkillsTab.vue";
-import LibraryAgentsTab from "./LibraryAgentsTab.vue";
-import LibraryInstructionsTab from "./LibraryInstructionsTab.vue";
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
+import TabPanel from 'primevue/tabpanel';
+import LibraryMcpTab from './LibraryMcpTab.vue';
+import LibraryToolsTab from './LibraryToolsTab.vue';
+import LibrarySkillsTab from './LibrarySkillsTab.vue';
+import LibraryAgentsTab from './LibraryAgentsTab.vue';
+import LibraryInstructionsTab from './LibraryInstructionsTab.vue';
 
 // Persist the last-active tab across panel re-mounts so toggling the
 // activity bar doesn't lose the user's place.
-const STORAGE_KEY = "dafman.library.activeTab";
+const STORAGE_KEY = 'dafman.library.activeTab';
 function readActiveTab(): string {
-  if (typeof localStorage === "undefined") return "mcp";
+  if (typeof localStorage === 'undefined') return 'mcp';
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? "mcp";
+    return localStorage.getItem(STORAGE_KEY) ?? 'mcp';
   } catch {
-    return "mcp";
+    return 'mcp';
   }
 }
 const activeTab = ref<string>(readActiveTab());
@@ -53,10 +53,10 @@ function onActivateRequest(e: Event) {
   if (detail?.tab) onTabChange(detail.tab);
 }
 onMounted(() => {
-  window.addEventListener("dafman:library-activate-tab", onActivateRequest);
+  window.addEventListener('dafman:library-activate-tab', onActivateRequest);
 });
 onBeforeUnmount(() => {
-  window.removeEventListener("dafman:library-activate-tab", onActivateRequest);
+  window.removeEventListener('dafman:library-activate-tab', onActivateRequest);
 });
 </script>
 
@@ -65,7 +65,11 @@ onBeforeUnmount(() => {
     <header class="library-header">
       <span class="library-title">Library</span>
     </header>
-    <Tabs :value="activeTab" @update:value="onTabChange" class="library-tabs">
+    <Tabs
+      :value="activeTab"
+      @update:value="onTabChange"
+      class="library-tabs"
+    >
       <TabList>
         <Tab value="mcp">MCP</Tab>
         <Tab value="tools">Tools</Tab>

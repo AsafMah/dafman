@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { storeToRefs } from "pinia";
-import Button from "primevue/button";
-import ToggleSwitch from "primevue/toggleswitch";
-import { invokeCommand } from "../ipc/invoke";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useToastStore } from "../stores/toastStore";
-import MessageContent from "./MessageContent.vue";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import Button from 'primevue/button';
+import ToggleSwitch from 'primevue/toggleswitch';
+import { invokeCommand } from '../ipc/invoke';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useToastStore } from '../stores/toastStore';
+import MessageContent from './MessageContent.vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 type ToolItem = { name: string; description: string; namespacedName?: string };
 type ToolGroup = { label: string; items: ToolItem[] };
@@ -33,13 +33,13 @@ const groups = computed<ToolGroup[]>(() => {
       builtins.push(tool);
       continue;
     }
-    const prefix = tool.namespacedName.split("/")[0] || "namespaced";
+    const prefix = tool.namespacedName.split('/')[0] || 'namespaced';
     const list = byPrefix.get(prefix) ?? [];
     list.push(tool);
     byPrefix.set(prefix, list);
   }
   const out: ToolGroup[] = [];
-  if (builtins.length > 0) out.push({ label: "Built-in", items: builtins });
+  if (builtins.length > 0) out.push({ label: 'Built-in', items: builtins });
   for (const prefix of [...byPrefix.keys()].sort()) {
     out.push({ label: prefix, items: byPrefix.get(prefix) ?? [] });
   }
@@ -50,7 +50,7 @@ async function load() {
   error.value = null;
   loaded.value = false;
   try {
-    tools.value = await invokeCommand("listBuiltinTools", {});
+    tools.value = await invokeCommand('listBuiltinTools', {});
     loaded.value = true;
   } catch (err) {
     error.value = toErrorMessage(err);
@@ -74,8 +74,8 @@ async function setToolEnabled(tool: ToolItem, enabled: boolean) {
     },
   });
   toasts.info(
-    "Tool defaults updated",
-    "Restart or recreate sessions to apply global tool changes.",
+    'Tool defaults updated',
+    'Restart or recreate sessions to apply global tool changes.',
   );
 }
 
@@ -88,8 +88,8 @@ async function setAll(enabled: boolean) {
     },
   });
   toasts.info(
-    enabled ? "All tools enabled by default" : "All tools disabled by default",
-    "Restart or recreate sessions to apply global tool changes.",
+    enabled ? 'All tools enabled by default' : 'All tools disabled by default',
+    'Restart or recreate sessions to apply global tool changes.',
   );
 }
 
@@ -112,8 +112,19 @@ onMounted(() => {
 <template>
   <div class="tools-tab">
     <div class="tab-actions">
-      <Button label="Enable all" size="small" severity="secondary" @click="setAll(true)" />
-      <Button label="Disable all" size="small" severity="secondary" text @click="setAll(false)" />
+      <Button
+        label="Enable all"
+        size="small"
+        severity="secondary"
+        @click="setAll(true)"
+      />
+      <Button
+        label="Disable all"
+        size="small"
+        severity="secondary"
+        text
+        @click="setAll(false)"
+      />
       <Button
         icon="pi pi-refresh"
         size="small"
@@ -125,16 +136,34 @@ onMounted(() => {
       />
     </div>
     <p class="hint">
-      Global tool toggles apply to newly-created sessions. Existing sessions keep
-      their current SDK tool registry.
+      Global tool toggles apply to newly-created sessions. Existing sessions keep their current SDK
+      tool registry.
     </p>
-    <div v-if="!loaded" class="empty-hint">Loading…</div>
-    <div v-else-if="error" class="empty-hint error">{{ error }}</div>
+    <div
+      v-if="!loaded"
+      class="empty-hint"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="error"
+      class="empty-hint error"
+    >
+      {{ error }}
+    </div>
     <template v-else>
-      <section v-for="group in groups" :key="group.label" class="tool-group">
+      <section
+        v-for="group in groups"
+        :key="group.label"
+        class="tool-group"
+      >
         <h3 class="tool-group-title">{{ group.label }} ({{ group.items.length }})</h3>
         <ul class="tool-list">
-          <li v-for="tool in group.items" :key="toolKey(tool)" class="tool-row">
+          <li
+            v-for="tool in group.items"
+            :key="toolKey(tool)"
+            class="tool-row"
+          >
             <button
               type="button"
               class="tool-name-button"
@@ -149,15 +178,25 @@ onMounted(() => {
                 aria-hidden="true"
               />
               <span class="tool-name">{{ tool.name }}</span>
-              <small v-if="tool.namespacedName" class="tool-tag">{{ tool.namespacedName }}</small>
+              <small
+                v-if="tool.namespacedName"
+                class="tool-tag"
+                >{{ tool.namespacedName }}</small
+              >
             </button>
             <ToggleSwitch
               :model-value="isEnabled(tool)"
               :aria-label="`Enable tool ${tool.name}`"
               @update:model-value="(value: boolean) => setToolEnabled(tool, value)"
             />
-            <div v-if="tool.description && isExpanded(toolKey(tool))" class="tool-desc">
-              <MessageContent :text="tool.description" label="Tool description" />
+            <div
+              v-if="tool.description && isExpanded(toolKey(tool))"
+              class="tool-desc"
+            >
+              <MessageContent
+                :text="tool.description"
+                label="Tool description"
+              />
             </div>
           </li>
         </ul>

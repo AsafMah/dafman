@@ -9,21 +9,21 @@
 /// `data.views` so dockview doesn't error on a dangling reference.
 /// Other fields are left untouched. Pure: never mutates the input.
 export function stripPanelFromLayout(layout: unknown, panelId: string): unknown {
-  if (!layout || typeof layout !== "object") return layout;
+  if (!layout || typeof layout !== 'object') return layout;
   const obj = layout as Record<string, unknown>;
   const panels = obj.panels;
-  if (!panels || typeof panels !== "object") return layout;
+  if (!panels || typeof panels !== 'object') return layout;
   if (!Object.prototype.hasOwnProperty.call(panels, panelId)) return layout;
   const nextPanels: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(panels as Record<string, unknown>)) {
     if (k !== panelId) nextPanels[k] = v;
   }
   const stripViews = (node: unknown): unknown => {
-    if (!node || typeof node !== "object") return node;
+    if (!node || typeof node !== 'object') return node;
     if (Array.isArray(node)) return node.map(stripViews);
     const next: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-      if (k === "views" && Array.isArray(v)) {
+      if (k === 'views' && Array.isArray(v)) {
         next[k] = (v as unknown[]).filter((x) => x !== panelId);
       } else {
         next[k] = stripViews(v);
@@ -41,14 +41,14 @@ export function stripPanelFromLayout(layout: unknown, panelId: string): unknown 
 /// (e.g. after a per-session → singleton migration that strips them
 /// all). Returns the input as-is when no changes are needed.
 export function collapseEmptyEdgeGroups(layout: unknown): unknown {
-  if (!layout || typeof layout !== "object") return layout;
+  if (!layout || typeof layout !== 'object') return layout;
   const obj = layout as Record<string, unknown>;
   const edgeGroups = obj.edgeGroups;
-  if (!edgeGroups || typeof edgeGroups !== "object") return layout;
+  if (!edgeGroups || typeof edgeGroups !== 'object') return layout;
   const nextEdge: Record<string, unknown> = {};
   let changed = false;
   for (const [pos, entry] of Object.entries(edgeGroups as Record<string, unknown>)) {
-    if (!entry || typeof entry !== "object") {
+    if (!entry || typeof entry !== 'object') {
       nextEdge[pos] = entry;
       continue;
     }
@@ -74,13 +74,13 @@ export function collapseEmptyEdgeGroups(layout: unknown): unknown {
 /// before this commit carries N legacy panels that need to be
 /// dropped before fromJSON to avoid orphan tabs in the right rail.
 export function stripLegacyDetailsPanels(layout: unknown): unknown {
-  if (!layout || typeof layout !== "object") return layout;
+  if (!layout || typeof layout !== 'object') return layout;
   const panels = (layout as { panels?: unknown }).panels;
-  if (!panels || typeof panels !== "object") return layout;
+  if (!panels || typeof panels !== 'object') return layout;
   const legacyIds: string[] = [];
   for (const id of Object.keys(panels as Record<string, unknown>)) {
-    if (id === "session-details") continue;
-    if (id.startsWith("session-details-")) legacyIds.push(id);
+    if (id === 'session-details') continue;
+    if (id.startsWith('session-details-')) legacyIds.push(id);
   }
   let next: unknown = layout;
   for (const id of legacyIds) {
@@ -91,14 +91,14 @@ export function stripLegacyDetailsPanels(layout: unknown): unknown {
 
 const EDGE_MINIMUMS: Record<string, Record<string, number>> = {
   left: {
-    "sessions-manager": 180,
-    "settings-panel": 380,
+    'sessions-manager': 180,
+    'settings-panel': 380,
     library: 320,
-    "jobs-panel": 380,
-    "log-viewer": 420,
+    'jobs-panel': 380,
+    'log-viewer': 420,
   },
   right: {
-    "session-details": 380,
+    'session-details': 380,
   },
 };
 
@@ -107,14 +107,14 @@ const EDGE_MINIMUMS: Record<string, Record<string, number>> = {
 /// the rail visibly start cut off before runtime repair can catch up.
 /// Clamp known edge-group sizes before `fromJSON()`.
 export function enforcePersistedEdgeMinimums(layout: unknown): unknown {
-  if (!layout || typeof layout !== "object") return layout;
+  if (!layout || typeof layout !== 'object') return layout;
   const obj = layout as Record<string, unknown>;
   const edgeGroups = obj.edgeGroups;
-  if (!edgeGroups || typeof edgeGroups !== "object") return layout;
+  if (!edgeGroups || typeof edgeGroups !== 'object') return layout;
   let changed = false;
   const nextEdge: Record<string, unknown> = {};
   for (const [pos, entry] of Object.entries(edgeGroups as Record<string, unknown>)) {
-    if (!entry || typeof entry !== "object") {
+    if (!entry || typeof entry !== 'object') {
       nextEdge[pos] = entry;
       continue;
     }
@@ -122,10 +122,10 @@ export function enforcePersistedEdgeMinimums(layout: unknown): unknown {
     const group = e.group as { views?: unknown[] } | undefined;
     const views = Array.isArray(group?.views) ? group.views : [];
     const minimum = views.reduce<number>((max, view) => {
-      if (typeof view !== "string") return max;
+      if (typeof view !== 'string') return max;
       return Math.max(max, EDGE_MINIMUMS[pos]?.[view] ?? 0);
     }, 0);
-    if (minimum > 0 && typeof e.size === "number" && e.size < minimum) {
+    if (minimum > 0 && typeof e.size === 'number' && e.size < minimum) {
       nextEdge[pos] = { ...e, size: minimum };
       changed = true;
     } else {
@@ -143,18 +143,15 @@ export function enforcePersistedEdgeMinimums(layout: unknown): unknown {
 /// manager, settings-panel) — those don't correspond to CLI sessions
 /// and asking the SDK to resume them just produces error toasts.
 export function extractChatPanelIds(layout: unknown): string[] {
-  if (!layout || typeof layout !== "object") return [];
+  if (!layout || typeof layout !== 'object') return [];
   const panels = (layout as { panels?: unknown }).panels;
-  if (!panels || typeof panels !== "object") return [];
+  if (!panels || typeof panels !== 'object') return [];
   const out: string[] = [];
-  for (const [id, entry] of Object.entries(
-    panels as Record<string, unknown>,
-  )) {
-    if (!entry || typeof entry !== "object") continue;
-    const component = (entry as { contentComponent?: unknown })
-      .contentComponent;
-    if (typeof component !== "string") continue;
-    if (component !== "chat") continue;
+  for (const [id, entry] of Object.entries(panels as Record<string, unknown>)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const component = (entry as { contentComponent?: unknown }).contentComponent;
+    if (typeof component !== 'string') continue;
+    if (component !== 'chat') continue;
     out.push(id);
   }
   return out;
@@ -164,8 +161,8 @@ export function extractChatPanelIds(layout: unknown): string[] {
 /// panel with the given id. Used to decide whether to add a default
 /// panel on startup (e.g. Sessions sidebar).
 export function persistedLayoutHasPanel(layout: unknown, panelId: string): boolean {
-  if (!layout || typeof layout !== "object") return false;
+  if (!layout || typeof layout !== 'object') return false;
   const panels = (layout as { panels?: unknown }).panels;
-  if (!panels || typeof panels !== "object") return false;
+  if (!panels || typeof panels !== 'object') return false;
   return Object.prototype.hasOwnProperty.call(panels, panelId);
 }

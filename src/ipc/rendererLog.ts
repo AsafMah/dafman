@@ -2,15 +2,15 @@
 // so we can debug WebView2 issues by tailing `dafman-*.log` instead of
 // requiring devtools to be open.
 
-import { invokeCommand } from "./invoke";
+import { invokeCommand } from './invoke';
 
-export type RendererLogLevel = "debug" | "info" | "warn" | "error";
+export type RendererLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 let installed = false;
 
 function send(level: RendererLogLevel, message: string, extra?: Record<string, unknown>): void {
   // Fire-and-forget; we already mirror to console below for devtools users.
-  invokeCommand("rendererLog", { level, message, extra }).catch(() => {});
+  invokeCommand('rendererLog', { level, message, extra }).catch(() => {});
 }
 
 export function rendererLog(
@@ -27,8 +27,8 @@ export function installRendererLogBridge(): void {
   if (installed) return;
   installed = true;
 
-  window.addEventListener("error", (event: ErrorEvent) => {
-    send("error", `uncaught ${event.message}`, {
+  window.addEventListener('error', (event: ErrorEvent) => {
+    send('error', `uncaught ${event.message}`, {
       source: event.filename,
       line: event.lineno,
       column: event.colno,
@@ -36,13 +36,13 @@ export function installRendererLogBridge(): void {
     });
   });
 
-  window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
+  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
     const reason = event.reason;
     const message =
       reason instanceof Error
         ? `unhandledrejection ${reason.message}`
         : `unhandledrejection ${String(reason)}`;
-    send("error", message, {
+    send('error', message, {
       stack: reason instanceof Error ? reason.stack : undefined,
     });
   });
@@ -50,18 +50,19 @@ export function installRendererLogBridge(): void {
   // Mirror console.error so anything throwing inside Lexical/PrimeVue/etc.
   // shows up server-side. Keep the original behaviour so devtools users
   // still see the message in the WebView2 console.
-  const wrap = (
-    level: RendererLogLevel,
-    method: "log" | "info" | "warn" | "error",
-  ) => {
+  const wrap = (level: RendererLogLevel, method: 'log' | 'info' | 'warn' | 'error') => {
     const original = (console[method] as (...a: unknown[]) => void).bind(console);
     (console[method] as unknown as (...a: unknown[]) => void) = (...args: unknown[]) => {
       try {
         const message = args
           .map((a) =>
-            a instanceof Error ? `${a.message}\n${a.stack ?? ""}` : typeof a === "string" ? a : safeStringify(a),
+            a instanceof Error
+              ? `${a.message}\n${a.stack ?? ''}`
+              : typeof a === 'string'
+                ? a
+                : safeStringify(a),
           )
-          .join(" ");
+          .join(' ');
         send(level, message);
       } catch {
         /* swallow — we never want logging to break the page */
@@ -69,9 +70,9 @@ export function installRendererLogBridge(): void {
       original(...args);
     };
   };
-  wrap("error", "error");
-  wrap("warn", "warn");
-  wrap("info", "info");
+  wrap('error', 'error');
+  wrap('warn', 'warn');
+  wrap('info', 'info');
 }
 
 function safeStringify(value: unknown): string {

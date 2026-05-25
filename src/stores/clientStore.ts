@@ -5,13 +5,13 @@
 // never goes back to false within a session. Per-session state lives in
 // `sessionsStore`.
 
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { invokeCommand } from "../ipc/invoke";
-import { useToastStore } from "./toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import { invokeCommand } from '../ipc/invoke';
+import { useToastStore } from './toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
-export const useClientStore = defineStore("client", () => {
+export const useClientStore = defineStore('client', () => {
   const ready = ref(false);
   const isCreating = ref(false);
   const lastError = ref<string | null>(null);
@@ -22,13 +22,13 @@ export const useClientStore = defineStore("client", () => {
     isCreating.value = true;
     lastError.value = null;
     try {
-      const status = await invokeCommand("createClient", {});
+      const status = await invokeCommand('createClient', {});
       ready.value = true;
       toasts.success(status);
     } catch (err) {
       const message = toErrorMessage(err);
       lastError.value = message;
-      toasts.error("Failed to start client", message);
+      toasts.error('Failed to start client', message);
       throw err;
     } finally {
       isCreating.value = false;

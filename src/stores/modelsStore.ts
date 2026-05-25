@@ -5,14 +5,14 @@
 // while waiting for the same response. Reset on client recreation if/when
 // we ever support that.
 
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { invokeCommand } from "../ipc/invoke";
-import type { ModelSummary } from "../ipc/types";
-import { useToastStore } from "./toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import { invokeCommand } from '../ipc/invoke';
+import type { ModelSummary } from '../ipc/types';
+import { useToastStore } from './toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
-export const useModelsStore = defineStore("models", () => {
+export const useModelsStore = defineStore('models', () => {
   const models = ref<ModelSummary[]>([]);
   const loaded = ref(false);
   const isLoading = ref(false);
@@ -24,13 +24,13 @@ export const useModelsStore = defineStore("models", () => {
     isLoading.value = true;
     inflight = (async () => {
       try {
-        const next = await invokeCommand("listModels", {});
+        const next = await invokeCommand('listModels', {});
         models.value = next;
         loaded.value = true;
         return next;
       } catch (err) {
         const message = toErrorMessage(err);
-        useToastStore().error("Failed to load models", message);
+        useToastStore().error('Failed to load models', message);
         throw err;
       } finally {
         isLoading.value = false;

@@ -341,22 +341,33 @@ A **more spacious** style improves readability without adding real overhead:
 //   return null;
 ```
 
-### Recommended Prettier Config
+### Adopted Style: Google TypeScript Style (gts) + Prettier
+
+**Tooling:** `gts` (ESLint + Prettier bundle) + `typescript-eslint/strictTypeChecked` + `eslint-plugin-vue`
+
+**Prettier config** (`.prettierrc`):
 
 ```json
 {
+  "singleQuote": true,
+  "trailingComma": "all",
   "printWidth": 100,
   "tabWidth": 2,
   "semi": true,
-  "singleQuote": false,
-  "trailingComma": "all",
   "bracketSpacing": true,
   "arrowParens": "always",
   "endOfLine": "lf",
-  "singleAttributePerLine": true,
-  "vueIndentScriptAndStyle": false
+  "singleAttributePerLine": true
 }
 ```
+
+**Key style choices:**
+- Single quotes everywhere (Google convention)
+- 100-char line width (spacious, avoids excessive wrapping)
+- Trailing commas (cleaner diffs)
+- One attribute per line in Vue templates
+- Early returns over nested conditionals
+- Blank lines between logical sections in large files
 
 
 ---

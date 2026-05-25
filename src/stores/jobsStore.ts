@@ -1,25 +1,25 @@
-import { computed, ref, watch } from "vue";
-import { defineStore } from "pinia";
-import { invokeCommand } from "../ipc/invoke";
-import type { JobRecord } from "../ipc/types";
-import { useLayoutStore } from "./layoutStore";
-import { useSessionsStore } from "./sessionsStore";
-import { useToastStore } from "./toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, ref, watch } from 'vue';
+import { defineStore } from 'pinia';
+import { invokeCommand } from '../ipc/invoke';
+import type { JobRecord } from '../ipc/types';
+import { useLayoutStore } from './layoutStore';
+import { useSessionsStore } from './sessionsStore';
+import { useToastStore } from './toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 type LocalAutopilotMeta = {
   seenThinking: boolean;
 };
 
-function isActiveStatus(status: JobRecord["status"]): boolean {
-  return status === "starting" || status === "running" || status === "idle";
+function isActiveStatus(status: JobRecord['status']): boolean {
+  return status === 'starting' || status === 'running' || status === 'idle';
 }
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-export const useJobsStore = defineStore("jobs", () => {
+export const useJobsStore = defineStore('jobs', () => {
   const sdkJobs = ref<JobRecord[]>([]);
   const localJobs = ref<JobRecord[]>([]);
   const isLoading = ref(false);
@@ -45,54 +45,49 @@ export const useJobsStore = defineStore("jobs", () => {
     isLoading.value = true;
     error.value = null;
     try {
-      sdkJobs.value = await invokeCommand("listJobs", {});
+      sdkJobs.value = await invokeCommand('listJobs', {});
     } catch (err) {
       error.value = toErrorMessage(err);
-      useToastStore().error("Failed to load jobs", error.value);
+      useToastStore().error('Failed to load jobs', error.value);
     } finally {
       isLoading.value = false;
     }
   }
 
   function hasActiveJobsForSession(sessionId: string): boolean {
-    return jobs.value.some(
-      (job) => job.sessionId === sessionId && isActiveStatus(job.status),
-    );
+    return jobs.value.some((job) => job.sessionId === sessionId && isActiveStatus(job.status));
   }
 
   async function cancelJob(job: JobRecord): Promise<void> {
     busyJobId.value = job.id;
     try {
-      if (job.source === "autopilot-session") {
+      if (job.source === 'autopilot-session') {
         await useSessionsStore().abortSession(job.sessionId);
         updateLocalJob(job.id, {
-          status: "cancelled",
+          status: 'cancelled',
           completedAt: nowIso(),
           canCancel: false,
           canRemove: true,
         });
-        useToastStore().info("Job cancelled", `Cancelled "${job.title}".`);
+        useToastStore().info('Job cancelled', `Cancelled "${job.title}".`);
       } else {
-        await invokeCommand("cancelTask", {
+        await invokeCommand('cancelTask', {
           sessionId: job.sessionId,
           id: taskIdFromJob(job),
         });
         // Mark locally as cancelled immediately — the SDK's task list
         // may still report "completed" if the cancel arrived too late.
         updateLocalJob(job.id, {
-          status: "cancelled",
+          status: 'cancelled',
           completedAt: nowIso(),
           canCancel: false,
           canRemove: true,
         });
-        useToastStore().info("Job cancelled", `Cancelled "${job.title}".`);
+        useToastStore().info('Job cancelled', `Cancelled "${job.title}".`);
         await refresh();
       }
     } catch (err) {
-      useToastStore().error(
-        "Failed to cancel job",
-        toErrorMessage(err),
-      );
+      useToastStore().error('Failed to cancel job', toErrorMessage(err));
     } finally {
       busyJobId.value = null;
     }
@@ -101,40 +96,34 @@ export const useJobsStore = defineStore("jobs", () => {
   async function removeJob(job: JobRecord): Promise<void> {
     busyJobId.value = job.id;
     try {
-      if (job.source === "autopilot-session") {
+      if (job.source === 'autopilot-session') {
         localJobs.value = localJobs.value.filter((j) => j.id !== job.id);
         localMeta.delete(job.id);
       } else {
-        await invokeCommand("removeTask", {
+        await invokeCommand('removeTask', {
           sessionId: job.sessionId,
           id: taskIdFromJob(job),
         });
         await refresh();
       }
     } catch (err) {
-      useToastStore().error(
-        "Failed to remove job",
-        toErrorMessage(err),
-      );
+      useToastStore().error('Failed to remove job', toErrorMessage(err));
     } finally {
       busyJobId.value = null;
     }
   }
 
   async function promoteJob(job: JobRecord): Promise<void> {
-    if (job.source !== "sdk-task") return;
+    if (job.source !== 'sdk-task') return;
     busyJobId.value = job.id;
     try {
-      await invokeCommand("promoteTask", {
+      await invokeCommand('promoteTask', {
         sessionId: job.sessionId,
         id: taskIdFromJob(job),
       });
       await refresh();
     } catch (err) {
-      useToastStore().error(
-        "Failed to promote job",
-        toErrorMessage(err),
-      );
+      useToastStore().error('Failed to promote job', toErrorMessage(err));
     } finally {
       busyJobId.value = null;
     }
@@ -146,9 +135,11 @@ export const useJobsStore = defineStore("jobs", () => {
     layout.activatePanel(sessionId);
     // Scroll to the bottom so the user sees the active work
     setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("dafman:scroll-to-bottom", {
-        detail: { sessionId },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('dafman:scroll-to-bottom', {
+          detail: { sessionId },
+        }),
+      );
     }, 100);
   }
 
@@ -160,10 +151,10 @@ export const useJobsStore = defineStore("jobs", () => {
     const job: JobRecord = {
       id,
       sessionId,
-      source: "autopilot-session",
-      kind: "autopilot",
-      status: "starting",
-      title: "Autopilot run",
+      source: 'autopilot-session',
+      kind: 'autopilot',
+      status: 'starting',
+      title: 'Autopilot run',
       description: trimmed,
       prompt: trimmed,
       startedAt: nowIso(),
@@ -173,18 +164,18 @@ export const useJobsStore = defineStore("jobs", () => {
       canOpenSession: true,
       latestResponse: session?.workingDirectory
         ? `Workspace: ${session.workingDirectory}`
-        : "Current session",
+        : 'Current session',
     };
     localJobs.value = [job, ...localJobs.value];
     localMeta.set(id, { seenThinking: false });
     try {
       const sessions = useSessionsStore();
-      await sessions.setSessionMode(sessionId, "autopilot");
-      updateLocalJob(id, { status: "running" });
-      await sessions.sendMessage(sessionId, trimmed, "steer");
+      await sessions.setSessionMode(sessionId, 'autopilot');
+      updateLocalJob(id, { status: 'running' });
+      await sessions.sendMessage(sessionId, trimmed, 'steer');
     } catch (err) {
       updateLocalJob(id, {
-        status: "failed",
+        status: 'failed',
         error: toErrorMessage(err),
         completedAt: nowIso(),
         canCancel: false,
@@ -195,20 +186,16 @@ export const useJobsStore = defineStore("jobs", () => {
   }
 
   function updateLocalJob(id: string, patch: Partial<JobRecord>): void {
-    localJobs.value = localJobs.value.map((job) =>
-      job.id === id ? { ...job, ...patch } : job,
-    );
+    localJobs.value = localJobs.value.map((job) => (job.id === id ? { ...job, ...patch } : job));
   }
 
   function taskIdFromJob(job: JobRecord): string {
-    return job.id.startsWith(`${job.sessionId}:`)
-      ? job.id.slice(job.sessionId.length + 1)
-      : job.id;
+    return job.id.startsWith(`${job.sessionId}:`) ? job.id.slice(job.sessionId.length + 1) : job.id;
   }
 
   const sessionsStore = useSessionsStore();
   watch(
-    () => sessionsStore.sessions.map((s) => `${s.id}:${s.tasksRefreshCounter}`).join("|"),
+    () => sessionsStore.sessions.map((s) => `${s.id}:${s.tasksRefreshCounter}`).join('|'),
     () => {
       void refresh();
     },
@@ -225,19 +212,17 @@ export const useJobsStore = defineStore("jobs", () => {
       })),
     () => {
       for (const job of localJobs.value) {
-        if (job.source !== "autopilot-session" || !isActiveStatus(job.status)) continue;
+        if (job.source !== 'autopilot-session' || !isActiveStatus(job.status)) continue;
         const session = sessionsStore.getSession(job.sessionId);
         if (!session) continue;
         const meta = localMeta.get(job.id);
         if (!meta) continue;
         const lastEvent = session.events[session.events.length - 1];
-        if (lastEvent?.eventType === "session.error") {
+        if (lastEvent?.eventType === 'session.error') {
           updateLocalJob(job.id, {
-            status: "failed",
+            status: 'failed',
             error:
-              typeof lastEvent.data.message === "string"
-                ? lastEvent.data.message
-                : "Session error",
+              typeof lastEvent.data.message === 'string' ? lastEvent.data.message : 'Session error',
             completedAt: nowIso(),
             canCancel: false,
             canRemove: true,
@@ -247,11 +232,11 @@ export const useJobsStore = defineStore("jobs", () => {
         if (session.isThinking) meta.seenThinking = true;
         if (meta.seenThinking && !session.isThinking) {
           updateLocalJob(job.id, {
-            status: "completed",
+            status: 'completed',
             completedAt: nowIso(),
             canCancel: false,
             canRemove: true,
-            latestResponse: "Turn complete",
+            latestResponse: 'Turn complete',
           });
         }
       }

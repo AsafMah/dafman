@@ -21,6 +21,9 @@
     "e2e:run": "playwright test --config=e2e/full/playwright.config.ts",
     "lint": "vue-tsc --noEmit",
     "lint:bun": "bun run tools/check-bun-entry.ts",
+    "lint:eslint": "eslint --no-error-on-unmatched-pattern 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
+    "format": "prettier --write 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "check": "bun run lint && bun run lint:bun && bun run test && bun run build && bun run smoke:run"
   },
   "dependencies": {
@@ -77,6 +80,7 @@
     "vue-command-palette": "^0.2.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@happy-dom/global-registrator": "20.9.0",
     "@playwright/test": "^1.60.0",
     "@testing-library/vue": "^8.1.0",
@@ -87,8 +91,13 @@
     "@types/prismjs": "^1.26.6",
     "@vitejs/plugin-vue": "5.2.4",
     "@vue/compiler-sfc": "3.5.34",
+    "@vue/eslint-config-typescript": "^14.7.0",
     "concurrently": "9.2.1",
+    "eslint": "^10.4.0",
+    "eslint-plugin-vue": "^10.9.1",
+    "gts": "^7.0.0",
     "typescript": "5.9.3",
+    "typescript-eslint": "^8.59.4",
     "vite": "6.4.2",
     "vue-tsc": "2.2.12"
   },

@@ -34,11 +34,11 @@
 //   be unscoped, and tests must clean teleported nodes between
 //   cases (see `__tests__/CommandPalette.test.ts` afterEach).
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { Command } from "vue-command-palette";
-import { useCommandRegistry, type Command as CommandDef } from "../stores/commandRegistry";
-import { useLayoutStore } from "../stores/layoutStore";
-import { searchValueFor } from "../lib/palette";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Command } from 'vue-command-palette';
+import { useCommandRegistry, type Command as CommandDef } from '../stores/commandRegistry';
+import { useLayoutStore } from '../stores/layoutStore';
+import { searchValueFor } from '../lib/palette';
 
 const registry = useCommandRegistry();
 const layoutStore = useLayoutStore();
@@ -72,13 +72,13 @@ const grouped = computed(() => {
 });
 
 function isOtherOverlayOpen(): boolean {
-  return Boolean(document.querySelector(".p-confirmpopup, .p-dialog-mask"));
+  return Boolean(document.querySelector('.p-confirmpopup, .p-dialog-mask'));
 }
 
 function onHotkey(e: KeyboardEvent): void {
   if (e.repeat) return;
-  if (e.key !== "k" && e.key !== "K") return;
-  const isMac = navigator.platform.toUpperCase().includes("MAC");
+  if (e.key !== 'k' && e.key !== 'K') return;
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
   const cmdChord = isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
   if (!cmdChord) return;
   if (e.altKey || e.shiftKey) return;
@@ -91,7 +91,7 @@ function onHotkey(e: KeyboardEvent): void {
 
 function onEscape(e: KeyboardEvent): void {
   if (!open.value) return;
-  if (e.key !== "Escape") return;
+  if (e.key !== 'Escape') return;
   e.preventDefault();
   e.stopPropagation();
   closePalette();
@@ -109,7 +109,7 @@ function closePalette(): void {
       prevFocus.focus();
     } else if (layoutStore.activeSessionId) {
       window.dispatchEvent(
-        new CustomEvent("dafman:focus-composer", {
+        new CustomEvent('dafman:focus-composer', {
           detail: { sessionId: layoutStore.activeSessionId },
         }),
       );
@@ -125,7 +125,7 @@ function onSelectItem(item: { key: string; value: string }): void {
   void nextTick(() => {
     try {
       const result = cmd.run();
-      if (result && typeof (result as Promise<void>).then === "function") {
+      if (result && typeof (result as Promise<void>).then === 'function') {
         void (result as Promise<void>).catch((err) => {
           console.error(`[command palette] ${cmd.id} failed`, err);
         });
@@ -140,21 +140,21 @@ function onWindowClick(e: MouseEvent): void {
   if (!open.value) return;
   const target = e.target as HTMLElement | null;
   if (!target) return;
-  if (target.hasAttribute("command-dialog-mask")) {
+  if (target.hasAttribute('command-dialog-mask')) {
     closePalette();
   }
 }
 
 onMounted(() => {
-  window.addEventListener("keydown", onHotkey, true);
-  window.addEventListener("keydown", onEscape, true);
-  window.addEventListener("click", onWindowClick, true);
+  window.addEventListener('keydown', onHotkey, true);
+  window.addEventListener('keydown', onEscape, true);
+  window.addEventListener('click', onWindowClick, true);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onHotkey, true);
-  window.removeEventListener("keydown", onEscape, true);
-  window.removeEventListener("click", onWindowClick, true);
+  window.removeEventListener('keydown', onHotkey, true);
+  window.removeEventListener('keydown', onEscape, true);
+  window.removeEventListener('click', onWindowClick, true);
 });
 </script>
 
@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
         <Command.Empty>No matching commands.</Command.Empty>
 
         <Command.Group
-          v-for="([heading, items]) in grouped.sections"
+          v-for="[heading, items] in grouped.sections"
           :key="heading"
           :heading="heading"
           :data-group="heading"
@@ -192,15 +192,26 @@ onBeforeUnmount(() => {
               :class="cmd.icon"
               aria-hidden="true"
             />
-            <span v-else class="cmd-icon cmd-icon-empty" />
+            <span
+              v-else
+              class="cmd-icon cmd-icon-empty"
+            />
             <span class="cmd-label">{{ cmd.label }}</span>
-            <span v-if="cmd.hint" class="cmd-hint">{{ cmd.hint }}</span>
+            <span
+              v-if="cmd.hint"
+              class="cmd-hint"
+              >{{ cmd.hint }}</span
+            >
             <span
               v-if="cmd.shortcut && cmd.shortcut.length > 0"
               class="cmd-shortcut"
               aria-label="Keyboard shortcut"
             >
-              <kbd v-for="(k, idx) in cmd.shortcut" :key="idx">{{ k }}</kbd>
+              <kbd
+                v-for="(k, idx) in cmd.shortcut"
+                :key="idx"
+                >{{ k }}</kbd
+              >
             </span>
           </Command.Item>
         </Command.Group>
@@ -221,15 +232,26 @@ onBeforeUnmount(() => {
               :class="cmd.icon"
               aria-hidden="true"
             />
-            <span v-else class="cmd-icon cmd-icon-empty" />
+            <span
+              v-else
+              class="cmd-icon cmd-icon-empty"
+            />
             <span class="cmd-label">{{ cmd.label }}</span>
-            <span v-if="cmd.hint" class="cmd-hint">{{ cmd.hint }}</span>
+            <span
+              v-if="cmd.hint"
+              class="cmd-hint"
+              >{{ cmd.hint }}</span
+            >
             <span
               v-if="cmd.shortcut && cmd.shortcut.length > 0"
               class="cmd-shortcut"
               aria-label="Keyboard shortcut"
             >
-              <kbd v-for="(k, idx) in cmd.shortcut" :key="idx">{{ k }}</kbd>
+              <kbd
+                v-for="(k, idx) in cmd.shortcut"
+                :key="idx"
+                >{{ k }}</kbd
+              >
             </span>
           </Command.Item>
         </template>
@@ -249,9 +271,9 @@ onBeforeUnmount(() => {
 /* Flatten the outer chrome so the mask can position-fixed the real
  * dialog. Without `display: contents` the intermediate divs trap the
  * mask's fixed-positioning context and screw with stacking. */
-div[command-theme="dafman"],
-div[command-theme="dafman"] > div[command-root=""],
-div[command-theme="dafman"] > div[command-root=""] > div[command-dialog=""] {
+div[command-theme='dafman'],
+div[command-theme='dafman'] > div[command-root=''],
+div[command-theme='dafman'] > div[command-root=''] > div[command-dialog=''] {
   display: contents;
 }
 
@@ -302,7 +324,7 @@ div[command-dialog-body] {
   overflow: hidden;
 }
 
-input[command-input=""] {
+input[command-input=''] {
   display: block;
   width: 100%;
   background: transparent;
@@ -315,11 +337,11 @@ input[command-input=""] {
   border-bottom: 1px solid var(--p-content-border-color);
 }
 
-input[command-input=""]::placeholder {
+input[command-input='']::placeholder {
   color: var(--p-text-muted-color);
 }
 
-div[command-list=""] {
+div[command-list=''] {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -332,7 +354,7 @@ div[command-list-sizer] {
   display: block;
 }
 
-div[command-empty=""] {
+div[command-empty=''] {
   padding: 1.5rem 1rem;
   color: var(--p-text-muted-color);
   text-align: center;
@@ -343,7 +365,7 @@ div[command-empty=""] {
 
 /* Default group heading color: muted. Per-group heading colors come
  * from the `[data-group]` attribute we put on the group element. */
-div[command-group-heading=""] {
+div[command-group-heading=''] {
   padding: 0.55rem 1rem 0.25rem;
   font-size: 0.68rem;
   font-weight: 700;
@@ -357,19 +379,19 @@ div[command-group-heading=""] {
  * "color-coded categories" lives here — pick colors that read on
  * both light and dark by using `--p-{hue}-{500,400}` semantic
  * tokens (PrimeVue ships these). */
-div[command-group=""][data-group="Navigation"] div[command-group-heading=""] {
+div[command-group=''][data-group='Navigation'] div[command-group-heading=''] {
   color: var(--p-blue-500, #3b82f6);
 }
-div[command-group=""][data-group="Sessions"] div[command-group-heading=""] {
+div[command-group=''][data-group='Sessions'] div[command-group-heading=''] {
   color: var(--p-emerald-500, #10b981);
 }
-div[command-group=""][data-group="Active Session"] div[command-group-heading=""] {
+div[command-group=''][data-group='Active Session'] div[command-group-heading=''] {
   color: var(--p-violet-500, #8b5cf6);
 }
-div[command-group=""][data-group="Appearance"] div[command-group-heading=""] {
+div[command-group=''][data-group='Appearance'] div[command-group-heading=''] {
   color: var(--p-amber-500, #f59e0b);
 }
-div[command-group=""][data-group="Diagnostics"] div[command-group-heading=""] {
+div[command-group=''][data-group='Diagnostics'] div[command-group-heading=''] {
   color: var(--p-orange-500, #f97316);
 }
 
@@ -377,26 +399,26 @@ div[command-group=""][data-group="Diagnostics"] div[command-group-heading=""] {
  * item rail + icon adopt the section's hue. Items can also override
  * via `--cmd-accent` inline style (see "Switch to: session" — that
  * uses the session's own accent). */
-div[command-group=""][data-group="Navigation"] div[command-item=""] {
+div[command-group=''][data-group='Navigation'] div[command-item=''] {
   --cmd-accent: var(--p-blue-500, #3b82f6);
 }
-div[command-group=""][data-group="Sessions"] div[command-item=""] {
+div[command-group=''][data-group='Sessions'] div[command-item=''] {
   --cmd-accent: var(--p-emerald-500, #10b981);
 }
-div[command-group=""][data-group="Active Session"] div[command-item=""] {
+div[command-group=''][data-group='Active Session'] div[command-item=''] {
   --cmd-accent: var(--p-violet-500, #8b5cf6);
 }
-div[command-group=""][data-group="Appearance"] div[command-item=""] {
+div[command-group=''][data-group='Appearance'] div[command-item=''] {
   --cmd-accent: var(--p-amber-500, #f59e0b);
 }
-div[command-group=""][data-group="Diagnostics"] div[command-item=""] {
+div[command-group=''][data-group='Diagnostics'] div[command-item=''] {
   --cmd-accent: var(--p-orange-500, #f97316);
 }
 
 /* Per-item override (e.g. session-specific accent on "Switch to: …").
  * Inline `style="--cmd-accent: ..."` wins via specificity-of-style. */
 
-div[command-item=""] {
+div[command-item=''] {
   position: relative;
   display: flex;
   align-items: center;
@@ -406,30 +428,33 @@ div[command-item=""] {
   color: var(--p-text-color);
   font-size: 0.92rem;
   border-left: 3px solid transparent;
-  transition: background 80ms ease, color 80ms ease, border-left-color 80ms ease;
+  transition:
+    background 80ms ease,
+    color 80ms ease,
+    border-left-color 80ms ease;
 }
 
 /* Idle: thin tinted rail in the category accent so groups read at a
  * glance even when scrolled past the heading. */
-div[command-item=""][style*="--cmd-accent"],
-div[command-item=""] {
+div[command-item=''][style*='--cmd-accent'],
+div[command-item=''] {
   border-left-color: color-mix(in srgb, var(--cmd-accent, var(--p-primary-color)) 35%, transparent);
 }
 
 /* Selected via keyboard nav. Library sets aria-selected="true". */
-div[command-item=""][aria-selected="true"] {
+div[command-item=''][aria-selected='true'] {
   background: color-mix(in srgb, var(--cmd-accent, var(--p-primary-color)) 22%, transparent);
   border-left-color: var(--cmd-accent, var(--p-primary-color));
 }
 
 /* Hover (mouse). Distinct from selected so users can read what
  * they'd hit if they Enter'd vs what they're hovering. */
-div[command-item=""]:hover:not([aria-selected="true"]) {
+div[command-item='']:hover:not([aria-selected='true']) {
   background: color-mix(in srgb, var(--cmd-accent, var(--p-primary-color)) 12%, transparent);
 }
 
 /* Hidden by the library when filtered out via fuse. */
-div[command-item=""][style*="display: none"] {
+div[command-item=''][style*='display: none'] {
   display: none !important;
 }
 
@@ -442,7 +467,7 @@ div[command-item=""][style*="display: none"] {
   text-align: center;
 }
 
-div[command-item=""][aria-selected="true"] .cmd-icon {
+div[command-item=''][aria-selected='true'] .cmd-icon {
   color: var(--p-text-color);
 }
 
@@ -485,7 +510,7 @@ div[command-item=""][aria-selected="true"] .cmd-icon {
   color: var(--p-text-muted-color);
 }
 
-hr[command-separator=""] {
+hr[command-separator=''] {
   border: none;
   border-top: 1px solid var(--p-content-border-color);
   margin: 0.4rem 0;

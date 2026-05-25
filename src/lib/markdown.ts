@@ -1,21 +1,21 @@
-import MarkdownIt from "markdown-it";
+import MarkdownIt from 'markdown-it';
 // markdown-it plugins. Types for footnote/emoji ship via @types/*; the
 // other three are declared in src/electrobun-shims.d.ts.
-import taskLists from "markdown-it-task-lists";
-import footnote from "markdown-it-footnote";
-import deflist from "markdown-it-deflist";
-import { full as emoji } from "markdown-it-emoji";
-import texmath from "markdown-it-texmath";
-import katex from "katex";
-import DOMPurify from "dompurify";
-import Prism from "prismjs";
+import taskLists from 'markdown-it-task-lists';
+import footnote from 'markdown-it-footnote';
+import deflist from 'markdown-it-deflist';
+import { full as emoji } from 'markdown-it-emoji';
+import texmath from 'markdown-it-texmath';
+import katex from 'katex';
+import DOMPurify from 'dompurify';
+import Prism from 'prismjs';
 // Side-effect: registers the prism grammars used by MessageContent for
 // fenced-code highlighting. See the file for the language list.
 // Importing it here means `renderMarkdown` highlights the same set of
 // languages whether it's called from MessageContent.vue (which also
 // imports it transitively) or directly from a unit test that doesn't
 // mount the Vue tree.
-import "../lexical/prismExtraLanguages";
+import '../lexical/prismExtraLanguages';
 
 /// Renders untrusted markdown to safe HTML for display in read-only
 /// message bubbles. Pipeline: markdown-it (`html: true`, `linkify`)
@@ -44,7 +44,7 @@ const md: MarkdownIt = new MarkdownIt({
   typographer: false,
   breaks: false,
   highlight(code, lang) {
-    const language = (lang || "").trim().toLowerCase();
+    const language = (lang || '').trim().toLowerCase();
     if (language && Prism.languages[language]) {
       try {
         const highlighted = Prism.highlight(
@@ -82,38 +82,36 @@ md.use(deflist);
 md.use(emoji);
 md.use(texmath, {
   engine: katex,
-  delimiters: "dollars",
-  katexOptions: { throwOnError: false, output: "html" },
+  delimiters: 'dollars',
+  katexOptions: { throwOnError: false, output: 'html' },
 });
 
 /// Re-tag a block-level open token with one of our `lex-*` class names.
 function addOpenClass(tag: string, cls: string): void {
   const original = md.renderer.rules[`${tag}_open`];
   md.renderer.rules[`${tag}_open`] = (tokens, idx, opts, env, self) => {
-    tokens[idx]!.attrJoin("class", cls);
-    return original
-      ? original(tokens, idx, opts, env, self)
-      : self.renderToken(tokens, idx, opts);
+    tokens[idx]!.attrJoin('class', cls);
+    return original ? original(tokens, idx, opts, env, self) : self.renderToken(tokens, idx, opts);
   };
 }
-addOpenClass("paragraph", "lex-paragraph");
-addOpenClass("blockquote", "lex-quote");
-addOpenClass("bullet_list", "lex-ul");
-addOpenClass("ordered_list", "lex-ol");
-addOpenClass("list_item", "lex-li");
-addOpenClass("table", "md-table");
+addOpenClass('paragraph', 'lex-paragraph');
+addOpenClass('blockquote', 'lex-quote');
+addOpenClass('bullet_list', 'lex-ul');
+addOpenClass('ordered_list', 'lex-ol');
+addOpenClass('list_item', 'lex-li');
+addOpenClass('table', 'md-table');
 
 // Headings: tag varies (h1..h6); pick the matching lex class.
 md.renderer.rules.heading_open = (tokens, idx, opts, _env, self) => {
   const t = tokens[idx]!;
-  t.attrJoin("class", `lex-${t.tag}`);
+  t.attrJoin('class', `lex-${t.tag}`);
   return self.renderToken(tokens, idx, opts);
 };
 
 // Inline tokens (no _open/_close pair on these — they're self-rendering).
 const codeInline = md.renderer.rules.code_inline;
 md.renderer.rules.code_inline = (tokens, idx, opts, env, self) => {
-  tokens[idx]!.attrJoin("class", "lex-text-code");
+  tokens[idx]!.attrJoin('class', 'lex-text-code');
   return codeInline
     ? codeInline(tokens, idx, opts, env, self)
     : self.renderToken(tokens, idx, opts);
@@ -122,27 +120,22 @@ md.renderer.rules.code_inline = (tokens, idx, opts, env, self) => {
 const linkOpen = md.renderer.rules.link_open;
 md.renderer.rules.link_open = (tokens, idx, opts, env, self) => {
   const t = tokens[idx]!;
-  t.attrJoin("class", "lex-link");
-  t.attrSet("target", "_blank");
-  t.attrSet("rel", "noopener noreferrer");
-  return linkOpen
-    ? linkOpen(tokens, idx, opts, env, self)
-    : self.renderToken(tokens, idx, opts);
+  t.attrJoin('class', 'lex-link');
+  t.attrSet('target', '_blank');
+  t.attrSet('rel', 'noopener noreferrer');
+  return linkOpen ? linkOpen(tokens, idx, opts, env, self) : self.renderToken(tokens, idx, opts);
 };
 
 md.renderer.rules.s_open = (tokens, idx, opts, _env, self) => {
-  tokens[idx]!.attrJoin("class", "lex-text-strike");
+  tokens[idx]!.attrJoin('class', 'lex-text-strike');
   return self.renderToken(tokens, idx, opts);
 };
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
+  return escapeHtml(s).replace(/"/g, '&quot;');
 }
 
 /// DOMPurify allowlist: every tag/attribute markdown-it can emit through
@@ -153,52 +146,107 @@ function escapeAttr(s: string): string {
 const PURIFY_CONFIG = {
   ALLOWED_TAGS: [
     // headings + block text
-    "h1","h2","h3","h4","h5","h6",
-    "p","blockquote","pre","code",
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'p',
+    'blockquote',
+    'pre',
+    'code',
     // lists
-    "ul","ol","li",
+    'ul',
+    'ol',
+    'li',
     // definition lists (markdown-it-deflist)
-    "dl","dt","dd",
+    'dl',
+    'dt',
+    'dd',
     // tables (GFM core)
-    "table","thead","tbody","tr","th","td",
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'th',
+    'td',
     // inline emphasis + semantic
-    "strong","em","s","del","kbd","sub","sup","mark",
+    'strong',
+    'em',
+    's',
+    'del',
+    'kbd',
+    'sub',
+    'sup',
+    'mark',
     // task-list checkboxes (markdown-it-task-lists)
-    "input",
+    'input',
     // collapsible sections (raw HTML pass-through after sanitize)
-    "details","summary",
+    'details',
+    'summary',
     // footnotes (markdown-it-footnote emits section/hr/ol/li with anchors)
-    "section","a","br","hr","span",
+    'section',
+    'a',
+    'br',
+    'hr',
+    'span',
     // images (linked, sanitized)
-    "img",
+    'img',
     // KaTeX HTML output (`output: "html"` emits nested span trees with
     // MathML annotations for screen readers)
-    "math","semantics","mrow","mi","mo","mn","msup","msub","mfrac","msqrt","annotation","mtext",
+    'math',
+    'semantics',
+    'mrow',
+    'mi',
+    'mo',
+    'mn',
+    'msup',
+    'msub',
+    'mfrac',
+    'msqrt',
+    'annotation',
+    'mtext',
   ] as string[],
   ALLOWED_ATTR: [
     // links + images
-    "href","target","rel","src","alt","title",
+    'href',
+    'target',
+    'rel',
+    'src',
+    'alt',
+    'title',
     // class is how every renderer-rule / plugin attaches styling;
     // KaTeX in particular leans on dozens of class names. Allowed.
-    "class",
+    'class',
     // task-list checkboxes
-    "type","checked","disabled",
+    'type',
+    'checked',
+    'disabled',
     // collapsible
-    "open",
+    'open',
     // tables
-    "colspan","rowspan","align","start",
+    'colspan',
+    'rowspan',
+    'align',
+    'start',
     // code-highlight metadata used by our CSS
-    "data-highlight-language",
+    'data-highlight-language',
     // footnote/cross-reference anchors
-    "id","name",
+    'id',
+    'name',
     // KaTeX accessibility
-    "role","aria-hidden","aria-label","xmlns","encoding",
+    'role',
+    'aria-hidden',
+    'aria-label',
+    'xmlns',
+    'encoding',
     // KaTeX inline sizing (em-width spans) is the one place we accept
     // a constrained `style` — narrowed below in the FORBID_ATTR rule
     // wouldn't help us, so we list it and rely on DOMPurify's URL
     // sanitization + a custom hook that strips anything not matching
     // `width:` / `margin:` / `height:` patterns.
-    "style",
+    'style',
   ] as string[],
   ALLOW_DATA_ATTR: false,
 };
@@ -210,16 +258,16 @@ const PURIFY_CONFIG = {
 let purifyHookInstalled = false;
 function ensurePurifyHook(): void {
   if (purifyHookInstalled) return;
-  if (typeof DOMPurify.addHook !== "function") return;
-  DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
-    if (data.attrName !== "style") return;
+  if (typeof DOMPurify.addHook !== 'function') return;
+  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+    if (data.attrName !== 'style') return;
     // KaTeX uses: width, height, margin-left, margin-right, margin-top,
     // top, left, vertical-align, padding-left/right, position:relative.
     // Tighter than the general "ALLOW_STYLE" sledgehammer.
     const allowed =
       /^(?:\s*(?:width|height|margin(?:-(?:left|right|top|bottom))?|top|left|right|bottom|vertical-align|padding(?:-(?:left|right|top|bottom))?|position)\s*:\s*[^;:]+;?\s*)+$/;
     if (!allowed.test(data.attrValue)) {
-      data.attrValue = "";
+      data.attrValue = '';
       data.keepAttr = false;
     }
   });
@@ -227,7 +275,7 @@ function ensurePurifyHook(): void {
 }
 
 export function renderMarkdown(source: string): string {
-  if (!source) return "";
+  if (!source) return '';
   ensurePurifyHook();
   const dirty = md.render(source);
   return DOMPurify.sanitize(dirty, PURIFY_CONFIG);
@@ -238,8 +286,8 @@ export function renderMarkdown(source: string): string {
 /// top-level fenced code block; `code` segments carry the raw code +
 /// language for the renderer to mount a CodeMirror instance.
 export type MarkdownSegment =
-  | { kind: "html"; html: string }
-  | { kind: "code"; code: string; language: string };
+  | { kind: 'html'; html: string }
+  | { kind: 'code'; code: string; language: string };
 
 /// Split markdown into a list of segments so the Vue renderer can mount
 /// CodeMirror instances per top-level fenced code block while keeping
@@ -259,10 +307,10 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
   // Strip <system_notification>...</system_notification> XML blocks
   // that the CLI agent embeds in assistant messages for sub-agent lifecycle.
   const cleaned = source
-    .replace(/<system_notification>[\s\S]*?<\/system_notification>/g, "")
+    .replace(/<system_notification>[\s\S]*?<\/system_notification>/g, '')
     // During streaming, the opening tag may arrive before its close;
     // strip the dangling open tag so it never flashes in the UI.
-    .replace(/<system_notification>[\s\S]*$/g, "")
+    .replace(/<system_notification>[\s\S]*$/g, '')
     .trim();
   if (!cleaned) return [];
   ensurePurifyHook();
@@ -275,19 +323,19 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
     const html = md.renderer.render(buffer, md.options, {});
     const clean = DOMPurify.sanitize(html, PURIFY_CONFIG);
     if (clean.trim().length > 0) {
-      segments.push({ kind: "html", html: clean });
+      segments.push({ kind: 'html', html: clean });
     }
     buffer = [];
   };
 
   for (const token of tokens) {
-    if (token.type === "fence" && token.level === 0) {
+    if (token.type === 'fence' && token.level === 0) {
       flushHtml();
-      const language = (token.info || "").trim().toLowerCase();
+      const language = (token.info || '').trim().toLowerCase();
       // markdown-it appends a trailing newline to fence content; drop
       // it so the editor doesn't show a phantom blank last line.
-      const code = token.content.replace(/\n$/, "");
-      segments.push({ kind: "code", code, language });
+      const code = token.content.replace(/\n$/, '');
+      segments.push({ kind: 'code', code, language });
     } else {
       buffer.push(token);
     }
@@ -309,12 +357,9 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
 /// Returns the empty string for empty input so callers can pass
 /// through `partialOutput` / `resultContent` without conditioning.
 export function fenced(content: string, language: string): string {
-  if (!content) return "";
-  const body = content.endsWith("\n") ? content : `${content}\n`;
-  const longestRun = (body.match(/`+/g) ?? []).reduce(
-    (max, run) => Math.max(max, run.length),
-    0,
-  );
-  const fence = "`".repeat(Math.max(3, longestRun + 1));
+  if (!content) return '';
+  const body = content.endsWith('\n') ? content : `${content}\n`;
+  const longestRun = (body.match(/`+/g) ?? []).reduce((max, run) => Math.max(max, run.length), 0);
+  const fence = '`'.repeat(Math.max(3, longestRun + 1));
   return `${fence}${language}\n${body}${fence}`;
 }

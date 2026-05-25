@@ -19,7 +19,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
-} from "./types";
+} from './types';
 import type {
   AuditEventListener,
   CommandResultEventListener,
@@ -28,7 +28,7 @@ import type {
   RpcBridge,
   SessionEventListener,
   TerminalEventListener,
-} from "./invoke";
+} from './invoke';
 
 interface PendingRpc {
   resolve: (value: unknown) => void;
@@ -36,26 +36,26 @@ interface PendingRpc {
 }
 
 interface WireRequest {
-  type: "request";
+  type: 'request';
   id: number;
   name: CommandName;
   args: unknown;
 }
 
 interface WireResponse {
-  type: "response";
+  type: 'response';
   id: number;
   result: unknown;
 }
 
 interface WireError {
-  type: "error";
+  type: 'error';
   id: number;
   error: { kind?: string; message?: string };
 }
 
 interface WireMessage {
-  type: "message";
+  type: 'message';
   name: string;
   payload: unknown;
 }
@@ -78,41 +78,41 @@ export function createWebSocketBridge(url: string): RpcBridge {
     openPromise = new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);
       socket = ws;
-      ws.addEventListener("open", () => {
+      ws.addEventListener('open', () => {
         resolve();
       });
-      ws.addEventListener("error", () => {
+      ws.addEventListener('error', () => {
         reject(new Error(`WebSocket connect failed: ${url}`));
       });
-      ws.addEventListener("close", () => {
+      ws.addEventListener('close', () => {
         // Drop pending requests; tests can decide whether to retry.
         for (const [, p] of pending) {
-          p.reject(new Error("WebSocket closed"));
+          p.reject(new Error('WebSocket closed'));
         }
         pending.clear();
         socket = null;
         openPromise = null;
       });
-      ws.addEventListener("message", (event) => {
+      ws.addEventListener('message', (event) => {
         let parsed: WireResponse | WireError | WireMessage;
         try {
           parsed = JSON.parse(String(event.data));
         } catch {
           return;
         }
-        if (parsed.type === "response") {
+        if (parsed.type === 'response') {
           const slot = pending.get(parsed.id);
           if (!slot) return;
           pending.delete(parsed.id);
           slot.resolve(parsed.result);
-        } else if (parsed.type === "error") {
+        } else if (parsed.type === 'error') {
           const slot = pending.get(parsed.id);
           if (!slot) return;
           pending.delete(parsed.id);
           slot.reject(
-            new Error(parsed.error?.message ?? `RPC error: ${parsed.error?.kind ?? "unknown"}`),
+            new Error(parsed.error?.message ?? `RPC error: ${parsed.error?.kind ?? 'unknown'}`),
           );
-        } else if (parsed.type === "message") {
+        } else if (parsed.type === 'message') {
           dispatchMessage(parsed.name, parsed.payload);
         }
       });
@@ -121,34 +121,34 @@ export function createWebSocketBridge(url: string): RpcBridge {
   }
 
   function dispatchMessage(name: string, payload: unknown): void {
-    if (name === "sessionEvent") {
+    if (name === 'sessionEvent') {
       for (const l of sessionListeners) l(payload as SessionEventPayload);
-    } else if (name === "pendingRequest") {
+    } else if (name === 'pendingRequest') {
       for (const l of pendingListeners) l(payload as PendingRequestPayload);
-    } else if (name === "logEvent") {
+    } else if (name === 'logEvent') {
       for (const l of logListeners) l(payload as LogRecord);
-    } else if (name === "auditEvent") {
+    } else if (name === 'auditEvent') {
       for (const l of auditListeners) l(payload as AuditEntry);
-    } else if (name === "terminalEvent") {
+    } else if (name === 'terminalEvent') {
       for (const l of terminalListeners) l(payload as TerminalEventPayload);
-    } else if (name === "commandResultEvent") {
+    } else if (name === 'commandResultEvent') {
       for (const l of commandResultListeners) l(payload as CommandResultEvent);
     }
   }
 
   async function request<N extends CommandName>(
     name: N,
-    args: CommandMap[N]["args"],
-  ): Promise<CommandMap[N]["result"]> {
+    args: CommandMap[N]['args'],
+  ): Promise<CommandMap[N]['result']> {
     await ensureOpen();
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket not open");
+      throw new Error('WebSocket not open');
     }
     const id = nextId++;
-    const wire: WireRequest = { type: "request", id, name, args };
-    return new Promise<CommandMap[N]["result"]>((resolve, reject) => {
+    const wire: WireRequest = { type: 'request', id, name, args };
+    return new Promise<CommandMap[N]['result']>((resolve, reject) => {
       pending.set(id, {
-        resolve: (v) => resolve(v as CommandMap[N]["result"]),
+        resolve: (v) => resolve(v as CommandMap[N]['result']),
         reject,
       });
       socket!.send(JSON.stringify(wire));

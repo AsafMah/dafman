@@ -11,19 +11,19 @@
 /// require an active session with a working directory; the form
 /// disables Project radio when no session is open.
 
-import { computed, onMounted, ref } from "vue";
-import { storeToRefs } from "pinia";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import SelectButton from "primevue/selectbutton";
-import Textarea from "primevue/textarea";
-import ToggleSwitch from "primevue/toggleswitch";
-import { invokeCommand } from "../ipc/invoke";
-import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from "../ipc/types";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useToastStore } from "../stores/toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import SelectButton from 'primevue/selectbutton';
+import Textarea from 'primevue/textarea';
+import ToggleSwitch from 'primevue/toggleswitch';
+import { invokeCommand } from '../ipc/invoke';
+import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from '../ipc/types';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useToastStore } from '../stores/toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -48,12 +48,12 @@ async function load() {
   loaded.value = false;
   try {
     if (activeSession.value) {
-      files.value = await invokeCommand("listAgentFiles", {
+      files.value = await invokeCommand('listAgentFiles', {
         sessionId: activeSession.value.id,
       });
     } else {
       // No session: user-scope only.
-      files.value = await invokeCommand("listAgentFilesGlobal", {});
+      files.value = await invokeCommand('listAgentFilesGlobal', {});
     }
     loaded.value = true;
   } catch (err) {
@@ -65,32 +65,32 @@ async function load() {
 onMounted(load);
 
 const grouped = computed(() => {
-  const user = files.value.filter((f) => f.scope === "user");
-  const project = files.value.filter((f) => f.scope === "project");
+  const user = files.value.filter((f) => f.scope === 'user');
+  const project = files.value.filter((f) => f.scope === 'project');
   return { user, project };
 });
 
 // ---------- Create form ----------
 const showForm = ref(false);
-const formScope = ref<AgentFileScope>("user");
-const formName = ref("");
-const formDisplayName = ref("");
-const formDescription = ref("");
-const formTools = ref("");
-const formSkills = ref("");
-const formModel = ref("");
+const formScope = ref<AgentFileScope>('user');
+const formName = ref('');
+const formDisplayName = ref('');
+const formDescription = ref('');
+const formTools = ref('');
+const formSkills = ref('');
+const formModel = ref('');
 const formUserInvocable = ref(true);
-const formPrompt = ref("");
+const formPrompt = ref('');
 const formBusy = ref(false);
 const formError = ref<string | null>(null);
 
 const scopeOptions = computed(() => {
   const out: Array<{ label: string; value: AgentFileScope; disabled?: boolean }> = [
-    { label: "User (global)", value: "user" },
+    { label: 'User (global)', value: 'user' },
   ];
   out.push({
-    label: "Project (.github/agents)",
-    value: "project",
+    label: 'Project (.github/agents)',
+    value: 'project',
     disabled: !activeSession.value,
   });
   return out;
@@ -98,15 +98,15 @@ const scopeOptions = computed(() => {
 
 function openForm() {
   showForm.value = true;
-  formScope.value = activeSession.value ? "project" : "user";
-  formName.value = "";
-  formDisplayName.value = "";
-  formDescription.value = "";
-  formTools.value = "";
-  formSkills.value = "";
-  formModel.value = "";
+  formScope.value = activeSession.value ? 'project' : 'user';
+  formName.value = '';
+  formDisplayName.value = '';
+  formDescription.value = '';
+  formTools.value = '';
+  formSkills.value = '';
+  formModel.value = '';
   formUserInvocable.value = true;
-  formPrompt.value = "";
+  formPrompt.value = '';
   formError.value = null;
 }
 
@@ -116,7 +116,7 @@ function closeForm() {
 
 function splitCsv(input: string): string[] {
   return input
-    .split(",")
+    .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
@@ -124,15 +124,15 @@ function splitCsv(input: string): string[] {
 async function submitForm() {
   formError.value = null;
   if (!formName.value.trim()) {
-    formError.value = "Name is required";
+    formError.value = 'Name is required';
     return;
   }
   if (!formDescription.value.trim()) {
-    formError.value = "Description is required";
+    formError.value = 'Description is required';
     return;
   }
-  if (formScope.value === "project" && !activeSession.value) {
-    formError.value = "Project scope requires an active session";
+  if (formScope.value === 'project' && !activeSession.value) {
+    formError.value = 'Project scope requires an active session';
     return;
   }
   formBusy.value = true;
@@ -143,7 +143,7 @@ async function submitForm() {
     // above if no session is open AND scope is project, so the
     // remaining cases all have a session.
     if (!activeSession.value) {
-      formError.value = "An active session is required to create agents";
+      formError.value = 'An active session is required to create agents';
       return;
     }
     const spec: AgentFileSpec = {
@@ -159,11 +159,11 @@ async function submitForm() {
     const skills = splitCsv(formSkills.value);
     if (skills.length > 0) spec.skills = skills;
     if (formModel.value.trim()) spec.model = formModel.value.trim();
-    const path = await invokeCommand("writeAgentFile", {
+    const path = await invokeCommand('writeAgentFile', {
       sessionId: activeSession.value.id,
       spec,
     });
-    toasts.success("Agent created", path);
+    toasts.success('Agent created', path);
     closeForm();
     await load();
   } catch (err) {
@@ -176,8 +176,8 @@ async function submitForm() {
 async function deleteFile(entry: AgentFileEntry) {
   if (!activeSession.value) {
     toasts.error(
-      "Need an active session",
-      "Open a session to delete project-scope agents. User-scope deletion also requires the session for SDK reload.",
+      'Need an active session',
+      'Open a session to delete project-scope agents. User-scope deletion also requires the session for SDK reload.',
     );
     return;
   }
@@ -186,30 +186,27 @@ async function deleteFile(entry: AgentFileEntry) {
   );
   if (!ok) return;
   try {
-    const removed = await invokeCommand("deleteAgentFile", {
+    const removed = await invokeCommand('deleteAgentFile', {
       sessionId: activeSession.value.id,
       scope: entry.scope,
       name: entry.name,
     });
     if (removed) {
-      toasts.success("Agent deleted", entry.name);
+      toasts.success('Agent deleted', entry.name);
     } else {
-      toasts.info("Already gone", `No file at ${entry.path}`);
+      toasts.info('Already gone', `No file at ${entry.path}`);
     }
     await load();
   } catch (err) {
-    toasts.error(
-      "Delete failed",
-      toErrorMessage(err),
-    );
+    toasts.error('Delete failed', toErrorMessage(err));
   }
 }
 
 async function reveal(path: string) {
   try {
-    await invokeCommand("revealPath", { path });
+    await invokeCommand('revealPath', { path });
   } catch (err) {
-    toasts.error("Reveal failed", toErrorMessage(err));
+    toasts.error('Reveal failed', toErrorMessage(err));
   }
 }
 </script>
@@ -219,8 +216,12 @@ async function reveal(path: string) {
     <header class="agents-header">
       <span class="agents-summary">
         <span v-if="!loaded">Loading…</span>
-        <span v-else-if="error" class="error">{{ error }}</span>
-        <span v-else>{{ files.length }} agent{{ files.length === 1 ? "" : "s" }}</span>
+        <span
+          v-else-if="error"
+          class="error"
+          >{{ error }}</span
+        >
+        <span v-else>{{ files.length }} agent{{ files.length === 1 ? '' : 's' }}</span>
       </span>
       <Button
         size="small"
@@ -232,23 +233,42 @@ async function reveal(path: string) {
       />
     </header>
 
-    <div v-if="!activeSession && loaded" class="hint">
-      No session is open. Showing user-scope agents only. Open a
-      session to manage project-scope agents under
+    <div
+      v-if="!activeSession && loaded"
+      class="hint"
+    >
+      No session is open. Showing user-scope agents only. Open a session to manage project-scope
+      agents under
       <code>.github/agents/</code>.
     </div>
 
-    <section v-if="grouped.project.length > 0 && loaded" class="agents-group">
+    <section
+      v-if="grouped.project.length > 0 && loaded"
+      class="agents-group"
+    >
       <h3 class="group-title">Project ({{ grouped.project.length }})</h3>
       <ul class="agents-list">
-        <li v-for="entry in grouped.project" :key="`p:${entry.name}`" class="agent-row">
+        <li
+          v-for="entry in grouped.project"
+          :key="`p:${entry.name}`"
+          class="agent-row"
+        >
           <div class="agent-line">
             <span class="agent-name">{{ entry.name }}</span>
-            <small v-if="!entry.canonical" class="warn-tag" title="File ends with .md (not .agent.md)">
+            <small
+              v-if="!entry.canonical"
+              class="warn-tag"
+              title="File ends with .md (not .agent.md)"
+            >
               .md
             </small>
           </div>
-          <div class="agent-path" :title="entry.path">{{ entry.path }}</div>
+          <div
+            class="agent-path"
+            :title="entry.path"
+          >
+            {{ entry.path }}
+          </div>
           <div class="agent-actions">
             <Button
               size="small"
@@ -271,17 +291,33 @@ async function reveal(path: string) {
       </ul>
     </section>
 
-    <section v-if="grouped.user.length > 0 && loaded" class="agents-group">
+    <section
+      v-if="grouped.user.length > 0 && loaded"
+      class="agents-group"
+    >
       <h3 class="group-title">User ({{ grouped.user.length }})</h3>
       <ul class="agents-list">
-        <li v-for="entry in grouped.user" :key="`u:${entry.name}`" class="agent-row">
+        <li
+          v-for="entry in grouped.user"
+          :key="`u:${entry.name}`"
+          class="agent-row"
+        >
           <div class="agent-line">
             <span class="agent-name">{{ entry.name }}</span>
-            <small v-if="!entry.canonical" class="warn-tag" title="File ends with .md (not .agent.md)">
+            <small
+              v-if="!entry.canonical"
+              class="warn-tag"
+              title="File ends with .md (not .agent.md)"
+            >
               .md
             </small>
           </div>
-          <div class="agent-path" :title="entry.path">{{ entry.path }}</div>
+          <div
+            class="agent-path"
+            :title="entry.path"
+          >
+            {{ entry.path }}
+          </div>
           <div class="agent-actions">
             <Button
               size="small"
@@ -304,15 +340,22 @@ async function reveal(path: string) {
       </ul>
     </section>
 
-    <div v-if="loaded && files.length === 0" class="empty-hint">
-      No custom agents yet. Click "New agent" to create one — it'll
-      be saved as a markdown file under
-      <code>~/.copilot/agents/</code> (User) or
-      <code>.github/agents/</code> (Project).
+    <div
+      v-if="loaded && files.length === 0"
+      class="empty-hint"
+    >
+      No custom agents yet. Click "New agent" to create one — it'll be saved as a markdown file
+      under
+      <code>~/.copilot/agents/</code> (User) or <code>.github/agents/</code> (Project).
     </div>
 
     <!-- New agent form -->
-    <div v-if="showForm" class="agent-form-wrap" role="dialog" aria-modal="true">
+    <div
+      v-if="showForm"
+      class="agent-form-wrap"
+      role="dialog"
+      aria-modal="true"
+    >
       <div class="agent-form">
         <header class="form-header">
           <h3>New custom agent</h3>
@@ -338,7 +381,9 @@ async function reveal(path: string) {
             />
           </label>
           <label class="form-field">
-            <span class="form-label">Name <small>(filename; letters/digits/.-_, max 64)</small></span>
+            <span class="form-label"
+              >Name <small>(filename; letters/digits/.-_, max 64)</small></span
+            >
             <InputText
               v-model="formName"
               placeholder="e.g. reviewer"
@@ -409,7 +454,12 @@ async function reveal(path: string) {
               placeholder="You are a strict code reviewer..."
             />
           </label>
-          <div v-if="formError" class="form-error">{{ formError }}</div>
+          <div
+            v-if="formError"
+            class="form-error"
+          >
+            {{ formError }}
+          </div>
         </div>
         <footer class="form-footer">
           <Button

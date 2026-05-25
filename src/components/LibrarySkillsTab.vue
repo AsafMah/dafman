@@ -6,15 +6,15 @@
 /// via `setGloballyDisabledSkills`. Reveal-in-folder when `path` is
 /// set so users can jump into the skill file.
 
-import { computed, onMounted, ref } from "vue";
-import Button from "primevue/button";
-import ToggleSwitch from "primevue/toggleswitch";
-import { invokeCommand } from "../ipc/invoke";
-import { useToastStore } from "../stores/toastStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import MessageContent from "./MessageContent.vue";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, ref } from 'vue';
+import Button from 'primevue/button';
+import ToggleSwitch from 'primevue/toggleswitch';
+import { invokeCommand } from '../ipc/invoke';
+import { useToastStore } from '../stores/toastStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import MessageContent from './MessageContent.vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 type Skill = {
   name: string;
@@ -50,20 +50,14 @@ async function load() {
     // working directory drives .github/skills/ discovery correctly.
     // Fall back to the global discover RPC when no session exists.
     const activeId = useLayoutStore().activeSessionId;
-    const active = activeId
-      ? sessionsStore.getSession(activeId)
-      : undefined;
-    const sessionId =
-      active?.id ??
-      sessionsStore.sessions[0]?.id;
+    const active = activeId ? sessionsStore.getSession(activeId) : undefined;
+    const sessionId = active?.id ?? sessionsStore.sessions[0]?.id;
 
     if (sessionId) {
-      skills.value = await invokeCommand("listSessionSkills", { sessionId });
+      skills.value = await invokeCommand('listSessionSkills', { sessionId });
     } else {
-      const wd =
-        sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
-        "";
-      skills.value = await invokeCommand("discoverSkills", wd ? { workingDirectory: wd } : {});
+      const wd = sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory || '';
+      skills.value = await invokeCommand('discoverSkills', wd ? { workingDirectory: wd } : {});
     }
     loaded.value = true;
   } catch (err) {
@@ -85,18 +79,18 @@ async function toggleSkill(skill: Skill) {
       sessionsStore.sessions[0]?.id;
 
     if (sessionId) {
-      await invokeCommand("setSessionSkillEnabled", {
+      await invokeCommand('setSessionSkillEnabled', {
         sessionId,
         name: skill.name,
         enabled: next,
       });
     } else {
       const disabled = skills.value.filter((s) => !s.enabled).map((s) => s.name);
-      await invokeCommand("setGloballyDisabledSkills", { disabledSkills: disabled });
+      await invokeCommand('setGloballyDisabledSkills', { disabledSkills: disabled });
     }
   } catch (err) {
     skill.enabled = !next;
-    toasts.error("Toggle failed", toErrorMessage(err));
+    toasts.error('Toggle failed', toErrorMessage(err));
   }
 }
 
@@ -114,12 +108,9 @@ function toggleExpansion(name: string) {
 async function revealSkillFile(path: string | undefined) {
   if (!path) return;
   try {
-    await invokeCommand("revealPath", { path });
+    await invokeCommand('revealPath', { path });
   } catch (err) {
-    toasts.error(
-      "Couldn't reveal skill",
-      toErrorMessage(err),
-    );
+    toasts.error("Couldn't reveal skill", toErrorMessage(err));
   }
 }
 
@@ -140,9 +131,22 @@ onMounted(() => {
         @click="load"
       />
     </div>
-    <div v-if="!loaded" class="empty-hint">Loading…</div>
-    <div v-else-if="error" class="empty-hint error">{{ error }}</div>
-    <div v-else-if="skills.length === 0" class="empty-hint">
+    <div
+      v-if="!loaded"
+      class="empty-hint"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="error"
+      class="empty-hint error"
+    >
+      {{ error }}
+    </div>
+    <div
+      v-else-if="skills.length === 0"
+      class="empty-hint"
+    >
       No skills discovered.
     </div>
     <template v-else>
@@ -172,7 +176,11 @@ onMounted(() => {
                 aria-hidden="true"
               />
               <span class="skill-name">{{ skill.name }}</span>
-              <small v-if="skill.userInvocable" class="skill-tag">/</small>
+              <small
+                v-if="skill.userInvocable"
+                class="skill-tag"
+                >/</small
+              >
             </button>
             <div class="skill-actions">
               <Button
@@ -195,7 +203,10 @@ onMounted(() => {
               v-if="skill.description && isExpanded(skill.name)"
               class="skill-desc"
             >
-              <MessageContent :text="skill.description" label="Skill description" />
+              <MessageContent
+                :text="skill.description"
+                label="Skill description"
+              />
             </div>
           </li>
         </ul>

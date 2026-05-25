@@ -19,37 +19,37 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import SplitButton from "primevue/splitbutton";
-import Popover from "primevue/popover";
-import type { MenuItem } from "primevue/menuitem";
-import { LexicalComposer, useLexicalComposer } from "lexical-vue/LexicalComposer";
-import { ContentEditable } from "lexical-vue/LexicalContentEditable";
-import { PlainTextPlugin } from "lexical-vue/LexicalPlainTextPlugin";
-import { RichTextPlugin } from "lexical-vue/LexicalRichTextPlugin";
-import { HistoryPlugin } from "lexical-vue/LexicalHistoryPlugin";
-import { AutoFocusPlugin } from "lexical-vue/LexicalAutoFocusPlugin";
-import { ListPlugin } from "lexical-vue/LexicalListPlugin";
-import { LinkPlugin } from "lexical-vue/LexicalLinkPlugin";
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import SplitButton from 'primevue/splitbutton';
+import Popover from 'primevue/popover';
+import type { MenuItem } from 'primevue/menuitem';
+import { LexicalComposer, useLexicalComposer } from 'lexical-vue/LexicalComposer';
+import { ContentEditable } from 'lexical-vue/LexicalContentEditable';
+import { PlainTextPlugin } from 'lexical-vue/LexicalPlainTextPlugin';
+import { RichTextPlugin } from 'lexical-vue/LexicalRichTextPlugin';
+import { HistoryPlugin } from 'lexical-vue/LexicalHistoryPlugin';
+import { AutoFocusPlugin } from 'lexical-vue/LexicalAutoFocusPlugin';
+import { ListPlugin } from 'lexical-vue/LexicalListPlugin';
+import { LinkPlugin } from 'lexical-vue/LexicalLinkPlugin';
 import {
   COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
   SELECTION_CHANGE_COMMAND,
   type LexicalEditor,
-} from "lexical";
-import { $createCodeNode, $isCodeNode } from "@lexical/code";
+} from 'lexical';
+import { $createCodeNode, $isCodeNode } from '@lexical/code';
 import {
   $isListNode,
   INSERT_ORDERED_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
-} from "@lexical/list";
+} from '@lexical/list';
 import {
   $createHeadingNode,
   $createQuoteNode,
   $isHeadingNode,
   $isQuoteNode,
-} from "@lexical/rich-text";
-import { $setBlocksType } from "@lexical/selection";
+} from '@lexical/rich-text';
+import { $setBlocksType } from '@lexical/selection';
 import {
   EditableSync,
   RegisterMarkdownShortcuts,
@@ -58,20 +58,29 @@ import {
   consumeComposerText,
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
-} from "../lexical/plugins";
-import { $getRoot, $getSelection, $isElementNode, $isRangeSelection, $createParagraphNode, $createTextNode, type ElementNode, type TextFormatType } from "lexical";
-import { markdownNodes } from "../lexical/nodes";
-import { $createAttachmentNode } from "../lexical/AttachmentNode";
-import { lexicalTheme } from "../lexical/theme";
-import type { DefaultSendMode } from "../stores/sessionsStore";
-import type { SendMessageAttachment } from "../ipc/types";
-import { useToastStore } from "../stores/toastStore";
-import { runLocalSlashCommand } from "../lib/sessionCommands";
-import SlashCommandPlugin from "./SlashCommandPlugin.vue";
-import MentionPlugin from "./MentionPlugin.vue";
-import FilePicker from "./FilePicker.vue";
-import ModeButtonGroup from "./ModeButtonGroup.vue";
-import TerminalPanel from "./TerminalPanel.vue";
+} from '../lexical/plugins';
+import {
+  $getRoot,
+  $getSelection,
+  $isElementNode,
+  $isRangeSelection,
+  $createParagraphNode,
+  $createTextNode,
+  type ElementNode,
+  type TextFormatType,
+} from 'lexical';
+import { markdownNodes } from '../lexical/nodes';
+import { $createAttachmentNode } from '../lexical/AttachmentNode';
+import { lexicalTheme } from '../lexical/theme';
+import type { DefaultSendMode } from '../stores/sessionsStore';
+import type { SendMessageAttachment } from '../ipc/types';
+import { useToastStore } from '../stores/toastStore';
+import { runLocalSlashCommand } from '../lib/sessionCommands';
+import SlashCommandPlugin from './SlashCommandPlugin.vue';
+import MentionPlugin from './MentionPlugin.vue';
+import FilePicker from './FilePicker.vue';
+import ModeButtonGroup from './ModeButtonGroup.vue';
+import TerminalPanel from './TerminalPanel.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -89,9 +98,9 @@ const props = withDefaults(
   }>(),
   {
     disabled: false,
-    placeholder: "Ask anything — use @ to attach files, / for commands.",
+    placeholder: 'Ask anything — use @ to attach files, / for commands.',
     enableMarkdownShortcuts: true,
-    defaultMode: "steer",
+    defaultMode: 'steer',
     sessionId: undefined,
     commandTerminalId: undefined,
   },
@@ -99,9 +108,7 @@ const props = withDefaults(
 
 const isDev = import.meta.env.DEV;
 const diagEnabled =
-  isDev &&
-  typeof window !== "undefined" &&
-  new URLSearchParams(window.location.search).has("diag");
+  isDev && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diag');
 
 /// Pending attachments are now stored INLINE in the editor itself —
 /// each chip is an `AttachmentNode` (a token-mode TextNode subclass)
@@ -125,9 +132,7 @@ const visibleFormatCount = computed(() => {
   return 0;
 });
 const inlineFormatActions = computed(() => formatActions.value.slice(0, visibleFormatCount.value));
-const overflowFormatActions = computed(() =>
-  formatActions.value.slice(visibleFormatCount.value),
-);
+const overflowFormatActions = computed(() => formatActions.value.slice(visibleFormatCount.value));
 let toolbarResizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
@@ -145,14 +150,13 @@ onBeforeUnmount(() => {
   toolbarResizeObserver = null;
 });
 
-
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
   if (!editor) return;
   editor.update(
     () => {
       const node = $createAttachmentNode(a);
-      const space = $createTextNode(" ");
+      const space = $createTextNode(' ');
       const sel = $getSelection();
       if ($isRangeSelection(sel)) {
         sel.insertNodes([node, space]);
@@ -179,7 +183,7 @@ function addAttachment(a: SendMessageAttachment): void {
       // (especially on drag-drop where the drag source had focus and
       // we need to claim it back).
       onUpdate: () => {
-        editor.focus(undefined, { defaultSelection: "rootEnd" });
+        editor.focus(undefined, { defaultSelection: 'rootEnd' });
       },
     },
   );
@@ -201,7 +205,7 @@ const MAX_BLOB_BYTES = 8 * 1024 * 1024; // 8 MiB safety cap
 async function blobFromFile(file: File): Promise<SendMessageAttachment | null> {
   if (file.size > MAX_BLOB_BYTES) {
     toasts.warn(
-      "File too large",
+      'File too large',
       `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MiB. Max is 8 MiB.`,
     );
     return null;
@@ -209,16 +213,16 @@ async function blobFromFile(file: File): Promise<SendMessageAttachment | null> {
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
   // Chunk to avoid stack overflows on String.fromCharCode(...big-array).
-  let bin = "";
+  let bin = '';
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
     bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
   const data = btoa(bin);
   return {
-    type: "blob",
+    type: 'blob',
     data,
-    mimeType: file.type || "application/octet-stream",
+    mimeType: file.type || 'application/octet-stream',
     displayName: file.name,
   };
 }
@@ -237,7 +241,7 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   const items = event.clipboardData?.items;
   if (!items) return;
   for (const item of Array.from(items)) {
-    if (item.kind !== "file") continue;
+    if (item.kind !== 'file') continue;
     const f = item.getAsFile();
     if (!f) continue;
     event.preventDefault();
@@ -250,10 +254,10 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
 /// the user invoked. The parent (`ChatWindow`) maps it to the
 /// session-store action.
 const emit = defineEmits<{
-  (e: "submit", payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }): void;
-  (e: "requestCommandTerminal"): void;
-  (e: "openFullTerminal"): void;
-  (e: "update:defaultMode", mode: DefaultSendMode): void;
+  (e: 'submit', payload: ComposerSubmitPayload & { attachments?: SendMessageAttachment[] }): void;
+  (e: 'requestCommandTerminal'): void;
+  (e: 'openFullTerminal'): void;
+  (e: 'update:defaultMode', mode: DefaultSendMode): void;
 }>();
 
 /// Imperatively focus the editor. Used by ChatWindow when an external
@@ -292,7 +296,7 @@ function appendText(value: string): void {
   if (!editor) return;
   editor.update(() => {
     const root = $getRoot();
-    const lines = value.split("\n");
+    const lines = value.split('\n');
     for (const line of lines) {
       const para = $createParagraphNode();
       if (line.length > 0) para.append($createTextNode(line));
@@ -327,21 +331,21 @@ function formatEditor(action: EditorFormatAction): void {
   if (!editor || props.disabled) return;
   if (TEXT_FORMAT_ACTIONS.has(action)) {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, action as TextFormatType);
-  } else if (action === "bullet") {
+  } else if (action === 'bullet') {
     editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined);
-  } else if (action === "number") {
+  } else if (action === 'number') {
     editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined);
   } else {
     editor.update(() => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return;
-      if (action === "h1") {
-        $setBlocksType(selection, () => $createHeadingNode("h1"));
-      } else if (action === "h2") {
-        $setBlocksType(selection, () => $createHeadingNode("h2"));
-      } else if (action === "quote") {
+      if (action === 'h1') {
+        $setBlocksType(selection, () => $createHeadingNode('h1'));
+      } else if (action === 'h2') {
+        $setBlocksType(selection, () => $createHeadingNode('h2'));
+      } else if (action === 'quote') {
         $setBlocksType(selection, () => $createQuoteNode());
-      } else if (action === "codeblock") {
+      } else if (action === 'codeblock') {
         $setBlocksType(selection, () => $createCodeNode());
       }
     });
@@ -350,24 +354,24 @@ function formatEditor(action: EditorFormatAction): void {
 }
 
 type EditorFormatAction =
-  | "bold"
-  | "italic"
-  | "underline"
-  | "strikethrough"
-  | "code"
-  | "bullet"
-  | "number"
-  | "h1"
-  | "h2"
-  | "quote"
-  | "codeblock";
+  | 'bold'
+  | 'italic'
+  | 'underline'
+  | 'strikethrough'
+  | 'code'
+  | 'bullet'
+  | 'number'
+  | 'h1'
+  | 'h2'
+  | 'quote'
+  | 'codeblock';
 
 const TEXT_FORMAT_ACTIONS = new Set<EditorFormatAction>([
-  "bold",
-  "italic",
-  "underline",
-  "strikethrough",
-  "code",
+  'bold',
+  'italic',
+  'underline',
+  'strikethrough',
+  'code',
 ]);
 
 const editorFormatActions: Array<{
@@ -379,17 +383,43 @@ const editorFormatActions: Array<{
   inline?: boolean;
   priority: 1 | 2 | 3 | 4;
 }> = [
-  { label: "Bold", glyph: "B", title: "Bold", action: "bold", inline: true, priority: 1 },
-  { label: "Italic", glyph: "I", title: "Italic", action: "italic", inline: true, priority: 1 },
-  { label: "Code", icon: "pi pi-code", title: "Inline code", action: "code", inline: true, priority: 1 },
-  { label: "Bullet list", icon: "pi pi-list", title: "Bullet list", action: "bullet", inline: true, priority: 1 },
-  { label: "Underline", glyph: "U", title: "Underline", action: "underline", priority: 2 },
-  { label: "Numbered list", icon: "pi pi-list-check", title: "Numbered list", action: "number", priority: 2 },
-  { label: "Strikethrough", glyph: "S", title: "Strikethrough", action: "strikethrough", priority: 3 },
-  { label: "Heading 1", glyph: "H1", title: "Heading 1", action: "h1", priority: 3 },
-  { label: "Heading 2", glyph: "H2", title: "Heading 2", action: "h2", priority: 3 },
-  { label: "Quote", glyph: "❝", title: "Quote block", action: "quote", priority: 4 },
-  { label: "Code block", glyph: "{ }", title: "Code block", action: "codeblock", priority: 4 },
+  { label: 'Bold', glyph: 'B', title: 'Bold', action: 'bold', inline: true, priority: 1 },
+  { label: 'Italic', glyph: 'I', title: 'Italic', action: 'italic', inline: true, priority: 1 },
+  {
+    label: 'Code',
+    icon: 'pi pi-code',
+    title: 'Inline code',
+    action: 'code',
+    inline: true,
+    priority: 1,
+  },
+  {
+    label: 'Bullet list',
+    icon: 'pi pi-list',
+    title: 'Bullet list',
+    action: 'bullet',
+    inline: true,
+    priority: 1,
+  },
+  { label: 'Underline', glyph: 'U', title: 'Underline', action: 'underline', priority: 2 },
+  {
+    label: 'Numbered list',
+    icon: 'pi pi-list-check',
+    title: 'Numbered list',
+    action: 'number',
+    priority: 2,
+  },
+  {
+    label: 'Strikethrough',
+    glyph: 'S',
+    title: 'Strikethrough',
+    action: 'strikethrough',
+    priority: 3,
+  },
+  { label: 'Heading 1', glyph: 'H1', title: 'Heading 1', action: 'h1', priority: 3 },
+  { label: 'Heading 2', glyph: 'H2', title: 'Heading 2', action: 'h2', priority: 3 },
+  { label: 'Quote', glyph: '❝', title: 'Quote block', action: 'quote', priority: 4 },
+  { label: 'Code block', glyph: '{ }', title: 'Code block', action: 'codeblock', priority: 4 },
 ] as const;
 
 const editorFormatState = ref<Record<EditorFormatAction, boolean>>({
@@ -418,13 +448,13 @@ function readEditorFormatState(): void {
     let node = selection.anchor.getNode();
     while (node) {
       if ($isListNode(node)) {
-        inBulletList = node.getListType() === "bullet";
-        inNumberList = node.getListType() === "number";
+        inBulletList = node.getListType() === 'bullet';
+        inNumberList = node.getListType() === 'number';
         break;
       }
       if ($isHeadingNode(node)) {
-        inHeading1 = node.getTag() === "h1";
-        inHeading2 = node.getTag() === "h2";
+        inHeading1 = node.getTag() === 'h1';
+        inHeading2 = node.getTag() === 'h2';
       } else if ($isQuoteNode(node)) {
         inQuote = true;
       } else if ($isCodeNode(node)) {
@@ -436,11 +466,11 @@ function readEditorFormatState(): void {
     }
   }
   editorFormatState.value = {
-    bold: $isRangeSelection(selection) && selection.hasFormat("bold"),
-    italic: $isRangeSelection(selection) && selection.hasFormat("italic"),
-    underline: $isRangeSelection(selection) && selection.hasFormat("underline"),
-    strikethrough: $isRangeSelection(selection) && selection.hasFormat("strikethrough"),
-    code: $isRangeSelection(selection) && selection.hasFormat("code"),
+    bold: $isRangeSelection(selection) && selection.hasFormat('bold'),
+    italic: $isRangeSelection(selection) && selection.hasFormat('italic'),
+    underline: $isRangeSelection(selection) && selection.hasFormat('underline'),
+    strikethrough: $isRangeSelection(selection) && selection.hasFormat('strikethrough'),
+    code: $isRangeSelection(selection) && selection.hasFormat('code'),
     bullet: inBulletList,
     number: inNumberList,
     h1: inHeading1,
@@ -450,12 +480,19 @@ function readEditorFormatState(): void {
   };
 }
 
-defineExpose({ focus: focusComposer, setText, appendText, addAttachment, enterCommandMode, exitCommandMode });
+defineExpose({
+  focus: focusComposer,
+  setText,
+  appendText,
+  addAttachment,
+  enterCommandMode,
+  exitCommandMode,
+});
 
 async function enterCommandMode(): Promise<void> {
   clearEditor();
   commandMode.value = true;
-  emit("requestCommandTerminal");
+  emit('requestCommandTerminal');
   await nextTick();
 }
 
@@ -464,22 +501,28 @@ let escTimer: ReturnType<typeof setTimeout> | null = null;
 
 function onCommandModeKeydown(event: KeyboardEvent): void {
   // Double-Esc exits command mode
-  if (event.key === "Escape") {
+  if (event.key === 'Escape') {
     if (escArmed) {
       event.preventDefault();
       event.stopPropagation();
       escArmed = false;
-      if (escTimer) { clearTimeout(escTimer); escTimer = null; }
+      if (escTimer) {
+        clearTimeout(escTimer);
+        escTimer = null;
+      }
       exitCommandMode();
       return;
     }
     escArmed = true;
     if (escTimer) clearTimeout(escTimer);
-    escTimer = setTimeout(() => { escArmed = false; escTimer = null; }, 400);
+    escTimer = setTimeout(() => {
+      escArmed = false;
+      escTimer = null;
+    }, 400);
     return;
   }
   // Ctrl+Backspace exits command mode
-  if (event.key === "Backspace" && event.ctrlKey) {
+  if (event.key === 'Backspace' && event.ctrlKey) {
     event.preventDefault();
     event.stopPropagation();
     exitCommandMode();
@@ -492,13 +535,16 @@ function exitCommandMode(): void {
   commandMode.value = false;
   bangArmed = false;
   escArmed = false;
-  if (escTimer) { clearTimeout(escTimer); escTimer = null; }
+  if (escTimer) {
+    clearTimeout(escTimer);
+    escTimer = null;
+  }
   setTimeout(() => focusComposer(), 0);
 }
 
 function onComposerKeydown(event: KeyboardEvent): void {
   if (props.disabled || commandMode.value) return;
-  if (event.key !== "!" || event.ctrlKey || event.altKey || event.metaKey) {
+  if (event.key !== '!' || event.ctrlKey || event.altKey || event.metaKey) {
     bangArmed = false;
     return;
   }
@@ -509,7 +555,7 @@ function onComposerKeydown(event: KeyboardEvent): void {
     bangArmed = true;
     return;
   }
-  if (bangArmed && text === "!") {
+  if (bangArmed && text === '!') {
     event.preventDefault();
     void enterCommandMode();
     return;
@@ -521,7 +567,7 @@ const editable = computed(() => !props.disabled);
 const richText = computed(() => props.enableMarkdownShortcuts);
 
 const initialConfig = computed(() => ({
-  namespace: "DafmanComposer",
+  namespace: 'DafmanComposer',
   editable: true,
   nodes: markdownNodes,
   theme: lexicalTheme,
@@ -530,15 +576,15 @@ const initialConfig = computed(() => ({
     // intercepts `console.error` and mirrors it to the bun JSON log,
     // so a single `console.error` reaches both surfaces. Don't also
     // call `rendererLog` here — that would double-log.
-    console.error("[lexical composer]", error);
+    console.error('[lexical composer]', error);
   },
 }));
 
 async function onSubmit(payload: ComposerSubmitPayload) {
-  if (props.sessionId && await runLocalSlashCommand(props.sessionId, payload.text)) {
+  if (props.sessionId && (await runLocalSlashCommand(props.sessionId, payload.text))) {
     return;
   }
-  emit("submit", payload);
+  emit('submit', payload);
 }
 
 /// Dropdown items for the SplitButton — let the user change the
@@ -548,20 +594,20 @@ async function onSubmit(payload: ComposerSubmitPayload) {
 /// destructive choice that should require an explicit modifier.
 const defaultModeItems = computed<MenuItem[]>(() => [
   {
-    label: "Steer (immediate)",
-    icon: props.defaultMode === "steer" ? "pi pi-check" : "pi pi-bolt",
-    command: () => emit("update:defaultMode", "steer"),
+    label: 'Steer (immediate)',
+    icon: props.defaultMode === 'steer' ? 'pi pi-check' : 'pi pi-bolt',
+    command: () => emit('update:defaultMode', 'steer'),
   },
   {
-    label: "Queue (wait for current turn)",
-    icon: props.defaultMode === "queue" ? "pi pi-check" : "pi pi-clock",
-    command: () => emit("update:defaultMode", "queue"),
+    label: 'Queue (wait for current turn)',
+    icon: props.defaultMode === 'queue' ? 'pi pi-check' : 'pi pi-clock',
+    command: () => emit('update:defaultMode', 'queue'),
   },
   { separator: true },
   {
-    label: "Send & interrupt current turn",
-    icon: "pi pi-stop-circle",
-    command: () => triggerSubmit("interrupt"),
+    label: 'Send & interrupt current turn',
+    icon: 'pi pi-stop-circle',
+    command: () => triggerSubmit('interrupt'),
   },
 ]);
 
@@ -574,12 +620,10 @@ function triggerSubmit(mode: ComposerSubmitMode) {
   if (!editor || props.disabled) return;
   const result = consumeComposerText(editor);
   if (result === null) return;
-  emit("submit", {
+  emit('submit', {
     text: result.text,
     mode,
-    ...(result.attachments.length > 0
-      ? { attachments: result.attachments }
-      : {}),
+    ...(result.attachments.length > 0 ? { attachments: result.attachments } : {}),
   });
 }
 
@@ -590,7 +634,7 @@ function triggerSubmit(mode: ComposerSubmitMode) {
 /// older `LexicalEditor` shape than the one exported by `lexical`;
 /// we cast at the call site where we actually use it.
 const EditorRefCapture = defineComponent({
-  name: "EditorRefCapture",
+  name: 'EditorRefCapture',
   setup() {
     const editor = useLexicalComposer();
     editorRef.value = editor;
@@ -613,14 +657,12 @@ const EditorRefCapture = defineComponent({
   },
 });
 
-const primaryLabel = computed(() => "");
-const primaryIcon = computed(() =>
-  props.defaultMode === "queue" ? "pi pi-clock" : "pi pi-send",
-);
+const primaryLabel = computed(() => '');
+const primaryIcon = computed(() => (props.defaultMode === 'queue' ? 'pi pi-clock' : 'pi pi-send'));
 const primaryTooltip = computed(() =>
-  props.defaultMode === "queue"
-    ? "Queue (Ctrl+Enter) — wait behind current turn. Alt+Enter forces queue; Ctrl+Shift+Enter interrupts."
-    : "Steer (Ctrl+Enter) — send immediately into current turn. Alt+Enter queues; Ctrl+Shift+Enter interrupts.",
+  props.defaultMode === 'queue'
+    ? 'Queue (Ctrl+Enter) — wait behind current turn. Alt+Enter forces queue; Ctrl+Shift+Enter interrupts.'
+    : 'Steer (Ctrl+Enter) — send immediately into current turn. Alt+Enter queues; Ctrl+Shift+Enter interrupts.',
 );
 
 /// SplitButton-style submit. Primary action runs the session's
@@ -629,7 +671,7 @@ const primaryTooltip = computed(() =>
 /// shortcut hints in the dropdown labels match the bindings registered
 /// by `SubmitOnEnter`.
 const SubmitButton = defineComponent({
-  name: "SubmitButton",
+  name: 'SubmitButton',
   props: {
     disabled: { type: Boolean, default: false },
     label: { type: String, required: true },
@@ -637,7 +679,7 @@ const SubmitButton = defineComponent({
     tooltip: { type: String, required: true },
     model: { type: Array as () => MenuItem[], required: true },
   },
-  emits: ["submit"],
+  emits: ['submit'],
   setup(p, { emit: emitInner }) {
     const editor = useLexicalComposer();
     function fire() {
@@ -646,12 +688,10 @@ const SubmitButton = defineComponent({
       if (result !== null) {
         const payload: ComposerSubmitPayload = {
           text: result.text,
-          mode: "default",
-          ...(result.attachments.length > 0
-            ? { attachments: result.attachments }
-            : {}),
+          mode: 'default',
+          ...(result.attachments.length > 0 ? { attachments: result.attachments } : {}),
         };
-        emitInner("submit", payload);
+        emitInner('submit', payload);
       }
     }
     return () =>
@@ -659,11 +699,11 @@ const SubmitButton = defineComponent({
         label: p.label,
         icon: p.icon,
         title: p.tooltip,
-        "aria-label": p.tooltip,
+        'aria-label': p.tooltip,
         disabled: p.disabled,
         model: p.model,
-        size: "small",
-        class: "lex-submit-button",
+        size: 'small',
+        class: 'lex-submit-button',
         onClick: fire,
         // Keep focus in the editor after primary-button click so the
         // next keystroke after a send still routes to it.
@@ -674,7 +714,11 @@ const SubmitButton = defineComponent({
 </script>
 
 <template>
-  <div class="lex-composer" @dragover.prevent @drop="onDrop">
+  <div
+    class="lex-composer"
+    @dragover.prevent
+    @drop="onDrop"
+  >
     <div class="lex-composer-frame">
       <LexicalComposer :initial-config="initialConfig">
         <EditableSync :editable="editable" />
@@ -688,15 +732,32 @@ const SubmitButton = defineComponent({
           v-if="props.sessionId"
           :session-id="props.sessionId"
         />
-          <div class="lex-composer-shell" :class="{ 'is-command-mode': commandMode }" @paste="onPaste" @keydown.capture="onComposerKeydown">
-          <div v-if="commandMode" class="lex-command-mode" @keydown.capture="onCommandModeKeydown">
+        <div
+          class="lex-composer-shell"
+          :class="{ 'is-command-mode': commandMode }"
+          @paste="onPaste"
+          @keydown.capture="onComposerKeydown"
+        >
+          <div
+            v-if="commandMode"
+            class="lex-command-mode"
+            @keydown.capture="onCommandModeKeydown"
+          >
             <TerminalPanel
               v-if="props.commandTerminalId"
               :params="{ terminalId: props.commandTerminalId, compact: true }"
             />
-            <p v-else class="lex-command-loading">Starting session terminal…</p>
+            <p
+              v-else
+              class="lex-command-loading"
+            >
+              Starting session terminal…
+            </p>
           </div>
-          <div v-show="!commandMode" class="lex-composer-editor">
+          <div
+            v-show="!commandMode"
+            class="lex-composer-editor"
+          >
             <template v-if="richText">
               <RichTextPlugin>
                 <template #contentEditable>
@@ -769,7 +830,10 @@ const SubmitButton = defineComponent({
               :disabled="props.disabled"
               @click="commandMode ? exitCommandMode() : enterCommandMode()"
             >
-              <i class="pi pi-chevron-right" aria-hidden="true" />
+              <i
+                class="pi pi-chevron-right"
+                aria-hidden="true"
+              />
             </button>
             <button
               type="button"
@@ -779,9 +843,16 @@ const SubmitButton = defineComponent({
               :disabled="props.disabled"
               @click="openFilePicker"
             >
-              <i class="pi pi-paperclip" aria-hidden="true" />
+              <i
+                class="pi pi-paperclip"
+                aria-hidden="true"
+              />
             </button>
-            <Popover ref="filePickerPopover" class="lex-attach-popover" :pt="{ content: { style: 'padding: 0' } }">
+            <Popover
+              ref="filePickerPopover"
+              class="lex-attach-popover"
+              :pt="{ content: { style: 'padding: 0' } }"
+            >
               <FilePicker
                 v-if="props.sessionId"
                 :session-id="props.sessionId"
@@ -799,10 +870,19 @@ const SubmitButton = defineComponent({
               :disabled="props.disabled || overflowFormatActions.length === 0"
               @click="toggleFormatPopover"
             >
-              <i class="pi pi-ellipsis-h" aria-hidden="true" />
+              <i
+                class="pi pi-ellipsis-h"
+                aria-hidden="true"
+              />
             </button>
-            <Popover ref="formatPopover" class="lex-format-popover">
-              <div class="lex-format-menu" aria-label="Formatting commands">
+            <Popover
+              ref="formatPopover"
+              class="lex-format-popover"
+            >
+              <div
+                class="lex-format-menu"
+                aria-label="Formatting commands"
+              >
                 <button
                   v-for="action in overflowFormatActions"
                   :key="`menu-${action.label}`"
@@ -811,7 +891,12 @@ const SubmitButton = defineComponent({
                   :class="{ 'is-active': editorFormatState[action.action] }"
                   :aria-pressed="editorFormatState[action.action]"
                   :disabled="props.disabled"
-                  @click="() => { formatEditor(action.action); formatPopover?.hide(); }"
+                  @click="
+                    () => {
+                      formatEditor(action.action);
+                      formatPopover?.hide();
+                    }
+                  "
                 >
                   <i
                     v-if="action.icon"
@@ -831,15 +916,16 @@ const SubmitButton = defineComponent({
                 </button>
               </div>
             </Popover>
-            <div class="lex-markdown-tools" aria-label="Markdown shortcuts">
+            <div
+              class="lex-markdown-tools"
+              aria-label="Markdown shortcuts"
+            >
               <button
                 v-for="action in inlineFormatActions"
                 :key="action.label"
                 type="button"
                 class="lex-toolbar-btn"
-                :class="[
-                  { 'is-active': editorFormatState[action.action] },
-                ]"
+                :class="[{ 'is-active': editorFormatState[action.action] }]"
                 :title="action.title"
                 :aria-label="action.title"
                 :aria-pressed="editorFormatState[action.action]"
@@ -866,9 +952,7 @@ const SubmitButton = defineComponent({
           <div class="lex-toolbar-right">
             <slot name="session-right-controls" />
           </div>
-          <slot
-            name="session-controls"
-          />
+          <slot name="session-controls" />
         </footer>
         <EditorRefCapture />
       </LexicalComposer>
@@ -876,16 +960,22 @@ const SubmitButton = defineComponent({
   </div>
 </template>
 
-
 <style scoped>
 .lex-composer-frame {
   display: flex;
   flex-direction: column;
-  border: 1px solid color-mix(in srgb, var(--accent, var(--p-content-border-color)) 50%, var(--p-content-border-color));
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--accent, var(--p-content-border-color)) 50%,
+      var(--p-content-border-color)
+    );
   border-radius: var(--p-border-radius-md, 8px);
   background: var(--p-content-background);
   overflow: hidden;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
   margin: 0.5rem;
 }
 
@@ -1015,7 +1105,9 @@ const SubmitButton = defineComponent({
   color: var(--p-text-muted-color);
   cursor: pointer;
   flex: 0 0 auto;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .lex-toolbar-btn:hover:not(:disabled) {
@@ -1045,7 +1137,13 @@ const SubmitButton = defineComponent({
   height: 1rem;
   font-size: 0.78rem;
   line-height: 1;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
 }
 
 .lex-format-glyph-bold {
@@ -1053,7 +1151,7 @@ const SubmitButton = defineComponent({
 }
 
 .lex-format-glyph-italic {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-style: italic;
   font-weight: 700;
 }
@@ -1142,7 +1240,8 @@ const SubmitButton = defineComponent({
 
 /* Below 760px: shrink approve-all to icon-only */
 @container (max-width: 760px) {
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
+  .lex-composer-toolbar
+    :deep(.session-header-controls.area-composer-left .approve-all-button .p-button-label) {
     display: none;
   }
   .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button) {
@@ -1160,10 +1259,12 @@ const SubmitButton = defineComponent({
   .lex-composer-toolbar :deep(.mode-select-shell) {
     display: inline-flex;
   }
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-right .session-terminal-button .p-button-label) {
+  .lex-composer-toolbar
+    :deep(.session-header-controls.area-composer-right .session-terminal-button .p-button-label) {
     display: none;
   }
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-right .session-terminal-button) {
+  .lex-composer-toolbar
+    :deep(.session-header-controls.area-composer-right .session-terminal-button) {
     width: 1.75rem;
     min-width: 1.75rem;
     padding-inline: 0;
@@ -1172,7 +1273,8 @@ const SubmitButton = defineComponent({
 
 /* Below 500px: shrink workspace chip to icon-only */
 @container (max-width: 500px) {
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label) {
+  .lex-composer-toolbar
+    :deep(.session-header-controls.area-composer-left .workspace-chip .p-chip-label) {
     display: none;
   }
   .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip) {
@@ -1204,5 +1306,4 @@ const SubmitButton = defineComponent({
     padding-inline: 0.25rem;
   }
 }
-
 </style>

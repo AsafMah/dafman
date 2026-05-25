@@ -7,16 +7,16 @@
 /// not yet in the configured list get an "Enable" shortcut that
 /// calls `addMcpConfig` + `enableMcpServers`.
 
-import { computed, onMounted, ref } from "vue";
-import Button from "primevue/button";
-import ToggleSwitch from "primevue/toggleswitch";
-import Dialog from "primevue/dialog";
-import { invokeCommand } from "../ipc/invoke";
-import { useToastStore } from "../stores/toastStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import McpServerForm from "./McpServerForm.vue";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, ref } from 'vue';
+import Button from 'primevue/button';
+import ToggleSwitch from 'primevue/toggleswitch';
+import Dialog from 'primevue/dialog';
+import { invokeCommand } from '../ipc/invoke';
+import { useToastStore } from '../stores/toastStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import McpServerForm from './McpServerForm.vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 type McpConfig = Record<string, unknown>;
 type ConfiguredEntry = {
@@ -25,7 +25,7 @@ type ConfiguredEntry = {
   /// Local vs http transport. Falls back to "local" when the SDK
   /// config blob doesn't include a type discriminator (some shapes
   /// only set `command` for local and `url` for http).
-  transport: "local" | "http";
+  transport: 'local' | 'http';
   hasOauth: boolean;
 };
 type DiscoveredEntry = {
@@ -49,21 +49,27 @@ const newlyDiscovered = computed(() =>
 );
 
 function classifyTransport(config: McpConfig): {
-  transport: "local" | "http";
+  transport: 'local' | 'http';
   hasOauth: boolean;
 } {
-  const type = typeof config.type === "string" ? (config.type as string) : null;
-  if (type === "http" || type === "sse") {
-    return { transport: "http", hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType) };
+  const type = typeof config.type === 'string' ? (config.type as string) : null;
+  if (type === 'http' || type === 'sse') {
+    return {
+      transport: 'http',
+      hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType),
+    };
   }
-  if (type === "local" || type === "stdio") {
-    return { transport: "local", hasOauth: false };
+  if (type === 'local' || type === 'stdio') {
+    return { transport: 'local', hasOauth: false };
   }
   // No explicit type — infer from shape. `url` field implies http.
-  if (typeof config.url === "string") {
-    return { transport: "http", hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType) };
+  if (typeof config.url === 'string') {
+    return {
+      transport: 'http',
+      hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType),
+    };
   }
-  return { transport: "local", hasOauth: false };
+  return { transport: 'local', hasOauth: false };
 }
 
 async function loadAll() {
@@ -81,17 +87,19 @@ async function loadAll() {
     const wd =
       active?.workingDirectory ||
       sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
-      "";
+      '';
     // Also query the active session's live MCP list — it includes
     // servers that the SDK auto-discovered AND connected to, which
     // mcp.discover (server-scoped) may miss for plugin-supplied
     // configs that only register against a live session.
     const sessionMcpsPromise = activeId
-      ? invokeCommand("listSessionMcpServers", { sessionId: activeId }).catch(() => [] as Array<{ name: string }>)
+      ? invokeCommand('listSessionMcpServers', { sessionId: activeId }).catch(
+          () => [] as Array<{ name: string }>,
+        )
       : Promise.resolve([] as Array<{ name: string }>);
     const [configs, disc, sessionMcps] = await Promise.all([
-      invokeCommand("listMcpConfigs", {}),
-      invokeCommand("discoverMcpServers", wd ? { workingDirectory: wd } : {}),
+      invokeCommand('listMcpConfigs', {}),
+      invokeCommand('discoverMcpServers', wd ? { workingDirectory: wd } : {}),
       sessionMcpsPromise,
     ]);
     configured.value = Object.entries(configs).map(([name, config]) => {
@@ -109,7 +117,7 @@ async function loadAll() {
       if (merged.has(s.name)) continue;
       merged.set(s.name, {
         name: s.name,
-        source: "session",
+        source: 'session',
         enabled: true,
       });
     }
@@ -127,7 +135,7 @@ async function loadAll() {
 async function syncToggleToActiveSessions(serverName: string, enabled: boolean) {
   for (const session of sessionsStore.sessions) {
     try {
-      await invokeCommand("setSessionMcpEnabled", {
+      await invokeCommand('setSessionMcpEnabled', {
         sessionId: session.id,
         serverName,
         enabled,
@@ -146,19 +154,16 @@ async function toggleEnable(entry: ConfiguredEntry) {
   const next = !currentlyEnabled;
   try {
     if (next) {
-      await invokeCommand("enableMcpServers", { names: [entry.name] });
+      await invokeCommand('enableMcpServers', { names: [entry.name] });
     } else {
-      await invokeCommand("disableMcpServers", { names: [entry.name] });
+      await invokeCommand('disableMcpServers', { names: [entry.name] });
     }
     // Push the change to active sessions so it takes effect immediately
     // (config-level enable/disable only affects new sessions).
     await syncToggleToActiveSessions(entry.name, next);
     await loadAll();
   } catch (err) {
-    toasts.error(
-      "Failed to toggle MCP server",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to toggle MCP server', toErrorMessage(err));
   }
 }
 
@@ -173,29 +178,29 @@ function isEnabled(name: string): boolean {
 async function removeEntry(entry: ConfiguredEntry) {
   if (!confirm(`Remove MCP server "${entry.name}"?`)) return;
   try {
-    await invokeCommand("removeMcpConfig", { name: entry.name });
+    await invokeCommand('removeMcpConfig', { name: entry.name });
     configured.value = configured.value.filter((e) => e.name !== entry.name);
-    toasts.success("MCP server removed", entry.name);
+    toasts.success('MCP server removed', entry.name);
   } catch (err) {
-    toasts.error("Failed to remove", toErrorMessage(err));
+    toasts.error('Failed to remove', toErrorMessage(err));
   }
 }
 
 // ---------- Add / edit dialog ----------
 const dialogOpen = ref(false);
-const dialogMode = ref<"add" | "edit">("add");
-const dialogInitialName = ref<string>("");
+const dialogMode = ref<'add' | 'edit'>('add');
+const dialogInitialName = ref<string>('');
 const dialogInitialConfig = ref<McpConfig>({});
 
 function openAddDialog() {
-  dialogMode.value = "add";
-  dialogInitialName.value = "";
+  dialogMode.value = 'add';
+  dialogInitialName.value = '';
   dialogInitialConfig.value = {};
   dialogOpen.value = true;
 }
 
 function openEditDialog(entry: ConfiguredEntry) {
-  dialogMode.value = "edit";
+  dialogMode.value = 'edit';
   dialogInitialName.value = entry.name;
   dialogInitialConfig.value = JSON.parse(JSON.stringify(entry.config));
   dialogOpen.value = true;
@@ -203,17 +208,17 @@ function openEditDialog(entry: ConfiguredEntry) {
 
 async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
   try {
-    if (dialogMode.value === "edit") {
-      await invokeCommand("updateMcpConfig", payload);
-      toasts.success("MCP server updated", payload.name);
+    if (dialogMode.value === 'edit') {
+      await invokeCommand('updateMcpConfig', payload);
+      toasts.success('MCP server updated', payload.name);
     } else {
-      await invokeCommand("addMcpConfig", payload);
-      toasts.success("MCP server added", payload.name);
+      await invokeCommand('addMcpConfig', payload);
+      toasts.success('MCP server added', payload.name);
     }
     dialogOpen.value = false;
     await loadAll();
   } catch (err) {
-    toasts.error("Save failed", toErrorMessage(err));
+    toasts.error('Save failed', toErrorMessage(err));
   }
 }
 
@@ -221,19 +226,16 @@ async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
 async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
   try {
     if (enabled) {
-      await invokeCommand("enableMcpServers", { names: [entry.name] });
+      await invokeCommand('enableMcpServers', { names: [entry.name] });
     } else {
-      await invokeCommand("disableMcpServers", { names: [entry.name] });
+      await invokeCommand('disableMcpServers', { names: [entry.name] });
     }
     // Push to active sessions so the toggle takes effect immediately.
     await syncToggleToActiveSessions(entry.name, enabled);
     await loadAll();
-    toasts.success(
-      enabled ? "MCP server enabled" : "MCP server disabled",
-      entry.name,
-    );
+    toasts.success(enabled ? 'MCP server enabled' : 'MCP server disabled', entry.name);
   } catch (err) {
-    toasts.error("MCP toggle failed", toErrorMessage(err));
+    toasts.error('MCP toggle failed', toErrorMessage(err));
   }
 }
 
@@ -242,27 +244,27 @@ async function signIn(entry: ConfiguredEntry) {
   const session = sessionsStore.sessions[0];
   if (!session) {
     toasts.warn(
-      "No session to authenticate",
-      "Create a session first; the OAuth flow runs through any active session.",
+      'No session to authenticate',
+      'Create a session first; the OAuth flow runs through any active session.',
     );
     return;
   }
   try {
-    const result = await invokeCommand("loginToMcpServer", {
+    const result = await invokeCommand('loginToMcpServer', {
       sessionId: session.id,
       serverName: entry.name,
     });
     if (result.authorizationUrl) {
-      await invokeCommand("openUrl", { url: result.authorizationUrl });
+      await invokeCommand('openUrl', { url: result.authorizationUrl });
       toasts.info(
-        "OAuth started",
-        "Complete sign-in in your browser; the SDK will reconnect automatically.",
+        'OAuth started',
+        'Complete sign-in in your browser; the SDK will reconnect automatically.',
       );
     } else {
-      toasts.success("Already signed in", entry.name);
+      toasts.success('Already signed in', entry.name);
     }
   } catch (err) {
-    toasts.error("Sign-in failed", toErrorMessage(err));
+    toasts.error('Sign-in failed', toErrorMessage(err));
   }
 }
 
@@ -290,16 +292,36 @@ onMounted(() => {
         @click="loadAll"
       />
     </div>
-    <div v-if="!loaded" class="empty-hint">Loading…</div>
-    <div v-else-if="error" class="empty-hint error">{{ error }}</div>
+    <div
+      v-if="!loaded"
+      class="empty-hint"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="error"
+      class="empty-hint error"
+    >
+      {{ error }}
+    </div>
     <template v-else>
       <section class="mcp-section">
         <h3 class="mcp-section-title">Configured</h3>
-        <div v-if="configured.length === 0" class="empty-hint">
+        <div
+          v-if="configured.length === 0"
+          class="empty-hint"
+        >
           No MCP servers configured.
         </div>
-        <ul v-else class="mcp-list">
-          <li v-for="entry in configured" :key="entry.name" class="mcp-row">
+        <ul
+          v-else
+          class="mcp-list"
+        >
+          <li
+            v-for="entry in configured"
+            :key="entry.name"
+            class="mcp-row"
+          >
             <div class="mcp-row-head">
               <span class="mcp-name">{{ entry.name }}</span>
               <span class="mcp-tag">{{ entry.transport }}</span>
@@ -342,10 +364,17 @@ onMounted(() => {
         </ul>
       </section>
 
-      <section v-if="newlyDiscovered.length > 0" class="mcp-section">
+      <section
+        v-if="newlyDiscovered.length > 0"
+        class="mcp-section"
+      >
         <h3 class="mcp-section-title">Discovered</h3>
         <ul class="mcp-list">
-          <li v-for="entry in newlyDiscovered" :key="entry.name" class="mcp-row">
+          <li
+            v-for="entry in newlyDiscovered"
+            :key="entry.name"
+            class="mcp-row"
+          >
             <div class="mcp-row-head">
               <span class="mcp-name">{{ entry.name }}</span>
               <span class="mcp-tag">{{ entry.source }}</span>

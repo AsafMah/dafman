@@ -13,16 +13,16 @@
 /// Emits `submit` with `{ name, config }` (config is the SDK
 /// `McpServerConfig` opaque shape) and `cancel` for the close action.
 
-import { computed, ref, watch } from "vue";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import SelectButton from "primevue/selectbutton";
-import ToggleSwitch from "primevue/toggleswitch";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, ref, watch } from 'vue';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import SelectButton from 'primevue/selectbutton';
+import ToggleSwitch from 'primevue/toggleswitch';
+import { toErrorMessage } from '../lib/errorMessage';
 
 type McpConfig = Record<string, unknown>;
-type Transport = "local" | "http";
-type Mode = "structured" | "json";
+type Transport = 'local' | 'http';
+type Mode = 'structured' | 'json';
 type EnvEntry = { key: string; value: string };
 type HeaderEntry = { key: string; value: string };
 
@@ -38,38 +38,38 @@ const emit = defineEmits<{
 }>();
 
 // ---------- shared name field ----------
-const name = ref<string>(props.initialName ?? "");
+const name = ref<string>(props.initialName ?? '');
 
 // ---------- mode toggle ----------
-const mode = ref<Mode>("structured");
+const mode = ref<Mode>('structured');
 const modeOptions = [
-  { label: "Form", value: "structured" },
-  { label: "JSON", value: "json" },
+  { label: 'Form', value: 'structured' },
+  { label: 'JSON', value: 'json' },
 ] as const;
 
 // ---------- structured fields ----------
-const transport = ref<Transport>("local");
+const transport = ref<Transport>('local');
 const transportOptions = [
-  { label: "Local (stdio)", value: "local" },
-  { label: "HTTP", value: "http" },
+  { label: 'Local (stdio)', value: 'local' },
+  { label: 'HTTP', value: 'http' },
 ] as const;
 // Local
-const command = ref("");
-const argsText = ref("");
+const command = ref('');
+const argsText = ref('');
 const envEntries = ref<EnvEntry[]>([]);
 // Http
-const url = ref("");
+const url = ref('');
 const headers = ref<HeaderEntry[]>([]);
-const oauthClientId = ref("");
+const oauthClientId = ref('');
 const oauthPublicClient = ref(false);
-const oauthGrantType = ref<string>("");
+const oauthGrantType = ref<string>('');
 
 // ---------- json mode ----------
-const jsonDraft = ref<string>("");
+const jsonDraft = ref<string>('');
 const jsonError = ref<string | null>(null);
 
 function configFromStructured(): McpConfig {
-  if (transport.value === "local") {
+  if (transport.value === 'local') {
     const env: Record<string, string> = {};
     for (const e of envEntries.value) {
       const k = e.key.trim();
@@ -77,7 +77,7 @@ function configFromStructured(): McpConfig {
       env[k] = e.value;
     }
     const out: McpConfig = {
-      type: "local",
+      type: 'local',
       command: command.value.trim(),
       args: argsText.value
         .split(/\s+/)
@@ -95,7 +95,7 @@ function configFromStructured(): McpConfig {
     hdr[k] = h.value;
   }
   const out: McpConfig = {
-    type: "http",
+    type: 'http',
     url: url.value.trim(),
   };
   if (Object.keys(hdr).length > 0) out.headers = hdr;
@@ -106,46 +106,42 @@ function configFromStructured(): McpConfig {
 }
 
 function structuredFromConfig(config: McpConfig): void {
-  const type = typeof config.type === "string" ? (config.type as string) : null;
+  const type = typeof config.type === 'string' ? (config.type as string) : null;
   const inferredTransport: Transport =
-    type === "http" || type === "sse" || typeof config.url === "string"
-      ? "http"
-      : "local";
+    type === 'http' || type === 'sse' || typeof config.url === 'string' ? 'http' : 'local';
   transport.value = inferredTransport;
-  if (inferredTransport === "local") {
-    command.value = typeof config.command === "string" ? config.command : "";
+  if (inferredTransport === 'local') {
+    command.value = typeof config.command === 'string' ? config.command : '';
     const a = config.args;
-    argsText.value = Array.isArray(a) ? (a as unknown[]).map(String).join(" ") : "";
+    argsText.value = Array.isArray(a) ? (a as unknown[]).map(String).join(' ') : '';
     const env = config.env;
     envEntries.value =
-      env && typeof env === "object" && !Array.isArray(env)
+      env && typeof env === 'object' && !Array.isArray(env)
         ? Object.entries(env as Record<string, unknown>).map(([key, value]) => ({
             key,
             value: String(value),
           }))
         : [];
-    url.value = "";
+    url.value = '';
     headers.value = [];
-    oauthClientId.value = "";
+    oauthClientId.value = '';
     oauthPublicClient.value = false;
-    oauthGrantType.value = "";
+    oauthGrantType.value = '';
   } else {
-    url.value = typeof config.url === "string" ? config.url : "";
+    url.value = typeof config.url === 'string' ? config.url : '';
     const h = config.headers;
     headers.value =
-      h && typeof h === "object" && !Array.isArray(h)
+      h && typeof h === 'object' && !Array.isArray(h)
         ? Object.entries(h as Record<string, unknown>).map(([key, value]) => ({
             key,
             value: String(value),
           }))
         : [];
-    oauthClientId.value =
-      typeof config.oauthClientId === "string" ? config.oauthClientId : "";
+    oauthClientId.value = typeof config.oauthClientId === 'string' ? config.oauthClientId : '';
     oauthPublicClient.value = config.oauthPublicClient === true;
-    oauthGrantType.value =
-      typeof config.oauthGrantType === "string" ? config.oauthGrantType : "";
-    command.value = "";
-    argsText.value = "";
+    oauthGrantType.value = typeof config.oauthGrantType === 'string' ? config.oauthGrantType : '';
+    command.value = '';
+    argsText.value = '';
     envEntries.value = [];
   }
 }
@@ -163,7 +159,7 @@ watch(
 
 function onModeChange(next: Mode) {
   if (!next || next === mode.value) return;
-  if (next === "json") {
+  if (next === 'json') {
     // Serialize current structured payload.
     jsonDraft.value = JSON.stringify(configFromStructured(), null, 2);
     jsonError.value = null;
@@ -182,13 +178,13 @@ function onModeChange(next: Mode) {
 }
 
 function addEnvRow() {
-  envEntries.value.push({ key: "", value: "" });
+  envEntries.value.push({ key: '', value: '' });
 }
 function removeEnvRow(i: number) {
   envEntries.value.splice(i, 1);
 }
 function addHeaderRow() {
-  headers.value.push({ key: "", value: "" });
+  headers.value.push({ key: '', value: '' });
 }
 function removeHeaderRow(i: number) {
   headers.value.splice(i, 1);
@@ -196,7 +192,7 @@ function removeHeaderRow(i: number) {
 
 const canSubmit = computed(() => {
   if (!name.value.trim()) return false;
-  if (mode.value === "json") {
+  if (mode.value === 'json') {
     try {
       JSON.parse(jsonDraft.value);
       return true;
@@ -204,13 +200,13 @@ const canSubmit = computed(() => {
       return false;
     }
   }
-  if (transport.value === "local") return command.value.trim().length > 0;
+  if (transport.value === 'local') return command.value.trim().length > 0;
   return url.value.trim().length > 0;
 });
 
 function onSubmit() {
   let config: McpConfig;
-  if (mode.value === "json") {
+  if (mode.value === 'json') {
     try {
       config = JSON.parse(jsonDraft.value) as McpConfig;
     } catch (err) {
@@ -220,14 +216,21 @@ function onSubmit() {
   } else {
     config = configFromStructured();
   }
-  emit("submit", { name: name.value.trim(), config });
+  emit('submit', { name: name.value.trim(), config });
 }
 </script>
 
 <template>
-  <form class="mcp-form" @submit.prevent="onSubmit">
+  <form
+    class="mcp-form"
+    @submit.prevent="onSubmit"
+  >
     <div class="form-row">
-      <label class="form-label" for="mcp-form-name">Name</label>
+      <label
+        class="form-label"
+        for="mcp-form-name"
+        >Name</label
+      >
       <InputText
         id="mcp-form-name"
         v-model="name"
@@ -266,7 +269,11 @@ function onSubmit() {
 
       <template v-if="transport === 'local'">
         <div class="form-row">
-          <label class="form-label" for="mcp-form-cmd">Command</label>
+          <label
+            class="form-label"
+            for="mcp-form-cmd"
+            >Command</label
+          >
           <InputText
             id="mcp-form-cmd"
             v-model="command"
@@ -276,7 +283,11 @@ function onSubmit() {
           />
         </div>
         <div class="form-row">
-          <label class="form-label" for="mcp-form-args">Args</label>
+          <label
+            class="form-label"
+            for="mcp-form-args"
+            >Args</label
+          >
           <InputText
             id="mcp-form-args"
             v-model="argsText"
@@ -297,14 +308,29 @@ function onSubmit() {
               @click="addEnvRow"
             />
           </div>
-          <div v-if="envEntries.length === 0" class="empty-hint">No env vars.</div>
+          <div
+            v-if="envEntries.length === 0"
+            class="empty-hint"
+          >
+            No env vars.
+          </div>
           <div
             v-for="(entry, i) in envEntries"
             :key="`env-${i}`"
             class="kv-row"
           >
-            <InputText v-model="entry.key" placeholder="KEY" size="small" class="kv-key" />
-            <InputText v-model="entry.value" placeholder="value" size="small" class="kv-value" />
+            <InputText
+              v-model="entry.key"
+              placeholder="KEY"
+              size="small"
+              class="kv-key"
+            />
+            <InputText
+              v-model="entry.value"
+              placeholder="value"
+              size="small"
+              class="kv-value"
+            />
             <Button
               icon="pi pi-times"
               size="small"
@@ -319,7 +345,11 @@ function onSubmit() {
 
       <template v-else>
         <div class="form-row">
-          <label class="form-label" for="mcp-form-url">URL</label>
+          <label
+            class="form-label"
+            for="mcp-form-url"
+            >URL</label
+          >
           <InputText
             id="mcp-form-url"
             v-model="url"
@@ -340,14 +370,29 @@ function onSubmit() {
               @click="addHeaderRow"
             />
           </div>
-          <div v-if="headers.length === 0" class="empty-hint">No headers.</div>
+          <div
+            v-if="headers.length === 0"
+            class="empty-hint"
+          >
+            No headers.
+          </div>
           <div
             v-for="(entry, i) in headers"
             :key="`hdr-${i}`"
             class="kv-row"
           >
-            <InputText v-model="entry.key" placeholder="Header-Name" size="small" class="kv-key" />
-            <InputText v-model="entry.value" placeholder="value" size="small" class="kv-value" />
+            <InputText
+              v-model="entry.key"
+              placeholder="Header-Name"
+              size="small"
+              class="kv-key"
+            />
+            <InputText
+              v-model="entry.value"
+              placeholder="value"
+              size="small"
+              class="kv-value"
+            />
             <Button
               icon="pi pi-times"
               size="small"
@@ -359,7 +404,11 @@ function onSubmit() {
           </div>
         </div>
         <div class="form-row">
-          <label class="form-label" for="mcp-form-oauth-client-id">OAuth client ID</label>
+          <label
+            class="form-label"
+            for="mcp-form-oauth-client-id"
+            >OAuth client ID</label
+          >
           <InputText
             id="mcp-form-oauth-client-id"
             v-model="oauthClientId"
@@ -369,7 +418,11 @@ function onSubmit() {
           />
         </div>
         <div class="form-row">
-          <label class="form-label" for="mcp-form-oauth-grant">OAuth grant type</label>
+          <label
+            class="form-label"
+            for="mcp-form-oauth-grant"
+            >OAuth grant type</label
+          >
           <InputText
             id="mcp-form-oauth-grant"
             v-model="oauthGrantType"
@@ -387,19 +440,34 @@ function onSubmit() {
 
     <template v-else>
       <div class="form-row form-row-stack">
-        <label class="form-label" for="mcp-form-json">Raw JSON</label>
+        <label
+          class="form-label"
+          for="mcp-form-json"
+          >Raw JSON</label
+        >
         <textarea
           id="mcp-form-json"
           v-model="jsonDraft"
           class="json-editor"
           rows="12"
         ></textarea>
-        <div v-if="jsonError" class="empty-hint error">{{ jsonError }}</div>
+        <div
+          v-if="jsonError"
+          class="empty-hint error"
+        >
+          {{ jsonError }}
+        </div>
       </div>
     </template>
 
     <div class="form-actions">
-      <Button label="Cancel" size="small" severity="secondary" text @click="emit('cancel')" />
+      <Button
+        label="Cancel"
+        size="small"
+        severity="secondary"
+        text
+        @click="emit('cancel')"
+      />
       <Button
         type="submit"
         :label="nameLocked ? 'Save' : 'Add'"

@@ -5,7 +5,7 @@
 /// (e.g. `javascript({ typescript: true })`) — we call them at lookup
 /// time and cache the result.
 
-import type { Extension } from "@codemirror/state";
+import type { Extension } from '@codemirror/state';
 
 let cache = new Map<string, Extension>();
 
@@ -13,73 +13,73 @@ type LangFactory = () => Promise<Extension>;
 
 const factories: Record<string, LangFactory> = {
   javascript: async () => {
-    const { javascript } = await import("@codemirror/lang-javascript");
+    const { javascript } = await import('@codemirror/lang-javascript');
     return javascript();
   },
   typescript: async () => {
-    const { javascript } = await import("@codemirror/lang-javascript");
+    const { javascript } = await import('@codemirror/lang-javascript');
     return javascript({ typescript: true });
   },
   jsx: async () => {
-    const { javascript } = await import("@codemirror/lang-javascript");
+    const { javascript } = await import('@codemirror/lang-javascript');
     return javascript({ jsx: true });
   },
   tsx: async () => {
-    const { javascript } = await import("@codemirror/lang-javascript");
+    const { javascript } = await import('@codemirror/lang-javascript');
     return javascript({ typescript: true, jsx: true });
   },
   json: async () => {
-    const { json } = await import("@codemirror/lang-json");
+    const { json } = await import('@codemirror/lang-json');
     return json();
   },
   markdown: async () => {
-    const { markdown } = await import("@codemirror/lang-markdown");
+    const { markdown } = await import('@codemirror/lang-markdown');
     return markdown();
   },
   css: async () => {
-    const { css } = await import("@codemirror/lang-css");
+    const { css } = await import('@codemirror/lang-css');
     return css();
   },
   html: async () => {
-    const { html } = await import("@codemirror/lang-html");
+    const { html } = await import('@codemirror/lang-html');
     return html();
   },
   python: async () => {
-    const { python } = await import("@codemirror/lang-python");
+    const { python } = await import('@codemirror/lang-python');
     return python();
   },
   rust: async () => {
-    const { rust } = await import("@codemirror/lang-rust");
+    const { rust } = await import('@codemirror/lang-rust');
     return rust();
   },
   go: async () => {
-    const { go } = await import("@codemirror/lang-go");
+    const { go } = await import('@codemirror/lang-go');
     return go();
   },
 };
 
 const extensionMap: Record<string, string> = {
-  js: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  ts: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  jsx: "jsx",
-  tsx: "tsx",
-  json: "json",
-  jsonc: "json",
-  md: "markdown",
-  markdown: "markdown",
-  css: "css",
-  scss: "css",
-  html: "html",
-  htm: "html",
-  vue: "html",
-  py: "python",
-  pyi: "python",
-  rs: "rust",
-  go: "go",
+  js: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  ts: 'typescript',
+  mts: 'typescript',
+  cts: 'typescript',
+  jsx: 'jsx',
+  tsx: 'tsx',
+  json: 'json',
+  jsonc: 'json',
+  md: 'markdown',
+  markdown: 'markdown',
+  css: 'css',
+  scss: 'css',
+  html: 'html',
+  htm: 'html',
+  vue: 'html',
+  py: 'python',
+  pyi: 'python',
+  rs: 'rust',
+  go: 'go',
 };
 
 /// Resolve a CM6 language extension by language id (one of the keys
@@ -113,7 +113,7 @@ export async function resolveLanguageForFile(
   fileOrExt: string | null | undefined,
 ): Promise<Extension | null> {
   if (!fileOrExt) return null;
-  const cleaned = fileOrExt.replace(/^.*[\\\/.]/, "").toLowerCase();
+  const cleaned = fileOrExt.replace(/^.*[\\\/.]/, '').toLowerCase();
   const langId = extensionMap[cleaned];
   return resolveLanguageExtension(langId);
 }

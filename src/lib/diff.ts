@@ -17,12 +17,12 @@
 /// body. Hunks are split on `@@` markers; if a file has no `@@` and
 /// is an Update, we still keep the body as a single hunk.
 
-type PatchOp = "update" | "add" | "delete";
+type PatchOp = 'update' | 'add' | 'delete';
 
 type PatchHunk = {
   /// Lines as they appear in the patch — prefix `+`, `-`, or ` `
   /// (space). The renderer strips the prefix and styles by kind.
-  lines: Array<{ kind: "added" | "removed" | "context"; text: string }>;
+  lines: Array<{ kind: 'added' | 'removed' | 'context'; text: string }>;
 };
 
 export type PatchFile = {
@@ -36,9 +36,9 @@ export function parseApplyPatch(input: string): PatchFile[] {
   let current: PatchFile | null = null;
   let currentHunk: PatchHunk | null = null;
 
-  const lines = input.split("\n");
+  const lines = input.split('\n');
   for (const raw of lines) {
-    if (raw.startsWith("*** Begin Patch") || raw.startsWith("*** End Patch")) {
+    if (raw.startsWith('*** Begin Patch') || raw.startsWith('*** End Patch')) {
       continue;
     }
     const op = parseFileHeader(raw);
@@ -49,7 +49,7 @@ export function parseApplyPatch(input: string): PatchFile[] {
       continue;
     }
     if (!current) continue;
-    if (raw.startsWith("@@")) {
+    if (raw.startsWith('@@')) {
       currentHunk = { lines: [] };
       current.hunks.push(currentHunk);
       continue;
@@ -58,15 +58,15 @@ export function parseApplyPatch(input: string): PatchFile[] {
       currentHunk = { lines: [] };
       current.hunks.push(currentHunk);
     }
-    if (raw.startsWith("+")) {
-      currentHunk.lines.push({ kind: "added", text: raw.slice(1) });
-    } else if (raw.startsWith("-")) {
-      currentHunk.lines.push({ kind: "removed", text: raw.slice(1) });
-    } else if (raw.startsWith(" ")) {
-      currentHunk.lines.push({ kind: "context", text: raw.slice(1) });
+    if (raw.startsWith('+')) {
+      currentHunk.lines.push({ kind: 'added', text: raw.slice(1) });
+    } else if (raw.startsWith('-')) {
+      currentHunk.lines.push({ kind: 'removed', text: raw.slice(1) });
+    } else if (raw.startsWith(' ')) {
+      currentHunk.lines.push({ kind: 'context', text: raw.slice(1) });
     } else if (raw.length > 0) {
       // Bare content (Add File body, no leading prefix). Treat as add.
-      currentHunk.lines.push({ kind: "added", text: raw });
+      currentHunk.lines.push({ kind: 'added', text: raw });
     }
   }
   return files;

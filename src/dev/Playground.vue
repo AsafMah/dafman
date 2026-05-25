@@ -8,159 +8,162 @@
 // surrounding App.vue's <Toast> service so we don't need our own
 // here.
 
-import { computed, reactive, ref } from "vue";
-import Button from "primevue/button";
-import Tabs from "primevue/tabs";
-import TabList from "primevue/tablist";
-import Tab from "primevue/tab";
-import TabPanels from "primevue/tabpanels";
-import TabPanel from "primevue/tabpanel";
-import ChatWindow from "../components/ChatWindow.vue";
+import { computed, reactive, ref } from 'vue';
+import Button from 'primevue/button';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
+import TabPanel from 'primevue/tabpanel';
+import ChatWindow from '../components/ChatWindow.vue';
 import type {
   ElicitationRequestData,
   PermissionRequestData,
   SessionEventPayload,
   UserInputRequestData,
-} from "../ipc/types";
-import { accentForIndex } from "../lib/color";
-import { useSessionsStore, type SessionRecord } from "../stores/sessionsStore";
-import { useToastStore } from "../stores/toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+} from '../ipc/types';
+import { accentForIndex } from '../lib/color';
+import { useSessionsStore, type SessionRecord } from '../stores/sessionsStore';
+import { useToastStore } from '../stores/toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const toastStore = useToastStore();
 const sessionsStore = useSessionsStore();
 
-type ScriptEvent = Omit<SessionEventPayload, "sessionId">;
+type ScriptEvent = Omit<SessionEventPayload, 'sessionId'>;
 type Script = { label: string; events: ScriptEvent[] };
 /// Grouping label drives which tab a script lives under. Keep flat
 /// so the running scripts array stays a single source of truth.
-type ScriptGroup = "session" | "tools" | "callouts" | "markdown";
+type ScriptGroup = 'session' | 'tools' | 'callouts' | 'markdown';
 
 /// Maps a script label prefix or substring to its tab group. Defined
 /// here (not on each Script object) so the SCRIPTS array stays terse;
 /// new scripts just need to use one of the documented label prefixes.
 function groupForLabel(label: string): ScriptGroup {
-  if (label.startsWith("Tool: ") || label.startsWith("Tools: ")) return "tools";
-  if (label.startsWith("Markdown")) return "markdown";
+  if (label.startsWith('Tool: ') || label.startsWith('Tools: ')) return 'tools';
+  if (label.startsWith('Markdown')) return 'markdown';
   if (
-    label.includes("callout") ||
-    label.includes("failure") ||
-    label.includes("Truncation") ||
-    label.includes("error") ||
-    label.includes("Error") ||
-    label.includes("Compaction")
+    label.includes('callout') ||
+    label.includes('failure') ||
+    label.includes('Truncation') ||
+    label.includes('error') ||
+    label.includes('Error') ||
+    label.includes('Compaction')
   ) {
-    return "callouts";
+    return 'callouts';
   }
-  return "session";
+  return 'session';
 }
 
 const SCRIPTS: Script[] = [
   {
-    label: "Title change",
-    events: [{ eventType: "session.title_changed", data: { title: "Refactor playground" } }],
+    label: 'Title change',
+    events: [{ eventType: 'session.title_changed', data: { title: 'Refactor playground' } }],
   },
   {
-    label: "Model change",
+    label: 'Model change',
     events: [
       {
-        eventType: "session.model_change",
+        eventType: 'session.model_change',
         data: {
-          previousModel: "claude-sonnet-4.5",
-          newModel: "gpt-5.5",
-          previousReasoningEffort: "medium",
-          reasoningEffort: "high",
+          previousModel: 'claude-sonnet-4.5',
+          newModel: 'gpt-5.5',
+          previousReasoningEffort: 'medium',
+          reasoningEffort: 'high',
         },
       },
     ],
   },
   {
-    label: "Usage info",
+    label: 'Usage info',
     events: [
       {
-        eventType: "session.usage_info",
+        eventType: 'session.usage_info',
         data: { currentTokens: 12340, tokenLimit: 200000 },
       },
     ],
   },
   {
-    label: "User -> reasoning -> assistant (full turn)",
+    label: 'User -> reasoning -> assistant (full turn)',
     events: [
-      { eventType: "assistant.turn_start", data: { turnId: "t1" } },
-      { eventType: "assistant.intent", data: { intent: "Drafting the reply" } },
+      { eventType: 'assistant.turn_start', data: { turnId: 't1' } },
+      { eventType: 'assistant.intent', data: { intent: 'Drafting the reply' } },
       {
-        eventType: "assistant.reasoning_delta",
-        data: { reasoningId: "r1", deltaContent: "Let me think about this carefully. " },
+        eventType: 'assistant.reasoning_delta',
+        data: { reasoningId: 'r1', deltaContent: 'Let me think about this carefully. ' },
       },
       {
-        eventType: "assistant.reasoning_delta",
-        data: { reasoningId: "r1", deltaContent: "First I need to consider the context." },
+        eventType: 'assistant.reasoning_delta',
+        data: { reasoningId: 'r1', deltaContent: 'First I need to consider the context.' },
       },
       {
-        eventType: "assistant.reasoning",
+        eventType: 'assistant.reasoning',
         data: {
-          reasoningId: "r1",
+          reasoningId: 'r1',
           content:
-            "Let me think about this carefully. First I need to consider the context, then formulate a clear answer.",
+            'Let me think about this carefully. First I need to consider the context, then formulate a clear answer.',
         },
       },
-      { eventType: "assistant.message_start", data: { messageId: "m1" } },
+      { eventType: 'assistant.message_start', data: { messageId: 'm1' } },
       {
-        eventType: "assistant.message_delta",
-        data: { messageId: "m1", deltaContent: "Hello! " },
+        eventType: 'assistant.message_delta',
+        data: { messageId: 'm1', deltaContent: 'Hello! ' },
       },
       {
-        eventType: "assistant.message_delta",
-        data: { messageId: "m1", deltaContent: "Here is your reply with **markdown** support coming soon." },
+        eventType: 'assistant.message_delta',
+        data: {
+          messageId: 'm1',
+          deltaContent: 'Here is your reply with **markdown** support coming soon.',
+        },
       },
-      { eventType: "assistant.turn_end", data: { turnId: "t1" } },
-      { eventType: "session.idle", data: {} },
+      { eventType: 'assistant.turn_end', data: { turnId: 't1' } },
+      { eventType: 'session.idle', data: {} },
     ],
   },
   {
-    label: "Info callout",
+    label: 'Info callout',
     events: [
       {
-        eventType: "session.info",
+        eventType: 'session.info',
         data: {
-          infoType: "mcp",
+          infoType: 'mcp',
           message: "MCP server 'github' connected",
-          tip: "Use /mcp list to inspect available tools",
+          tip: 'Use /mcp list to inspect available tools',
         },
       },
     ],
   },
   {
-    label: "Warning callout",
+    label: 'Warning callout',
     events: [
       {
-        eventType: "session.warning",
-        data: { warningType: "context_window", message: "Approaching context limit (90%)" },
+        eventType: 'session.warning',
+        data: { warningType: 'context_window', message: 'Approaching context limit (90%)' },
       },
     ],
   },
   {
-    label: "Model call failure",
+    label: 'Model call failure',
     events: [
       {
-        eventType: "model.call_failure",
+        eventType: 'model.call_failure',
         data: {
-          errorMessage: "Rate limit exceeded",
+          errorMessage: 'Rate limit exceeded',
           statusCode: 429,
-          source: "user-initiated",
-          model: "gpt-5.5",
+          source: 'user-initiated',
+          model: 'gpt-5.5',
         },
       },
     ],
   },
   {
-    label: "Truncation",
+    label: 'Truncation',
     events: [
       {
-        eventType: "session.truncation",
+        eventType: 'session.truncation',
         data: {
           messagesRemovedDuringTruncation: 12,
-          performedBy: "BasicTruncator",
+          performedBy: 'BasicTruncator',
           postTruncationMessagesLength: 20,
           postTruncationTokensInMessages: 4000,
           preTruncationMessagesLength: 32,
@@ -172,129 +175,130 @@ const SCRIPTS: Script[] = [
     ],
   },
   {
-    label: "Session error",
-    events: [
-      { eventType: "session.error", data: { message: "Upstream connection reset" } },
-    ],
+    label: 'Session error',
+    events: [{ eventType: 'session.error', data: { message: 'Upstream connection reset' } }],
   },
   {
-    label: "Tool: shell (success)",
+    label: 'Tool: shell (success)',
     events: [
-      { eventType: "assistant.turn_start", data: { turnId: "t-tool" } },
+      { eventType: 'assistant.turn_start', data: { turnId: 't-tool' } },
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-shell-1",
-          toolName: "shell",
-          arguments: { command: "ls -la" },
+          toolCallId: 'call-shell-1',
+          toolName: 'shell',
+          arguments: { command: 'ls -la' },
         },
       },
       {
-        eventType: "tool.execution_progress",
-        data: { toolCallId: "call-shell-1", progressMessage: "Spawning shell…" },
+        eventType: 'tool.execution_progress',
+        data: { toolCallId: 'call-shell-1', progressMessage: 'Spawning shell…' },
       },
       {
-        eventType: "tool.execution_partial_result",
-        data: { toolCallId: "call-shell-1", partialOutput: "total 24\n" },
+        eventType: 'tool.execution_partial_result',
+        data: { toolCallId: 'call-shell-1', partialOutput: 'total 24\n' },
       },
       {
-        eventType: "tool.execution_partial_result",
+        eventType: 'tool.execution_partial_result',
         data: {
-          toolCallId: "call-shell-1",
-          partialOutput: "drwxr-xr-x  2 user user 4096 May 17 16:00 src\n",
+          toolCallId: 'call-shell-1',
+          partialOutput: 'drwxr-xr-x  2 user user 4096 May 17 16:00 src\n',
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-shell-1",
+          toolCallId: 'call-shell-1',
           success: true,
           result: {
-            content: "ok",
+            content: 'ok',
             detailedContent:
-              "total 24\ndrwxr-xr-x  2 user user 4096 May 17 16:00 src\n-rw-r--r--  1 user user  234 May 17 15:58 README.md\n",
+              'total 24\ndrwxr-xr-x  2 user user 4096 May 17 16:00 src\n-rw-r--r--  1 user user  234 May 17 15:58 README.md\n',
           },
         },
       },
-      { eventType: "assistant.turn_end", data: { turnId: "t-tool" } },
+      { eventType: 'assistant.turn_end', data: { turnId: 't-tool' } },
     ],
   },
   {
-    label: "Tool: write (failure)",
+    label: 'Tool: write (failure)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-write-1",
-          toolName: "write",
-          arguments: { path: "/etc/hosts", content: "127.0.0.1 evil.example\n" },
+          toolCallId: 'call-write-1',
+          toolName: 'write',
+          arguments: { path: '/etc/hosts', content: '127.0.0.1 evil.example\n' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-write-1",
+          toolCallId: 'call-write-1',
           success: false,
-          error: { code: "EACCES", message: "permission denied: /etc/hosts" },
+          error: { code: 'EACCES', message: 'permission denied: /etc/hosts' },
         },
       },
     ],
   },
   {
-    label: "Tool: MCP (github · search_issues)",
+    label: 'Tool: MCP (github · search_issues)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-mcp-1",
-          toolName: "github_search_issues",
-          mcpServerName: "github",
-          mcpToolName: "search_issues",
-          arguments: { query: "is:open is:issue assignee:@me" },
+          toolCallId: 'call-mcp-1',
+          toolName: 'github_search_issues',
+          mcpServerName: 'github',
+          mcpToolName: 'search_issues',
+          arguments: { query: 'is:open is:issue assignee:@me' },
         },
-        agentId: "sub-agent-7",
+        agentId: 'sub-agent-7',
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-mcp-1",
+          toolCallId: 'call-mcp-1',
           success: true,
-          result: { content: "Found 3 issues.", detailedContent: "- #42 fix flake\n- #51 docs\n- #58 perf\n" },
+          result: {
+            content: 'Found 3 issues.',
+            detailedContent: '- #42 fix flake\n- #51 docs\n- #58 perf\n',
+          },
         },
-        agentId: "sub-agent-7",
+        agentId: 'sub-agent-7',
       },
     ],
   },
   {
-    label: "Tool: MCP (structured JSON result)",
+    label: 'Tool: MCP (structured JSON result)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-mcp-struct-1",
-          toolName: "github_get_issue",
-          mcpServerName: "github",
-          mcpToolName: "get_issue",
-          arguments: { owner: "AsafMah", repo: "dafman", number: 42 },
+          toolCallId: 'call-mcp-struct-1',
+          toolName: 'github_get_issue',
+          mcpServerName: 'github',
+          mcpToolName: 'get_issue',
+          arguments: { owner: 'AsafMah', repo: 'dafman', number: 42 },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-mcp-struct-1",
+          toolCallId: 'call-mcp-struct-1',
           success: true,
           result: {
             content: JSON.stringify(
               {
                 number: 42,
-                title: "fix(chat): scrollback regression",
-                state: "open",
-                assignees: ["asafmah", "octocat"],
-                labels: ["bug", "regression", "p1"],
+                title: 'fix(chat): scrollback regression',
+                state: 'open',
+                assignees: ['asafmah', 'octocat'],
+                labels: ['bug', 'regression', 'p1'],
                 comments: 7,
-                createdAt: "2026-05-12T10:14:00Z",
+                createdAt: '2026-05-12T10:14:00Z',
                 metrics: { reactions: { thumbsUp: 4, heart: 1 }, watchers: 12 },
-                body: "Tracking down a scroll jump that occurs when streaming a long\nresponse. Repro is in the comments.",
+                body: 'Tracking down a scroll jump that occurs when streaming a long\nresponse. Repro is in the comments.',
               },
               null,
               2,
@@ -306,23 +310,23 @@ const SCRIPTS: Script[] = [
   },
   // ----- Additional tool variants -----------------------------------
   {
-    label: "Tool: read (file contents)",
+    label: 'Tool: read (file contents)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-read-1",
-          toolName: "read",
-          arguments: { path: "src/main.ts" },
+          toolCallId: 'call-read-1',
+          toolName: 'read',
+          arguments: { path: 'src/main.ts' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-read-1",
+          toolCallId: 'call-read-1',
           success: true,
           result: {
-            content: "ok",
+            content: 'ok',
             detailedContent:
               "import { createApp } from 'vue';\nimport { createPinia } from 'pinia';\nimport App from './App.vue';\n\nconst app = createApp(App);\napp.use(createPinia());\napp.mount('#app');\n",
           },
@@ -331,298 +335,298 @@ const SCRIPTS: Script[] = [
     ],
   },
   {
-    label: "Tool: edit (str_replace)",
+    label: 'Tool: edit (str_replace)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-edit-1",
-          toolName: "edit",
+          toolCallId: 'call-edit-1',
+          toolName: 'edit',
           arguments: {
-            path: "src/lib/markdown.ts",
+            path: 'src/lib/markdown.ts',
             oldText:
-              "const md = new MarkdownIt({\n  html: false,\n  linkify: true,\n  breaks: false,\n});\n\nexport function renderMarkdown(text: string) {\n  return md.render(text);\n}",
+              'const md = new MarkdownIt({\n  html: false,\n  linkify: true,\n  breaks: false,\n});\n\nexport function renderMarkdown(text: string) {\n  return md.render(text);\n}',
             newText:
-              "const md = new MarkdownIt({\n  html: true,\n  linkify: true,\n  breaks: true,\n  typographer: true,\n});\n\nexport function renderMarkdown(text: string) {\n  const html = md.render(text);\n  return DOMPurify.sanitize(html);\n}",
+              'const md = new MarkdownIt({\n  html: true,\n  linkify: true,\n  breaks: true,\n  typographer: true,\n});\n\nexport function renderMarkdown(text: string) {\n  const html = md.render(text);\n  return DOMPurify.sanitize(html);\n}',
           },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-edit-1",
+          toolCallId: 'call-edit-1',
           success: true,
-          result: { content: "Replaced 1 occurrence in src/lib/markdown.ts" },
+          result: { content: 'Replaced 1 occurrence in src/lib/markdown.ts' },
         },
       },
     ],
   },
   {
-    label: "Tool: apply_patch (multi-file diff)",
+    label: 'Tool: apply_patch (multi-file diff)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-patch-1",
-          toolName: "apply_patch",
+          toolCallId: 'call-patch-1',
+          toolName: 'apply_patch',
           arguments: {
             input:
-              "*** Begin Patch\n" +
-              "*** Update File: src/App.vue\n" +
-              "@@\n" +
-              " <script setup lang=\"ts\">\n" +
-              "-const isDark = false;\n" +
-              "+const isDark = true;\n" +
-              " const accent = computed(() => accentFor(sessionId));\n" +
-              "*** Add File: src/lib/theme.ts\n" +
-              "+export function isDarkMode(): boolean {\n" +
-              "+  return window.matchMedia(\"(prefers-color-scheme: dark)\").matches;\n" +
-              "+}\n" +
-              "*** Update File: src/main.ts\n" +
-              "@@\n" +
-              "-app.mount(\"#app\");\n" +
-              "+app.use(PrimeVue).mount(\"#app\");\n" +
-              "*** Delete File: src/lib/legacyTheme.ts\n" +
-              "*** End Patch\n",
+              '*** Begin Patch\n' +
+              '*** Update File: src/App.vue\n' +
+              '@@\n' +
+              ' <script setup lang="ts">\n' +
+              '-const isDark = false;\n' +
+              '+const isDark = true;\n' +
+              ' const accent = computed(() => accentFor(sessionId));\n' +
+              '*** Add File: src/lib/theme.ts\n' +
+              '+export function isDarkMode(): boolean {\n' +
+              '+  return window.matchMedia("(prefers-color-scheme: dark)").matches;\n' +
+              '+}\n' +
+              '*** Update File: src/main.ts\n' +
+              '@@\n' +
+              '-app.mount("#app");\n' +
+              '+app.use(PrimeVue).mount("#app");\n' +
+              '*** Delete File: src/lib/legacyTheme.ts\n' +
+              '*** End Patch\n',
           },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-patch-1",
+          toolCallId: 'call-patch-1',
           success: true,
-          result: { content: "Patched 4 files" },
+          result: { content: 'Patched 4 files' },
         },
       },
     ],
   },
   {
-    label: "Tool: grep (matches)",
+    label: 'Tool: grep (matches)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-grep-1",
-          toolName: "grep",
-          arguments: { pattern: "useSessionsStore", path: "src/" },
+          toolCallId: 'call-grep-1',
+          toolName: 'grep',
+          arguments: { pattern: 'useSessionsStore', path: 'src/' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-grep-1",
-          success: true,
-          result: {
-            content:
-              "src/App.vue:12: const sessionsStore = useSessionsStore();\n" +
-              "src/components/ChatTab.vue:34: const sessionsStore = useSessionsStore();\n" +
-              "src/components/ChatTab.vue:88:   const events = useSessionsStore().events;\n" +
-              "src/components/SessionsManager.vue:21: const sessionsStore = useSessionsStore();\n" +
-              "src/dev/Playground.vue:144: const sessionsStore = useSessionsStore();\n" +
-              "src/stores/layoutStore.ts:67: const sessionsStore = useSessionsStore();\n",
-          },
-        },
-      },
-    ],
-  },
-  {
-    label: "Tool: glob (file pattern)",
-    events: [
-      {
-        eventType: "tool.execution_start",
-        data: {
-          toolCallId: "call-glob-1",
-          toolName: "glob",
-          arguments: { pattern: "src/**/*.test.ts" },
-        },
-      },
-      {
-        eventType: "tool.execution_complete",
-        data: {
-          toolCallId: "call-glob-1",
+          toolCallId: 'call-grep-1',
           success: true,
           result: {
             content:
-              "src/lib/__tests__/chatEvents.test.ts\n" +
-              "src/lib/__tests__/markdown.test.ts\n" +
-              "src/lib/__tests__/diff.test.ts\n" +
-              "src/lib/__tests__/palette.test.ts\n" +
-              "src/stores/__tests__/sessionsStore.restore.test.ts\n" +
-              "src/stores/__tests__/layoutStore.addPanel.test.ts\n" +
-              "src/components/__tests__/CommandPalette.test.ts\n" +
-              "src/components/__tests__/JsonSchemaForm.test.ts\n" +
-              "src/components/__tests__/JsonValueView.test.ts",
+              'src/App.vue:12: const sessionsStore = useSessionsStore();\n' +
+              'src/components/ChatTab.vue:34: const sessionsStore = useSessionsStore();\n' +
+              'src/components/ChatTab.vue:88:   const events = useSessionsStore().events;\n' +
+              'src/components/SessionsManager.vue:21: const sessionsStore = useSessionsStore();\n' +
+              'src/dev/Playground.vue:144: const sessionsStore = useSessionsStore();\n' +
+              'src/stores/layoutStore.ts:67: const sessionsStore = useSessionsStore();\n',
           },
         },
       },
     ],
   },
   {
-    label: "Tool: view (file with range)",
+    label: 'Tool: glob (file pattern)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-view-1",
-          toolName: "view",
-          arguments: { path: "package.json", view_range: [1, 15] },
+          toolCallId: 'call-glob-1',
+          toolName: 'glob',
+          arguments: { pattern: 'src/**/*.test.ts' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-view-1",
+          toolCallId: 'call-glob-1',
           success: true,
           result: {
             content:
-              "{\n  \"name\": \"dafman\",\n  \"version\": \"0.1.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"electrobun dev --watch\",\n    \"build\": \"vite build && electrobun build\"\n  }\n}",
+              'src/lib/__tests__/chatEvents.test.ts\n' +
+              'src/lib/__tests__/markdown.test.ts\n' +
+              'src/lib/__tests__/diff.test.ts\n' +
+              'src/lib/__tests__/palette.test.ts\n' +
+              'src/stores/__tests__/sessionsStore.restore.test.ts\n' +
+              'src/stores/__tests__/layoutStore.addPanel.test.ts\n' +
+              'src/components/__tests__/CommandPalette.test.ts\n' +
+              'src/components/__tests__/JsonSchemaForm.test.ts\n' +
+              'src/components/__tests__/JsonValueView.test.ts',
           },
         },
       },
     ],
   },
   {
-    label: "Tool: fetch (HTTP JSON)",
+    label: 'Tool: view (file with range)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-fetch-1",
-          toolName: "fetch",
-          arguments: { url: "https://api.github.com/repos/AsafMah/dafman" },
+          toolCallId: 'call-view-1',
+          toolName: 'view',
+          arguments: { path: 'package.json', view_range: [1, 15] },
         },
       },
       {
-        eventType: "tool.execution_progress",
-        data: { toolCallId: "call-fetch-1", progressMessage: "GET 200 OK" },
-      },
-      {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-fetch-1",
+          toolCallId: 'call-view-1',
           success: true,
           result: {
             content:
-              "{\n  \"name\": \"dafman\",\n  \"full_name\": \"AsafMah/dafman\",\n  \"stargazers_count\": 0,\n  \"language\": \"TypeScript\",\n  \"open_issues\": 3\n}",
+              '{\n  "name": "dafman",\n  "version": "0.1.0",\n  "type": "module",\n  "scripts": {\n    "dev": "electrobun dev --watch",\n    "build": "vite build && electrobun build"\n  }\n}',
           },
         },
       },
     ],
   },
   {
-    label: "Tool: todo_write (task list)",
+    label: 'Tool: fetch (HTTP JSON)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-todo-1",
-          toolName: "todo_write",
+          toolCallId: 'call-fetch-1',
+          toolName: 'fetch',
+          arguments: { url: 'https://api.github.com/repos/AsafMah/dafman' },
+        },
+      },
+      {
+        eventType: 'tool.execution_progress',
+        data: { toolCallId: 'call-fetch-1', progressMessage: 'GET 200 OK' },
+      },
+      {
+        eventType: 'tool.execution_complete',
+        data: {
+          toolCallId: 'call-fetch-1',
+          success: true,
+          result: {
+            content:
+              '{\n  "name": "dafman",\n  "full_name": "AsafMah/dafman",\n  "stargazers_count": 0,\n  "language": "TypeScript",\n  "open_issues": 3\n}',
+          },
+        },
+      },
+    ],
+  },
+  {
+    label: 'Tool: todo_write (task list)',
+    events: [
+      {
+        eventType: 'tool.execution_start',
+        data: {
+          toolCallId: 'call-todo-1',
+          toolName: 'todo_write',
           arguments: {
             todos: [
-              { id: "1", title: "Wire ToolDetails", status: "in_progress" },
-              { id: "2", title: "JSON Schema form renderer", status: "pending" },
-              { id: "3", title: "Result viewer", status: "pending" },
+              { id: '1', title: 'Wire ToolDetails', status: 'in_progress' },
+              { id: '2', title: 'JSON Schema form renderer', status: 'pending' },
+              { id: '3', title: 'Result viewer', status: 'pending' },
             ],
           },
         },
       },
       {
-        eventType: "tool.execution_complete",
-        data: { toolCallId: "call-todo-1", success: true, result: { content: "Saved 3 todos" } },
+        eventType: 'tool.execution_complete',
+        data: { toolCallId: 'call-todo-1', success: true, result: { content: 'Saved 3 todos' } },
       },
     ],
   },
   {
-    label: "Tool: shell (large output, streaming)",
+    label: 'Tool: shell (large output, streaming)',
     events: [
-      { eventType: "assistant.turn_start", data: { turnId: "t-shell-big" } },
+      { eventType: 'assistant.turn_start', data: { turnId: 't-shell-big' } },
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-shell-big",
-          toolName: "shell",
+          toolCallId: 'call-shell-big',
+          toolName: 'shell',
           arguments: { command: "find . -name '*.ts' | head -50" },
         },
       },
       ...Array.from({ length: 12 }, (_, i) => ({
-        eventType: "tool.execution_partial_result",
+        eventType: 'tool.execution_partial_result',
         data: {
-          toolCallId: "call-shell-big",
+          toolCallId: 'call-shell-big',
           partialOutput: `./src/file-${i + 1}.ts\n`,
         },
       })),
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-shell-big",
+          toolCallId: 'call-shell-big',
           success: true,
-          result: { content: "12 files listed" },
+          result: { content: '12 files listed' },
         },
       },
-      { eventType: "assistant.turn_end", data: { turnId: "t-shell-big" } },
+      { eventType: 'assistant.turn_end', data: { turnId: 't-shell-big' } },
     ],
   },
   {
-    label: "Tool: shell (error exit)",
+    label: 'Tool: shell (error exit)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-shell-fail",
-          toolName: "shell",
-          arguments: { command: "cat /nonexistent.txt" },
+          toolCallId: 'call-shell-fail',
+          toolName: 'shell',
+          arguments: { command: 'cat /nonexistent.txt' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-shell-fail",
+          toolCallId: 'call-shell-fail',
           success: false,
-          error: { code: "ENOENT", message: "cat: /nonexistent.txt: No such file or directory" },
+          error: { code: 'ENOENT', message: 'cat: /nonexistent.txt: No such file or directory' },
         },
       },
     ],
   },
   {
-    label: "Tools: 2 concurrent (grep + read)",
+    label: 'Tools: 2 concurrent (grep + read)',
     events: [
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "concur-grep",
-          toolName: "grep",
-          arguments: { pattern: "TODO", path: "src/" },
+          toolCallId: 'concur-grep',
+          toolName: 'grep',
+          arguments: { pattern: 'TODO', path: 'src/' },
         },
       },
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "concur-read",
-          toolName: "read",
-          arguments: { path: "README.md" },
+          toolCallId: 'concur-read',
+          toolName: 'read',
+          arguments: { path: 'README.md' },
         },
       },
       {
-        eventType: "tool.execution_partial_result",
-        data: { toolCallId: "concur-read", partialOutput: "# dafman\n\n" },
+        eventType: 'tool.execution_partial_result',
+        data: { toolCallId: 'concur-read', partialOutput: '# dafman\n\n' },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "concur-grep",
+          toolCallId: 'concur-grep',
           success: true,
-          result: { content: "src/App.vue:42: // TODO: rename\nsrc/lib/x.ts:9: // TODO: fix" },
+          result: { content: 'src/App.vue:42: // TODO: rename\nsrc/lib/x.ts:9: // TODO: fix' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "concur-read",
+          toolCallId: 'concur-read',
           success: true,
           result: {
             content:
-              "# dafman\n\nDesktop replacement for the Copilot CLI.\n\n## Setup\n\nbun install && bun run dev\n",
+              '# dafman\n\nDesktop replacement for the Copilot CLI.\n\n## Setup\n\nbun install && bun run dev\n',
           },
         },
       },
@@ -630,92 +634,92 @@ const SCRIPTS: Script[] = [
   },
   // ----- Markdown / callouts ----------------------------------------
   {
-    label: "Markdown: feature showcase",
+    label: 'Markdown: feature showcase',
     events: [
-      { eventType: "assistant.message_start", data: { messageId: "m-md" } },
+      { eventType: 'assistant.message_start', data: { messageId: 'm-md' } },
       {
-        eventType: "assistant.message",
+        eventType: 'assistant.message',
         data: {
-          messageId: "m-md",
+          messageId: 'm-md',
           content: [
-            "# Markdown feature showcase",
-            "",
-            "Inline **bold**, _italic_, ~~strikethrough~~, ==highlight==, `inline code`,",
-            "math like $E = mc^2$, and an autolinked URL: https://github.com/AsafMah/dafman.",
-            "",
-            "## Lists",
-            "- bullet one",
-            "- bullet two",
-            "  - nested",
-            "1. ordered",
-            "2. second",
-            "",
-            "## Task list",
-            "- [x] ship inline pending card",
-            "- [x] bespoke permission details",
-            "- [ ] tool execution details",
-            "- [ ] JSON schema form",
-            "",
-            "## Table",
-            "| Kind | Status | Notes |",
-            "| --- | --- | --- |",
-            "| shell | ✅ | command + cwd chip |",
-            "| write | ✅ | path + preview |",
-            "| mcp | ⏳ | server + tool chips |",
-            "",
-            "## Code",
-            "```ts",
-            "function greet(name: string): string {",
-            "  return `Hello, ${name}!`;",
-            "}",
-            "```",
-            "",
-            "## Math (block)",
-            "$$\\int_a^b f(x)\\,dx = F(b) - F(a)$$",
-            "",
-            "## Footnotes",
-            "Statement with a footnote.[^1]",
-            "",
-            "[^1]: Footnote body. Backref clickable.",
-            "",
-            "## Definition list",
-            "Term 1",
-            ": First definition.",
-            "",
-            "Term 2",
-            ": Second definition with `code`.",
-            "",
-            "## Emoji",
-            ":smile: :rocket: :bug:",
-            "",
-            "## Collapsible",
-            "<details><summary>Click to expand</summary>",
-            "",
-            "Hidden content with **markdown** inside.",
-            "</details>",
-            "",
-            "## Inline tags",
-            "Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette.",
-            "Use H<sub>2</sub>O and x<sup>2</sup>. Inline <mark>highlight</mark>.",
-            "",
-            "## Quote",
-            "> Markdown should render every common extension, not just headings and lists.",
-            "",
-            "---",
-            "",
-            "End of showcase.",
-          ].join("\n"),
+            '# Markdown feature showcase',
+            '',
+            'Inline **bold**, _italic_, ~~strikethrough~~, ==highlight==, `inline code`,',
+            'math like $E = mc^2$, and an autolinked URL: https://github.com/AsafMah/dafman.',
+            '',
+            '## Lists',
+            '- bullet one',
+            '- bullet two',
+            '  - nested',
+            '1. ordered',
+            '2. second',
+            '',
+            '## Task list',
+            '- [x] ship inline pending card',
+            '- [x] bespoke permission details',
+            '- [ ] tool execution details',
+            '- [ ] JSON schema form',
+            '',
+            '## Table',
+            '| Kind | Status | Notes |',
+            '| --- | --- | --- |',
+            '| shell | ✅ | command + cwd chip |',
+            '| write | ✅ | path + preview |',
+            '| mcp | ⏳ | server + tool chips |',
+            '',
+            '## Code',
+            '```ts',
+            'function greet(name: string): string {',
+            '  return `Hello, ${name}!`;',
+            '}',
+            '```',
+            '',
+            '## Math (block)',
+            '$$\\int_a^b f(x)\\,dx = F(b) - F(a)$$',
+            '',
+            '## Footnotes',
+            'Statement with a footnote.[^1]',
+            '',
+            '[^1]: Footnote body. Backref clickable.',
+            '',
+            '## Definition list',
+            'Term 1',
+            ': First definition.',
+            '',
+            'Term 2',
+            ': Second definition with `code`.',
+            '',
+            '## Emoji',
+            ':smile: :rocket: :bug:',
+            '',
+            '## Collapsible',
+            '<details><summary>Click to expand</summary>',
+            '',
+            'Hidden content with **markdown** inside.',
+            '</details>',
+            '',
+            '## Inline tags',
+            'Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette.',
+            'Use H<sub>2</sub>O and x<sup>2</sup>. Inline <mark>highlight</mark>.',
+            '',
+            '## Quote',
+            '> Markdown should render every common extension, not just headings and lists.',
+            '',
+            '---',
+            '',
+            'End of showcase.',
+          ].join('\n'),
         },
       },
     ],
   },
   {
-    label: "Compaction notice",
+    label: 'Compaction notice',
     events: [
       {
-        eventType: "session.compaction",
+        eventType: 'session.compaction',
         data: {
-          performedBy: "auto",
+          performedBy: 'auto',
           messagesRemoved: 18,
           tokensFreed: 4200,
         },
@@ -723,68 +727,68 @@ const SCRIPTS: Script[] = [
     ],
   },
   {
-    label: "System: info message",
+    label: 'System: info message',
     events: [
       {
-        eventType: "session.info",
-        data: { infoType: "tip", message: "Tip: Ctrl+K opens the command palette." },
+        eventType: 'session.info',
+        data: { infoType: 'tip', message: 'Tip: Ctrl+K opens the command palette.' },
       },
     ],
   },
   {
-    label: "System: warning message",
+    label: 'System: warning message',
     events: [
       {
-        eventType: "session.warning",
-        data: { warningType: "context_window", message: "Approaching context limit (90%)." },
+        eventType: 'session.warning',
+        data: { warningType: 'context_window', message: 'Approaching context limit (90%).' },
       },
     ],
   },
   {
-    label: "Full turn with permission + tool (real flow)",
+    label: 'Full turn with permission + tool (real flow)',
     events: [
-      { eventType: "assistant.turn_start", data: { turnId: "t-flow" } },
+      { eventType: 'assistant.turn_start', data: { turnId: 't-flow' } },
       {
-        eventType: "assistant.intent",
-        data: { intent: "Checking project structure" },
+        eventType: 'assistant.intent',
+        data: { intent: 'Checking project structure' },
       },
       {
-        eventType: "tool.user_requested",
+        eventType: 'tool.user_requested',
         data: {
-          toolCallId: "call-flow-1",
-          toolName: "shell",
-          arguments: { command: "ls -la src" },
+          toolCallId: 'call-flow-1',
+          toolName: 'shell',
+          arguments: { command: 'ls -la src' },
         },
       },
       {
-        eventType: "tool.execution_start",
+        eventType: 'tool.execution_start',
         data: {
-          toolCallId: "call-flow-1",
-          toolName: "shell",
-          arguments: { command: "ls -la src" },
+          toolCallId: 'call-flow-1',
+          toolName: 'shell',
+          arguments: { command: 'ls -la src' },
         },
       },
       {
-        eventType: "tool.execution_complete",
+        eventType: 'tool.execution_complete',
         data: {
-          toolCallId: "call-flow-1",
+          toolCallId: 'call-flow-1',
           success: true,
           result: {
-            content: "components/ dev/ ipc/ lexical/ lib/ stores/ App.vue main.ts style.css",
+            content: 'components/ dev/ ipc/ lexical/ lib/ stores/ App.vue main.ts style.css',
           },
         },
       },
-      { eventType: "assistant.message_start", data: { messageId: "m-flow" } },
+      { eventType: 'assistant.message_start', data: { messageId: 'm-flow' } },
       {
-        eventType: "assistant.message",
+        eventType: 'assistant.message',
         data: {
-          messageId: "m-flow",
+          messageId: 'm-flow',
           content:
-            "Your `src/` has the expected layout: `components/`, `stores/`, `lib/`, `ipc/`, `lexical/`, plus the entry files. Want me to dig into any of them?",
+            'Your `src/` has the expected layout: `components/`, `stores/`, `lib/`, `ipc/`, `lexical/`, plus the entry files. Want me to dig into any of them?',
         },
       },
-      { eventType: "assistant.turn_end", data: { turnId: "t-flow" } },
-      { eventType: "session.idle", data: {} },
+      { eventType: 'assistant.turn_end', data: { turnId: 't-flow' } },
+      { eventType: 'session.idle', data: {} },
     ],
   },
 ];
@@ -796,12 +800,10 @@ const SCRIPTS: Script[] = [
 // short-circuited inside the store (skips the RPC) but still
 // mutates this record's `events` array, so the reducer in the
 // playground's ChatWindow removes the card on response.
-const PLAYGROUND_PENDING_SESSION_ID = "playground-pending";
+const PLAYGROUND_PENDING_SESSION_ID = 'playground-pending';
 
 function ensurePlaygroundSession(): SessionRecord {
-  const existing = sessionsStore.sessions.find(
-    (s) => s.id === PLAYGROUND_PENDING_SESSION_ID,
-  );
+  const existing = sessionsStore.sessions.find((s) => s.id === PLAYGROUND_PENDING_SESSION_ID);
   if (existing) return existing;
   const fresh: SessionRecord = reactive({
     id: PLAYGROUND_PENDING_SESSION_ID,
@@ -810,12 +812,12 @@ function ensurePlaygroundSession(): SessionRecord {
     droppedEventCount: 0,
     model: null,
     reasoningEffort: null,
-    title: "Playground",
+    title: 'Playground',
     mode: null,
     approveAll: false,
-    reasoningVisibilityOverride: "default" as const,
+    reasoningVisibilityOverride: 'default' as const,
     workingDirectory: null,
-    defaultSendMode: "steer" as const,
+    defaultSendMode: 'steer' as const,
     pendingRequests: [],
     unseenTurns: 0,
     isThinking: false,
@@ -842,8 +844,7 @@ const events = playgroundRecord.events;
 const chatKey = ref(0);
 
 function run(script: Script) {
-  for (const e of script.events)
-    events.push({ ...e, sessionId: PLAYGROUND_PENDING_SESSION_ID });
+  for (const e of script.events) events.push({ ...e, sessionId: PLAYGROUND_PENDING_SESSION_ID });
 }
 
 function clearChat() {
@@ -863,11 +864,10 @@ function sleep(ms: number): Promise<void> {
 async function echoSend(text: string): Promise<void> {
   const turnId = `echo-${Date.now()}`;
   const messageId = `echo-msg-${Date.now()}`;
-  const push = (e: ScriptEvent) =>
-    events.push({ ...e, sessionId: PLAYGROUND_PENDING_SESSION_ID });
+  const push = (e: ScriptEvent) => events.push({ ...e, sessionId: PLAYGROUND_PENDING_SESSION_ID });
 
-  push({ eventType: "assistant.turn_start", data: { turnId } });
-  push({ eventType: "assistant.message_start", data: { messageId } });
+  push({ eventType: 'assistant.turn_start', data: { turnId } });
+  push({ eventType: 'assistant.message_start', data: { messageId } });
 
   const reply = `echo: ${text}`;
   // Stream a few characters at a time so the streaming-delta animation
@@ -875,14 +875,14 @@ async function echoSend(text: string): Promise<void> {
   const chunkSize = 4;
   for (let i = 0; i < reply.length; i += chunkSize) {
     push({
-      eventType: "assistant.message_delta",
+      eventType: 'assistant.message_delta',
       data: { messageId, deltaContent: reply.slice(i, i + chunkSize) },
     });
     await sleep(35);
   }
 
-  push({ eventType: "assistant.turn_end", data: { turnId } });
-  push({ eventType: "session.idle", data: {} });
+  push({ eventType: 'assistant.turn_end', data: { turnId } });
+  push({ eventType: 'session.idle', data: {} });
 }
 
 const customEventJson = ref('{"eventType":"assistant.intent","data":{"intent":"Custom intent"}}');
@@ -892,7 +892,7 @@ function pushCustom() {
   customError.value = null;
   try {
     const parsed = JSON.parse(customEventJson.value) as Partial<SessionEventPayload>;
-    if (!parsed.eventType) throw new Error("missing eventType");
+    if (!parsed.eventType) throw new Error('missing eventType');
     events.push({
       sessionId: PLAYGROUND_PENDING_SESSION_ID,
       eventType: parsed.eventType,
@@ -914,17 +914,17 @@ function pushManyEvents(count: number): void {
     const messageId = `stress-msg-${i}`;
     events.push({
       sessionId: PLAYGROUND_PENDING_SESSION_ID,
-      eventType: "assistant.turn_start",
+      eventType: 'assistant.turn_start',
       data: { turnId },
     });
     events.push({
       sessionId: PLAYGROUND_PENDING_SESSION_ID,
-      eventType: "assistant.message",
+      eventType: 'assistant.message',
       data: { messageId, content: `stress message ${i}` },
     });
     events.push({
       sessionId: PLAYGROUND_PENDING_SESSION_ID,
-      eventType: "assistant.turn_end",
+      eventType: 'assistant.turn_end',
       data: { turnId },
     });
   }
@@ -932,7 +932,7 @@ function pushManyEvents(count: number): void {
   toastStore.info(`Pushed ${count * 3} events`, `${ms.toFixed(0)} ms enqueue`);
 }
 
-const toastSeverities = ["info", "success", "warn", "error"] as const;
+const toastSeverities = ['info', 'success', 'warn', 'error'] as const;
 function fireToast(severity: (typeof toastSeverities)[number]) {
   toastStore[severity](
     `${severity.toUpperCase()} toast`,
@@ -961,16 +961,13 @@ function nextRequestId(): string {
 }
 
 function injectPending(
-  kind: "permission" | "userInput" | "elicitation",
-  request:
-    | PermissionRequestData
-    | UserInputRequestData
-    | ElicitationRequestData,
+  kind: 'permission' | 'userInput' | 'elicitation',
+  request: PermissionRequestData | UserInputRequestData | ElicitationRequestData,
 ): void {
   const requestId = nextRequestId();
   events.push({
     sessionId: PLAYGROUND_PENDING_SESSION_ID,
-    eventType: "dafman.pending_request",
+    eventType: 'dafman.pending_request',
     data: {
       sessionId: PLAYGROUND_PENDING_SESSION_ID,
       requestId,
@@ -981,19 +978,19 @@ function injectPending(
 }
 
 function injectPermission(
-  kind: PermissionRequestData["kind"],
+  kind: PermissionRequestData['kind'],
   summary: string,
   raw: Record<string, unknown>,
 ) {
-  injectPending("permission", { kind, summary, raw });
+  injectPending('permission', { kind, summary, raw });
 }
 
 function injectUserInput(request: UserInputRequestData) {
-  injectPending("userInput", request);
+  injectPending('userInput', request);
 }
 
 function injectElicitation(request: ElicitationRequestData) {
-  injectPending("elicitation", request);
+  injectPending('elicitation', request);
 }
 
 function clearPlaygroundQueue() {
@@ -1006,201 +1003,189 @@ function clearPlaygroundQueue() {
       sessionId: PLAYGROUND_PENDING_SESSION_ID,
       requestId: p.requestId,
     };
-    if (p.kind === "permission") {
+    if (p.kind === 'permission') {
       void sessionsStore.respondToPending({
         ...base,
-        response: { kind: "permission", decision: "reject" },
+        response: { kind: 'permission', decision: 'reject' },
       });
-    } else if (p.kind === "userInput") {
+    } else if (p.kind === 'userInput') {
       void sessionsStore.respondToPending({
         ...base,
-        response: { kind: "userInput", answer: "", wasFreeform: false },
+        response: { kind: 'userInput', answer: '', wasFreeform: false },
       });
     } else {
       void sessionsStore.respondToPending({
         ...base,
-        response: { kind: "elicitation", action: "cancel" },
+        response: { kind: 'elicitation', action: 'cancel' },
       });
     }
   }
 }
 
 function injectShellPermission() {
-  injectPermission(
-    "shell",
-    "Run a shell command",
-    { command: "rm -rf /tmp/cache && echo done", cwd: "/home/user" },
-  );
+  injectPermission('shell', 'Run a shell command', {
+    command: 'rm -rf /tmp/cache && echo done',
+    cwd: '/home/user',
+  });
 }
 
 function injectWritePermission() {
-  injectPermission(
-    "write",
-    "Modify src/components/NewWidget.vue",
-    {
-      path: "src/components/NewWidget.vue",
-      contentPreview:
-        "<template>\n  <div class=\"widget\">\n    <h2>{{ title }}</h2>\n  </div>\n</template>\n\n<" + "script setup lang=\"ts\">\nconst title = 'New widget';\n</" + "script>\n",
-    },
-  );
+  injectPermission('write', 'Modify src/components/NewWidget.vue', {
+    path: 'src/components/NewWidget.vue',
+    contentPreview:
+      '<template>\n  <div class="widget">\n    <h2>{{ title }}</h2>\n  </div>\n</template>\n\n<' +
+      'script setup lang="ts">\nconst title = \'New widget\';\n</' +
+      'script>\n',
+  });
 }
 
 function injectReadPermission() {
-  injectPermission(
-    "read",
-    "Read package.json",
-    { path: "package.json" },
-  );
+  injectPermission('read', 'Read package.json', { path: 'package.json' });
 }
 
 function injectUrlPermission() {
-  injectPermission(
-    "url",
-    "Open https://api.github.com/...",
-    { url: "https://api.github.com/repos/AsafMah/dafman/issues?state=open&assignee=me" },
-  );
+  injectPermission('url', 'Open https://api.github.com/...', {
+    url: 'https://api.github.com/repos/AsafMah/dafman/issues?state=open&assignee=me',
+  });
 }
 
 function injectMcpPermission() {
-  injectPermission(
-    "mcp",
-    "Call github / create_issue",
-    {
-      serverName: "github",
-      toolName: "create_issue",
-      arguments: { repo: "AsafMah/dafman", title: "Bug: thing broken", body: "Steps to reproduce..." },
+  injectPermission('mcp', 'Call github / create_issue', {
+    serverName: 'github',
+    toolName: 'create_issue',
+    arguments: {
+      repo: 'AsafMah/dafman',
+      title: 'Bug: thing broken',
+      body: 'Steps to reproduce...',
     },
-  );
+  });
 }
 
 function injectMemoryPermission() {
-  injectPermission(
-    "memory",
-    "Save to memory",
-    {
-      content: "User prefers TypeScript with strict mode and 2-space indentation. Composer should default to plain text mode on Linux.",
-    },
-  );
+  injectPermission('memory', 'Save to memory', {
+    content:
+      'User prefers TypeScript with strict mode and 2-space indentation. Composer should default to plain text mode on Linux.',
+  });
 }
 
 function injectUserInputFreeform() {
   injectUserInput({
-    question: "What should I name the new component?",
+    question: 'What should I name the new component?',
     allowFreeform: true,
   });
 }
 
 function injectUserInputChoices() {
   injectUserInput({
-    question: "Which testing framework should I use?",
-    choices: ["Vitest", "Bun test", "Mocha", "Jest"],
+    question: 'Which testing framework should I use?',
+    choices: ['Vitest', 'Bun test', 'Mocha', 'Jest'],
     allowFreeform: false,
   });
 }
 
 function injectUserInputChoicesPlusFreeform() {
   injectUserInput({
-    question: "Pick a deployment target (or type a custom name).",
-    choices: ["staging", "production", "preview"],
+    question: 'Pick a deployment target (or type a custom name).',
+    choices: ['staging', 'production', 'preview'],
     allowFreeform: true,
   });
 }
 
 function injectElicitationUrl() {
   injectElicitation({
-    message: "Authenticate with GitHub to continue.",
-    mode: "url",
-    elicitationSource: "mcp/github",
-    url: "https://github.com/login/oauth/authorize?client_id=demo",
+    message: 'Authenticate with GitHub to continue.',
+    mode: 'url',
+    elicitationSource: 'mcp/github',
+    url: 'https://github.com/login/oauth/authorize?client_id=demo',
   });
 }
 
 function injectElicitationForm() {
   injectElicitation({
-    message: "Configure the database connection.",
-    mode: "form",
-    elicitationSource: "mcp/database",
+    message: 'Configure the database connection.',
+    mode: 'form',
+    elicitationSource: 'mcp/database',
     requestedSchema: {
-      type: "object",
-      description: "Connection settings for the dev database.",
+      type: 'object',
+      description: 'Connection settings for the dev database.',
       properties: {
         host: {
-          type: "string",
-          title: "Host",
-          description: "Hostname or IP address.",
-          default: "localhost",
+          type: 'string',
+          title: 'Host',
+          description: 'Hostname or IP address.',
+          default: 'localhost',
         },
         port: {
-          type: "integer",
-          title: "Port",
+          type: 'integer',
+          title: 'Port',
           minimum: 1,
           maximum: 65535,
           default: 5432,
         },
         engine: {
-          type: "string",
-          title: "Engine",
-          enum: ["postgres", "mysql", "sqlite"],
-          default: "postgres",
+          type: 'string',
+          title: 'Engine',
+          enum: ['postgres', 'mysql', 'sqlite'],
+          default: 'postgres',
         },
         useSsl: {
-          type: "boolean",
-          title: "Use SSL",
-          description: "Require TLS when connecting.",
+          type: 'boolean',
+          title: 'Use SSL',
+          description: 'Require TLS when connecting.',
           default: true,
         },
         credentials: {
-          type: "object",
-          title: "Credentials",
-          required: ["username"],
+          type: 'object',
+          title: 'Credentials',
+          required: ['username'],
           properties: {
-            username: { type: "string", title: "Username" },
-            password: { type: "string", title: "Password" },
+            username: { type: 'string', title: 'Username' },
+            password: { type: 'string', title: 'Password' },
           },
         },
       },
-      required: ["host", "port", "engine"],
+      required: ['host', 'port', 'engine'],
     },
   });
 }
 
 function injectElicitationFormRich() {
   injectElicitation({
-    message: "Pick deployment options.",
-    mode: "form",
-    elicitationSource: "mcp/deploy",
+    message: 'Pick deployment options.',
+    mode: 'form',
+    elicitationSource: 'mcp/deploy',
     requestedSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         environment: {
-          type: "string",
-          title: "Environment",
+          type: 'string',
+          title: 'Environment',
           oneOf: [
-            { const: "dev", title: "Development" },
-            { const: "staging", title: "Staging" },
-            { const: "prod", title: "Production" },
+            { const: 'dev', title: 'Development' },
+            { const: 'staging', title: 'Staging' },
+            { const: 'prod', title: 'Production' },
           ],
-          default: "dev",
+          default: 'dev',
         },
         region: {
-          type: "string",
-          title: "Region",
-          enum: ["us-east-1", "us-west-2", "eu-west-1", "ap-south-1", "sa-east-1"],
+          type: 'string',
+          title: 'Region',
+          enum: ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-south-1', 'sa-east-1'],
         },
         tags: {
-          type: "array",
-          title: "Tags",
-          description: "Free-form labels for the deployment.",
-          items: { type: "string" },
+          type: 'array',
+          title: 'Tags',
+          description: 'Free-form labels for the deployment.',
+          items: { type: 'string' },
         },
         contact: {
-          type: "string",
-          title: "On-call email",
-          format: "email",
+          type: 'string',
+          title: 'On-call email',
+          format: 'email',
         },
-        notes: { type: "string", title: "Notes" },
+        notes: { type: 'string', title: 'Notes' },
       },
-      required: ["environment", "region"],
+      required: ['environment', 'region'],
     },
   });
 }
@@ -1223,19 +1208,20 @@ const scriptsByGroup = computed(() => {
   return map;
 });
 
-const activeTab = ref<"session" | "tools" | "pending" | "markdown" | "callouts" | "toasts" | "custom">("tools");
+const activeTab = ref<
+  'session' | 'tools' | 'pending' | 'markdown' | 'callouts' | 'toasts' | 'custom'
+>('tools');
 
 /// Quick theme preview toggle. Flips the `.app-dark` class directly
 /// on `<html>` so we can preview both palettes without leaving the
 /// dev panel. Initialized from whatever applyThemeClass set so the
 /// toggle starts in sync with the user's chosen theme.
 const isDarkPreview = ref(
-  typeof document !== "undefined" &&
-    document.documentElement.classList.contains("app-dark"),
+  typeof document !== 'undefined' && document.documentElement.classList.contains('app-dark'),
 );
 function toggleDarkPreview() {
   isDarkPreview.value = !isDarkPreview.value;
-  document.documentElement.classList.toggle("app-dark", isDarkPreview.value);
+  document.documentElement.classList.toggle('app-dark', isDarkPreview.value);
 }
 </script>
 
@@ -1257,13 +1243,16 @@ function toggleDarkPreview() {
         />
       </div>
       <p class="muted">
-        Dev-only surface for exercising chat components in isolation.
-        Tabs hold the injection controls; the chat preview below
-        renders the resulting state. Close the tab to reset.
+        Dev-only surface for exercising chat components in isolation. Tabs hold the injection
+        controls; the chat preview below renders the resulting state. Close the tab to reset.
       </p>
     </header>
 
-    <Tabs v-model:value="activeTab" scrollable class="playground-tabs">
+    <Tabs
+      v-model:value="activeTab"
+      scrollable
+      class="playground-tabs"
+    >
       <TabList>
         <Tab value="tools">Tools</Tab>
         <Tab value="session">Session & turns</Tab>
@@ -1305,38 +1294,103 @@ function toggleDarkPreview() {
         <!-- Pending requests — the inline PendingRequestCard surface -->
         <TabPanel value="pending">
           <p class="muted small panel-blurb">
-            Each button enqueues a fake SDK callback on the playground
-            session. The card renders inline in the chat below; FIFO
-            across all kinds. Responses short-circuit the RPC so you
+            Each button enqueues a fake SDK callback on the playground session. The card renders
+            inline in the chat below; FIFO across all kinds. Responses short-circuit the RPC so you
             can iterate on the UI without a live bun handler.
           </p>
           <div class="actions">
-            <Button label="Permission: shell" size="small" severity="secondary" @click="injectShellPermission" />
-            <Button label="Permission: write" size="small" severity="secondary" @click="injectWritePermission" />
-            <Button label="Permission: read" size="small" severity="secondary" @click="injectReadPermission" />
-            <Button label="Permission: url" size="small" severity="secondary" @click="injectUrlPermission" />
-            <Button label="Permission: mcp" size="small" severity="secondary" @click="injectMcpPermission" />
-            <Button label="Permission: memory" size="small" severity="secondary" @click="injectMemoryPermission" />
+            <Button
+              label="Permission: shell"
+              size="small"
+              severity="secondary"
+              @click="injectShellPermission"
+            />
+            <Button
+              label="Permission: write"
+              size="small"
+              severity="secondary"
+              @click="injectWritePermission"
+            />
+            <Button
+              label="Permission: read"
+              size="small"
+              severity="secondary"
+              @click="injectReadPermission"
+            />
+            <Button
+              label="Permission: url"
+              size="small"
+              severity="secondary"
+              @click="injectUrlPermission"
+            />
+            <Button
+              label="Permission: mcp"
+              size="small"
+              severity="secondary"
+              @click="injectMcpPermission"
+            />
+            <Button
+              label="Permission: memory"
+              size="small"
+              severity="secondary"
+              @click="injectMemoryPermission"
+            />
           </div>
           <div class="actions">
-            <Button label="User input: freeform" size="small" severity="secondary" @click="injectUserInputFreeform" />
-            <Button label="User input: choices" size="small" severity="secondary" @click="injectUserInputChoices" />
-            <Button label="User input: both" size="small" severity="secondary" @click="injectUserInputChoicesPlusFreeform" />
+            <Button
+              label="User input: freeform"
+              size="small"
+              severity="secondary"
+              @click="injectUserInputFreeform"
+            />
+            <Button
+              label="User input: choices"
+              size="small"
+              severity="secondary"
+              @click="injectUserInputChoices"
+            />
+            <Button
+              label="User input: both"
+              size="small"
+              severity="secondary"
+              @click="injectUserInputChoicesPlusFreeform"
+            />
           </div>
           <div class="actions">
-            <Button label="Elicitation: URL (OAuth)" size="small" severity="secondary" @click="injectElicitationUrl" />
-            <Button label="Elicitation: form (database)" size="small" severity="secondary" @click="injectElicitationForm" />
-            <Button label="Elicitation: form (deploy)" size="small" severity="secondary" @click="injectElicitationFormRich" />
-            <Button label="Clear queue" icon="pi pi-trash" severity="danger" text size="small" @click="clearPlaygroundQueue" />
+            <Button
+              label="Elicitation: URL (OAuth)"
+              size="small"
+              severity="secondary"
+              @click="injectElicitationUrl"
+            />
+            <Button
+              label="Elicitation: form (database)"
+              size="small"
+              severity="secondary"
+              @click="injectElicitationForm"
+            />
+            <Button
+              label="Elicitation: form (deploy)"
+              size="small"
+              severity="secondary"
+              @click="injectElicitationFormRich"
+            />
+            <Button
+              label="Clear queue"
+              icon="pi pi-trash"
+              severity="danger"
+              text
+              size="small"
+              @click="clearPlaygroundQueue"
+            />
           </div>
         </TabPanel>
 
         <!-- Markdown showcase — exercises every plugin we ship -->
         <TabPanel value="markdown">
           <p class="muted small panel-blurb">
-            One-click feature showcase covering headings, lists, tasks,
-            tables, math, code, footnotes, definition lists, emoji,
-            collapsible sections, kbd/sub/sup/mark, and quotes.
+            One-click feature showcase covering headings, lists, tasks, tables, math, code,
+            footnotes, definition lists, emoji, collapsible sections, kbd/sub/sup/mark, and quotes.
           </p>
           <div class="actions">
             <Button
@@ -1367,15 +1421,22 @@ function toggleDarkPreview() {
         <!-- Toasts -->
         <TabPanel value="toasts">
           <p class="muted small panel-blurb">
-            Fires through the global toast store — same surface real
-            actions use.
+            Fires through the global toast store — same surface real actions use.
           </p>
           <div class="actions">
             <Button
               v-for="sev in toastSeverities"
               :key="sev"
               :label="`Fire ${sev}`"
-              :severity="sev === 'error' ? 'danger' : sev === 'warn' ? 'warn' : sev === 'success' ? 'success' : 'info'"
+              :severity="
+                sev === 'error'
+                  ? 'danger'
+                  : sev === 'warn'
+                    ? 'warn'
+                    : sev === 'success'
+                      ? 'success'
+                      : 'info'
+              "
               size="small"
               @click="fireToast(sev)"
             />
@@ -1385,14 +1446,28 @@ function toggleDarkPreview() {
         <!-- Custom event JSON editor -->
         <TabPanel value="custom">
           <p class="muted small panel-blurb">
-            Push any SessionEventPayload through the reducer.
-            `eventType` is required; everything else is your call.
+            Push any SessionEventPayload through the reducer. `eventType` is required; everything
+            else is your call.
           </p>
-          <textarea v-model="customEventJson" rows="4" class="json-input" />
+          <textarea
+            v-model="customEventJson"
+            rows="4"
+            class="json-input"
+          />
           <div class="actions">
-            <Button label="Push event" icon="pi pi-send" size="small" @click="pushCustom" />
+            <Button
+              label="Push event"
+              icon="pi pi-send"
+              size="small"
+              @click="pushCustom"
+            />
           </div>
-          <p v-if="customError" class="error">{{ customError }}</p>
+          <p
+            v-if="customError"
+            class="error"
+          >
+            {{ customError }}
+          </p>
         </TabPanel>
       </TabPanels>
     </Tabs>
@@ -1415,7 +1490,14 @@ function toggleDarkPreview() {
           severity="warn"
           @click="pushManyEvents(3333)"
         />
-        <Button label="Clear chat" icon="pi pi-trash" severity="danger" text size="small" @click="clearChat" />
+        <Button
+          label="Clear chat"
+          icon="pi pi-trash"
+          severity="danger"
+          text
+          size="small"
+          @click="clearChat"
+        />
       </header>
       <div class="chat-frame">
         <ChatWindow

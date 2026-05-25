@@ -15,23 +15,23 @@
 // the user opts in). When the gate is off, mermaid fences fall back
 // to the normal code-editor path so the source is still visible.
 
-import { computed } from "vue";
-import { storeToRefs } from "pinia";
-import { renderMarkdownSegments } from "../lib/markdown";
+import { computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { renderMarkdownSegments } from '../lib/markdown';
 // Side-effect import: registers extra prism grammars for the inline /
 // nested code path that still goes through markdown-it's highlight
 // hook. See prismExtraLanguages.ts for the language list.
-import "../lexical/prismExtraLanguages";
-import CodeEditor from "./CodeEditor.vue";
-import MermaidBlock from "./MermaidBlock.vue";
-import { useSettingsStore } from "../stores/settingsStore";
+import '../lexical/prismExtraLanguages';
+import CodeEditor from './CodeEditor.vue';
+import MermaidBlock from './MermaidBlock.vue';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const props = withDefaults(
   defineProps<{
     text: string;
     label?: string;
   }>(),
-  { label: "Message content" },
+  { label: 'Message content' },
 );
 
 const settingsStore = useSettingsStore();
@@ -40,8 +40,8 @@ const segments = computed(() => renderMarkdownSegments(props.text));
 
 function isMermaidSegment(seg: ReturnType<typeof renderMarkdownSegments>[number]): boolean {
   return (
-    seg.kind === "code" &&
-    seg.language?.toLowerCase() === "mermaid" &&
+    seg.kind === 'code' &&
+    seg.language?.toLowerCase() === 'mermaid' &&
     settings.value.appearance.enableMermaid
   );
 }
@@ -54,7 +54,10 @@ function isMermaidSegment(seg: ReturnType<typeof renderMarkdownSegments>[number]
     :aria-readonly="true"
     :aria-label="props.label"
   >
-    <template v-for="(seg, idx) in segments" :key="idx">
+    <template
+      v-for="(seg, idx) in segments"
+      :key="idx"
+    >
       <div
         v-if="seg.kind === 'html'"
         class="md-html-segment"

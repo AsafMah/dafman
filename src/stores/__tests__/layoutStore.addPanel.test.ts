@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { setActivePinia, createPinia } from "pinia";
-import type { DockviewApi } from "dockview-core";
-import { useLayoutStore } from "../layoutStore";
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { setActivePinia, createPinia } from 'pinia';
+import type { DockviewApi } from 'dockview-core';
+import { useLayoutStore } from '../layoutStore';
 
 // Minimal fake dockview API. Covers only the methods the layoutStore
 // addPanel path actually touches; everything else throws so a future
@@ -15,7 +15,7 @@ import { useLayoutStore } from "../layoutStore";
 
 type FakeGroup = {
   id: string;
-  locationType: "grid" | "edge";
+  locationType: 'grid' | 'edge';
   panels: Array<{ id: string; component: string }>;
 };
 
@@ -68,7 +68,7 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
     addGroup() {
       const newGroup: FakeGroup = {
         id: `g${nextGroupId++}`,
-        locationType: "grid",
+        locationType: 'grid',
         panels: [],
       };
       groups.push(newGroup);
@@ -84,16 +84,16 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
       // assumption and we throw to surface it.
       const direction = args.position?.direction;
       const refId = args.position?.referenceGroup;
-      if (direction === "within") {
+      if (direction === 'within') {
         const target = groups.find((g) => g.id === refId);
         if (!target) {
           throw new Error(`fake dock: addPanel within ${refId} but no such group`);
         }
         target.panels.push({ id: args.id, component: args.component });
-      } else if (direction === "right") {
+      } else if (direction === 'right') {
         const newGroup: FakeGroup = {
           id: `g${nextGroupId++}`,
-          locationType: "grid",
+          locationType: 'grid',
           panels: [{ id: args.id, component: args.component }],
         };
         groups.push(newGroup);
@@ -113,7 +113,7 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
         } else {
           const newGroup: FakeGroup = {
             id: `g${nextGroupId++}`,
-            locationType: "grid",
+            locationType: 'grid',
             panels: [{ id: args.id, component: args.component }],
           };
           groups.push(newGroup);
@@ -140,16 +140,22 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
       const id = opts.id ?? `edge-${position}`;
       const newGroup: FakeGroup = {
         id,
-        locationType: "edge",
+        locationType: 'edge',
         panels: [],
       };
       groups.push(newGroup);
       addGroupCalls.push({ id });
       return { id };
     },
-    removeEdgeGroup() { /* no-op */ },
-    setEdgeGroupVisible() { /* no-op */ },
-    isEdgeGroupVisible() { return true; },
+    removeEdgeGroup() {
+      /* no-op */
+    },
+    setEdgeGroupVisible() {
+      /* no-op */
+    },
+    isEdgeGroupVisible() {
+      return true;
+    },
     onDidActiveGroupChange: () => ({ dispose: () => {} }),
     onDidActivePanelChange: () => ({ dispose: () => {} }),
     onDidAddPanel: () => ({ dispose: () => {} }),
@@ -159,17 +165,17 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
   return { api, addPanelCalls, addGroupCalls, groups };
 }
 
-describe("layoutStore.addPanel placement", () => {
+describe('layoutStore.addPanel placement', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  test("no groups at all → creates a body group and drops panel WITHIN it (not as a sibling)", () => {
+  test('no groups at all → creates a body group and drops panel WITHIN it (not as a sibling)', () => {
     const dock = makeFakeDock([]);
     const store = useLayoutStore();
     store.setApi(dock.api);
 
-    store.addPanel("session-1");
+    store.addPanel('session-1');
 
     // addPanel is responsible for the CHAT panel placement decision;
     // it also auto-opens the per-session details right-rail panel
@@ -177,81 +183,85 @@ describe("layoutStore.addPanel placement", () => {
     // matters for placement (edge groups are tracked separately via
     // addEdgeGroup), but the fake also routes addEdgeGroup through
     // addGroupCalls, so we filter on the body-grid id we expect.
-    const chatCall = dock.addPanelCalls.find((c) => c.component === "chat")!;
+    const chatCall = dock.addPanelCalls.find((c) => c.component === 'chat')!;
     expect(chatCall).toBeDefined();
-    expect(chatCall.id).toBe("session-1");
-    expect(chatCall.position?.direction).toBe("within");
+    expect(chatCall.id).toBe('session-1');
+    expect(chatCall.position?.direction).toBe('within');
     const bodyGroupId = chatCall.position?.referenceGroup;
     expect(bodyGroupId).toBeDefined();
     expect(dock.addGroupCalls.some((g) => g.id === bodyGroupId)).toBe(true);
     const bodyGroup = dock.groups.find((g) => g.id === bodyGroupId);
-    expect(bodyGroup?.panels.map((p) => p.id)).toEqual(["session-1"]);
+    expect(bodyGroup?.panels.map((p) => p.id)).toEqual(['session-1']);
   });
 
-  test("only edge group exists (Sessions sidebar) → still creates a body group, panel does NOT land in the sidebar", () => {
+  test('only edge group exists (Sessions sidebar) → still creates a body group, panel does NOT land in the sidebar', () => {
     const dock = makeFakeDock([
-      { id: "sessions-sidebar", locationType: "edge", panels: [{ id: "sessions-manager", component: "sessionsManager" }] },
+      {
+        id: 'sessions-sidebar',
+        locationType: 'edge',
+        panels: [{ id: 'sessions-manager', component: 'sessionsManager' }],
+      },
     ]);
     const store = useLayoutStore();
     store.setApi(dock.api);
 
-    store.addPanel("session-1");
+    store.addPanel('session-1');
 
-    const chatCall = dock.addPanelCalls.find((c) => c.component === "chat")!;
-    expect(chatCall.position?.direction).toBe("within");
+    const chatCall = dock.addPanelCalls.find((c) => c.component === 'chat')!;
+    expect(chatCall.position?.direction).toBe('within');
     const newBodyId = chatCall.position?.referenceGroup;
     expect(newBodyId).toBeDefined();
     expect(dock.addGroupCalls.some((g) => g.id === newBodyId)).toBe(true);
     // Sidebar must remain untouched.
-    const sidebar = dock.groups.find((g) => g.id === "sessions-sidebar");
-    expect(sidebar?.panels.map((p) => p.id)).toEqual(["sessions-manager"]);
+    const sidebar = dock.groups.find((g) => g.id === 'sessions-sidebar');
+    expect(sidebar?.panels.map((p) => p.id)).toEqual(['sessions-manager']);
     // Chat panel landed in the new body group.
     const body = dock.groups.find((g) => g.id === newBodyId);
-    expect(body?.panels.map((p) => p.id)).toEqual(["session-1"]);
+    expect(body?.panels.map((p) => p.id)).toEqual(['session-1']);
   });
 
-  test("body group already exists → tile to the RIGHT (new group), not within", () => {
+  test('body group already exists → tile to the RIGHT (new group), not within', () => {
     const dock = makeFakeDock([
-      { id: "body-1", locationType: "grid", panels: [{ id: "existing", component: "chat" }] },
+      { id: 'body-1', locationType: 'grid', panels: [{ id: 'existing', component: 'chat' }] },
     ]);
     const store = useLayoutStore();
     store.setApi(dock.api);
 
-    store.addPanel("session-2");
+    store.addPanel('session-2');
 
     // No new body group via addGroup() — dockview creates the sibling
     // group as part of `addPanel({ direction: "right" })`. The
     // details-rail panel will trigger an addEdgeGroup call though;
     // assert specifically on the chat-panel placement.
-    const chatCall = dock.addPanelCalls.find((c) => c.component === "chat")!;
-    expect(chatCall.position?.direction).toBe("right");
-    expect(chatCall.position?.referenceGroup).toBe("body-1");
+    const chatCall = dock.addPanelCalls.find((c) => c.component === 'chat')!;
+    expect(chatCall.position?.direction).toBe('right');
+    expect(chatCall.position?.referenceGroup).toBe('body-1');
     // Only the right-edge details group should be the addGroupCalls
     // entry (id like `edge-right`), NOT a body group.
-    expect(dock.addGroupCalls.every((g) => g.id.startsWith("edge-"))).toBe(true);
+    expect(dock.addGroupCalls.every((g) => g.id.startsWith('edge-'))).toBe(true);
   });
 
-  test("targetGroupId supplied (orphan replacement) → WITHIN that group", () => {
+  test('targetGroupId supplied (orphan replacement) → WITHIN that group', () => {
     const dock = makeFakeDock([
-      { id: "body-1", locationType: "grid", panels: [{ id: "orphan", component: "chat" }] },
+      { id: 'body-1', locationType: 'grid', panels: [{ id: 'orphan', component: 'chat' }] },
     ]);
     const store = useLayoutStore();
     store.setApi(dock.api);
 
-    store.addPanel("replacement", { targetGroupId: "body-1" });
+    store.addPanel('replacement', { targetGroupId: 'body-1' });
 
-    expect(dock.addPanelCalls[0]?.position?.direction).toBe("within");
-    expect(dock.addPanelCalls[0]?.position?.referenceGroup).toBe("body-1");
+    expect(dock.addPanelCalls[0]?.position?.direction).toBe('within');
+    expect(dock.addPanelCalls[0]?.position?.referenceGroup).toBe('body-1');
   });
 
   test("duplicate sessionId → no-op (doesn't double-add or split)", () => {
     const dock = makeFakeDock([
-      { id: "body-1", locationType: "grid", panels: [{ id: "session-1", component: "chat" }] },
+      { id: 'body-1', locationType: 'grid', panels: [{ id: 'session-1', component: 'chat' }] },
     ]);
     const store = useLayoutStore();
     store.setApi(dock.api);
 
-    store.addPanel("session-1");
+    store.addPanel('session-1');
 
     expect(dock.addPanelCalls).toHaveLength(0);
     expect(dock.addGroupCalls).toHaveLength(0);

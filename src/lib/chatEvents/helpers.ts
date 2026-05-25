@@ -7,24 +7,21 @@ export function clampOutput(text: string): string {
 }
 
 export function pickString(data: unknown, keys: readonly string[]): string {
-  if (!data || typeof data !== "object") return "";
+  if (!data || typeof data !== 'object') return '';
   const obj = data as Record<string, unknown>;
   for (const key of keys) {
     const v = obj[key];
-    if (typeof v === "string") return v;
+    if (typeof v === 'string') return v;
   }
-  return "";
+  return '';
 }
 
-export function pickNumber(
-  data: unknown,
-  keys: readonly string[],
-): number | null {
-  if (!data || typeof data !== "object") return null;
+export function pickNumber(data: unknown, keys: readonly string[]): number | null {
+  if (!data || typeof data !== 'object') return null;
   const obj = data as Record<string, unknown>;
   for (const key of keys) {
     const v = obj[key];
-    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
   }
   return null;
 }

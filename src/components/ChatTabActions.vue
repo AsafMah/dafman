@@ -9,13 +9,9 @@
 // — `props.params.activePanel`, `props.params.group`, etc. See the
 // stored memory "dockview-vue panel props" for the why.
 
-import { computed } from "vue";
-import type {
-  DockviewApi,
-  DockviewGroupPanel,
-  IDockviewPanel,
-} from "dockview-core";
-import SessionHeaderControls from "./SessionHeaderControls.vue";
+import { computed } from 'vue';
+import type { DockviewApi, DockviewGroupPanel, IDockviewPanel } from 'dockview-core';
+import SessionHeaderControls from './SessionHeaderControls.vue';
 
 interface HeaderActionsParams {
   group: DockviewGroupPanel;
@@ -31,17 +27,13 @@ const props = defineProps<{ params: HeaderActionsParams }>();
 /// (`layoutStore.addPanel({ id: sessionId, … })`). Empty string means
 /// "no panel" which renders nothing (e.g., during edge-group lifecycle
 /// transitions, or for non-chat panels we may add later).
-const activeSessionId = computed(
-  () => props.params?.activePanel?.id ?? "",
-);
+const activeSessionId = computed(() => props.params?.activePanel?.id ?? '');
 
 /// We only render the chat controls for panels whose component is the
 /// chat panel. Future non-chat panels (recent-sessions picker, log
 /// viewer, permission queue, …) won't have this component name and
 /// will just leave the header empty on the right.
-const isChatPanel = computed(
-  () => props.params?.activePanel?.api.component === "chat",
-);
+const isChatPanel = computed(() => props.params?.activePanel?.api.component === 'chat');
 </script>
 
 <template>
@@ -49,7 +41,11 @@ const isChatPanel = computed(
     v-if="isChatPanel && activeSessionId"
     :session-id="activeSessionId"
   />
-  <div v-else class="empty-actions" aria-hidden="true" />
+  <div
+    v-else
+    class="empty-actions"
+    aria-hidden="true"
+  />
 </template>
 
 <style scoped>

@@ -19,13 +19,13 @@
 // available in the bundle.
 
 export type NotificationEventType =
-  | "permission"
-  | "userInput"
-  | "elicitation"
-  | "exitPlanMode"
-  | "autoModeSwitch"
-  | "thinking"
-  | "unseenActivity";
+  | 'permission'
+  | 'userInput'
+  | 'elicitation'
+  | 'exitPlanMode'
+  | 'autoModeSwitch'
+  | 'thinking'
+  | 'unseenActivity';
 
 export interface NotificationStyle {
   /// Solid color CSS expression (already includes `var(--p-…-500)`).
@@ -49,48 +49,48 @@ export interface NotificationStyle {
 
 const STYLES: Record<NotificationEventType, NotificationStyle> = {
   permission: {
-    color: "var(--p-amber-500, #f59e0b)",
-    iconSuffix: "shield",
-    label: "Permission",
+    color: 'var(--p-amber-500, #f59e0b)',
+    iconSuffix: 'shield',
+    label: 'Permission',
     pulse: true,
   },
   userInput: {
-    color: "var(--p-sky-500, #0ea5e9)",
-    iconSuffix: "comment",
-    label: "Input requested",
+    color: 'var(--p-sky-500, #0ea5e9)',
+    iconSuffix: 'comment',
+    label: 'Input requested',
     pulse: true,
   },
   elicitation: {
-    color: "var(--p-violet-500, #8b5cf6)",
-    iconSuffix: "external-link",
-    label: "Awaiting response",
+    color: 'var(--p-violet-500, #8b5cf6)',
+    iconSuffix: 'external-link',
+    label: 'Awaiting response',
     pulse: true,
   },
   exitPlanMode: {
-    color: "var(--p-indigo-500, #6366f1)",
-    iconSuffix: "list-check",
-    label: "Plan approval",
+    color: 'var(--p-indigo-500, #6366f1)',
+    iconSuffix: 'list-check',
+    label: 'Plan approval',
     pulse: true,
   },
   autoModeSwitch: {
-    color: "var(--p-orange-500, #f97316)",
-    iconSuffix: "bolt",
-    label: "Auto mode",
+    color: 'var(--p-orange-500, #f97316)',
+    iconSuffix: 'bolt',
+    label: 'Auto mode',
     pulse: true,
   },
   thinking: {
     // Session-primary tinted so it reads as "this session is
     // working" rather than as a blocking signal. Spinner icon
     // self-animates; no extra pulse.
-    color: "var(--p-primary-color)",
-    iconSuffix: "spin pi-spinner",
-    label: "Thinking…",
+    color: 'var(--p-primary-color)',
+    iconSuffix: 'spin pi-spinner',
+    label: 'Thinking…',
     pulse: false,
   },
   unseenActivity: {
-    color: "var(--p-emerald-500, #10b981)",
-    iconSuffix: "circle-fill",
-    label: "New activity",
+    color: 'var(--p-emerald-500, #10b981)',
+    iconSuffix: 'circle-fill',
+    label: 'New activity',
     pulse: false,
   },
 };
@@ -112,18 +112,18 @@ export function styleFor(type: NotificationEventType): NotificationStyle {
 /// ("there was new output you haven't read yet").
 export function indicatorStyle(
   pendingRequestType:
-    | "permission"
-    | "userInput"
-    | "elicitation"
-    | "exitPlanMode"
-    | "autoModeSwitch"
+    | 'permission'
+    | 'userInput'
+    | 'elicitation'
+    | 'exitPlanMode'
+    | 'autoModeSwitch'
     | null
     | undefined,
   isThinking: boolean,
   unseenTurns: number,
 ): NotificationStyle | null {
   if (pendingRequestType) return styleFor(pendingRequestType);
-  if (isThinking) return styleFor("thinking");
-  if (unseenTurns > 0) return styleFor("unseenActivity");
+  if (isThinking) return styleFor('thinking');
+  if (unseenTurns > 0) return styleFor('unseenActivity');
   return null;
 }

@@ -8,16 +8,16 @@
 /// `settingsStore.appearance.enableMermaid` upstream; this component
 /// only renders when the gate is already on.
 
-import { computed, onMounted, ref, watch } from "vue";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, ref, watch } from 'vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const props = defineProps<{
   source: string;
 }>();
 
 const target = ref<HTMLElement | null>(null);
-const svg = ref<string>("");
-const error = ref<string>("");
+const svg = ref<string>('');
+const error = ref<string>('');
 const ready = ref(false);
 
 // Unique id per instance so two diagrams on the same page don't
@@ -32,21 +32,20 @@ type MermaidModule = {
   };
 };
 
-let mermaidPromise: Promise<MermaidModule["default"]> | null = null;
-function loadMermaid(): Promise<MermaidModule["default"]> {
+let mermaidPromise: Promise<MermaidModule['default']> | null = null;
+function loadMermaid(): Promise<MermaidModule['default']> {
   if (mermaidPromise) return mermaidPromise;
-  mermaidPromise = import("mermaid").then((mod) => {
+  mermaidPromise = import('mermaid').then((mod) => {
     const m = (mod as unknown as MermaidModule).default;
     // Theme picks up our PrimeVue palette — colors flip with .app-dark
     // because mermaid pulls them from CSS variables on render.
     const isDark =
-      typeof document !== "undefined" &&
-      document.documentElement.classList.contains("app-dark");
+      typeof document !== 'undefined' && document.documentElement.classList.contains('app-dark');
     m.initialize({
       startOnLoad: false,
-      securityLevel: "strict",
-      theme: isDark ? "dark" : "default",
-      fontFamily: "inherit",
+      securityLevel: 'strict',
+      theme: isDark ? 'dark' : 'default',
+      fontFamily: 'inherit',
     });
     return m;
   });
@@ -55,7 +54,7 @@ function loadMermaid(): Promise<MermaidModule["default"]> {
 
 async function renderDiagram() {
   ready.value = false;
-  error.value = "";
+  error.value = '';
   try {
     const m = await loadMermaid();
     const { svg: out } = await m.render(localId, props.source);
@@ -69,19 +68,37 @@ async function renderDiagram() {
 onMounted(renderDiagram);
 watch(() => props.source, renderDiagram);
 
-const showFallback = computed(() => error.value !== "");
+const showFallback = computed(() => error.value !== '');
 </script>
 
 <template>
-  <div ref="target" class="mermaid-block">
-    <div v-if="ready && !showFallback" class="mermaid-svg" v-html="svg" />
-    <pre v-else-if="showFallback" class="mermaid-error" :title="error">
+  <div
+    ref="target"
+    class="mermaid-block"
+  >
+    <div
+      v-if="ready && !showFallback"
+      class="mermaid-svg"
+      v-html="svg"
+    />
+    <pre
+      v-else-if="showFallback"
+      class="mermaid-error"
+      :title="error"
+    >
 mermaid diagram failed to render: {{ error }}
 
 {{ props.source }}
     </pre>
-    <div v-else class="mermaid-loading" aria-label="Rendering diagram">
-      <i class="pi pi-spin pi-spinner" aria-hidden="true" />
+    <div
+      v-else
+      class="mermaid-loading"
+      aria-label="Rendering diagram"
+    >
+      <i
+        class="pi pi-spin pi-spinner"
+        aria-hidden="true"
+      />
       <span>Rendering diagram…</span>
     </div>
   </div>

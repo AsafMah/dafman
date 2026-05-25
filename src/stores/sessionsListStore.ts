@@ -5,13 +5,13 @@
 // session.created/deleted events we can subscribe to from the renderer,
 // so we refetch on user actions and on app focus / panel mount.
 
-import { defineStore } from "pinia";
-import { computed, ref } from "vue";
-import { invokeCommand } from "../ipc/invoke";
-import type { SessionMetadataSummary } from "../ipc/types";
-import { basename } from "./layoutStore";
-import { useToastStore } from "./toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
+import { invokeCommand } from '../ipc/invoke';
+import type { SessionMetadataSummary } from '../ipc/types';
+import { basename } from './layoutStore';
+import { useToastStore } from './toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 export interface WorkspaceGroup {
   /// Stable key for the group — full workspace path, or "" for the
@@ -24,7 +24,7 @@ export interface WorkspaceGroup {
   sessions: SessionMetadataSummary[];
 }
 
-export const useSessionsListStore = defineStore("sessionsList", () => {
+export const useSessionsListStore = defineStore('sessionsList', () => {
   const sessions = ref<SessionMetadataSummary[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -38,16 +38,14 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const list = await invokeCommand("listSessions", {});
+      const list = await invokeCommand('listSessions', {});
       // Most-recently-modified first.
-      sessions.value = [...list].sort((a, b) =>
-        b.modifiedTime.localeCompare(a.modifiedTime),
-      );
+      sessions.value = [...list].sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
       hasLoaded.value = true;
     } catch (err) {
       const message = toErrorMessage(err);
       error.value = message;
-      toasts.error("Failed to list sessions", message);
+      toasts.error('Failed to list sessions', message);
     } finally {
       isLoading.value = false;
     }
@@ -60,14 +58,12 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
   async function deleteSession(sessionId: string): Promise<void> {
     const toasts = useToastStore();
     try {
-      await invokeCommand("deleteSession", { sessionId });
-      sessions.value = sessions.value.filter(
-        (s) => s.sessionId !== sessionId,
-      );
-      toasts.success("Session deleted", sessionId.slice(0, 8));
+      await invokeCommand('deleteSession', { sessionId });
+      sessions.value = sessions.value.filter((s) => s.sessionId !== sessionId);
+      toasts.success('Session deleted', sessionId.slice(0, 8));
     } catch (err) {
       const message = toErrorMessage(err);
-      toasts.error("Failed to delete session", message);
+      toasts.error('Failed to delete session', message);
       throw err;
     }
   }
@@ -84,7 +80,7 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
   const grouped = computed<WorkspaceGroup[]>(() => {
     const map = new Map<string, SessionMetadataSummary[]>();
     for (const session of sessions.value) {
-      const key = session.cwd ?? "";
+      const key = session.cwd ?? '';
       const list = map.get(key) ?? [];
       list.push(session);
       map.set(key, list);
@@ -93,7 +89,7 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     for (const [key, list] of map.entries()) {
       groups.push({
         key,
-        label: key === "" ? "No workspace" : basename(key) || key,
+        label: key === '' ? 'No workspace' : basename(key) || key,
         path: key,
         sessions: list,
       });
@@ -103,8 +99,8 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     // group ordering — lexical order matches chronological order for
     // well-formed ISO strings.
     groups.sort((a, b) => {
-      const aLatest = a.sessions[0]?.modifiedTime ?? "";
-      const bLatest = b.sessions[0]?.modifiedTime ?? "";
+      const aLatest = a.sessions[0]?.modifiedTime ?? '';
+      const bLatest = b.sessions[0]?.modifiedTime ?? '';
       return bLatest.localeCompare(aLatest);
     });
     return groups;
@@ -121,18 +117,14 @@ export const useSessionsListStore = defineStore("sessionsList", () => {
     const trimmed = name.trim();
     const lower = trimmed.toLowerCase();
     const all = sessions.value;
-    const exact = all.find((s) => (s.summary ?? "").toLowerCase() === lower);
+    const exact = all.find((s) => (s.summary ?? '').toLowerCase() === lower);
     if (exact) return exact;
-    const starts = all.find((s) =>
-      (s.summary ?? "").toLowerCase().startsWith(lower),
-    );
+    const starts = all.find((s) => (s.summary ?? '').toLowerCase().startsWith(lower));
     if (starts) return starts;
     const m = trimmed.match(/([0-9a-f]{4,})/i);
     if (m && m[1]) {
       const prefix = m[1].toLowerCase();
-      const byId = all.find((s) =>
-        s.sessionId.toLowerCase().startsWith(prefix),
-      );
+      const byId = all.find((s) => s.sessionId.toLowerCase().startsWith(prefix));
       if (byId) return byId;
     }
     return undefined;

@@ -12,11 +12,11 @@
 /// are present because most attachment-bearing prompts are short
 /// natural-language references rather than heavily formatted markdown.
 
-import { computed } from "vue";
-import MessageContent from "./MessageContent.vue";
-import type { SendMessageAttachment } from "../ipc/types";
-import { labelForAttachment } from "../lexical/AttachmentNode";
-import { openAttachment } from "../lib/openAttachment";
+import { computed } from 'vue';
+import MessageContent from './MessageContent.vue';
+import type { SendMessageAttachment } from '../ipc/types';
+import { labelForAttachment } from '../lexical/AttachmentNode';
+import { openAttachment } from '../lib/openAttachment';
 
 const props = defineProps<{
   text: string;
@@ -25,8 +25,8 @@ const props = defineProps<{
 }>();
 
 type Segment =
-  | { kind: "text"; value: string }
-  | { kind: "pill"; attachment: SendMessageAttachment };
+  | { kind: 'text'; value: string }
+  | { kind: 'pill'; attachment: SendMessageAttachment };
 
 const segments = computed<Segment[]>(() => {
   if (!props.attachments || props.attachments.length === 0) return [];
@@ -39,27 +39,27 @@ const segments = computed<Segment[]>(() => {
       // Filename wasn't found in the text — could happen if the user
       // edited the message after sending. Emit the pill anyway so the
       // attachment is still visible somewhere.
-      out.push({ kind: "pill", attachment: a });
+      out.push({ kind: 'pill', attachment: a });
       continue;
     }
     if (idx > cursor) {
-      out.push({ kind: "text", value: props.text.slice(cursor, idx) });
+      out.push({ kind: 'text', value: props.text.slice(cursor, idx) });
     }
-    out.push({ kind: "pill", attachment: a });
+    out.push({ kind: 'pill', attachment: a });
     cursor = idx + label.length;
   }
   if (cursor < props.text.length) {
-    out.push({ kind: "text", value: props.text.slice(cursor) });
+    out.push({ kind: 'text', value: props.text.slice(cursor) });
   }
   return out;
 });
 
 function iconClass(a: SendMessageAttachment): string {
-  if (a.type === "directory") return "pi-folder";
-  if (a.type === "selection") return "pi-bookmark";
-  if (a.type === "commandResult") return "pi-terminal";
-  if (a.type === "blob" && (a.mimeType ?? "").startsWith("image/")) return "pi-image";
-  return "pi-file";
+  if (a.type === 'directory') return 'pi-folder';
+  if (a.type === 'selection') return 'pi-bookmark';
+  if (a.type === 'commandResult') return 'pi-terminal';
+  if (a.type === 'blob' && (a.mimeType ?? '').startsWith('image/')) return 'pi-image';
+  return 'pi-file';
 }
 </script>
 
@@ -69,9 +69,20 @@ function iconClass(a: SendMessageAttachment): string {
     :text="text"
     :label="label"
   />
-  <p v-else class="user-message-body" :aria-label="label">
-    <template v-for="(seg, i) in segments" :key="i">
-      <span v-if="seg.kind === 'text'" class="user-text-seg">{{ seg.value }}</span>
+  <p
+    v-else
+    class="user-message-body"
+    :aria-label="label"
+  >
+    <template
+      v-for="(seg, i) in segments"
+      :key="i"
+    >
+      <span
+        v-if="seg.kind === 'text'"
+        class="user-text-seg"
+        >{{ seg.value }}</span
+      >
       <button
         v-else
         type="button"
@@ -81,14 +92,17 @@ function iconClass(a: SendMessageAttachment): string {
           seg.attachment.type === 'commandResult'
             ? 'command-result'
             : seg.attachment.type === 'blob' && (seg.attachment.mimeType ?? '').startsWith('image/')
-            ? 'image'
-            : undefined
+              ? 'image'
+              : undefined
         "
         :title="labelForAttachment(seg.attachment)"
         :aria-label="`Open attachment ${labelForAttachment(seg.attachment)}`"
         @click="openAttachment(seg.attachment)"
       >
-        <i :class="`pi ${iconClass(seg.attachment)} composer-attachment-pill-icon`" aria-hidden="true" />
+        <i
+          :class="`pi ${iconClass(seg.attachment)} composer-attachment-pill-icon`"
+          aria-hidden="true"
+        />
         <span class="composer-attachment-pill-label">{{ labelForAttachment(seg.attachment) }}</span>
       </button>
     </template>

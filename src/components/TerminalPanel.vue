@@ -1,30 +1,34 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { SearchAddon } from "@xterm/addon-search";
-import { WebLinksAddon } from "@xterm/addon-web-links";
-import { ClipboardAddon } from "@xterm/addon-clipboard";
-import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebFontsAddon } from "@xterm/addon-web-fonts";
-import { ProgressAddon, type IProgressState } from "@xterm/addon-progress";
-import { LigaturesAddon } from "@xterm/addon-ligatures";
-import { ImageAddon } from "@xterm/addon-image";
-import { UnicodeGraphemesAddon } from "@xterm/addon-unicode-graphemes";
-import { WebglAddon } from "@xterm/addon-webgl";
-import { SerializeAddon } from "@xterm/addon-serialize";
-import "@xterm/xterm/css/xterm.css";
-import Button from "primevue/button";
-import { useTerminalStore } from "../stores/terminalStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import { invokeCommand } from "../ipc/invoke";
-import { parseTerminalOsc, type TerminalShellEvent } from "../lib/terminalShellIntegration";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { ClipboardAddon } from '@xterm/addon-clipboard';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+import { WebFontsAddon } from '@xterm/addon-web-fonts';
+import { ProgressAddon, type IProgressState } from '@xterm/addon-progress';
+import { LigaturesAddon } from '@xterm/addon-ligatures';
+import { ImageAddon } from '@xterm/addon-image';
+import { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes';
+import { WebglAddon } from '@xterm/addon-webgl';
+import { SerializeAddon } from '@xterm/addon-serialize';
+import '@xterm/xterm/css/xterm.css';
+import Button from 'primevue/button';
+import { useTerminalStore } from '../stores/terminalStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { invokeCommand } from '../ipc/invoke';
+import { parseTerminalOsc, type TerminalShellEvent } from '../lib/terminalShellIntegration';
 
 type UserParams = { terminalId?: string; compact?: boolean };
 type WrappedParams = { params?: UserParams };
 const props = defineProps<{ params: UserParams & WrappedParams }>();
-const compact = computed(() => props.params?.params?.compact === true || (props.params as { compact?: boolean })?.compact === true);
+const compact = computed(
+  () =>
+    props.params?.params?.compact === true ||
+    (props.params as { compact?: boolean })?.compact === true,
+);
 
 const terminalStore = useTerminalStore();
 const settingsStore = useSettingsStore();
@@ -32,8 +36,8 @@ const layoutStore = useLayoutStore();
 const host = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const searchOpen = ref(false);
-const searchQuery = ref("");
-const searchResultLabel = ref("");
+const searchQuery = ref('');
+const searchResultLabel = ref('');
 const progress = ref<IProgressState>({ state: 0, value: 0 });
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
@@ -44,23 +48,23 @@ const addonDisposables: Array<{ dispose(): void }> = [];
 let resizeObserver: ResizeObserver | null = null;
 let pendingSearchFrame: number | null = null;
 let commandCaptureActive = false;
-let commandCaptureBuffer = "";
+let commandCaptureBuffer = '';
 let replayingBuffer = false;
 
-const propTerminalId = computed(() => props.params?.params?.terminalId ?? props.params?.terminalId ?? "");
+const propTerminalId = computed(
+  () => props.params?.params?.terminalId ?? props.params?.terminalId ?? '',
+);
 const overrideTerminalId = ref<string | null>(null);
 const terminalId = computed(() => overrideTerminalId.value ?? propTerminalId.value);
-const rendererRole = computed<"compact" | "full">(() => compact.value ? "compact" : "full");
+const rendererRole = computed<'compact' | 'full'>(() => (compact.value ? 'compact' : 'full'));
 const isOwnedByOther = computed(() => {
   const owner = terminalStore.activeRendererOwner[terminalId.value];
   return owner !== undefined && owner !== rendererRole.value;
 });
-const summary = computed(() =>
-  terminalStore.terminals.find((t) => t.id === terminalId.value),
-);
-const buffer = computed(() => terminalStore.buffers[terminalId.value] ?? "");
+const summary = computed(() => terminalStore.terminals.find((t) => t.id === terminalId.value));
+const buffer = computed(() => terminalStore.buffers[terminalId.value] ?? '');
 const terminalPrefs = computed(() => settingsStore.settings.terminal);
-const integrationNonce = computed(() => summary.value?.integrationNonce ?? "");
+const integrationNonce = computed(() => summary.value?.integrationNonce ?? '');
 
 function fitAndNotify(): void {
   if (!fit || !term || !terminalId.value) return;
@@ -77,7 +81,7 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
     activate();
     addonDisposables.push(addon);
   } catch (err) {
-    console.warn("[terminal addon] failed to load", err);
+    console.warn('[terminal addon] failed to load', err);
     try {
       addon.dispose();
     } catch {
@@ -88,9 +92,9 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
 
 function applyShellEvent(event: TerminalShellEvent): void {
   if (!terminalId.value) return;
-  if (event.kind === "commandStart") {
+  if (event.kind === 'commandStart') {
     commandCaptureActive = true;
-    commandCaptureBuffer = "";
+    commandCaptureBuffer = '';
     if (!terminalStore.activeCommands[terminalId.value]) {
       terminalStore.startCommand(terminalId.value, {
         cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
@@ -100,25 +104,26 @@ function applyShellEvent(event: TerminalShellEvent): void {
     }
     return;
   }
-  if (event.kind === "commandFinish") {
+  if (event.kind === 'commandFinish') {
     const output = commandCaptureBuffer;
     commandCaptureActive = false;
-    commandCaptureBuffer = "";
+    commandCaptureBuffer = '';
     terminalStore.finishCommand(terminalId.value, event.exitCode, output);
     return;
   }
-  if (event.kind === "commandLine") {
+  if (event.kind === 'commandLine') {
     const patch = {
       command: event.command,
       cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
       protocol: event.protocol,
       trusted: event.trusted,
     };
-    if (terminalStore.activeCommands[terminalId.value]) terminalStore.updateActiveCommand(terminalId.value, patch);
+    if (terminalStore.activeCommands[terminalId.value])
+      terminalStore.updateActiveCommand(terminalId.value, patch);
     else terminalStore.startCommand(terminalId.value, patch);
     return;
   }
-  if (event.kind === "cwd") {
+  if (event.kind === 'cwd') {
     terminalStore.updateTerminalCwd(terminalId.value, event.cwd);
   }
 }
@@ -143,32 +148,35 @@ function registerShellIntegrationHandlers(): void {
 
 function searchDecorations() {
   return {
-    matchBackground: "#1f2937",
-    activeMatchBackground: "#0ea5e9",
-    matchOverviewRuler: "#64748b",
-    activeMatchColorOverviewRuler: "#38bdf8",
+    matchBackground: '#1f2937',
+    activeMatchBackground: '#0ea5e9',
+    matchOverviewRuler: '#64748b',
+    activeMatchColorOverviewRuler: '#38bdf8',
   };
 }
 
-function runSearch(direction: "next" | "previous", incremental = false, queryOverride?: string): void {
+function runSearch(
+  direction: 'next' | 'previous',
+  incremental = false,
+  queryOverride?: string,
+): void {
   const query = (queryOverride ?? searchQuery.value).trim();
   if (!query) {
     search?.clearDecorations();
-    searchResultLabel.value = "";
+    searchResultLabel.value = '';
     return;
   }
   if (!search) {
-    searchResultLabel.value = "Search unavailable";
+    searchResultLabel.value = 'Search unavailable';
     return;
   }
   const options = {
     incremental,
     decorations: searchDecorations(),
   };
-  const found = direction === "next"
-    ? search.findNext(query, options)
-    : search.findPrevious(query, options);
-  if (!found) searchResultLabel.value = "No matches";
+  const found =
+    direction === 'next' ? search.findNext(query, options) : search.findPrevious(query, options);
+  if (!found) searchResultLabel.value = 'No matches';
 }
 
 function scheduleSearch(incremental = true): void {
@@ -176,22 +184,22 @@ function scheduleSearch(incremental = true): void {
   if (pendingSearchFrame !== null) cancelAnimationFrame(pendingSearchFrame);
   pendingSearchFrame = requestAnimationFrame(() => {
     pendingSearchFrame = null;
-    runSearch("next", incremental);
+    runSearch('next', incremental);
   });
 }
 
 function findNext(): void {
-  runSearch("next");
+  runSearch('next');
 }
 
 function findPrevious(): void {
-  runSearch("previous");
+  runSearch('previous');
 }
 
 function onSearchInput(event: Event): void {
   const next = (event.target as HTMLInputElement).value;
   searchQuery.value = next;
-  runSearch("next", true, next);
+  runSearch('next', true, next);
 }
 
 async function copySelection(): Promise<void> {
@@ -201,10 +209,10 @@ async function copySelection(): Promise<void> {
 
 function registerCopyShortcuts(): void {
   term?.attachCustomKeyEventHandler((event) => {
-    if (event.type !== "keydown") return true;
+    if (event.type !== 'keydown') return true;
     const isCopyShortcut =
-      (event.ctrlKey && event.shiftKey && event.code === "KeyC") ||
-      (event.altKey && event.code === "Insert");
+      (event.ctrlKey && event.shiftKey && event.code === 'KeyC') ||
+      (event.altKey && event.code === 'Insert');
     if (!isCopyShortcut) return true;
     const selected = term?.getSelection();
     if (!selected) return true;
@@ -219,9 +227,11 @@ function focusSession(): void {
   layoutStore.addPanel(sessionId);
   layoutStore.activatePanel(sessionId);
   setTimeout(() => {
-    window.dispatchEvent(new CustomEvent("dafman:focus-composer", {
-      detail: { sessionId },
-    }));
+    window.dispatchEvent(
+      new CustomEvent('dafman:focus-composer', {
+        detail: { sessionId },
+      }),
+    );
   }, 0);
 }
 
@@ -245,9 +255,12 @@ function initXterm(): void {
     search = new SearchAddon();
     loadAddon(search, () => {
       term?.loadAddon(search!);
-      addonDisposables.push(search!.onDidChangeResults(({ resultIndex, resultCount }) => {
-        searchResultLabel.value = resultCount > 0 ? `${resultIndex + 1} / ${resultCount}` : "No matches";
-      }));
+      addonDisposables.push(
+        search!.onDidChangeResults(({ resultIndex, resultCount }) => {
+          searchResultLabel.value =
+            resultCount > 0 ? `${resultIndex + 1} / ${resultCount}` : 'No matches';
+        }),
+      );
     });
   }
   if (addons.serialize) {
@@ -258,7 +271,7 @@ function initXterm(): void {
     const unicode11 = new Unicode11Addon();
     loadAddon(unicode11, () => {
       term?.loadAddon(unicode11);
-      if (term) term.unicode.activeVersion = "11";
+      if (term) term.unicode.activeVersion = '11';
     });
   }
   if (addons.unicodeGraphemes) {
@@ -267,7 +280,7 @@ function initXterm(): void {
   }
   if (addons.webLinks) {
     const links = new WebLinksAddon((_event, uri) => {
-      void invokeCommand("openUrl", { url: uri });
+      void invokeCommand('openUrl', { url: uri });
     });
     loadAddon(links, () => term?.loadAddon(links));
   }
@@ -279,16 +292,21 @@ function initXterm(): void {
     webFonts = new WebFontsAddon(true);
     loadAddon(webFonts, () => {
       term?.loadAddon(webFonts!);
-      void webFonts?.loadFonts().then(() => fitAndNotify()).catch(() => {});
+      void webFonts
+        ?.loadFonts()
+        .then(() => fitAndNotify())
+        .catch(() => {});
     });
   }
   if (addons.progress) {
     const progressAddon = new ProgressAddon();
     loadAddon(progressAddon, () => {
       term?.loadAddon(progressAddon);
-      addonDisposables.push(progressAddon.onChange((state) => {
-        progress.value = state;
-      }));
+      addonDisposables.push(
+        progressAddon.onChange((state) => {
+          progress.value = state;
+        }),
+      );
     });
   }
   if (addons.image) {
@@ -299,10 +317,12 @@ function initXterm(): void {
     webgl = new WebglAddon();
     loadAddon(webgl, () => {
       term?.loadAddon(webgl!);
-      addonDisposables.push(webgl!.onContextLoss(() => {
-        webgl?.dispose();
-        webgl = null;
-      }));
+      addonDisposables.push(
+        webgl!.onContextLoss(() => {
+          webgl?.dispose();
+          webgl = null;
+        }),
+      );
     });
   }
   term.open(host.value);
@@ -335,8 +355,9 @@ onMounted(async () => {
   // Recovery: if this terminal doesn't exist on the backend (e.g. after restart),
   // find the session that owned it and create a new terminal
   if (terminalId.value && !terminalStore.terminals.find((t) => t.id === terminalId.value)) {
-    const sessionId = Object.entries(terminalStore.sessionTerminalIds)
-      .find(([, tid]) => tid === propTerminalId.value)?.[0];
+    const sessionId = Object.entries(terminalStore.sessionTerminalIds).find(
+      ([, tid]) => tid === propTerminalId.value,
+    )?.[0];
     if (sessionId) {
       try {
         const newTerminal = await terminalStore.getOrCreateSessionTerminal(sessionId);
@@ -349,7 +370,7 @@ onMounted(async () => {
   }
 
   initXterm();
-  window.addEventListener("dafman:focus-terminal", onFocusTerminal);
+  window.addEventListener('dafman:focus-terminal', onFocusTerminal);
 });
 
 // When ownership is released by another renderer, initialize xterm
@@ -374,7 +395,7 @@ watch(buffer, (next, prev) => {
 watch(searchOpen, async (open) => {
   if (!open) {
     search?.clearDecorations();
-    searchResultLabel.value = "";
+    searchResultLabel.value = '';
     term?.focus();
     return;
   }
@@ -383,11 +404,11 @@ watch(searchOpen, async (open) => {
   searchInput.value?.select();
 });
 
-watch(searchQuery, () => scheduleSearch(true), { flush: "post" });
+watch(searchQuery, () => scheduleSearch(true), { flush: 'post' });
 
 onBeforeUnmount(() => {
   terminalStore.releaseRenderer(terminalId.value, rendererRole.value);
-  window.removeEventListener("dafman:focus-terminal", onFocusTerminal);
+  window.removeEventListener('dafman:focus-terminal', onFocusTerminal);
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (pendingSearchFrame !== null) {
@@ -414,10 +435,16 @@ function onFocusTerminal(event: Event): void {
 </script>
 
 <template>
-  <section class="terminal-panel" :class="{ compact }">
-    <header v-if="!compact" class="terminal-header">
+  <section
+    class="terminal-panel"
+    :class="{ compact }"
+  >
+    <header
+      v-if="!compact"
+      class="terminal-header"
+    >
       <div class="terminal-title">
-        <strong>{{ summary?.title ?? "Terminal" }}</strong>
+        <strong>{{ summary?.title ?? 'Terminal' }}</strong>
         <small>{{ summary?.cwd }}</small>
       </div>
       <div
@@ -426,7 +453,10 @@ function onFocusTerminal(event: Event): void {
         :class="`state-${progress.state}`"
         :title="`Progress ${progress.value}%`"
       >
-        <span class="terminal-progress-bar" :style="{ width: `${progress.value}%` }" />
+        <span
+          class="terminal-progress-bar"
+          :style="{ width: `${progress.value}%` }"
+        />
       </div>
       <div class="terminal-actions">
         <Button
@@ -466,7 +496,11 @@ function onFocusTerminal(event: Event): void {
         severity="secondary"
         @click="terminalStore.killTerminal(terminalId)"
       />
-      <span v-else class="terminal-status">{{ summary?.status ?? "missing" }}</span>
+      <span
+        v-else
+        class="terminal-status"
+        >{{ summary?.status ?? 'missing' }}</span
+      >
     </header>
     <form
       v-if="!compact && searchOpen"
@@ -481,7 +515,12 @@ function onFocusTerminal(event: Event): void {
         aria-label="Search terminal"
         @input="onSearchInput"
       />
-      <span class="terminal-search-status" role="status" aria-live="polite">{{ searchResultLabel }}</span>
+      <span
+        class="terminal-search-status"
+        role="status"
+        aria-live="polite"
+        >{{ searchResultLabel }}</span
+      >
       <Button
         icon="pi pi-arrow-up"
         label="Previous"
@@ -500,9 +539,18 @@ function onFocusTerminal(event: Event): void {
         type="submit"
       />
     </form>
-    <div ref="host" class="terminal-host" />
-    <div v-if="isOwnedByOther" class="terminal-frozen-placeholder">
-      <span>Terminal in use by {{ isOwnedByOther ? (rendererRole === 'full' ? 'editor' : 'terminal tab') : '' }}</span>
+    <div
+      ref="host"
+      class="terminal-host"
+    />
+    <div
+      v-if="isOwnedByOther"
+      class="terminal-frozen-placeholder"
+    >
+      <span
+        >Terminal in use by
+        {{ isOwnedByOther ? (rendererRole === 'full' ? 'editor' : 'terminal tab') : '' }}</span
+      >
     </div>
   </section>
 </template>

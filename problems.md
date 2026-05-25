@@ -7,13 +7,6 @@
 
 - The word "attachment" triggers an issue with the sql, we need to reword "see attachment"
 - Sessions still don't get their title sometimes when they are resumed
-- Groups feature attempted twice, both reverted:
-  - v1 (~1900 lines): multiple DockviewVue instances — fundamentally broken
-  - v2 (~380 lines): single dockview + layout swap — passed all automated tests but failed at runtime
-  - Root cause: no automated tests cover real dockview layout restore/switch flows
-  - Need real dockview integration tests before attempting again
-
-
 
 ## Solved (2026-05-22 sweep)
 

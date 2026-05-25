@@ -2,15 +2,15 @@
 // system preference. Lives outside the store so it can be unit-tested
 // without Pinia.
 
-import type { ThemeChoice } from "../ipc/types";
+import type { ThemeChoice } from '../ipc/types';
 
 export function resolveIsDark(theme: ThemeChoice, prefersDark: boolean): boolean {
   switch (theme) {
-    case "system":
+    case 'system':
       return prefersDark;
-    case "dark":
+    case 'dark':
       return true;
-    case "light":
+    case 'light':
       return false;
   }
 }

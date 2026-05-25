@@ -26,10 +26,10 @@
 //     `mode: "form"` shows a "not yet supported" notice + Cancel
 //     (form-schema renderer is the next ticket).
 
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import RadioButton from "primevue/radiobutton";
-import Textarea from "primevue/textarea";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import RadioButton from 'primevue/radiobutton';
+import Textarea from 'primevue/textarea';
 import type {
   AutoModeSwitchRequestData,
   ElicitationRequestData,
@@ -37,26 +37,21 @@ import type {
   PermissionApprovalRule,
   PermissionRequestData,
   UserInputRequestData,
-} from "../ipc/types";
-import { useSessionsStore } from "../stores/sessionsStore";
-import MessageContent from "./MessageContent.vue";
-import { useToastStore } from "../stores/toastStore";
-import { invokeCommand } from "../ipc/invoke";
-import { styleFor } from "../lib/notificationStyles";
-import PermissionDetails from "./PermissionDetails.vue";
-import PermissionRuleEditor from "./PermissionRuleEditor.vue";
-import JsonSchemaForm from "./JsonSchemaForm.vue";
-import { toErrorMessage } from "../lib/errorMessage";
+} from '../ipc/types';
+import { useSessionsStore } from '../stores/sessionsStore';
+import MessageContent from './MessageContent.vue';
+import { useToastStore } from '../stores/toastStore';
+import { invokeCommand } from '../ipc/invoke';
+import { styleFor } from '../lib/notificationStyles';
+import PermissionDetails from './PermissionDetails.vue';
+import PermissionRuleEditor from './PermissionRuleEditor.vue';
+import JsonSchemaForm from './JsonSchemaForm.vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const props = defineProps<{
   sessionId: string;
   requestId: string;
-  pendingKind:
-    | "permission"
-    | "userInput"
-    | "elicitation"
-    | "exitPlanMode"
-    | "autoModeSwitch";
+  pendingKind: 'permission' | 'userInput' | 'elicitation' | 'exitPlanMode' | 'autoModeSwitch';
   message: string;
   request:
     | PermissionRequestData
@@ -73,51 +68,41 @@ const style = computed(() => styleFor(props.pendingKind));
 
 const title = computed(() => {
   switch (props.pendingKind) {
-    case "permission":
-      return "Permission requested";
-    case "userInput":
-      return "Question";
-    case "elicitation":
-      return "Input requested";
-    case "exitPlanMode":
-      return "Plan approval";
-    case "autoModeSwitch":
-      return "Auto mode switch";
+    case 'permission':
+      return 'Permission requested';
+    case 'userInput':
+      return 'Question';
+    case 'elicitation':
+      return 'Input requested';
+    case 'exitPlanMode':
+      return 'Plan approval';
+    case 'autoModeSwitch':
+      return 'Auto mode switch';
   }
 });
 
-const inputAnswer = ref("");
+const inputAnswer = ref('');
 const inputChoice = ref<string | null>(null);
 const urlOpened = ref(false);
 const formContent = ref<Record<string, unknown>>({});
 const formComponentRef = ref<{ validate: () => string | null } | null>(null);
-const exitPlanFeedback = ref("");
+const exitPlanFeedback = ref('');
 
 // Type-narrowed accessors so the template doesn't need casts.
 const asPermission = computed(() =>
-  props.pendingKind === "permission"
-    ? (props.request as PermissionRequestData)
-    : null,
+  props.pendingKind === 'permission' ? (props.request as PermissionRequestData) : null,
 );
 const asUserInput = computed(() =>
-  props.pendingKind === "userInput"
-    ? (props.request as UserInputRequestData)
-    : null,
+  props.pendingKind === 'userInput' ? (props.request as UserInputRequestData) : null,
 );
 const asElicitation = computed(() =>
-  props.pendingKind === "elicitation"
-    ? (props.request as ElicitationRequestData)
-    : null,
+  props.pendingKind === 'elicitation' ? (props.request as ElicitationRequestData) : null,
 );
 const asExitPlanMode = computed(() =>
-  props.pendingKind === "exitPlanMode"
-    ? (props.request as ExitPlanModeRequestData)
-    : null,
+  props.pendingKind === 'exitPlanMode' ? (props.request as ExitPlanModeRequestData) : null,
 );
 const asAutoModeSwitch = computed(() =>
-  props.pendingKind === "autoModeSwitch"
-    ? (props.request as AutoModeSwitchRequestData)
-    : null,
+  props.pendingKind === 'autoModeSwitch' ? (props.request as AutoModeSwitchRequestData) : null,
 );
 
 // Permission actions. Only Allow-once / Reject / Allow-and-stop-asking
@@ -126,13 +111,11 @@ const asAutoModeSwitch = computed(() =>
 // toggle on the session so subsequent prompts auto-approve without
 // surfacing a card. User can revert via the session-header gear
 // menu (the toggle there mirrors the same state).
-async function permissionRespond(
-  decision: "approveOnce" | "reject",
-): Promise<void> {
+async function permissionRespond(decision: 'approveOnce' | 'reject'): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "permission", decision },
+    response: { kind: 'permission', decision },
   });
 }
 
@@ -144,12 +127,12 @@ async function permissionAllowAndStopAsking(): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "permission", decision: "approveOnce" },
+    response: { kind: 'permission', decision: 'approveOnce' },
   });
   await sessionsStore.setSessionApproveAll(props.sessionId, true);
   toasts.info(
-    "Auto-approve enabled for this session",
-    "Toggle it back from the session options gear if you want prompts again.",
+    'Auto-approve enabled for this session',
+    'Toggle it back from the session options gear if you want prompts again.',
   );
 }
 
@@ -168,8 +151,8 @@ async function permissionAllowForSession(payload: {
     sessionId: props.sessionId,
     requestId: props.requestId,
     response: {
-      kind: "permission",
-      decision: "approveForSession",
+      kind: 'permission',
+      decision: 'approveForSession',
       ...(payload.approval ? { approval: payload.approval } : {}),
       ...(payload.domain ? { domain: payload.domain } : {}),
     },
@@ -181,15 +164,14 @@ const userInputSubmittable = computed(() => {
   const req = asUserInput.value;
   if (!req) return false;
   if (req.allowFreeform && inputAnswer.value.trim().length > 0) return true;
-  if (req.choices && req.choices.length > 0 && inputChoice.value !== null)
-    return true;
+  if (req.choices && req.choices.length > 0 && inputChoice.value !== null) return true;
   return false;
 });
 
 async function userInputSubmit(): Promise<void> {
   const req = asUserInput.value;
   if (!req) return;
-  let answer = "";
+  let answer = '';
   let wasFreeform = false;
   if (req.allowFreeform && inputAnswer.value.trim().length > 0) {
     answer = inputAnswer.value;
@@ -201,7 +183,7 @@ async function userInputSubmit(): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "userInput", answer, wasFreeform },
+    response: { kind: 'userInput', answer, wasFreeform },
   });
 }
 
@@ -209,7 +191,7 @@ async function userInputCancel(): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "userInput", answer: "", wasFreeform: false },
+    response: { kind: 'userInput', answer: '', wasFreeform: false },
   });
 }
 
@@ -218,32 +200,29 @@ async function openElicitationUrl(): Promise<void> {
   const req = asElicitation.value;
   if (!req) return;
   if (!req.url) {
-    toasts.warn("No URL provided", "The agent didn't supply a URL to open.");
+    toasts.warn('No URL provided', "The agent didn't supply a URL to open.");
     return;
   }
   try {
-    const ok = await invokeCommand("openUrl", { url: req.url });
+    const ok = await invokeCommand('openUrl', { url: req.url });
     if (ok) {
       urlOpened.value = true;
     } else {
       toasts.error("Couldn't open URL", req.url);
     }
   } catch (err) {
-    toasts.error(
-      "Couldn't open URL",
-      toErrorMessage(err),
-    );
+    toasts.error("Couldn't open URL", toErrorMessage(err));
   }
 }
 
 async function elicitationAccept(): Promise<void> {
   // Form-mode: validate first, then ship the collected content.
-  if (asElicitation.value && asElicitation.value.mode === "form") {
+  if (asElicitation.value && asElicitation.value.mode === 'form') {
     const formRef = formComponentRef.value;
     if (formRef) {
       const err = formRef.validate();
       if (err) {
-        toasts.warn("Form incomplete", `Please fill in ${err}.`);
+        toasts.warn('Form incomplete', `Please fill in ${err}.`);
         return;
       }
     }
@@ -251,8 +230,8 @@ async function elicitationAccept(): Promise<void> {
       sessionId: props.sessionId,
       requestId: props.requestId,
       response: {
-        kind: "elicitation",
-        action: "accept",
+        kind: 'elicitation',
+        action: 'accept',
         content: formContent.value,
       },
     });
@@ -261,43 +240,39 @@ async function elicitationAccept(): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "elicitation", action: "accept" },
+    response: { kind: 'elicitation', action: 'accept' },
   });
 }
 
-async function elicitationCancel(
-  action: "decline" | "cancel" = "cancel",
-): Promise<void> {
+async function elicitationCancel(action: 'decline' | 'cancel' = 'cancel'): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "elicitation", action },
+    response: { kind: 'elicitation', action },
   });
 }
 
 async function exitPlanRespond(
   approved: boolean,
-  selectedAction?: "interactive" | "autopilot" | "exit_only" | "autopilot_fleet",
+  selectedAction?: 'interactive' | 'autopilot' | 'exit_only' | 'autopilot_fleet',
 ): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
     response: {
-      kind: "exitPlanMode",
+      kind: 'exitPlanMode',
       approved,
       ...(selectedAction ? { selectedAction } : {}),
-      ...(exitPlanFeedback.value.trim()
-        ? { feedback: exitPlanFeedback.value.trim() }
-        : {}),
+      ...(exitPlanFeedback.value.trim() ? { feedback: exitPlanFeedback.value.trim() } : {}),
     },
   });
 }
 
-async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<void> {
+async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<void> {
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
-    response: { kind: "autoModeSwitch", response },
+    response: { kind: 'autoModeSwitch', response },
   });
 }
 </script>
@@ -378,9 +353,16 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
           <span>{{ choice }}</span>
         </label>
       </div>
-      <div v-if="asUserInput.allowFreeform" class="pending-card-input">
+      <div
+        v-if="asUserInput.allowFreeform"
+        class="pending-card-input"
+      >
         <label class="pending-card-input-label">
-          {{ asUserInput.choices && asUserInput.choices.length > 0 ? "Or type your own:" : "Your answer:" }}
+          {{
+            asUserInput.choices && asUserInput.choices.length > 0
+              ? 'Or type your own:'
+              : 'Your answer:'
+          }}
         </label>
         <Textarea
           v-model="inputAnswer"
@@ -408,10 +390,16 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
 
     <!-- Elicitation url-mode -->
     <template v-else-if="asElicitation && asElicitation.mode === 'url'">
-      <div v-if="asElicitation.url" class="pending-card-url">
+      <div
+        v-if="asElicitation.url"
+        class="pending-card-url"
+      >
         <code class="pending-card-url-text">{{ asElicitation.url }}</code>
       </div>
-      <p v-if="asElicitation.elicitationSource" class="pending-card-source">
+      <p
+        v-if="asElicitation.elicitationSource"
+        class="pending-card-source"
+      >
         Requested by: {{ asElicitation.elicitationSource }}
       </p>
       <div class="pending-card-actions">
@@ -445,14 +433,23 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
       <JsonSchemaForm
         v-if="asElicitation.requestedSchema"
         ref="formComponentRef"
-        :schema="(asElicitation.requestedSchema as Record<string, unknown>)"
+        :schema="asElicitation.requestedSchema as Record<string, unknown>"
         v-model="formContent"
       />
-      <p v-else class="pending-card-unsupported">
-        <i class="pi pi-info-circle" aria-hidden="true" />
+      <p
+        v-else
+        class="pending-card-unsupported"
+      >
+        <i
+          class="pi pi-info-circle"
+          aria-hidden="true"
+        />
         No schema was provided. Cancel to let the agent proceed.
       </p>
-      <p v-if="asElicitation.elicitationSource" class="pending-card-source">
+      <p
+        v-if="asElicitation.elicitationSource"
+        class="pending-card-source"
+      >
         Requested by: {{ asElicitation.elicitationSource }}
       </p>
       <div class="pending-card-actions">
@@ -482,18 +479,22 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
 
     <!-- Exit plan mode -->
     <template v-else-if="asExitPlanMode">
-      <p class="pending-card-source">
-        Recommended: {{ asExitPlanMode.recommendedAction }}
-      </p>
+      <p class="pending-card-source">Recommended: {{ asExitPlanMode.recommendedAction }}</p>
       <div
         v-if="asExitPlanMode.planContent"
         class="pending-card-plan"
       >
-        <MessageContent :text="asExitPlanMode.planContent" label="Plan markdown" />
+        <MessageContent
+          :text="asExitPlanMode.planContent"
+          label="Plan markdown"
+        />
       </div>
       <div class="pending-card-input">
         <label class="pending-card-input-label">Feedback / requested changes:</label>
-        <Textarea v-model="exitPlanFeedback" rows="3" />
+        <Textarea
+          v-model="exitPlanFeedback"
+          rows="3"
+        />
       </div>
       <div class="pending-card-actions">
         <Button
@@ -568,7 +569,11 @@ async function autoModeRespond(response: "yes" | "yes_always" | "no"): Promise<v
   margin: 0.25rem 0;
   border-radius: var(--p-border-radius-md);
   border: 1px solid color-mix(in srgb, var(--card-accent, var(--p-primary-color)) 45%, transparent);
-  background: color-mix(in srgb, var(--card-accent, var(--p-primary-color)) 8%, var(--p-content-background));
+  background: color-mix(
+    in srgb,
+    var(--card-accent, var(--p-primary-color)) 8%,
+    var(--p-content-background)
+  );
   /* Slim accent rail on the left to match the visual language of the
    * chat-tile + tab indicators. */
   border-left: 4px solid var(--card-accent, var(--p-primary-color));

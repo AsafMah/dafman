@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import Tag from "primevue/tag";
-import type { ToolStatus } from "../lib/chatEvents";
-import { getToolRenderer } from "../lib/toolRenderers";
-import ToolDetails from "./ToolDetails.vue";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import Tag from 'primevue/tag';
+import type { ToolStatus } from '../lib/chatEvents';
+import { getToolRenderer } from '../lib/toolRenderers';
+import ToolDetails from './ToolDetails.vue';
 
 const props = defineProps<{
   toolName: string;
@@ -30,25 +30,25 @@ const displayName = computed(() => {
   return props.toolName;
 });
 
-const statusSeverity = computed<"info" | "success" | "danger">(() => {
+const statusSeverity = computed<'info' | 'success' | 'danger'>(() => {
   switch (props.status) {
-    case "running":
-      return "info";
-    case "success":
-      return "success";
-    case "error":
-      return "danger";
+    case 'running':
+      return 'info';
+    case 'success':
+      return 'success';
+    case 'error':
+      return 'danger';
   }
 });
 
 const statusLabel = computed(() => {
   switch (props.status) {
-    case "running":
-      return "Running";
-    case "success":
-      return "Done";
-    case "error":
-      return "Failed";
+    case 'running':
+      return 'Running';
+    case 'success':
+      return 'Done';
+    case 'error':
+      return 'Failed';
   }
 });
 
@@ -57,7 +57,10 @@ const statusLabel = computed(() => {
 /// pick its result language from the file extension once we see the
 /// arguments.
 const renderHints = computed(() =>
-  getToolRenderer(props.toolName, props.mcpServerName)({
+  getToolRenderer(
+    props.toolName,
+    props.mcpServerName,
+  )({
     args: props.args,
     result: props.resultContent,
     partialOutput: props.partialOutput,
@@ -71,15 +74,11 @@ const renderHints = computed(() =>
 /// back to the historical "first line of latest output" behaviour
 /// when the tool has no registered renderer.
 const previewLine = computed(() => {
-  if (props.status === "error" && props.errorMessage) return props.errorMessage;
+  if (props.status === 'error' && props.errorMessage) return props.errorMessage;
   if (renderHints.value.summary) return renderHints.value.summary;
-  const source =
-    props.resultContent ||
-    props.progressMessage ||
-    props.partialOutput ||
-    "";
-  if (!source) return "";
-  const firstLine = source.split("\n", 1)[0] ?? "";
+  const source = props.resultContent || props.progressMessage || props.partialOutput || '';
+  if (!source) return '';
+  const firstLine = source.split('\n', 1)[0] ?? '';
   return firstLine.length > 160 ? `${firstLine.slice(0, 160)}…` : firstLine;
 });
 
@@ -88,7 +87,10 @@ const previewLine = computed(() => {
 </script>
 
 <template>
-  <div class="tool-card" :class="[`status-${props.status}`]">
+  <div
+    class="tool-card"
+    :class="[`status-${props.status}`]"
+  >
     <button
       type="button"
       class="tool-header"
@@ -96,13 +98,27 @@ const previewLine = computed(() => {
       :aria-label="`${expanded ? 'Collapse' : 'Expand'} tool call ${displayName}`"
       @click="expanded = !expanded"
     >
-      <i class="pi pi-wrench tool-icon" aria-hidden="true" />
+      <i
+        class="pi pi-wrench tool-icon"
+        aria-hidden="true"
+      />
       <span class="tool-name">{{ displayName }}</span>
-      <Tag :value="statusLabel" :severity="statusSeverity" />
-      <span v-if="props.agentId" class="tool-meta" :title="`Sub-agent ${props.agentId}`">
+      <Tag
+        :value="statusLabel"
+        :severity="statusSeverity"
+      />
+      <span
+        v-if="props.agentId"
+        class="tool-meta"
+        :title="`Sub-agent ${props.agentId}`"
+      >
         sub-agent
       </span>
-      <span v-if="previewLine" class="tool-preview">{{ previewLine }}</span>
+      <span
+        v-if="previewLine"
+        class="tool-preview"
+        >{{ previewLine }}</span
+      >
       <Button
         :icon="expanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
         text
@@ -114,7 +130,10 @@ const previewLine = computed(() => {
       />
     </button>
 
-    <div v-if="expanded" class="tool-body">
+    <div
+      v-if="expanded"
+      class="tool-body"
+    >
       <ToolDetails
         :tool-name="props.toolName"
         :args="props.args"
@@ -124,17 +143,28 @@ const previewLine = computed(() => {
         :partial-output="props.partialOutput"
       />
 
-      <section v-if="props.progressMessage" class="tool-section">
+      <section
+        v-if="props.progressMessage"
+        class="tool-section"
+      >
         <header class="tool-section-label">Progress</header>
         <p class="tool-progress">{{ props.progressMessage }}</p>
       </section>
 
-      <section v-if="props.errorMessage" class="tool-section">
-        <header class="tool-section-label">Error<span v-if="props.errorCode"> · {{ props.errorCode }}</span></header>
+      <section
+        v-if="props.errorMessage"
+        class="tool-section"
+      >
+        <header class="tool-section-label">
+          Error<span v-if="props.errorCode"> · {{ props.errorCode }}</span>
+        </header>
         <p class="tool-error">{{ props.errorMessage }}</p>
       </section>
 
-      <p class="tool-id" :title="`tool call id: ${props.toolCallId}`">
+      <p
+        class="tool-id"
+        :title="`tool call id: ${props.toolCallId}`"
+      >
         id: {{ props.toolCallId }}
       </p>
     </div>

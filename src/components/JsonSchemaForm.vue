@@ -22,18 +22,18 @@
 /// `validate()` (exposed via defineExpose) returns the first error path
 /// or null. The card wires "Submit" through that gate.
 
-import { computed, ref, watch } from "vue";
-import JsonSchemaField from "./JsonSchemaField.vue";
+import { computed, ref, watch } from 'vue';
+import JsonSchemaField from './JsonSchemaField.vue';
 
 type JsonSchema = {
-  type?: "object" | "string" | "number" | "integer" | "boolean" | "array";
+  type?: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array';
   title?: string;
   description?: string;
   default?: unknown;
   enum?: unknown[];
   /// MCP `oneOf: [{ const, title }]` carries human-readable labels.
   oneOf?: Array<{ const?: unknown; title?: string }>;
-  format?: "email" | "uri" | "date" | "date-time";
+  format?: 'email' | 'uri' | 'date' | 'date-time';
   minLength?: number;
   maxLength?: number;
   minimum?: number;
@@ -55,7 +55,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "update:modelValue", value: Record<string, unknown>): void;
+  (e: 'update:modelValue', value: Record<string, unknown>): void;
 }>();
 
 const value = ref<Record<string, unknown>>({ ...props.modelValue });
@@ -63,30 +63,30 @@ const value = ref<Record<string, unknown>>({ ...props.modelValue });
 // Seed defaults from the schema once (so an empty `modelValue` still
 // presents the user with sensible starting values).
 function seedDefaults(schema: JsonSchema, target: Record<string, unknown>): void {
-  if (schema.type !== "object" || !schema.properties) return;
+  if (schema.type !== 'object' || !schema.properties) return;
   for (const [key, sub] of Object.entries(schema.properties)) {
     if (target[key] !== undefined) continue;
     if (sub.default !== undefined) {
       target[key] = structuredClone(sub.default);
       continue;
     }
-    if (sub.type === "object") {
+    if (sub.type === 'object') {
       const child: Record<string, unknown> = {};
       seedDefaults(sub, child);
       target[key] = child;
       continue;
     }
-    if (sub.type === "array") {
+    if (sub.type === 'array') {
       target[key] = [];
       continue;
     }
-    if (sub.type === "boolean") {
+    if (sub.type === 'boolean') {
       target[key] = false;
     }
   }
 }
 seedDefaults(props.schema, value.value);
-emit("update:modelValue", value.value);
+emit('update:modelValue', value.value);
 
 watch(
   () => props.modelValue,
@@ -109,13 +109,13 @@ function update(path: string[], v: unknown): void {
   }
   cursor[path[path.length - 1]!] = v;
   value.value = root;
-  emit("update:modelValue", root);
+  emit('update:modelValue', root);
 }
 
 function readPath(path: string[]): unknown {
   let cursor: unknown = value.value;
   for (const seg of path) {
-    if (cursor && typeof cursor === "object") {
+    if (cursor && typeof cursor === 'object') {
       cursor = (cursor as Record<string, unknown>)[seg];
     } else {
       return undefined;
@@ -127,18 +127,18 @@ function readPath(path: string[]): unknown {
 // PrimeVue InputText/InputNumber's `format` prop is for number locale,
 // not html-input type. We pass `type=` directly to the underlying input
 // via `inputProps` for InputText. Map JSON-Schema format → html input.
-function htmlInputType(format?: JsonSchema["format"]): string {
+function htmlInputType(format?: JsonSchema['format']): string {
   switch (format) {
-    case "email":
-      return "email";
-    case "uri":
-      return "url";
-    case "date":
-      return "date";
-    case "date-time":
-      return "datetime-local";
+    case 'email':
+      return 'email';
+    case 'uri':
+      return 'url';
+    case 'date':
+      return 'date';
+    case 'date-time':
+      return 'datetime-local';
     default:
-      return "text";
+      return 'text';
   }
 }
 
@@ -157,12 +157,8 @@ function enumOptions(schema: JsonSchema): Array<{ value: unknown; label: string 
 
 /// Top-level required-set for validate(). Recursing only honors immediate
 /// `required` lists — nested schemas carry their own.
-function validateNode(
-  schema: JsonSchema,
-  v: unknown,
-  path: string[],
-): string | null {
-  if (schema.type === "object") {
+function validateNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
+  if (schema.type === 'object') {
     const obj = (v ?? {}) as Record<string, unknown>;
     const req = schema.required ?? [];
     for (const key of req) {
@@ -170,9 +166,9 @@ function validateNode(
       const isEmpty =
         child === undefined ||
         child === null ||
-        (typeof child === "string" && child.trim() === "") ||
+        (typeof child === 'string' && child.trim() === '') ||
         (Array.isArray(child) && child.length === 0);
-      if (isEmpty) return [...path, key].join(".") || key;
+      if (isEmpty) return [...path, key].join('.') || key;
     }
     if (schema.properties) {
       for (const [key, sub] of Object.entries(schema.properties)) {
@@ -182,31 +178,31 @@ function validateNode(
     }
     return null;
   }
-  if (schema.type === "array") {
+  if (schema.type === 'array') {
     if (Array.isArray(v)) {
       if (schema.minItems !== undefined && v.length < schema.minItems) {
-        return path.join(".") || "(array)";
+        return path.join('.') || '(array)';
       }
       if (schema.maxItems !== undefined && v.length > schema.maxItems) {
-        return path.join(".") || "(array)";
+        return path.join('.') || '(array)';
       }
     }
     return null;
   }
-  if (schema.type === "string" && typeof v === "string") {
+  if (schema.type === 'string' && typeof v === 'string') {
     if (schema.minLength !== undefined && v.length < schema.minLength) {
-      return path.join(".") || "(string)";
+      return path.join('.') || '(string)';
     }
     if (schema.maxLength !== undefined && v.length > schema.maxLength) {
-      return path.join(".") || "(string)";
+      return path.join('.') || '(string)';
     }
   }
-  if ((schema.type === "number" || schema.type === "integer") && typeof v === "number") {
+  if ((schema.type === 'number' || schema.type === 'integer') && typeof v === 'number') {
     if (schema.minimum !== undefined && v < schema.minimum) {
-      return path.join(".") || "(number)";
+      return path.join('.') || '(number)';
     }
     if (schema.maximum !== undefined && v > schema.maximum) {
-      return path.join(".") || "(number)";
+      return path.join('.') || '(number)';
     }
   }
   return null;
@@ -221,7 +217,7 @@ defineExpose({ validate });
 // Top-level properties array — when root isn't an object, we still
 // render a single field at path `[]`.
 const rootProperties = computed(() => {
-  if (props.schema.type === "object" && props.schema.properties) {
+  if (props.schema.type === 'object' && props.schema.properties) {
     return Object.entries(props.schema.properties).map(([key, sub]) => ({
       key,
       schema: sub,
@@ -233,8 +229,16 @@ const rootProperties = computed(() => {
 </script>
 
 <template>
-  <div class="json-schema-form" role="group">
-    <p v-if="schema.description" class="form-description">{{ schema.description }}</p>
+  <div
+    class="json-schema-form"
+    role="group"
+  >
+    <p
+      v-if="schema.description"
+      class="form-description"
+    >
+      {{ schema.description }}
+    </p>
 
     <template v-if="rootProperties.length > 0">
       <JsonSchemaField
@@ -249,7 +253,12 @@ const rootProperties = computed(() => {
         :html-input-type="htmlInputType"
       />
     </template>
-    <p v-else class="form-empty">No fields requested.</p>
+    <p
+      v-else
+      class="form-empty"
+    >
+      No fields requested.
+    </p>
   </div>
 </template>
 

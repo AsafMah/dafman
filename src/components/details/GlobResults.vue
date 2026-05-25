@@ -5,8 +5,8 @@
 /// prominently so you can immediately see "this matched 200 files"
 /// without scrolling.
 
-import { computed } from "vue";
-import PathChip from "./PathChip.vue";
+import { computed } from 'vue';
+import PathChip from './PathChip.vue';
 
 const props = defineProps<{
   output: string;
@@ -14,7 +14,7 @@ const props = defineProps<{
 
 const paths = computed<string[]>(() => {
   return props.output
-    .split("\n")
+    .split('\n')
     .map((p) => p.trim())
     .filter((p) => p.length > 0)
     .sort();
@@ -22,17 +22,30 @@ const paths = computed<string[]>(() => {
 </script>
 
 <template>
-  <div v-if="paths.length > 0" class="glob-results">
-    <p class="glob-summary">
-      {{ paths.length }} file{{ paths.length === 1 ? "" : "s" }} matched
-    </p>
+  <div
+    v-if="paths.length > 0"
+    class="glob-results"
+  >
+    <p class="glob-summary">{{ paths.length }} file{{ paths.length === 1 ? '' : 's' }} matched</p>
     <ul class="glob-list">
-      <li v-for="p in paths" :key="p" class="glob-item">
-        <PathChip :path="p" icon="file" />
+      <li
+        v-for="p in paths"
+        :key="p"
+        class="glob-item"
+      >
+        <PathChip
+          :path="p"
+          icon="file"
+        />
       </li>
     </ul>
   </div>
-  <p v-else class="glob-empty">No matches.</p>
+  <p
+    v-else
+    class="glob-empty"
+  >
+    No matches.
+  </p>
 </template>
 
 <style scoped>

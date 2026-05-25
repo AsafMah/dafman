@@ -3,12 +3,12 @@
 /// it can be mounted inside LexicalComposer and call
 /// `useLexicalComposer()` (which only resolves inside the provider).
 
-import { onBeforeUnmount, onMounted } from "vue";
-import { useLexicalComposer } from "lexical-vue/LexicalComposer";
-import { ContentEditable } from "lexical-vue/LexicalContentEditable";
-import { PlainTextPlugin } from "lexical-vue/LexicalPlainTextPlugin";
-import { HistoryPlugin } from "lexical-vue/LexicalHistoryPlugin";
-import { AutoFocusPlugin } from "lexical-vue/LexicalAutoFocusPlugin";
+import { onBeforeUnmount, onMounted } from 'vue';
+import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
+import { ContentEditable } from 'lexical-vue/LexicalContentEditable';
+import { PlainTextPlugin } from 'lexical-vue/LexicalPlainTextPlugin';
+import { HistoryPlugin } from 'lexical-vue/LexicalHistoryPlugin';
+import { AutoFocusPlugin } from 'lexical-vue/LexicalAutoFocusPlugin';
 import {
   $getRoot,
   $createParagraphNode,
@@ -16,7 +16,7 @@ import {
   COMMAND_PRIORITY_HIGH,
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
-} from "lexical";
+} from 'lexical';
 
 const props = defineProps<{
   originalText: string;
@@ -24,10 +24,10 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "save", text: string): void;
-  (e: "saveAndFork", text: string): void;
-  (e: "cancel"): void;
-  (e: "draftChange", text: string): void;
+  (e: 'save', text: string): void;
+  (e: 'saveAndFork', text: string): void;
+  (e: 'cancel'): void;
+  (e: 'draftChange', text: string): void;
 }>();
 
 const editor = useLexicalComposer();
@@ -39,7 +39,7 @@ onMounted(() => {
   editor.update(() => {
     const root = $getRoot();
     root.clear();
-    const lines = props.originalText.split("\n");
+    const lines = props.originalText.split('\n');
     for (const line of lines) {
       const para = $createParagraphNode();
       if (line.length > 0) para.append($createTextNode(line));
@@ -60,8 +60,8 @@ onMounted(() => {
           .read(() => $getRoot().getTextContent())
           .trimEnd();
         if (text.length === 0) return true;
-        if (event.shiftKey && props.canFork) emit("saveAndFork", text);
-        else emit("save", text);
+        if (event.shiftKey && props.canFork) emit('saveAndFork', text);
+        else emit('save', text);
         return true;
       },
       COMMAND_PRIORITY_HIGH,
@@ -72,7 +72,7 @@ onMounted(() => {
     editor.registerCommand(
       KEY_ESCAPE_COMMAND,
       () => {
-        emit("cancel");
+        emit('cancel');
         return true;
       },
       COMMAND_PRIORITY_HIGH,
@@ -82,7 +82,7 @@ onMounted(() => {
   cleanups.push(
     editor.registerUpdateListener(({ editorState }) => {
       editorState.read(() => {
-        emit("draftChange", $getRoot().getTextContent());
+        emit('draftChange', $getRoot().getTextContent());
       });
     }),
   );

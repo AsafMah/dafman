@@ -8,23 +8,21 @@
 // so any other surface that mutates mode (popover fallback, server-
 // initiated /plan, …) stays in sync.
 
-import { computed } from "vue";
-import SelectButton from "primevue/selectbutton";
-import Select from "primevue/select";
-import type { SessionMode } from "../ipc/types";
-import { useSessionsStore } from "../stores/sessionsStore";
+import { computed } from 'vue';
+import SelectButton from 'primevue/selectbutton';
+import Select from 'primevue/select';
+import type { SessionMode } from '../ipc/types';
+import { useSessionsStore } from '../stores/sessionsStore';
 
 const props = defineProps<{ sessionId: string }>();
 const sessionsStore = useSessionsStore();
 
-const record = computed(() =>
-  sessionsStore.getSession(props.sessionId),
-);
+const record = computed(() => sessionsStore.getSession(props.sessionId));
 
 const modeOptions: { label: string; value: SessionMode; icon: string }[] = [
-  { label: "Interactive", value: "interactive", icon: "pi pi-comments" },
-  { label: "Plan", value: "plan", icon: "pi pi-list-check" },
-  { label: "Autopilot", value: "autopilot", icon: "pi pi-bolt" },
+  { label: 'Interactive', value: 'interactive', icon: 'pi pi-comments' },
+  { label: 'Plan', value: 'plan', icon: 'pi pi-list-check' },
+  { label: 'Autopilot', value: 'autopilot', icon: 'pi pi-bolt' },
 ];
 
 const modeChoice = computed<SessionMode | null>({
@@ -35,7 +33,7 @@ const modeChoice = computed<SessionMode | null>({
   },
 });
 
-const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
+const modeClass = computed(() => `mode-${modeChoice.value ?? 'interactive'}`);
 </script>
 
 <template>
@@ -52,11 +50,17 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
     :class="modeClass"
   >
     <template #option="slotProps">
-      <i :class="slotProps.option.icon" :title="slotProps.option.label" />
+      <i
+        :class="slotProps.option.icon"
+        :title="slotProps.option.label"
+      />
       <span class="sr-only">{{ slotProps.option.label }}</span>
     </template>
   </SelectButton>
-  <div v-if="record" class="mode-select-shell">
+  <div
+    v-if="record"
+    class="mode-select-shell"
+  >
     <Select
       v-model="modeChoice"
       :options="modeOptions"
@@ -69,13 +73,21 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
     >
       <template #value="{ value }">
         <span class="mode-select-value">
-          <i :class="modeOptions.find((option) => option.value === value)?.icon" aria-hidden="true" />
-          <span class="mode-select-current-label">{{ modeOptions.find((option) => option.value === value)?.label ?? "Mode" }}</span>
+          <i
+            :class="modeOptions.find((option) => option.value === value)?.icon"
+            aria-hidden="true"
+          />
+          <span class="mode-select-current-label">{{
+            modeOptions.find((option) => option.value === value)?.label ?? 'Mode'
+          }}</span>
         </span>
       </template>
       <template #option="{ option }">
         <span class="mode-select-value">
-          <i :class="option.icon" aria-hidden="true" />
+          <i
+            :class="option.icon"
+            aria-hidden="true"
+          />
           <span>{{ option.label }}</span>
         </span>
       </template>
@@ -139,14 +151,20 @@ const modeClass = computed(() => `mode-${modeChoice.value ?? "interactive"}`);
   border: 0;
   color: var(--p-text-muted-color);
   border-radius: 0;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 .mode-button-group :deep(.p-selectbutton .p-button:not(.p-togglebutton-checked):hover) {
   background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
   color: var(--p-text-color);
 }
 .mode-button-group :deep(.p-selectbutton .p-button.p-togglebutton-checked) {
-  background: color-mix(in srgb, var(--mode-color, var(--accent, var(--p-primary-color))) 22%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--mode-color, var(--accent, var(--p-primary-color))) 22%,
+    transparent
+  );
   color: var(--mode-color, var(--p-text-color));
   border: 0;
 }

@@ -15,8 +15,8 @@
 // The rail itself lives OUTSIDE dockview so it survives any layout
 // state (including all panels closed).
 
-import { computed, onMounted, ref } from "vue";
-import { useLayoutStore } from "../stores/layoutStore";
+import { computed, onMounted, ref } from 'vue';
+import { useLayoutStore } from '../stores/layoutStore';
 
 interface ActivityItemBase {
   id: string;
@@ -27,11 +27,11 @@ interface ActivityItemBase {
   /// `"top"` (default) pins to the upper stack, `"bottom"` pins below
   /// `margin-top: auto`. Bottom is for global actions (settings,
   /// dev tools).
-  group?: "top" | "bottom";
+  group?: 'top' | 'bottom';
 }
 
 export interface PanelActivityItem extends ActivityItemBase {
-  kind: "panel";
+  kind: 'panel';
   /// Dockview-registered component name rendered when this panel is open.
   component: string;
   /// Initial width in pixels for the expanded panel.
@@ -42,7 +42,7 @@ export interface PanelActivityItem extends ActivityItemBase {
 }
 
 export interface ActionActivityItem extends ActivityItemBase {
-  kind: "action";
+  kind: 'action';
   /// Callback invoked on click. The ActivityBar never reflects state
   /// from action items (no pressed indicator).
   onClick: () => void;
@@ -61,7 +61,7 @@ const openIds = ref<Set<string>>(new Set());
 function syncOpenState() {
   const next = new Set<string>();
   for (const item of props.items) {
-    if (item.kind !== "panel") continue;
+    if (item.kind !== 'panel') continue;
     if (layoutStore.isPanelOpen(item.id)) next.add(item.id);
   }
   openIds.value = next;
@@ -72,7 +72,7 @@ onMounted(() => {
 });
 
 function activate(item: ActivityItem) {
-  if (item.kind === "action") {
+  if (item.kind === 'action') {
     item.onClick();
     return;
   }
@@ -85,22 +85,20 @@ function activate(item: ActivityItem) {
     // buttons in the rail. Close any other open panel-kind items
     // before opening the new one.
     for (const other of props.items) {
-      if (other.kind !== "panel") continue;
+      if (other.kind !== 'panel') continue;
       if (other.id === item.id) continue;
       if (layoutStore.isPanelOpen(other.id)) {
         layoutStore.closePanel(other.id);
       }
     }
-    layoutStore.openEdgePanel("left", {
+    layoutStore.openEdgePanel('left', {
       id: item.id,
       component: item.component,
-      tabComponent: "sidebarTab",
+      tabComponent: 'sidebarTab',
       title: item.title,
       initialSize: item.initialSize,
       exclusive: true,
-      ...(item.minimumSize !== undefined
-        ? { minimumSize: item.minimumSize }
-        : {}),
+      ...(item.minimumSize !== undefined ? { minimumSize: item.minimumSize } : {}),
     });
   }
   // Optimistic flip; the onDidLayoutChange subscription in App.vue
@@ -110,18 +108,17 @@ function activate(item: ActivityItem) {
 
 const isOpen = computed(() => (id: string) => openIds.value.has(id));
 
-const topItems = computed(() =>
-  props.items.filter((i) => (i.group ?? "top") === "top"),
-);
-const bottomItems = computed(() =>
-  props.items.filter((i) => i.group === "bottom"),
-);
+const topItems = computed(() => props.items.filter((i) => (i.group ?? 'top') === 'top'));
+const bottomItems = computed(() => props.items.filter((i) => i.group === 'bottom'));
 
 defineExpose({ sync: syncOpenState });
 </script>
 
 <template>
-  <nav class="activity-bar" aria-label="Activity bar">
+  <nav
+    class="activity-bar"
+    aria-label="Activity bar"
+  >
     <div class="activity-stack">
       <a
         href="#"
@@ -130,7 +127,11 @@ defineExpose({ sync: syncOpenState });
         aria-label="Dafman"
         @click.prevent
       >
-        <img src="/dafman.svg" alt="" class="activity-brand-icon" />
+        <img
+          src="/dafman.svg"
+          alt=""
+          class="activity-brand-icon"
+        />
       </a>
       <button
         v-for="item in topItems"
@@ -143,8 +144,16 @@ defineExpose({ sync: syncOpenState });
         :aria-pressed="item.kind === 'panel' ? isOpen(item.id) : undefined"
         @click="activate(item)"
       >
-        <i class="pi activity-icon" :class="item.icon" aria-hidden="true" />
-        <span v-if="item.badge" class="activity-badge">{{ item.badge }}</span>
+        <i
+          class="pi activity-icon"
+          :class="item.icon"
+          aria-hidden="true"
+        />
+        <span
+          v-if="item.badge"
+          class="activity-badge"
+          >{{ item.badge }}</span
+        >
       </button>
     </div>
     <div class="activity-stack activity-stack-bottom">
@@ -159,8 +168,16 @@ defineExpose({ sync: syncOpenState });
         :aria-pressed="item.kind === 'panel' ? isOpen(item.id) : undefined"
         @click="activate(item)"
       >
-        <i class="pi activity-icon" :class="item.icon" aria-hidden="true" />
-        <span v-if="item.badge" class="activity-badge">{{ item.badge }}</span>
+        <i
+          class="pi activity-icon"
+          :class="item.icon"
+          aria-hidden="true"
+        />
+        <span
+          v-if="item.badge"
+          class="activity-badge"
+          >{{ item.badge }}</span
+        >
       </button>
     </div>
   </nav>
@@ -247,7 +264,7 @@ defineExpose({ sync: syncOpenState });
 /* Vertical accent stripe on the active item — mirrors VS Code's
  * activity-bar pattern so the open panel is identifiable at a glance. */
 .activity-button.is-active::before {
-  content: "";
+  content: '';
   position: absolute;
   left: -0.175rem;
   top: 0.4rem;

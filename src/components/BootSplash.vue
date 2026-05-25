@@ -24,10 +24,10 @@
 // keeps it from getting caught in any parent component's reactivity
 // flush and lets it overlay popouts cleanly.
 
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useBootStore } from "../stores/bootStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { resolveIsDark } from "../lib/theme";
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useBootStore } from '../stores/bootStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { resolveIsDark } from '../lib/theme';
 
 const bootStore = useBootStore();
 const settingsStore = useSettingsStore();
@@ -35,33 +35,27 @@ const settingsStore = useSettingsStore();
 const prefersDark = ref(false);
 
 onMounted(() => {
-  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+  const mql = window.matchMedia('(prefers-color-scheme: dark)');
   prefersDark.value = mql.matches;
   const onChange = (e: MediaQueryListEvent) => {
     prefersDark.value = e.matches;
   };
-  mql.addEventListener("change", onChange);
-  onBeforeUnmount(() => mql.removeEventListener("change", onChange));
+  mql.addEventListener('change', onChange);
+  onBeforeUnmount(() => mql.removeEventListener('change', onChange));
 });
 
 const isDark = computed(() => {
   if (!settingsStore.loaded) return prefersDark.value;
-  return resolveIsDark(
-    settingsStore.settings.appearance.theme,
-    prefersDark.value,
-  );
+  return resolveIsDark(settingsStore.settings.appearance.theme, prefersDark.value);
 });
 
 const showDeterminateBar = computed(
-  () => bootStore.phase === "sessions" && bootStore.sessionsTotal > 0,
+  () => bootStore.phase === 'sessions' && bootStore.sessionsTotal > 0,
 );
 
 const progressPct = computed(() => {
   if (bootStore.sessionsTotal === 0) return 0;
-  return Math.min(
-    100,
-    Math.round((bootStore.sessionsRestored / bootStore.sessionsTotal) * 100),
-  );
+  return Math.min(100, Math.round((bootStore.sessionsRestored / bootStore.sessionsTotal) * 100));
 });
 
 function reload() {
@@ -91,7 +85,13 @@ function reload() {
               fill="none"
               aria-hidden="true"
             >
-              <rect x="4" y="6" width="18" height="14" rx="3" />
+              <rect
+                x="4"
+                y="6"
+                width="18"
+                height="14"
+                rx="3"
+              />
               <rect
                 x="10"
                 y="12"
@@ -104,13 +104,26 @@ function reload() {
             <h1 class="boot-title">dafman</h1>
           </div>
 
-          <div v-if="bootStore.phase === 'failed'" class="boot-error">
-            <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+          <div
+            v-if="bootStore.phase === 'failed'"
+            class="boot-error"
+          >
+            <i
+              class="pi pi-exclamation-triangle"
+              aria-hidden="true"
+            />
             <p class="boot-status">{{ bootStore.statusText }}</p>
-            <p v-if="bootStore.error" class="boot-error-detail">
+            <p
+              v-if="bootStore.error"
+              class="boot-error-detail"
+            >
               {{ bootStore.error }}
             </p>
-            <button type="button" class="boot-reload" @click="reload">
+            <button
+              type="button"
+              class="boot-reload"
+              @click="reload"
+            >
               Reload
             </button>
           </div>
@@ -119,8 +132,14 @@ function reload() {
             <!-- Spinner is GPU-promoted via will-change so its rotation
                  keeps animating even when the main thread is blocked
                  by dockview's synchronous panel-mount burst. -->
-            <div class="boot-spinner" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none">
+            <div
+              class="boot-spinner"
+              aria-hidden="true"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+              >
                 <circle
                   cx="12"
                   cy="12"
@@ -240,8 +259,12 @@ function reload() {
 }
 
 @keyframes boot-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .boot-status {
@@ -283,8 +306,12 @@ function reload() {
 }
 
 @keyframes boot-shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(370%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(370%);
+  }
 }
 
 .boot-progress-fill {

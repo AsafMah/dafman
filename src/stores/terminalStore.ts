@@ -1,14 +1,14 @@
-import { computed, ref } from "vue";
-import { defineStore } from "pinia";
-import { invokeCommand, onTerminalEvent } from "../ipc/invoke";
-import type { TerminalEventPayload, TerminalSummary } from "../ipc/types";
-import { useToastStore } from "./toastStore";
-import { useSessionsStore } from "./sessionsStore";
+import { computed, ref } from 'vue';
+import { defineStore } from 'pinia';
+import { invokeCommand, onTerminalEvent } from '../ipc/invoke';
+import type { TerminalEventPayload, TerminalSummary } from '../ipc/types';
+import { useToastStore } from './toastStore';
+import { useSessionsStore } from './sessionsStore';
 
 const MAX_BUFFER = 256_000;
 const MAX_COMMANDS_PER_TERMINAL = 200;
-const SESSION_TERMINALS_KEY = "dafman.sessionTerminals";
-const SESSION_TERMINAL_BUFFERS_KEY = "dafman.sessionTerminalBuffers";
+const SESSION_TERMINALS_KEY = 'dafman.sessionTerminals';
+const SESSION_TERMINAL_BUFFERS_KEY = 'dafman.sessionTerminalBuffers';
 
 export interface TerminalCommandRecord {
   id: string;
@@ -18,11 +18,11 @@ export interface TerminalCommandRecord {
   startedAt: string;
   endedAt?: string;
   exitCode?: number;
-  protocol: "osc633" | "osc133";
+  protocol: 'osc633' | 'osc133';
   trusted: boolean;
 }
 
-export const useTerminalStore = defineStore("terminals", () => {
+export const useTerminalStore = defineStore('terminals', () => {
   const terminals = ref<TerminalSummary[]>([]);
   const buffers = ref<Record<string, string>>({});
   const commands = ref<Record<string, TerminalCommandRecord[]>>({});
@@ -32,17 +32,17 @@ export const useTerminalStore = defineStore("terminals", () => {
   const loaded = ref(false);
   const sessionTerminalIds = ref<Record<string, string>>({});
   const sessionTerminalBuffers = ref<Record<string, string>>({});
-  const activeRendererOwner = ref<Record<string, "compact" | "full">>({});
+  const activeRendererOwner = ref<Record<string, 'compact' | 'full'>>({});
 
   const running = computed(() =>
-    terminals.value.filter((t) => t.status === "running" || t.status === "exiting"),
+    terminals.value.filter((t) => t.status === 'running' || t.status === 'exiting'),
   );
 
   async function refresh(): Promise<void> {
-    terminals.value = await invokeCommand("listTerminals", {});
+    terminals.value = await invokeCommand('listTerminals', {});
     const nextMap = { ...sessionTerminalIds.value };
     for (const terminal of terminals.value) {
-      if (terminal.sessionId && terminal.status === "running") {
+      if (terminal.sessionId && terminal.status === 'running') {
         nextMap[terminal.sessionId] = terminal.id;
       }
     }
@@ -59,7 +59,7 @@ export const useTerminalStore = defineStore("terminals", () => {
     title?: string;
     sessionId?: string;
   }): Promise<TerminalSummary> {
-    const summary = await invokeCommand("createTerminal", params);
+    const summary = await invokeCommand('createTerminal', params);
     upsert(summary);
     return summary;
   }
@@ -69,9 +69,9 @@ export const useTerminalStore = defineStore("terminals", () => {
     const existing = existingId
       ? terminals.value.find((terminal) => terminal.id === existingId)
       : null;
-    if (existing && existing.status === "running") return existing;
-    const linked = terminals.value.find((terminal) =>
-      terminal.sessionId === sessionId && terminal.status === "running",
+    if (existing && existing.status === 'running') return existing;
+    const linked = terminals.value.find(
+      (terminal) => terminal.sessionId === sessionId && terminal.status === 'running',
     );
     if (linked) {
       setSessionTerminalIds({ ...sessionTerminalIds.value, [sessionId]: linked.id });
@@ -83,7 +83,7 @@ export const useTerminalStore = defineStore("terminals", () => {
       rows: 8,
       ...(session?.workingDirectory ? { cwd: session.workingDirectory } : {}),
       sessionId,
-      title: "Session Shell",
+      title: 'Session Shell',
     });
     const restored = sessionTerminalBuffers.value[sessionId];
     if (restored) {
@@ -94,19 +94,15 @@ export const useTerminalStore = defineStore("terminals", () => {
   }
 
   async function writeTerminal(terminalId: string, data: string): Promise<boolean> {
-    return invokeCommand("writeTerminal", { terminalId, data });
+    return invokeCommand('writeTerminal', { terminalId, data });
   }
 
-  async function resizeTerminal(
-    terminalId: string,
-    cols: number,
-    rows: number,
-  ): Promise<boolean> {
-    return invokeCommand("resizeTerminal", { terminalId, cols, rows });
+  async function resizeTerminal(terminalId: string, cols: number, rows: number): Promise<boolean> {
+    return invokeCommand('resizeTerminal', { terminalId, cols, rows });
   }
 
   async function killTerminal(terminalId: string): Promise<boolean> {
-    const ok = await invokeCommand("killTerminal", { terminalId });
+    const ok = await invokeCommand('killTerminal', { terminalId });
     await refresh().catch(() => {});
     return ok;
   }
@@ -115,7 +111,7 @@ export const useTerminalStore = defineStore("terminals", () => {
     const idx = terminals.value.findIndex((t) => t.id === summary.id);
     if (idx >= 0) terminals.value.splice(idx, 1, summary);
     else terminals.value.push(summary);
-    if (summary.sessionId && summary.status === "running") {
+    if (summary.sessionId && summary.status === 'running') {
       setSessionTerminalIds({ ...sessionTerminalIds.value, [summary.sessionId]: summary.id });
     }
   }
@@ -136,7 +132,7 @@ export const useTerminalStore = defineStore("terminals", () => {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       const next: Record<string, string> = {};
       for (const [sessionId, terminalId] of Object.entries(parsed)) {
-        if (typeof terminalId === "string") next[sessionId] = terminalId;
+        if (typeof terminalId === 'string') next[sessionId] = terminalId;
       }
       sessionTerminalIds.value = next;
     } catch {
@@ -161,7 +157,7 @@ export const useTerminalStore = defineStore("terminals", () => {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       const next: Record<string, string> = {};
       for (const [sessionId, buffer] of Object.entries(parsed)) {
-        if (typeof buffer === "string") next[sessionId] = buffer.slice(-MAX_BUFFER);
+        if (typeof buffer === 'string') next[sessionId] = buffer.slice(-MAX_BUFFER);
       }
       sessionTerminalBuffers.value = next;
     } catch {
@@ -170,8 +166,8 @@ export const useTerminalStore = defineStore("terminals", () => {
   }
 
   function applyEvent(event: TerminalEventPayload): void {
-    if (event.kind === "output") {
-      const prev = buffers.value[event.terminalId] ?? "";
+    if (event.kind === 'output') {
+      const prev = buffers.value[event.terminalId] ?? '';
       const next = `${prev}${event.data}`;
       const capped = next.length > MAX_BUFFER ? next.slice(-MAX_BUFFER) : next;
       buffers.value = {
@@ -182,12 +178,12 @@ export const useTerminalStore = defineStore("terminals", () => {
       if (terminal?.sessionId) setSessionTerminalBuffer(terminal.sessionId, capped);
       return;
     }
-    if (event.kind === "status" || event.kind === "exit") {
+    if (event.kind === 'status' || event.kind === 'exit') {
       upsert(event.summary);
       return;
     }
-    if (event.kind === "error") {
-      useToastStore().error("Terminal error", event.message);
+    if (event.kind === 'error') {
+      useToastStore().error('Terminal error', event.message);
     }
   }
 
@@ -197,7 +193,7 @@ export const useTerminalStore = defineStore("terminals", () => {
 
   function startCommand(
     terminalId: string,
-    command: Omit<TerminalCommandRecord, "id" | "startedAt"> & { startedAt?: string },
+    command: Omit<TerminalCommandRecord, 'id' | 'startedAt'> & { startedAt?: string },
   ): TerminalCommandRecord {
     const record: TerminalCommandRecord = {
       id: crypto.randomUUID(),
@@ -210,7 +206,7 @@ export const useTerminalStore = defineStore("terminals", () => {
 
   function updateActiveCommand(
     terminalId: string,
-    patch: Partial<Omit<TerminalCommandRecord, "id" | "startedAt">>,
+    patch: Partial<Omit<TerminalCommandRecord, 'id' | 'startedAt'>>,
   ): void {
     const record = activeCommands.value[terminalId];
     if (!record) return;
@@ -220,7 +216,11 @@ export const useTerminalStore = defineStore("terminals", () => {
     };
   }
 
-  function finishCommand(terminalId: string, exitCode?: number, output?: string): TerminalCommandRecord | null {
+  function finishCommand(
+    terminalId: string,
+    exitCode?: number,
+    output?: string,
+  ): TerminalCommandRecord | null {
     const record = activeCommands.value[terminalId];
     if (!record) return null;
     const finished: TerminalCommandRecord = {
@@ -261,10 +261,10 @@ export const useTerminalStore = defineStore("terminals", () => {
     /* app may be starting; explicit actions surface errors */
   });
 
-  function claimRenderer(terminalId: string, owner: "compact" | "full"): void {
+  function claimRenderer(terminalId: string, owner: 'compact' | 'full'): void {
     activeRendererOwner.value = { ...activeRendererOwner.value, [terminalId]: owner };
   }
-  function releaseRenderer(terminalId: string, owner: "compact" | "full"): void {
+  function releaseRenderer(terminalId: string, owner: 'compact' | 'full'): void {
     if (activeRendererOwner.value[terminalId] === owner) {
       const next = { ...activeRendererOwner.value };
       delete next[terminalId];

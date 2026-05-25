@@ -3,35 +3,41 @@
 // startup; `update()` does a full-replace (the backend persists to disk
 // and returns the canonical document, including the stamped version).
 
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { invokeCommand } from "../ipc/invoke";
-import type { NotificationPrefs, ReasoningVisibility, Settings, TerminalPrefs, ThemeChoice } from "../ipc/types";
-import { useToastStore } from "./toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import { invokeCommand } from '../ipc/invoke';
+import type {
+  NotificationPrefs,
+  ReasoningVisibility,
+  Settings,
+  TerminalPrefs,
+  ThemeChoice,
+} from '../ipc/types';
+import { useToastStore } from './toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 function defaultSettings(): Settings {
   return {
     version: 14,
     appearance: {
-      theme: "system",
-      reasoningVisibility: "compact",
-      defaultModelId: "auto",
+      theme: 'system',
+      reasoningVisibility: 'compact',
+      defaultModelId: 'auto',
       defaultReasoningEffort: null,
       streaming: false,
       enableMermaid: false,
     },
     layout: { dockview: null },
-    workspaces: { recent: [], defaultWorkspace: "" },
+    workspaces: { recent: [], defaultWorkspace: '' },
     notifications: { turnEnd: false, waitingForInput: true },
     tools: { defaultExcluded: [], defaultAllowed: [] },
     permissions: { defaultApproveAll: false },
     terminal: {
-      defaultProfileId: "platform-default",
-      fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
+      defaultProfileId: 'platform-default',
+      fontFamily: 'Cascadia Mono, Consolas, ui-monospace, monospace',
       fontSize: 13,
       scrollback: 10_000,
-      theme: { background: "#111827", foreground: "#d1d5db" },
+      theme: { background: '#111827', foreground: '#d1d5db' },
       addons: {
         search: true,
         webLinks: true,
@@ -52,25 +58,25 @@ function defaultSettings(): Settings {
 /// Hard upper bound on the workspace MRU; matches the backend constant
 /// `WORKSPACES_MRU_LIMIT`. Anything past this is trimmed off the tail.
 const WORKSPACES_MRU_LIMIT = 10;
-type TerminalPrefsPatch = Omit<Partial<TerminalPrefs>, "addons" | "theme"> & {
-  addons?: Partial<TerminalPrefs["addons"]>;
-  theme?: Partial<TerminalPrefs["theme"]>;
+type TerminalPrefsPatch = Omit<Partial<TerminalPrefs>, 'addons' | 'theme'> & {
+  addons?: Partial<TerminalPrefs['addons']>;
+  theme?: Partial<TerminalPrefs['theme']>;
 };
 
-export const useSettingsStore = defineStore("settings", () => {
+export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<Settings>(defaultSettings());
   const loaded = ref(false);
   const isSaving = ref(false);
 
   async function load(): Promise<Settings> {
     try {
-      const next = await invokeCommand("getSettings", {});
+      const next = await invokeCommand('getSettings', {});
       settings.value = next;
       loaded.value = true;
       return next;
     } catch (err) {
       const message = toErrorMessage(err);
-      useToastStore().error("Failed to load settings", message);
+      useToastStore().error('Failed to load settings', message);
       throw err;
     }
   }
@@ -78,12 +84,12 @@ export const useSettingsStore = defineStore("settings", () => {
   async function update(next: Settings): Promise<Settings> {
     isSaving.value = true;
     try {
-      const written = await invokeCommand("updateSettings", { next });
+      const written = await invokeCommand('updateSettings', { next });
       settings.value = written;
       return written;
     } catch (err) {
       const message = toErrorMessage(err);
-      useToastStore().error("Failed to save settings", message);
+      useToastStore().error('Failed to save settings', message);
       throw err;
     } finally {
       isSaving.value = false;
@@ -149,9 +155,7 @@ export const useSettingsStore = defineStore("settings", () => {
 
   /// Partial update for OS-notification toggles. Either key can be
   /// omitted to leave the existing value intact.
-  async function setNotifications(
-    next: Partial<NotificationPrefs>,
-  ): Promise<void> {
+  async function setNotifications(next: Partial<NotificationPrefs>): Promise<void> {
     try {
       await update({
         ...settings.value,
@@ -191,10 +195,7 @@ export const useSettingsStore = defineStore("settings", () => {
     const filtered = prev.filter((p) => p !== trimmed);
     const next = [trimmed, ...filtered].slice(0, WORKSPACES_MRU_LIMIT);
     // Avoid a write if nothing changed (same head, same length).
-    if (
-      prev.length === next.length &&
-      prev.every((p, i) => p === next[i])
-    ) {
+    if (prev.length === next.length && prev.every((p, i) => p === next[i])) {
       return;
     }
     try {

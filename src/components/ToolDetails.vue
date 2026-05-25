@@ -8,16 +8,16 @@
 // registry — same source of truth as the collapsed header summary.
 // Each layout is a thin composition of `details/*` primitives.
 
-import { computed } from "vue";
-import PathChip from "./details/PathChip.vue";
-import CommandBlock from "./details/CommandBlock.vue";
-import UrlChip from "./details/UrlChip.vue";
-import ToolChip from "./details/ToolChip.vue";
-import DiffEditor from "./details/DiffEditor.vue";
-import ApplyPatchView from "./details/ApplyPatchView.vue";
-import GrepResults from "./details/GrepResults.vue";
-import GlobResults from "./details/GlobResults.vue";
-import JsonValueView from "./JsonValueView.vue";
+import { computed } from 'vue';
+import PathChip from './details/PathChip.vue';
+import CommandBlock from './details/CommandBlock.vue';
+import UrlChip from './details/UrlChip.vue';
+import ToolChip from './details/ToolChip.vue';
+import DiffEditor from './details/DiffEditor.vue';
+import ApplyPatchView from './details/ApplyPatchView.vue';
+import GrepResults from './details/GrepResults.vue';
+import GlobResults from './details/GlobResults.vue';
+import JsonValueView from './JsonValueView.vue';
 
 const props = defineProps<{
   toolName: string;
@@ -37,97 +37,97 @@ const props = defineProps<{
 // Normalised kind — covers aliases so the template only has to care
 // about a small set. Mirrors the alias entries in toolRenderers.ts.
 const kind = computed<
-  | "shell"
-  | "read"
-  | "write"
-  | "edit"
-  | "apply_patch"
-  | "grep"
-  | "glob"
-  | "view"
-  | "fetch"
-  | "todo_write"
-  | "mcp"
-  | "generic"
+  | 'shell'
+  | 'read'
+  | 'write'
+  | 'edit'
+  | 'apply_patch'
+  | 'grep'
+  | 'glob'
+  | 'view'
+  | 'fetch'
+  | 'todo_write'
+  | 'mcp'
+  | 'generic'
 >(() => {
-  if (props.mcpServerName) return "mcp";
+  if (props.mcpServerName) return 'mcp';
   switch (props.toolName) {
-    case "shell":
-    case "bash":
-    case "execute":
-      return "shell";
-    case "read":
-    case "read_file":
-    case "readFile":
-      return "read";
-    case "write":
-    case "write_file":
-    case "writeFile":
-    case "create":
-      return "write";
-    case "edit":
-    case "str_replace_editor":
-    case "str_replace":
-      return "edit";
-    case "apply_patch":
-    case "applyPatch":
-    case "patch":
-      return "apply_patch";
-    case "grep":
-    case "search":
-      return "grep";
-    case "glob":
-      return "glob";
-    case "view":
-      return "view";
-    case "fetch":
-    case "web_fetch":
-    case "webFetch":
-      return "fetch";
-    case "todo_write":
-    case "todoWrite":
-    case "todos":
-      return "todo_write";
+    case 'shell':
+    case 'bash':
+    case 'execute':
+      return 'shell';
+    case 'read':
+    case 'read_file':
+    case 'readFile':
+      return 'read';
+    case 'write':
+    case 'write_file':
+    case 'writeFile':
+    case 'create':
+      return 'write';
+    case 'edit':
+    case 'str_replace_editor':
+    case 'str_replace':
+      return 'edit';
+    case 'apply_patch':
+    case 'applyPatch':
+    case 'patch':
+      return 'apply_patch';
+    case 'grep':
+    case 'search':
+      return 'grep';
+    case 'glob':
+      return 'glob';
+    case 'view':
+      return 'view';
+    case 'fetch':
+    case 'web_fetch':
+    case 'webFetch':
+      return 'fetch';
+    case 'todo_write':
+    case 'todoWrite':
+    case 'todos':
+      return 'todo_write';
     default:
-      return "generic";
+      return 'generic';
   }
 });
 
 // Args probes — defensive on `unknown` shape.
 function s(...keys: string[]): string {
   const a = props.args;
-  if (!a) return "";
+  if (!a) return '';
   for (const k of keys) {
     const v = a[k];
-    if (typeof v === "string" && v.length > 0) return v;
+    if (typeof v === 'string' && v.length > 0) return v;
   }
-  return "";
+  return '';
 }
 
-const shellCommand = computed(() => s("command", "cmd"));
-const shellCwd = computed(() => s("cwd", "workingDirectory"));
+const shellCommand = computed(() => s('command', 'cmd'));
+const shellCwd = computed(() => s('cwd', 'workingDirectory'));
 
-const filePath = computed(() => s("path", "filePath", "fileName", "file_path"));
+const filePath = computed(() => s('path', 'filePath', 'fileName', 'file_path'));
 
-const editOld = computed(() => s("oldText", "old_str", "old"));
-const editNew = computed(() => s("newText", "new_str", "new"));
+const editOld = computed(() => s('oldText', 'old_str', 'old'));
+const editNew = computed(() => s('newText', 'new_str', 'new'));
 
-const patchInput = computed(() => s("input", "patch", "diff"));
+const patchInput = computed(() => s('input', 'patch', 'diff'));
 
-const grepPattern = computed(() => s("pattern"));
-const grepPath = computed(() => s("path", "dir", "directory"));
+const grepPattern = computed(() => s('pattern'));
+const grepPath = computed(() => s('path', 'dir', 'directory'));
 
-const globPattern = computed(() => s("pattern", "glob"));
+const globPattern = computed(() => s('pattern', 'glob'));
 
 const viewRange = computed<[number, number] | null>(() => {
   const r = props.args?.view_range;
-  if (Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === "number")) {
+  if (Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === 'number')) {
     return [r[0] as number, r[1] as number];
   }
   return null;
 });
 
-const fetchUrl = computed(() => s("url"));
+const fetchUrl = computed(() => s('url'));
 
 const todoItems = computed<Array<{ id?: unknown; title?: unknown; status?: unknown }>>(() => {
   const t = props.args?.todos;
@@ -139,22 +139,25 @@ const todoItems = computed<Array<{ id?: unknown; title?: unknown; status?: unkno
 // content lines (without leading +/- space).
 const viewContent = computed(() => {
   const raw = liveResult.value;
-  if (!raw) return "";
+  if (!raw) return '';
   // Detect unified diff format
   if (/^diff --git /m.test(raw) || /^---\s+a\//m.test(raw)) {
-    const lines = raw.split("\n");
+    const lines = raw.split('\n');
     const content: string[] = [];
     let inHunk = false;
     for (const line of lines) {
-      if (line.startsWith("@@")) { inHunk = true; continue; }
+      if (line.startsWith('@@')) {
+        inHunk = true;
+        continue;
+      }
       if (!inHunk) continue;
       // Skip removed lines (leading -)
-      if (line.startsWith("-")) continue;
+      if (line.startsWith('-')) continue;
       // Added or context lines: strip leading + or space
-      if (line.startsWith("+")) content.push(line.slice(1));
-      else content.push(line.startsWith(" ") ? line.slice(1) : line);
+      if (line.startsWith('+')) content.push(line.slice(1));
+      else content.push(line.startsWith(' ') ? line.slice(1) : line);
     }
-    return content.join("\n");
+    return content.join('\n');
   }
   return raw;
 });
@@ -162,17 +165,17 @@ const viewContent = computed(() => {
 // Language inference for results
 const fileExtension = computed(() => {
   const p = filePath.value;
-  if (!p) return "";
+  if (!p) return '';
   const m = /\.([a-z0-9]+)$/i.exec(p);
-  return m ? m[1]!.toLowerCase() : "";
+  return m ? m[1]!.toLowerCase() : '';
 });
 
 const argsJson = computed(() => {
-  if (!props.args) return "";
+  if (!props.args) return '';
   try {
     return JSON.stringify(props.args, null, 2);
   } catch {
-    return "";
+    return '';
   }
 });
 
@@ -181,7 +184,7 @@ const argsJson = computed(() => {
 const liveResult = computed(() => {
   if (props.resultContent && props.resultContent.length > 0) return props.resultContent;
   if (props.partialOutput && props.partialOutput.length > 0) return props.partialOutput;
-  return "";
+  return '';
 });
 const hasResult = computed(() => liveResult.value.length > 0);
 
@@ -194,7 +197,7 @@ const parsedResult = computed<unknown | undefined>(() => {
   const trimmed = liveResult.value.trim();
   if (trimmed.length === 0) return undefined;
   const firstChar = trimmed[0];
-  if (firstChar !== "{" && firstChar !== "[") return undefined;
+  if (firstChar !== '{' && firstChar !== '[') return undefined;
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -203,11 +206,7 @@ const parsedResult = computed<unknown | undefined>(() => {
 });
 const isStructuredResult = computed(() => {
   const v = parsedResult.value;
-  return (
-    v !== undefined &&
-    v !== null &&
-    (Array.isArray(v) || typeof v === "object")
-  );
+  return v !== undefined && v !== null && (Array.isArray(v) || typeof v === 'object');
 });
 </script>
 
@@ -215,10 +214,20 @@ const isStructuredResult = computed(() => {
   <div class="tool-details">
     <!-- shell -->
     <template v-if="kind === 'shell'">
-      <CommandBlock v-if="shellCommand" :code="shellCommand" lang="bash" />
-      <div v-if="shellCwd" class="tool-meta">
+      <CommandBlock
+        v-if="shellCommand"
+        :code="shellCommand"
+        lang="bash"
+      />
+      <div
+        v-if="shellCwd"
+        class="tool-meta"
+      >
         <span class="tool-meta-label">in</span>
-        <PathChip :path="shellCwd" icon="folder" />
+        <PathChip
+          :path="shellCwd"
+          icon="folder"
+        />
       </div>
       <CommandBlock
         v-if="hasResult"
@@ -229,7 +238,12 @@ const isStructuredResult = computed(() => {
 
     <!-- read -->
     <template v-else-if="kind === 'read'">
-      <PathChip v-if="filePath" :path="filePath" icon="eye" badge="read" />
+      <PathChip
+        v-if="filePath"
+        :path="filePath"
+        icon="eye"
+        badge="read"
+      />
       <CommandBlock
         v-if="hasResult"
         :code="liveResult"
@@ -240,7 +254,11 @@ const isStructuredResult = computed(() => {
 
     <!-- write -->
     <template v-else-if="kind === 'write'">
-      <PathChip v-if="filePath" :path="filePath" icon="file-edit" />
+      <PathChip
+        v-if="filePath"
+        :path="filePath"
+        icon="file-edit"
+      />
       <CommandBlock
         v-if="hasResult"
         :code="liveResult"
@@ -251,20 +269,35 @@ const isStructuredResult = computed(() => {
 
     <!-- edit / str_replace -->
     <template v-else-if="kind === 'edit'">
-      <PathChip v-if="filePath" :path="filePath" icon="pencil" />
+      <PathChip
+        v-if="filePath"
+        :path="filePath"
+        icon="pencil"
+      />
       <DiffEditor
         v-if="editOld !== undefined || editNew !== undefined"
         :old-text="editOld ?? ''"
         :new-text="editNew ?? ''"
         :filename="filePath"
       />
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
+      <CommandBlock
+        v-if="hasResult"
+        :code="liveResult"
+        lang="text"
+      />
     </template>
 
     <!-- apply_patch -->
     <template v-else-if="kind === 'apply_patch'">
-      <ApplyPatchView v-if="patchInput" :patch="patchInput" />
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
+      <ApplyPatchView
+        v-if="patchInput"
+        :patch="patchInput"
+      />
+      <CommandBlock
+        v-if="hasResult"
+        :code="liveResult"
+        lang="text"
+      />
     </template>
 
     <!-- grep -->
@@ -274,7 +307,10 @@ const isStructuredResult = computed(() => {
         <code class="tool-meta-code">{{ grepPattern }}</code>
         <template v-if="grepPath">
           <span class="tool-meta-label">in</span>
-          <PathChip :path="grepPath" icon="folder" />
+          <PathChip
+            :path="grepPath"
+            icon="folder"
+          />
         </template>
       </div>
       <GrepResults
@@ -290,14 +326,24 @@ const isStructuredResult = computed(() => {
         <span class="tool-meta-label">glob</span>
         <code class="tool-meta-code">{{ globPattern }}</code>
       </div>
-      <GlobResults v-if="hasResult" :output="liveResult" />
+      <GlobResults
+        v-if="hasResult"
+        :output="liveResult"
+      />
     </template>
 
     <!-- view -->
     <template v-else-if="kind === 'view'">
       <div class="tool-meta">
-        <PathChip v-if="filePath" :path="filePath" icon="eye" />
-        <span v-if="viewRange" class="tool-meta-range">
+        <PathChip
+          v-if="filePath"
+          :path="filePath"
+          icon="eye"
+        />
+        <span
+          v-if="viewRange"
+          class="tool-meta-range"
+        >
           lines {{ viewRange[0] }}–{{ viewRange[1] }}
         </span>
       </div>
@@ -311,28 +357,42 @@ const isStructuredResult = computed(() => {
 
     <!-- fetch -->
     <template v-else-if="kind === 'fetch'">
-      <UrlChip v-if="fetchUrl" :url="fetchUrl" />
+      <UrlChip
+        v-if="fetchUrl"
+        :url="fetchUrl"
+      />
       <JsonValueView
         v-if="isStructuredResult"
         :value="parsedResult"
       />
-      <CommandBlock v-else-if="hasResult" :code="liveResult" lang="json" />
+      <CommandBlock
+        v-else-if="hasResult"
+        :code="liveResult"
+        lang="json"
+      />
     </template>
 
     <!-- todo_write -->
     <template v-else-if="kind === 'todo_write'">
-      <ol v-if="todoItems.length > 0" class="tool-todos">
+      <ol
+        v-if="todoItems.length > 0"
+        class="tool-todos"
+      >
         <li
           v-for="(t, i) in todoItems"
           :key="String(t.id ?? i)"
           class="tool-todo"
           :class="`tool-todo-${String(t.status ?? 'pending')}`"
         >
-          <span class="tool-todo-status">{{ String(t.status ?? "pending") }}</span>
-          <span class="tool-todo-title">{{ String(t.title ?? "(no title)") }}</span>
+          <span class="tool-todo-status">{{ String(t.status ?? 'pending') }}</span>
+          <span class="tool-todo-title">{{ String(t.title ?? '(no title)') }}</span>
         </li>
       </ol>
-      <CommandBlock v-if="hasResult" :code="liveResult" lang="text" />
+      <CommandBlock
+        v-if="hasResult"
+        :code="liveResult"
+        lang="text"
+      />
     </template>
 
     <!-- mcp -->
@@ -341,28 +401,49 @@ const isStructuredResult = computed(() => {
         :server="mcpServerName"
         :tool="mcpToolName ?? toolName"
       />
-      <details v-if="argsJson" class="tool-preview">
+      <details
+        v-if="argsJson"
+        class="tool-preview"
+      >
         <summary>Arguments</summary>
-        <CommandBlock :code="argsJson" lang="json" />
+        <CommandBlock
+          :code="argsJson"
+          lang="json"
+        />
       </details>
       <JsonValueView
         v-if="isStructuredResult"
         :value="parsedResult"
       />
-      <CommandBlock v-else-if="hasResult" :code="liveResult" lang="markdown" />
+      <CommandBlock
+        v-else-if="hasResult"
+        :code="liveResult"
+        lang="markdown"
+      />
     </template>
 
     <!-- generic fallback: JSON args + JSON-aware result -->
     <template v-else>
-      <details v-if="argsJson" class="tool-preview" open>
+      <details
+        v-if="argsJson"
+        class="tool-preview"
+        open
+      >
         <summary>Arguments</summary>
-        <CommandBlock :code="argsJson" lang="json" />
+        <CommandBlock
+          :code="argsJson"
+          lang="json"
+        />
       </details>
       <JsonValueView
         v-if="isStructuredResult"
         :value="parsedResult"
       />
-      <CommandBlock v-else-if="hasResult" :code="liveResult" lang="text" />
+      <CommandBlock
+        v-else-if="hasResult"
+        :code="liveResult"
+        lang="text"
+      />
     </template>
   </div>
 </template>

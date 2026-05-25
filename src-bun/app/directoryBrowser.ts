@@ -20,24 +20,21 @@
 //   denied, network drive offline) we return `[]` — the UI falls
 //   back to MRU-only suggestions without surfacing the error.
 
-import { readdirSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readdirSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const MAX_RESULTS = 20;
 
 /// True when `prefix` ends in a path separator. Determines whether
 /// we list the directory itself vs. complete against the leaf.
 function endsWithSeparator(prefix: string): boolean {
-  return prefix.endsWith("/") || prefix.endsWith("\\");
+  return prefix.endsWith('/') || prefix.endsWith('\\');
 }
 
 /// Cross-platform basename extraction without dragging in `path`'s
 /// normalization (which would coerce `/` <-> `\` on Windows).
 function leafOf(prefix: string): string {
-  const lastSlash = Math.max(
-    prefix.lastIndexOf("/"),
-    prefix.lastIndexOf("\\"),
-  );
+  const lastSlash = Math.max(prefix.lastIndexOf('/'), prefix.lastIndexOf('\\'));
   return lastSlash === -1 ? prefix : prefix.slice(lastSlash + 1);
 }
 
@@ -52,7 +49,7 @@ export function browseDirectorySync(prefix: string): string[] {
   let leafPrefix: string;
   if (endsWithSeparator(trimmed)) {
     parent = trimmed;
-    leafPrefix = "";
+    leafPrefix = '';
   } else {
     parent = dirname(trimmed);
     leafPrefix = leafOf(trimmed);
@@ -70,16 +67,13 @@ export function browseDirectorySync(prefix: string): string[] {
   const lowerPrefix = leafPrefix.toLowerCase();
   const matches: string[] = [];
   for (const name of entries) {
-    if (
-      lowerPrefix.length > 0 &&
-      !name.toLowerCase().startsWith(lowerPrefix)
-    ) {
+    if (lowerPrefix.length > 0 && !name.toLowerCase().startsWith(lowerPrefix)) {
       continue;
     }
     // Skip hidden / dot-prefixed entries unless the user is explicitly
     // typing a dot — saves them from `.git` / `.next` / `node_modules`
     // noise on every keystroke.
-    if (lowerPrefix.length === 0 && name.startsWith(".")) continue;
+    if (lowerPrefix.length === 0 && name.startsWith('.')) continue;
     const full = join(parent, name);
     try {
       if (!statSync(full).isDirectory()) continue;

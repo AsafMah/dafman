@@ -10,62 +10,50 @@
 // sessionEvents BEFORE resolving the resumeSession response, and
 // verifies the resulting record has all the history.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { setActivePinia, createPinia } from "pinia";
-import {
-  setRpcBridge,
-  type RpcBridge,
-  type SessionEventListener,
-} from "../../ipc/invoke";
-import type {
-  CommandMap,
-  CommandName,
-  SessionEventPayload,
-} from "../../ipc/types";
-import { useSessionsStore, _resetSessionsStoreForTest } from "../sessionsStore";
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { setActivePinia, createPinia } from 'pinia';
+import { setRpcBridge, type RpcBridge, type SessionEventListener } from '../../ipc/invoke';
+import type { CommandMap, CommandName, SessionEventPayload } from '../../ipc/types';
+import { useSessionsStore, _resetSessionsStoreForTest } from '../sessionsStore';
 
 function makeFakeBridge(): {
   bridge: RpcBridge;
   fire: (payload: SessionEventPayload) => void;
-  firePending: (payload: import("../../ipc/types").PendingRequestPayload) => void;
+  firePending: (payload: import('../../ipc/types').PendingRequestPayload) => void;
   calls: Array<{ name: string; args: unknown }>;
   handlers: Partial<{
     [K in CommandName]: (
-      args: CommandMap[K]["args"],
+      args: CommandMap[K]['args'],
       fire: (payload: SessionEventPayload) => void,
-    ) => Promise<CommandMap[K]["result"]>;
+    ) => Promise<CommandMap[K]['result']>;
   }>;
 } {
   const listeners = new Set<SessionEventListener>();
   const fire = (payload: SessionEventPayload) => {
     for (const l of listeners) l(payload);
   };
-  const pendingListeners = new Set<(p: import("../../ipc/types").PendingRequestPayload) => void>();
-  const firePending = (payload: import("../../ipc/types").PendingRequestPayload) => {
+  const pendingListeners = new Set<(p: import('../../ipc/types').PendingRequestPayload) => void>();
+  const firePending = (payload: import('../../ipc/types').PendingRequestPayload) => {
     for (const l of pendingListeners) l(payload);
   };
   const calls: Array<{ name: string; args: unknown }> = [];
   const handlers: Partial<{
     [K in CommandName]: (
-      args: CommandMap[K]["args"],
+      args: CommandMap[K]['args'],
       fire: (p: SessionEventPayload) => void,
-    ) => Promise<CommandMap[K]["result"]>;
+    ) => Promise<CommandMap[K]['result']>;
   }> = {};
   const bridge: RpcBridge = {
-    request: (async <N extends CommandName>(
-      name: N,
-      args: CommandMap[N]["args"],
-    ) => {
+    request: (async <N extends CommandName>(name: N, args: CommandMap[N]['args']) => {
       calls.push({ name, args });
       const handler = handlers[name];
       if (handler) {
-        return (await (handler as (
-          a: CommandMap[N]["args"],
-          f: typeof fire,
-        ) => Promise<CommandMap[N]["result"]>)(args, fire));
+        return await (
+          handler as (a: CommandMap[N]['args'], f: typeof fire) => Promise<CommandMap[N]['result']>
+        )(args, fire);
       }
-      return undefined as unknown as CommandMap[N]["result"];
-    }) as RpcBridge["request"],
+      return undefined as unknown as CommandMap[N]['result'];
+    }) as RpcBridge['request'],
     onSessionEvent: (l) => {
       listeners.add(l);
       return () => listeners.delete(l);
@@ -88,7 +76,7 @@ function event(
   return { sessionId, eventType: type, data };
 }
 
-describe("sessionsStore.restoreSession — buffer + drain", () => {
+describe('sessionsStore.restoreSession — buffer + drain', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     _resetSessionsStoreForTest();
@@ -98,36 +86,36 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     _resetSessionsStoreForTest();
   });
 
-  test("createSession forwards default model settings and seeds record model", async () => {
+  test('createSession forwards default model settings and seeds record model', async () => {
     const { bridge, calls, handlers } = makeFakeBridge();
-    handlers.createSession = async () => "created-1";
+    handlers.createSession = async () => 'created-1';
     setRpcBridge(bridge);
     const store = useSessionsStore();
 
     const rec = await store.createSession();
 
-    expect(rec?.model).toBe("auto");
-    expect(calls.find((c) => c.name === "createSession")?.args).toEqual({
-      model: "auto",
+    expect(rec?.model).toBe('auto');
+    expect(calls.find((c) => c.name === 'createSession')?.args).toEqual({
+      model: 'auto',
     });
   });
 
-  test("events fired DURING the resumeSession RPC end up on the record", async () => {
+  test('events fired DURING the resumeSession RPC end up on the record', async () => {
     const { bridge, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args, fire) => {
       const { sessionId } = args as { sessionId: string };
-      fire(event(sessionId, "session.resume", { context: { cwd: "/r" } }));
-      fire(event(sessionId, "assistant.message_start", { messageId: "m1" }));
+      fire(event(sessionId, 'session.resume', { context: { cwd: '/r' } }));
+      fire(event(sessionId, 'assistant.message_start', { messageId: 'm1' }));
       fire(
-        event(sessionId, "assistant.message_delta", {
-          messageId: "m1",
-          deltaContent: "hello ",
+        event(sessionId, 'assistant.message_delta', {
+          messageId: 'm1',
+          deltaContent: 'hello ',
         }),
       );
       fire(
-        event(sessionId, "assistant.message_delta", {
-          messageId: "m1",
-          deltaContent: "world",
+        event(sessionId, 'assistant.message_delta', {
+          messageId: 'm1',
+          deltaContent: 'world',
         }),
       );
       return { sessionId, cwd: null, model: null };
@@ -135,50 +123,56 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
-    const record = await store.restoreSession("sess-abc");
+    const record = await store.restoreSession('sess-abc');
 
     expect(record).not.toBeNull();
-    expect(record!.id).toBe("sess-abc");
+    expect(record!.id).toBe('sess-abc');
     expect(record!.events).toHaveLength(4);
-    expect(record!.events[0]?.eventType).toBe("session.resume");
-    expect(record!.events[3]?.eventType).toBe("assistant.message_delta");
-    expect(record!.workingDirectory).toBe("/r");
+    expect(record!.events[0]?.eventType).toBe('session.resume');
+    expect(record!.events[3]?.eventType).toBe('assistant.message_delta');
+    expect(record!.workingDirectory).toBe('/r');
   });
 
-  test("events fired AFTER the RPC resolves are appended live", async () => {
+  test('events fired AFTER the RPC resolves are appended live', async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
-    handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+      model: null,
+    });
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
-    const record = await store.restoreSession("sess-live");
+    const record = await store.restoreSession('sess-live');
     expect(record!.events).toHaveLength(0);
 
-    fire(event("sess-live", "assistant.turn_start", { turnId: "t1" }));
+    fire(event('sess-live', 'assistant.turn_start', { turnId: 't1' }));
     expect(record!.events).toHaveLength(1);
-    expect(record!.events[0]?.eventType).toBe("assistant.turn_start");
+    expect(record!.events[0]?.eventType).toBe('assistant.turn_start');
   });
 
-  test("events for unknown sessions buffer indefinitely then drain on a later restore", async () => {
+  test('events for unknown sessions buffer indefinitely then drain on a later restore', async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
-    handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+      model: null,
+    });
     setRpcBridge(bridge);
     const store = useSessionsStore();
 
     // Trigger subscription via a first restoreSession.
-    await store.restoreSession("sess-other");
+    await store.restoreSession('sess-other');
 
     // Fire an event for a session that has no record yet.
-    fire(event("sess-late", "assistant.message_start", { messageId: "m1" }));
+    fire(event('sess-late', 'assistant.message_start', { messageId: 'm1' }));
 
-    const record = await store.restoreSession("sess-late");
+    const record = await store.restoreSession('sess-late');
     expect(record!.events).toHaveLength(1);
-    expect(record!.events[0]?.eventType).toBe("assistant.message_start");
+    expect(record!.events[0]?.eventType).toBe('assistant.message_start');
   });
 
-  test("dafman pendingRequest mirrors into record.pendingRequests; .completed clears", async () => {
+  test('dafman pendingRequest mirrors into record.pendingRequests; .completed clears', async () => {
     const { bridge, fire, firePending, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) => ({
       sessionId: (args as { sessionId: string }).sessionId,
@@ -187,20 +181,20 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
-    const record = await store.restoreSession("s1");
+    const record = await store.restoreSession('s1');
     expect(record!.pendingRequests).toEqual([]);
 
     firePending({
-      sessionId: "s1",
-      requestId: "req-1",
-      kind: "permission",
-      request: { kind: "shell", summary: "run `ls`", raw: {} },
+      sessionId: 's1',
+      requestId: 'req-1',
+      kind: 'permission',
+      request: { kind: 'shell', summary: 'run `ls`', raw: {} },
     });
     expect(record!.pendingRequests).toHaveLength(1);
-    expect(record!.pendingRequests[0]?.kind).toBe("permission");
-    expect(record!.pendingRequests[0]?.message).toBe("run `ls`");
+    expect(record!.pendingRequests[0]?.kind).toBe('permission');
+    expect(record!.pendingRequests[0]?.message).toBe('run `ls`');
 
-    fire(event("s1", "permission.completed", {}));
+    fire(event('s1', 'permission.completed', {}));
     expect(record!.pendingRequests).toEqual([]);
   });
 
@@ -213,21 +207,21 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
-    const record = await store.restoreSession("s1");
+    const record = await store.restoreSession('s1');
 
     firePending({
-      sessionId: "s1",
-      requestId: "req-1",
-      kind: "userInput",
-      request: { question: "name?", allowFreeform: true },
+      sessionId: 's1',
+      requestId: 'req-1',
+      kind: 'userInput',
+      request: { question: 'name?', allowFreeform: true },
     });
-    expect(record!.pendingRequests[0]?.kind).toBe("userInput");
+    expect(record!.pendingRequests[0]?.kind).toBe('userInput');
 
     // permission.completed shouldn't clear a userInput-channel request.
-    fire(event("s1", "permission.completed", {}));
-    expect(record!.pendingRequests[0]?.kind).toBe("userInput");
+    fire(event('s1', 'permission.completed', {}));
+    expect(record!.pendingRequests[0]?.kind).toBe('userInput');
 
-    fire(event("s1", "user_input.completed", {}));
+    fire(event('s1', 'user_input.completed', {}));
     expect(record!.pendingRequests).toEqual([]);
   });
 
@@ -246,15 +240,15 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
-    const record = await store.restoreSession("s1");
+    const record = await store.restoreSession('s1');
     expect(record!.unseenTurns).toBe(0);
 
-    fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
-    fire(event("s1", "assistant.turn_end", { turnId: "t2" }));
+    fire(event('s1', 'assistant.turn_end', { turnId: 't1' }));
+    fire(event('s1', 'assistant.turn_end', { turnId: 't2' }));
     expect(record!.unseenTurns).toBe(2);
   });
 
-  test("isThinking tracks assistant.turn_start / turn_end / session.idle", async () => {
+  test('isThinking tracks assistant.turn_start / turn_end / session.idle', async () => {
     // Drives the "Thinking…" spinner icon on the tab + sidebar row.
     // Lives on the record (not just ChatAmbient) so sibling sessions
     // can react without their chat panels being mounted.
@@ -266,48 +260,48 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
-    const record = await store.restoreSession("s1");
+    const record = await store.restoreSession('s1');
     expect(record!.isThinking).toBe(false);
     expect(record!.sawTurnBoundary).toBe(false);
 
-    fire(event("s1", "assistant.turn_start", { turnId: "t1" }));
+    fire(event('s1', 'assistant.turn_start', { turnId: 't1' }));
     expect(record!.isThinking).toBe(true);
     expect(record!.sawTurnBoundary).toBe(true);
 
-    fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
+    fire(event('s1', 'assistant.turn_end', { turnId: 't1' }));
     expect(record!.isThinking).toBe(false);
 
     // session.idle is the SDK's "I'm done" fallback for older
     // boundaries; should also clear isThinking.
-    fire(event("s1", "assistant.turn_start", { turnId: "t2" }));
+    fire(event('s1', 'assistant.turn_start', { turnId: 't2' }));
     expect(record!.isThinking).toBe(true);
-    fire(event("s1", "session.idle", {}));
+    fire(event('s1', 'session.idle', {}));
     expect(record!.isThinking).toBe(false);
   });
 
-  test("file and command artifacts are tracked across restored history", async () => {
+  test('file and command artifacts are tracked across restored history', async () => {
     const { bridge, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args, fire) => {
       const { sessionId } = args as { sessionId: string };
       fire(
-        event(sessionId, "tool.execution_start", {
-          toolCallId: "cmd-1",
-          toolName: "shell",
-          arguments: { command: "bun test" },
+        event(sessionId, 'tool.execution_start', {
+          toolCallId: 'cmd-1',
+          toolName: 'shell',
+          arguments: { command: 'bun test' },
         }),
       );
       fire(
-        event(sessionId, "tool.execution_start", {
-          toolCallId: "edit-1",
-          toolName: "apply_patch",
-          arguments: { path: "src/App.vue" },
+        event(sessionId, 'tool.execution_start', {
+          toolCallId: 'edit-1',
+          toolName: 'apply_patch',
+          arguments: { path: 'src/App.vue' },
         }),
       );
       fire(
-        event(sessionId, "tool.user_requested", {
-          toolCallId: "edit-1",
-          toolName: "apply_patch",
-          arguments: { path: "src/App.vue" },
+        event(sessionId, 'tool.user_requested', {
+          toolCallId: 'edit-1',
+          toolName: 'apply_patch',
+          arguments: { path: 'src/App.vue' },
         }),
       );
       return { sessionId, cwd: null, model: null };
@@ -315,21 +309,21 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     setRpcBridge(bridge);
     const store = useSessionsStore();
 
-    const rec = await store.restoreSession("s1");
+    const rec = await store.restoreSession('s1');
 
     expect(rec?.commandsRun).toBe(1);
-    expect(rec?.touchedFiles).toEqual(["src/App.vue"]);
+    expect(rec?.touchedFiles).toEqual(['src/App.vue']);
   });
 
-  test("OS notification fires for every pending-request channel AND turn_end (not just permission)", async () => {
+  test('OS notification fires for every pending-request channel AND turn_end (not just permission)', async () => {
     // Pins the contract the user surfaced after the first
     // notifications PR: notifications must cover ALL of
     // permission.requested, user_input.requested, elicitation.requested,
     // AND assistant.turn_end — not just permission. Each event for
     // a non-active session should produce a notificationsStore.notify
     // call with the right `kind`.
-    const { useNotificationsStore } = await import("../notificationsStore");
-    const { useSettingsStore } = await import("../settingsStore");
+    const { useNotificationsStore } = await import('../notificationsStore');
+    const { useSettingsStore } = await import('../settingsStore');
     const notifications = useNotificationsStore();
     const settings = useSettingsStore();
     // Allow both kinds so we can observe firing decisions purely
@@ -350,75 +344,78 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
-    await store.restoreSession("s1");
+    await store.restoreSession('s1');
 
     // Three SDK-pending-callback channels arrive over the new
     // dafman pendingRequest push. The reducer no longer reacts to
     // the SDK `*.requested` events for state purposes.
     firePending({
-      sessionId: "s1",
-      requestId: "req-1",
-      kind: "permission",
-      request: { kind: "shell", summary: "run x", raw: {} },
+      sessionId: 's1',
+      requestId: 'req-1',
+      kind: 'permission',
+      request: { kind: 'shell', summary: 'run x', raw: {} },
     });
     firePending({
-      sessionId: "s1",
-      requestId: "req-2",
-      kind: "userInput",
-      request: { question: "your name?", allowFreeform: true },
+      sessionId: 's1',
+      requestId: 'req-2',
+      kind: 'userInput',
+      request: { question: 'your name?', allowFreeform: true },
     });
     firePending({
-      sessionId: "s1",
-      requestId: "req-3",
-      kind: "elicitation",
-      request: { message: "https://oauth.example", mode: "url", url: "https://oauth.example" },
+      sessionId: 's1',
+      requestId: 'req-3',
+      kind: 'elicitation',
+      request: { message: 'https://oauth.example', mode: 'url', url: 'https://oauth.example' },
     });
-    fire(event("s1", "assistant.turn_end", { turnId: "t1" }));
+    fire(event('s1', 'assistant.turn_end', { turnId: 't1' }));
 
     // 3 waitingForInput + 1 turnEnd = 4 notify calls.
     expect(calls).toHaveLength(4);
     const kinds = calls.map((c) => c.kind);
-    expect(kinds.filter((k) => k === "waitingForInput")).toHaveLength(3);
-    expect(kinds.filter((k) => k === "turnEnd")).toHaveLength(1);
+    expect(kinds.filter((k) => k === 'waitingForInput')).toHaveLength(3);
+    expect(kinds.filter((k) => k === 'turnEnd')).toHaveLength(1);
     // The waitingForInput bodies carry the per-kind summary so the
     // notification shows what's being asked.
-    expect(calls.find((c) => c.body === "run x")).toBeTruthy();
-    expect(calls.find((c) => c.body === "your name?")).toBeTruthy();
-    expect(calls.find((c) => c.body === "https://oauth.example")).toBeTruthy();
+    expect(calls.find((c) => c.body === 'run x')).toBeTruthy();
+    expect(calls.find((c) => c.body === 'your name?')).toBeTruthy();
+    expect(calls.find((c) => c.body === 'https://oauth.example')).toBeTruthy();
   });
 
-  test("sendMessage forwards attachments and deep-clones reactive payloads", async () => {
+  test('sendMessage forwards attachments and deep-clones reactive payloads', async () => {
     const { bridge, handlers, calls } = makeFakeBridge();
-    handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
-    handlers.sendMessage = async () => "msg-1";
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+      model: null,
+    });
+    handlers.sendMessage = async () => 'msg-1';
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
-    await store.restoreSession("sess-att");
+    await store.restoreSession('sess-att');
 
-    const { reactive } = await import("vue");
+    const { reactive } = await import('vue');
     // Wrap in a reactive proxy to simulate the composer's actual
     // attachments ref — Vue's reactive proxies have historically
     // failed structured-clone through some IPC bridges. The store's
     // JSON deep-clone defends against that.
     const atts = reactive([
       {
-        type: "file" as const,
-        path: "/abs/src/main.ts",
-        displayName: "src/main.ts",
+        type: 'file' as const,
+        path: '/abs/src/main.ts',
+        displayName: 'src/main.ts',
       },
       {
-        type: "blob" as const,
-        data: "AAAA",
-        mimeType: "image/png",
-        displayName: "shot.png",
+        type: 'blob' as const,
+        data: 'AAAA',
+        mimeType: 'image/png',
+        displayName: 'shot.png',
       },
     ]);
 
-    await store.sendMessage("sess-att", "look at this", "steer", atts);
+    await store.sendMessage('sess-att', 'look at this', 'steer', atts);
 
-    const sendCall = calls.find((c) => c.name === "sendMessage");
+    const sendCall = calls.find((c) => c.name === 'sendMessage');
     expect(sendCall).toBeTruthy();
     const args = sendCall!.args as {
       sessionId: string;
@@ -426,32 +423,35 @@ describe("sessionsStore.restoreSession — buffer + drain", () => {
       mode?: string;
       attachments?: unknown[];
     };
-    expect(args.sessionId).toBe("sess-att");
-    expect(args.text).toBe("look at this");
-    expect(args.mode).toBe("immediate");
+    expect(args.sessionId).toBe('sess-att');
+    expect(args.text).toBe('look at this');
+    expect(args.mode).toBe('immediate');
     expect(args.attachments).toHaveLength(2);
     // Plain-object after deep-clone — not a Vue proxy.
     expect(JSON.stringify(args.attachments)).toBe(
       JSON.stringify([
-        { type: "file", path: "/abs/src/main.ts", displayName: "src/main.ts" },
-        { type: "blob", data: "AAAA", mimeType: "image/png", displayName: "shot.png" },
+        { type: 'file', path: '/abs/src/main.ts', displayName: 'src/main.ts' },
+        { type: 'blob', data: 'AAAA', mimeType: 'image/png', displayName: 'shot.png' },
       ]),
     );
   });
 
-  test("sendMessage omits the attachments field when none are queued", async () => {
+  test('sendMessage omits the attachments field when none are queued', async () => {
     const { bridge, handlers, calls } = makeFakeBridge();
-    handlers.resumeSession = async (args) =>
-      ({ sessionId: (args as { sessionId: string }).sessionId, cwd: null, model: null });
-    handlers.sendMessage = async () => "msg-2";
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+      model: null,
+    });
+    handlers.sendMessage = async () => 'msg-2';
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
-    await store.restoreSession("sess-noatt");
-    await store.sendMessage("sess-noatt", "hi");
+    await store.restoreSession('sess-noatt');
+    await store.sendMessage('sess-noatt', 'hi');
 
-    const sendCall = calls.find((c) => c.name === "sendMessage");
+    const sendCall = calls.find((c) => c.name === 'sendMessage');
     expect(sendCall).toBeTruthy();
-    expect("attachments" in (sendCall!.args as object)).toBe(false);
+    expect('attachments' in (sendCall!.args as object)).toBe(false);
   });
 });

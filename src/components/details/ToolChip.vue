@@ -19,10 +19,26 @@ defineProps<{
 
 <template>
   <span class="tool-chip">
-    <i v-if="icon" :class="`pi pi-${icon} tool-chip-icon`" aria-hidden="true" />
-    <span v-if="server" class="tool-chip-server">{{ server }}</span>
-    <span v-if="server && tool" class="tool-chip-sep">/</span>
-    <span v-if="tool" class="tool-chip-tool">{{ tool }}</span>
+    <i
+      v-if="icon"
+      :class="`pi pi-${icon} tool-chip-icon`"
+      aria-hidden="true"
+    />
+    <span
+      v-if="server"
+      class="tool-chip-server"
+      >{{ server }}</span
+    >
+    <span
+      v-if="server && tool"
+      class="tool-chip-sep"
+      >/</span
+    >
+    <span
+      v-if="tool"
+      class="tool-chip-tool"
+      >{{ tool }}</span
+    >
   </span>
 </template>
 

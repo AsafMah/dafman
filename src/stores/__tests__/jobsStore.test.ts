@@ -1,29 +1,30 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createPinia, setActivePinia } from "pinia";
-import { nextTick, reactive } from "vue";
-import { setRpcBridge, type RpcBridge } from "../../ipc/invoke";
-import type { CommandMap, CommandName, JobRecord } from "../../ipc/types";
-import { useJobsStore } from "../jobsStore";
-import { useSessionsStore, _resetSessionsStoreForTest, type SessionRecord } from "../sessionsStore";
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { createPinia, setActivePinia } from 'pinia';
+import { nextTick, reactive } from 'vue';
+import { setRpcBridge, type RpcBridge } from '../../ipc/invoke';
+import type { CommandMap, CommandName, JobRecord } from '../../ipc/types';
+import { useJobsStore } from '../jobsStore';
+import { useSessionsStore, _resetSessionsStoreForTest, type SessionRecord } from '../sessionsStore';
 
-function makeBridge(handlers: Partial<{
-  [K in CommandName]: (args: CommandMap[K]["args"]) => Promise<CommandMap[K]["result"]>;
-}> = {}): { bridge: RpcBridge; calls: Array<{ name: string; args: unknown }> } {
+function makeBridge(
+  handlers: Partial<{
+    [K in CommandName]: (args: CommandMap[K]['args']) => Promise<CommandMap[K]['result']>;
+  }> = {},
+): { bridge: RpcBridge; calls: Array<{ name: string; args: unknown }> } {
   const calls: Array<{ name: string; args: unknown }> = [];
   return {
     calls,
     bridge: {
-      request: (async <N extends CommandName>(
-        name: N,
-        args: CommandMap[N]["args"],
-      ) => {
+      request: (async <N extends CommandName>(name: N, args: CommandMap[N]['args']) => {
         calls.push({ name, args });
         const handler = handlers[name];
         if (handler) {
-          return (await (handler as (a: CommandMap[N]["args"]) => Promise<CommandMap[N]["result"]>)(args));
+          return await (handler as (a: CommandMap[N]['args']) => Promise<CommandMap[N]['result']>)(
+            args,
+          );
         }
-        return undefined as CommandMap[N]["result"];
-      }) as RpcBridge["request"],
+        return undefined as CommandMap[N]['result'];
+      }) as RpcBridge['request'],
       onSessionEvent: () => () => {},
       onPendingRequest: () => () => {},
       onLogEvent: () => () => {},
@@ -32,20 +33,20 @@ function makeBridge(handlers: Partial<{
   };
 }
 
-function sessionRecord(id = "s1"): SessionRecord {
+function sessionRecord(id = 's1'): SessionRecord {
   return reactive({
     id,
-    accent: "red",
+    accent: 'red',
     events: [],
     droppedEventCount: 0,
-    model: "auto",
+    model: 'auto',
     reasoningEffort: null,
-    mode: "interactive",
+    mode: 'interactive',
     approveAll: false,
-    title: "Test session",
-    reasoningVisibilityOverride: "default",
-    workingDirectory: "C:\\repo",
-    defaultSendMode: "steer",
+    title: 'Test session',
+    reasoningVisibilityOverride: 'default',
+    workingDirectory: 'C:\\repo',
+    defaultSendMode: 'steer',
     pendingRequests: [],
     unseenTurns: 0,
     isThinking: false,
@@ -60,7 +61,7 @@ function sessionRecord(id = "s1"): SessionRecord {
   }) as SessionRecord;
 }
 
-describe("jobsStore", () => {
+describe('jobsStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     _resetSessionsStoreForTest();
@@ -71,15 +72,15 @@ describe("jobsStore", () => {
     _resetSessionsStoreForTest();
   });
 
-  test("refresh loads aggregate jobs and computes active count", async () => {
+  test('refresh loads aggregate jobs and computes active count', async () => {
     const job: JobRecord = {
-      id: "s1:t1",
-      sessionId: "s1",
-      source: "sdk-task",
-      kind: "agent",
-      status: "running",
-      title: "Explore",
-      description: "Explore repo",
+      id: 's1:t1',
+      sessionId: 's1',
+      source: 'sdk-task',
+      kind: 'agent',
+      status: 'running',
+      title: 'Explore',
+      description: 'Explore repo',
       canCancel: true,
       canRemove: false,
       canPromoteToBackground: false,
@@ -95,50 +96,50 @@ describe("jobsStore", () => {
 
     expect(store.jobs).toEqual([job]);
     expect(store.activeCount).toBe(1);
-    expect(store.hasActiveJobsForSession("s1")).toBe(true);
+    expect(store.hasActiveJobsForSession('s1')).toBe(true);
   });
 
-  test("startAutopilot drives current session mode and send flow", async () => {
+  test('startAutopilot drives current session mode and send flow', async () => {
     const { bridge, calls } = makeBridge({
       listJobs: async () => [],
-      setSessionMode: async () => "autopilot",
-      sendMessage: async () => "msg-1",
+      setSessionMode: async () => 'autopilot',
+      sendMessage: async () => 'msg-1',
     });
     setRpcBridge(bridge);
     const sessions = useSessionsStore();
-    sessions.sessions.push(sessionRecord("s1"));
+    sessions.sessions.push(sessionRecord('s1'));
     const store = useJobsStore();
 
-    await store.startAutopilot("s1", "Do the work");
+    await store.startAutopilot('s1', 'Do the work');
 
-    expect(calls.some((c) => c.name === "setSessionMode")).toBe(true);
-    expect(calls.some((c) => c.name === "sendMessage")).toBe(true);
+    expect(calls.some((c) => c.name === 'setSessionMode')).toBe(true);
+    expect(calls.some((c) => c.name === 'sendMessage')).toBe(true);
     expect(store.jobs[0]).toMatchObject({
-      sessionId: "s1",
-      source: "autopilot-session",
-      status: "running",
-      prompt: "Do the work",
+      sessionId: 's1',
+      source: 'autopilot-session',
+      status: 'running',
+      prompt: 'Do the work',
     });
   });
 
-  test("local autopilot job completes after the session thinking cycle ends", async () => {
+  test('local autopilot job completes after the session thinking cycle ends', async () => {
     const { bridge } = makeBridge({
       listJobs: async () => [],
-      setSessionMode: async () => "autopilot",
-      sendMessage: async () => "msg-1",
+      setSessionMode: async () => 'autopilot',
+      sendMessage: async () => 'msg-1',
     });
     setRpcBridge(bridge);
     const sessions = useSessionsStore();
-    const record = sessionRecord("s1");
+    const record = sessionRecord('s1');
     sessions.sessions.push(record);
     const store = useJobsStore();
 
-    await store.startAutopilot("s1", "Do the work");
+    await store.startAutopilot('s1', 'Do the work');
     record.isThinking = true;
     await nextTick();
     record.isThinking = false;
     await nextTick();
 
-    expect(store.jobs[0]?.status).toBe("completed");
+    expect(store.jobs[0]?.status).toBe('completed');
   });
 });

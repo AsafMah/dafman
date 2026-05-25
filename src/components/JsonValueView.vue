@@ -18,7 +18,7 @@
 /// NOT a JSON editor — read-only on purpose. The "view" surface is what
 /// users actually want; for editing we'd ship a dedicated component.
 
-import { computed, ref } from "vue";
+import { computed, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -32,44 +32,36 @@ const props = withDefaults(
   { depth: 0, collapseArrayThreshold: 20 },
 );
 
-const kind = computed<
-  "null" | "boolean" | "number" | "string" | "array" | "object"
->(() => {
+const kind = computed<'null' | 'boolean' | 'number' | 'string' | 'array' | 'object'>(() => {
   const v = props.value;
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "array";
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'array';
   switch (typeof v) {
-    case "boolean":
-      return "boolean";
-    case "number":
-      return "number";
-    case "string":
-      return "string";
-    case "object":
-      return "object";
+    case 'boolean':
+      return 'boolean';
+    case 'number':
+      return 'number';
+    case 'string':
+      return 'string';
+    case 'object':
+      return 'object';
     default:
-      return "string";
+      return 'string';
   }
 });
 
-const asArray = computed<unknown[]>(() =>
-  Array.isArray(props.value) ? props.value : [],
-);
+const asArray = computed<unknown[]>(() => (Array.isArray(props.value) ? props.value : []));
 const asObject = computed<Array<[string, unknown]>>(() => {
-  if (kind.value !== "object") return [];
+  if (kind.value !== 'object') return [];
   return Object.entries(props.value as Record<string, unknown>);
 });
-const asString = computed(() =>
-  typeof props.value === "string" ? props.value : "",
-);
+const asString = computed(() => (typeof props.value === 'string' ? props.value : ''));
 
-const isMultilineString = computed(
-  () => kind.value === "string" && asString.value.includes("\n"),
-);
+const isMultilineString = computed(() => kind.value === 'string' && asString.value.includes('\n'));
 
 const initiallyExpanded = computed(() => {
   if (props.depth >= 3) return false;
-  if (kind.value === "array" && asArray.value.length > props.collapseArrayThreshold) {
+  if (kind.value === 'array' && asArray.value.length > props.collapseArrayThreshold) {
     return false;
   }
   return true;
@@ -82,40 +74,68 @@ function toggle(): void {
 }
 
 const summary = computed(() => {
-  if (kind.value === "array") return `Array(${asArray.value.length})`;
-  if (kind.value === "object") return `Object(${asObject.value.length})`;
-  return "";
+  if (kind.value === 'array') return `Array(${asArray.value.length})`;
+  if (kind.value === 'object') return `Object(${asObject.value.length})`;
+  return '';
 });
 </script>
 
 <template>
   <!-- Primitive: null -->
-  <span v-if="kind === 'null'" class="jv-primitive jv-null">null</span>
+  <span
+    v-if="kind === 'null'"
+    class="jv-primitive jv-null"
+    >null</span
+  >
 
   <!-- Primitive: boolean -->
-  <span v-else-if="kind === 'boolean'" class="jv-primitive jv-bool">
-    {{ value ? "true" : "false" }}
+  <span
+    v-else-if="kind === 'boolean'"
+    class="jv-primitive jv-bool"
+  >
+    {{ value ? 'true' : 'false' }}
   </span>
 
   <!-- Primitive: number -->
-  <span v-else-if="kind === 'number'" class="jv-primitive jv-num">{{ value }}</span>
+  <span
+    v-else-if="kind === 'number'"
+    class="jv-primitive jv-num"
+    >{{ value }}</span
+  >
 
   <!-- Primitive: string -->
-  <pre v-else-if="kind === 'string' && isMultilineString" class="jv-multiline">{{ asString }}</pre>
-  <span v-else-if="kind === 'string'" class="jv-primitive jv-str">{{ asString }}</span>
+  <pre
+    v-else-if="kind === 'string' && isMultilineString"
+    class="jv-multiline"
+    >{{ asString }}</pre
+  >
+  <span
+    v-else-if="kind === 'string'"
+    class="jv-primitive jv-str"
+    >{{ asString }}</span
+  >
 
   <!-- Array -->
-  <div v-else-if="kind === 'array'" class="jv-collection">
+  <div
+    v-else-if="kind === 'array'"
+    class="jv-collection"
+  >
     <button
       type="button"
       class="jv-toggle"
       :aria-expanded="expanded"
       @click="toggle"
     >
-      <i :class="['pi', expanded ? 'pi-chevron-down' : 'pi-chevron-right']" aria-hidden="true" />
+      <i
+        :class="['pi', expanded ? 'pi-chevron-down' : 'pi-chevron-right']"
+        aria-hidden="true"
+      />
       <span class="jv-summary">{{ summary }}</span>
     </button>
-    <ol v-if="expanded" class="jv-array">
+    <ol
+      v-if="expanded"
+      class="jv-array"
+    >
       <li
         v-for="(item, idx) in asArray"
         :key="idx"
@@ -132,18 +152,30 @@ const summary = computed(() => {
   </div>
 
   <!-- Object -->
-  <div v-else-if="kind === 'object'" class="jv-collection">
+  <div
+    v-else-if="kind === 'object'"
+    class="jv-collection"
+  >
     <button
       type="button"
       class="jv-toggle"
       :aria-expanded="expanded"
       @click="toggle"
     >
-      <i :class="['pi', expanded ? 'pi-chevron-down' : 'pi-chevron-right']" aria-hidden="true" />
+      <i
+        :class="['pi', expanded ? 'pi-chevron-down' : 'pi-chevron-right']"
+        aria-hidden="true"
+      />
       <span class="jv-summary">{{ summary }}</span>
     </button>
-    <dl v-if="expanded" class="jv-object">
-      <template v-for="[k, v] in asObject" :key="k">
+    <dl
+      v-if="expanded"
+      class="jv-object"
+    >
+      <template
+        v-for="[k, v] in asObject"
+        :key="k"
+      >
         <dt class="jv-key">{{ k }}</dt>
         <dd class="jv-value">
           <JsonValueView
@@ -269,7 +301,7 @@ const summary = computed(() => {
 }
 
 .jv-key::after {
-  content: ":";
+  content: ':';
   color: var(--p-text-muted-color);
 }
 

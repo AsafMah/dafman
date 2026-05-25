@@ -22,11 +22,11 @@
 /// Single-pick per spec: select dismisses the popup. Multi-select
 /// can be re-opened. Directories attach as `directory` pills.
 
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { invokeCommand } from "../ipc/invoke";
-import { useToastStore } from "../stores/toastStore";
-import type { WorkspaceFileMatch, SendMessageAttachment } from "../ipc/types";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { invokeCommand } from '../ipc/invoke';
+import { useToastStore } from '../stores/toastStore';
+import type { WorkspaceFileMatch, SendMessageAttachment } from '../ipc/types';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const props = withDefaults(
   defineProps<{
@@ -40,26 +40,26 @@ const props = withDefaults(
     showSearchInput?: boolean;
     /// Where to send initial focus on mount. Paperclip path wants
     /// `"input"`; the @-trigger path wants `"none"`.
-    initialFocus?: "input" | "none";
+    initialFocus?: 'input' | 'none';
   }>(),
   {
-    externalQuery: "",
+    externalQuery: '',
     showSearchInput: false,
-    initialFocus: "none",
+    initialFocus: 'none',
   },
 );
 
 const emit = defineEmits<{
-  (e: "select", attachment: SendMessageAttachment): void;
-  (e: "dismiss"): void;
+  (e: 'select', attachment: SendMessageAttachment): void;
+  (e: 'dismiss'): void;
 }>();
 
-const LS_HIDDEN = "dafman.filePicker.showHidden";
-const LS_IGNORED = "dafman.filePicker.showIgnored";
+const LS_HIDDEN = 'dafman.filePicker.showHidden';
+const LS_IGNORED = 'dafman.filePicker.showIgnored';
 
 function readPref(key: string): boolean {
   try {
-    return typeof localStorage !== "undefined" && localStorage.getItem(key) === "1";
+    return typeof localStorage !== 'undefined' && localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
@@ -67,8 +67,8 @@ function readPref(key: string): boolean {
 
 function writePref(key: string, value: boolean): void {
   try {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem(key, value ? "1" : "0");
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, value ? '1' : '0');
     }
   } catch {
     // Storage may be disabled in restricted contexts — keep the
@@ -76,7 +76,7 @@ function writePref(key: string, value: boolean): void {
   }
 }
 
-const internalQuery = ref("");
+const internalQuery = ref('');
 const showHidden = ref(readPref(LS_HIDDEN));
 const showIgnored = ref(readPref(LS_IGNORED));
 const results = ref<WorkspaceFileMatch[]>([]);
@@ -94,7 +94,7 @@ let fetchTag = 0;
 async function fetchResults(): Promise<void> {
   const tag = ++fetchTag;
   try {
-    const r = await invokeCommand("searchWorkspaceFiles", {
+    const r = await invokeCommand('searchWorkspaceFiles', {
       sessionId: props.sessionId,
       query: effectiveQuery.value,
       limit: 40,
@@ -122,41 +122,38 @@ watch(showIgnored, (v) => {
 });
 
 onMounted(() => {
-  if (props.initialFocus === "input") {
+  if (props.initialFocus === 'input') {
     setTimeout(() => searchInputRef.value?.focus(), 0);
   }
 });
 
 function toAttachment(match: WorkspaceFileMatch): SendMessageAttachment {
-  return match.kind === "directory"
-    ? { type: "directory", path: match.absolutePath, displayName: match.path }
-    : { type: "file", path: match.absolutePath, displayName: match.path };
+  return match.kind === 'directory'
+    ? { type: 'directory', path: match.absolutePath, displayName: match.path }
+    : { type: 'file', path: match.absolutePath, displayName: match.path };
 }
 
 function selectAt(index: number): void {
   const match = results.value[index];
   if (!match) return;
-  emit("select", toAttachment(match));
+  emit('select', toAttachment(match));
 }
 
 function onInputKey(e: KeyboardEvent): void {
-  if (e.key === "ArrowDown") {
+  if (e.key === 'ArrowDown') {
     e.preventDefault();
-    highlightedIndex.value = Math.min(
-      results.value.length - 1,
-      highlightedIndex.value + 1,
-    );
+    highlightedIndex.value = Math.min(results.value.length - 1, highlightedIndex.value + 1);
     scrollHighlightIntoView();
-  } else if (e.key === "ArrowUp") {
+  } else if (e.key === 'ArrowUp') {
     e.preventDefault();
     highlightedIndex.value = Math.max(0, highlightedIndex.value - 1);
     scrollHighlightIntoView();
-  } else if (e.key === "Enter") {
+  } else if (e.key === 'Enter') {
     e.preventDefault();
     selectAt(highlightedIndex.value);
-  } else if (e.key === "Escape") {
+  } else if (e.key === 'Escape') {
     e.preventDefault();
-    emit("dismiss");
+    emit('dismiss');
   }
 }
 
@@ -167,17 +164,17 @@ function onInputKey(e: KeyboardEvent): void {
 function onWindowKey(e: KeyboardEvent): void {
   if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
   const k = e.key.toLowerCase();
-  if (k === "h") {
+  if (k === 'h') {
     e.preventDefault();
     showHidden.value = !showHidden.value;
-  } else if (k === "i") {
+  } else if (k === 'i') {
     e.preventDefault();
     showIgnored.value = !showIgnored.value;
   }
 }
 
-onMounted(() => window.addEventListener("keydown", onWindowKey, true));
-onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
+onMounted(() => window.addEventListener('keydown', onWindowKey, true));
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true));
 
 /// Exposed so the @-trigger surface can forward keystrokes from the
 /// editor (where focus actually lives) without re-implementing nav.
@@ -185,10 +182,7 @@ defineExpose({
   moveHighlight(direction: 1 | -1): void {
     if (results.value.length === 0) return;
     if (direction > 0) {
-      highlightedIndex.value = Math.min(
-        results.value.length - 1,
-        highlightedIndex.value + 1,
-      );
+      highlightedIndex.value = Math.min(results.value.length - 1, highlightedIndex.value + 1);
     } else {
       highlightedIndex.value = Math.max(0, highlightedIndex.value - 1);
     }
@@ -206,35 +200,40 @@ defineExpose({
 function scrollHighlightIntoView(): void {
   const list = listRef.value;
   if (!list) return;
-  const child = list.querySelector<HTMLElement>(
-    `[data-index="${highlightedIndex.value}"]`,
-  );
-  child?.scrollIntoView({ block: "nearest" });
+  const child = list.querySelector<HTMLElement>(`[data-index="${highlightedIndex.value}"]`);
+  child?.scrollIntoView({ block: 'nearest' });
 }
 
-async function browse(kind: "file" | "directory"): Promise<void> {
+async function browse(kind: 'file' | 'directory'): Promise<void> {
   try {
-    const picked = await invokeCommand("pickAttachment", { kind });
+    const picked = await invokeCommand('pickAttachment', { kind });
     if (!picked) return;
     emit(
-      "select",
-      picked.kind === "directory"
-        ? { type: "directory", path: picked.path, displayName: picked.path }
-        : { type: "file", path: picked.path, displayName: picked.path },
+      'select',
+      picked.kind === 'directory'
+        ? { type: 'directory', path: picked.path, displayName: picked.path }
+        : { type: 'file', path: picked.path, displayName: picked.path },
     );
   } catch (err) {
-    useToastStore().error(
-      "Picker failed",
-      toErrorMessage(err),
-    );
+    useToastStore().error('Picker failed', toErrorMessage(err));
   }
 }
 </script>
 
 <template>
-  <div class="file-picker" role="dialog" aria-label="Attach file or folder">
-    <div v-if="props.showSearchInput" class="file-picker-search">
-      <i class="pi pi-search file-picker-search-icon" aria-hidden="true" />
+  <div
+    class="file-picker"
+    role="dialog"
+    aria-label="Attach file or folder"
+  >
+    <div
+      v-if="props.showSearchInput"
+      class="file-picker-search"
+    >
+      <i
+        class="pi pi-search file-picker-search-icon"
+        aria-hidden="true"
+      />
       <input
         ref="searchInputRef"
         v-model="internalQuery"
@@ -247,7 +246,10 @@ async function browse(kind: "file" | "directory"): Promise<void> {
     </div>
     <div class="file-picker-toolbar">
       <div class="file-picker-toggles">
-        <label class="file-picker-toggle" title="Alt+H">
+        <label
+          class="file-picker-toggle"
+          title="Alt+H"
+        >
           <input
             v-model="showHidden"
             type="checkbox"
@@ -256,7 +258,10 @@ async function browse(kind: "file" | "directory"): Promise<void> {
           <span>Hidden</span>
           <span class="file-picker-shortcut">Alt+H</span>
         </label>
-        <label class="file-picker-toggle" title="Alt+I">
+        <label
+          class="file-picker-toggle"
+          title="Alt+I"
+        >
           <input
             v-model="showIgnored"
             type="checkbox"
@@ -273,7 +278,10 @@ async function browse(kind: "file" | "directory"): Promise<void> {
           title="Open native file picker"
           @click="browse('file')"
         >
-          <i class="pi pi-file" aria-hidden="true" />
+          <i
+            class="pi pi-file"
+            aria-hidden="true"
+          />
           File…
         </button>
         <button
@@ -282,7 +290,10 @@ async function browse(kind: "file" | "directory"): Promise<void> {
           title="Open native folder picker"
           @click="browse('directory')"
         >
-          <i class="pi pi-folder-open" aria-hidden="true" />
+          <i
+            class="pi pi-folder-open"
+            aria-hidden="true"
+          />
           Folder…
         </button>
       </div>
@@ -319,7 +330,7 @@ async function browse(kind: "file" | "directory"): Promise<void> {
             <span class="file-picker-item-name">{{ r.name }}</span>
             <span class="file-picker-item-path">{{ r.path }}</span>
           </span>
-          <span class="file-picker-item-kind">{{ r.kind === "directory" ? "dir" : "file" }}</span>
+          <span class="file-picker-item-kind">{{ r.kind === 'directory' ? 'dir' : 'file' }}</span>
         </button>
       </template>
     </div>

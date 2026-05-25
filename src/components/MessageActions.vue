@@ -12,12 +12,12 @@
 /// affected buttons disabled when the item has no eventId yet (live
 /// streaming, before the SDK echoes back).
 
-import { computed } from "vue";
-import Button from "primevue/button";
-import { useToastStore } from "../stores/toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed } from 'vue';
+import Button from 'primevue/button';
+import { useToastStore } from '../stores/toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
-type Kind = "user" | "assistant" | "reasoning" | "tool" | "system";
+type Kind = 'user' | 'assistant' | 'reasoning' | 'tool' | 'system';
 
 const props = defineProps<{
   kind: Kind;
@@ -35,39 +35,43 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "edit"): void;
-  (e: "quote", text: string): void;
-  (e: "retry"): void;
-  (e: "fork"): void;
+  (e: 'edit'): void;
+  (e: 'quote', text: string): void;
+  (e: 'retry'): void;
+  (e: 'fork'): void;
 }>();
 
 const toasts = useToastStore();
 
 const canAnchor = computed(() => Boolean(props.eventId));
 
-async function copyToClipboard(value: string, label = "Copied"): Promise<void> {
+async function copyToClipboard(value: string, label = 'Copied'): Promise<void> {
   if (!value) return;
   try {
     await navigator.clipboard.writeText(value);
     toasts.success(label);
   } catch (err) {
     const message = toErrorMessage(err);
-    toasts.error("Copy failed", message);
+    toasts.error('Copy failed', message);
   }
 }
 
 function quoteToCommand(text: string): string {
   // Prefix every line with "> " so the composer renders a blockquote.
   const block = text
-    .split("\n")
+    .split('\n')
     .map((line) => `> ${line}`)
-    .join("\n");
+    .join('\n');
   return `${block}\n\n`;
 }
 </script>
 
 <template>
-  <div class="message-actions" role="toolbar" :aria-label="`${kind} message actions`">
+  <div
+    class="message-actions"
+    role="toolbar"
+    :aria-label="`${kind} message actions`"
+  >
     <!-- Universal copy. For tool kind we split into args / result. -->
     <template v-if="kind === 'tool'">
       <Button
@@ -122,7 +126,11 @@ function quoteToCommand(text: string): string {
       size="small"
       class="msg-action"
       :disabled="!text || !canAnchor"
-      :title="canAnchor ? 'Edit and resend (replaces history from here)' : 'Wait for the server to acknowledge this message'"
+      :title="
+        canAnchor
+          ? 'Edit and resend (replaces history from here)'
+          : 'Wait for the server to acknowledge this message'
+      "
       @click="emit('edit')"
     />
 

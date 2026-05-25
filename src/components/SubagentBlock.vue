@@ -12,20 +12,20 @@
 /// pendingRequest / forkNotice / user / sub-sub-agent items end
 /// up here (those stay top-level).
 
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import MessageContent from "./MessageContent.vue";
-import ReasoningBlock from "./ReasoningBlock.vue";
-import ToolCallBlock from "./ToolCallBlock.vue";
-import type { ChatItem } from "../lib/chatEvents";
-import type { ReasoningVisibility } from "../ipc/types";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import MessageContent from './MessageContent.vue';
+import ReasoningBlock from './ReasoningBlock.vue';
+import ToolCallBlock from './ToolCallBlock.vue';
+import type { ChatItem } from '../lib/chatEvents';
+import type { ReasoningVisibility } from '../ipc/types';
 
 const props = defineProps<{
   agentId: string;
   agentName: string;
   displayName: string;
   description: string;
-  status: "running" | "completed" | "failed";
+  status: 'running' | 'completed' | 'failed';
   startedAt?: string;
   completedAt?: string;
   error?: string;
@@ -40,7 +40,7 @@ const userToggled = ref(false);
 const userExpanded = ref(true);
 const expanded = computed(() => {
   if (userToggled.value) return userExpanded.value;
-  return props.status === "running";
+  return props.status === 'running';
 });
 function toggle() {
   userToggled.value = true;
@@ -49,11 +49,11 @@ function toggle() {
 
 /// Format elapsed: `startedAt`→`completedAt` or `startedAt`→now.
 const elapsedLabel = computed(() => {
-  if (!props.startedAt) return "";
+  if (!props.startedAt) return '';
   const start = Date.parse(props.startedAt);
-  if (!Number.isFinite(start)) return "";
+  if (!Number.isFinite(start)) return '';
   const end = props.completedAt ? Date.parse(props.completedAt) : Date.now();
-  if (!Number.isFinite(end)) return "";
+  if (!Number.isFinite(end)) return '';
   const ms = end - start;
   if (ms < 1000) return `${ms}ms`;
   const s = Math.round(ms / 1000);
@@ -82,29 +82,68 @@ const elapsedLabel = computed(() => {
         class="subagent-toggle"
         @click="toggle"
       />
-      <i class="pi pi-users subagent-icon" aria-hidden="true" />
-      <span class="subagent-name" :title="agentName">{{ displayName }}</span>
-      <span class="subagent-status-pill" :title="status">{{ status }}</span>
-      <span v-if="elapsedLabel" class="subagent-elapsed">{{ elapsedLabel }}</span>
+      <i
+        class="pi pi-users subagent-icon"
+        aria-hidden="true"
+      />
+      <span
+        class="subagent-name"
+        :title="agentName"
+        >{{ displayName }}</span
+      >
+      <span
+        class="subagent-status-pill"
+        :title="status"
+        >{{ status }}</span
+      >
+      <span
+        v-if="elapsedLabel"
+        class="subagent-elapsed"
+        >{{ elapsedLabel }}</span
+      >
     </header>
-    <p v-if="description" class="subagent-desc">{{ description }}</p>
-    <p v-if="status === 'failed' && error" class="subagent-error" role="alert">
+    <p
+      v-if="description"
+      class="subagent-desc"
+    >
+      {{ description }}
+    </p>
+    <p
+      v-if="status === 'failed' && error"
+      class="subagent-error"
+      role="alert"
+    >
       {{ error }}
     </p>
-    <div v-if="expanded" class="subagent-body">
-      <div v-if="items.length === 0" class="subagent-empty">
+    <div
+      v-if="expanded"
+      class="subagent-body"
+    >
+      <div
+        v-if="items.length === 0"
+        class="subagent-empty"
+      >
         <span v-if="status === 'running'">Working…</span>
         <span v-else>(no visible activity)</span>
       </div>
-      <template v-for="item in items" :key="item.id">
-        <div v-if="item.kind === 'reasoning'" class="message-shell">
+      <template
+        v-for="item in items"
+        :key="item.id"
+      >
+        <div
+          v-if="item.kind === 'reasoning'"
+          class="message-shell"
+        >
           <ReasoningBlock
             :text="item.text"
             :visibility="reasoningVisibility"
             :opaque="item.opaque === true"
           />
         </div>
-        <div v-else-if="item.kind === 'tool'" class="message-shell">
+        <div
+          v-else-if="item.kind === 'tool'"
+          class="message-shell"
+        >
           <ToolCallBlock
             :tool-name="item.toolName"
             :tool-call-id="item.toolCallId"
@@ -124,7 +163,10 @@ const elapsedLabel = computed(() => {
           v-else-if="item.kind === 'assistant' && item.text !== ''"
           class="message-card assistant"
         >
-          <MessageContent :text="item.text" label="Sub-agent message" />
+          <MessageContent
+            :text="item.text"
+            label="Sub-agent message"
+          />
         </article>
         <article
           v-else-if="item.kind === 'system'"

@@ -21,8 +21,8 @@
 // * **No "open" state here.** Whether the palette overlay is shown
 //   belongs to the component; this store only owns the catalog.
 
-import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
 
 export interface Command {
   /// Stable identity. `register` overwrites by id, so registrations
@@ -65,7 +65,7 @@ export interface Command {
   run: () => void | Promise<void>;
 }
 
-export const useCommandRegistry = defineStore("commandRegistry", () => {
+export const useCommandRegistry = defineStore('commandRegistry', () => {
   const commands = ref<Map<string, Command>>(new Map());
 
   function register(command: Command): () => void {

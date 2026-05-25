@@ -4,10 +4,10 @@
 // components) so non-component code — stores, background tasks — can push
 // toasts without grabbing a Vue setup context.
 
-import { defineStore } from "pinia";
-import { ref } from "vue";
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
 
-export type ToastSeverity = "success" | "info" | "warn" | "error";
+export type ToastSeverity = 'success' | 'info' | 'warn' | 'error';
 
 export type ToastMessage = {
   id: number;
@@ -19,7 +19,7 @@ export type ToastMessage = {
 
 let nextToastId = 1;
 
-export const useToastStore = defineStore("toast", () => {
+export const useToastStore = defineStore('toast', () => {
   const pending = ref<ToastMessage[]>([]);
 
   function push(
@@ -48,12 +48,10 @@ export const useToastStore = defineStore("toast", () => {
   return {
     pending,
     push,
-    info: (summary: string, detail?: string) => push("info", summary, detail),
-    success: (summary: string, detail?: string) =>
-      push("success", summary, detail),
-    warn: (summary: string, detail?: string) => push("warn", summary, detail),
-    error: (summary: string, detail?: string) =>
-      push("error", summary, detail, 5000),
+    info: (summary: string, detail?: string) => push('info', summary, detail),
+    success: (summary: string, detail?: string) => push('success', summary, detail),
+    warn: (summary: string, detail?: string) => push('warn', summary, detail),
+    error: (summary: string, detail?: string) => push('error', summary, detail, 5000),
     consume,
   };
 });

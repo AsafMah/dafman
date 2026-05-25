@@ -16,9 +16,16 @@ defineProps<{
 
 <template>
   <span class="path-chip">
-    <i :class="`pi pi-${icon ?? 'file'} path-chip-icon`" aria-hidden="true" />
+    <i
+      :class="`pi pi-${icon ?? 'file'} path-chip-icon`"
+      aria-hidden="true"
+    />
     <code class="path-chip-text">{{ path }}</code>
-    <span v-if="badge" class="path-chip-badge">{{ badge }}</span>
+    <span
+      v-if="badge"
+      class="path-chip-badge"
+      >{{ badge }}</span
+    >
   </span>
 </template>
 

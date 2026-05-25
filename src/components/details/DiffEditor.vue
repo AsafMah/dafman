@@ -13,19 +13,16 @@
 /// up-front and rebuilding on prop change is simpler and always
 /// shows tokens correctly.
 
-import { onMounted, onUnmounted, ref, watch } from "vue";
-import { EditorView, lineNumbers } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
-import type { Extension } from "@codemirror/state";
-import { MergeView, unifiedMergeView } from "@codemirror/merge";
-import { oneDark } from "@codemirror/theme-one-dark";
-import Button from "primevue/button";
-import {
-  resolveLanguageExtension,
-  resolveLanguageForFile,
-} from "../../lib/codeLanguage";
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { EditorView, lineNumbers } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
+import type { Extension } from '@codemirror/state';
+import { MergeView, unifiedMergeView } from '@codemirror/merge';
+import { oneDark } from '@codemirror/theme-one-dark';
+import Button from 'primevue/button';
+import { resolveLanguageExtension, resolveLanguageForFile } from '../../lib/codeLanguage';
 
-type Mode = "inline" | "side-by-side";
+type Mode = 'inline' | 'side-by-side';
 
 const props = withDefaults(
   defineProps<{
@@ -37,7 +34,7 @@ const props = withDefaults(
     /// Max height before scroll. 0 = fit content.
     maxHeight?: number;
   }>(),
-  { initialMode: "inline", maxHeight: 480 },
+  { initialMode: 'inline', maxHeight: 480 },
 );
 
 const host = ref<HTMLDivElement | null>(null);
@@ -55,19 +52,18 @@ function commonExtensions(): Extension[] {
     ...(resolvedLang ? [resolvedLang] : []),
     oneDark,
     EditorView.theme({
-      "&": {
-        fontSize: "0.82rem",
-        backgroundColor: "transparent",
+      '&': {
+        fontSize: '0.82rem',
+        backgroundColor: 'transparent',
       },
-      ".cm-scroller": {
-        fontFamily:
-          "var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
-        maxHeight: props.maxHeight > 0 ? `${props.maxHeight}px` : "none",
+      '.cm-scroller': {
+        fontFamily: 'var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+        maxHeight: props.maxHeight > 0 ? `${props.maxHeight}px` : 'none',
       },
-      ".cm-content": { padding: "0.3rem 0.5rem" },
-      ".cm-gutters": {
-        backgroundColor: "transparent",
-        borderRight: "1px solid var(--p-surface-border, rgba(255,255,255,0.08))",
+      '.cm-content': { padding: '0.3rem 0.5rem' },
+      '.cm-gutters': {
+        backgroundColor: 'transparent',
+        borderRight: '1px solid var(--p-surface-border, rgba(255,255,255,0.08))',
       },
     }),
   ];
@@ -94,15 +90,15 @@ function buildSync(): void {
     inlineView.destroy();
     inlineView = null;
   }
-  host.value.innerHTML = "";
-  host.value.classList.remove("merge-inline");
+  host.value.innerHTML = '';
+  host.value.classList.remove('merge-inline');
 
-  if (mode.value === "side-by-side") {
+  if (mode.value === 'side-by-side') {
     mergeView = new MergeView({
       a: { doc: props.oldText, extensions: commonExtensions() },
       b: { doc: props.newText, extensions: commonExtensions() },
       parent: host.value,
-      orientation: "a-b",
+      orientation: 'a-b',
       highlightChanges: true,
       gutter: true,
       collapseUnchanged: { margin: 3, minSize: 6 },
@@ -125,7 +121,7 @@ function buildSync(): void {
       ],
       parent: host.value,
     });
-    host.value.classList.add("merge-inline");
+    host.value.classList.add('merge-inline');
   }
 }
 
@@ -158,7 +154,7 @@ watch(
 );
 
 function toggleMode(): void {
-  mode.value = mode.value === "inline" ? "side-by-side" : "inline";
+  mode.value = mode.value === 'inline' ? 'side-by-side' : 'inline';
 }
 </script>
 
@@ -173,7 +169,10 @@ function toggleMode(): void {
         @click="toggleMode"
       />
     </header>
-    <div ref="host" class="diff-editor-host" />
+    <div
+      ref="host"
+      class="diff-editor-host"
+    />
   </div>
 </template>
 

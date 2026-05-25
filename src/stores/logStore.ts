@@ -10,21 +10,21 @@
 // are written to the file + stderr; the in-memory subscriber stream is
 // always full-fidelity.
 
-import { computed, ref } from "vue";
-import { defineStore } from "pinia";
-import { invokeCommand, onLogEvent } from "../ipc/invoke";
-import type { LogLevel, LogRecord } from "../ipc/types";
+import { computed, ref } from 'vue';
+import { defineStore } from 'pinia';
+import { invokeCommand, onLogEvent } from '../ipc/invoke';
+import type { LogLevel, LogRecord } from '../ipc/types';
 
 /// How many records we keep in the renderer ring buffer. Display-side
 /// only; the bun side has its own (smaller) buffer for "recent" replay.
 const RENDERER_CAP = 4000;
 
 export const LEVEL_NAMES: ReadonlyArray<LogLevel> = [
-  "trace",
-  "debug",
-  "info",
-  "warn",
-  "error",
+  'trace',
+  'debug',
+  'info',
+  'warn',
+  'error',
 ] as const;
 
 const LEVEL_RANK: Record<LogLevel, number> = {
@@ -35,18 +35,18 @@ const LEVEL_RANK: Record<LogLevel, number> = {
   error: 50,
 };
 
-export const useLogStore = defineStore("logs", () => {
+export const useLogStore = defineStore('logs', () => {
   const records = ref<LogRecord[]>([]);
   /// Configured bun-side level — controls what reaches disk / stderr.
   /// Independent of the renderer's display filter.
-  const level = ref<LogLevel>("info");
+  const level = ref<LogLevel>('info');
   /// Renderer-side display filter. Records below this are dropped from
   /// the UI list (but kept in the buffer so flipping the filter
   /// reveals them again).
-  const displayLevel = ref<LogLevel>("info");
+  const displayLevel = ref<LogLevel>('info');
   /// Free-text search (case-insensitive substring) applied to the
   /// JSON-serialised record.
-  const search = ref("");
+  const search = ref('');
 
   const initialised = ref(false);
   let unsubscribe: (() => void) | null = null;
@@ -57,12 +57,12 @@ export const useLogStore = defineStore("logs", () => {
     if (initialised.value) return;
     initialised.value = true;
     try {
-      const state = await invokeCommand("getLogState", { recentLimit: 500 });
+      const state = await invokeCommand('getLogState', { recentLimit: 500 });
       level.value = state.level;
       displayLevel.value = state.level;
       records.value = state.recent;
     } catch (err) {
-      console.warn("[logStore] failed to load initial state", err);
+      console.warn('[logStore] failed to load initial state', err);
     }
     unsubscribe = onLogEvent((record) => {
       pushRecord(record);
@@ -81,7 +81,7 @@ export const useLogStore = defineStore("logs", () => {
   /// Throws on RPC failure so callers can toast — previously the throw
   /// was swallowed by Electrobun's plain-object bridge.
   async function setLevel(next: LogLevel): Promise<LogLevel> {
-    const updated = await invokeCommand("setLogLevel", { level: next });
+    const updated = await invokeCommand('setLogLevel', { level: next });
     level.value = updated;
     // Default the display filter to follow the bun-side level when the
     // user changes it. They can still override per-session via the
@@ -105,7 +105,7 @@ export const useLogStore = defineStore("logs", () => {
   /// Build the diagnostics bundle. Returns the export directory path
   /// for "Reveal in file explorer" follow-on.
   async function exportBundle(): Promise<{ path: string; files: string[]; totalBytes: number }> {
-    return invokeCommand("exportDiagnostics", {});
+    return invokeCommand('exportDiagnostics', {});
   }
 
   const filtered = computed<LogRecord[]>(() => {

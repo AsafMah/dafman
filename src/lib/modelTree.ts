@@ -17,7 +17,7 @@
 /// the original `name` is preserved verbatim in the leaf label so e.g.
 /// "(1M context)" suffixes stay visible.
 
-import type { ModelSummary } from "../ipc/types";
+import type { ModelSummary } from '../ipc/types';
 
 export interface ModelTreeLeaf {
   key: string;
@@ -41,16 +41,16 @@ export interface ModelTreeGroup {
 
 export type ModelTreeNode = ModelTreeGroup | ModelTreeLeaf;
 
-const CLAUDE_TYPE_ORDER = ["opus", "sonnet", "haiku"];
+const CLAUDE_TYPE_ORDER = ['opus', 'sonnet', 'haiku'];
 
 function isAuto(name: string): boolean {
-  return name.trim().toLowerCase() === "auto";
+  return name.trim().toLowerCase() === 'auto';
 }
 
 function providerOf(name: string): string {
   const trimmed = name.trim();
   // "GPT-5.5", "GPT-5.3-Codex" — split on the first dash.
-  if (/^gpt[-\s]/i.test(trimmed)) return "GPT";
+  if (/^gpt[-\s]/i.test(trimmed)) return 'GPT';
   // "Claude Sonnet 4.6", "Claude Opus 4.7 (1M context)".
   const firstWord = trimmed.split(/\s+/)[0];
   return firstWord ?? trimmed;
@@ -60,12 +60,12 @@ function providerOf(name: string): string {
 /// everything else. Case preserved as-rendered for the group label.
 function claudeType(name: string): string {
   const m = name.trim().match(/^claude\s+(\S+)/i);
-  if (!m) return "";
+  if (!m) return '';
   const word = m[1].toLowerCase();
-  if (word === "opus") return "Opus";
-  if (word === "sonnet") return "Sonnet";
-  if (word === "haiku") return "Haiku";
-  return "";
+  if (word === 'opus') return 'Opus';
+  if (word === 'sonnet') return 'Sonnet';
+  if (word === 'haiku') return 'Haiku';
+  return '';
 }
 
 /// Natural-order comparator on version-ish strings: splits on
@@ -77,14 +77,14 @@ function compareVersionDesc(a: string, b: string): number {
   const bx = b.split(/[^0-9a-z]+/i).filter(Boolean);
   const len = Math.max(ax.length, bx.length);
   for (let i = 0; i < len; i++) {
-    const ai = ax[i] ?? "";
-    const bi = bx[i] ?? "";
+    const ai = ax[i] ?? '';
+    const bi = bx[i] ?? '';
     const an = Number(ai);
     const bn = Number(bi);
-    if (!Number.isNaN(an) && !Number.isNaN(bn) && ai !== "" && bi !== "") {
+    if (!Number.isNaN(an) && !Number.isNaN(bn) && ai !== '' && bi !== '') {
       if (an !== bn) return bn - an;
     } else {
-      const cmp = ai.localeCompare(bi, undefined, { sensitivity: "base" });
+      const cmp = ai.localeCompare(bi, undefined, { sensitivity: 'base' });
       if (cmp !== 0) return -cmp;
     }
   }
@@ -106,7 +106,7 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
     const provider = providerOf(m.name);
     const providerKey = provider.toLowerCase();
     providerLabel.set(providerKey, provider);
-    const type = providerKey === "claude" ? claudeType(m.name) : "";
+    const type = providerKey === 'claude' ? claudeType(m.name) : '';
     const typeKey = type.toLowerCase();
     if (type) typeLabel.set(`${providerKey}::${typeKey}`, type);
     const provBucket = buckets.get(providerKey) ?? new Map();
@@ -127,8 +127,7 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
   // Providers sorted alphabetically EXCEPT Claude and GPT come first
   // in that order (matches the user's stated priority).
   const providers = [...buckets.keys()].sort((a, b) => {
-    const rank = (k: string) =>
-      k === "claude" ? 0 : k === "gpt" ? 1 : 2;
+    const rank = (k: string) => (k === 'claude' ? 0 : k === 'gpt' ? 1 : 2);
     const ra = rank(a);
     const rb = rank(b);
     if (ra !== rb) return ra - rb;
@@ -145,7 +144,7 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
     // are flattened into the provider directly.
     const types = [...provBucket.keys()];
     types.sort((a, b) => {
-      if (provKey === "claude") {
+      if (provKey === 'claude') {
         const ia = CLAUDE_TYPE_ORDER.indexOf(a);
         const ib = CLAUDE_TYPE_ORDER.indexOf(b);
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
@@ -156,7 +155,7 @@ export function buildModelTree(models: ModelSummary[]): ModelTreeNode[] {
     for (const typeKey of types) {
       const leaves = provBucket.get(typeKey)!;
       leaves.sort((a, b) => compareVersionDesc(a.label, b.label));
-      if (typeKey === "") {
+      if (typeKey === '') {
         providerChildren.push(...leaves);
       } else {
         providerChildren.push({
@@ -189,11 +188,11 @@ export function expandKeysForModel(
   const out: Record<string, boolean> = {};
   function visit(nodes: ModelTreeNode[], ancestors: string[]): boolean {
     for (const n of nodes) {
-      if ("data" in n && n.data === modelId) {
+      if ('data' in n && n.data === modelId) {
         for (const a of ancestors) out[a] = true;
         return true;
       }
-      if ("children" in n) {
+      if ('children' in n) {
         if (visit(n.children, [...ancestors, n.key])) return true;
       }
     }

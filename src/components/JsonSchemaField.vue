@@ -6,22 +6,22 @@
 /// "two-way binding via prop-mutation" foot-gun and lets validate()
 /// inspect the same store the inputs write to).
 
-import { computed } from "vue";
-import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
-import RadioButton from "primevue/radiobutton";
-import Dropdown from "primevue/dropdown";
-import InputSwitch from "primevue/toggleswitch";
-import Button from "primevue/button";
+import { computed } from 'vue';
+import InputText from 'primevue/inputtext';
+import InputNumber from 'primevue/inputnumber';
+import RadioButton from 'primevue/radiobutton';
+import Dropdown from 'primevue/dropdown';
+import InputSwitch from 'primevue/toggleswitch';
+import Button from 'primevue/button';
 
 type JsonSchema = {
-  type?: "object" | "string" | "number" | "integer" | "boolean" | "array";
+  type?: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array';
   title?: string;
   description?: string;
   default?: unknown;
   enum?: unknown[];
   oneOf?: Array<{ const?: unknown; title?: string }>;
-  format?: "email" | "uri" | "date" | "date-time";
+  format?: 'email' | 'uri' | 'date' | 'date-time';
   minLength?: number;
   maxLength?: number;
   minimum?: number;
@@ -40,28 +40,29 @@ const props = defineProps<{
   readValue: (path: string[]) => unknown;
   update: (path: string[], v: unknown) => void;
   enumOptions: (schema: JsonSchema) => Array<{ value: unknown; label: string }>;
-  htmlInputType: (format?: JsonSchema["format"]) => string;
+  htmlInputType: (format?: JsonSchema['format']) => string;
 }>();
 
-const label = computed(() => props.schema.title ?? props.path[props.path.length - 1] ?? "");
-const fieldId = computed(() => `jsf-${props.path.join("-")}`);
+const label = computed(() => props.schema.title ?? props.path[props.path.length - 1] ?? '');
+const fieldId = computed(() => `jsf-${props.path.join('-')}`);
 const current = computed(() => props.readValue(props.path));
 
 const isEnum = computed(
-  () => (props.schema.enum && props.schema.enum.length > 0)
-    || (props.schema.oneOf && props.schema.oneOf.length > 0),
+  () =>
+    (props.schema.enum && props.schema.enum.length > 0) ||
+    (props.schema.oneOf && props.schema.oneOf.length > 0),
 );
 const enumOpts = computed(() => props.enumOptions(props.schema));
 const useRadio = computed(() => isEnum.value && enumOpts.value.length <= 4);
 const useDropdown = computed(() => isEnum.value && enumOpts.value.length > 4);
 
 const textValue = computed({
-  get: () => (typeof current.value === "string" ? current.value : ""),
+  get: () => (typeof current.value === 'string' ? current.value : ''),
   set: (v: string) => props.update(props.path, v),
 });
 
 const numberValue = computed({
-  get: () => (typeof current.value === "number" ? current.value : null),
+  get: () => (typeof current.value === 'number' ? current.value : null),
   set: (v: number | null) => props.update(props.path, v),
 });
 
@@ -81,7 +82,7 @@ const arrayValue = computed(() => {
 });
 
 const nestedProperties = computed(() => {
-  if (props.schema.type === "object" && props.schema.properties) {
+  if (props.schema.type === 'object' && props.schema.properties) {
     return Object.entries(props.schema.properties).map(([key, sub]) => ({
       key,
       schema: sub,
@@ -92,17 +93,17 @@ const nestedProperties = computed(() => {
 });
 
 function addArrayItem(): void {
-  const items = props.schema.items ?? { type: "string" };
+  const items = props.schema.items ?? { type: 'string' };
   const seed =
     items.default !== undefined
       ? structuredClone(items.default)
-      : items.type === "number" || items.type === "integer"
+      : items.type === 'number' || items.type === 'integer'
         ? null
-        : items.type === "boolean"
+        : items.type === 'boolean'
           ? false
-          : items.type === "object"
+          : items.type === 'object'
             ? {}
-            : "";
+            : '';
   props.update(props.path, [...arrayValue.value, seed]);
 }
 
@@ -121,11 +122,25 @@ function updateArrayItem(idx: number, v: unknown): void {
 
 <template>
   <!-- Object: nested fieldset, recurses -->
-  <fieldset v-if="schema.type === 'object'" class="jsf-fieldset">
+  <fieldset
+    v-if="schema.type === 'object'"
+    class="jsf-fieldset"
+  >
     <legend class="jsf-legend">
-      {{ label }}<span v-if="required" class="jsf-required" aria-label="required">*</span>
+      {{ label
+      }}<span
+        v-if="required"
+        class="jsf-required"
+        aria-label="required"
+        >*</span
+      >
     </legend>
-    <p v-if="schema.description" class="jsf-description">{{ schema.description }}</p>
+    <p
+      v-if="schema.description"
+      class="jsf-description"
+    >
+      {{ schema.description }}
+    </p>
     <JsonSchemaField
       v-for="prop in nestedProperties"
       :key="prop.key"
@@ -140,11 +155,28 @@ function updateArrayItem(idx: number, v: unknown): void {
   </fieldset>
 
   <!-- Array: repeated rows of items -->
-  <div v-else-if="schema.type === 'array'" class="jsf-field">
-    <label class="jsf-label" :for="fieldId">
-      {{ label }}<span v-if="required" class="jsf-required" aria-label="required">*</span>
+  <div
+    v-else-if="schema.type === 'array'"
+    class="jsf-field"
+  >
+    <label
+      class="jsf-label"
+      :for="fieldId"
+    >
+      {{ label
+      }}<span
+        v-if="required"
+        class="jsf-required"
+        aria-label="required"
+        >*</span
+      >
     </label>
-    <p v-if="schema.description" class="jsf-description">{{ schema.description }}</p>
+    <p
+      v-if="schema.description"
+      class="jsf-description"
+    >
+      {{ schema.description }}
+    </p>
     <div class="jsf-array">
       <div
         v-for="(_item, idx) in arrayValue"
@@ -181,12 +213,32 @@ function updateArrayItem(idx: number, v: unknown): void {
   </div>
 
   <!-- Enum (string with enum/oneOf): radio for ≤4, dropdown for >4 -->
-  <div v-else-if="isEnum" class="jsf-field">
-    <label class="jsf-label" :for="fieldId">
-      {{ label }}<span v-if="required" class="jsf-required" aria-label="required">*</span>
+  <div
+    v-else-if="isEnum"
+    class="jsf-field"
+  >
+    <label
+      class="jsf-label"
+      :for="fieldId"
+    >
+      {{ label
+      }}<span
+        v-if="required"
+        class="jsf-required"
+        aria-label="required"
+        >*</span
+      >
     </label>
-    <p v-if="schema.description" class="jsf-description">{{ schema.description }}</p>
-    <div v-if="useRadio" class="jsf-radios">
+    <p
+      v-if="schema.description"
+      class="jsf-description"
+    >
+      {{ schema.description }}
+    </p>
+    <div
+      v-if="useRadio"
+      class="jsf-radios"
+    >
       <label
         v-for="opt in enumOpts"
         :key="String(opt.value)"
@@ -214,11 +266,28 @@ function updateArrayItem(idx: number, v: unknown): void {
   </div>
 
   <!-- Number / integer -->
-  <div v-else-if="schema.type === 'number' || schema.type === 'integer'" class="jsf-field">
-    <label class="jsf-label" :for="fieldId">
-      {{ label }}<span v-if="required" class="jsf-required" aria-label="required">*</span>
+  <div
+    v-else-if="schema.type === 'number' || schema.type === 'integer'"
+    class="jsf-field"
+  >
+    <label
+      class="jsf-label"
+      :for="fieldId"
+    >
+      {{ label
+      }}<span
+        v-if="required"
+        class="jsf-required"
+        aria-label="required"
+        >*</span
+      >
     </label>
-    <p v-if="schema.description" class="jsf-description">{{ schema.description }}</p>
+    <p
+      v-if="schema.description"
+      class="jsf-description"
+    >
+      {{ schema.description }}
+    </p>
     <InputNumber
       :input-id="fieldId"
       :model-value="numberValue"
@@ -231,26 +300,58 @@ function updateArrayItem(idx: number, v: unknown): void {
   </div>
 
   <!-- Boolean -->
-  <div v-else-if="schema.type === 'boolean'" class="jsf-field jsf-field-inline">
+  <div
+    v-else-if="schema.type === 'boolean'"
+    class="jsf-field jsf-field-inline"
+  >
     <InputSwitch
       :input-id="fieldId"
       :model-value="booleanValue"
       @update:model-value="booleanValue = $event"
     />
-    <label class="jsf-label" :for="fieldId">
-      {{ label }}<span v-if="required" class="jsf-required" aria-label="required">*</span>
+    <label
+      class="jsf-label"
+      :for="fieldId"
+    >
+      {{ label
+      }}<span
+        v-if="required"
+        class="jsf-required"
+        aria-label="required"
+        >*</span
+      >
     </label>
-    <p v-if="schema.description" class="jsf-description jsf-description-inline">
+    <p
+      v-if="schema.description"
+      class="jsf-description jsf-description-inline"
+    >
       {{ schema.description }}
     </p>
   </div>
 
   <!-- String (text / email / uri / date / date-time) -->
-  <div v-else class="jsf-field">
-    <label class="jsf-label" :for="fieldId">
-      {{ label }}<span v-if="required" class="jsf-required" aria-label="required">*</span>
+  <div
+    v-else
+    class="jsf-field"
+  >
+    <label
+      class="jsf-label"
+      :for="fieldId"
+    >
+      {{ label
+      }}<span
+        v-if="required"
+        class="jsf-required"
+        aria-label="required"
+        >*</span
+      >
     </label>
-    <p v-if="schema.description" class="jsf-description">{{ schema.description }}</p>
+    <p
+      v-if="schema.description"
+      class="jsf-description"
+    >
+      {{ schema.description }}
+    </p>
     <InputText
       :id="fieldId"
       :model-value="textValue"

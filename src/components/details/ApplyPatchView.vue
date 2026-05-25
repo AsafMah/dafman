@@ -6,10 +6,10 @@
 /// text for each hunk from the +/-/context lines so CM6's MergeView
 /// can show real language-aware syntax highlighting.
 
-import { computed } from "vue";
-import { parseApplyPatch } from "../../lib/diff";
-import PathChip from "./PathChip.vue";
-import DiffEditor from "./DiffEditor.vue";
+import { computed } from 'vue';
+import { parseApplyPatch } from '../../lib/diff';
+import PathChip from './PathChip.vue';
+import DiffEditor from './DiffEditor.vue';
 
 const props = defineProps<{
   patch: string;
@@ -17,50 +17,60 @@ const props = defineProps<{
 
 const files = computed(() => parseApplyPatch(props.patch));
 
-function opLabel(op: "update" | "add" | "delete"): string {
+function opLabel(op: 'update' | 'add' | 'delete'): string {
   switch (op) {
-    case "update":
-      return "Update";
-    case "add":
-      return "Add";
-    case "delete":
-      return "Delete";
+    case 'update':
+      return 'Update';
+    case 'add':
+      return 'Add';
+    case 'delete':
+      return 'Delete';
   }
 }
 
 /// Reconstruct the "before" text from hunk lines (context + removed,
 /// in order). For Add files, before is empty.
 function hunkBefore(
-  op: "update" | "add" | "delete",
-  lines: Array<{ kind: "added" | "removed" | "context"; text: string }>,
+  op: 'update' | 'add' | 'delete',
+  lines: Array<{ kind: 'added' | 'removed' | 'context'; text: string }>,
 ): string {
-  if (op === "add") return "";
+  if (op === 'add') return '';
   return lines
-    .filter((l) => l.kind !== "added")
+    .filter((l) => l.kind !== 'added')
     .map((l) => l.text)
-    .join("\n");
+    .join('\n');
 }
 
 /// Reconstruct the "after" text from hunk lines (context + added,
 /// in order). For Delete files, after is empty.
 function hunkAfter(
-  op: "update" | "add" | "delete",
-  lines: Array<{ kind: "added" | "removed" | "context"; text: string }>,
+  op: 'update' | 'add' | 'delete',
+  lines: Array<{ kind: 'added' | 'removed' | 'context'; text: string }>,
 ): string {
-  if (op === "delete") return "";
+  if (op === 'delete') return '';
   return lines
-    .filter((l) => l.kind !== "removed")
+    .filter((l) => l.kind !== 'removed')
     .map((l) => l.text)
-    .join("\n");
+    .join('\n');
 }
 </script>
 
 <template>
-  <div v-if="files.length > 0" class="apply-patch">
-    <article v-for="(file, idx) in files" :key="idx" class="apply-patch-file">
+  <div
+    v-if="files.length > 0"
+    class="apply-patch"
+  >
+    <article
+      v-for="(file, idx) in files"
+      :key="idx"
+      class="apply-patch-file"
+    >
       <header class="apply-patch-header">
         <span :class="['apply-patch-op', `op-${file.op}`]">{{ opLabel(file.op) }}</span>
-        <PathChip :path="file.path" :icon="file.op === 'delete' ? 'trash' : 'file-edit'" />
+        <PathChip
+          :path="file.path"
+          :icon="file.op === 'delete' ? 'trash' : 'file-edit'"
+        />
       </header>
       <DiffEditor
         v-for="(hunk, hi) in file.hunks"
@@ -70,12 +80,20 @@ function hunkAfter(
         :new-text="hunkAfter(file.op, hunk.lines)"
         :filename="file.path"
       />
-      <p v-if="file.hunks.length === 0" class="apply-patch-empty">
+      <p
+        v-if="file.hunks.length === 0"
+        class="apply-patch-empty"
+      >
         (no hunks)
       </p>
     </article>
   </div>
-  <p v-else class="apply-patch-empty">Empty patch.</p>
+  <p
+    v-else
+    class="apply-patch-empty"
+  >
+    Empty patch.
+  </p>
 </template>
 
 <style scoped>

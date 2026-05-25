@@ -39,24 +39,21 @@ export type ToolRenderer = (input: ToolRendererArgs) => ToolRenderResult;
 
 /// Extract a string field from `args` with safe fallback. Returns ""
 /// if the field is missing or not a string.
-function s(
-  args: Record<string, unknown> | undefined,
-  ...keys: string[]
-): string {
-  if (!args) return "";
+function s(args: Record<string, unknown> | undefined, ...keys: string[]): string {
+  if (!args) return '';
   for (const key of keys) {
     const value = args[key];
-    if (typeof value === "string" && value.length > 0) return value;
+    if (typeof value === 'string' && value.length > 0) return value;
   }
-  return "";
+  return '';
 }
 
 /// Truncate a single-line preview so it fits in a header row. The
 /// 160-char cap matches `ToolCallBlock.previewLine`'s historical
 /// behaviour so the look-and-feel doesn't jump when summaries arrive.
 function clip(value: string, max = 160): string {
-  if (!value) return "";
-  const oneLine = value.replace(/\s*\n+\s*/g, " ").trim();
+  if (!value) return '';
+  const oneLine = value.replace(/\s*\n+\s*/g, ' ').trim();
   return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
@@ -64,147 +61,145 @@ function clip(value: string, max = 160): string {
 /// for anything not in the explicit map (prism's grammars are
 /// case-sensitive ids; @lexical/code maps friendly names → grammars).
 function languageForFile(path: string): string {
-  if (!path) return "text";
-  const dot = path.lastIndexOf(".");
-  if (dot === -1) return "text";
+  if (!path) return 'text';
+  const dot = path.lastIndexOf('.');
+  if (dot === -1) return 'text';
   const ext = path.slice(dot + 1).toLowerCase();
   // Keep this map intentionally short — prismjs loads grammars on
   // demand via @lexical/code's lazy loader, but only for the ones it
   // actually knows about. Unknown langs render as plain `text`.
   const map: Record<string, string> = {
-    ts: "typescript",
-    tsx: "typescript",
-    js: "javascript",
-    jsx: "javascript",
-    mjs: "javascript",
-    cjs: "javascript",
-    vue: "markup", // closest fit; vue SFC syntax isn't first-class
-    json: "json",
-    md: "markdown",
-    markdown: "markdown",
-    sh: "bash",
-    bash: "bash",
-    zsh: "bash",
-    ps1: "powershell",
-    py: "python",
-    rs: "rust",
-    go: "go",
-    java: "java",
-    c: "c",
-    h: "c",
-    cpp: "cpp",
-    cc: "cpp",
-    hpp: "cpp",
-    cs: "csharp",
-    css: "css",
-    html: "markup",
-    htm: "markup",
-    xml: "markup",
-    yml: "yaml",
-    yaml: "yaml",
-    toml: "toml",
-    sql: "sql",
-    rb: "ruby",
-    php: "php",
-    swift: "swift",
-    kt: "kotlin",
+    ts: 'typescript',
+    tsx: 'typescript',
+    js: 'javascript',
+    jsx: 'javascript',
+    mjs: 'javascript',
+    cjs: 'javascript',
+    vue: 'markup', // closest fit; vue SFC syntax isn't first-class
+    json: 'json',
+    md: 'markdown',
+    markdown: 'markdown',
+    sh: 'bash',
+    bash: 'bash',
+    zsh: 'bash',
+    ps1: 'powershell',
+    py: 'python',
+    rs: 'rust',
+    go: 'go',
+    java: 'java',
+    c: 'c',
+    h: 'c',
+    cpp: 'cpp',
+    cc: 'cpp',
+    hpp: 'cpp',
+    cs: 'csharp',
+    css: 'css',
+    html: 'markup',
+    htm: 'markup',
+    xml: 'markup',
+    yml: 'yaml',
+    yaml: 'yaml',
+    toml: 'toml',
+    sql: 'sql',
+    rb: 'ruby',
+    php: 'php',
+    swift: 'swift',
+    kt: 'kotlin',
   };
-  return map[ext] ?? "text";
+  return map[ext] ?? 'text';
 }
 
 // -------- per-tool renderers --------
 
 const shellRenderer: ToolRenderer = ({ args }) => {
-  const command = s(args, "command", "cmd", "script");
+  const command = s(args, 'command', 'cmd', 'script');
   return {
     summary: command ? clip(command) : undefined,
-    argsLanguage: "bash",
-    resultLanguage: "text",
+    argsLanguage: 'bash',
+    resultLanguage: 'text',
   };
 };
 
 const readFileRenderer: ToolRenderer = ({ args }) => {
-  const path = s(args, "file_path", "path", "filePath", "filename");
+  const path = s(args, 'file_path', 'path', 'filePath', 'filename');
   return {
     summary: path ? clip(path) : undefined,
-    argsLanguage: "json",
+    argsLanguage: 'json',
     resultLanguage: languageForFile(path),
   };
 };
 
 const writeFileRenderer: ToolRenderer = ({ args }) => {
-  const path = s(args, "file_path", "path", "filePath", "filename");
+  const path = s(args, 'file_path', 'path', 'filePath', 'filename');
   return {
     summary: path ? `write ${clip(path)}` : undefined,
-    argsLanguage: "json",
+    argsLanguage: 'json',
     resultLanguage: languageForFile(path),
   };
 };
 
 const editRenderer: ToolRenderer = ({ args }) => {
-  const path = s(args, "file_path", "path", "filePath", "filename");
-  const oldStr = s(args, "old_str", "search");
+  const path = s(args, 'file_path', 'path', 'filePath', 'filename');
+  const oldStr = s(args, 'old_str', 'search');
   return {
-    summary: path
-      ? `edit ${clip(path)}${oldStr ? `  · ${clip(oldStr, 60)}` : ""}`
-      : undefined,
-    argsLanguage: "json",
-    resultLanguage: "diff",
+    summary: path ? `edit ${clip(path)}${oldStr ? `  · ${clip(oldStr, 60)}` : ''}` : undefined,
+    argsLanguage: 'json',
+    resultLanguage: 'diff',
   };
 };
 
 const applyPatchRenderer: ToolRenderer = ({ args }) => {
-  const patch = s(args, "patch", "diff");
+  const patch = s(args, 'patch', 'diff');
   const fileMatch = patch.match(/^\*\*\* (?:Update|Add|Delete) File: (.+)$/m);
-  const path = fileMatch?.[1] ?? "";
+  const path = fileMatch?.[1] ?? '';
   return {
-    summary: path ? `patch ${clip(path)}` : "apply patch",
-    argsLanguage: "diff",
-    resultLanguage: "diff",
+    summary: path ? `patch ${clip(path)}` : 'apply patch',
+    argsLanguage: 'diff',
+    resultLanguage: 'diff',
   };
 };
 
 const grepRenderer: ToolRenderer = ({ args }) => {
-  const pattern = s(args, "pattern", "query", "regex");
-  const path = s(args, "path", "paths", "directory");
+  const pattern = s(args, 'pattern', 'query', 'regex');
+  const path = s(args, 'path', 'paths', 'directory');
   return {
     summary: pattern
-      ? `grep "${clip(pattern, 60)}"${path ? ` in ${clip(path, 50)}` : ""}`
+      ? `grep "${clip(pattern, 60)}"${path ? ` in ${clip(path, 50)}` : ''}`
       : undefined,
-    argsLanguage: "json",
-    resultLanguage: "text",
+    argsLanguage: 'json',
+    resultLanguage: 'text',
   };
 };
 
 const globRenderer: ToolRenderer = ({ args }) => {
-  const pattern = s(args, "pattern", "glob");
+  const pattern = s(args, 'pattern', 'glob');
   return {
     summary: pattern ? `glob ${clip(pattern)}` : undefined,
-    argsLanguage: "json",
-    resultLanguage: "text",
+    argsLanguage: 'json',
+    resultLanguage: 'text',
   };
 };
 
 const viewRenderer: ToolRenderer = ({ args }) => {
-  const path = s(args, "path", "file_path", "filePath");
+  const path = s(args, 'path', 'file_path', 'filePath');
   const range = args?.view_range;
-  let rangeStr = "";
+  let rangeStr = '';
   if (Array.isArray(range) && range.length === 2) {
     rangeStr = ` [${range[0]}–${range[1]}]`;
   }
   return {
     summary: path ? `view ${clip(path)}${rangeStr}` : undefined,
-    argsLanguage: "json",
+    argsLanguage: 'json',
     resultLanguage: languageForFile(path),
   };
 };
 
 const fetchRenderer: ToolRenderer = ({ args }) => {
-  const url = s(args, "url");
+  const url = s(args, 'url');
   return {
     summary: url ? clip(url) : undefined,
-    argsLanguage: "json",
-    resultLanguage: "markdown",
+    argsLanguage: 'json',
+    resultLanguage: 'markdown',
   };
 };
 
@@ -212,12 +207,12 @@ const todoRenderer: ToolRenderer = ({ args }) => {
   const todos = args?.todos;
   if (Array.isArray(todos)) {
     return {
-      summary: `${todos.length} todo${todos.length === 1 ? "" : "s"}`,
-      argsLanguage: "json",
-      resultLanguage: "json",
+      summary: `${todos.length} todo${todos.length === 1 ? '' : 's'}`,
+      argsLanguage: 'json',
+      resultLanguage: 'json',
     };
   }
-  return { argsLanguage: "json", resultLanguage: "json" };
+  return { argsLanguage: 'json', resultLanguage: 'json' };
 };
 
 const RENDERERS: Record<string, ToolRenderer> = {
@@ -264,16 +259,13 @@ const RENDERERS: Record<string, ToolRenderer> = {
 /// carry a `mcpServerName`) currently use the default renderer — the
 /// MCP tool name is opaque to us. Future: allow registering per-MCP
 /// renderers (e.g. for the standard playwright / github MCP servers).
-export function getToolRenderer(
-  toolName: string,
-  mcpServerName?: string,
-): ToolRenderer {
+export function getToolRenderer(toolName: string, mcpServerName?: string): ToolRenderer {
   if (mcpServerName) {
     // Default renderer for MCP tools — args are JSON, result depends
     // on the tool itself; assume markdown for richer MCP outputs.
-    return ({ args: _a }) => ({ argsLanguage: "json", resultLanguage: "markdown" });
+    return ({ args: _a }) => ({ argsLanguage: 'json', resultLanguage: 'markdown' });
   }
   const renderer = RENDERERS[toolName];
   if (renderer) return renderer;
-  return () => ({ argsLanguage: "json", resultLanguage: "text" });
+  return () => ({ argsLanguage: 'json', resultLanguage: 'text' });
 }

@@ -1,4 +1,4 @@
-import { toErrorMessage } from "./errorMessage";
+import { toErrorMessage } from './errorMessage';
 // AppError — discriminated union that crosses the RPC bridge.
 //
 // Mirrors the old `AppError` in `src-tauri/src/app/error.rs` field-for-field.
@@ -8,51 +8,51 @@ import { toErrorMessage } from "./errorMessage";
 // JS Error stacks.
 
 export type AppErrorPayload =
-	| { kind: "ClientNotStarted" }
-	| { kind: "SessionNotFound"; data: string }
-	| { kind: "Settings"; data: string }
-	| { kind: "Sdk"; data: string }
-	| { kind: "Io"; data: string };
+  | { kind: 'ClientNotStarted' }
+  | { kind: 'SessionNotFound'; data: string }
+  | { kind: 'Settings'; data: string }
+  | { kind: 'Sdk'; data: string }
+  | { kind: 'Io'; data: string };
 
 export class AppError extends Error {
-	readonly payload: AppErrorPayload;
+  readonly payload: AppErrorPayload;
 
-	constructor(payload: AppErrorPayload) {
-		super(formatPayload(payload));
-		this.name = "AppError";
-		this.payload = payload;
-	}
+  constructor(payload: AppErrorPayload) {
+    super(formatPayload(payload));
+    this.name = 'AppError';
+    this.payload = payload;
+  }
 
-	static clientNotStarted(): AppError {
-		return new AppError({ kind: "ClientNotStarted" });
-	}
-	static sessionNotFound(sessionId: string): AppError {
-		return new AppError({ kind: "SessionNotFound", data: sessionId });
-	}
-	static settings(detail: string): AppError {
-		return new AppError({ kind: "Settings", data: detail });
-	}
-	static sdk(detail: string): AppError {
-		return new AppError({ kind: "Sdk", data: detail });
-	}
-	static io(detail: string): AppError {
-		return new AppError({ kind: "Io", data: detail });
-	}
+  static clientNotStarted(): AppError {
+    return new AppError({ kind: 'ClientNotStarted' });
+  }
+  static sessionNotFound(sessionId: string): AppError {
+    return new AppError({ kind: 'SessionNotFound', data: sessionId });
+  }
+  static settings(detail: string): AppError {
+    return new AppError({ kind: 'Settings', data: detail });
+  }
+  static sdk(detail: string): AppError {
+    return new AppError({ kind: 'Sdk', data: detail });
+  }
+  static io(detail: string): AppError {
+    return new AppError({ kind: 'Io', data: detail });
+  }
 }
 
 function formatPayload(p: AppErrorPayload): string {
-	switch (p.kind) {
-		case "ClientNotStarted":
-			return "client not started";
-		case "SessionNotFound":
-			return `session ${p.data} not found`;
-		case "Settings":
-			return `settings: ${p.data}`;
-		case "Sdk":
-			return `sdk: ${p.data}`;
-		case "Io":
-			return `io: ${p.data}`;
-	}
+  switch (p.kind) {
+    case 'ClientNotStarted':
+      return 'client not started';
+    case 'SessionNotFound':
+      return `session ${p.data} not found`;
+    case 'Settings':
+      return `settings: ${p.data}`;
+    case 'Sdk':
+      return `sdk: ${p.data}`;
+    case 'Io':
+      return `io: ${p.data}`;
+  }
 }
 
 /// Wrap an RPC handler so any thrown `AppError` is serialized as its
@@ -63,23 +63,23 @@ function formatPayload(p: AppErrorPayload): string {
 /// see node_modules/electrobun/dist/api/shared/rpc.ts:398). So we
 /// always throw a real `Error` whose message is a JSON-encoded
 /// `AppErrorPayload`; the renderer's `invokeCommand` decodes it.
-const APP_ERROR_PREFIX = "AppErrorPayload:";
+const APP_ERROR_PREFIX = 'AppErrorPayload:';
 
 export function rpcGuard<TArgs, TResult>(
-	fn: (args: TArgs) => Promise<TResult> | TResult,
+  fn: (args: TArgs) => Promise<TResult> | TResult,
 ): (args: TArgs) => Promise<TResult> {
-	return async (args) => {
-		try {
-			return await fn(args);
-		} catch (err) {
-			let payload: AppErrorPayload;
-			if (err instanceof AppError) {
-				payload = err.payload;
-			} else {
-				const message = toErrorMessage(err);
-				payload = { kind: "Sdk", data: message };
-			}
-			throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);
-		}
-	};
+  return async (args) => {
+    try {
+      return await fn(args);
+    } catch (err) {
+      let payload: AppErrorPayload;
+      if (err instanceof AppError) {
+        payload = err.payload;
+      } else {
+        const message = toErrorMessage(err);
+        payload = { kind: 'Sdk', data: message };
+      }
+      throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);
+    }
+  };
 }

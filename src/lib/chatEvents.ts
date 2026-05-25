@@ -13,26 +13,26 @@
 // and the `TOOL_OUTPUT_CAP_BYTES` constant are exported from here so
 // the handler modules can reuse them without circular imports.
 
-import type { SessionEventPayload } from "../ipc/types";
-import { calloutHandlers } from "./chatEvents/calloutHandlers";
-import type { Handler, ReducerContext } from "./chatEvents/context";
-import { lifecycleHandlers } from "./chatEvents/lifecycleHandlers";
-import { messageHandlers } from "./chatEvents/messageHandlers";
-import { notificationHandlers } from "./chatEvents/notificationHandlers";
-import { reasoningHandlers } from "./chatEvents/reasoningHandlers";
-import { sessionMetaHandlers } from "./chatEvents/sessionMetaHandlers";
-import { toolHandlers } from "./chatEvents/toolHandlers";
-import { turnHandlers } from "./chatEvents/turnHandlers";
-export { clampOutput, pickNumber, pickString, TOOL_OUTPUT_CAP_BYTES } from "./chatEvents/helpers";
+import type { SessionEventPayload } from '../ipc/types';
+import { calloutHandlers } from './chatEvents/calloutHandlers';
+import type { Handler, ReducerContext } from './chatEvents/context';
+import { lifecycleHandlers } from './chatEvents/lifecycleHandlers';
+import { messageHandlers } from './chatEvents/messageHandlers';
+import { notificationHandlers } from './chatEvents/notificationHandlers';
+import { reasoningHandlers } from './chatEvents/reasoningHandlers';
+import { sessionMetaHandlers } from './chatEvents/sessionMetaHandlers';
+import { toolHandlers } from './chatEvents/toolHandlers';
+import { turnHandlers } from './chatEvents/turnHandlers';
+export { clampOutput, pickNumber, pickString, TOOL_OUTPUT_CAP_BYTES } from './chatEvents/helpers';
 
-export type SystemSeverity = "info" | "warn" | "error";
+export type SystemSeverity = 'info' | 'warn' | 'error';
 
-export type ToolStatus = "running" | "success" | "error";
+export type ToolStatus = 'running' | 'success' | 'error';
 
 export type ChatItem =
   | {
       id: number;
-      kind: "user";
+      kind: 'user';
       text: string;
       /// SDK envelope event id, set when the item originates from (or
       /// has been reconciled with) a `user.message` event. Locally
@@ -48,11 +48,11 @@ export type ChatItem =
       /// in the transcript bubble by `UserMessageBody.vue`; pill order
       /// in the text matches array order (the composer's
       /// document-order extraction in `consumeComposerText`).
-      attachments?: import("../ipc/types").SendMessageAttachment[];
+      attachments?: import('../ipc/types').SendMessageAttachment[];
     }
   | {
       id: number;
-      kind: "assistant";
+      kind: 'assistant';
       text: string;
       messageId: string;
       /// Envelope id of the `assistant.message_start` event that
@@ -61,7 +61,7 @@ export type ChatItem =
     }
   | {
       id: number;
-      kind: "reasoning";
+      kind: 'reasoning';
       text: string;
       reasoningId: string;
       eventId?: string;
@@ -74,7 +74,7 @@ export type ChatItem =
     }
   | {
       id: number;
-      kind: "tool";
+      kind: 'tool';
       toolCallId: string;
       toolName: string;
       mcpServerName?: string;
@@ -103,46 +103,41 @@ export type ChatItem =
     }
   | {
       id: number;
-      kind: "system";
+      kind: 'system';
       text: string;
       severity: SystemSeverity;
     }
   | {
       id: number;
-      kind: "pendingRequest";
+      kind: 'pendingRequest';
       /// Bun-generated id used to correlate the response via
       /// `respondToRequest`. Card is removed from `items` when
       /// either `dafman.pending_response` (immediate user action)
       /// or the SDK's `*.completed` (out-of-band resolution)
       /// arrives.
       requestId: string;
-      pendingKind:
-        | "permission"
-        | "userInput"
-        | "elicitation"
-        | "exitPlanMode"
-        | "autoModeSwitch";
+      pendingKind: 'permission' | 'userInput' | 'elicitation' | 'exitPlanMode' | 'autoModeSwitch';
       /// Short human-readable summary used by accessible labels and
       /// as a fallback when the renderer wants a single string.
       message: string;
       /// Full typed payload for the per-kind layout.
       request:
-        | import("../ipc/types").PermissionRequestData
-        | import("../ipc/types").UserInputRequestData
-        | import("../ipc/types").ElicitationRequestData
-        | import("../ipc/types").ExitPlanModeRequestData
-        | import("../ipc/types").AutoModeSwitchRequestData;
+        | import('../ipc/types').PermissionRequestData
+        | import('../ipc/types').UserInputRequestData
+        | import('../ipc/types').ElicitationRequestData
+        | import('../ipc/types').ExitPlanModeRequestData
+        | import('../ipc/types').AutoModeSwitchRequestData;
     }
   | {
       id: number;
-      kind: "forkNotice";
+      kind: 'forkNotice';
       /// Anchor for dedup. The CLI emits the same fork session.info
       /// twice in pathological resume flows (live + persisted on next
       /// replay); we collapse them by eventId so users see one chip.
       eventId?: string;
       /// Whether this is the source session ("Forked into X") or the
       /// destination ("Forked from X").
-      direction: "into" | "from";
+      direction: 'into' | 'from';
       /// Session name as the CLI rendered it (truncated id or
       /// user-supplied). The renderer looks it up in the sessionsStore
       /// to resolve to a clickable id.
@@ -155,7 +150,7 @@ export type ChatItem =
       /// Created on `subagent.started`; status flips to completed /
       /// failed on the matching `subagent.completed` / `.failed` event.
       id: number;
-      kind: "subagent";
+      kind: 'subagent';
       /// SDK's sub-agent instance identifier from the envelope's
       /// `agentId` field. Routing key for nested events.
       agentId: string;
@@ -168,7 +163,7 @@ export type ChatItem =
       /// Lifecycle status. `running` from start to completion; flips to
       /// `completed` on `subagent.completed`, `failed` on
       /// `subagent.failed` (with `error` set).
-      status: "running" | "completed" | "failed";
+      status: 'running' | 'completed' | 'failed';
       /// Started/completed timestamps from the event envelope. ISO 8601
       /// strings to match the rest of the wire shape.
       startedAt?: string;
@@ -221,7 +216,7 @@ export type ChatAmbient = {
   /// Currently-selected custom agent for the session, or null when the
   /// default agent is in use. Driven by `subagent.selected` /
   /// `.deselected` events; reflected in the header chip + rail.
-  currentAgent: import("../ipc/types").AgentInfo | null;
+  currentAgent: import('../ipc/types').AgentInfo | null;
 };
 
 /// A single SDK-blocking pending callback. `requestId` is generated
@@ -231,34 +226,34 @@ export type ChatAmbient = {
 /// `src/ipc/types.ts`.
 export type PendingRequest =
   | {
-      kind: "permission";
+      kind: 'permission';
       requestId: string;
       message: string;
-      request: import("../ipc/types").PermissionRequestData;
+      request: import('../ipc/types').PermissionRequestData;
     }
   | {
-      kind: "userInput";
+      kind: 'userInput';
       requestId: string;
       message: string;
-      request: import("../ipc/types").UserInputRequestData;
+      request: import('../ipc/types').UserInputRequestData;
     }
   | {
-      kind: "elicitation";
+      kind: 'elicitation';
       requestId: string;
       message: string;
-      request: import("../ipc/types").ElicitationRequestData;
+      request: import('../ipc/types').ElicitationRequestData;
     }
   | {
-      kind: "exitPlanMode";
+      kind: 'exitPlanMode';
       requestId: string;
       message: string;
-      request: import("../ipc/types").ExitPlanModeRequestData;
+      request: import('../ipc/types').ExitPlanModeRequestData;
     }
   | {
-      kind: "autoModeSwitch";
+      kind: 'autoModeSwitch';
       requestId: string;
       message: string;
-      request: import("../ipc/types").AutoModeSwitchRequestData;
+      request: import('../ipc/types').AutoModeSwitchRequestData;
     };
 
 export function defaultAmbient(): ChatAmbient {
@@ -280,7 +275,7 @@ export function defaultAmbient(): ChatAmbient {
 /// change). Kept as data so the pure reducer doesn't depend on the toast
 /// store; the caller drains them.
 export type ChatToast = {
-  severity: "success" | "info" | "warn" | "error";
+  severity: 'success' | 'info' | 'warn' | 'error';
   summary: string;
   detail?: string;
 };
@@ -314,9 +309,7 @@ const HANDLERS: Record<string, Handler> = {
 
 /// Visible to tests for the "every event is handled or ignored"
 /// completeness check.
-export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(
-  Object.keys(HANDLERS),
-);
+export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(Object.keys(HANDLERS));
 
 /// Visual event types that get routed to a sub-agent's nested
 /// `items[]` when the envelope carries a matching `agentId`. All
@@ -325,10 +318,10 @@ export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(
 /// corrupt global state — per the 19c rubber-duck #4.
 function isVisualEventType(eventType: string): boolean {
   return (
-    eventType.startsWith("assistant.") ||
-    eventType.startsWith("user.") ||
-    eventType.startsWith("tool.") ||
-    eventType === "system.notification"
+    eventType.startsWith('assistant.') ||
+    eventType.startsWith('user.') ||
+    eventType.startsWith('tool.') ||
+    eventType === 'system.notification'
   );
 }
 
@@ -354,9 +347,9 @@ function makeReducerCtx(opts: {
   const toolIdx = new Map<string, number>();
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!;
-    if (it.kind === "assistant" && it.messageId) assistantIdx.set(it.messageId, i);
-    else if (it.kind === "reasoning" && it.reasoningId) reasoningIdx.set(it.reasoningId, i);
-    else if (it.kind === "tool" && it.toolCallId) toolIdx.set(it.toolCallId, i);
+    if (it.kind === 'assistant' && it.messageId) assistantIdx.set(it.messageId, i);
+    else if (it.kind === 'reasoning' && it.reasoningId) reasoningIdx.set(it.reasoningId, i);
+    else if (it.kind === 'tool' && it.toolCallId) toolIdx.set(it.toolCallId, i);
   }
   const upsertAssistant = (messageId: string, eventId?: string): ChatItem => {
     const cached = assistantIdx.get(messageId);
@@ -364,14 +357,14 @@ function makeReducerCtx(opts: {
     if (!existing) {
       existing = {
         id: counter.next++,
-        kind: "assistant",
-        text: "",
+        kind: 'assistant',
+        text: '',
         messageId,
         ...(eventId ? { eventId } : {}),
       };
       assistantIdx.set(messageId, items.length);
       items.push(existing);
-    } else if (eventId && existing.kind === "assistant" && !existing.eventId) {
+    } else if (eventId && existing.kind === 'assistant' && !existing.eventId) {
       existing.eventId = eventId;
     }
     return existing;
@@ -382,44 +375,40 @@ function makeReducerCtx(opts: {
     if (!existing) {
       existing = {
         id: counter.next++,
-        kind: "reasoning",
-        text: "",
+        kind: 'reasoning',
+        text: '',
         reasoningId,
         ...(eventId ? { eventId } : {}),
       };
       reasoningIdx.set(reasoningId, items.length);
       items.push(existing);
-    } else if (eventId && existing.kind === "reasoning" && !existing.eventId) {
+    } else if (eventId && existing.kind === 'reasoning' && !existing.eventId) {
       existing.eventId = eventId;
     }
     return existing;
   };
-  const upsertTool = (
-    toolCallId: string,
-    fallbackName?: string,
-    eventId?: string,
-  ): ChatItem => {
+  const upsertTool = (toolCallId: string, fallbackName?: string, eventId?: string): ChatItem => {
     const cached = toolIdx.get(toolCallId);
     let existing = cached !== undefined ? items[cached] : undefined;
     if (!existing) {
       existing = {
         id: counter.next++,
-        kind: "tool",
+        kind: 'tool',
         toolCallId,
         toolName: fallbackName ?? `tool ${toolCallId.slice(0, 8)}`,
-        status: "running",
-        partialOutput: "",
+        status: 'running',
+        partialOutput: '',
         ...(eventId ? { eventId } : {}),
       };
       toolIdx.set(toolCallId, items.length);
       items.push(existing);
-    } else if (eventId && existing.kind === "tool" && !existing.eventId) {
+    } else if (eventId && existing.kind === 'tool' && !existing.eventId) {
       existing.eventId = eventId;
     }
     return existing;
   };
   const pushSystem = (text: string, severity: SystemSeverity) => {
-    items.push({ id: counter.next++, kind: "system", text, severity });
+    items.push({ id: counter.next++, kind: 'system', text, severity });
   };
   return {
     items,
@@ -473,7 +462,7 @@ export function processEvents(
   /// can continue routing into them.
   const nestedByAgentId = new Map<string, { item: ChatItem; ctx: ReducerContext }>();
   for (const it of items) {
-    if (it.kind === "subagent" && it.status === "running") {
+    if (it.kind === 'subagent' && it.status === 'running') {
       nestedByAgentId.set(it.agentId, {
         item: it,
         ctx: makeReducerCtx({
@@ -497,13 +486,13 @@ export function processEvents(
     // the nestedByAgentId map. `subagent.selected/.deselected` stay
     // in sessionMetaHandlers (those are session-level picker events,
     // not per-turn delegation — see 19a).
-    if (eventType === "subagent.started") {
-      if (typeof envelopeAgentId !== "string" || envelopeAgentId.length === 0) {
+    if (eventType === 'subagent.started') {
+      if (typeof envelopeAgentId !== 'string' || envelopeAgentId.length === 0) {
         // No envelope agentId means we can't route subsequent events
         // to this sub-agent — drop the visual block but log so the
         // issue surfaces in diagnostics.
         // eslint-disable-next-line no-console
-        console.warn("subagent.started with no envelope agentId; ignoring", payload);
+        console.warn('subagent.started with no envelope agentId; ignoring', payload);
         continue;
       }
       // If this agentId already has a SubagentChatItem (rare —
@@ -517,17 +506,17 @@ export function processEvents(
       };
       const subItem: ChatItem = {
         id: counter.next++,
-        kind: "subagent",
+        kind: 'subagent',
         agentId: envelopeAgentId,
-        agentName: typeof d.agentName === "string" ? d.agentName : envelopeAgentId,
+        agentName: typeof d.agentName === 'string' ? d.agentName : envelopeAgentId,
         displayName:
-          typeof d.agentDisplayName === "string"
+          typeof d.agentDisplayName === 'string'
             ? d.agentDisplayName
-            : typeof d.agentName === "string"
+            : typeof d.agentName === 'string'
               ? d.agentName
               : envelopeAgentId,
-        description: typeof d.agentDescription === "string" ? d.agentDescription : "",
-        status: "running",
+        description: typeof d.agentDescription === 'string' ? d.agentDescription : '',
+        status: 'running',
         ...(payload.timestamp ? { startedAt: payload.timestamp } : {}),
         items: [],
       };
@@ -547,17 +536,17 @@ export function processEvents(
       continue;
     }
 
-    if (eventType === "subagent.completed" || eventType === "subagent.failed") {
-      if (typeof envelopeAgentId !== "string" || envelopeAgentId.length === 0) continue;
+    if (eventType === 'subagent.completed' || eventType === 'subagent.failed') {
+      if (typeof envelopeAgentId !== 'string' || envelopeAgentId.length === 0) continue;
       // Find the SubagentChatItem by agentId. We rely on the
       // nestedByAgentId map (built from items[]) so this is O(1).
       const slot = nestedByAgentId.get(envelopeAgentId);
-      if (slot && slot.item.kind === "subagent") {
-        slot.item.status = eventType === "subagent.failed" ? "failed" : "completed";
+      if (slot && slot.item.kind === 'subagent') {
+        slot.item.status = eventType === 'subagent.failed' ? 'failed' : 'completed';
         if (payload.timestamp) slot.item.completedAt = payload.timestamp;
-        if (eventType === "subagent.failed") {
+        if (eventType === 'subagent.failed') {
           const errMsg = (payload.data as { error?: unknown }).error;
-          if (typeof errMsg === "string") slot.item.error = errMsg;
+          if (typeof errMsg === 'string') slot.item.error = errMsg;
         }
         // Drop from the routing map — subsequent events with this
         // (now-stale) agentId won't get routed back into the
@@ -572,11 +561,10 @@ export function processEvents(
     //   → route to that sub-agent's nested context
     // - everything else → top-level context
     const nestedSlot =
-      typeof envelopeAgentId === "string" && envelopeAgentId.length > 0
+      typeof envelopeAgentId === 'string' && envelopeAgentId.length > 0
         ? nestedByAgentId.get(envelopeAgentId)
         : undefined;
-    const ctx =
-      nestedSlot && isVisualEventType(eventType) ? nestedSlot.ctx : topCtx;
+    const ctx = nestedSlot && isVisualEventType(eventType) ? nestedSlot.ctx : topCtx;
     const handler = HANDLERS[eventType];
     if (!handler) continue;
     const data = payload.data ?? {};
@@ -590,13 +578,13 @@ export function appendUserMessage(
   current: ChatItem[],
   text: string,
   counter: IdCounter,
-  attachments?: import("../ipc/types").SendMessageAttachment[],
+  attachments?: import('../ipc/types').SendMessageAttachment[],
 ): ChatItem[] {
   return [
     ...current,
     {
       id: counter.next++,
-      kind: "user",
+      kind: 'user',
       text,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
     },
@@ -607,10 +595,7 @@ export function appendSystemMessage(
   current: ChatItem[],
   text: string,
   counter: IdCounter,
-  severity: SystemSeverity = "error",
+  severity: SystemSeverity = 'error',
 ): ChatItem[] {
-  return [
-    ...current,
-    { id: counter.next++, kind: "system", text, severity },
-  ];
+  return [...current, { id: counter.next++, kind: 'system', text, severity }];
 }

@@ -1,0 +1,67 @@
+# Code Quality Audit — Cleanup Plan
+
+## Top-Level Summary
+
+### Biggest pain points (by user feedback + audit):
+1. **Giant files** — 5 files over 1000 lines, SessionDetailsPanel is 2417 lines
+2. **Duplicated patterns** — mode controls, IPC listener boilerplate, error handling, commandExists
+3. **Inconsistent constants** — magic numbers in setTimeout calls, hardcoded strings
+4. **TypeScript hacks** — 12 `as unknown as` casts in production code, unsafe payload narrowing
+5. **Bloat** — dead fallback UI in ModeButtonGroup, test-server duplicates production handlers
+
+---
+
+## Phase 1: Split Giant Files (highest impact)
+
+### 1a. Split `SessionDetailsPanel.vue` (2417 lines → ~6 smaller components)
+- Extract: SkillsSection, McpSection, ToolsSection, PlanSection, UsageSection, QuotaSection
+- Keep SessionDetailsPanel as a thin orchestrator
+
+### 1b. Split `sessions.ts` (1939 lines → 3-4 modules)
+- Extract: agent/task management, MCP/skills integration, command-result integration
+- Keep core CRUD + event forwarding in sessions.ts
+
+### 1c. Split `SessionHeaderControls.vue` (814 lines → smaller subcomponents)
+- Extract: workspace controls, agent controls, terminal opener
+
+### 1d. Split `sessionsStore.ts` (1308 lines → composables)
+- Extract: pending request handling, event subscription, session creation/restore
+
+## Phase 2: Eliminate Duplications
+
+### 2a. Shared session-mode controls composable
+- 3 components repeat mode/reasoning option lists → `useSessionModeOptions()`
+
+### 2b. Shared `commandExists()` helper
+- Duplicated in terminalRegistry.ts and commandResultRegistry.ts → `shellUtils.ts`
+
+### 2c. Shared IPC listener registry
+- 3 bridge files repeat listener/unsubscribe boilerplate → common emitter
+
+### 2d. Shared `revealPath + toast` helper
+- Duplicated in 2 components → `pathActions.ts`
+
+## Phase 3: Constants & Magic Numbers
+
+### 3a. Centralize timing constants
+### 3b. Extract shared UI constants (edge panel sizes, debounce intervals)
+
+## Phase 4: TypeScript Cleanup
+
+### 4a. Type the Electrobun RPC bridge properly (eliminate `as unknown as`)
+### 4b. Add runtime validation to WS bridge payloads
+### 4c. Define explicit SDK response types
+
+## Phase 5: Remove Bloat
+
+### 5a. Remove dead Select fallback in ModeButtonGroup
+### 5b. Reduce test-server / index.ts duplication
+
+## Execution Order
+1. Phase 2a + 2b + 2d (quick wins, ~30 min)
+2. Phase 1a (split SessionDetailsPanel, ~45 min)
+3. Phase 3a + 3b (constants, ~20 min)
+4. Phase 5a (dead code, ~5 min)
+5. Phase 1b (split sessions.ts, ~45 min)
+6. Phase 4a (TS bridge typing, ~30 min)
+7. Remaining phases as time allows

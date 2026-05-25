@@ -8,10 +8,10 @@
 // These tests cover (1) and (2). The "is the session foregrounded?"
 // gate lives in sessionsStore and is covered there.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { setActivePinia, createPinia } from "pinia";
-import { useNotificationsStore } from "../notificationsStore";
-import { useSettingsStore } from "../settingsStore";
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { setActivePinia, createPinia } from 'pinia';
+import { useNotificationsStore } from '../notificationsStore';
+import { useSettingsStore } from '../settingsStore';
 
 interface FakeNotification {
   title: string;
@@ -22,10 +22,10 @@ interface FakeNotification {
 }
 
 let constructed: FakeNotification[] = [];
-let permissionState: NotificationPermission = "granted";
+let permissionState: NotificationPermission = 'granted';
 
 class StubNotification {
-  static permission: NotificationPermission = "granted";
+  static permission: NotificationPermission = 'granted';
   static async requestPermission(): Promise<NotificationPermission> {
     return permissionState;
   }
@@ -42,7 +42,7 @@ class StubNotification {
   close() {}
 }
 
-function installStubs(state: NotificationPermission = "granted") {
+function installStubs(state: NotificationPermission = 'granted') {
   constructed = [];
   permissionState = state;
   StubNotification.permission = state;
@@ -56,85 +56,85 @@ function uninstallStubs() {
   delete (globalThis as unknown as { Notification?: unknown }).Notification;
 }
 
-describe("notificationsStore", () => {
+describe('notificationsStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    installStubs("granted");
+    installStubs('granted');
   });
 
   afterEach(() => {
     uninstallStubs();
   });
 
-  test("permission picks up Notification.permission on init", () => {
+  test('permission picks up Notification.permission on init', () => {
     const store = useNotificationsStore();
-    expect(store.permission).toBe("granted");
+    expect(store.permission).toBe('granted');
   });
 
-  test("notify() fires when settings + permission allow", () => {
+  test('notify() fires when settings + permission allow', () => {
     const store = useNotificationsStore();
     const settings = useSettingsStore();
     // Default settings.notifications has waitingForInput=true.
     settings.settings.notifications = { turnEnd: true, waitingForInput: true };
     const fired = store.notify({
-      kind: "waitingForInput",
-      title: "Test",
-      body: "hi",
-      sessionId: "s1",
+      kind: 'waitingForInput',
+      title: 'Test',
+      body: 'hi',
+      sessionId: 's1',
     });
     expect(fired).toBe(true);
     expect(constructed).toHaveLength(1);
-    expect(constructed[0]?.title).toBe("Test");
+    expect(constructed[0]?.title).toBe('Test');
   });
 
-  test("notify() suppressed when matching settings toggle is off", () => {
+  test('notify() suppressed when matching settings toggle is off', () => {
     const store = useNotificationsStore();
     const settings = useSettingsStore();
     settings.settings.notifications = { turnEnd: false, waitingForInput: true };
     const fired = store.notify({
-      kind: "turnEnd",
-      title: "Test",
-      body: "hi",
+      kind: 'turnEnd',
+      title: 'Test',
+      body: 'hi',
     });
     expect(fired).toBe(false);
     expect(constructed).toHaveLength(0);
   });
 
   test("notify() suppressed when permission isn't granted", () => {
-    installStubs("denied");
+    installStubs('denied');
     const store = useNotificationsStore();
     const settings = useSettingsStore();
     settings.settings.notifications = { turnEnd: true, waitingForInput: true };
     const fired = store.notify({
-      kind: "waitingForInput",
-      title: "T",
-      body: "B",
+      kind: 'waitingForInput',
+      title: 'T',
+      body: 'B',
     });
     expect(fired).toBe(false);
     expect(constructed).toHaveLength(0);
   });
 
-  test("requestPermission resolves through Notification.requestPermission", async () => {
-    installStubs("default");
+  test('requestPermission resolves through Notification.requestPermission', async () => {
+    installStubs('default');
     const store = useNotificationsStore();
-    expect(store.permission).toBe("default");
-    permissionState = "granted";
-    StubNotification.permission = "granted";
+    expect(store.permission).toBe('default');
+    permissionState = 'granted';
+    StubNotification.permission = 'granted';
     const result = await store.requestPermission();
-    expect(result).toBe("granted");
-    expect(store.permission).toBe("granted");
+    expect(result).toBe('granted');
+    expect(store.permission).toBe('granted');
   });
 
-  test("notify() returns false silently when Notification is unsupported", () => {
+  test('notify() returns false silently when Notification is unsupported', () => {
     uninstallStubs();
     const store = useNotificationsStore();
     const settings = useSettingsStore();
     settings.settings.notifications = { turnEnd: true, waitingForInput: true };
-    expect(store.permission).toBe("unsupported");
+    expect(store.permission).toBe('unsupported');
     const fired = store.notify({
-      kind: "waitingForInput",
-      title: "T",
-      body: "B",
+      kind: 'waitingForInput',
+      title: 'T',
+      body: 'B',
     });
     expect(fired).toBe(false);
   });

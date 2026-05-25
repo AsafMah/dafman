@@ -6,15 +6,15 @@
 /// Numbers are wall-clock on the dev machine — relative comparisons
 /// matter more than absolute values.
 
-import { describe, expect, test, beforeEach } from "bun:test";
-import { render, cleanup } from "@testing-library/vue";
-import { setActivePinia, createPinia } from "pinia";
-import { nextTick, h } from "vue";
-import PrimeVue from "primevue/config";
-import CodeEditor from "../CodeEditor.vue";
-import DiffEditor from "../details/DiffEditor.vue";
-import MessageContent from "../MessageContent.vue";
-import { renderMarkdown, renderMarkdownSegments } from "../../lib/markdown";
+import { describe, expect, test, beforeEach } from 'bun:test';
+import { render, cleanup } from '@testing-library/vue';
+import { setActivePinia, createPinia } from 'pinia';
+import { nextTick, h } from 'vue';
+import PrimeVue from 'primevue/config';
+import CodeEditor from '../CodeEditor.vue';
+import DiffEditor from '../details/DiffEditor.vue';
+import MessageContent from '../MessageContent.vue';
+import { renderMarkdown, renderMarkdownSegments } from '../../lib/markdown';
 
 const SAMPLE_TS = `import { computed, ref } from "vue";
 import { EditorView } from "@codemirror/view";
@@ -37,12 +37,9 @@ const sample = Array.from({ length: 50 }, (_, i) =>
 `;
 
 const SAMPLE_TS_NEW = SAMPLE_TS.replace(
-  "function fn0() { return 0 * 2; }",
-  "function fn0() { return 0 * 4; }",
-).replace(
-  "function fn1() { return 1 * 2; }",
-  "function fn1() { return 1 * 4; } // changed",
-);
+  'function fn0() { return 0 * 2; }',
+  'function fn0() { return 0 * 4; }',
+).replace('function fn1() { return 1 * 2; }', 'function fn1() { return 1 * 4; } // changed');
 
 async function mountTimed<T extends () => unknown>(factory: T): Promise<number> {
   const t0 = performance.now();
@@ -52,19 +49,19 @@ async function mountTimed<T extends () => unknown>(factory: T): Promise<number> 
   return performance.now() - t0;
 }
 
-describe("perf: CodeEditor", () => {
+describe('perf: CodeEditor', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  test("mount with TypeScript syntax highlighting", async () => {
+  test('mount with TypeScript syntax highlighting', async () => {
     const ms = await mountTimed(() =>
       render(
         {
           setup: () => () =>
             h(CodeEditor, {
               modelValue: SAMPLE_TS,
-              language: "typescript",
+              language: 'typescript',
               readonly: true,
             }),
         },
@@ -76,7 +73,7 @@ describe("perf: CodeEditor", () => {
     cleanup();
   });
 
-  test("mount with no language (plain text fast path)", async () => {
+  test('mount with no language (plain text fast path)', async () => {
     const ms = await mountTimed(() =>
       render(
         {
@@ -95,12 +92,12 @@ describe("perf: CodeEditor", () => {
   });
 });
 
-describe("perf: DiffEditor", () => {
+describe('perf: DiffEditor', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  test("mount inline (unifiedMergeView)", async () => {
+  test('mount inline (unifiedMergeView)', async () => {
     const ms = await mountTimed(() =>
       render(
         {
@@ -108,8 +105,8 @@ describe("perf: DiffEditor", () => {
             h(DiffEditor, {
               oldText: SAMPLE_TS,
               newText: SAMPLE_TS_NEW,
-              filename: "sample.ts",
-              initialMode: "inline",
+              filename: 'sample.ts',
+              initialMode: 'inline',
             }),
         },
         { global: { plugins: [PrimeVue] } },
@@ -120,7 +117,7 @@ describe("perf: DiffEditor", () => {
     cleanup();
   });
 
-  test("mount side-by-side (MergeView)", async () => {
+  test('mount side-by-side (MergeView)', async () => {
     const ms = await mountTimed(() =>
       render(
         {
@@ -128,8 +125,8 @@ describe("perf: DiffEditor", () => {
             h(DiffEditor, {
               oldText: SAMPLE_TS,
               newText: SAMPLE_TS_NEW,
-              filename: "sample.ts",
-              initialMode: "side-by-side",
+              filename: 'sample.ts',
+              initialMode: 'side-by-side',
             }),
         },
         { global: { plugins: [PrimeVue] } },
@@ -141,12 +138,12 @@ describe("perf: DiffEditor", () => {
   });
 });
 
-describe("perf: markdown rendering", () => {
+describe('perf: markdown rendering', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  const STREAMING_DOC= `# A long response
+  const STREAMING_DOC = `# A long response
 
 Here's some intro text with **bold** and \`inline code\` and a [link](https://example.com).
 
@@ -165,7 +162,7 @@ print([fib(i) for i in range(10)])
 
 End of message.`;
 
-  test("renderMarkdown (old v-html path)", () => {
+  test('renderMarkdown (old v-html path)', () => {
     const t0 = performance.now();
     for (let i = 0; i < 50; i++) renderMarkdown(STREAMING_DOC);
     const ms = (performance.now() - t0) / 50;
@@ -173,7 +170,7 @@ End of message.`;
     expect(ms).toBeLessThan(50);
   });
 
-  test("renderMarkdownSegments (new segment path)", () => {
+  test('renderMarkdownSegments (new segment path)', () => {
     const t0 = performance.now();
     for (let i = 0; i < 50; i++) renderMarkdownSegments(STREAMING_DOC);
     const ms = (performance.now() - t0) / 50;
@@ -181,12 +178,11 @@ End of message.`;
     expect(ms).toBeLessThan(50);
   });
 
-  test("MessageContent full mount", async () => {
+  test('MessageContent full mount', async () => {
     const ms = await mountTimed(() =>
       render(
         {
-          setup: () => () =>
-            h(MessageContent, { text: STREAMING_DOC }),
+          setup: () => () => h(MessageContent, { text: STREAMING_DOC }),
         },
         { global: { plugins: [PrimeVue] } },
       ),
@@ -197,24 +193,23 @@ End of message.`;
   });
 });
 
-describe("perf: streaming simulation", () => {
+describe('perf: streaming simulation', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  test("incremental MessageContent updates (50 chunks)", async () => {
-    let doc = "Loading...\n\n\`\`\`typescript\n";
+  test('incremental MessageContent updates (50 chunks)', async () => {
+    let doc = 'Loading...\n\n\`\`\`typescript\n';
     const tail = SAMPLE_TS;
     const chunkSize = Math.ceil(tail.length / 50);
 
     const { rerender } = render(
       {
-        props: ["text"],
-        setup: (props: { text: string }) => () =>
-          h(MessageContent, { text: props.text }),
+        props: ['text'],
+        setup: (props: { text: string }) => () => h(MessageContent, { text: props.text }),
       },
       {
-        props: { text: doc + "\n```" },
+        props: { text: doc + '\n```' },
         global: { plugins: [PrimeVue] },
       },
     );
@@ -224,7 +219,7 @@ describe("perf: streaming simulation", () => {
     const t0 = performance.now();
     for (let i = 0; i < 50; i++) {
       doc += tail.slice(i * chunkSize, (i + 1) * chunkSize);
-      await rerender({ text: doc + "\n```" });
+      await rerender({ text: doc + '\n```' });
     }
     await nextTick();
     const total = performance.now() - t0;

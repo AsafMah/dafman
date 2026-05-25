@@ -17,43 +17,43 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
-} from "./types";
+} from './types';
 
-export type InvokeResult<N extends CommandName> = CommandMap[N]["result"];
+export type InvokeResult<N extends CommandName> = CommandMap[N]['result'];
 
 export class AppError extends Error {
   readonly payload: AppErrorPayload;
   constructor(payload: AppErrorPayload) {
     super(formatAppError(payload));
-    this.name = "AppError";
+    this.name = 'AppError';
     this.payload = payload;
   }
 }
 
 function formatAppError(payload: AppErrorPayload): string {
   switch (payload.kind) {
-    case "ClientNotStarted":
-      return "Copilot client not started";
-    case "SessionNotFound":
+    case 'ClientNotStarted':
+      return 'Copilot client not started';
+    case 'SessionNotFound':
       return `Session ${payload.data} not found`;
-    case "Settings":
+    case 'Settings':
       return `Settings error: ${payload.data}`;
-    case "Sdk":
+    case 'Sdk':
       return `SDK error: ${payload.data}`;
-    case "Io":
+    case 'Io':
       return `I/O error: ${payload.data}`;
   }
 }
 
 function isAppErrorPayload(value: unknown): value is AppErrorPayload {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== 'object') return false;
   const kind = (value as { kind?: unknown }).kind;
   return (
-    kind === "ClientNotStarted" ||
-    kind === "SessionNotFound" ||
-    kind === "Settings" ||
-    kind === "Sdk" ||
-    kind === "Io"
+    kind === 'ClientNotStarted' ||
+    kind === 'SessionNotFound' ||
+    kind === 'Settings' ||
+    kind === 'Sdk' ||
+    kind === 'Io'
   );
 }
 
@@ -61,7 +61,7 @@ function isAppErrorPayload(value: unknown): value is AppErrorPayload {
 /// `AppErrorPayload:{json}` — Electrobun's bridge only forwards
 /// `error.message` (and silently drops non-Error throws — see
 /// node_modules/electrobun/dist/api/shared/rpc.ts:398). Decode here.
-const APP_ERROR_PREFIX = "AppErrorPayload:";
+const APP_ERROR_PREFIX = 'AppErrorPayload:';
 
 function tryDecodeAppErrorMessage(message: string): AppErrorPayload | null {
   if (!message.startsWith(APP_ERROR_PREFIX)) return null;
@@ -84,10 +84,7 @@ export type CommandResultEventListener = (event: CommandResultEvent) => void;
 /// Electrobun bridge and unit-test fakes match this shape; tests inject a
 /// stub via `setRpcBridge`.
 export interface RpcBridge {
-  request<N extends CommandName>(
-    name: N,
-    args: CommandMap[N]["args"],
-  ): Promise<InvokeResult<N>>;
+  request<N extends CommandName>(name: N, args: CommandMap[N]['args']): Promise<InvokeResult<N>>;
   onSessionEvent(listener: SessionEventListener): () => void;
   onPendingRequest(listener: PendingRequestListener): () => void;
   onLogEvent(listener: LogEventListener): () => void;
@@ -135,12 +132,10 @@ export function setRpcBridge(next: RpcBridge | null): void {
 
 export async function invokeCommand<N extends CommandName>(
   name: N,
-  args: CommandMap[N]["args"],
+  args: CommandMap[N]['args'],
 ): Promise<InvokeResult<N>> {
   if (!bridge) {
-    throw new Error(
-      `RPC bridge not initialized; cannot invoke '${String(name)}'`,
-    );
+    throw new Error(`RPC bridge not initialized; cannot invoke '${String(name)}'`);
   }
   try {
     return await bridge.request(name, args);

@@ -7,8 +7,8 @@
 /// Streaming partial output: trailing partial line is dropped so we
 /// don't render a broken half-row.
 
-import { computed } from "vue";
-import PathChip from "./PathChip.vue";
+import { computed } from 'vue';
+import PathChip from './PathChip.vue';
 
 const props = defineProps<{
   output: string;
@@ -18,10 +18,10 @@ const props = defineProps<{
 type Hit = { lineNumber: number | null; content: string };
 
 const groups = computed<Array<{ path: string; hits: Hit[] }>>(() => {
-  const lines = props.output.split("\n");
+  const lines = props.output.split('\n');
   // Drop possibly-truncated last line during streaming. Safe because
   // the source produces a trailing newline on complete output.
-  const trimmedLast = lines[lines.length - 1] === "" ? lines.slice(0, -1) : lines;
+  const trimmedLast = lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
 
   const map = new Map<string, Hit[]>();
   for (const raw of trimmedLast) {
@@ -32,21 +32,19 @@ const groups = computed<Array<{ path: string; hits: Hit[] }>>(() => {
     if (m) {
       const [, path, lineStr, content] = m;
       const hits = map.get(path!) ?? [];
-      hits.push({ lineNumber: parseInt(lineStr!, 10), content: content ?? "" });
+      hits.push({ lineNumber: parseInt(lineStr!, 10), content: content ?? '' });
       map.set(path!, hits);
     } else {
       // No `:line:` — treat as a path-only hit (e.g. `grep -l`).
       const hits = map.get(raw) ?? [];
-      hits.push({ lineNumber: null, content: "" });
+      hits.push({ lineNumber: null, content: '' });
       map.set(raw, hits);
     }
   }
   return Array.from(map.entries()).map(([path, hits]) => ({ path, hits }));
 });
 
-const totalMatches = computed(() =>
-  groups.value.reduce((sum, g) => sum + g.hits.length, 0),
-);
+const totalMatches = computed(() => groups.value.reduce((sum, g) => sum + g.hits.length, 0));
 
 /// Build escape-safe HTML with `<mark>` wrapped around each pattern
 /// match. We escape the source content first, then substitute. The
@@ -67,19 +65,23 @@ function highlight(content: string): string {
 
 function escapeHtml(s: string): string {
   return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 </script>
 
 <template>
-  <div v-if="groups.length > 0" class="grep-results">
+  <div
+    v-if="groups.length > 0"
+    class="grep-results"
+  >
     <p class="grep-summary">
-      {{ totalMatches }} match{{ totalMatches === 1 ? "" : "es" }} across
-      {{ groups.length }} file{{ groups.length === 1 ? "" : "s" }}
+      {{ totalMatches }} match{{ totalMatches === 1 ? '' : 'es' }} across {{ groups.length }} file{{
+        groups.length === 1 ? '' : 's'
+      }}
     </p>
     <article
       v-for="g in groups"
@@ -87,7 +89,10 @@ function escapeHtml(s: string): string {
       class="grep-group"
     >
       <header class="grep-group-header">
-        <PathChip :path="g.path" icon="file" />
+        <PathChip
+          :path="g.path"
+          icon="file"
+        />
         <span class="grep-count">{{ g.hits.length }}</span>
       </header>
       <ol class="grep-hits">
@@ -96,7 +101,10 @@ function escapeHtml(s: string): string {
           :key="idx"
           class="grep-hit"
         >
-          <span v-if="hit.lineNumber !== null" class="grep-line">
+          <span
+            v-if="hit.lineNumber !== null"
+            class="grep-line"
+          >
             {{ hit.lineNumber }}
           </span>
           <code
@@ -107,7 +115,12 @@ function escapeHtml(s: string): string {
       </ol>
     </article>
   </div>
-  <p v-else class="grep-empty">No matches.</p>
+  <p
+    v-else
+    class="grep-empty"
+  >
+    No matches.
+  </p>
 </template>
 
 <style scoped>

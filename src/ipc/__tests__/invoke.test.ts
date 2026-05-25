@@ -12,14 +12,14 @@
 /// renderer-side `invokeCommand` decodes the message back into a typed
 /// `AppError`. This test exercises BOTH halves of that contract.
 
-import { describe, expect, test, beforeEach } from "bun:test";
-import { AppError, invokeCommand, setRpcBridge, type RpcBridge } from "../invoke";
+import { describe, expect, test, beforeEach } from 'bun:test';
+import { AppError, invokeCommand, setRpcBridge, type RpcBridge } from '../invoke';
 
-const APP_ERROR_PREFIX = "AppErrorPayload:";
+const APP_ERROR_PREFIX = 'AppErrorPayload:';
 
 function makeBridge(handler: (name: string, args: unknown) => Promise<unknown>): RpcBridge {
   return {
-    request: handler as RpcBridge["request"],
+    request: handler as RpcBridge['request'],
     onSessionEvent: () => () => {},
     onPendingRequest: () => () => {},
     onLogEvent: () => () => {},
@@ -27,28 +27,28 @@ function makeBridge(handler: (name: string, args: unknown) => Promise<unknown>):
   };
 }
 
-describe("invokeCommand AppErrorPayload decoding", () => {
+describe('invokeCommand AppErrorPayload decoding', () => {
   beforeEach(() => {
     setRpcBridge(null);
   });
 
-  test("decodes an Error whose message is AppErrorPayload:{json} back into a typed AppError", async () => {
+  test('decodes an Error whose message is AppErrorPayload:{json} back into a typed AppError', async () => {
     setRpcBridge(
       makeBridge(async () => {
         throw new Error(
-          `${APP_ERROR_PREFIX}${JSON.stringify({ kind: "SessionNotFound", data: "missing-id" })}`,
+          `${APP_ERROR_PREFIX}${JSON.stringify({ kind: 'SessionNotFound', data: 'missing-id' })}`,
         );
       }),
     );
 
     try {
-      await invokeCommand("resumeSession" as never, {} as never);
-      throw new Error("should have thrown");
+      await invokeCommand('resumeSession' as never, {} as never);
+      throw new Error('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(AppError);
       expect((err as AppError).payload).toEqual({
-        kind: "SessionNotFound",
-        data: "missing-id",
+        kind: 'SessionNotFound',
+        data: 'missing-id',
       });
     }
   });
@@ -58,12 +58,12 @@ describe("invokeCommand AppErrorPayload decoding", () => {
   // Error-wrapped-AppErrorPayload encoding shipped — these tests are
   // the regression net for that protocol gap.
   test.each([
-    { kind: "ClientNotStarted" } as const,
-    { kind: "SessionNotFound", data: "sess-x" } as const,
-    { kind: "Settings", data: "settings.json missing" } as const,
-    { kind: "Sdk", data: "internal sdk boom" } as const,
-    { kind: "Io", data: "EACCES /tmp" } as const,
-  ])("decodes variant %p back into a typed AppError", async (payload) => {
+    { kind: 'ClientNotStarted' } as const,
+    { kind: 'SessionNotFound', data: 'sess-x' } as const,
+    { kind: 'Settings', data: 'settings.json missing' } as const,
+    { kind: 'Sdk', data: 'internal sdk boom' } as const,
+    { kind: 'Io', data: 'EACCES /tmp' } as const,
+  ])('decodes variant %p back into a typed AppError', async (payload) => {
     setRpcBridge(
       makeBridge(async () => {
         throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);
@@ -71,45 +71,45 @@ describe("invokeCommand AppErrorPayload decoding", () => {
     );
 
     try {
-      await invokeCommand("resumeSession" as never, {} as never);
-      throw new Error("should have thrown");
+      await invokeCommand('resumeSession' as never, {} as never);
+      throw new Error('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(AppError);
       expect((err as AppError).payload).toEqual(payload);
     }
   });
 
-  test("passes through a raw AppErrorPayload throw (back-compat path)", async () => {
+  test('passes through a raw AppErrorPayload throw (back-compat path)', async () => {
     setRpcBridge(
       makeBridge(async () => {
         // eslint-disable-next-line @typescript-eslint/no-throw-literal
-        throw { kind: "Sdk", data: "raw payload" };
+        throw { kind: 'Sdk', data: 'raw payload' };
       }),
     );
 
     try {
-      await invokeCommand("resumeSession" as never, {} as never);
-      throw new Error("should have thrown");
+      await invokeCommand('resumeSession' as never, {} as never);
+      throw new Error('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).payload).toEqual({ kind: "Sdk", data: "raw payload" });
+      expect((err as AppError).payload).toEqual({ kind: 'Sdk', data: 'raw payload' });
     }
   });
 
-  test("non-AppError messages pass through as plain Error", async () => {
+  test('non-AppError messages pass through as plain Error', async () => {
     setRpcBridge(
       makeBridge(async () => {
-        throw new Error("totally unrelated failure");
+        throw new Error('totally unrelated failure');
       }),
     );
 
     try {
-      await invokeCommand("resumeSession" as never, {} as never);
-      throw new Error("should have thrown");
+      await invokeCommand('resumeSession' as never, {} as never);
+      throw new Error('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(Error);
       expect(err).not.toBeInstanceOf(AppError);
-      expect((err as Error).message).toBe("totally unrelated failure");
+      expect((err as Error).message).toBe('totally unrelated failure');
     }
   });
 });

@@ -5,7 +5,7 @@
 /// group ended up with `views: []` AND `visible: true`, which is
 /// the exact shape `collapseEmptyEdgeGroups` neutralizes.
 
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect } from 'bun:test';
 import {
   collapseEmptyEdgeGroups,
   enforcePersistedEdgeMinimums,
@@ -13,25 +13,25 @@ import {
   persistedLayoutHasPanel,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
-} from "../layoutSanitize";
+} from '../layoutSanitize';
 
 // Real-user fixture (redacted to use placeholder session ids).
 const USER_LAYOUT_2026_05_22 = {
   grid: {
     root: {
-      type: "branch",
+      type: 'branch',
       data: [
         {
-          type: "branch",
+          type: 'branch',
           data: [
             {
-              type: "leaf",
-              data: { views: ["session-A"], activeView: "session-A", id: "1" },
+              type: 'leaf',
+              data: { views: ['session-A'], activeView: 'session-A', id: '1' },
               size: 210,
             },
             {
-              type: "leaf",
-              data: { views: ["session-B"], activeView: "session-B", id: "2" },
+              type: 'leaf',
+              data: { views: ['session-B'], activeView: 'session-B', id: '2' },
               size: 210,
             },
           ],
@@ -42,40 +42,40 @@ const USER_LAYOUT_2026_05_22 = {
     },
     width: 420,
     height: 761,
-    orientation: "VERTICAL",
+    orientation: 'VERTICAL',
   },
   panels: {
-    "session-A": {
-      id: "session-A",
-      contentComponent: "chat",
-      tabComponent: "chatTab",
-      params: { sessionId: "session-A" },
-      title: "session-A…",
+    'session-A': {
+      id: 'session-A',
+      contentComponent: 'chat',
+      tabComponent: 'chatTab',
+      params: { sessionId: 'session-A' },
+      title: 'session-A…',
     },
-    "session-B": {
-      id: "session-B",
-      contentComponent: "chat",
-      tabComponent: "chatTab",
-      params: { sessionId: "session-B" },
-      title: "session-B…",
+    'session-B': {
+      id: 'session-B',
+      contentComponent: 'chat',
+      tabComponent: 'chatTab',
+      params: { sessionId: 'session-B' },
+      title: 'session-B…',
     },
-    "sessions-manager": {
-      id: "sessions-manager",
-      contentComponent: "sessionsManager",
-      tabComponent: "sidebarTab",
-      title: "Sessions",
+    'sessions-manager': {
+      id: 'sessions-manager',
+      contentComponent: 'sessionsManager',
+      tabComponent: 'sidebarTab',
+      title: 'Sessions',
     },
   },
-  activeGroup: "2",
+  activeGroup: '2',
   edgeGroups: {
     left: {
       size: 240,
       visible: true,
       group: {
-        views: ["sessions-manager"],
-        activeView: "sessions-manager",
-        id: "edge-left",
-        headerPosition: "left",
+        views: ['sessions-manager'],
+        activeView: 'sessions-manager',
+        id: 'edge-left',
+        headerPosition: 'left',
       },
     },
     right: {
@@ -84,29 +84,29 @@ const USER_LAYOUT_2026_05_22 = {
       visible: true,
       group: {
         views: [],
-        id: "edge-right",
-        headerPosition: "right",
+        id: 'edge-right',
+        headerPosition: 'right',
       },
     },
   },
 };
 
-describe("collapseEmptyEdgeGroups", () => {
-  test("flips visible to false for empty right edge group (the regression)", () => {
+describe('collapseEmptyEdgeGroups', () => {
+  test('flips visible to false for empty right edge group (the regression)', () => {
     const out = collapseEmptyEdgeGroups(USER_LAYOUT_2026_05_22) as typeof USER_LAYOUT_2026_05_22;
     expect(out.edgeGroups.right.visible).toBe(false);
     // left edge has a view → untouched.
     expect(out.edgeGroups.left.visible).toBe(true);
   });
 
-  test("returns the input by reference when no changes are needed", () => {
-    const clean = { edgeGroups: { left: { visible: true, group: { views: ["x"] } } } };
+  test('returns the input by reference when no changes are needed', () => {
+    const clean = { edgeGroups: { left: { visible: true, group: { views: ['x'] } } } };
     expect(collapseEmptyEdgeGroups(clean)).toBe(clean);
   });
 
-  test("non-object / null / no edgeGroups → passthrough", () => {
+  test('non-object / null / no edgeGroups → passthrough', () => {
     expect(collapseEmptyEdgeGroups(null)).toBe(null);
-    expect(collapseEmptyEdgeGroups("not an object")).toBe("not an object");
+    expect(collapseEmptyEdgeGroups('not an object')).toBe('not an object');
     expect(collapseEmptyEdgeGroups({ grid: {} })).toEqual({ grid: {} });
   });
 
@@ -118,47 +118,50 @@ describe("collapseEmptyEdgeGroups", () => {
   });
 });
 
-describe("stripPanelFromLayout", () => {
-  test("removes the panel from panels + every views[] reference", () => {
-    const out = stripPanelFromLayout(USER_LAYOUT_2026_05_22, "session-A") as typeof USER_LAYOUT_2026_05_22;
-    expect(Object.keys(out.panels)).not.toContain("session-A");
+describe('stripPanelFromLayout', () => {
+  test('removes the panel from panels + every views[] reference', () => {
+    const out = stripPanelFromLayout(
+      USER_LAYOUT_2026_05_22,
+      'session-A',
+    ) as typeof USER_LAYOUT_2026_05_22;
+    expect(Object.keys(out.panels)).not.toContain('session-A');
     // Walk the structure and assert no `views` array still mentions
     // "session-A" anywhere.
     const allViews: string[] = [];
     const walk = (node: unknown): void => {
-      if (!node || typeof node !== "object") return;
+      if (!node || typeof node !== 'object') return;
       if (Array.isArray(node)) {
         for (const n of node) walk(n);
         return;
       }
       for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-        if (k === "views" && Array.isArray(v)) {
-          for (const x of v) if (typeof x === "string") allViews.push(x);
+        if (k === 'views' && Array.isArray(v)) {
+          for (const x of v) if (typeof x === 'string') allViews.push(x);
         } else {
           walk(v);
         }
       }
     };
     walk(out);
-    expect(allViews).not.toContain("session-A");
+    expect(allViews).not.toContain('session-A');
   });
 
-  test("returns the input as-is when the id is not in panels", () => {
-    expect(stripPanelFromLayout(USER_LAYOUT_2026_05_22, "ghost")).toBe(USER_LAYOUT_2026_05_22);
+  test('returns the input as-is when the id is not in panels', () => {
+    expect(stripPanelFromLayout(USER_LAYOUT_2026_05_22, 'ghost')).toBe(USER_LAYOUT_2026_05_22);
   });
 });
 
-describe("stripLegacyDetailsPanels", () => {
-  test("strips session-details-{id} entries and collapses the now-empty right rail", () => {
+describe('stripLegacyDetailsPanels', () => {
+  test('strips session-details-{id} entries and collapses the now-empty right rail', () => {
     const withLegacy = {
       ...USER_LAYOUT_2026_05_22,
       panels: {
         ...USER_LAYOUT_2026_05_22.panels,
-        "session-details-session-A": {
-          id: "session-details-session-A",
-          contentComponent: "sessionDetails",
-          params: { sessionId: "session-A" },
-          title: "Session",
+        'session-details-session-A': {
+          id: 'session-details-session-A',
+          contentComponent: 'sessionDetails',
+          params: { sessionId: 'session-A' },
+          title: 'Session',
         },
       },
       edgeGroups: {
@@ -167,10 +170,10 @@ describe("stripLegacyDetailsPanels", () => {
           size: 480,
           visible: true,
           group: {
-            views: ["session-details-session-A"],
-            activeView: "session-details-session-A",
-            id: "edge-right",
-            headerPosition: "right",
+            views: ['session-details-session-A'],
+            activeView: 'session-details-session-A',
+            id: 'edge-right',
+            headerPosition: 'right',
           },
         },
       },
@@ -179,7 +182,7 @@ describe("stripLegacyDetailsPanels", () => {
       panels: Record<string, unknown>;
       edgeGroups: { right: { visible: boolean; group: { views: string[] } } };
     };
-    expect(Object.keys(out.panels)).not.toContain("session-details-session-A");
+    expect(Object.keys(out.panels)).not.toContain('session-details-session-A');
     expect(out.edgeGroups.right.group.views).toEqual([]);
     // Collapsed because the strip emptied it.
     expect(out.edgeGroups.right.visible).toBe(false);
@@ -188,16 +191,16 @@ describe("stripLegacyDetailsPanels", () => {
   test("keeps the singleton 'session-details' panel untouched", () => {
     const layoutWithSingleton = {
       panels: {
-        "session-details": {
-          id: "session-details",
-          contentComponent: "sessionDetails",
+        'session-details': {
+          id: 'session-details',
+          contentComponent: 'sessionDetails',
         },
       },
     };
     const out = stripLegacyDetailsPanels(layoutWithSingleton) as {
       panels: Record<string, unknown>;
     };
-    expect(out.panels["session-details"]).toBeDefined();
+    expect(out.panels['session-details']).toBeDefined();
   });
 
   test("user's real layout (no legacy panels) round-trips with right edge collapsed", () => {
@@ -209,55 +212,52 @@ describe("stripLegacyDetailsPanels", () => {
   });
 });
 
-describe("extractChatPanelIds", () => {
-  test("returns only contentComponent=chat ids", () => {
-    expect(extractChatPanelIds(USER_LAYOUT_2026_05_22).sort()).toEqual([
-      "session-A",
-      "session-B",
-    ]);
+describe('extractChatPanelIds', () => {
+  test('returns only contentComponent=chat ids', () => {
+    expect(extractChatPanelIds(USER_LAYOUT_2026_05_22).sort()).toEqual(['session-A', 'session-B']);
   });
 
-  test("excludes sessionsManager / sessionDetails / settings panels", () => {
+  test('excludes sessionsManager / sessionDetails / settings panels', () => {
     const ids = extractChatPanelIds(USER_LAYOUT_2026_05_22);
-    expect(ids).not.toContain("sessions-manager");
+    expect(ids).not.toContain('sessions-manager');
   });
 });
 
-describe("persistedLayoutHasPanel", () => {
-  test("returns true for an id that exists", () => {
-    expect(persistedLayoutHasPanel(USER_LAYOUT_2026_05_22, "sessions-manager")).toBe(true);
+describe('persistedLayoutHasPanel', () => {
+  test('returns true for an id that exists', () => {
+    expect(persistedLayoutHasPanel(USER_LAYOUT_2026_05_22, 'sessions-manager')).toBe(true);
   });
 
-  test("returns false for an absent id", () => {
-    expect(persistedLayoutHasPanel(USER_LAYOUT_2026_05_22, "nope")).toBe(false);
+  test('returns false for an absent id', () => {
+    expect(persistedLayoutHasPanel(USER_LAYOUT_2026_05_22, 'nope')).toBe(false);
   });
 
-  test("safe on null / non-object", () => {
-    expect(persistedLayoutHasPanel(null, "x")).toBe(false);
-    expect(persistedLayoutHasPanel({}, "x")).toBe(false);
+  test('safe on null / non-object', () => {
+    expect(persistedLayoutHasPanel(null, 'x')).toBe(false);
+    expect(persistedLayoutHasPanel({}, 'x')).toBe(false);
   });
 });
 
-describe("enforcePersistedEdgeMinimums", () => {
-  test("clamps known left and right edge panels before dockview restore", () => {
+describe('enforcePersistedEdgeMinimums', () => {
+  test('clamps known left and right edge panels before dockview restore', () => {
     const layout = {
       panels: {
-        library: { id: "library", contentComponent: "library" },
-        "session-details": { id: "session-details", contentComponent: "sessionDetails" },
+        library: { id: 'library', contentComponent: 'library' },
+        'session-details': { id: 'session-details', contentComponent: 'sessionDetails' },
       },
       edgeGroups: {
         left: {
           size: 120,
           visible: true,
-          group: { views: ["library"], activeView: "library", id: "edge-left" },
+          group: { views: ['library'], activeView: 'library', id: 'edge-left' },
         },
         right: {
           size: 150,
           visible: true,
           group: {
-            views: ["session-details"],
-            activeView: "session-details",
-            id: "edge-right",
+            views: ['session-details'],
+            activeView: 'session-details',
+            id: 'edge-right',
           },
         },
       },
@@ -271,11 +271,11 @@ describe("enforcePersistedEdgeMinimums", () => {
     expect(out.edgeGroups.right.size).toBe(380);
   });
 
-  test("returns input by reference when edge sizes are already valid", () => {
+  test('returns input by reference when edge sizes are already valid', () => {
     const layout = {
       edgeGroups: {
-        left: { size: 360, group: { views: ["library"] } },
-        right: { size: 380, group: { views: ["session-details"] } },
+        left: { size: 360, group: { views: ['library'] } },
+        right: { size: 380, group: { views: ['session-details'] } },
       },
     };
     expect(enforcePersistedEdgeMinimums(layout)).toBe(layout);

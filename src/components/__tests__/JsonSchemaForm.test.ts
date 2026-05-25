@@ -1,8 +1,8 @@
-import { describe, expect, test } from "bun:test";
-import { render, fireEvent, cleanup } from "@testing-library/vue";
-import { ref, nextTick, h } from "vue";
-import PrimeVue from "primevue/config";
-import JsonSchemaForm from "../JsonSchemaForm.vue";
+import { describe, expect, test } from 'bun:test';
+import { render, fireEvent, cleanup } from '@testing-library/vue';
+import { ref, nextTick, h } from 'vue';
+import PrimeVue from 'primevue/config';
+import JsonSchemaForm from '../JsonSchemaForm.vue';
 
 /// JsonSchemaForm renders inputs per JSON-Schema and validates required.
 ///
@@ -25,7 +25,7 @@ function mountForm(schema: Record<string, unknown>) {
             },
             schema,
             modelValue: model.value,
-            "onUpdate:modelValue": (v: Record<string, unknown>) => {
+            'onUpdate:modelValue': (v: Record<string, unknown>) => {
               model.value = v;
             },
           });
@@ -36,115 +36,115 @@ function mountForm(schema: Record<string, unknown>) {
   return { utils, model, formRef };
 }
 
-describe("JsonSchemaForm", () => {
-  test("seeds defaults from the schema on mount", async () => {
+describe('JsonSchemaForm', () => {
+  test('seeds defaults from the schema on mount', async () => {
     const { model } = mountForm({
-      type: "object",
+      type: 'object',
       properties: {
-        host: { type: "string", default: "localhost" },
-        port: { type: "integer", default: 5432 },
-        ssl: { type: "boolean", default: true },
+        host: { type: 'string', default: 'localhost' },
+        port: { type: 'integer', default: 5432 },
+        ssl: { type: 'boolean', default: true },
       },
     });
     await nextTick();
-    expect(model.value).toEqual({ host: "localhost", port: 5432, ssl: true });
+    expect(model.value).toEqual({ host: 'localhost', port: 5432, ssl: true });
     cleanup();
   });
 
-  test("validate() returns first missing required field path", async () => {
+  test('validate() returns first missing required field path', async () => {
     const { formRef } = mountForm({
-      type: "object",
-      required: ["host", "port"],
+      type: 'object',
+      required: ['host', 'port'],
       properties: {
-        host: { type: "string" },
-        port: { type: "integer" },
+        host: { type: 'string' },
+        port: { type: 'integer' },
       },
     });
     await nextTick();
     expect(formRef.value).not.toBeNull();
-    expect(formRef.value!.validate()).toBe("host");
+    expect(formRef.value!.validate()).toBe('host');
     cleanup();
   });
 
-  test("validate() returns null when required fields are filled", async () => {
+  test('validate() returns null when required fields are filled', async () => {
     const { formRef, model } = mountForm({
-      type: "object",
-      required: ["host"],
-      properties: { host: { type: "string", default: "x" } },
+      type: 'object',
+      required: ['host'],
+      properties: { host: { type: 'string', default: 'x' } },
     });
     await nextTick();
     expect(formRef.value!.validate()).toBe(null);
-    expect(model.value.host).toBe("x");
+    expect(model.value.host).toBe('x');
     cleanup();
   });
 
-  test("text input updates the model on user input", async () => {
+  test('text input updates the model on user input', async () => {
     const { model, utils } = mountForm({
-      type: "object",
-      properties: { name: { type: "string", title: "Name" } },
+      type: 'object',
+      properties: { name: { type: 'string', title: 'Name' } },
     });
     await nextTick();
-    const input = utils.container.querySelector("input[type=text]")!;
+    const input = utils.container.querySelector('input[type=text]')!;
     expect(input).not.toBeNull();
-    await fireEvent.update(input, "Alice");
+    await fireEvent.update(input, 'Alice');
     await nextTick();
-    expect(model.value.name).toBe("Alice");
+    expect(model.value.name).toBe('Alice');
     cleanup();
   });
 
-  test("renders enum oneOf as radio buttons (≤4 options)", async () => {
+  test('renders enum oneOf as radio buttons (≤4 options)', async () => {
     const { utils } = mountForm({
-      type: "object",
+      type: 'object',
       properties: {
         env: {
-          type: "string",
+          type: 'string',
           oneOf: [
-            { const: "dev", title: "Development" },
-            { const: "prod", title: "Production" },
+            { const: 'dev', title: 'Development' },
+            { const: 'prod', title: 'Production' },
           ],
         },
       },
     });
     await nextTick();
     // PrimeVue RadioButton renders an input[type=radio] internally.
-    const radios = utils.container.querySelectorAll("input[type=radio]");
+    const radios = utils.container.querySelectorAll('input[type=radio]');
     expect(radios.length).toBe(2);
     cleanup();
   });
 
-  test("recurses into nested objects", async () => {
+  test('recurses into nested objects', async () => {
     const { model, utils } = mountForm({
-      type: "object",
+      type: 'object',
       properties: {
         creds: {
-          type: "object",
+          type: 'object',
           properties: {
-            user: { type: "string", default: "u" },
+            user: { type: 'string', default: 'u' },
           },
         },
       },
     });
     await nextTick();
-    expect(model.value).toEqual({ creds: { user: "u" } });
+    expect(model.value).toEqual({ creds: { user: 'u' } });
     // The nested fieldset should be in the DOM.
-    expect(utils.container.querySelector("fieldset")).not.toBeNull();
+    expect(utils.container.querySelector('fieldset')).not.toBeNull();
     cleanup();
   });
 
-  test("validate() walks nested required", async () => {
+  test('validate() walks nested required', async () => {
     const { formRef } = mountForm({
-      type: "object",
-      required: ["creds"],
+      type: 'object',
+      required: ['creds'],
       properties: {
         creds: {
-          type: "object",
-          required: ["user"],
-          properties: { user: { type: "string" } },
+          type: 'object',
+          required: ['user'],
+          properties: { user: { type: 'string' } },
         },
       },
     });
     await nextTick();
-    expect(formRef.value!.validate()).toBe("creds.user");
+    expect(formRef.value!.validate()).toBe('creds.user');
     cleanup();
   });
 });

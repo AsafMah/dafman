@@ -11,13 +11,13 @@
 // Built on shared primitives in `./details/*` so ToolDetails (the
 // tool-execution counterpart) can reuse the same visual language.
 
-import { computed } from "vue";
-import type { PermissionRequestData } from "../ipc/types";
-import { renderMarkdown } from "../lib/markdown";
-import PathChip from "./details/PathChip.vue";
-import CommandBlock from "./details/CommandBlock.vue";
-import UrlChip from "./details/UrlChip.vue";
-import ToolChip from "./details/ToolChip.vue";
+import { computed } from 'vue';
+import type { PermissionRequestData } from '../ipc/types';
+import { renderMarkdown } from '../lib/markdown';
+import PathChip from './details/PathChip.vue';
+import CommandBlock from './details/CommandBlock.vue';
+import UrlChip from './details/UrlChip.vue';
+import ToolChip from './details/ToolChip.vue';
 
 const props = defineProps<{ request: PermissionRequestData }>();
 
@@ -26,7 +26,7 @@ const raw = computed<Record<string, unknown>>(() => props.request.raw ?? {});
 function pickStr(...keys: string[]): string | null {
   for (const k of keys) {
     const v = raw.value[k];
-    if (typeof v === "string" && v.length > 0) return v;
+    if (typeof v === 'string' && v.length > 0) return v;
   }
   return null;
 }
@@ -34,7 +34,7 @@ function pickStr(...keys: string[]): string | null {
 function pickObj(...keys: string[]): Record<string, unknown> | null {
   for (const k of keys) {
     const v = raw.value[k];
-    if (v && typeof v === "object" && !Array.isArray(v)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
       return v as Record<string, unknown>;
     }
   }
@@ -42,69 +42,67 @@ function pickObj(...keys: string[]): Record<string, unknown> | null {
 }
 
 // Per-kind field probes ---------------------------------------------
-const shellCommand = computed(() => pickStr("command", "cmd"));
-const shellCwd = computed(() => pickStr("cwd", "workingDirectory"));
+const shellCommand = computed(() => pickStr('command', 'cmd'));
+const shellCwd = computed(() => pickStr('cwd', 'workingDirectory'));
 
-const filePath = computed(() => pickStr("path", "filePath", "fileName"));
-const contentPreview = computed(() =>
-  pickStr("contentPreview", "content", "preview"),
-);
+const filePath = computed(() => pickStr('path', 'filePath', 'fileName'));
+const contentPreview = computed(() => pickStr('contentPreview', 'content', 'preview'));
 const writeExtension = computed(() => {
   const p = filePath.value;
-  if (!p) return "";
+  if (!p) return '';
   const m = /\.([a-z0-9]+)$/i.exec(p);
-  return m ? m[1]!.toLowerCase() : "";
+  return m ? m[1]!.toLowerCase() : '';
 });
 
-const urlString = computed(() => pickStr("url"));
+const urlString = computed(() => pickStr('url'));
 
-const mcpServerName = computed(() => pickStr("serverName", "mcpServerName"));
-const toolName = computed(() => pickStr("toolName", "mcpToolName", "tool"));
-const toolArgs = computed(() => pickObj("arguments", "args", "params"));
+const mcpServerName = computed(() => pickStr('serverName', 'mcpServerName'));
+const toolName = computed(() => pickStr('toolName', 'mcpToolName', 'tool'));
+const toolArgs = computed(() => pickObj('arguments', 'args', 'params'));
 const toolArgsJson = computed(() => {
   const args = toolArgs.value;
-  if (!args) return "";
+  if (!args) return '';
   try {
     return JSON.stringify(args, null, 2);
   } catch {
-    return "";
+    return '';
   }
 });
 
-const memoryContent = computed(() => pickStr("content", "text", "memory"));
-const hookName = computed(() => pickStr("hookName", "name", "hook"));
+const memoryContent = computed(() => pickStr('content', 'text', 'memory'));
+const hookName = computed(() => pickStr('hookName', 'name', 'hook'));
 
 /// Human-readable reason the agent provided. Present on read / write
 /// / url permission requests per the SDK shape. Surfaced above the
 /// per-kind chip so the user sees *why* before *what*.
-const intention = computed(() => pickStr("intention"));
+const intention = computed(() => pickStr('intention'));
 
 // Raw fallback ------------------------------------------------------
 const rawJsonHtml = computed(() => {
   try {
     const j = JSON.stringify(raw.value, null, 2);
-    return renderMarkdown("```json\n" + j + "\n```");
+    return renderMarkdown('```json\n' + j + '\n```');
   } catch {
-    return "";
+    return '';
   }
 });
 
 const hasFocusedView = computed(() => {
   switch (props.request.kind) {
-    case "shell":
+    case 'shell':
       return shellCommand.value !== null;
-    case "write":
-    case "read":
+    case 'write':
+    case 'read':
       return filePath.value !== null;
-    case "url":
+    case 'url':
       return urlString.value !== null;
-    case "mcp":
+    case 'mcp':
       return mcpServerName.value !== null || toolName.value !== null;
-    case "custom-tool":
+    case 'custom-tool':
       return toolName.value !== null;
-    case "memory":
+    case 'memory':
       return memoryContent.value !== null;
-    case "hook":
+    case 'hook':
       return hookName.value !== null;
   }
 });
@@ -112,28 +110,55 @@ const hasFocusedView = computed(() => {
 
 <template>
   <div class="perm-details">
-    <p v-if="intention" class="perm-intention">{{ intention }}</p>
+    <p
+      v-if="intention"
+      class="perm-intention"
+    >
+      {{ intention }}
+    </p>
     <!-- shell -->
     <template v-if="request.kind === 'shell' && hasFocusedView">
-      <CommandBlock :code="shellCommand!" lang="bash" />
-      <div v-if="shellCwd" class="perm-meta">
+      <CommandBlock
+        :code="shellCommand!"
+        lang="bash"
+      />
+      <div
+        v-if="shellCwd"
+        class="perm-meta"
+      >
         <span class="perm-meta-label">in</span>
-        <PathChip :path="shellCwd" icon="folder" />
+        <PathChip
+          :path="shellCwd"
+          icon="folder"
+        />
       </div>
     </template>
 
     <!-- write -->
     <template v-else-if="request.kind === 'write' && hasFocusedView">
-      <PathChip :path="filePath!" icon="file-edit" />
-      <details v-if="contentPreview" class="perm-preview">
+      <PathChip
+        :path="filePath!"
+        icon="file-edit"
+      />
+      <details
+        v-if="contentPreview"
+        class="perm-preview"
+      >
         <summary>Preview content</summary>
-        <CommandBlock :code="contentPreview" :lang="writeExtension || 'text'" />
+        <CommandBlock
+          :code="contentPreview"
+          :lang="writeExtension || 'text'"
+        />
       </details>
     </template>
 
     <!-- read -->
     <template v-else-if="request.kind === 'read' && hasFocusedView">
-      <PathChip :path="filePath!" icon="eye" badge="read-only" />
+      <PathChip
+        :path="filePath!"
+        icon="eye"
+        badge="read-only"
+      />
     </template>
 
     <!-- url -->
@@ -147,46 +172,83 @@ const hasFocusedView = computed(() => {
         :server="mcpServerName ?? undefined"
         :tool="toolName ?? undefined"
       />
-      <details v-if="toolArgsJson" class="perm-preview">
+      <details
+        v-if="toolArgsJson"
+        class="perm-preview"
+      >
         <summary>Arguments</summary>
-        <CommandBlock :code="toolArgsJson" lang="json" />
+        <CommandBlock
+          :code="toolArgsJson"
+          lang="json"
+        />
       </details>
     </template>
 
     <!-- custom-tool -->
     <template v-else-if="request.kind === 'custom-tool' && hasFocusedView">
-      <ToolChip :tool="toolName ?? undefined" icon="bolt" />
-      <details v-if="toolArgsJson" class="perm-preview">
+      <ToolChip
+        :tool="toolName ?? undefined"
+        icon="bolt"
+      />
+      <details
+        v-if="toolArgsJson"
+        class="perm-preview"
+      >
         <summary>Arguments</summary>
-        <CommandBlock :code="toolArgsJson" lang="json" />
+        <CommandBlock
+          :code="toolArgsJson"
+          lang="json"
+        />
       </details>
     </template>
 
     <!-- memory -->
     <template v-else-if="request.kind === 'memory' && hasFocusedView">
       <div class="perm-meta">
-        <i class="pi pi-bookmark perm-meta-icon" aria-hidden="true" />
+        <i
+          class="pi pi-bookmark perm-meta-icon"
+          aria-hidden="true"
+        />
         <span class="perm-meta-label">save memory</span>
       </div>
-      <CommandBlock :code="memoryContent!" lang="text" />
+      <CommandBlock
+        :code="memoryContent!"
+        lang="text"
+      />
     </template>
 
     <!-- hook -->
     <template v-else-if="request.kind === 'hook' && hasFocusedView">
-      <ToolChip :tool="hookName ?? undefined" icon="link" />
+      <ToolChip
+        :tool="hookName ?? undefined"
+        icon="link"
+      />
     </template>
 
     <!-- fallback: raw JSON when no focused view available -->
-    <details v-else class="perm-preview" open>
+    <details
+      v-else
+      class="perm-preview"
+      open
+    >
       <summary>Request payload</summary>
-      <div class="perm-preview-body" v-html="rawJsonHtml" />
+      <div
+        class="perm-preview-body"
+        v-html="rawJsonHtml"
+      />
     </details>
 
     <!-- "Show raw" toggle for completeness whenever we DID render a
          focused view. Lets the user inspect anything we didn't surface. -->
-    <details v-if="hasFocusedView" class="perm-preview perm-raw-toggle">
+    <details
+      v-if="hasFocusedView"
+      class="perm-preview perm-raw-toggle"
+    >
       <summary>Show raw</summary>
-      <div class="perm-preview-body" v-html="rawJsonHtml" />
+      <div
+        class="perm-preview-body"
+        v-html="rawJsonHtml"
+      />
     </details>
   </div>
 </template>

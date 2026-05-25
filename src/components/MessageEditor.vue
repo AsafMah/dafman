@@ -12,12 +12,12 @@
 ///                 left intact.
 /// Cancel restores the original text without touching history.
 
-import { ref } from "vue";
-import Button from "primevue/button";
-import { LexicalComposer } from "lexical-vue/LexicalComposer";
-import { markdownNodes } from "../lexical/nodes";
-import { lexicalTheme } from "../lexical/theme";
-import MessageEditorBody from "./MessageEditorBody.vue";
+import { ref } from 'vue';
+import Button from 'primevue/button';
+import { LexicalComposer } from 'lexical-vue/LexicalComposer';
+import { markdownNodes } from '../lexical/nodes';
+import { lexicalTheme } from '../lexical/theme';
+import MessageEditorBody from './MessageEditorBody.vue';
 
 const props = defineProps<{
   originalText: string;
@@ -25,20 +25,20 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "save", text: string): void;
-  (e: "saveAndFork", text: string): void;
-  (e: "cancel"): void;
+  (e: 'save', text: string): void;
+  (e: 'saveAndFork', text: string): void;
+  (e: 'cancel'): void;
 }>();
 
 const draftText = ref(props.originalText);
 
 const lexicalConfig = {
-  namespace: "DafmanMessageEditor",
+  namespace: 'DafmanMessageEditor',
   editable: true,
   nodes: markdownNodes,
   theme: lexicalTheme,
   onError(error: Error) {
-    console.error("[lexical message editor]", error);
+    console.error('[lexical message editor]', error);
   },
 };
 
@@ -46,12 +46,12 @@ const hasContent = () => draftText.value.trim().length > 0;
 
 function onSave() {
   if (!hasContent()) return;
-  emit("save", draftText.value.trimEnd());
+  emit('save', draftText.value.trimEnd());
 }
 
 function onSaveFork() {
   if (!hasContent()) return;
-  emit("saveAndFork", draftText.value.trimEnd());
+  emit('saveAndFork', draftText.value.trimEnd());
 }
 
 function onDraftChange(text: string) {
@@ -63,7 +63,10 @@ function onDraftChange(text: string) {
   <div class="message-editor">
     <header class="me-header">
       <span class="me-label">Editing</span>
-      <span class="me-hint" aria-hidden="true">
+      <span
+        class="me-hint"
+        aria-hidden="true"
+      >
         Ctrl+Enter to save<span v-if="canFork">, Ctrl+Shift+Enter to fork</span>, Esc to cancel
       </span>
     </header>

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import Textarea from "primevue/textarea";
-import { storeToRefs } from "pinia";
-import type { JobRecord } from "../ipc/types";
-import { useJobsStore } from "../stores/jobsStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useToastStore } from "../stores/toastStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import Textarea from 'primevue/textarea';
+import { storeToRefs } from 'pinia';
+import type { JobRecord } from '../ipc/types';
+import { useJobsStore } from '../stores/jobsStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useToastStore } from '../stores/toastStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const jobsStore = useJobsStore();
 const layoutStore = useLayoutStore();
@@ -16,7 +16,7 @@ const sessionsStore = useSessionsStore();
 const toasts = useToastStore();
 const { jobs, activeCount, isLoading, busyJobId } = storeToRefs(jobsStore);
 
-const goal = ref("");
+const goal = ref('');
 const startingAutopilot = ref(false);
 
 const activeSession = computed(() => {
@@ -33,9 +33,9 @@ const groupedJobs = computed(() => {
     cancelled: [],
   };
   for (const job of jobs.value) {
-    if (job.status === "failed") groups.failed.push(job);
-    else if (job.status === "cancelled") groups.cancelled.push(job);
-    else if (job.status === "completed") groups.completed.push(job);
+    if (job.status === 'failed') groups.failed.push(job);
+    else if (job.status === 'cancelled') groups.cancelled.push(job);
+    else if (job.status === 'completed') groups.completed.push(job);
     else groups.active.push(job);
   }
   return groups;
@@ -48,13 +48,10 @@ async function startAutopilot(): Promise<void> {
   startingAutopilot.value = true;
   try {
     await jobsStore.startAutopilot(session.id, trimmed);
-    goal.value = "";
-    toasts.success("Autopilot started", session.title ?? session.id.slice(0, 8));
+    goal.value = '';
+    toasts.success('Autopilot started', session.title ?? session.id.slice(0, 8));
   } catch (err) {
-    toasts.error(
-      "Failed to start autopilot",
-      toErrorMessage(err),
-    );
+    toasts.error('Failed to start autopilot', toErrorMessage(err));
   } finally {
     startingAutopilot.value = false;
   }
@@ -72,7 +69,7 @@ function elapsed(job: JobRecord): string {
     const end = job.completedAt ? Date.parse(job.completedAt) : Date.now();
     if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
   }
-  if (ms === null) return "";
+  if (ms === null) return '';
   if (ms < 1000) return `${ms}ms`;
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -83,17 +80,17 @@ function elapsed(job: JobRecord): string {
 
 function statusIcon(job: JobRecord): string {
   switch (job.status) {
-    case "starting":
-    case "running":
-      return "pi pi-spin pi-spinner";
-    case "idle":
-      return "pi pi-pause-circle";
-    case "completed":
-      return "pi pi-check-circle";
-    case "failed":
-      return "pi pi-times-circle";
-    case "cancelled":
-      return "pi pi-ban";
+    case 'starting':
+    case 'running':
+      return 'pi pi-spin pi-spinner';
+    case 'idle':
+      return 'pi pi-pause-circle';
+    case 'completed':
+      return 'pi pi-check-circle';
+    case 'failed':
+      return 'pi pi-times-circle';
+    case 'cancelled':
+      return 'pi pi-ban';
   }
 }
 </script>
@@ -118,20 +115,26 @@ function statusIcon(job: JobRecord): string {
 
     <section class="autopilot-card">
       <h3>Start Autopilot</h3>
-      <p class="hint">
-        Runs in the current session: switches to Autopilot and sends the goal.
-      </p>
-      <div v-if="activeSession" class="context">
+      <p class="hint">Runs in the current session: switches to Autopilot and sends the goal.</p>
+      <div
+        v-if="activeSession"
+        class="context"
+      >
         <span>Session</span>
         <strong>{{ sessionLabel(activeSession.id) }}</strong>
         <span>Mode</span>
-        <strong>{{ activeSession.mode ?? "unknown" }}</strong>
+        <strong>{{ activeSession.mode ?? 'unknown' }}</strong>
         <span>Auto-approve</span>
-        <strong>{{ activeSession.approveAll ? "on" : "off" }}</strong>
+        <strong>{{ activeSession.approveAll ? 'on' : 'off' }}</strong>
         <span>Pending requests</span>
         <strong>{{ activeSession.pendingRequests.length }}</strong>
       </div>
-      <div v-else class="empty-hint">Open a session to start Autopilot.</div>
+      <div
+        v-else
+        class="empty-hint"
+      >
+        Open a session to start Autopilot.
+      </div>
       <Textarea
         v-model="goal"
         rows="4"
@@ -149,13 +152,27 @@ function statusIcon(job: JobRecord): string {
       />
     </section>
 
-    <div v-if="jobsStore.error" class="empty-hint error">{{ jobsStore.error }}</div>
-    <div v-if="jobs.length === 0 && !isLoading" class="empty-hint">
+    <div
+      v-if="jobsStore.error"
+      class="empty-hint error"
+    >
+      {{ jobsStore.error }}
+    </div>
+    <div
+      v-if="jobs.length === 0 && !isLoading"
+      class="empty-hint"
+    >
       No jobs yet. Start Autopilot or let the agent spawn background tasks.
     </div>
 
-    <template v-for="(list, group) in groupedJobs" :key="group">
-      <section v-if="list.length > 0" class="job-group">
+    <template
+      v-for="(list, group) in groupedJobs"
+      :key="group"
+    >
+      <section
+        v-if="list.length > 0"
+        class="job-group"
+      >
         <h3 class="job-group-title">{{ group }} ({{ list.length }})</h3>
         <ul class="job-list">
           <li
@@ -165,7 +182,10 @@ function statusIcon(job: JobRecord): string {
             :class="`job-${job.status}`"
           >
             <div class="job-main">
-              <i :class="statusIcon(job)" aria-hidden="true" />
+              <i
+                :class="statusIcon(job)"
+                aria-hidden="true"
+              />
               <div class="job-text">
                 <div class="job-title-line">
                   <strong>{{ job.title }}</strong>
@@ -173,10 +193,30 @@ function statusIcon(job: JobRecord): string {
                   <small v-if="elapsed(job)">{{ elapsed(job) }}</small>
                 </div>
                 <div class="job-session">{{ sessionLabel(job.sessionId) }}</div>
-                <p v-if="job.description" class="job-desc">{{ job.description }}</p>
-                <p v-if="job.latestResponse" class="job-desc">{{ job.latestResponse }}</p>
-                <p v-if="job.result" class="job-result">{{ job.result }}</p>
-                <p v-if="job.error" class="job-error">{{ job.error }}</p>
+                <p
+                  v-if="job.description"
+                  class="job-desc"
+                >
+                  {{ job.description }}
+                </p>
+                <p
+                  v-if="job.latestResponse"
+                  class="job-desc"
+                >
+                  {{ job.latestResponse }}
+                </p>
+                <p
+                  v-if="job.result"
+                  class="job-result"
+                >
+                  {{ job.result }}
+                </p>
+                <p
+                  v-if="job.error"
+                  class="job-error"
+                >
+                  {{ job.error }}
+                </p>
               </div>
             </div>
             <div class="job-actions">

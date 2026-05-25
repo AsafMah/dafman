@@ -5,8 +5,8 @@
 // component (not a slot template) because dockview-vue's
 // `findComponent(name)` walks `instance.components[name]`, not slots.
 
-import { useClientStore } from "../stores/clientStore";
-import { storeToRefs } from "pinia";
+import { useClientStore } from '../stores/clientStore';
+import { storeToRefs } from 'pinia';
 
 const clientStore = useClientStore();
 const { ready } = storeToRefs(clientStore);
@@ -15,9 +15,7 @@ const { ready } = storeToRefs(clientStore);
 <template>
   <div class="watermark">
     <template v-if="!ready">Starting Copilot client...</template>
-    <template v-else>
-      Click <strong>&nbsp;New Session&nbsp;</strong> to start chatting.
-    </template>
+    <template v-else> Click <strong>&nbsp;New Session&nbsp;</strong> to start chatting. </template>
   </div>
 </template>
 

@@ -9,10 +9,10 @@
 // `update()` everything is re-wrapped into a single `params` prop. See
 // stored memory "dockview-vue panel props".
 
-import { computed, onBeforeUnmount, ref, watchEffect } from "vue";
-import type { DockviewPanelApi } from "dockview-core";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { indicatorStyle } from "../lib/notificationStyles";
+import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
+import type { DockviewPanelApi } from 'dockview-core';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { indicatorStyle } from '../lib/notificationStyles';
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {
@@ -28,25 +28,20 @@ const props = defineProps<{
 
 const sessionsStore = useSessionsStore();
 
-const panelApi = computed<DockviewPanelApi | undefined>(
-  () => props.api ?? props.params?.api,
-);
+const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
 
 const sessionId = computed(() => {
-  const fromUserParams =
-    props.params?.params?.sessionId ?? props.params?.sessionId;
-  return fromUserParams ?? panelApi.value?.id ?? "";
+  const fromUserParams = props.params?.params?.sessionId ?? props.params?.sessionId;
+  return fromUserParams ?? panelApi.value?.id ?? '';
 });
 
-const record = computed(() =>
-  sessionsStore.getSession(sessionId.value),
-);
+const record = computed(() => sessionsStore.getSession(sessionId.value));
 
 /// Reactive mirror of `api.title`. Dockview emits `onDidTitleChange`
 /// when the layout-side title updates (we drive it from
 /// `layoutStore.renamePanel` on `session.title_changed`), so we'd miss
 /// changes if we just read `api.title` once.
-const title = ref<string>(panelApi.value?.title ?? "");
+const title = ref<string>(panelApi.value?.title ?? '');
 /// Reactive `api.isActive`. Drives the active/inactive styling without
 /// reaching for the parent `.dv-active-tab` class.
 const isActive = ref<boolean>(panelApi.value?.isActive ?? false);
@@ -57,12 +52,12 @@ let unsubActive: (() => void) | null = null;
 watchEffect((onCleanup) => {
   const api = panelApi.value;
   if (!api) return;
-  title.value = api.title ?? "";
+  title.value = api.title ?? '';
   isActive.value = api.isActive;
   unsubTitle?.();
   unsubActive?.();
   const titleSub = api.onDidTitleChange((e) => {
-    title.value = e.title ?? "";
+    title.value = e.title ?? '';
   });
   const activeSub = api.onDidActiveChange(() => {
     isActive.value = api.isActive;
@@ -82,7 +77,7 @@ onBeforeUnmount(() => {
   unsubActive?.();
 });
 
-const accent = computed(() => record.value?.accent ?? "var(--p-primary-color)");
+const accent = computed(() => record.value?.accent ?? 'var(--p-primary-color)');
 
 const displayTitle = computed(() => {
   if (title.value) return title.value;
@@ -122,10 +117,7 @@ function onClose(event: MouseEvent) {
     <i
       v-if="indicator"
       class="pi chat-tab-icon"
-      :class="[
-        `pi-${indicator.iconSuffix}`,
-        { 'chat-tab-icon-pulse': indicator.pulse },
-      ]"
+      :class="[`pi-${indicator.iconSuffix}`, { 'chat-tab-icon-pulse': indicator.pulse }]"
       :style="{ '--icon-color': indicator.color }"
       :aria-label="indicator.label"
       :title="indicator.label"
@@ -138,7 +130,10 @@ function onClose(event: MouseEvent) {
       @pointerdown.stop
       @click="onClose"
     >
-      <i class="pi pi-times" aria-hidden="true" />
+      <i
+        class="pi pi-times"
+        aria-hidden="true"
+      />
     </button>
   </div>
 </template>
@@ -178,7 +173,9 @@ function onClose(event: MouseEvent) {
   height: calc(var(--dv-tabs-and-actions-container-height, 35px) - 4px);
   margin-top: 2px;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .chat-tab-active {
@@ -225,7 +222,9 @@ function onClose(event: MouseEvent) {
   font-size: 0.7rem;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
 }
 
 .chat-tab:hover .chat-tab-close,
@@ -262,8 +261,12 @@ function onClose(event: MouseEvent) {
 }
 
 @keyframes chat-tab-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-tab-icon.chat-tab-icon-pulse {
@@ -273,7 +276,12 @@ function onClose(event: MouseEvent) {
 }
 
 @keyframes chat-tab-icon-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 </style>

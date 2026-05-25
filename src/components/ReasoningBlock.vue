@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import Button from "primevue/button";
-import type { ReasoningVisibility } from "../ipc/types";
-import MessageContent from "./MessageContent.vue";
+import { computed, ref } from 'vue';
+import Button from 'primevue/button';
+import type { ReasoningVisibility } from '../ipc/types';
+import MessageContent from './MessageContent.vue';
 
 const props = defineProps<{
   text: string;
@@ -15,23 +15,24 @@ const props = defineProps<{
 
 const expanded = ref(false);
 
-const OPAQUE_PREVIEW = "Reasoned privately (encrypted by the model)";
+const OPAQUE_PREVIEW = 'Reasoned privately (encrypted by the model)';
 const OPAQUE_BODY =
   "This model used encrypted reasoning. The thinking happened — the SDK just doesn't expose it as readable text. Tokens are billed against your reasoning budget all the same.";
 
 const preview = computed(() => {
   if (props.opaque) return OPAQUE_PREVIEW;
-  const firstLine = props.text.split("\n", 1)[0] ?? "";
+  const firstLine = props.text.split('\n', 1)[0] ?? '';
   return firstLine.length > 120 ? `${firstLine.slice(0, 120)}...` : firstLine;
 });
 
-const showFull = computed(
-  () => props.visibility === "expanded" || expanded.value,
-);
+const showFull = computed(() => props.visibility === 'expanded' || expanded.value);
 </script>
 
 <template>
-  <div v-if="props.visibility !== 'hidden'" class="reasoning-card">
+  <div
+    v-if="props.visibility !== 'hidden'"
+    class="reasoning-card"
+  >
     <!-- Compact mode: the preview line lives in the header next to the
          chevron, and the standalone "REASONING" label is dropped. The
          label only appears in fully-expanded mode (no toggle), where
@@ -48,7 +49,7 @@ const showFull = computed(
       @keydown.enter.prevent="expanded = !expanded"
       @keydown.space.prevent="expanded = !expanded"
     >
-      <span class="reasoning-preview">{{ preview || "Thinking..." }}</span>
+      <span class="reasoning-preview">{{ preview || 'Thinking...' }}</span>
       <Button
         :icon="expanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
         text
@@ -59,13 +60,16 @@ const showFull = computed(
         @click.stop="expanded = !expanded"
       />
     </div>
-    <div v-else class="reasoning-header">
+    <div
+      v-else
+      class="reasoning-header"
+    >
       <span class="role-label">Reasoning</span>
     </div>
     <MessageContent
       v-if="showFull"
       class="reasoning-body"
-      :text="opaque ? OPAQUE_BODY : (props.text || 'Thinking...')"
+      :text="opaque ? OPAQUE_BODY : props.text || 'Thinking...'"
       label="Reasoning content"
     />
   </div>

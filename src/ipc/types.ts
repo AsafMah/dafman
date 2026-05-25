@@ -4,12 +4,12 @@
 // payload-only types here so the Vue tree never imports from
 // `electrobun/bun` (which is a Bun-only module).
 
-export type ThemeChoice = "system" | "light" | "dark";
+export type ThemeChoice = 'system' | 'light' | 'dark';
 
-export type ReasoningVisibility = "hidden" | "compact" | "expanded";
+export type ReasoningVisibility = 'hidden' | 'compact' | 'expanded';
 
 /// Mirrors `SessionMode` in `src-bun/rpc.ts`. Agent run mode.
-export type SessionMode = "interactive" | "plan" | "autopilot";
+export type SessionMode = 'interactive' | 'plan' | 'autopilot';
 
 /// Mirrors `SessionHistoryCompactionResult` in `src-bun/rpc.ts`.
 export interface SessionHistoryCompactionResult {
@@ -104,7 +104,7 @@ export interface TerminalSummary {
   cwd: string;
   shell: string;
   args: string[];
-  status: "running" | "exiting" | "exited" | "failed";
+  status: 'running' | 'exiting' | 'exited' | 'failed';
   createdAt: string;
   cols: number;
   rows: number;
@@ -115,17 +115,12 @@ export interface TerminalSummary {
 }
 
 export type TerminalEventPayload =
-  | { terminalId: string; kind: "output"; data: string }
-  | { terminalId: string; kind: "status"; summary: TerminalSummary }
-  | { terminalId: string; kind: "exit"; summary: TerminalSummary }
-  | { terminalId: string; kind: "error"; message: string };
+  | { terminalId: string; kind: 'output'; data: string }
+  | { terminalId: string; kind: 'status'; summary: TerminalSummary }
+  | { terminalId: string; kind: 'exit'; summary: TerminalSummary }
+  | { terminalId: string; kind: 'error'; message: string };
 
-export type CommandResultStatus =
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "timeout";
+export type CommandResultStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'timeout';
 
 export interface CommandResultRecord {
   id: string;
@@ -146,25 +141,25 @@ export interface CommandResultRecord {
 
 export type CommandResultEvent =
   | {
-      kind: "started";
+      kind: 'started';
       sessionId: string;
       commandId: string;
       record: CommandResultRecord;
     }
   | {
-      kind: "stdout" | "stderr";
+      kind: 'stdout' | 'stderr';
       sessionId: string;
       commandId: string;
       data: string;
     }
   | {
-      kind: "truncated";
+      kind: 'truncated';
       sessionId: string;
       commandId: string;
       limitBytes: number;
     }
   | {
-      kind: "completed" | "cancelled";
+      kind: 'completed' | 'cancelled';
       sessionId: string;
       commandId: string;
       record: CommandResultRecord;
@@ -220,25 +215,25 @@ export interface AgentInfo {
   path?: string;
 }
 
-export type TaskStatus = "running" | "idle" | "completed" | "failed" | "cancelled";
+export type TaskStatus = 'running' | 'idle' | 'completed' | 'failed' | 'cancelled';
 
 interface BaseTaskInfo {
   id: string;
-  type: "agent" | "shell";
+  type: 'agent' | 'shell';
   description: string;
   status: TaskStatus;
   startedAt?: string;
   completedAt?: string;
   activeTimeMs?: number;
   error?: string;
-  executionMode?: "sync" | "background";
+  executionMode?: 'sync' | 'background';
   canPromoteToBackground?: boolean;
 }
 
 export type TaskInfo = TaskAgentInfo | TaskShellInfo;
 
 export interface TaskAgentInfo extends BaseTaskInfo {
-  type: "agent";
+  type: 'agent';
   agentType: string;
   toolCallId?: string;
   agentName?: string;
@@ -251,9 +246,9 @@ export interface TaskAgentInfo extends BaseTaskInfo {
 }
 
 export interface TaskShellInfo extends BaseTaskInfo {
-  type: "shell";
+  type: 'shell';
   command: string;
-  attachmentMode?: "pty" | "detached";
+  attachmentMode?: 'pty' | 'detached';
   logPath?: string;
   pid?: number;
 }
@@ -261,9 +256,9 @@ export interface TaskShellInfo extends BaseTaskInfo {
 export interface JobRecord {
   id: string;
   sessionId: string;
-  source: "sdk-task" | "fleet" | "autopilot-session";
-  kind: "agent" | "shell" | "fleet" | "autopilot";
-  status: "starting" | TaskStatus;
+  source: 'sdk-task' | 'fleet' | 'autopilot-session';
+  kind: 'agent' | 'shell' | 'fleet' | 'autopilot';
+  status: 'starting' | TaskStatus;
   title: string;
   description: string;
   startedAt?: string;
@@ -281,7 +276,7 @@ export interface JobRecord {
   command?: string;
   logPath?: string;
   pid?: number;
-  executionMode?: "sync" | "background";
+  executionMode?: 'sync' | 'background';
   canCancel: boolean;
   canRemove: boolean;
   canPromoteToBackground: boolean;
@@ -290,7 +285,7 @@ export interface JobRecord {
 
 /// Mirror of `src-bun/rpc.ts:AgentFileScope`. Library tab scope
 /// discriminator for filesystem-backed agent CRUD.
-export type AgentFileScope = "user" | "project";
+export type AgentFileScope = 'user' | 'project';
 
 /// Mirror of `src-bun/rpc.ts:AgentFileEntry`. Filesystem-discovered
 /// agent file (used by the Library tab; distinct from `AgentInfo`
@@ -302,7 +297,7 @@ export interface AgentFileEntry {
   canonical: boolean;
 }
 
-export type InstructionScope = "global" | "project";
+export type InstructionScope = 'global' | 'project';
 
 export interface InstructionSource {
   name: string;
@@ -333,10 +328,10 @@ export interface AgentFileSpec {
 /// Mirrored here so the renderer can construct without importing the
 /// SDK types directly. Pass-through to bun → SDK at send time.
 export type SendMessageAttachment =
-  | { type: "file"; path: string; displayName?: string }
-  | { type: "directory"; path: string; displayName?: string }
+  | { type: 'file'; path: string; displayName?: string }
+  | { type: 'directory'; path: string; displayName?: string }
   | {
-      type: "selection";
+      type: 'selection';
       filePath: string;
       displayName: string;
       selection?: {
@@ -345,14 +340,14 @@ export type SendMessageAttachment =
       };
       text?: string;
     }
-  | { type: "blob"; data: string; mimeType: string; displayName?: string }
-  | { type: "commandResult"; result: CommandResultRecord; displayName?: string };
+  | { type: 'blob'; data: string; mimeType: string; displayName?: string }
+  | { type: 'commandResult'; result: CommandResultRecord; displayName?: string };
 
 export interface WorkspaceFileMatch {
   path: string;
   absolutePath: string;
   name: string;
-  kind: "file" | "directory";
+  kind: 'file' | 'directory';
 }
 
 export interface SessionEventPayload {
@@ -367,7 +362,7 @@ export interface SessionEventPayload {
 /// Mirrors `PermissionRequestData` in `src-bun/rpc.ts`. Permission
 /// request surfaced to the renderer for the pending-request modal.
 export interface PermissionRequestData {
-  kind: "shell" | "write" | "mcp" | "read" | "url" | "custom-tool" | "memory" | "hook";
+  kind: 'shell' | 'write' | 'mcp' | 'read' | 'url' | 'custom-tool' | 'memory' | 'hook';
   toolCallId?: string;
   /// Best-effort summary computed bun-side (e.g. "shell: ls -la").
   summary: string;
@@ -383,7 +378,7 @@ export interface UserInputRequestData {
 
 export interface ElicitationRequestData {
   message: string;
-  mode: "form" | "url";
+  mode: 'form' | 'url';
   elicitationSource?: string;
   /// Present for `mode: "url"` — the URL to open in the browser.
   url?: string;
@@ -409,31 +404,31 @@ export type PendingRequestPayload =
   | {
       sessionId: string;
       requestId: string;
-      kind: "permission";
+      kind: 'permission';
       request: PermissionRequestData;
     }
   | {
       sessionId: string;
       requestId: string;
-      kind: "userInput";
+      kind: 'userInput';
       request: UserInputRequestData;
     }
   | {
       sessionId: string;
       requestId: string;
-      kind: "elicitation";
+      kind: 'elicitation';
       request: ElicitationRequestData;
     }
   | {
       sessionId: string;
       requestId: string;
-      kind: "exitPlanMode";
+      kind: 'exitPlanMode';
       request: ExitPlanModeRequestData;
     }
   | {
       sessionId: string;
       requestId: string;
-      kind: "autoModeSwitch";
+      kind: 'autoModeSwitch';
       request: AutoModeSwitchRequestData;
     };
 
@@ -443,13 +438,13 @@ export type PendingRequestPayload =
 /// `undefined` falls back to the SDK's default (kind-specific blanket
 /// approval); we only send a concrete rule when the user picks one.
 export type PermissionApprovalRule =
-  | { kind: "commands"; commandIdentifiers: string[] }
-  | { kind: "read" }
-  | { kind: "write" }
-  | { kind: "mcp"; serverName: string; toolName: string | null }
-  | { kind: "mcp-sampling"; serverName: string }
-  | { kind: "memory" }
-  | { kind: "custom-tool"; toolName: string };
+  | { kind: 'commands'; commandIdentifiers: string[] }
+  | { kind: 'read' }
+  | { kind: 'write' }
+  | { kind: 'mcp'; serverName: string; toolName: string | null }
+  | { kind: 'mcp-sampling'; serverName: string }
+  | { kind: 'memory' }
+  | { kind: 'custom-tool'; toolName: string };
 
 /// Renderer → bun response shape for `respondToRequest`.
 export type RespondToRequestParams =
@@ -457,8 +452,8 @@ export type RespondToRequestParams =
       sessionId: string;
       requestId: string;
       response: {
-        kind: "permission";
-        decision: "approveOnce" | "approveForSession" | "reject";
+        kind: 'permission';
+        decision: 'approveOnce' | 'approveForSession' | 'reject';
         /// Optional approval rule for `approveForSession` decisions.
         /// When absent the SDK uses a kind-specific blanket approval.
         approval?: PermissionApprovalRule;
@@ -471,14 +466,14 @@ export type RespondToRequestParams =
   | {
       sessionId: string;
       requestId: string;
-      response: { kind: "userInput"; answer: string; wasFreeform: boolean };
+      response: { kind: 'userInput'; answer: string; wasFreeform: boolean };
     }
   | {
       sessionId: string;
       requestId: string;
       response: {
-        kind: "elicitation";
-        action: "accept" | "decline" | "cancel";
+        kind: 'elicitation';
+        action: 'accept' | 'decline' | 'cancel';
         content?: Record<string, unknown>;
       };
     }
@@ -486,26 +481,26 @@ export type RespondToRequestParams =
       sessionId: string;
       requestId: string;
       response: {
-        kind: "exitPlanMode";
+        kind: 'exitPlanMode';
         approved: boolean;
-        selectedAction?: "interactive" | "autopilot" | "exit_only" | "autopilot_fleet";
+        selectedAction?: 'interactive' | 'autopilot' | 'exit_only' | 'autopilot_fleet';
         feedback?: string;
       };
     }
   | {
       sessionId: string;
       requestId: string;
-      response: { kind: "autoModeSwitch"; response: "yes" | "yes_always" | "no" };
+      response: { kind: 'autoModeSwitch'; response: 'yes' | 'yes_always' | 'no' };
     };
 
 /// Discriminated union mirroring `AppErrorPayload` in `src-bun/app/errors.ts`.
 /// RPC rejections are deserialized into this shape by `invokeCommand`.
 export type AppErrorPayload =
-  | { kind: "ClientNotStarted" }
-  | { kind: "SessionNotFound"; data: string }
-  | { kind: "Settings"; data: string }
-  | { kind: "Sdk"; data: string }
-  | { kind: "Io"; data: string };
+  | { kind: 'ClientNotStarted' }
+  | { kind: 'SessionNotFound'; data: string }
+  | { kind: 'Settings'; data: string }
+  | { kind: 'Sdk'; data: string }
+  | { kind: 'Io'; data: string };
 
 /// Single source of truth for the request surface. Adding a new RPC?
 /// Add it here, then implement on the bun side in `src-bun/index.ts`.
@@ -524,8 +519,8 @@ export type CommandMap = {
     result: string | null;
   };
   pickAttachment: {
-    args: { kind: "file" | "directory"; startingFolder?: string };
-    result: { path: string; kind: "file" | "directory" } | null;
+    args: { kind: 'file' | 'directory'; startingFolder?: string };
+    result: { path: string; kind: 'file' | 'directory' } | null;
   };
   browseDirectory: {
     args: { prefix: string };
@@ -536,7 +531,7 @@ export type CommandMap = {
     args: {
       sessionId: string;
       text: string;
-      mode?: "enqueue" | "immediate";
+      mode?: 'enqueue' | 'immediate';
       attachments?: SendMessageAttachment[];
     };
     result: string;
@@ -708,14 +703,17 @@ export type CommandMap = {
   };
   getAccountQuota: {
     args: Record<string, never>;
-    result: Record<string, {
-      isUnlimitedEntitlement: boolean;
-      entitlementRequests: number;
-      usedRequests: number;
-      remainingPercentage: number;
-      overage: number;
-      resetDate?: string;
-    }>;
+    result: Record<
+      string,
+      {
+        isUnlimitedEntitlement: boolean;
+        entitlementRequests: number;
+        usedRequests: number;
+        remainingPercentage: number;
+        overage: number;
+        resetDate?: string;
+      }
+    >;
   };
   readSessionPlan: {
     args: { sessionId: string };
@@ -834,7 +832,7 @@ export type CommandMap = {
   respondToRequest: { args: RespondToRequestParams; result: boolean };
   rendererLog: {
     args: {
-      level: "debug" | "info" | "warn" | "error";
+      level: 'debug' | 'info' | 'warn' | 'error';
       message: string;
       extra?: Record<string, unknown>;
     };
@@ -862,7 +860,7 @@ export type CommandMap = {
   };
 };
 
-export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
 export interface LogRecord {
   ts: string;
   level: LogLevel;
@@ -873,31 +871,31 @@ export interface LogRecord {
 export type AuditEntry =
   | {
       ts: string;
-      kind: "permission";
+      kind: 'permission';
       sessionId: string;
       requestId: string;
       permissionKind: string;
-      decision: "approveOnce" | "approveForSession" | "reject";
+      decision: 'approveOnce' | 'approveForSession' | 'reject';
       summary?: string;
       approvalKind?: string;
       approvalDomain?: string;
     }
   | {
       ts: string;
-      kind: "url";
+      kind: 'url';
       url: string;
       allowed: boolean;
       reason: string;
     }
   | {
       ts: string;
-      kind: "command";
+      kind: 'command';
       sessionId: string;
       commandId: string;
       command: string;
       cwd: string;
       shell: string;
-      status: "started" | "completed" | "failed" | "cancelled" | "timeout";
+      status: 'started' | 'completed' | 'failed' | 'cancelled' | 'timeout';
       exitCode?: number | null;
       durationMs?: number;
       truncated?: boolean;

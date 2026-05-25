@@ -1,33 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
-import Toast from "primevue/toast";
-import { useToast } from "primevue/usetoast";
-import type { ToastMessageOptions } from "primevue/toast";
-import { DockviewVue, type DockviewReadyEvent } from "dockview-vue";
-import ActivityBar, { type ActivityItem } from "./components/ActivityBar.vue";
-import BootSplash from "./components/BootSplash.vue";
-import CommandPalette from "./components/CommandPalette.vue";
-import { useClientStore } from "./stores/clientStore";
-import { useSessionsStore } from "./stores/sessionsStore";
-import { useSettingsStore } from "./stores/settingsStore";
-import { useToastStore } from "./stores/toastStore";
-import { useLayoutStore, composePanelTitle } from "./stores/layoutStore";
-import { useModelsStore } from "./stores/modelsStore";
-import { useBootStore } from "./stores/bootStore";
-import { useJobsStore } from "./stores/jobsStore";
-import { useConfirm } from "primevue/useconfirm";
-import ConfirmDialog from "primevue/confirmdialog";
-import { resolveIsDark } from "./lib/theme";
-import { registerBuiltinCommands } from "./lib/registerBuiltinCommands";
+import { computed, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import Toast from 'primevue/toast';
+import { useToast } from 'primevue/usetoast';
+import type { ToastMessageOptions } from 'primevue/toast';
+import { DockviewVue, type DockviewReadyEvent } from 'dockview-vue';
+import ActivityBar, { type ActivityItem } from './components/ActivityBar.vue';
+import BootSplash from './components/BootSplash.vue';
+import CommandPalette from './components/CommandPalette.vue';
+import { useClientStore } from './stores/clientStore';
+import { useSessionsStore } from './stores/sessionsStore';
+import { useSettingsStore } from './stores/settingsStore';
+import { useToastStore } from './stores/toastStore';
+import { useLayoutStore, composePanelTitle } from './stores/layoutStore';
+import { useModelsStore } from './stores/modelsStore';
+import { useBootStore } from './stores/bootStore';
+import { useJobsStore } from './stores/jobsStore';
+import { useConfirm } from 'primevue/useconfirm';
+import ConfirmDialog from 'primevue/confirmdialog';
+import { resolveIsDark } from './lib/theme';
+import { registerBuiltinCommands } from './lib/registerBuiltinCommands';
 import {
   extractChatPanelIds,
   enforcePersistedEdgeMinimums,
   persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
-} from "./lib/layoutSanitize";
-import { toErrorMessage } from "./lib/errorMessage";
+} from './lib/layoutSanitize';
+import { toErrorMessage } from './lib/errorMessage';
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -48,7 +48,7 @@ const prefersDark = ref(false);
 // Dev playground is only built in dev mode; the action item is
 // stripped from the ActivityBar in prod.
 const isDev = import.meta.env.DEV;
-const PLAYGROUND_PANEL_ID = "playground";
+const PLAYGROUND_PANEL_ID = 'playground';
 
 /// Opens the Dev Playground as a regular dockview body tab (not a
 /// sidebar edge panel). Subsequent calls just focus the existing tab.
@@ -65,14 +65,14 @@ function openPlayground() {
   // Pinia's HMR, which left users on an older bundle staring at
   // `firstBodyGroupId is not a function`.
   const bodyGroups = dock.groups.filter(
-    (g) => (g as unknown as { location?: { type?: string } }).location?.type === "grid",
+    (g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid',
   );
   const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
   dock.addPanel({
     id: PLAYGROUND_PANEL_ID,
-    component: "playground",
-    title: "Dev Playground",
-    position: { referenceGroup, direction: "within" },
+    component: 'playground',
+    title: 'Dev Playground',
+    position: { referenceGroup, direction: 'within' },
   });
 }
 
@@ -81,13 +81,13 @@ const isDarkMode = computed(() =>
 );
 
 function applyThemeClass(isDark: boolean) {
-  document.documentElement.classList.toggle("app-dark", isDark);
+  document.documentElement.classList.toggle('app-dark', isDark);
 }
 
 onMounted(async () => {
-  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+  const mql = window.matchMedia('(prefers-color-scheme: dark)');
   prefersDark.value = mql.matches;
-  mql.addEventListener("change", (e) => {
+  mql.addEventListener('change', (e) => {
     prefersDark.value = e.matches;
   });
   applyThemeClass(isDarkMode.value);
@@ -103,12 +103,12 @@ onMounted(async () => {
   // never settled).
   const SPLASH_WATCHDOG_MS = 6_000;
   const splashWatchdog = window.setTimeout(() => {
-    if (bootStore.isBooting && bootStore.phase !== "failed") {
+    if (bootStore.isBooting && bootStore.phase !== 'failed') {
       console.error(
         `[boot] watchdog: splash still up after ${SPLASH_WATCHDOG_MS}ms, forcing ready`,
       );
       toastStore.warn(
-        "Startup took too long",
+        'Startup took too long',
         "The app loaded but something didn't finish. Try Reload Layout from the command palette if anything looks wrong.",
       );
       bootStore.markReady();
@@ -132,7 +132,7 @@ onMounted(async () => {
       // good enough to get the user into the app. Toast already
       // surfaced by the store.
       bootStore.markSettingsLoaded();
-      console.error("[boot] settings.load failed; continuing with defaults", err);
+      console.error('[boot] settings.load failed; continuing with defaults', err);
       return null;
     });
 
@@ -179,15 +179,15 @@ onMounted(async () => {
   // "Restoring sessions…" / "Applying layout…" forever. We log,
   // toast, and continue to `markReady` — better to surface a
   // half-restored app the user can fix than to lock them out.
-  console.info("[boot] starting restoreFromLayout");
+  console.info('[boot] starting restoreFromLayout');
   try {
     await restoreFromLayout();
   } catch (err) {
     const message = toErrorMessage(err);
     // eslint-disable-next-line no-console
-    console.error("[App] restoreFromLayout threw — continuing to ready", err);
+    console.error('[App] restoreFromLayout threw — continuing to ready', err);
     toastStore.error(
-      "Layout restore failed",
+      'Layout restore failed',
       `${message}. The app will load empty — your sessions are still in the catalog.`,
     );
   }
@@ -214,7 +214,7 @@ onMounted(async () => {
   // dispatches `dafman:focus-session` from a Notification's onclick;
   // we activate the matching panel here. Window focus is already
   // attempted on the store side.
-  window.addEventListener("dafman:focus-session", (e: Event) => {
+  window.addEventListener('dafman:focus-session', (e: Event) => {
     const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
     if (!detail?.sessionId) return;
     const dock = layoutStore.api;
@@ -228,8 +228,8 @@ onMounted(async () => {
   // without needing a separate `?dev` switch (the param is opt-in,
   // so production users never trigger it).
   if (
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).has("autosession")
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('autosession')
   ) {
     setTimeout(() => {
       if (sessionsStore.sessions.length === 0) {
@@ -250,17 +250,15 @@ const pendingRestoreLayout = ref<unknown | null>(null);
 
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;
-  if (!layout || typeof layout !== "object") {
-    console.info("[boot] restoreFromLayout: no layout to restore");
+  if (!layout || typeof layout !== 'object') {
+    console.info('[boot] restoreFromLayout: no layout to restore');
     return;
   }
   const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
   const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
   const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
   const sessionIds = extractChatPanelIds(sanitized);
-  console.info(
-    `[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`,
-  );
+  console.info(`[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`);
   if (sessionIds.length === 0) {
     if (layoutStore.api) {
       const ok = layoutStore.restore(sanitized);
@@ -277,19 +275,13 @@ async function restoreFromLayout() {
   // errors.ts comment).
   await Promise.all(
     sessionIds.map((id) =>
-      sessionsStore
-        .restoreSession(id)
-        .finally(() => bootStore.markSessionRestored()),
+      sessionsStore.restoreSession(id).finally(() => bootStore.markSessionRestored()),
     ),
   );
-  console.info("[boot] restoreFromLayout: all resumes settled, applying layout");
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => resolve()),
-  );
+  console.info('[boot] restoreFromLayout: all resumes settled, applying layout');
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   bootStore.beginApplying();
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => resolve()),
-  );
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   if (layoutStore.api) {
     const ok = layoutStore.restore(sanitized);
     console.info(`[boot] restoreFromLayout: fromJSON ok=${ok}`);
@@ -298,8 +290,8 @@ async function restoreFromLayout() {
       // so the user has something to work with instead of a blank
       // window.
       useToastStore().warn(
-        "Layout restore failed",
-        "The persisted dockview JSON was rejected. Resetting to default.",
+        'Layout restore failed',
+        'The persisted dockview JSON was rejected. Resetting to default.',
       );
       layoutStore.resetToDefault();
     }
@@ -337,8 +329,7 @@ function closeToast({ message }: { message: ToastMessageOptions }) {
 /// recognisable label, especially before the model has auto-summarised
 /// the conversation — followed by the SDK title (`folder · title`).
 watch(
-  () =>
-    sessions.value.map((s) => [s.id, s.title] as const),
+  () => sessions.value.map((s) => [s.id, s.title] as const),
   (entries) => {
     for (const [id, title] of entries) {
       layoutStore.renamePanel(id, composePanelTitle(id, title));
@@ -348,7 +339,7 @@ watch(
 );
 
 function onDockReady(event: DockviewReadyEvent) {
-  console.info("[boot] onDockReady fired");
+  console.info('[boot] onDockReady fired');
   layoutStore.setApi(event.api);
   // Whenever the user closes a tab via dockview's own X (we hide the
   // in-pane close button to keep a single source of truth), tear down
@@ -367,8 +358,8 @@ function onDockReady(event: DockviewReadyEvent) {
         (record?.pendingRequests?.length ?? 0) > 0;
       if (sessionBusy) {
         toastStore.info(
-          "Session detached",
-          "Session is still busy. Reopen from the Sessions sidebar.",
+          'Session detached',
+          'Session is still busy. Reopen from the Sessions sidebar.',
         );
       } else {
         void sessionsStore.closeSession(panel.id);
@@ -423,12 +414,12 @@ function scheduleLayoutSave() {
 // Sessions Manager — left edge-group panel toggle. Owned by the
 // ActivityBar; the SESSIONS_PANEL_ID constant is shared with the
 // activity-item config below and with the open-by-default path.
-const SESSIONS_PANEL_ID = "sessions-manager";
-const SETTINGS_PANEL_ID = "settings-panel";
-const LOG_VIEWER_PANEL_ID = "log-viewer";
-const LIBRARY_PANEL_ID = "library";
-const JOBS_PANEL_ID = "jobs-panel";
-const TERMINALS_PANEL_ID = "terminals-panel";
+const SESSIONS_PANEL_ID = 'sessions-manager';
+const SETTINGS_PANEL_ID = 'settings-panel';
+const LOG_VIEWER_PANEL_ID = 'log-viewer';
+const LIBRARY_PANEL_ID = 'library';
+const JOBS_PANEL_ID = 'jobs-panel';
+const TERMINALS_PANEL_ID = 'terminals-panel';
 
 /// ActivityBar items.
 /// - Top stack (default `group: "top"`): panel toggles. Sessions today;
@@ -439,38 +430,38 @@ const TERMINALS_PANEL_ID = "terminals-panel";
 const activityItems = computed<ActivityItem[]>(() => {
   const items: ActivityItem[] = [
     {
-      kind: "panel",
+      kind: 'panel',
       id: SESSIONS_PANEL_ID,
-      component: "sessionsManager",
-      icon: "pi-list",
-      title: "Sessions",
+      component: 'sessionsManager',
+      icon: 'pi-list',
+      title: 'Sessions',
       initialSize: 260,
       minimumSize: 180,
     },
     {
-      kind: "panel",
+      kind: 'panel',
       id: TERMINALS_PANEL_ID,
-      component: "terminalsPanel",
-      icon: "pi-chevron-right",
-      title: "Terminals — running shells",
+      component: 'terminalsPanel',
+      icon: 'pi-chevron-right',
+      title: 'Terminals — running shells',
       initialSize: 360,
       minimumSize: 320,
     },
     {
-      kind: "panel",
+      kind: 'panel',
       id: LIBRARY_PANEL_ID,
-      component: "library",
-      icon: "pi-book",
-      title: "Library — MCP servers + Tools + Skills + Agents + Instructions",
+      component: 'library',
+      icon: 'pi-book',
+      title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
       initialSize: 360,
       minimumSize: 320,
     },
     {
-      kind: "panel",
+      kind: 'panel',
       id: JOBS_PANEL_ID,
-      component: "jobsPanel",
-      icon: "pi-clock",
-      title: "Jobs",
+      component: 'jobsPanel',
+      icon: 'pi-clock',
+      title: 'Jobs',
       initialSize: 380,
       minimumSize: 380,
       badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
@@ -478,31 +469,31 @@ const activityItems = computed<ActivityItem[]>(() => {
   ];
   if (isDev) {
     items.push({
-      kind: "action",
-      id: "playground",
-      icon: "pi-wrench",
-      title: "Open dev playground",
-      group: "bottom",
+      kind: 'action',
+      id: 'playground',
+      icon: 'pi-wrench',
+      title: 'Open dev playground',
+      group: 'bottom',
       onClick: openPlayground,
     });
   }
   items.push({
-    kind: "panel",
+    kind: 'panel',
     id: LOG_VIEWER_PANEL_ID,
-    component: "logViewer",
-    icon: "pi-bars",
-    title: "Diagnostics — live log + bundle export",
-    group: "bottom",
+    component: 'logViewer',
+    icon: 'pi-bars',
+    title: 'Diagnostics — live log + bundle export',
+    group: 'bottom',
     initialSize: 480,
     minimumSize: 420,
   });
   items.push({
-    kind: "panel",
+    kind: 'panel',
     id: SETTINGS_PANEL_ID,
-    component: "settingsPanel",
-    icon: "pi-cog",
-    title: "Settings",
-    group: "bottom",
+    component: 'settingsPanel',
+    icon: 'pi-cog',
+    title: 'Settings',
+    group: 'bottom',
     // Settings rows pack an input + 2 icon buttons + a "Request
     // permission" button — 280 px clipped the right edge in
     // practice. 400 / 380 fits comfortably and still leaves the
@@ -539,17 +530,17 @@ function openSessionsByDefault(attempt = 0) {
       // with no Sessions panel. Surface the issue in the log so we
       // can diagnose from the in-app log viewer.
       console.warn(
-        "[boot] openSessionsByDefault: dockview api never became ready after 20 retries; Sessions panel will not auto-open",
+        '[boot] openSessionsByDefault: dockview api never became ready after 20 retries; Sessions panel will not auto-open',
       );
     }
     return;
   }
   if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) return;
-  layoutStore.openEdgePanel("left", {
+  layoutStore.openEdgePanel('left', {
     id: SESSIONS_PANEL_ID,
-    component: "sessionsManager",
-    tabComponent: "sidebarTab",
-    title: "Sessions",
+    component: 'sessionsManager',
+    tabComponent: 'sidebarTab',
+    title: 'Sessions',
     initialSize: 240,
     minimumSize: 160,
     exclusive: true,
@@ -559,7 +550,10 @@ function openSessionsByDefault(attempt = 0) {
 </script>
 
 <template>
-  <main class="app-root" :class="{ 'app-dark': isDarkMode }">
+  <main
+    class="app-root"
+    :class="{ 'app-dark': isDarkMode }"
+  >
     <Toast :on-click="closeToast" />
     <ConfirmDialog />
     <!-- Command palette: global Ctrl/Cmd+K overlay. Mounted once at
@@ -578,7 +572,10 @@ function openSessionsByDefault(attempt = 0) {
          panel toggles. No topbar — the rail is the only chrome.
          Settings is a panel like Sessions, not a modal. -->
     <div class="app-body">
-      <ActivityBar ref="activityBarRef" :items="activityItems" />
+      <ActivityBar
+        ref="activityBarRef"
+        :items="activityItems"
+      />
       <div
         class="dock-wrapper"
         :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"

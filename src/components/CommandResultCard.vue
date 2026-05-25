@@ -1,36 +1,38 @@
 <script setup lang="ts">
-import Button from "primevue/button";
-import type { CommandResultRecord } from "../ipc/types";
-import { cleanTerminalCommandOutput } from "../lib/ansi";
+import Button from 'primevue/button';
+import type { CommandResultRecord } from '../ipc/types';
+import { cleanTerminalCommandOutput } from '../lib/ansi';
 
 defineProps<{ record: CommandResultRecord }>();
 const emit = defineEmits<{
-  (e: "add", record: CommandResultRecord): void;
-  (e: "cancel", record: CommandResultRecord): void;
+  (e: 'add', record: CommandResultRecord): void;
+  (e: 'cancel', record: CommandResultRecord): void;
 }>();
 
 function markdownFor(record: CommandResultRecord): string {
   const stdout = cleanTerminalCommandOutput(record.stdout);
   const stderr = cleanTerminalCommandOutput(record.stderr);
   return [
-    "```shell",
+    '```shell',
     record.command,
-    "```",
-    "",
+    '```',
+    '',
     `cwd: ${record.cwd}`,
-    `status: ${record.status}${typeof record.exitCode === "number" ? ` (${record.exitCode})` : ""}`,
-    record.truncated ? "output: truncated" : "",
-    "",
-    "stdout:",
-    "```text",
-    stdout || "(empty)",
-    "```",
-    "",
-    "stderr:",
-    "```text",
-    stderr || "(empty)",
-    "```",
-  ].filter(Boolean).join("\n");
+    `status: ${record.status}${typeof record.exitCode === 'number' ? ` (${record.exitCode})` : ''}`,
+    record.truncated ? 'output: truncated' : '',
+    '',
+    'stdout:',
+    '```text',
+    stdout || '(empty)',
+    '```',
+    '',
+    'stderr:',
+    '```text',
+    stderr || '(empty)',
+    '```',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function copyText(text: string): Promise<void> {
@@ -43,7 +45,10 @@ function clean(value: string): string {
 </script>
 
 <template>
-  <article class="command-result-card" :class="`status-${record.status}`">
+  <article
+    class="command-result-card"
+    :class="`status-${record.status}`"
+  >
     <header class="command-result-header">
       <div class="command-result-title">
         <span class="command-result-kicker">Command result</span>
@@ -58,7 +63,7 @@ function clean(value: string): string {
       </div>
       <div>
         <dt>Exit</dt>
-        <dd>{{ record.exitCode ?? "…" }}</dd>
+        <dd>{{ record.exitCode ?? '…' }}</dd>
       </div>
       <div v-if="record.durationMs !== undefined">
         <dt>Time</dt>
@@ -69,17 +74,55 @@ function clean(value: string): string {
         <dd>truncated</dd>
       </div>
     </dl>
-    <pre v-if="record.stdout" class="command-output stdout">{{ clean(record.stdout) }}</pre>
-    <pre v-if="record.stderr" class="command-output stderr">{{ clean(record.stderr) }}</pre>
-    <p v-if="record.status === 'running' && !record.stdout && !record.stderr" class="command-running">
-      <i class="pi pi-spin pi-spinner" aria-hidden="true" />
+    <pre
+      v-if="record.stdout"
+      class="command-output stdout"
+      >{{ clean(record.stdout) }}</pre
+    >
+    <pre
+      v-if="record.stderr"
+      class="command-output stderr"
+      >{{ clean(record.stderr) }}</pre
+    >
+    <p
+      v-if="record.status === 'running' && !record.stdout && !record.stderr"
+      class="command-running"
+    >
+      <i
+        class="pi pi-spin pi-spinner"
+        aria-hidden="true"
+      />
       Running…
     </p>
     <footer class="command-result-actions">
-      <Button label="Copy command" icon="pi pi-copy" size="small" text @click="copyText(record.command)" />
-      <Button label="Copy output" icon="pi pi-align-left" size="small" text @click="copyText(clean(`${record.stdout}${record.stderr}`))" />
-      <Button label="Copy markdown" icon="pi pi-code" size="small" text @click="copyText(markdownFor(record))" />
-      <Button label="Add to composer" icon="pi pi-plus" size="small" text @click="emit('add', record)" />
+      <Button
+        label="Copy command"
+        icon="pi pi-copy"
+        size="small"
+        text
+        @click="copyText(record.command)"
+      />
+      <Button
+        label="Copy output"
+        icon="pi pi-align-left"
+        size="small"
+        text
+        @click="copyText(clean(`${record.stdout}${record.stderr}`))"
+      />
+      <Button
+        label="Copy markdown"
+        icon="pi pi-code"
+        size="small"
+        text
+        @click="copyText(markdownFor(record))"
+      />
+      <Button
+        label="Add to composer"
+        icon="pi pi-plus"
+        size="small"
+        text
+        @click="emit('add', record)"
+      />
       <Button
         v-if="record.status === 'running'"
         label="Cancel"

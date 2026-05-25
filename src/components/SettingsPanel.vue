@@ -9,21 +9,26 @@
 // New settings categories slot in as additional <section> blocks; the
 // existing collapsedGroups reactive map keys them by id.
 
-import { computed, onMounted, reactive, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
-import Button from "primevue/button";
-import ColorPicker from "primevue/colorpicker";
-import InputNumber from "primevue/inputnumber";
-import InputText from "primevue/inputtext";
-import Select from "primevue/select";
-import ToggleSwitch from "primevue/toggleswitch";
-import { useNotificationsStore } from "../stores/notificationsStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useToastStore } from "../stores/toastStore";
-import { invokeCommand } from "../ipc/invoke";
-import type { ModelSummary, ReasoningVisibility, TerminalAddonPrefs, ThemeChoice } from "../ipc/types";
-import { useModelsStore } from "../stores/modelsStore";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import Button from 'primevue/button';
+import ColorPicker from 'primevue/colorpicker';
+import InputNumber from 'primevue/inputnumber';
+import InputText from 'primevue/inputtext';
+import Select from 'primevue/select';
+import ToggleSwitch from 'primevue/toggleswitch';
+import { useNotificationsStore } from '../stores/notificationsStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useToastStore } from '../stores/toastStore';
+import { invokeCommand } from '../ipc/invoke';
+import type {
+  ModelSummary,
+  ReasoningVisibility,
+  TerminalAddonPrefs,
+  ThemeChoice,
+} from '../ipc/types';
+import { useModelsStore } from '../stores/modelsStore';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelsStore();
@@ -38,60 +43,59 @@ onMounted(() => {
 });
 
 const themeOptions: { label: string; value: ThemeChoice }[] = [
-  { label: "System", value: "system" },
-  { label: "Light", value: "light" },
-  { label: "Dark", value: "dark" },
+  { label: 'System', value: 'system' },
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
 ];
 
 const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
-  { label: "Hidden", value: "hidden" },
-  { label: "Compact", value: "compact" },
-  { label: "Expanded", value: "expanded" },
+  { label: 'Hidden', value: 'hidden' },
+  { label: 'Compact', value: 'compact' },
+  { label: 'Expanded', value: 'expanded' },
 ];
 
 const terminalProfileOptions = [
-  { label: "Platform default", value: "platform-default" },
-  { label: "PowerShell 7 / pwsh", value: "pwsh" },
-  { label: "Windows PowerShell", value: "powershell" },
-  { label: "Command Prompt", value: "cmd" },
-  { label: "Unix shell ($SHELL)", value: "unix-shell" },
+  { label: 'Platform default', value: 'platform-default' },
+  { label: 'PowerShell 7 / pwsh', value: 'pwsh' },
+  { label: 'Windows PowerShell', value: 'powershell' },
+  { label: 'Command Prompt', value: 'cmd' },
+  { label: 'Unix shell ($SHELL)', value: 'unix-shell' },
 ];
 
 const terminalAddonLabels: Array<{ key: keyof TerminalAddonPrefs; label: string }> = [
-  { key: "search", label: "Search" },
-  { key: "webLinks", label: "Web links" },
-  { key: "clipboard", label: "Clipboard" },
-  { key: "unicode11", label: "Unicode 11" },
-  { key: "webFonts", label: "Web fonts" },
-  { key: "progress", label: "Progress" },
-  { key: "ligatures", label: "Ligatures" },
-  { key: "image", label: "Images" },
-  { key: "unicodeGraphemes", label: "Graphemes" },
-  { key: "webgl", label: "WebGL" },
-  { key: "serialize", label: "Serialize" },
+  { key: 'search', label: 'Search' },
+  { key: 'webLinks', label: 'Web links' },
+  { key: 'clipboard', label: 'Clipboard' },
+  { key: 'unicode11', label: 'Unicode 11' },
+  { key: 'webFonts', label: 'Web fonts' },
+  { key: 'progress', label: 'Progress' },
+  { key: 'ligatures', label: 'Ligatures' },
+  { key: 'image', label: 'Images' },
+  { key: 'unicodeGraphemes', label: 'Graphemes' },
+  { key: 'webgl', label: 'WebGL' },
+  { key: 'serialize', label: 'Serialize' },
 ];
 
-const defaultModelOptions = computed<Array<ModelSummary | { id: ""; name: string }>>(
-  () => [{ id: "", name: "CLI default" }, ...models.value],
-);
+const defaultModelOptions = computed<Array<ModelSummary | { id: ''; name: string }>>(() => [
+  { id: '', name: 'CLI default' },
+  ...models.value,
+]);
 
 const defaultModel = computed<string>({
-  get: () => settings.value.appearance.defaultModelId ?? "",
+  get: () => settings.value.appearance.defaultModelId ?? '',
   set: (value) => {
     const model = models.value.find((m) => m.id === value);
     const effort = model?.supportsReasoningEffort
-      ? settings.value.appearance.defaultReasoningEffort ?? model.defaultReasoningEffort
+      ? (settings.value.appearance.defaultReasoningEffort ?? model.defaultReasoningEffort)
       : null;
     void settingsStore.setDefaultModel(value, effort);
   },
 });
 
-const selectedDefaultModel = computed(() =>
-  models.value.find((m) => m.id === defaultModel.value),
-);
+const selectedDefaultModel = computed(() => models.value.find((m) => m.id === defaultModel.value));
 
 const defaultReasoningOptions = computed(() => [
-  { label: "Model default", value: null as string | null },
+  { label: 'Model default', value: null as string | null },
   ...(selectedDefaultModel.value?.supportedReasoningEfforts ?? []).map((effort) => ({
     label: effort,
     value: effort,
@@ -106,7 +110,7 @@ const defaultReasoning = computed<string | null>({
 });
 
 const defaultTerminalProfile = computed<string>({
-  get: () => settings.value.terminal?.defaultProfileId ?? "platform-default",
+  get: () => settings.value.terminal?.defaultProfileId ?? 'platform-default',
   set: (value) => {
     void settingsStore.setDefaultTerminalProfile(value);
   },
@@ -115,27 +119,29 @@ const defaultTerminalProfile = computed<string>({
 const terminalPrefs = computed(() => settings.value.terminal);
 
 function setTerminalFontFamily(value: string): void {
-  void settingsStore.setTerminalPrefs({ fontFamily: value.trim() || terminalPrefs.value.fontFamily });
+  void settingsStore.setTerminalPrefs({
+    fontFamily: value.trim() || terminalPrefs.value.fontFamily,
+  });
 }
 
 function setTerminalFontSize(value: number | null | undefined): void {
-  if (typeof value === "number") void settingsStore.setTerminalPrefs({ fontSize: value });
+  if (typeof value === 'number') void settingsStore.setTerminalPrefs({ fontSize: value });
 }
 
 function setTerminalScrollback(value: number | null | undefined): void {
-  if (typeof value === "number") void settingsStore.setTerminalPrefs({ scrollback: value });
+  if (typeof value === 'number') void settingsStore.setTerminalPrefs({ scrollback: value });
 }
 
 function hexNoHash(value: string): string {
-  return value.trim().replace(/^#/, "");
+  return value.trim().replace(/^#/, '');
 }
 
 function hexWithHash(value: string): string {
   const clean = hexNoHash(value);
-  return clean ? `#${clean}` : "";
+  return clean ? `#${clean}` : '';
 }
 
-function setTerminalColor(which: "background" | "foreground", value: string): void {
+function setTerminalColor(which: 'background' | 'foreground', value: string): void {
   const next = hexWithHash(value) || terminalPrefs.value.theme[which];
   void settingsStore.setTerminalPrefs({ theme: { [which]: next } });
 }
@@ -184,7 +190,7 @@ const notifyTurnEnd = computed<boolean>({
     // If the user just turned ON a notification and the browser
     // doesn't have permission yet, kick off the prompt so they
     // don't enable a no-op toggle. Skipped when turning OFF.
-    if (value && notificationsStore.permission === "default") {
+    if (value && notificationsStore.permission === 'default') {
       void notificationsStore.requestPermission();
     }
   },
@@ -194,7 +200,7 @@ const notifyWaitingForInput = computed<boolean>({
   get: () => settings.value.notifications?.waitingForInput ?? true,
   set: (value) => {
     void settingsStore.setNotifications({ waitingForInput: value });
-    if (value && notificationsStore.permission === "default") {
+    if (value && notificationsStore.permission === 'default') {
       void notificationsStore.requestPermission();
     }
   },
@@ -202,15 +208,15 @@ const notifyWaitingForInput = computed<boolean>({
 
 const notificationPermissionLabel = computed(() => {
   switch (notificationsStore.permission) {
-    case "granted":
-      return "Granted";
-    case "denied":
-      return "Denied — enable in your OS / browser settings.";
-    case "default":
-      return "Not yet asked — toggle a notification on to grant.";
-    case "unsupported":
+    case 'granted':
+      return 'Granted';
+    case 'denied':
+      return 'Denied — enable in your OS / browser settings.';
+    case 'default':
+      return 'Not yet asked — toggle a notification on to grant.';
+    case 'unsupported':
     default:
-      return "Not supported in this WebView.";
+      return 'Not supported in this WebView.';
   }
 });
 
@@ -221,8 +227,8 @@ async function askPermission() {
 async function openLogFolder() {
   const toasts = useToastStore();
   try {
-    const ok = await invokeCommand("openLogFolder", {});
-    if (!ok) toasts.warn("Log folder not available yet");
+    const ok = await invokeCommand('openLogFolder', {});
+    if (!ok) toasts.warn('Log folder not available yet');
   } catch (err) {
     const message = toErrorMessage(err);
     toasts.error("Couldn't open log folder", message);
@@ -233,14 +239,12 @@ async function openLogFolder() {
 /// the user can type freely without firing an RPC on every keystroke.
 /// Committed on blur / Enter. Synced from the store whenever the
 /// canonical value changes (e.g. the startup backfill landed).
-const defaultWorkspaceDraft = ref<string>(
-  settings.value.workspaces.defaultWorkspace ?? "",
-);
+const defaultWorkspaceDraft = ref<string>(settings.value.workspaces.defaultWorkspace ?? '');
 watch(
   () => settings.value.workspaces.defaultWorkspace,
   (next) => {
     if (next !== defaultWorkspaceDraft.value) {
-      defaultWorkspaceDraft.value = next ?? "";
+      defaultWorkspaceDraft.value = next ?? '';
     }
   },
 );
@@ -256,7 +260,7 @@ async function pickDefaultWorkspace() {
   if (isPickingDefault.value) return;
   isPickingDefault.value = true;
   try {
-    const picked = await invokeCommand("pickFolder", {
+    const picked = await invokeCommand('pickFolder', {
       startingFolder: defaultWorkspaceDraft.value.trim() || undefined,
     });
     if (picked) {
@@ -275,7 +279,7 @@ async function revealDefaultWorkspace() {
   const path = defaultWorkspaceDraft.value.trim();
   if (!path) return;
   try {
-    await invokeCommand("revealPath", { path });
+    await invokeCommand('revealPath', { path });
   } catch (err) {
     const message = toErrorMessage(err);
     useToastStore().error("Couldn't reveal folder", message);
@@ -312,17 +316,24 @@ function toggle(id: string) {
       >
         <i
           class="pi group-chevron"
-          :class="
-            collapsed.appearance ? 'pi-chevron-right' : 'pi-chevron-down'
-          "
+          :class="collapsed.appearance ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-palette group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-palette group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">Appearance</span>
       </button>
 
-      <div v-show="!collapsed.appearance" class="group-body">
-        <label class="field" for="theme-select">
+      <div
+        v-show="!collapsed.appearance"
+        class="group-body"
+      >
+        <label
+          class="field"
+          for="theme-select"
+        >
           <span class="field-label">Theme</span>
           <Select
             id="theme-select"
@@ -336,7 +347,10 @@ function toggle(id: string) {
           />
         </label>
 
-        <label class="field" for="reasoning-select">
+        <label
+          class="field"
+          for="reasoning-select"
+        >
           <span class="field-label">Reasoning visibility</span>
           <Select
             id="reasoning-select"
@@ -352,7 +366,10 @@ function toggle(id: string) {
             Default for new chats. Each session can override this from its header.
           </p>
         </label>
-        <label class="field" for="default-model-select">
+        <label
+          class="field"
+          for="default-model-select"
+        >
           <span class="field-label">Default model</span>
           <Select
             id="default-model-select"
@@ -390,9 +407,8 @@ function toggle(id: string) {
             <span>Stream assistant replies</span>
           </label>
           <p class="field-hint">
-            Off (default): the agent's reply appears in one chunk per
-            turn. On: text streams in word-by-word (livelier, but can
-            jitter under heavy load). Takes effect on the
+            Off (default): the agent's reply appears in one chunk per turn. On: text streams in
+            word-by-word (livelier, but can jitter under heavy load). Takes effect on the
             <strong>next</strong> session you create.
           </p>
         </div>
@@ -402,11 +418,9 @@ function toggle(id: string) {
             <span>Render mermaid diagrams</span>
           </label>
           <p class="field-hint">
-            Off (default): <code>```mermaid</code> fences render as
-            plain code blocks. On: lazy-loads the mermaid library on
-            first use and renders the diagram inline. Adds ~800 KB to
-            the chunk fetched when you first open a chat with a
-            diagram.
+            Off (default): <code>```mermaid</code> fences render as plain code blocks. On:
+            lazy-loads the mermaid library on first use and renders the diagram inline. Adds ~800 KB
+            to the chunk fetched when you first open a chat with a diagram.
           </p>
         </div>
       </div>
@@ -422,18 +436,25 @@ function toggle(id: string) {
       >
         <i
           class="pi group-chevron"
-          :class="
-            collapsed.workspaces ? 'pi-chevron-right' : 'pi-chevron-down'
-          "
+          :class="collapsed.workspaces ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-folder group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-folder group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">Workspaces</span>
       </button>
 
-      <div v-show="!collapsed.workspaces" class="group-body">
+      <div
+        v-show="!collapsed.workspaces"
+        class="group-body"
+      >
         <div class="field">
-          <span class="field-label" id="default-workspace-label">
+          <span
+            class="field-label"
+            id="default-workspace-label"
+          >
             Default workspace
           </span>
           <div class="field-control workspace-row">
@@ -483,11 +504,20 @@ function toggle(id: string) {
           :class="collapsed.terminal ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-window-maximize group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-window-maximize group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">Terminal</span>
       </button>
-      <div v-show="!collapsed.terminal" class="group-body">
-        <label class="field" for="terminal-profile-select">
+      <div
+        v-show="!collapsed.terminal"
+        class="group-body"
+      >
+        <label
+          class="field"
+          for="terminal-profile-select"
+        >
           <span class="field-label">Default terminal profile</span>
           <Select
             id="terminal-profile-select"
@@ -502,7 +532,10 @@ function toggle(id: string) {
             Used for new terminal panes. Full profile editing is planned for a later slice.
           </p>
         </label>
-        <label class="field" for="terminal-font-family">
+        <label
+          class="field"
+          for="terminal-font-family"
+        >
           <span class="field-label">Font family</span>
           <InputText
             id="terminal-font-family"
@@ -512,7 +545,10 @@ function toggle(id: string) {
           />
         </label>
         <div class="settings-grid">
-          <label class="field" for="terminal-font-size">
+          <label
+            class="field"
+            for="terminal-font-size"
+          >
             <span class="field-label">Font size</span>
             <InputNumber
               id="terminal-font-size"
@@ -523,7 +559,10 @@ function toggle(id: string) {
               @update:model-value="setTerminalFontSize"
             />
           </label>
-          <label class="field" for="terminal-scrollback">
+          <label
+            class="field"
+            for="terminal-scrollback"
+          >
             <span class="field-label">Scrollback</span>
             <InputNumber
               id="terminal-scrollback"
@@ -536,7 +575,10 @@ function toggle(id: string) {
           </label>
         </div>
         <div class="settings-grid">
-          <label class="field color-field" for="terminal-background">
+          <label
+            class="field color-field"
+            for="terminal-background"
+          >
             <span class="field-label">Background</span>
             <div class="color-row">
               <ColorPicker
@@ -547,7 +589,10 @@ function toggle(id: string) {
               <code>{{ terminalPrefs.theme.background }}</code>
             </div>
           </label>
-          <label class="field color-field" for="terminal-foreground">
+          <label
+            class="field color-field"
+            for="terminal-foreground"
+          >
             <span class="field-label">Foreground</span>
             <div class="color-row">
               <ColorPicker
@@ -560,7 +605,11 @@ function toggle(id: string) {
           </label>
         </div>
         <div class="addon-grid">
-          <label v-for="addon in terminalAddonLabels" :key="addon.key" class="addon-toggle">
+          <label
+            v-for="addon in terminalAddonLabels"
+            :key="addon.key"
+            class="addon-toggle"
+          >
             <ToggleSwitch
               :model-value="terminalPrefs.addons[addon.key]"
               @update:model-value="(value) => setTerminalAddon(addon.key, value)"
@@ -582,24 +631,28 @@ function toggle(id: string) {
       >
         <i
           class="pi group-chevron"
-          :class="
-            collapsed.notifications ? 'pi-chevron-right' : 'pi-chevron-down'
-          "
+          :class="collapsed.notifications ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-bell group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-bell group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">Notifications</span>
       </button>
 
-      <div v-show="!collapsed.notifications" class="group-body">
+      <div
+        v-show="!collapsed.notifications"
+        class="group-body"
+      >
         <div class="field field-inline">
           <label class="field-inline-label">
             <ToggleSwitch v-model="notifyWaitingForInput" />
             <span>Waiting for input</span>
           </label>
           <p class="field-hint">
-            OS notification when a tool needs permission or a session
-            asks for input, and you're not on its panel.
+            OS notification when a tool needs permission or a session asks for input, and you're not
+            on its panel.
           </p>
         </div>
         <div class="field field-inline">
@@ -608,8 +661,8 @@ function toggle(id: string) {
             <span>Turn complete</span>
           </label>
           <p class="field-hint">
-            OS notification on every <code>assistant.turn_end</code> for
-            a background session. Off by default — can be noisy.
+            OS notification on every <code>assistant.turn_end</code> for a background session. Off
+            by default — can be noisy.
           </p>
         </div>
         <div class="field">
@@ -638,34 +691,36 @@ function toggle(id: string) {
       >
         <i
           class="pi group-chevron"
-          :class="
-            collapsed.permissions ? 'pi-chevron-right' : 'pi-chevron-down'
-          "
+          :class="collapsed.permissions ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-shield group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-shield group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">Permissions</span>
       </button>
 
-      <div v-show="!collapsed.permissions" class="group-body">
+      <div
+        v-show="!collapsed.permissions"
+        class="group-body"
+      >
         <div class="field field-inline">
           <label class="field-inline-label">
             <ToggleSwitch v-model="defaultApproveAll" />
             <span>Default to approve all for new sessions</span>
           </label>
           <p class="field-hint">
-            When ON, brand-new sessions automatically approve every
-            privileged tool call (file write, shell, network, etc.)
-            without prompting. Off by default — explicit user choice.
-            The per-session toggle in the session rail continues to
-            drive runtime state; this only sets the starting value.
+            When ON, brand-new sessions automatically approve every privileged tool call (file
+            write, shell, network, etc.) without prompting. Off by default — explicit user choice.
+            The per-session toggle in the session rail continues to drive runtime state; this only
+            sets the starting value.
           </p>
         </div>
         <div class="field">
           <p class="field-hint">
-            To reset remembered approvals for an open session, use
-            "Reset approvals" in the session's right-rail Session
-            section.
+            To reset remembered approvals for an open session, use "Reset approvals" in the
+            session's right-rail Session section.
           </p>
         </div>
       </div>
@@ -681,16 +736,20 @@ function toggle(id: string) {
       >
         <i
           class="pi group-chevron"
-          :class="
-            collapsed.diagnostics ? 'pi-chevron-right' : 'pi-chevron-down'
-          "
+          :class="collapsed.diagnostics ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-info-circle group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-info-circle group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">Diagnostics</span>
       </button>
 
-      <div v-show="!collapsed.diagnostics" class="group-body">
+      <div
+        v-show="!collapsed.diagnostics"
+        class="group-body"
+      >
         <div class="field">
           <Button
             label="Open log folder"
@@ -720,11 +779,17 @@ function toggle(id: string) {
           :class="collapsed.about ? 'pi-chevron-right' : 'pi-chevron-down'"
           aria-hidden="true"
         />
-        <i class="pi pi-tag group-icon" aria-hidden="true" />
+        <i
+          class="pi pi-tag group-icon"
+          aria-hidden="true"
+        />
         <span class="group-label">About</span>
       </button>
 
-      <div v-show="!collapsed.about" class="group-body">
+      <div
+        v-show="!collapsed.about"
+        class="group-body"
+      >
         <p class="field-hint">
           Schema version <strong>{{ settings.version }}</strong> — stored under
           <code>userData/settings.json</code>.
@@ -732,7 +797,12 @@ function toggle(id: string) {
       </div>
     </section>
 
-    <p v-if="isSaving" class="saving-state">Saving…</p>
+    <p
+      v-if="isSaving"
+      class="saving-state"
+    >
+      Saving…
+    </p>
   </div>
 </template>
 

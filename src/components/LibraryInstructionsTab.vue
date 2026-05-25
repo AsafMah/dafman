@@ -5,15 +5,15 @@
 /// intentionally deferred: saving AGENTS.md / copilot-instructions.md is a
 /// project file write and must go through a permissioned editor flow.
 
-import { computed, onMounted, ref, watch } from "vue";
-import Button from "primevue/button";
-import { invokeCommand } from "../ipc/invoke";
-import type { InstructionSource } from "../ipc/types";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSessionsStore } from "../stores/sessionsStore";
-import { useToastStore } from "../stores/toastStore";
-import MessageContent from "./MessageContent.vue";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, ref, watch } from 'vue';
+import Button from 'primevue/button';
+import { invokeCommand } from '../ipc/invoke';
+import type { InstructionSource } from '../ipc/types';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useToastStore } from '../stores/toastStore';
+import MessageContent from './MessageContent.vue';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const toasts = useToastStore();
 const layoutStore = useLayoutStore();
@@ -31,8 +31,8 @@ const activeSession = computed(() => {
 });
 
 const groups = computed(() => ({
-  project: sources.value.filter((s) => s.scope === "project"),
-  global: sources.value.filter((s) => s.scope === "global"),
+  project: sources.value.filter((s) => s.scope === 'project'),
+  global: sources.value.filter((s) => s.scope === 'global'),
 }));
 
 function keyFor(src: InstructionSource): string {
@@ -52,8 +52,8 @@ function toggle(src: InstructionSource) {
 }
 
 function sizeLabel(src: InstructionSource): string {
-  if (!src.exists) return "missing";
-  if (src.sizeBytes == null) return "unknown";
+  if (!src.exists) return 'missing';
+  if (src.sizeBytes == null) return 'unknown';
   if (src.sizeBytes < 1024) return `${src.sizeBytes} B`;
   return `${(src.sizeBytes / 1024).toFixed(1)} KB`;
 }
@@ -62,7 +62,7 @@ async function load() {
   error.value = null;
   loaded.value = false;
   try {
-    sources.value = await invokeCommand("listInstructionSources", {
+    sources.value = await invokeCommand('listInstructionSources', {
       ...(activeSession.value?.workingDirectory
         ? { workingDirectory: activeSession.value.workingDirectory }
         : {}),
@@ -77,16 +77,19 @@ async function load() {
 async function reveal(src: InstructionSource) {
   if (!src.exists) return;
   try {
-    await invokeCommand("revealPath", { path: src.path });
+    await invokeCommand('revealPath', { path: src.path });
   } catch (err) {
-    toasts.error("Reveal failed", toErrorMessage(err));
+    toasts.error('Reveal failed', toErrorMessage(err));
   }
 }
 
 onMounted(load);
-watch(() => activeSession.value?.workingDirectory ?? "", () => {
-  void load();
-});
+watch(
+  () => activeSession.value?.workingDirectory ?? '',
+  () => {
+    void load();
+  },
+);
 </script>
 
 <template>
@@ -94,9 +97,16 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
     <header class="instructions-header">
       <span class="instructions-summary">
         <span v-if="!loaded">Loading…</span>
-        <span v-else-if="error" class="error">{{ error }}</span>
+        <span
+          v-else-if="error"
+          class="error"
+          >{{ error }}</span
+        >
         <span v-else>
-          {{ sources.filter((s) => s.exists).length }} file{{ sources.filter((s) => s.exists).length === 1 ? "" : "s" }} found
+          {{ sources.filter((s) => s.exists).length }} file{{
+            sources.filter((s) => s.exists).length === 1 ? '' : 's'
+          }}
+          found
         </span>
       </span>
       <Button
@@ -109,17 +119,26 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
       />
     </header>
 
-    <div v-if="!activeSession" class="hint">
-      No active workspace. Showing global instruction candidates only.
-      Open a session with a working directory to include project files.
+    <div
+      v-if="!activeSession"
+      class="hint"
+    >
+      No active workspace. Showing global instruction candidates only. Open a session with a working
+      directory to include project files.
     </div>
-    <div v-else class="hint">
+    <div
+      v-else
+      class="hint"
+    >
       Project scope is based on the active session workspace:
-      <code>{{ activeSession.workingDirectory || "default process cwd" }}</code>
+      <code>{{ activeSession.workingDirectory || 'default process cwd' }}</code>
     </div>
 
     <template v-if="loaded && !error">
-      <section v-if="groups.project.length > 0" class="instruction-group">
+      <section
+        v-if="groups.project.length > 0"
+        class="instruction-group"
+      >
         <h3 class="group-title">Project ({{ groups.project.filter((s) => s.exists).length }})</h3>
         <ul class="instruction-list">
           <li
@@ -144,7 +163,12 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
               <span class="instruction-name">{{ src.name }}</span>
               <small class="instruction-size">{{ sizeLabel(src) }}</small>
             </button>
-            <div class="instruction-path" :title="src.path">{{ src.relativePath }}</div>
+            <div
+              class="instruction-path"
+              :title="src.path"
+            >
+              {{ src.relativePath }}
+            </div>
             <div class="instruction-actions">
               <Button
                 icon="pi pi-external-link"
@@ -156,8 +180,14 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
                 @click="reveal(src)"
               />
             </div>
-            <div v-if="src.exists && isExpanded(src) && src.content" class="instruction-content">
-              <MessageContent :text="src.content" label="Instruction markdown" />
+            <div
+              v-if="src.exists && isExpanded(src) && src.content"
+              class="instruction-content"
+            >
+              <MessageContent
+                :text="src.content"
+                label="Instruction markdown"
+              />
             </div>
           </li>
         </ul>
@@ -188,7 +218,12 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
               <span class="instruction-name">{{ src.name }}</span>
               <small class="instruction-size">{{ sizeLabel(src) }}</small>
             </button>
-            <div class="instruction-path" :title="src.path">{{ src.path }}</div>
+            <div
+              class="instruction-path"
+              :title="src.path"
+            >
+              {{ src.path }}
+            </div>
             <div class="instruction-actions">
               <Button
                 icon="pi pi-external-link"
@@ -200,8 +235,14 @@ watch(() => activeSession.value?.workingDirectory ?? "", () => {
                 @click="reveal(src)"
               />
             </div>
-            <div v-if="src.exists && isExpanded(src) && src.content" class="instruction-content">
-              <MessageContent :text="src.content" label="Instruction markdown" />
+            <div
+              v-if="src.exists && isExpanded(src) && src.content"
+              class="instruction-content"
+            >
+              <MessageContent
+                :text="src.content"
+                label="Instruction markdown"
+              />
             </div>
           </li>
         </ul>

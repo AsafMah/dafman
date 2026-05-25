@@ -7,16 +7,16 @@
 // (e.g. accidentally re-adding setMode to the constructor) trips at
 // `bun test` instead of in production.
 
-import { describe, expect, test } from "bun:test";
-import { createEditor, $getRoot, $createParagraphNode, $isElementNode } from "lexical";
-import { AttachmentNode, $createAttachmentNode, $isAttachmentNode } from "../AttachmentNode";
-import type { SendMessageAttachment } from "../../ipc/types";
+import { describe, expect, test } from 'bun:test';
+import { createEditor, $getRoot, $createParagraphNode, $isElementNode } from 'lexical';
+import { AttachmentNode, $createAttachmentNode, $isAttachmentNode } from '../AttachmentNode';
+import type { SendMessageAttachment } from '../../ipc/types';
 
 function makeEditor() {
   // No `theme` / `onError` — we only care that construction + state
   // transitions don't throw.
   return createEditor({
-    namespace: "AttachmentNodeTest",
+    namespace: 'AttachmentNodeTest',
     nodes: [AttachmentNode],
     onError: (e) => {
       throw e;
@@ -25,20 +25,20 @@ function makeEditor() {
 }
 
 const sampleFile: SendMessageAttachment = {
-  type: "file",
-  path: "/abs/path/to/sample.ts",
-  displayName: "src/sample.ts",
+  type: 'file',
+  path: '/abs/path/to/sample.ts',
+  displayName: 'src/sample.ts',
 };
 
 const sampleImage: SendMessageAttachment = {
-  type: "blob",
-  data: "Zm9v",
-  mimeType: "image/png",
-  displayName: "screenshot.png",
+  type: 'blob',
+  data: 'Zm9v',
+  mimeType: 'image/png',
+  displayName: 'screenshot.png',
 };
 
-describe("AttachmentNode", () => {
-  test("constructs without infinite recursion (regression: setMode in ctor)", () => {
+describe('AttachmentNode', () => {
+  test('constructs without infinite recursion (regression: setMode in ctor)', () => {
     const editor = makeEditor();
     editor.update(
       () => {
@@ -50,7 +50,7 @@ describe("AttachmentNode", () => {
     );
   });
 
-  test("$createAttachmentNode and $isAttachmentNode discriminate correctly", () => {
+  test('$createAttachmentNode and $isAttachmentNode discriminate correctly', () => {
     const editor = makeEditor();
     editor.update(
       () => {
@@ -62,7 +62,7 @@ describe("AttachmentNode", () => {
     );
   });
 
-  test("getTextContent returns prompt-friendly reference", () => {
+  test('getTextContent returns prompt-friendly reference', () => {
     const editor = makeEditor();
     editor.update(
       () => {
@@ -75,7 +75,7 @@ describe("AttachmentNode", () => {
     );
   });
 
-  test("inserts into an editor paragraph and walks back out via getTextContent", () => {
+  test('inserts into an editor paragraph and walks back out via getTextContent', () => {
     const editor = makeEditor();
     editor.update(
       () => {
@@ -88,16 +88,16 @@ describe("AttachmentNode", () => {
     );
     const text = editor.read(() => $getRoot().getTextContent());
     // No brackets, just the filename embedded in document order.
-    expect(text).toContain("src/sample.ts");
+    expect(text).toContain('src/sample.ts');
   });
 
-  test("exportJSON / importJSON round-trip preserves the attachment payload", () => {
+  test('exportJSON / importJSON round-trip preserves the attachment payload', () => {
     const editor = makeEditor();
     editor.update(
       () => {
         const node = new AttachmentNode(sampleFile);
         const json = node.exportJSON();
-        expect(json.type).toBe("dafman-attachment");
+        expect(json.type).toBe('dafman-attachment');
         expect(json.attachment).toEqual(sampleFile);
         const restored = AttachmentNode.importJSON(json);
         expect(restored.getAttachment()).toEqual(sampleFile);
@@ -106,7 +106,7 @@ describe("AttachmentNode", () => {
     );
   });
 
-  test("clone preserves attachment (no recursion)", () => {
+  test('clone preserves attachment (no recursion)', () => {
     const editor = makeEditor();
     editor.update(
       () => {
@@ -119,7 +119,7 @@ describe("AttachmentNode", () => {
     );
   });
 
-  test("walks find AttachmentNodes in document order — submit-extraction contract", () => {
+  test('walks find AttachmentNodes in document order — submit-extraction contract', () => {
     const editor = makeEditor();
     editor.update(
       () => {
@@ -133,7 +133,7 @@ describe("AttachmentNode", () => {
     );
     const collected: SendMessageAttachment[] = [];
     editor.read(() => {
-      const visit = (n: import("lexical").LexicalNode): void => {
+      const visit = (n: import('lexical').LexicalNode): void => {
         if ($isAttachmentNode(n)) {
           collected.push(n.getAttachment());
           return;

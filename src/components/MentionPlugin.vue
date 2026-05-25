@@ -23,21 +23,21 @@
 ///      us the textNode, then we insert the pill using the
 ///      attachment cached in `pendingAttachment`.
 
-import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { TextNode, $createTextNode, $isTextNode } from "lexical";
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { TextNode, $createTextNode, $isTextNode } from 'lexical';
 import {
   TypeaheadMenuPlugin,
   MenuOption,
   useBasicTypeaheadTriggerMatch,
-} from "lexical-vue/LexicalTypeaheadMenuPlugin";
-import { useLexicalComposer } from "lexical-vue/LexicalComposer";
-import { $createAttachmentNode } from "../lexical/AttachmentNode";
-import type { SendMessageAttachment } from "../ipc/types";
-import FilePicker from "./FilePicker.vue";
+} from 'lexical-vue/LexicalTypeaheadMenuPlugin';
+import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
+import { $createAttachmentNode } from '../lexical/AttachmentNode';
+import type { SendMessageAttachment } from '../ipc/types';
+import FilePicker from './FilePicker.vue';
 
 class SentinelOption extends MenuOption {
   constructor() {
-    super("file-picker-sentinel");
+    super('file-picker-sentinel');
   }
 }
 
@@ -46,19 +46,19 @@ const props = defineProps<{
 }>();
 
 const editor = useLexicalComposer();
-const query = ref("");
+const query = ref('');
 const menuParent = ref<HTMLElement | null>(null);
 const pickerRef = ref<InstanceType<typeof FilePicker> | null>(null);
 /// Tunnel: set by click handlers, consumed by onSelectOption.
 const pendingAttachment = ref<SendMessageAttachment | null>(null);
 
 onMounted(() => {
-  if (typeof document !== "undefined") menuParent.value = document.body;
+  if (typeof document !== 'undefined') menuParent.value = document.body;
 });
 
 const sentinelOptions = computed(() => [new SentinelOption()]);
 
-const triggerFn = useBasicTypeaheadTriggerMatch("@", {
+const triggerFn = useBasicTypeaheadTriggerMatch('@', {
   minLength: 0,
   allowWhitespace: false,
   // Default `punctuation` excludes `.`, `/`, `~`, `\`, `-`, `:` from
@@ -66,11 +66,11 @@ const triggerFn = useBasicTypeaheadTriggerMatch("@", {
   // exit the menu instantly. We need path-nav chars allowed; passing
   // an empty string lets any non-whitespace, non-`@` char extend the
   // match. fileSearch.ts handles whatever the user types from there.
-  punctuation: "",
+  punctuation: '',
 });
 
 function onQueryChange(q: string | null) {
-  query.value = q ?? "";
+  query.value = q ?? '';
 }
 
 function replaceTriggerWith(
@@ -82,7 +82,7 @@ function replaceTriggerWith(
     if ($isTextNode(textNodeContainingQuery)) {
       const pill = $createAttachmentNode(attachment);
       textNodeContainingQuery.replace(pill);
-      const space = $createTextNode(" ");
+      const space = $createTextNode(' ');
       pill.insertAfter(space);
       space.selectEnd();
     }
@@ -97,8 +97,7 @@ function onSelectOption(payload: {
   const { textNodeContainingQuery, closeMenu } = payload;
   // Click path: pendingAttachment is set. Enter-from-editor path:
   // pendingAttachment is null, pull from the picker's highlight.
-  const attachment =
-    pendingAttachment.value ?? pickerRef.value?.pickCurrent?.() ?? null;
+  const attachment = pendingAttachment.value ?? pickerRef.value?.pickCurrent?.() ?? null;
   pendingAttachment.value = null;
   if (attachment) {
     replaceTriggerWith(textNodeContainingQuery, attachment);
@@ -108,17 +107,17 @@ function onSelectOption(payload: {
 
 function onWindowKey(e: KeyboardEvent): void {
   if (!pickerRef.value?.hasResults?.()) return;
-  if (e.key === "ArrowDown") {
+  if (e.key === 'ArrowDown') {
     pickerRef.value.moveHighlight(1);
     e.preventDefault();
-  } else if (e.key === "ArrowUp") {
+  } else if (e.key === 'ArrowUp') {
     pickerRef.value.moveHighlight(-1);
     e.preventDefault();
   }
 }
 
-onMounted(() => window.addEventListener("keydown", onWindowKey, true));
-onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
+onMounted(() => window.addEventListener('keydown', onWindowKey, true));
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true));
 </script>
 
 <template>
@@ -142,10 +141,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKey, true));
             :external-query="query"
             :show-search-input="false"
             initial-focus="none"
-            @select="(att: SendMessageAttachment) => {
-              pendingAttachment = att;
-              itemProps.selectOptionAndCleanUp(itemProps.options[0]);
-            }"
+            @select="
+              (att: SendMessageAttachment) => {
+                pendingAttachment = att;
+                itemProps.selectOptionAndCleanUp(itemProps.options[0]);
+              }
+            "
             @dismiss="() => {}"
           />
         </div>

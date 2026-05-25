@@ -27,9 +27,9 @@ import {
   type NodeKey,
   type SerializedLexicalNode,
   type Spread,
-} from "lexical";
-import type { SendMessageAttachment } from "../ipc/types";
-import { openAttachment } from "../lib/openAttachment";
+} from 'lexical';
+import type { SendMessageAttachment } from '../ipc/types';
+import { openAttachment } from '../lib/openAttachment';
 
 export type SerializedAttachmentNode = Spread<
   { attachment: SendMessageAttachment },
@@ -40,7 +40,7 @@ export class AttachmentNode extends DecoratorNode<null> {
   __attachment: SendMessageAttachment;
 
   static getType(): string {
-    return "dafman-attachment";
+    return 'dafman-attachment';
   }
 
   static clone(node: AttachmentNode): AttachmentNode {
@@ -72,25 +72,23 @@ export class AttachmentNode extends DecoratorNode<null> {
     // non-configurable data property...". Local-variable captures
     // sidestep the proxy entirely.
     const attachment = this.__attachment;
-    const isImage =
-      attachment.type === "blob" &&
-      (attachment.mimeType ?? "").startsWith("image/");
+    const isImage = attachment.type === 'blob' && (attachment.mimeType ?? '').startsWith('image/');
     const label = labelForAttachment(attachment);
 
-    const dom = document.createElement("span");
-    dom.className = "composer-attachment-pill";
+    const dom = document.createElement('span');
+    dom.className = 'composer-attachment-pill';
     dom.dataset.attachmentType = attachment.type;
-    if (attachment.type === "commandResult") {
-      dom.dataset.attachmentKind = "command-result";
+    if (attachment.type === 'commandResult') {
+      dom.dataset.attachmentKind = 'command-result';
     }
     if (isImage) {
-      dom.dataset.attachmentKind = "image";
+      dom.dataset.attachmentKind = 'image';
     }
-    const icon = document.createElement("i");
+    const icon = document.createElement('i');
     icon.className = `pi ${iconClassForAttachment(attachment, isImage)} composer-attachment-pill-icon`;
-    icon.setAttribute("aria-hidden", "true");
-    const text = document.createElement("span");
-    text.className = "composer-attachment-pill-label";
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.className = 'composer-attachment-pill-label';
     text.textContent = label;
     dom.appendChild(icon);
     dom.appendChild(text);
@@ -98,15 +96,15 @@ export class AttachmentNode extends DecoratorNode<null> {
     // contenteditable=false so the browser treats the pill as a single
     // atomic widget for caret nav + selection. Lexical complements
     // this with DecoratorNode's own selection model.
-    dom.setAttribute("contenteditable", "false");
-    dom.style.cursor = "pointer";
-    dom.addEventListener("mousedown", (e) => {
+    dom.setAttribute('contenteditable', 'false');
+    dom.style.cursor = 'pointer';
+    dom.addEventListener('mousedown', (e) => {
       // Prevent the editor from collapsing the selection inside the
       // pill on mousedown — we want a clean click that opens the
       // attachment without disturbing the caret.
       e.preventDefault();
     });
-    dom.addEventListener("click", (e) => {
+    dom.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       void openAttachment(attachment);
@@ -136,7 +134,7 @@ export class AttachmentNode extends DecoratorNode<null> {
 
   exportJSON(): SerializedAttachmentNode {
     return {
-      type: "dafman-attachment",
+      type: 'dafman-attachment',
       version: 1,
       attachment: this.__attachment,
     };
@@ -144,35 +142,30 @@ export class AttachmentNode extends DecoratorNode<null> {
 }
 
 export function labelForAttachment(a: SendMessageAttachment): string {
-  if (a.type === "file" || a.type === "directory") {
+  if (a.type === 'file' || a.type === 'directory') {
     return a.displayName ?? a.path.split(/[\\/]/).pop() ?? a.path;
   }
-  if (a.type === "blob") return a.displayName ?? "attachment";
-  if (a.type === "commandResult") return a.displayName ?? `Command: ${a.result.command}`;
-  return "selection";
+  if (a.type === 'blob') return a.displayName ?? 'attachment';
+  if (a.type === 'commandResult') return a.displayName ?? `Command: ${a.result.command}`;
+  return 'selection';
 }
 
 function promptTextForAttachment(a: SendMessageAttachment): string {
   return `(see attachment "${labelForAttachment(a)}")`;
 }
 
-function iconClassForAttachment(
-  a: SendMessageAttachment,
-  isImage: boolean,
-): string {
-  if (a.type === "directory") return "pi-folder";
-  if (a.type === "selection") return "pi-bookmark";
-  if (a.type === "commandResult") return "pi-terminal";
-  if (isImage) return "pi-image";
-  return "pi-file";
+function iconClassForAttachment(a: SendMessageAttachment, isImage: boolean): string {
+  if (a.type === 'directory') return 'pi-folder';
+  if (a.type === 'selection') return 'pi-bookmark';
+  if (a.type === 'commandResult') return 'pi-terminal';
+  if (isImage) return 'pi-image';
+  return 'pi-file';
 }
 
 export function $createAttachmentNode(a: SendMessageAttachment): AttachmentNode {
   return new AttachmentNode(a);
 }
 
-export function $isAttachmentNode(
-  node: LexicalNode | null | undefined,
-): node is AttachmentNode {
+export function $isAttachmentNode(node: LexicalNode | null | undefined): node is AttachmentNode {
   return node instanceof AttachmentNode;
 }

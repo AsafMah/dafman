@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
-import MessageComposer from "./MessageComposer.vue";
-import MessageContent from "./MessageContent.vue";
-import UserMessageBody from "./UserMessageBody.vue";
-import MessageActions from "./MessageActions.vue";
-import MessageEditor from "./MessageEditor.vue";
-import SessionHeaderControls from "./SessionHeaderControls.vue";
-import ToolCallBlock from "./ToolCallBlock.vue";
-import SubagentBlock from "./SubagentBlock.vue";
-import PendingRequestCard from "./PendingRequestCard.vue";
-import CommandResultCard from "./CommandResultCard.vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import MessageComposer from './MessageComposer.vue';
+import MessageContent from './MessageContent.vue';
+import UserMessageBody from './UserMessageBody.vue';
+import MessageActions from './MessageActions.vue';
+import MessageEditor from './MessageEditor.vue';
+import SessionHeaderControls from './SessionHeaderControls.vue';
+import ToolCallBlock from './ToolCallBlock.vue';
+import SubagentBlock from './SubagentBlock.vue';
+import PendingRequestCard from './PendingRequestCard.vue';
+import CommandResultCard from './CommandResultCard.vue';
 import {
   appendSystemMessage,
   appendUserMessage,
@@ -19,25 +19,25 @@ import {
   type ChatAmbient,
   type ChatItem,
   type IdCounter,
-} from "../lib/chatEvents";
+} from '../lib/chatEvents';
 import type {
   CommandResultRecord,
   ReasoningVisibility,
   SendMessageAttachment,
   SessionEventPayload,
-} from "../ipc/types";
-import { useSessionsStore, type DefaultSendMode } from "../stores/sessionsStore";
-import { useSessionsListStore } from "../stores/sessionsListStore";
-import { useLayoutStore } from "../stores/layoutStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useCommandResultsStore } from "../stores/commandResultsStore";
-import { useTerminalStore } from "../stores/terminalStore";
-import { useToastStore } from "../stores/toastStore";
-import ReasoningBlock from "./ReasoningBlock.vue";
-import type { ComposerSubmitPayload } from "../lexical/plugins";
-import { styleFor } from "../lib/notificationStyles";
-import { cleanTerminalCommandOutput } from "../lib/ansi";
-import { toErrorMessage } from "../lib/errorMessage";
+} from '../ipc/types';
+import { useSessionsStore, type DefaultSendMode } from '../stores/sessionsStore';
+import { useSessionsListStore } from '../stores/sessionsListStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useCommandResultsStore } from '../stores/commandResultsStore';
+import { useTerminalStore } from '../stores/terminalStore';
+import { useToastStore } from '../stores/toastStore';
+import ReasoningBlock from './ReasoningBlock.vue';
+import type { ComposerSubmitPayload } from '../lexical/plugins';
+import { styleFor } from '../lib/notificationStyles';
+import { cleanTerminalCommandOutput } from '../lib/ansi';
+import { toErrorMessage } from '../lib/errorMessage';
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -58,10 +58,10 @@ const props = defineProps<{
   /// inherit from app settings). Sourced from `SessionRecord` so the
   /// controls (rendered in the dockview tab strip) can mutate it from
   /// outside this component.
-  reasoningVisibilityOverride: ReasoningVisibility | "default";
+  reasoningVisibilityOverride: ReasoningVisibility | 'default';
   /// Per-session default mode for the composer's primary send action.
   /// "steer" maps to SDK `mode: "immediate"`; "queue" to `"enqueue"`.
-  defaultSendMode: "steer" | "queue";
+  defaultSendMode: 'steer' | 'queue';
   commandsRun?: number;
   /// Optional override for the send action. When provided, ChatWindow
   /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
@@ -88,7 +88,7 @@ const composerRef = ref<{
   exitCommandMode?: () => void;
   enterCommandMode?: () => void;
 } | null>(null);
-const commandTerminalId = ref<string>("");
+const commandTerminalId = ref<string>('');
 const autoAttachedCommandIds = new Set<string>();
 const capturedTerminalCommandIds = new Set<string>();
 const commandModeOpenedAt = ref<number>(0);
@@ -122,11 +122,12 @@ function onExternalScrollToBottom(e: Event) {
 }
 
 onMounted(() => {
-  window.addEventListener("dafman:focus-composer", onExternalFocusRequest);
-  window.addEventListener("dafman:open-command-terminal", onExternalCommandTerminalRequest);
-  window.addEventListener("dafman:close-command-terminal", onExternalCloseCommandTerminalRequest);
-  window.addEventListener("dafman:scroll-to-bottom", onExternalScrollToBottom);
-  void commandResultsStore.refresh(props.sessionId)
+  window.addEventListener('dafman:focus-composer', onExternalFocusRequest);
+  window.addEventListener('dafman:open-command-terminal', onExternalCommandTerminalRequest);
+  window.addEventListener('dafman:close-command-terminal', onExternalCloseCommandTerminalRequest);
+  window.addEventListener('dafman:scroll-to-bottom', onExternalScrollToBottom);
+  void commandResultsStore
+    .refresh(props.sessionId)
     .then(() => {
       for (const record of commandResultsStore.recordsBySession[props.sessionId] ?? []) {
         autoAttachedCommandIds.add(record.id);
@@ -138,10 +139,13 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("dafman:focus-composer", onExternalFocusRequest);
-  window.removeEventListener("dafman:open-command-terminal", onExternalCommandTerminalRequest);
-  window.removeEventListener("dafman:close-command-terminal", onExternalCloseCommandTerminalRequest);
-  window.removeEventListener("dafman:scroll-to-bottom", onExternalScrollToBottom);
+  window.removeEventListener('dafman:focus-composer', onExternalFocusRequest);
+  window.removeEventListener('dafman:open-command-terminal', onExternalCommandTerminalRequest);
+  window.removeEventListener(
+    'dafman:close-command-terminal',
+    onExternalCloseCommandTerminalRequest,
+  );
+  window.removeEventListener('dafman:scroll-to-bottom', onExternalScrollToBottom);
 });
 /// Live `--tile-height` so the composer can cap itself at a percentage of
 /// the chat tile's height even though the tile lives inside a flex/grid
@@ -152,11 +156,11 @@ let tileResizeObserver: ResizeObserver | null = null;
 let tileResizeRaf: number | null = null;
 
 onMounted(() => {
-  if (typeof ResizeObserver === "undefined" || !tileEl.value) return;
+  if (typeof ResizeObserver === 'undefined' || !tileEl.value) return;
   const el = tileEl.value;
   const update = () => {
     tileResizeRaf = null;
-    el.style.setProperty("--tile-height", `${el.clientHeight}px`);
+    el.style.setProperty('--tile-height', `${el.clientHeight}px`);
   };
   const schedule = () => {
     if (tileResizeRaf !== null) return;
@@ -207,7 +211,7 @@ const recordIsThinking = computed(() => {
 });
 
 const reasoningVisibility = computed<ReasoningVisibility>(() =>
-  props.reasoningVisibilityOverride === "default"
+  props.reasoningVisibilityOverride === 'default'
     ? settings.value.appearance.reasoningVisibility
     : props.reasoningVisibilityOverride,
 );
@@ -215,12 +219,11 @@ const reasoningVisibility = computed<ReasoningVisibility>(() =>
 const accentColor = computed(() => props.accent);
 const commandResults = computed(() => commandResultsStore.recordsBySession[props.sessionId] ?? []);
 const timelineItems = computed(() => {
-  const out: Array<ChatItem | { kind: "commandResult"; id: number; record: CommandResultRecord }> = [
-    ...items.value,
-  ];
+  const out: Array<ChatItem | { kind: 'commandResult'; id: number; record: CommandResultRecord }> =
+    [...items.value];
   for (const record of commandResults.value) {
     out.push({
-      kind: "commandResult",
+      kind: 'commandResult',
       id: commandResultOrder.value[record.id] ?? Number.MAX_SAFE_INTEGER,
       record,
     });
@@ -230,7 +233,7 @@ const timelineItems = computed(() => {
 
 async function scrollToBottom() {
   await nextTick();
-  if (typeof requestAnimationFrame !== "undefined") {
+  if (typeof requestAnimationFrame !== 'undefined') {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
@@ -249,7 +252,7 @@ let isFirstBatch = true;
 let pendingFlush: number | null = null;
 function scheduleFlush(): void {
   if (pendingFlush !== null) return;
-  if (typeof requestAnimationFrame === "undefined") {
+  if (typeof requestAnimationFrame === 'undefined') {
     // Test environments (jsdom etc.) — flush synchronously so the
     // existing chatEvents tests don't have to wait for a frame.
     flush();
@@ -282,13 +285,13 @@ function flush(): void {
   if (result.idle || result.error) isSendingFallback.value = false;
   for (const t of result.toasts) {
     switch (t.severity) {
-      case "success":
+      case 'success':
         toasts.success(t.summary, t.detail);
         break;
-      case "warn":
+      case 'warn':
         toasts.warn(t.summary, t.detail);
         break;
-      case "error":
+      case 'error':
         toasts.error(t.summary, t.detail);
         break;
       default:
@@ -298,9 +301,9 @@ function flush(): void {
   if (result.error && live) {
     const lastSystem = [...result.items]
       .reverse()
-      .find((i) => i.kind === "system" && i.severity === "error");
-    if (lastSystem && lastSystem.kind === "system") {
-      toasts.error("Session error", lastSystem.text);
+      .find((i) => i.kind === 'system' && i.severity === 'error');
+    if (lastSystem && lastSystem.kind === 'system') {
+      toasts.error('Session error', lastSystem.text);
     }
   }
   scrollToBottom();
@@ -317,7 +320,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  if (pendingFlush !== null && typeof cancelAnimationFrame !== "undefined") {
+  if (pendingFlush !== null && typeof cancelAnimationFrame !== 'undefined') {
     cancelAnimationFrame(pendingFlush);
     pendingFlush = null;
   }
@@ -346,12 +349,11 @@ watch(
 /// reconciles it with the eventual `user.message` echo.
 async function sendMessage(
   payload: ComposerSubmitPayload & {
-    attachments?: import("../ipc/types").SendMessageAttachment[];
+    attachments?: import('../ipc/types').SendMessageAttachment[];
   },
 ) {
   if (!payload.text) return;
-  const concreteMode =
-    payload.mode === "default" ? props.defaultSendMode : payload.mode;
+  const concreteMode = payload.mode === 'default' ? props.defaultSendMode : payload.mode;
 
   items.value = appendUserMessage(items.value, payload.text, idCounter, payload.attachments);
   isSendingFallback.value = true;
@@ -370,12 +372,8 @@ async function sendMessage(
     }
   } catch (error) {
     const message = toErrorMessage(error);
-    items.value = appendSystemMessage(
-      items.value,
-      `Error: ${message}`,
-      idCounter,
-    );
-    toasts.error("Failed to send message", message);
+    items.value = appendSystemMessage(items.value, `Error: ${message}`, idCounter);
+    toasts.error('Failed to send message', message);
     isSendingFallback.value = false;
     await scrollToBottom();
   }
@@ -394,7 +392,7 @@ async function ensureCommandTerminal(): Promise<string | null> {
     return terminal.id;
   } catch (err) {
     const message = toErrorMessage(err);
-    toasts.error("Failed to open session terminal", message);
+    toasts.error('Failed to open session terminal', message);
     return null;
   }
 }
@@ -404,9 +402,11 @@ async function onRequestCommandTerminal(): Promise<void> {
   await ensureCommandTerminal();
   await nextTick();
   if (commandTerminalId.value) {
-    window.dispatchEvent(new CustomEvent("dafman:focus-terminal", {
-      detail: { terminalId: commandTerminalId.value },
-    }));
+    window.dispatchEvent(
+      new CustomEvent('dafman:focus-terminal', {
+        detail: { terminalId: commandTerminalId.value },
+      }),
+    );
   }
 }
 
@@ -415,12 +415,12 @@ async function openFullSessionTerminal(): Promise<void> {
   if (!terminalId) return;
   composerRef.value?.exitCommandMode?.();
   const terminal = terminalStore.terminals.find((t) => t.id === terminalId);
-  layoutStore.addTerminalPanel(terminalId, terminal?.title ?? "Session Shell");
+  layoutStore.addTerminalPanel(terminalId, terminal?.title ?? 'Session Shell');
 }
 
 function addCommandResultAttachment(record: CommandResultRecord): void {
   composerRef.value?.addAttachment?.({
-    type: "commandResult",
+    type: 'commandResult',
     result: record,
     displayName: `command-result-${record.id.slice(0, 8)}.md`,
   });
@@ -438,30 +438,30 @@ watch(commandResults, (records) => {
         [record.id]: idCounter.next++,
       };
     }
-    if (record.status === "running" || autoAttachedCommandIds.has(record.id)) continue;
+    if (record.status === 'running' || autoAttachedCommandIds.has(record.id)) continue;
     autoAttachedCommandIds.add(record.id);
     addCommandResultAttachment(record);
   }
 });
 
 watch(
-  () => commandTerminalId.value ? terminalStore.commands[commandTerminalId.value] ?? [] : [],
+  () => (commandTerminalId.value ? (terminalStore.commands[commandTerminalId.value] ?? []) : []),
   (commands) => {
     for (const command of commands) {
       if (!command.command || capturedTerminalCommandIds.has(command.id)) continue;
       if (new Date(command.startedAt).getTime() < commandModeOpenedAt.value) continue;
       capturedTerminalCommandIds.add(command.id);
       const now = new Date().toISOString();
-      const output = cleanTerminalCommandOutput(command.output ?? "");
+      const output = cleanTerminalCommandOutput(command.output ?? '');
       commandResultsStore.addLocal({
         id: command.id,
         sessionId: props.sessionId,
         command: command.command,
-        cwd: command.cwd ?? "",
-        shell: "session terminal",
-        status: command.exitCode === 0 ? "completed" : "failed",
+        cwd: command.cwd ?? '',
+        shell: 'session terminal',
+        status: command.exitCode === 0 ? 'completed' : 'failed',
         stdout: output,
-        stderr: "",
+        stderr: '',
         truncated: false,
         createdAt: command.startedAt,
         completedAt: command.endedAt ?? now,
@@ -483,9 +483,10 @@ function onMessageEdit(itemId: number) {
 }
 
 function onMessageQuote(quotedText: string) {
-  const composer = composerRef.value as
-    | { appendText?: (v: string) => void; focus: () => void }
-    | null;
+  const composer = composerRef.value as {
+    appendText?: (v: string) => void;
+    focus: () => void;
+  } | null;
   composer?.appendText?.(quotedText);
 }
 
@@ -494,7 +495,7 @@ function onMessageQuote(quotedText: string) {
 async function onEditorSave(eventId: string, newText: string): Promise<void> {
   editingItemId.value = null;
   if (!eventId) {
-    toasts.warn("Can't save edit", "Missing server anchor for this message.");
+    toasts.warn("Can't save edit", 'Missing server anchor for this message.');
     return;
   }
   try {
@@ -516,15 +517,11 @@ async function onEditorSave(eventId: string, newText: string): Promise<void> {
 async function onEditorSaveFork(eventId: string, newText: string): Promise<void> {
   editingItemId.value = null;
   if (!eventId) {
-    toasts.warn("Can't fork", "Missing server anchor for this message.");
+    toasts.warn("Can't fork", 'Missing server anchor for this message.');
     return;
   }
   try {
-    const newId = await sessionsStore.forkAndSend(
-      props.sessionId,
-      eventId,
-      newText,
-    );
+    const newId = await sessionsStore.forkAndSend(props.sessionId, eventId, newText);
     layoutStore.addPanel(newId);
     layoutStore.activatePanel(newId);
   } catch {
@@ -542,7 +539,7 @@ async function onMessageRetry(assistantItemIndex: number) {
   // we resend.
   for (let i = assistantItemIndex - 1; i >= 0; i--) {
     const it = items.value[i];
-    if (it && it.kind === "user" && it.eventId) {
+    if (it && it.kind === 'user' && it.eventId) {
       try {
         await sessionsStore.retryFromEvent(props.sessionId, it.eventId, it.text);
       } catch {
@@ -553,7 +550,7 @@ async function onMessageRetry(assistantItemIndex: number) {
   }
   toasts.warn(
     "Can't retry from here",
-    "No preceding user message with a server-acknowledged anchor.",
+    'No preceding user message with a server-acknowledged anchor.',
   );
 }
 
@@ -570,10 +567,10 @@ async function onMessageRetry(assistantItemIndex: number) {
 function resolveForkAnchor(itemIndex: number): string | undefined {
   const item = items.value[itemIndex];
   if (!item) return undefined;
-  if (item.kind === "user" && item.eventId) return item.eventId;
+  if (item.kind === 'user' && item.eventId) return item.eventId;
   for (let i = itemIndex; i >= 0; i--) {
     const it = items.value[i];
-    if (it && it.kind === "user" && it.eventId) return it.eventId;
+    if (it && it.kind === 'user' && it.eventId) return it.eventId;
   }
   return undefined;
 }
@@ -583,7 +580,7 @@ async function onMessageFork(itemIndex: number) {
   if (!anchor) {
     toasts.warn(
       "Can't fork from here",
-      "Need a preceding user message with a server-acknowledged anchor.",
+      'Need a preceding user message with a server-acknowledged anchor.',
     );
     return;
   }
@@ -640,17 +637,12 @@ async function onForkNoticeClick(referenceName: string) {
 /// Session command summary. File details moved to the right rail where
 /// the paths are actually useful and expandable.
 const commandsRun = computed(() => {
-  if (typeof props.commandsRun === "number") return props.commandsRun;
+  if (typeof props.commandsRun === 'number') return props.commandsRun;
   let total = 0;
   for (const it of items.value) {
-    if (it.kind !== "tool") continue;
+    if (it.kind !== 'tool') continue;
     const name = it.toolName.toLowerCase();
-    if (
-      name === "shell" ||
-      name === "bash" ||
-      name === "exec" ||
-      name === "execute"
-    ) {
+    if (name === 'shell' || name === 'bash' || name === 'exec' || name === 'execute') {
       total++;
     }
   }
@@ -676,20 +668,36 @@ const pendingStyle = computed(() => {
 </script>
 
 <template>
-  <section ref="tileEl" class="chat-tile" :style="{ '--accent': accentColor }">
-    <div ref="messagesEl" class="chat-messages">
-      <p v-if="items.length === 0" class="empty-message">
+  <section
+    ref="tileEl"
+    class="chat-tile"
+    :style="{ '--accent': accentColor }"
+  >
+    <div
+      ref="messagesEl"
+      class="chat-messages"
+    >
+      <p
+        v-if="items.length === 0"
+        class="empty-message"
+      >
         Start typing below to send a message.
       </p>
 
-      <template v-for="item in timelineItems" :key="`${item.kind}-${item.id}`">
+      <template
+        v-for="item in timelineItems"
+        :key="`${item.kind}-${item.id}`"
+      >
         <CommandResultCard
           v-if="item.kind === 'commandResult'"
           :record="item.record"
           @add="addCommandResultAttachment"
           @cancel="cancelCommandResult"
         />
-        <div v-else-if="item.kind === 'reasoning' && reasoningVisibility !== 'hidden'" class="message-shell">
+        <div
+          v-else-if="item.kind === 'reasoning' && reasoningVisibility !== 'hidden'"
+          class="message-shell"
+        >
           <ReasoningBlock
             :text="item.text"
             :visibility="reasoningVisibility"
@@ -703,7 +711,10 @@ const pendingStyle = computed(() => {
             @fork="onMessageFork(itemIndexById(item.id))"
           />
         </div>
-        <div v-else-if="item.kind === 'tool'" class="message-shell">
+        <div
+          v-else-if="item.kind === 'tool'"
+          class="message-shell"
+        >
           <ToolCallBlock
             :tool-name="item.toolName"
             :tool-call-id="item.toolCallId"
@@ -759,12 +770,18 @@ const pendingStyle = computed(() => {
           "
           @click="onForkNoticeClick(item.referenceName)"
         >
-          <i class="pi pi-share-alt" aria-hidden="true" />
+          <i
+            class="pi pi-share-alt"
+            aria-hidden="true"
+          />
           <span class="fork-notice-label">
-            {{ item.direction === "from" ? "Forked from" : "Forked into" }}
+            {{ item.direction === 'from' ? 'Forked from' : 'Forked into' }}
           </span>
           <span class="fork-notice-target">{{ item.referenceName }}</span>
-          <i class="pi pi-arrow-right" aria-hidden="true" />
+          <i
+            class="pi pi-arrow-right"
+            aria-hidden="true"
+          />
         </button>
         <!-- Skip empty assistant items entirely. The model emits
              `assistant.message_start` (creating an empty item) before
@@ -783,35 +800,34 @@ const pendingStyle = computed(() => {
           <!-- canFork is true iff the item has a server-acknowledged   -->
           <!-- eventId we can pin the fork to.                          -->
           <MessageEditor
-            v-if="
-               item.kind === 'user' &&
-              editingItemId === item.id
-            "
+            v-if="item.kind === 'user' && editingItemId === item.id"
             :original-text="item.text"
             :can-fork="Boolean('eventId' in item && item.eventId)"
-            @save="(text) => onEditorSave(('eventId' in item && item.eventId) ? item.eventId : '', text)"
-            @save-and-fork="(text) => onEditorSaveFork(('eventId' in item && item.eventId) ? item.eventId : '', text)"
+            @save="
+              (text) => onEditorSave('eventId' in item && item.eventId ? item.eventId : '', text)
+            "
+            @save-and-fork="
+              (text) =>
+                onEditorSaveFork('eventId' in item && item.eventId ? item.eventId : '', text)
+            "
             @cancel="onEditorCancel"
           />
           <template v-else>
             <article
               class="message-card"
-              :class="[
-                item.kind,
-                item.kind === 'system' ? `severity-${item.severity}` : '',
-              ]"
+              :class="[item.kind, item.kind === 'system' ? `severity-${item.severity}` : '']"
             >
               <header class="role-label">
                 {{
-                  item.kind === "user"
-                    ? "You"
-                    : item.kind === "assistant"
-                      ? "Assistant"
-                      : item.kind === "system" && item.severity === "warn"
-                        ? "Warning"
-                        : item.kind === "system" && item.severity === "error"
-                          ? "Error"
-                          : "Info"
+                  item.kind === 'user'
+                    ? 'You'
+                    : item.kind === 'assistant'
+                      ? 'Assistant'
+                      : item.kind === 'system' && item.severity === 'warn'
+                        ? 'Warning'
+                        : item.kind === 'system' && item.severity === 'error'
+                          ? 'Error'
+                          : 'Info'
                 }}
               </header>
               <UserMessageBody
@@ -825,7 +841,12 @@ const pendingStyle = computed(() => {
                 :text="item.text"
                 label="Assistant message"
               />
-              <p v-else class="message-body">{{ item.text }}</p>
+              <p
+                v-else
+                class="message-body"
+              >
+                {{ item.text }}
+              </p>
             </article>
             <MessageActions
               :kind="item.kind"
@@ -857,7 +878,7 @@ const pendingStyle = computed(() => {
         <header class="role-label">Assistant</header>
         <p class="message-body">
           <i class="pi pi-spin pi-spinner thinking-spinner" />
-          {{ ambient.intent || "Thinking…" }}
+          {{ ambient.intent || 'Thinking…' }}
         </p>
       </article>
     </div>
@@ -871,15 +892,21 @@ const pendingStyle = computed(() => {
         class="artifact-pill"
         :title="`${commandsRun} shell command(s) executed this session`"
       >
-        <i class="pi pi-window-maximize" aria-hidden="true" />
-        {{ commandsRun }} command{{ commandsRun === 1 ? "" : "s" }}
+        <i
+          class="pi pi-window-maximize"
+          aria-hidden="true"
+        />
+        {{ commandsRun }} command{{ commandsRun === 1 ? '' : 's' }}
       </span>
       <span
         v-if="ambient.usage && ambient.usage.tokenLimit > 0"
         class="artifact-pill usage-pill"
         :title="`${ambient.usage.currentTokens.toLocaleString()} / ${ambient.usage.tokenLimit.toLocaleString()} tokens`"
       >
-        <i class="pi pi-chart-bar" aria-hidden="true" />
+        <i
+          class="pi pi-chart-bar"
+          aria-hidden="true"
+        />
         {{ ambient.usage.currentTokens.toLocaleString() }} /
         {{ ambient.usage.tokenLimit.toLocaleString() }}
       </span>
@@ -908,13 +935,17 @@ const pendingStyle = computed(() => {
         <span class="pending-banner-kind">
           {{ pendingStyle.label
           }}<template v-if="ambient.pendingRequests.length > 1">
-            · {{ ambient.pendingRequests.length }} pending</template>
+            · {{ ambient.pendingRequests.length }} pending</template
+          >
         </span>
         <span class="pending-banner-message">{{ pendingHead.message }}</span>
       </div>
     </div>
 
-    <form class="chat-composer" @submit.prevent>
+    <form
+      class="chat-composer"
+      @submit.prevent
+    >
       <MessageComposer
         ref="composerRef"
         :default-mode="props.defaultSendMode"
@@ -926,10 +957,16 @@ const pendingStyle = computed(() => {
         @update:default-mode="onUpdateDefaultMode"
       >
         <template #session-left-controls>
-          <SessionHeaderControls :session-id="props.sessionId" area="composer-left" />
+          <SessionHeaderControls
+            :session-id="props.sessionId"
+            area="composer-left"
+          />
         </template>
         <template #session-right-controls>
-          <SessionHeaderControls :session-id="props.sessionId" area="composer-right" />
+          <SessionHeaderControls
+            :session-id="props.sessionId"
+            area="composer-right"
+          />
         </template>
       </MessageComposer>
     </form>
@@ -951,7 +988,9 @@ const pendingStyle = computed(() => {
   border: 1px solid color-mix(in srgb, var(--p-primary-500) 35%, transparent);
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .fork-notice:hover {
@@ -991,12 +1030,11 @@ const pendingStyle = computed(() => {
    * the per-session identity prominent now that the chat header is gone
    * (model + options live on the dockview tab strip via
    * `ChatTabActions`). */
-  background:
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--accent) 7%, var(--p-content-background)) 0,
-      var(--p-content-background) 220px
-    );
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 7%, var(--p-content-background)) 0,
+    var(--p-content-background) 220px
+  );
   /* Tile sits flush against the dockview tab strip: drop the top border
    * + top corner radius so we don't visually double up the strip's own
    * bottom border. The 4 px left rail remains the dominant accent
@@ -1129,8 +1167,12 @@ const pendingStyle = computed(() => {
 }
 
 @keyframes thinking-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-composer {
@@ -1151,7 +1193,11 @@ const pendingStyle = computed(() => {
   margin: 0.5rem 0.5rem 0;
   border-radius: var(--p-border-radius-md);
   border: 1px solid color-mix(in srgb, var(--banner-color, var(--p-primary-color)) 40%, transparent);
-  background: color-mix(in srgb, var(--banner-color, var(--p-primary-color)) 14%, var(--p-content-background));
+  background: color-mix(
+    in srgb,
+    var(--banner-color, var(--p-primary-color)) 14%,
+    var(--p-content-background)
+  );
   color: var(--p-text-color);
 }
 

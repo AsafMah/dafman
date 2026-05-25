@@ -9,27 +9,27 @@
 /// lets the user temporarily widen or narrow what they see without
 /// changing what reaches disk.
 
-import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from "vue";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import Select from "primevue/select";
-import SelectButton from "primevue/selectbutton";
-import { useLogStore, LEVEL_NAMES } from "../stores/logStore";
-import { useAuditStore } from "../stores/auditStore";
-import { useToastStore } from "../stores/toastStore";
-import { invokeCommand } from "../ipc/invoke";
-import type { AuditEntry, LogLevel, LogRecord } from "../ipc/types";
-import { toErrorMessage } from "../lib/errorMessage";
+import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from 'vue';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Select from 'primevue/select';
+import SelectButton from 'primevue/selectbutton';
+import { useLogStore, LEVEL_NAMES } from '../stores/logStore';
+import { useAuditStore } from '../stores/auditStore';
+import { useToastStore } from '../stores/toastStore';
+import { invokeCommand } from '../ipc/invoke';
+import type { AuditEntry, LogLevel, LogRecord } from '../ipc/types';
+import { toErrorMessage } from '../lib/errorMessage';
 
 const logStore = useLogStore();
 const auditStore = useAuditStore();
 const toasts = useToastStore();
 
-type Tab = "logs" | "activity";
-const tab = ref<Tab>("logs");
+type Tab = 'logs' | 'activity';
+const tab = ref<Tab>('logs');
 const tabOptions = [
-  { label: "Logs", value: "logs" as Tab },
-  { label: "Activity", value: "activity" as Tab },
+  { label: 'Logs', value: 'logs' as Tab },
+  { label: 'Activity', value: 'activity' as Tab },
 ];
 
 const listEl = ref<HTMLElement | null>(null);
@@ -44,10 +44,7 @@ const bunLevel = computed<LogLevel>({
   get: () => logStore.level,
   set: (v) => {
     logStore.setLevel(v).catch((err: unknown) => {
-      toasts.error(
-        "Failed to set log level",
-        toErrorMessage(err),
-      );
+      toasts.error('Failed to set log level', toErrorMessage(err));
     });
   },
 });
@@ -98,22 +95,22 @@ async function exportNow(): Promise<void> {
   try {
     const result = await logStore.exportBundle();
     toasts.success(
-      "Diagnostics ready",
+      'Diagnostics ready',
       `${result.files.length} file(s), ${(result.totalBytes / 1024).toFixed(1)} KiB`,
     );
     // Reveal the directory so the user can zip it up for a bug report.
     try {
-      await invokeCommand("revealPath", { path: result.path });
+      await invokeCommand('revealPath', { path: result.path });
     } catch {
       /* best-effort */
     }
   } catch (err) {
-    toasts.error("Diagnostics export failed", toErrorMessage(err));
+    toasts.error('Diagnostics export failed', toErrorMessage(err));
   }
 }
 
 function clearAll(): void {
-  if (tab.value === "logs") logStore.clear();
+  if (tab.value === 'logs') logStore.clear();
   else auditStore.clear();
 }
 
@@ -123,17 +120,24 @@ function fmtTime(ts: string): string {
 }
 
 function auditLabel(entry: AuditEntry): string {
-  if (entry.kind === "permission") {
-    const verb = entry.decision === "reject" ? "rejected" : entry.decision === "approveOnce" ? "approved once" : "approved for session";
-    const scope = entry.approvalDomain ? `domain ${entry.approvalDomain}` : entry.approvalKind ?? "";
-    const tail = scope ? ` · ${scope}` : "";
+  if (entry.kind === 'permission') {
+    const verb =
+      entry.decision === 'reject'
+        ? 'rejected'
+        : entry.decision === 'approveOnce'
+          ? 'approved once'
+          : 'approved for session';
+    const scope = entry.approvalDomain
+      ? `domain ${entry.approvalDomain}`
+      : (entry.approvalKind ?? '');
+    const tail = scope ? ` · ${scope}` : '';
     return `${entry.permissionKind} ${verb}${tail}`;
   }
-  if (entry.kind === "command") {
-    const exit = typeof entry.exitCode === "number" ? ` · exit ${entry.exitCode}` : "";
+  if (entry.kind === 'command') {
+    const exit = typeof entry.exitCode === 'number' ? ` · exit ${entry.exitCode}` : '';
     return `${entry.status} · ${entry.command}${exit}`;
   }
-  return `${entry.allowed ? "opened" : "blocked"} · ${entry.url}`;
+  return `${entry.allowed ? 'opened' : 'blocked'} · ${entry.url}`;
 }
 
 function formatTime(ts: string): string {
@@ -149,7 +153,7 @@ function fieldsFor(record: LogRecord): Record<string, unknown> {
 
 function formatFields(fields: Record<string, unknown>): string {
   const keys = Object.keys(fields);
-  if (keys.length === 0) return "";
+  if (keys.length === 0) return '';
   try {
     return JSON.stringify(fields);
   } catch {
@@ -208,12 +212,24 @@ function formatFields(fields: Record<string, unknown>): string {
         </div>
       </template>
       <div class="logviewer-row logviewer-row-actions">
-        <span v-if="tab === 'logs'" class="logviewer-count">
+        <span
+          v-if="tab === 'logs'"
+          class="logviewer-count"
+        >
           {{ filtered.length }} shown / {{ logStore.records.length }} buffered
-          <span v-if="!followTail" class="logviewer-not-tailing">· paused</span>
+          <span
+            v-if="!followTail"
+            class="logviewer-not-tailing"
+            >· paused</span
+          >
         </span>
-        <span v-else class="logviewer-count">
-          {{ auditStore.entries.length }} audit entr{{ auditStore.entries.length === 1 ? 'y' : 'ies' }}
+        <span
+          v-else
+          class="logviewer-count"
+        >
+          {{ auditStore.entries.length }} audit entr{{
+            auditStore.entries.length === 1 ? 'y' : 'ies'
+          }}
         </span>
         <Button
           icon="pi pi-trash"
@@ -240,7 +256,10 @@ function formatFields(fields: Record<string, unknown>): string {
       aria-live="polite"
       @scroll.passive="onScroll"
     >
-      <div v-if="filtered.length === 0" class="logviewer-empty">
+      <div
+        v-if="filtered.length === 0"
+        class="logviewer-empty"
+      >
         No log records match the current filter.
       </div>
       <article
@@ -261,28 +280,47 @@ function formatFields(fields: Record<string, unknown>): string {
         </span>
       </article>
     </div>
-    <div v-else class="logviewer-list" tabindex="0" role="log" aria-live="polite">
-      <div v-if="auditStore.entries.length === 0" class="logviewer-empty">
+    <div
+      v-else
+      class="logviewer-list"
+      tabindex="0"
+      role="log"
+      aria-live="polite"
+    >
+      <div
+        v-if="auditStore.entries.length === 0"
+        class="logviewer-empty"
+      >
         No audit entries yet. Permission decisions and URL opens land here as they happen.
       </div>
       <article
         v-for="(entry, idx) in auditStore.entries"
         :key="`${entry.ts}-${idx}`"
         class="logviewer-row-record"
-        :class="entry.kind === 'permission'
-          ? `audit-perm-${entry.decision}`
-          : entry.kind === 'command'
-            ? `audit-command-${entry.status}`
-            : entry.allowed ? 'audit-url-ok' : 'audit-url-blocked'"
+        :class="
+          entry.kind === 'permission'
+            ? `audit-perm-${entry.decision}`
+            : entry.kind === 'command'
+              ? `audit-command-${entry.status}`
+              : entry.allowed
+                ? 'audit-url-ok'
+                : 'audit-url-blocked'
+        "
         :title="entry.ts"
       >
         <span class="logviewer-ts">{{ fmtTime(entry.ts) }}</span>
         <span class="logviewer-level">{{ entry.kind.toUpperCase() }}</span>
         <span class="logviewer-message">{{ auditLabel(entry) }}</span>
-        <span v-if="entry.kind === 'permission' && entry.summary" class="logviewer-fields">
+        <span
+          v-if="entry.kind === 'permission' && entry.summary"
+          class="logviewer-fields"
+        >
           {{ entry.summary }}
         </span>
-        <span v-else-if="entry.kind === 'command'" class="logviewer-fields">
+        <span
+          v-else-if="entry.kind === 'command'"
+          class="logviewer-fields"
+        >
           {{ entry.cwd }}
         </span>
       </article>
@@ -408,20 +446,44 @@ function formatFields(fields: Record<string, unknown>): string {
   letter-spacing: 0.04em;
 }
 
-.logviewer-record-trace .logviewer-level { color: var(--p-text-muted-color); }
-.logviewer-record-debug .logviewer-level { color: var(--p-text-muted-color); }
-.logviewer-record-info  .logviewer-level { color: var(--p-primary-color); }
-.logviewer-record-warn  .logviewer-level { color: var(--p-yellow-500, #d97706); }
-.logviewer-record-error .logviewer-level { color: var(--p-red-500, #ef4444); }
+.logviewer-record-trace .logviewer-level {
+  color: var(--p-text-muted-color);
+}
+.logviewer-record-debug .logviewer-level {
+  color: var(--p-text-muted-color);
+}
+.logviewer-record-info .logviewer-level {
+  color: var(--p-primary-color);
+}
+.logviewer-record-warn .logviewer-level {
+  color: var(--p-yellow-500, #d97706);
+}
+.logviewer-record-error .logviewer-level {
+  color: var(--p-red-500, #ef4444);
+}
 
-.logviewer-row-record.logviewer-record-warn  { background: color-mix(in srgb, var(--p-yellow-500, #d97706) 7%, transparent); }
-.logviewer-row-record.logviewer-record-error { background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent); }
+.logviewer-row-record.logviewer-record-warn {
+  background: color-mix(in srgb, var(--p-yellow-500, #d97706) 7%, transparent);
+}
+.logviewer-row-record.logviewer-record-error {
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent);
+}
 
-.logviewer-row-record.audit-perm-reject       { background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent); }
-.logviewer-row-record.audit-perm-approveOnce  { background: color-mix(in srgb, var(--p-text-color) 3%, transparent); }
-.logviewer-row-record.audit-perm-approveForSession { background: color-mix(in srgb, var(--p-primary-color) 8%, transparent); }
-.logviewer-row-record.audit-url-blocked       { background: color-mix(in srgb, var(--p-red-500, #ef4444) 7%, transparent); }
-.logviewer-row-record.audit-url-ok            { background: color-mix(in srgb, var(--p-text-color) 3%, transparent); }
+.logviewer-row-record.audit-perm-reject {
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 8%, transparent);
+}
+.logviewer-row-record.audit-perm-approveOnce {
+  background: color-mix(in srgb, var(--p-text-color) 3%, transparent);
+}
+.logviewer-row-record.audit-perm-approveForSession {
+  background: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
+}
+.logviewer-row-record.audit-url-blocked {
+  background: color-mix(in srgb, var(--p-red-500, #ef4444) 7%, transparent);
+}
+.logviewer-row-record.audit-url-ok {
+  background: color-mix(in srgb, var(--p-text-color) 3%, transparent);
+}
 
 .logviewer-row-tabs {
   padding-bottom: 0.25rem;
