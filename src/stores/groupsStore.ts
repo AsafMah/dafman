@@ -53,13 +53,17 @@ export const useGroupsStore = defineStore("groups", () => {
     }
   }
 
-  /** Persist current groups + activeGroupId to settings. */
+  /** Persist current groups + activeGroupId + full dockview snapshot to settings. */
   async function persist(): Promise<void> {
     const s = settingsStore.settings;
+    // Also save the full dockview snapshot so edge state survives restart
+    const api = layoutStore.api;
+    const dockview = api ? api.toJSON() : s.layout.dockview;
     await settingsStore.update({
       ...s,
       layout: {
         ...s.layout,
+        dockview,
         groups: groups.value.map((g) => ({ ...g })),
         activeGroupId: activeGroupId.value,
       },
@@ -92,13 +96,33 @@ export const useGroupsStore = defineStore("groups", () => {
       await switchGroup(next.id);
     }
 
-    // Close sessions that belong to the deleted group
+    // Close sessions that belong ONLY to the deleted group (not shared)
     const deleted = groups.value.find((g) => g.id === id);
     if (deleted?.layout) {
-      const sessionIds = extractChatPanelIds(deleted.layout);
+      const deletedSessionIds = extractChatPanelIds(deleted.layout);
+      // Collect session IDs from all OTHER groups
+      const otherSessionIds = new Set<string>();
+      for (const g of groups.value) {
+        if (g.id === id) continue;
+        if (g.id === activeGroupId.value) {
+          // Active group: read from live dockview
+          const api = layoutStore.api;
+          if (api) {
+            for (const sid of extractChatPanelIds(stripEdges(api.toJSON()))) {
+              otherSessionIds.add(sid);
+            }
+          }
+        } else if (g.layout) {
+          for (const sid of extractChatPanelIds(g.layout)) {
+            otherSessionIds.add(sid);
+          }
+        }
+      }
       const sessionsStore = useSessionsStore();
-      for (const sid of sessionIds) {
-        void sessionsStore.closeSession(sid);
+      for (const sid of deletedSessionIds) {
+        if (!otherSessionIds.has(sid)) {
+          void sessionsStore.closeSession(sid);
+        }
       }
     }
 
@@ -127,19 +151,22 @@ export const useGroupsStore = defineStore("groups", () => {
    */
   async function switchGroup(targetId: string): Promise<void> {
     if (targetId === activeGroupId.value) return;
+    if (layoutStore.switching) return; // prevent re-entrant switches
     const target = groups.value.find((g) => g.id === targetId);
     if (!target) return;
     const api = layoutStore.api;
     if (!api) return;
 
+    const sourceGroupId = activeGroupId.value;
     layoutStore.switching = true;
     try {
-      // Save current body
-      saveActiveBody();
+      // Save current body into the SOURCE group (not activeGroupId which we're about to change)
+      const sourceGroup = groups.value.find((g) => g.id === sourceGroupId);
+      if (sourceGroup) {
+        const full = api.toJSON();
+        sourceGroup.layout = stripEdges(full);
+      }
       const currentFull = api.toJSON();
-
-      // Set active
-      activeGroupId.value = targetId;
 
       if (target.layout) {
         // Lazy-resume sessions that aren't yet loaded
@@ -152,12 +179,20 @@ export const useGroupsStore = defineStore("groups", () => {
 
         // Merge body with current edges and restore
         const merged = mergeBodyWithEdges(target.layout, currentFull);
-        layoutStore.restore(merged);
+        const ok = layoutStore.restore(merged);
+        if (!ok) {
+          // Restore failed — don't change active group
+          return;
+        }
       } else {
         // Empty group — keep only edges
-        const empty = edgesOnlyLayout(api.toJSON());
-        layoutStore.restore(empty);
+        const empty = edgesOnlyLayout(currentFull);
+        const ok = layoutStore.restore(empty);
+        if (!ok) return;
       }
+
+      // Only update activeGroupId after successful restore
+      activeGroupId.value = targetId;
     } finally {
       layoutStore.switching = false;
     }
@@ -183,16 +218,10 @@ export const useGroupsStore = defineStore("groups", () => {
     const g = groups.value.find((g) => g.id === groupId);
     if (!g) return 0;
     if (g.id === activeGroupId.value) {
-      // Active group: count from live dockview
+      // Active group: count from live dockview snapshot
       const api = layoutStore.api;
       if (!api) return 0;
-      return api.panels
-        .filter((p) => {
-          const comp = (p as unknown as { view: { contentComponent: string } })
-            ?.view?.contentComponent;
-          return comp === "chat";
-        })
-        .length;
+      return extractChatPanelIds(stripEdges(api.toJSON())).length;
     }
     // Inactive group: count from stored layout
     return g.layout ? extractChatPanelIds(g.layout).length : 0;

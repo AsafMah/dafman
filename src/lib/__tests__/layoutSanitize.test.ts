@@ -430,12 +430,15 @@ describe("mergeBodyWithEdges", () => {
 });
 
 describe("edgesOnlyLayout", () => {
-  test("produces layout with only edge panels", () => {
+  test("produces layout with only edge panels and minimal empty grid", () => {
     const eo = edgesOnlyLayout(FULL_LAYOUT) as Record<string, unknown>;
     const panels = eo.panels as Record<string, unknown>;
     expect(Object.keys(panels).sort()).toEqual(["session-details", "sessions-manager"]);
     expect(eo.edgeGroups).toEqual(FULL_LAYOUT.edgeGroups);
-    expect(eo.grid).toEqual(FULL_LAYOUT.grid);
+    // Grid should be a minimal empty leaf, not the original (which has dangling refs)
+    const grid = eo.grid as { root: { type: string; data: { views: unknown[] } } };
+    expect(grid.root.type).toBe("leaf");
+    expect(grid.root.data.views).toEqual([]);
   });
 
   test("safe on null", () => {

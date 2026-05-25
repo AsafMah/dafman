@@ -173,7 +173,7 @@ export const useSettingsStore = defineStore("settings", () => {
     try {
       await update({
         ...settings.value,
-        layout: { dockview },
+        layout: { ...settings.value.layout, dockview },
       });
     } catch {
       /* toast already shown by `update()` */

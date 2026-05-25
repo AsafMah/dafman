@@ -25,6 +25,7 @@ import { registerBuiltinCommands } from "./lib/registerBuiltinCommands";
 import {
   extractChatPanelIds,
   enforcePersistedEdgeMinimums,
+  mergeBodyWithEdges,
   persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
@@ -255,12 +256,16 @@ async function restoreFromLayout() {
   // Hydrate groups from settings — creates "Default" group on migration
   groupsStore.hydrate(settingsStore.settings.layout);
 
-  // Determine which layout to restore: active group's or legacy dockview
+  // Determine which layout to restore: active group's body merged with
+  // persisted edges, or legacy dockview blob for migration.
   const activeGroup = groupsStore.activeGroup;
   let rawLayout: unknown | null = null;
   if (activeGroup?.layout) {
-    // Group-aware: merge body with empty edge state (edges auto-open later)
-    rawLayout = activeGroup.layout;
+    // Merge body with persisted edges from the full dockview snapshot
+    rawLayout = mergeBodyWithEdges(
+      activeGroup.layout,
+      settingsStore.settings.layout?.dockview,
+    );
   } else {
     rawLayout = settingsStore.settings.layout?.dockview;
   }

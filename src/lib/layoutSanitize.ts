@@ -260,14 +260,20 @@ export function mergeBodyWithEdges(
 }
 
 /// Build a layout that contains ONLY edge groups (empty body).
-/// Used when switching to a fresh/empty group.
+/// Used when switching to a fresh/empty group. Produces a minimal
+/// valid grid with no body panels — avoids dangling view refs.
 export function edgesOnlyLayout(currentFullLayout: unknown): unknown {
   if (!currentFullLayout || typeof currentFullLayout !== "object") return currentFullLayout;
-  const full = currentFullLayout as Record<string, unknown>;
   const { edgeGroups, edgePanels } = extractEdges(currentFullLayout);
   return {
-    grid: full.grid,
+    // Minimal valid grid — single empty leaf.
+    grid: {
+      root: { type: "leaf", data: { views: [], id: "1" }, size: 1 },
+      width: 1,
+      height: 1,
+      orientation: "HORIZONTAL",
+    },
     panels: edgePanels,
-    edgeGroups,
+    ...(edgeGroups !== undefined ? { edgeGroups } : {}),
   };
 }
