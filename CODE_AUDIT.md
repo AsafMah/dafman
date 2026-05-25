@@ -18,14 +18,14 @@ Files above **800 lines** are strong candidates for splitting.
 | 1,635 | `src/dev/Playground.vue`                          | Dev-only, not shipped            |
 | 1,396 | `src/components/chat/MessageComposer.vue`         | Lexical editor + toolbar         |
 | 1,239 | `src-bun/rpc.ts`                                  | IPC handler registry             |
-| 1,209 | `src/components/chat/ChatWindow.vue`              | ↓110 — terminal extracted        |
-| 1,149 | `src/stores/chat/sessionsStore.ts`                | ↓317 — reducer extracted         |
-| 1,145 | `src/stores/shell/layoutStore.ts`                 | Dockview orchestration           |
-| 1,062 | `src/components/session/SessionsManager.vue`      | Sidebar session list             |
-|   991 | `src/components/settings/SettingsPanel.vue`       | Settings UI                      |
-|   920 | `src/components/session/SessionHeaderControls.vue`| Header bar controls              |
-|   904 | `src/ipc/types.ts`                                | Shared type defs (expected big)  |
-|   762 | `src/components/terminal/TerminalPanel.vue`       | Terminal container               |
+| 1,185 | `src/components/chat/ChatWindow.vue`              | ↓24 — VueUse + bus       |
+| 1,149 | `src/stores/chat/sessionsStore.ts`                | ↓317 — reducer extracted |
+| 1,145 | `src/stores/shell/layoutStore.ts`                 | Dockview orchestration  |
+| 1,062 | `src/components/session/SessionsManager.vue`      | Sidebar session list    |
+|   991 | `src/components/settings/SettingsPanel.vue`       | Settings UI             |
+|   920 | `src/components/session/SessionHeaderControls.vue`| Header bar controls     |
+|   904 | `src/ipc/types.ts`                                | Shared type defs (expected big)|
+|   757 | `src/components/terminal/TerminalPanel.vue`       | ↓5 — VueUse + bus       |
 |   721 | `src/components/library/LibraryAgentsTab.vue`     | Agent library UI                 |
 |   712 | `src/components/permissions/PendingRequestCard.vue`| Permission card                 |
 |   692 | `src-bun/test-server.ts`                          | Dev test server                  |
@@ -247,17 +247,17 @@ risk reduced).
 
 | What we hand-rolled | File(s) | Lines | Library alternative | Verdict |
 |---|---|---:|---|---|
-| **Event bus** (window.dispatchEvent) | 9 files, 13 dispatchers, 9 listeners | ~80 | **mitt** (200B) or VueUse `useEventBus` | 🔴 Replace — untyped, no cleanup guarantee, untraceable |
-| **localStorage persist** (manual JSON.parse/stringify + try/catch) | terminalStore.ts:135-193 | ~60 | **pinia-plugin-persistedstate** (zero-config) | 🔴 Replace — duplicated 2×, no validation |
-| **Deferred listener queue** (if bridge, register; else queue) | invoke.ts:100-221 | ~120 | Single generic `createDeferredChannel<T>()` or mitt + lazy init | 🔴 Replace — 6 identical blocks |
+| ~~**Event bus** (window.dispatchEvent)~~ | ~~9 files, 13 dispatchers, 9 listeners~~ | ~~80~~ | ~~**mitt** (200B) or VueUse `useEventBus`~~ | ✅ Done — mitt + src/lib/bus.ts (Phase A) |
+| ~~**localStorage persist** (manual JSON.parse/stringify + try/catch)~~ | ~~terminalStore.ts:135-193~~ | ~~60~~ | ~~**pinia-plugin-persistedstate**~~ | ✅ Done — `usePersistedRef` (Phase A); declined pinia-plugin (no throttle/cap) |
+| ~~**Deferred listener queue** (if bridge, register; else queue)~~ | ~~invoke.ts:100-221~~ | ~~120~~ | ~~Single generic `createDeferredChannel<T>()`~~ | ✅ Done — `createDeferredChannel<L>()` (Phase A) |
 | **Pub/sub fan-out** (`Set<Listener>`, subscribe, fanOut) | listenerRegistry.ts:45-95 | ~50 | **mitt** does exactly this in 200B | 🔴 Replace — hand-rolled EventEmitter |
-| **ANSI stripping** (3 regexes) | ansi.ts:1-25 | 25 | **strip-ansi** (npm, 1.2M weekly, battle-tested) | 🔴 Replace — our regexes miss edge cases |
+| ~~**ANSI stripping** (3 regexes)~~ | ~~ansi.ts:1-25~~ | ~~25~~ | ~~**strip-ansi**~~ | ✅ Done (Phase A) — also fixed OSC ST-terminator bug |
 | **setTimeout focus hacks** (`setTimeout(fn, 0)`) | 6 components, ~10 sites | ~30 | VueUse `useFocus`, `useActiveElement`, `nextTick` | 🟡 Consider — some are legitimate, most are lifecycle hacks |
 | **Scroll management** (manual rAF + double nextTick) | ChatWindow.vue:246-349 | ~100 | VueUse `useScroll`, `useInfiniteScroll` | 🟡 Consider — our scroll logic is custom (event batching + scroll-to-bottom), but the rAF scheduling could use `useDebounceFn`/`useRafFn` |
-| **Resize observer** (raw ResizeObserver in ChatWindow) | ChatWindow.vue:157-190 | ~30 | VueUse `useResizeObserver` | 🔴 Replace — manual cleanup, no throttle |
+| ~~**Resize observer** (raw ResizeObserver in ChatWindow)~~ | ~~ChatWindow.vue:157-190~~ | ~~30~~ | ~~VueUse `useResizeObserver`~~ | ✅ Done — Phase A (ChatWindow + MessageComposer + TerminalPanel) |
 | **Debounce** (manual setTimeout timers) | SessionsManager.vue:188-226, App.vue:450-455 | ~40 | VueUse `useDebounceFn` or `watchDebounced` | 🔴 Replace — hand-rolled timer management |
 | **`toErrorMessage()`** (ternary wrapper) | errorMessage.ts:1-5 | 5 | Inline `err instanceof Error ? err.message : String(err)` or **serialize-error** | 🟡 Consider — trivial, but used everywhere; keep as utility, just not a whole file |
-| **CodeMirror language resolver** | codeLanguage.ts:1-148 | 148 | **@codemirror/language-data** (official package) has `languages[]` with load/extensions | 🔴 Replace — we maintain a manual ext→lang map that's incomplete |
+| ~~**CodeMirror language resolver**~~ | ~~codeLanguage.ts:1-148~~ | ~~148~~ | ~~**@codemirror/language-data**~~ | ✅ Done — Phase A (+ lang-vue + lang-sass) |
 | **Markdown pipeline** (markdown-it + DOMPurify + Prism + class rewrite) | markdown.ts:1-395 | 395 | Keep — this is heavily customized (lex-* classes, KaTeX style hook, system_notification stripping). No drop-in exists | 🟢 Keep |
 | **Tool renderer registry** | toolRenderers.ts:1-296 | 296 | Keep — domain-specific, no library for this | 🟢 Keep |
 | **Diff/patch parser** | diff.ts:1-92 | 92 | Keep — parses the Copilot `apply_patch` format, not standard unified diff | 🟢 Keep |
@@ -563,8 +563,8 @@ formalize these.
 | File | Lines | What's mixed together |
 |---|---:|---|
 | `sessions.ts` (backend) | 1,929 | Session CRUD + event forwarding + agent lifecycle + MCP + pending requests + workspace |
-| `MessageComposer.vue` | 1,396 | Lexical editor setup + toolbar + attachments + slash commands + file picker + send logic |
-| `ChatWindow.vue` | 1,209 | Transcript rendering + scroll management + command terminal + event processing + selection |
+| `MessageComposer.vue` | 1,389 | Lexical editor setup + toolbar + attachments + slash commands + file picker + send logic (↓7 — Phase A) |
+| `ChatWindow.vue` | 1,185 | Transcript rendering + scroll management + command terminal + event processing + selection (↓24 — Phase A) |
 | `layoutStore.ts` | 1,145 | Dockview API + edge panels + session tracking + panel lifecycle + size management |
 | `SessionsManager.vue` | 1,062 | Session list + creation form + workspace picker + sidebar rendering + sorting |
 | `SettingsPanel.vue` | 991 | Every settings category in one template |
@@ -599,11 +599,11 @@ at runtime. Should be a shared type file imported by both sides.
 | Pattern | Where | Impact |
 |---|---|---|
 | Settings type shape | settingsStore + settings.ts (backend) | Runtime drift risk |
-| localStorage set/hydrate | terminalStore (2× identical pairs) | Boilerplate |
-| Deferred listener queue | invoke.ts (6× identical blocks) | Boilerplate |
+| ~~localStorage set/hydrate~~ | ~~terminalStore (2× identical pairs)~~ | ✅ Fixed — `usePersistedRef` (Phase A) |
+| ~~Deferred listener queue~~ | ~~invoke.ts (6× identical blocks)~~ | ✅ Fixed — `createDeferredChannel<L>()` (Phase A) |
 | `as unknown as` shape probes | layoutStore (12×) + App.vue (1×) | Type safety hole |
 | Component → IPC direct calls | 12 .vue files, ~36 call sites | Architecture bypass |
-| Window event bus | 8 event names, 13 dispatchers, 9 listeners | Untyped global coupling |
+| ~~Window event bus~~ | ~~9 event names, 13 dispatchers, 9 listeners~~ | ✅ Fixed — mitt + `src/lib/bus.ts` (Phase A) |
 | setTimeout focus hacks | 6+ components, ~10 sites | Missing lifecycle mgmt |
 
 
@@ -628,6 +628,16 @@ at runtime. Should be a shared type file imported by both sides.
 - [x] **Complexity reduction:** dispatch tables for sessionReducer, chatEvents, sessionHelpers
 - [x] **no-dynamic-delete:** destructuring rest pattern in terminalStore, SessionHeaderControls
 - [x] **Composable extraction:** `useCommandTerminal`, `watchDynamicCommands`, `usePanelLifecycle`
+- [x] **Phase A (2026-05-25):** library swaps + typed constants (8 commits)
+  - [x] +49 regression tests for ansi/terminalStore/listenerRegistry/codeLanguage
+  - [x] `strip-ansi` replaces 3 hand-rolled OSC/CSI regexes — also fixed OSC ST-terminator bug
+  - [x] `@codemirror/language-data` + lang-vue/sass replace the 22-entry extension map and the 11 hand-rolled factory functions (148 lines → 0 in `codeLanguage.ts`'s mapping; full file 148 → 124)
+  - [x] `mitt` typed app bus — 13 `window.dispatchEvent` dispatchers + 9 `addEventListener` listeners deleted, 9 channels typed end-to-end, per-listener exception isolation preserved
+  - [x] `createDeferredChannel<L>()` generic — 6 IPC channel pairs collapsed (invoke.ts: 222 → 187 lines)
+  - [x] `usePersistedRef` composable — replaces 4 hand-rolled localStorage functions (terminalStore: 347 → 297 lines), adds 250ms throttle + buffer cap (perf win)
+  - [x] VueUse selective adoption — 3 ResizeObservers + 4 keyboard listener pairs → `useResizeObserver`/`useEventListener`, 7 lifecycle hooks deleted
+  - [x] `src/constants/panels.ts` — typed IDs replacing magic-string `'library'`/`'sessionsManager'`/`'sidebarTab'` in production code
+  - **Net Phase A: ~420 production lines deleted, 3 real bugs fixed, +49 tests (551 → 600), lint clean throughout**
 
 
 ---
@@ -635,7 +645,7 @@ at runtime. Should be a shared type file imported by both sides.
 
 ## 8  Priority Cleanup Plan
 
-### Phase A — Foundation: library replacements + typed constants
+### Phase A — Foundation: library replacements + typed constants ✅ DONE (2026-05-25)
 
 Per §5 build-vs-buy analysis, replace hand-rolled implementations with
 battle-tested libraries. This is the highest-ROI phase — it deletes ~500+
@@ -645,43 +655,17 @@ lines of bespoke plumbing and eliminates entire bug categories.
 blast radius, add regression tests first, defer settings-type split, and
 pick exactly one event-bus abstraction.
 
-1. **Add/strengthen regression tests** — `ansi.test.ts` (OSC 633/133/7,
-   prompt stripping, BEL); `terminalStore.test.ts` (hydration, buffer cap);
-   event-bus tests (sync delivery, unsub, listener-error isolation);
-   `codeLanguage.test.ts` (TS/TSX/Vue/unknown/cache). This is the safety
-   net for every swap below.
-2. **Add strip-ansi** — replace ONLY the inner `stripAnsi()` in
-   `src/lib/ansi.ts`. Keep `cleanTerminalCommandOutput()` (PowerShell prompt
-   stripping is domain-specific). Verify VS Code shell-integration OSCs
-   (633/133/7) still get stripped — vanilla strip-ansi may not cover them.
-3. **CodeMirror language resolver** — `src/lib/codeLanguage.ts` is consumed
-   by `CodeEditor.vue`/`DiffEditor.vue` (NOT markdown.ts / Prism), so
-   `@codemirror/language-data` is the right ecosystem. Verify lazy loading
-   and bundle impact before adopting; keep `Makefile`-style fallbacks.
-4. **Pick ONE event-bus abstraction** — choose `mitt` OR VueUse's
-   `useEventBus`, not both. Recommended: **mitt** (200B, simpler API, plays
-   nicely with the listener-error isolation we need below). Replace all 8
-   `dafman:*` window events (13 dispatchers, 9 listeners). Wrap dispatch
-   with try/catch per-listener to preserve current `listenerRegistry`
-   isolation semantics.
-5. **IPC listener / deferred-channel cleanup** — replace 6 identical
-   "if bridge, register; else queue" blocks in `src/ipc/invoke.ts` with a
-   single `createDeferredChannel<T>()`. Keep separate from the UI event bus
-   (different failure-isolation requirements).
-6. **Terminal persistence** — replace `terminalStore.ts:135-193` manual
-   localStorage with a custom `usePersistedRef<T>(key, default, { throttle,
-   validate, cap })` composable. **Do NOT** adopt
-   `pinia-plugin-persistedstate` — `sessionTerminalBuffers` can be large
-   (scrollback) and the plugin would `JSON.stringify` on every unrelated
-   mutation by default. Custom helper gives us throttle + buffer cap.
-7. **VueUse mechanical cleanups (selective)** — adopt for the obvious
-   wins: `useEventListener`, `useResizeObserver`, `useDebounceFn`. **Avoid**
-   `useFocus` for Lexical/xterm (their `.focus()` semantics aren't ordinary
-   input focus). **Avoid** `useRafFn` for one-shot/double-rAF settle
-   patterns (it's loop-oriented).
-8. **Panel ID constants** — single `src/constants/panels.ts` with typed
-   string-literal union for all panel/component IDs. Independent of every
-   other item; do last to avoid merge conflicts.
+All 8 items completed in commits `4396c7e` → `1dfee83`. See §7 for the
+cumulative delta. Highlights:
+
+- [x] 1. Regression safety net (+49 tests across 4 files)
+- [x] 2. `strip-ansi` — also fixed real OSC ST-terminator bug
+- [x] 3. `@codemirror/language-data` + lang-vue + lang-sass (148 → 124 line)
+- [x] 4. `mitt` typed app bus (22 window event sites → 0; full type safety)
+- [x] 5. `createDeferredChannel<L>()` generic (invoke.ts: 222 → 187 lines)
+- [x] 6. `usePersistedRef` composable (terminalStore: 347 → 297; +throttle/cap)
+- [x] 7. Selective VueUse (3 ResizeObservers + 4 keyboard listener pairs)
+- [x] 8. `src/constants/panels.ts` typed panel IDs
 
 **Deferred to Phase C** (was item 7): shared settings type between renderer
 and backend. This is cross-boundary architecture work, not a library swap,
