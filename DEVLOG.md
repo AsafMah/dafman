@@ -10,7 +10,45 @@
 
 ---
 
-## 2026-05-25 — Complexity reduction + composable extraction (session 2)
+## 2026-05-25 — Build-vs-buy analysis (session 3)
+
+**Takeaway:** Completed systematic audit of every hand-rolled pattern against npm
+libraries and Bun APIs. Added §5 to CODE_AUDIT.md with concrete replacement
+recommendations. 5 high-ROI replacements identified that would delete ~600+ lines.
+
+### Key findings
+
+- **@vueuse/core** — would replace hand-rolled event listeners, debounce timers,
+  localStorage persistence, resize observers, focus hacks, and rAF helpers across
+  10+ files (~300 lines)
+- **mitt** — would replace the entire window event bus (8 events, 13 dispatchers,
+  10 listeners) plus listenerRegistry.ts (~130 lines)
+- **strip-ansi** — replaces ansi.ts hand-rolled regexes (25 lines, our regexes miss edge cases)
+- **@codemirror/language-data** — replaces codeLanguage.ts manual ext→lang map (148 lines)
+- **pinia-plugin-persistedstate** — replaces terminalStore manual localStorage (60 lines)
+
+### Confirmed domain-specific keeps
+
+markdown.ts, diff.ts, terminalShellIntegration.ts, modelTree.ts, layoutSanitize.ts,
+toolRenderers.ts, exportConversation.ts, errors.ts, stderrFilter.ts, rendererLog.ts,
+notificationStyles.ts, color.ts — all domain-specific, no library would cover them.
+
+### Medium-ROI for later
+
+- **zod/valibot** for settings schema validation (settings.ts CC=20+)
+- **pino** for structured logging (logging.ts + audit.ts share 90% pattern)
+- **fuse.js** for fuzzy file search scoring (fileSearch.ts)
+
+### Bun API gaps
+
+Not using `Bun.Glob` (for fileSearch walk) or `Bun.file()/Bun.write()` anywhere —
+using node:fs/promises throughout instead.
+
+### Commits
+
+- `fe6f793` — docs: add build-vs-buy analysis to CODE_AUDIT (§5)
+
+---
 
 **Takeaway:** ESLint warnings dropped from 38 → 31 (92 at start of audit). Extracted
 shared patterns, applied dispatch tables, and fixed a recurring dockview component
