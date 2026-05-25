@@ -136,6 +136,7 @@ async function mountWith(Root: typeof App) {
   // dockview-vue's findComponent() does an exact case-sensitive lookup
   // in Vue's appContext.components. Names here MUST match the strings
   // used in addPanel({ component: '...' }) and the watermark/tab props.
+  /* eslint-disable vue/component-definition-name-casing -- dockview requires camelCase */
   app.component('chat', ChatPanel);
   app.component('jobsPanel', JobsPanel);
   app.component('library', LibraryPanel);
@@ -149,10 +150,12 @@ async function mountWith(Root: typeof App) {
   app.component('chatTabActions', ChatTabActions);
   app.component('chatTab', ChatTab);
   app.component('sidebarTab', SidebarTab);
+  /* eslint-enable vue/component-definition-name-casing */
 
   if (import.meta.env.DEV) {
     const mod = await import('@/dev/Playground.vue');
 
+    // eslint-disable-next-line vue/component-definition-name-casing
     app.component('playground', mod.default);
   }
 
