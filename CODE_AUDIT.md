@@ -1,39 +1,45 @@
 # Code Quality Audit
 
-> **Date:** 2026-05-25
-> **Codebase:** ~39,500 lines of TypeScript + Vue across `src/` and `src-bun/`
-> **Tools used:** ESLint (strict TypeScript), jscpd (copy-paste detection), knip (dead code), IDE diagnostics
+> **Date:** 2026-05-25 (refreshed after directory restructure + path aliases)
+> **Codebase:** ~33,000 lines of TypeScript + Vue across `src/` and `src-bun/`
+> **Tools used:** ESLint (strictTypeChecked), jscpd (copy-paste detection), manual review, IDE diagnostics
 
 ---
 
 
 ## 1  File Size Distribution
 
-Thirty largest production files (excluding tests).
 Files above **800 lines** are strong candidates for splitting.
 
-| Lines | File                                        | Notes                            |
-| ----: | ------------------------------------------- | -------------------------------- |
-| 2,417 | `src/components/SessionDetailsPanel.vue`    | Largest file in codebase         |
-| 1,939 | `src-bun/app/sessions.ts`                   | Backend session god-object       |
-| 1,484 | `src/dev/Playground.vue`                    | Dev-only, not shipped            |
-| 1,308 | `src/stores/sessionsStore.ts`               | Store body is 866 lines          |
-| 1,190 | `src-bun/rpc.ts`                            | IPC handler registry             |
-| 1,124 | `src/components/MessageComposer.vue`        | Lexical editor + toolbar         |
-| 1,104 | `src/components/ChatWindow.vue`             | Message list + scroll            |
-|   953 | `src/stores/layoutStore.ts`                 | Dockview orchestration           |
-|   893 | `src/components/SessionsManager.vue`        | Sidebar session list             |
-|   857 | `src/ipc/types.ts`                          | Shared type defs (expected big)  |
-|   830 | `src/components/SettingsPanel.vue`           | Settings UI                      |
-|   814 | `src/components/SessionHeaderControls.vue`  | Header bar controls              |
-|   652 | `src-bun/index.ts`                          | Main process entry               |
-|   642 | `src/components/PendingRequestCard.vue`     | Permission card                  |
-|   595 | `src/components/TerminalPanel.vue`          | Terminal container               |
-|   592 | `src/lib/chatEvents.ts`                     | Chat event reducer               |
-|   592 | `src/components/LibraryAgentsTab.vue`       | Agent library UI                 |
-|   591 | `src/App.vue`                               | Root component                   |
-|   582 | `src-bun/test-server.ts`                    | Dev test server                  |
-|   485 | `src-bun/app/fakeClient.ts`                 | Fake SDK client                  |
+| Lines | File                                              | Notes                            |
+| ----: | ------------------------------------------------- | -------------------------------- |
+| 2,954 | `src/components/session/SessionDetailsPanel.vue`  | Largest file — 6+ UI sections    |
+| 2,233 | `src-bun/app/chat/sessions.ts`                    | Backend session god-object       |
+| 1,635 | `src/dev/Playground.vue`                          | Dev-only, not shipped            |
+| 1,466 | `src/stores/chat/sessionsStore.ts`                | Store body is 866+ lines         |
+| 1,398 | `src/components/chat/MessageComposer.vue`         | Lexical editor + toolbar         |
+| 1,319 | `src/components/chat/ChatWindow.vue`              | Message list + scroll            |
+| 1,239 | `src-bun/rpc.ts`                                  | IPC handler registry             |
+| 1,145 | `src/stores/shell/layoutStore.ts`                 | Dockview orchestration           |
+| 1,058 | `src/components/session/SessionsManager.vue`      | Sidebar session list             |
+|   991 | `src/components/settings/SettingsPanel.vue`       | Settings UI                      |
+|   921 | `src/components/session/SessionHeaderControls.vue`| Header bar controls              |
+|   904 | `src/ipc/types.ts`                                | Shared type defs (expected big)  |
+|   760 | `src/components/terminal/TerminalPanel.vue`       | Terminal container               |
+|   721 | `src/components/library/LibraryAgentsTab.vue`     | Agent library UI                 |
+|   712 | `src/components/permissions/PendingRequestCard.vue`| Permission card                 |
+|   689 | `src-bun/test-server.ts`                          | Dev test server                  |
+|   669 | `src/App.vue`                                     | Root component                   |
+|   653 | `src-bun/index.ts`                                | Main process entry               |
+|   631 | `src/lib/chatEvents.ts`                           | Chat event reducer               |
+|   614 | `src/components/library/McpServerForm.vue`        | MCP server form                  |
+|   605 | `src-bun/app/client/fakeClient.ts`                | Fake SDK client                  |
+|   575 | `src/components/permissions/ToolDetails.vue`      | Tool detail view                 |
+|   545 | `src/components/shared/FilePicker.vue`            | File picker component            |
+|   540 | `src/components/shell/CommandPalette.vue`         | Command palette                  |
+|   528 | `src/components/library/LibraryMcpTab.vue`        | MCP library tab                  |
+|   522 | `src/lib/registerBuiltinCommands.ts`              | Builtin command registry         |
+|   521 | `src/components/observability/LogViewer.vue`      | Log viewer                       |
 
 
 ---
@@ -41,129 +47,98 @@ Files above **800 lines** are strong candidates for splitting.
 
 ## 2  ESLint — Strict TypeScript Analysis
 
-**Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity rules + `@stylistic/eslint-plugin`.
+**Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity + `@stylistic/eslint-plugin`
 
-**Current: 0 errors, 365 warnings** (down from 715 issues / 292 errors)
-
-Changes made:
-- Added browser globals for `src/**` (fixed 118 `no-undef` errors)
-- Turned off `require-await` (async interface implementations don't need await)
-- Turned off `no-control-regex` (ANSI escape regexes are legitimate)
-- Disabled `vue/html-closing-bracket-newline` and `vue/html-indent` (fight Prettier)
-- Downgraded to warnings: `unified-signatures`, `no-redundant-type-constituents`,
-  `no-non-null-assertion`, `no-dynamic-delete`, `no-invalid-void-type`,
-  `use-unknown-in-catch-callback-variable`
-- Fixed: `==` → `===`, deprecated `keyCode`, useless regex escapes,
-  unnecessary `String()` wrappers, missing switch defaults, `no-base-to-string`
-- Added `@stylistic/eslint-plugin` padding-line rules for spacious formatting
+**Current: 0 errors, 300 warnings**
 
 ### 2.1  Issues by Rule
 
 | Count | Rule                                           | What It Means                                  |
 | ----: | ---------------------------------------------- | ---------------------------------------------- |
-|   132 | `no-unnecessary-condition`                     | Dead branches, always-true/false checks        |
-|   118 | `no-undef`                                     | Undefined globals (Vue template macros mostly) |
-|    85 | `require-await`                                | `async` functions that never `await`           |
-|    81 | `restrict-template-expressions`                | Unsafe types in template literals              |
-|    40 | `no-unnecessary-type-assertion`                | Redundant `as` casts that add nothing          |
-|    25 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
-|    21 | `complexity`                                   | Cyclomatic complexity above 15                 |
-|    20 | `no-unsafe-assignment`                         | Assignments from `any`-typed values            |
-|    16 | `prefer-nullish-coalescing`                    | `||` where `??` is safer                       |
-|    15 | `no-unsafe-call`                               | Calling an `any`-typed value                   |
-|    14 | `no-unsafe-member-access`                      | Property access on `any`                       |
-|    14 | `no-redundant-type-constituents`               | Union/intersection with redundant members      |
+|   120 | `no-unnecessary-condition`                     | Dead branches, always-true/false checks        |
+|    63 | `restrict-template-expressions`                | Unsafe types in template literals              |
 |    14 | `vue/component-definition-name-casing`         | Component name casing mismatch                 |
-|     9 | `no-duplicate-imports`                          | Same module imported twice                     |
+|    13 | `complexity`                                   | Cyclomatic complexity above 15                 |
+|    11 | `no-redundant-type-constituents`               | Union/intersection with redundant members      |
+|    10 | `prefer-nullish-coalescing`                    | `||` where `??` is safer                       |
 |     9 | `unified-signatures`                           | Overloads that can be a single signature       |
-|     8 | `no-control-regex`                             | Control chars in regex (terminal handling)     |
-|     8 | `vue/attributes-order`                         | Attribute order convention                     |
-|     7 | `no-floating-promises`                         | Unhandled promise rejections                   |
+|     9 | `no-unsafe-assignment`                         | Assignments from `any`-typed values            |
+|     9 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
+|     6 | `no-duplicate-imports`                         | Same module imported twice                     |
 |     6 | `vue/one-component-per-file`                   | Multiple components in one SFC                 |
-|     5 | `no-unused-vars`                               | Unused variables                               |
 |     5 | `vue/require-default-prop`                     | Props without defaults                         |
 |     5 | `max-lines-per-function`                       | Function body > 200 lines                      |
-|     4 | `use-unknown-in-catch-callback-variable`       | `catch(e)` without `unknown` type              |
-|     4 | `no-unsafe-return`                             | Returning `any`-typed values                   |
-|     4 | `no-misused-promises`                          | Promise used in non-async context              |
-|     4 | `vue/return-in-computed-property`              | Computed missing return path                   |
-|     3 | `no-unnecessary-type-conversion`               | Useless `.toString()` / `String()`             |
-|     3 | `no-invalid-void-type`                         | `void` used outside return type                |
-|     3 | `no-unnecessary-boolean-literal-compare`       | `=== true` / `=== false` on booleans           |
-|     3 | `no-unsafe-argument`                           | `any` passed to typed parameter                |
+|     3 | `use-unknown-in-catch-callback-variable`       | `catch(e)` without `unknown` type              |
+|     3 | `no-unused-vars`                               | Unused variables                               |
 |     3 | `no-dynamic-delete`                            | `delete obj[key]` on dynamic key               |
-|     2 | `max-depth`                                    | Nesting > 4 levels deep                        |
-|     2 | `no-useless-escape`                            | Unnecessary backslash escapes                  |
-|     1 | `no-explicit-any`                              | Explicit `any` type annotation                 |
-|     1 | `no-deprecated`                                | Using deprecated API                           |
+|     2 | `no-unsafe-return`                             | Returning `any`-typed values                   |
+|     2 | `no-unsafe-argument`                           | `any` passed to typed parameter                |
+|     2 | `no-misused-promises`                          | Promise used in non-async context              |
+|     1 | `no-unnecessary-type-assertion`                | Redundant `as` casts                           |
+|     1 | `no-invalid-void-type`                         | `void` used outside return type                |
+|     1 | `max-depth`                                    | Nesting > 4 levels deep                        |
+|     1 | `no-unsafe-call`                               | Calling an `any`-typed value                   |
+|     1 | `no-unsafe-member-access`                      | Property access on `any`                       |
 
-### 2.2  Files with Most Issues
+### 2.2  Files with Most Warnings
 
-| Count | File                                        |
-| ----: | ------------------------------------------- |
-|    50 | `src-bun/app/fakeClient.ts`                 |
-|    45 | `src/App.vue`                               |
-|    41 | `src-bun/test-server.ts`                    |
-|    34 | `src/components/SessionDetailsPanel.vue`    |
-|    30 | `src/components/ChatWindow.vue`             |
-|    29 | `src/components/TerminalPanel.vue`          |
-|    26 | `src-bun/app/sessions.ts`                   |
-|    26 | `src-bun/index.ts`                          |
-|    18 | `src/main.ts`                               |
-|    17 | `src/components/MessageComposer.vue`        |
-|    17 | `src/components/SessionsManager.vue`        |
-|    17 | `src/stores/layoutStore.ts`                 |
-|    16 | `src/components/CommandPalette.vue`         |
-|    14 | `src/components/MentionPlugin.vue`          |
-|    14 | `src/components/SessionHeaderControls.vue`  |
-|    13 | `src/components/SettingsPanel.vue`          |
-|    13 | `src/stores/sessionsStore.ts`               |
-|    12 | `src/lib/markdown.ts`                       |
+| Count | File                                               |
+| ----: | -------------------------------------------------- |
+|    27 | `src/components/session/SessionDetailsPanel.vue`   |
+|    17 | `src/components/terminal/TerminalPanel.vue`        |
+|    16 | `src/main.ts`                                      |
+|    13 | `src/App.vue`                                      |
+|    11 | `src/components/settings/SettingsPanel.vue`        |
+|    11 | `src/stores/chat/sessionsStore.ts`                 |
+|    10 | `src/components/chat/ChatWindow.vue`               |
+|    10 | `src/components/session/SessionsManager.vue`       |
+|     7 | `src/lib/chatEvents/notificationHandlers.ts`       |
+|     7 | `src/lib/modelTree.ts`                             |
+|     6 | `src/components/chat/SubagentBlock.vue`            |
+|     6 | `src/components/observability/JobsPanel.vue`       |
+|     6 | `src/components/shared/JsonSchemaField.vue`        |
+|     6 | `src/stores/terminal/terminalStore.ts`             |
+|     5 | `src/components/chat/MessageComposer.vue`          |
+|     5 | `src/components/observability/LogViewer.vue`       |
+|     5 | `src/ipc/wsBridge.ts`                              |
+|     5 | `src/lexical/plugins.ts`                           |
+|     5 | `src/lib/chatEvents.ts`                            |
 
 ### 2.3  Complexity Violations (Cyclomatic > 15)
 
-Functions that are too branchy. Higher = harder to test and maintain.
-
-| Complexity | File:Line                                              | Function              |
-| ---------: | ------------------------------------------------------ | --------------------- |
-|     **60** | `src/stores/sessionsStore.ts:287`                      | `applyToRecord`       |
-|     **40** | `src/components/JsonSchemaForm.vue:160`                 | `validateNode`        |
-|     **33** | `src/lib/chatEvents.ts:439`                            | `processEvents`       |
-|     **32** | `src-bun/app/sessions.ts:182`                          | `normalizeTask`       |
-|     **29** | `src/stores/layoutStore.ts:790`                        | `openEdgePanel`       |
-|     **28** | `src/components/ToolDetails.vue:52`                    | (arrow fn)            |
-|     **25** | `src-bun/app/sessions.ts:311`                          | `summarizePermission` |
-|     **24** | `src-bun/app/sessions.ts:959`                          | `forward`             |
-|     **24** | `src/lib/chatEvents/messageHandlers.ts:69`             | `user.message`        |
-|     **23** | `src/components/SessionDetailsPanel.vue:440`           | `loadUsage`           |
-|     **22** | `src-bun/app/pendingRequests.ts:153`                   | (handler)             |
-|     **20** | `src-bun/app/settings.ts:240`                          | (handler)             |
-|     **19** | `src/lib/chatEvents/messageHandlers.ts:135`            | (handler)             |
-|     **19** | `src/stores/sessionsStore.ts:502`                      | (handler)             |
-|     **18** | `src-bun/app/sessions.ts:1124`                         | (handler)             |
-|     **18** | `src-bun/app/stderrFilter.ts:62`                       | (filter)              |
-|     **18** | `src/stores/sessionsStore.ts:690`                      | (handler)             |
-|     **17** | `src/components/McpServerForm.vue:108`                 | (form logic)          |
-|     **17** | `src/lexical/plugins.ts:141`                           | (plugin)              |
-|     **16** | `src-bun/app/sessions.ts:684`                          | (handler)             |
-|     **16** | `src/components/TerminalPanel.vue:228`                 | (handler)             |
+| CC | File                                                     | Function              |
+| -: | -------------------------------------------------------- | --------------------- |
+| 60 | `src/stores/chat/sessionsStore.ts`                       | `applyToRecord`       |
+| 40 | `src/components/shared/JsonSchemaForm.vue`               | `validateNode`        |
+| 33 | `src/lib/chatEvents.ts`                                  | `processEvents`       |
+| 32 | `src-bun/app/chat/sessions.ts`                           | `normalizeTask`       |
+| 29 | `src/stores/shell/layoutStore.ts`                        | `openEdgePanel`       |
+| 28 | `src/components/permissions/ToolDetails.vue`             | (arrow fn)            |
+| 25 | `src-bun/app/chat/sessions.ts`                           | `summarizePermission` |
+| 24 | `src-bun/app/chat/sessions.ts`                           | `forward`             |
+| 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`        |
+| 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`           |
+| 22 | `src-bun/app/chat/pendingRequests.ts`                    | (handler)             |
+| 20 | `src-bun/app/config/settings.ts`                         | (handler)             |
+| 19 | `src/lib/chatEvents/messageHandlers.ts`                  | (handler)             |
+| 19 | `src/stores/chat/sessionsStore.ts`                       | (handler)             |
+| 18 | `src-bun/app/chat/sessions.ts`                           | (handler)             |
+| 18 | `src-bun/app/observability/stderrFilter.ts`              | (filter)              |
+| 18 | `src/stores/chat/sessionsStore.ts`                       | (handler)             |
+| 17 | `src/components/library/McpServerForm.vue`               | (form logic)          |
+| 17 | `src/lexical/plugins.ts`                                 | (plugin)              |
+| 16 | `src-bun/app/chat/sessions.ts`                           | (handler)             |
+| 16 | `src/components/terminal/TerminalPanel.vue`              | (handler)             |
 
 ### 2.4  Oversized Functions (> 200 lines)
 
-| Lines | File                                    | Function                    |
-| ----: | --------------------------------------- | --------------------------- |
-|   866 | `src/stores/sessionsStore.ts:239`       | Entire store body           |
-|   622 | `src/stores/layoutStore.ts:163`         | Entire store body           |
-|   379 | `src/lib/registerBuiltinCommands.ts:52` | `registerBuiltinCommands()` |
-|   251 | `src/stores/terminalStore.ts:25`        | Entire store body           |
-|   240 | `src/stores/jobsStore.ts:22`            | Entire store body           |
-
-### 2.5  Max-Depth Violations (> 4)
-
-| File                         | Line | Depth |
-| ---------------------------- | ---: | ----: |
-| `src-bun/app/audit.ts`       |  119 |     5 |
-| `src/lib/chatEvents.ts`      |  560 |     5 |
+| Lines | File                                                | Function                    |
+| ----: | --------------------------------------------------- | --------------------------- |
+|   866 | `src/stores/chat/sessionsStore.ts`                  | Entire store body           |
+|   598 | `src/stores/shell/layoutStore.ts`                   | Entire store body           |
+|   379 | `src/lib/registerBuiltinCommands.ts`                | `registerBuiltinCommands()` |
+|   251 | `src/stores/terminal/terminalStore.ts`              | Entire store body           |
+|   240 | `src/stores/observability/jobsStore.ts`             | Entire store body           |
 
 
 ---
@@ -171,95 +146,65 @@ Functions that are too branchy. Higher = harder to test and maintain.
 
 ## 3  Copy-Paste Detection (jscpd)
 
-**23 clones detected** across the codebase.
+**16 clones detected** (down from 23 — extracted listener registry, mode options, revealPath)
 
-Clones are sorted by significance (token count × lines).
+Duplication rate: **1.05%** tokens, **1.13%** lines
 
-### 3.1  Cross-File Clones (should extract to shared modules)
+### 3.1  Cross-File Clones
 
-| Tokens | Lines | Source A                            | Source B                            | What's Duplicated                  |
-| -----: | ----: | ----------------------------------- | ----------------------------------- | ---------------------------------- |
-|    376 |    33 | `ChatTab.vue`                       | `SidebarTab.vue`                    | Panel lifecycle (title, isActive)  |
-|    331 |    36 | `settingsStore.ts`                  | `settings.ts` (bun)                 | Default settings shape             |
-|    257 |    27 | `electrobunBridge.ts`               | `wsBridge.ts`                       | IPC listener registry boilerplate  |
-|    162 |    15 | `JsonSchemaField.vue`               | `JsonSchemaForm.vue`                | JSON Schema type definitions       |
-|    147 |    12 | `PermissionDetails.vue`             | `PermissionRuleEditor.vue`          | Raw prop extraction helper         |
-|    135 |    10 | `commandResultRegistry.ts`          | `terminalRegistry.ts`               | `commandExists()` helper           |
-|    124 |    10 | `mcpRegistry.ts`                    | `skillsRegistry.ts`                 | `withClient()` wrapper             |
-|    121 |    15 | `ChatPanel.vue`                     | `ChatTab.vue`                       | Props type + destructuring         |
-|    116 |    12 | `ipc/types.ts`                      | `audit.ts`                          | Audit entry type shape             |
-|    109 |    15 | `LibraryInstructionsTab.vue`        | `LibrarySkillsTab.vue`              | Accordion expand/collapse logic    |
-|    103 |    11 | `MessageEditor.vue`                 | `MessageEditorBody.vue`             | Props + emit definitions           |
-|    100 |    12 | `CodeEditor.vue`                    | `details/DiffEditor.vue`            | Monaco editor style setup          |
-|     93 |    10 | `ModeButtonGroup.vue`               | `SessionHeaderControls.vue`         | Mode button CSS                    |
-|     63 |    11 | `MentionPlugin.vue`                 | `SlashCommandPlugin.vue`            | Typeahead doc comment block        |
+| Tokens | Lines | Source A                 | Source B                     | What's Duplicated               |
+| -----: | ----: | ------------------------ | ---------------------------- | ------------------------------- |
+|    346 |    36 | `ChatTab.vue`            | `SidebarTab.vue`             | Panel lifecycle (title, active) |
 
-### 3.2  Intra-File Clones (internal repetition)
+### 3.2  Intra-File Clones
 
-| Tokens | Lines | File                              | What's Duplicated                    |
-| -----: | ----: | --------------------------------- | ------------------------------------ |
-|    226 |    30 | `LibraryAgentsTab.vue`            | User vs project agent file sections  |
-|    196 |    21 | `CommandPalette.vue`              | Dialog setup + imports               |
-|    162 |    21 | `LibraryInstructionsTab.vue`      | User vs project instruction sections |
-|    144 |    16 | `SessionsManager.vue`             | Create-session-with-workspace logic  |
-|    129 |    14 | `ActivityBar.vue`                 | Top vs bottom activity items         |
-|    127 |    17 | `LibraryInstructionsTab.vue`      | Group heading + expand buttons       |
-|    101 |    10 | `JsonValueView.vue`               | Type detection switch                |
-|     93 |    12 | `PendingRequestCard.vue`          | Comment blocks about SDK channels    |
-|     61 |    11 | `ToolDetails.vue`                 | Conditional block rendering          |
+| Tokens | Lines | File                    | What's Duplicated                    |
+| -----: | ----: | ----------------------- | ------------------------------------ |
+|    217 |    41 | `LibraryAgentsTab.vue`  | User vs project agent sections       |
+|    147 |    10 | `layoutSanitize.ts`     | Panel sanitize logic                 |
 
 
 ---
 
 
-## 4  Dead Code Detection (knip)
+## 4  Runtime Safety Issues
 
-> ⚠️ **Knip caveat:** Knip doesn't understand Bun entry points or Electrobun
-> config. The "unused files" list includes false positives like `src-bun/index.ts`,
-> `electrobun.config.ts`, and test files. Focus on the exports and dependencies.
+Found by manual review and IDE diagnostics.
 
-### 4.1  Unused Dependency
+### 4.1  Type Safety
 
-| Package           | Note                                                  |
-| ----------------- | ----------------------------------------------------- |
-| `@xterm/headless` | Was for headless terminal testing; no longer imported  |
+| Severity | File                                         | Line(s)  | Issue                                                |
+| -------- | -------------------------------------------- | -------- | ---------------------------------------------------- |
+| HIGH     | `src/ipc/wsBridge.ts`                        | 123, 141 | `payload as never` dispatch + `socket!` non-null     |
+| MEDIUM   | `src/stores/chat/sessionsStore.ts`           | 310+     | Repeated `payload.data as {...}` casts in reducer    |
+| MEDIUM   | `src-bun/app/chat/sessions.ts`               | 341      | `request as unknown as Record<string, unknown>`      |
+| MEDIUM   | `src-bun/app/chat/sessions.ts`               | 717, 790 | `opts.reasoningEffort as ReasoningEffort`             |
+| LOW      | `src/components/terminal/TerminalPanel.vue`  | 30, 225  | `as { compact? }`, `as HTMLInputElement`             |
+| LOW      | `src/ipc/rendererLog.ts`                     | 58       | `console[method]` reassigned via `as unknown as`     |
 
-### 4.2  Unused Dev Dependency
+### 4.2  Missing Error Handling
 
-| Package                          | Note                                       |
-| -------------------------------- | ------------------------------------------ |
-| `@vue/eslint-config-typescript`  | Superseded by `typescript-eslint` directly  |
+| Severity | File                                         | Line(s) | Issue                                                 |
+| -------- | -------------------------------------------- | ------- | ----------------------------------------------------- |
+| MEDIUM   | `src/components/terminal/TerminalPanel.vue`  | 327     | `invokeCommand('openUrl')` — no `.catch()`            |
+| MEDIUM   | `src/App.vue`                                | 228     | `dafman:focus-session` listener never removed (HMR)   |
+| MEDIUM   | `src-bun/app/terminal/terminalRegistry.ts`   | 311     | `flushTimer` never cleared on kill/exit               |
 
-### 4.3  Unlisted Dependencies (used but not in `package.json`)
+### 4.3  Performance
 
-These are transitive deps that work today but could break on version bumps.
+| Severity | File                                    | Line(s)  | Issue                                                  |
+| -------- | --------------------------------------- | -------- | ------------------------------------------------------ |
+| MEDIUM   | `src/components/chat/ChatWindow.vue`    | 237-249  | `timelineItems` rebuilds + sorts array every update    |
+| MEDIUM   | `src/App.vue`                           | 73       | Double cast `as unknown as` on dockview group          |
 
-| Package             | Used In                                                    |
-| ------------------- | ---------------------------------------------------------- |
-| `dockview-core`     | Stores, ChatPanel, ChatTab, SidebarTab, ChatTabActions     |
-| `prismjs`           | Lexical prism langs, markdown.ts                           |
-| `@lexical/selection`| MessageComposer.vue                                        |
+### 4.4  Backend Specific
 
-### 4.4  Unused Exports (shipped code, not test helpers)
-
-| File                          | Unused Exports                                                       |
-| ----------------------------- | -------------------------------------------------------------------- |
-| `agentFiles.ts`               | `userAgentsDir`, `projectAgentsDir`                                  |
-| `client.ts`                   | `setClientForTest`, `ensureClient`, `shutdownClient`                 |
-| `copilotSdk.ts`               | `approveAll`, `convertMcpCallToolResult`, `createSessionFsAdapter`, `defineTool`, `SYSTEM_PROMPT_SECTIONS` |
-| `logging.ts`                  | `getLogLevel`, `setLogLevel`, `subscribeLogs`                        |
-| `settings.ts`                 | `ensureDefaultWorkspace`                                             |
-| `stderrFilter.ts`             | `installStderrFilter`                                                |
-| `plugins.ts`                  | `useLexicalComposer`                                                 |
-| `chatEvents.ts`               | `clampOutput`, `pickNumber`, `pickString`                            |
-| `layoutStore.ts`              | `shortPanelTitle`                                                    |
-
-### 4.5  Unused Exported Types
-
-Most are in `copilotSdk.ts`, `rpc.ts`, and `ipc/types.ts` — re-exports of SDK
-types that exist for the public surface but aren't consumed internally yet.
-**16 unused types** in `copilotSdk.ts` alone. These are mostly forward
-declarations for planned features (plan mode, elicitation, permissions).
+| Severity | File                                       | Line(s)    | Issue                                              |
+| -------- | ------------------------------------------ | ---------- | -------------------------------------------------- |
+| HIGH     | `src-bun/app/chat/sessions.ts`             | (entire)   | 2,233-line god object — CRUD+events+agents+MCP     |
+| MEDIUM   | `src-bun/app/library/mcpRegistry.ts`       | 59-73      | Duplicated RPC wrapper (addConfig/updateConfig)    |
+| MEDIUM   | `src-bun/app/client/fakeClient.ts`         | 287-290    | Raw `Error` throws (inconsistent with AppError)    |
+| LOW      | `src-bun/app/client/client.ts`             | 21-24, 116 | Duplicate test seams (`setClientForTest` × 2)      |
 
 
 ---
@@ -267,119 +212,34 @@ declarations for planned features (plan mode, elicitation, permissions).
 
 ## 5  Structural Issues
 
-### 5.1  God Objects
+### 5.1  God Objects (top priority for splitting)
 
-| File                      | Lines | Problem                                                  |
-| ------------------------- | ----: | -------------------------------------------------------- |
-| `SessionDetailsPanel.vue` | 2,417 | 6+ distinct UI sections in one SFC                       |
-| `sessions.ts`             | 1,939 | CRUD + events + agents + tasks + MCP + skills + commands |
-| `sessionsStore.ts`        | 1,308 | Store body is 866 lines; `applyToRecord` alone is 60 CC  |
-| `layoutStore.ts`          |   953 | Dockview + edge panels + session tracking in one store   |
-| `ChatWindow.vue`          | 1,104 | Message list + scroll + auto-scroll + selection          |
-| `MessageComposer.vue`     | 1,124 | Lexical editor + toolbar + attachments + slash commands  |
+| File                                              | Lines | Problem                                                  |
+| ------------------------------------------------- | ----: | -------------------------------------------------------- |
+| `SessionDetailsPanel.vue`                         | 2,954 | 6+ distinct UI sections in one SFC                       |
+| `sessions.ts`                                     | 2,233 | CRUD + events + agents + tasks + MCP + skills + commands |
+| `sessionsStore.ts`                                | 1,466 | `applyToRecord` alone has CC 60                          |
+| `MessageComposer.vue`                             | 1,398 | Lexical editor + toolbar + attachments + slash commands  |
+| `ChatWindow.vue`                                  | 1,319 | Message list + scroll + auto-scroll + selection          |
+| `layoutStore.ts`                                  | 1,145 | Dockview + edge panels + session tracking                |
 
 ### 5.2  Cross-Boundary Duplication
 
-The settings type shape is defined **twice**: once in `src/stores/settingsStore.ts`
-(renderer) and once in `src-bun/app/settings.ts` (main process). 36 lines / 331
-tokens of identical structure. A single shared type file imported by both sides
-would eliminate this and prevent drift.
-
-The IPC listener registry pattern is copy-pasted between `electrobunBridge.ts`
-and `wsBridge.ts` (27 lines / 257 tokens). Both implement `onSessionEvent`,
-`onPendingRequest`, `onLogEvent`, etc. with identical add/remove-from-Set logic.
-A shared `createListenerRegistry()` factory would DRY this.
-
-### 5.3  `commandExists()` is Implemented Twice
-
-Both `commandResultRegistry.ts:27` and `terminalRegistry.ts:43` have identical
-10-line `commandExists()` functions that shell out to `where.exe` / `which`.
-Should be a single shared utility in `src-bun/app/shellUtils.ts`.
+- **Settings type shape** defined twice: `src/stores/app/settingsStore.ts` + `src-bun/app/config/settings.ts` — 36 lines identical
+- **ChatTab / SidebarTab** — 36 lines / 346 tokens of identical panel lifecycle logic → needs `usePanelLifecycle` composable
 
 
 ---
 
 
-## 6  Recommended Code Style
+## 6  What's Been Done ✅
 
-The current style is dense — minimal spacing, packed function bodies.
-A **more spacious** style improves readability without adding real overhead:
-
-### Spacing Rules (add to ESLint / Prettier)
-
-```js
-// -- Blank lines --
-// Before and after: function declarations, class methods, control blocks,
-// multi-line object/array literals, return statements preceded by logic.
-
-// -- Function organization --
-// Group related logic with a blank line and a short comment header:
-//
-//   // ── Session lifecycle ────────────────────────
-//   function create() { ... }
-//   function resume() { ... }
-//   function destroy() { ... }
-//
-//   // ── Event processing ─────────────────────────
-//   function processEvents() { ... }
-
-// -- Imports --
-// Group imports with blank lines between:
-//   1. Node / Bun built-ins
-//   2. Third-party packages
-//   3. Internal modules (absolute paths)
-//   4. Relative imports (sibling / parent)
-
-// -- Object literals --
-// Multi-property objects on separate lines, even if short:
-//   const config = {
-//     timeout: 5000,
-//     retries: 3,
-//     verbose: false,
-//   };
-
-// -- Conditionals --
-// Early returns over nested if/else:
-//   if (!session) return null;
-//   if (!session.isActive) return null;
-//   return session.data;
-//
-// Not:
-//   if (session) {
-//     if (session.isActive) {
-//       return session.data;
-//     }
-//   }
-//   return null;
-```
-
-### Adopted Style: Google TypeScript Style (gts) + Prettier
-
-**Tooling:** `gts` (ESLint + Prettier bundle) + `typescript-eslint/strictTypeChecked` + `eslint-plugin-vue`
-
-**Prettier config** (`.prettierrc`):
-
-```json
-{
-  "singleQuote": true,
-  "trailingComma": "all",
-  "printWidth": 100,
-  "tabWidth": 2,
-  "semi": true,
-  "bracketSpacing": true,
-  "arrowParens": "always",
-  "endOfLine": "lf",
-  "singleAttributePerLine": true
-}
-```
-
-**Key style choices:**
-- Single quotes everywhere (Google convention)
-- 100-char line width (spacious, avoids excessive wrapping)
-- Trailing commas (cleaner diffs)
-- One attribute per line in Vue templates
-- Early returns over nested conditionals
-- Blank lines between logical sections in large files
+- [x] **Code style:** gts + Prettier adopted, spacious padding lines
+- [x] **ESLint:** 715 issues → 300 warnings (0 errors)
+- [x] **Shared utilities:** `createListenerRegistry`, `revealPath`, `MODE_OPTIONS`, `shellUtils`
+- [x] **Directory restructure:** stores (6 folders), components (9 folders), backend (8 folders)
+- [x] **Path aliases:** `@/` configured for all renderer imports (129 files)
+- [x] **Dependencies:** removed unused, added unlisted transitive deps
 
 
 ---
@@ -387,56 +247,39 @@ A **more spacious** style improves readability without adding real overhead:
 
 ## 7  Priority Cleanup Plan
 
-Ordered by impact — each phase is independently valuable.
+### Phase 3 — Split God Objects (next)
 
-### Phase 1 — Extract Shared Utilities (quick wins)
-
-- [x] `commandExists()` → `src-bun/app/shellUtils.ts`
-- [ ] Settings type → `src/shared/settingsTypes.ts` (imported by both sides)
-- [ ] IPC listener registry → `src/ipc/listenerRegistry.ts`
-- [ ] Mode options list → `src/lib/sessionModeOptions.ts`
-- [ ] Panel lifecycle (ChatTab/SidebarTab) → `src/composables/usePanelLifecycle.ts`
-- [ ] Permission raw-prop extractor → `src/lib/permissionUtils.ts`
-- [ ] Editor style constants → `src/lib/editorDefaults.ts`
-- [ ] Accordion expand/collapse → `src/composables/useAccordion.ts`
-
-### Phase 2 — Split God Objects
-
-- [ ] `SessionDetailsPanel.vue` → 6 sub-components (Skills, MCP, Tools, Plan, Usage, Quota)
-- [ ] `sessions.ts` → `sessionCrud.ts` + `sessionEvents.ts` + `sessionAgents.ts` + `sessionMcp.ts`
-- [ ] `sessionsStore.ts` → extract `applyToRecord` into `src/lib/sessionReducer.ts`
+- [ ] `SessionDetailsPanel.vue` (2,954 lines) → 6 sub-components
+- [ ] `sessions.ts` (2,233 lines) → `sessionCrud.ts` + `sessionEvents.ts` + `sessionAgents.ts`
+- [ ] `sessionsStore.ts` (1,466 lines) → extract `applyToRecord` into `sessionReducer.ts`
+- [ ] `ChatWindow.vue` (1,319 lines) → extract scroll manager composable
+- [ ] `MessageComposer.vue` (1,398 lines) → extract toolbar, attachment logic
 - [ ] `registerBuiltinCommands.ts` → split by command group
-- [ ] `ChatWindow.vue` → extract scroll manager composable
-- [ ] `MessageComposer.vue` → extract toolbar, attachment logic
+- [ ] `layoutStore.ts` (1,145 lines) → separate edge panel logic
 
-### Phase 3 — TypeScript Strictness
+### Phase 4 — Fix Warnings (300 total)
 
-- [ ] Eliminate 40 unnecessary type assertions
-- [ ] Replace 25 non-null assertions with proper guards
-- [x] Fix 7 floating promises (add `void` or `await`)
-- [ ] Type the IPC bridge payloads to eliminate `as unknown as`
+- [ ] 120 `no-unnecessary-condition` — remove dead branches
+- [ ] 63 `restrict-template-expressions` — add type narrowing
+- [ ] 14 `vue/component-definition-name-casing` — standardize
+- [ ] 13 `complexity` — reduce CC on 21 functions above 15
+- [ ] 10 `prefer-nullish-coalescing` — `||` → `??`
+- [ ] 9 `no-non-null-assertion` — replace `!` with guards
+- [ ] 9 `no-unsafe-assignment` — add proper typing
+- [ ] Remaining ~62 warnings across 14 rules
+
+### Phase 5 — Runtime Safety
+
+- [ ] Type IPC bridge payloads — eliminate `as unknown as` in wsBridge
 - [ ] Add runtime validation for WS bridge messages
+- [ ] Fix event listener leak in `App.vue`
+- [ ] Add `.catch()` to unguarded IPC calls
+- [ ] Clear `flushTimer` on terminal kill/exit
+- [ ] Deduplicate `addConfig`/`updateConfig` in mcpRegistry
 
-### Phase 4 — Dead Code & Dependencies
+### Phase 6 — Additional Cleanup
 
-- [x] Remove `@xterm/headless` from dependencies
-- [x] Remove `@vue/eslint-config-typescript` from devDependencies
-- [x] Add `dockview-core`, `prismjs`, `@lexical/selection` to dependencies
-- [ ] Remove or `@internal`-mark unused exports identified by knip
-- [ ] Clean up unused exported types (decide: keep for planned API or remove)
-
-### Phase 5 — Reduce Complexity
-
-- [ ] `applyToRecord` (CC 60) → switch-map or strategy pattern per event type
-- [ ] `validateNode` (CC 40) → per-type validator functions
-- [ ] `processEvents` (CC 33) → handler registry (already partially done)
-- [ ] `normalizeTask` (CC 32) → extract sub-normalizers
-- [ ] `openEdgePanel` (CC 29) → separate create vs update paths
-- [ ] Flatten 2 max-depth violations with early returns
-
-### Phase 6 — Code Style & Formatting
-
-- [x] Add Prettier with spacious config (see §6)
-- [ ] Add import sorting (eslint-plugin-import or `@trivago/prettier-plugin-sort-imports`)
-- [x] Enforce blank lines between function groups in stores
-- [x] One-time format pass on entire codebase
+- [ ] ChatTab/SidebarTab → `usePanelLifecycle` composable
+- [ ] Settings type → shared file imported by both sides
+- [ ] Remove/mark unused exports
+- [ ] Add import sorting plugin
