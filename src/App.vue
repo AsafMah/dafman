@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import Toast from 'primevue/toast';
+import Toast, { type ToastMessageOptions } from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
-import type { ToastMessageOptions } from 'primevue/toast';
 import { DockviewVue, type DockviewReadyEvent } from 'dockview-vue';
 import ActivityBar, { type ActivityItem } from '@/components/shell/ActivityBar.vue';
 import BootSplash from '@/components/shell/BootSplash.vue';

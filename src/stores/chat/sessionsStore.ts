@@ -29,11 +29,7 @@ import { useNotificationsStore } from '@/stores/app/notificationsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
-import {
-  appendEvent,
-  applyToRecord,
-  shouldFireForRecord,
-} from './sessionReducer';
+import { appendEvent, applyToRecord, shouldFireForRecord } from './sessionReducer';
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -273,7 +269,6 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     applyToRecord(record, payload);
   }
-
 
   /// Bun-side `pendingRequest` push handler. Appends to the matching
   /// session's queue + fires the "waiting for input" OS notification

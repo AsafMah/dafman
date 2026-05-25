@@ -87,15 +87,10 @@ const {
   resetMcp,
 } = useSessionTools(sessionId);
 
-const {
-  usage,
-  usageError,
-  loadUsage,
-  resetUsage,
-  quota,
-  quotaError,
-  loadQuota,
-} = useSessionUsage(sessionId, record);
+const { usage, usageError, loadUsage, resetUsage, quota, quotaError, loadQuota } = useSessionUsage(
+  sessionId,
+  record,
+);
 
 const {
   planExists,
@@ -121,12 +116,7 @@ const {
   reset: resetSkills,
 } = useSessionSkills(sessionId);
 
-const {
-  sectionOpen,
-  toggleSection,
-  isItemExpanded,
-  toggleItemExpansion,
-} = useDetailsSections();
+const { sectionOpen, toggleSection, isItemExpanded, toggleItemExpansion } = useDetailsSections();
 
 // ---------- Name ----------
 const nameDraft = ref<string>(record.value?.title ?? '');

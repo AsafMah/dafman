@@ -32,10 +32,18 @@ import { AutoFocusPlugin } from 'lexical-vue/LexicalAutoFocusPlugin';
 import { ListPlugin } from 'lexical-vue/LexicalListPlugin';
 import { LinkPlugin } from 'lexical-vue/LexicalLinkPlugin';
 import {
+  $getRoot,
+  $getSelection,
+  $isElementNode,
+  $isRangeSelection,
+  $createParagraphNode,
+  $createTextNode,
   COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
   SELECTION_CHANGE_COMMAND,
+  type ElementNode,
   type LexicalEditor,
+  type TextFormatType,
 } from 'lexical';
 import { $createCodeNode, $isCodeNode } from '@lexical/code';
 import {
@@ -59,16 +67,6 @@ import {
   type ComposerSubmitMode,
   type ComposerSubmitPayload,
 } from '@/lexical/plugins';
-import {
-  $getRoot,
-  $getSelection,
-  $isElementNode,
-  $isRangeSelection,
-  $createParagraphNode,
-  $createTextNode,
-  type ElementNode,
-  type TextFormatType,
-} from 'lexical';
 import { markdownNodes } from '@/lexical/nodes';
 import { $createAttachmentNode } from '@/lexical/AttachmentNode';
 import { lexicalTheme } from '@/lexical/theme';

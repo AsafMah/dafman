@@ -57,10 +57,7 @@ export function shouldFireForRecord(record: SessionRecord): boolean {
 }
 
 function trackSessionArtifact(record: SessionRecord, payload: SessionEventPayload): void {
-  if (
-    payload.eventType !== 'tool.user_requested' &&
-    payload.eventType !== 'tool.execution_start'
-  ) {
+  if (payload.eventType !== 'tool.user_requested' && payload.eventType !== 'tool.execution_start') {
     return;
   }
 
@@ -141,11 +138,7 @@ export function applyToRecord(record: SessionRecord, payload: SessionEventPayloa
   if (payload.eventType === 'session.mode_changed') {
     const data = payload.data as { newMode?: unknown };
 
-    if (
-      data.newMode === 'interactive' ||
-      data.newMode === 'plan' ||
-      data.newMode === 'autopilot'
-    ) {
+    if (data.newMode === 'interactive' || data.newMode === 'plan' || data.newMode === 'autopilot') {
       record.mode = data.newMode;
 
       if (data.newMode === 'autopilot' && record.pendingRequests.length > 0) {

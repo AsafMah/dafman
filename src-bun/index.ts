@@ -10,7 +10,7 @@
 
 import { join } from 'node:path';
 import { BrowserView, BrowserWindow, Updater, Utils } from 'electrobun/bun';
-import { ensureClient, shutdownClient } from './app/client/client';
+import { ensureClient, shutdownClient, tryGetClient } from './app/client/client';
 import { browseDirectorySync } from './app/filesystem/directoryBrowser';
 import { rpcGuard } from './app/shared/errors';
 import {
@@ -24,8 +24,13 @@ import {
 } from './app/observability/logging';
 import { exportDiagnostics } from './app/observability/diagnostics';
 import { saveExportFile } from './app/config/exports';
-import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/observability/audit';
-import type { AuditEntry } from './app/observability/audit';
+import {
+  initAudit,
+  recentAudit,
+  recordUrl,
+  subscribeAudit,
+  type AuditEntry,
+} from './app/observability/audit';
 import { toModelSummary } from './app/library/models';
 import { SessionRegistry } from './app/chat/sessions';
 import { McpRegistry } from './app/library/mcpRegistry';
@@ -35,7 +40,6 @@ import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { listInstructionSources } from './app/library/instructions';
 import { SettingsService, ensureDefaultWorkspace } from './app/config/settings';
 import { installStderrFilter } from './app/observability/stderrFilter';
-import { tryGetClient } from './app/client/client';
 import type {
   CommandResultEvent,
   DafmanRPC,

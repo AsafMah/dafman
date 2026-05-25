@@ -15,8 +15,7 @@
 /// outputs).
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { EditorState, Compartment } from '@codemirror/state';
-import type { Extension } from '@codemirror/state';
+import { EditorState, Compartment, type Extension } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';

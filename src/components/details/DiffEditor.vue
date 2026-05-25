@@ -15,8 +15,7 @@
 
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { EditorView, lineNumbers } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
-import type { Extension } from '@codemirror/state';
+import { EditorState, type Extension } from '@codemirror/state';
 import { MergeView, unifiedMergeView } from '@codemirror/merge';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';

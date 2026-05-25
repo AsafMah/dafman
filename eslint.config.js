@@ -19,6 +19,7 @@ export default tseslint.config(
       'tools/**',
       'src/dev/**',
       '*.config.*',
+      '**/*.d.ts',
     ],
   },
 
@@ -71,18 +72,26 @@ export default tseslint.config(
       'no-duplicate-imports': 'warn',
 
       // TS strictness tweaks
-      '@typescript-eslint/no-unsafe-assignment': 'warn',
-      '@typescript-eslint/no-unsafe-member-access': 'warn',
-      '@typescript-eslint/no-unsafe-call': 'warn',
-      '@typescript-eslint/no-unsafe-return': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
+      // SDK interaction code uses `any`-typed values extensively; these
+      // produce hundreds of false positives. Disabled for the whole repo
+      // since the SDK boundary permeates most modules.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
       '@typescript-eslint/prefer-nullish-coalescing': 'warn',
       '@typescript-eslint/no-misused-promises': 'warn',
-      '@typescript-eslint/restrict-template-expressions': 'warn',
-      '@typescript-eslint/no-unnecessary-condition': 'warn',
+      '@typescript-eslint/restrict-template-expressions': ['warn', { allowNumber: true }],
+      // Defensive runtime checks are fine — SDK shapes drift and external
+      // data can surprise us. Keep this off to allow `if (x)` guards.
+      '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/require-await': 'off', // async interface implementations don't need await
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/no-confusing-void-expression': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/unified-signatures': 'warn',
@@ -104,6 +113,8 @@ export default tseslint.config(
       'vue/html-self-closing': 'off',
       'vue/html-closing-bracket-newline': 'off',
       'vue/html-indent': 'off',
+      'vue/one-component-per-file': 'off', // test helpers / barrel exports
+      'vue/require-default-prop': 'off', // TypeScript handles defaults
 
       // Spacious style — blank lines around control flow and returns
       '@stylistic/padding-line-between-statements': [

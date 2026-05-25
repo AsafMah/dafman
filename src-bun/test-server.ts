@@ -24,7 +24,13 @@ import {
   subscribeLogs,
   log,
 } from './app/observability/logging';
-import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/observability/audit';
+import {
+  initAudit,
+  recentAudit,
+  recordUrl,
+  subscribeAudit,
+  type AuditEntry,
+} from './app/observability/audit';
 import { saveExportFile } from './app/config/exports';
 import { exportDiagnostics } from './app/observability/diagnostics';
 import { browseDirectorySync } from './app/filesystem/directoryBrowser';
@@ -38,7 +44,6 @@ import { SettingsService } from './app/config/settings';
 import { listInstructionSources } from './app/library/instructions';
 import { toModelSummary } from './app/library/models';
 import { FakeCopilotClient } from './app/client/fakeClient';
-import type { AuditEntry } from './app/observability/audit';
 import { toErrorMessage } from './app/shared/errorMessage';
 import type {
   LogRecord,

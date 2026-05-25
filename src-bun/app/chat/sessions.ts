@@ -69,7 +69,6 @@ import type {
   AgentInfo,
   JobRecord,
   TaskInfo,
-  CommandResultRecord,
 } from '../rpc';
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
