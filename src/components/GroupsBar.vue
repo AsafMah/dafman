@@ -64,7 +64,7 @@ function handleContextAction(action: "rename" | "delete") {
 </script>
 
 <template>
-  <!-- Hidden when only one group exists -->
+  <!-- Show full bar when 2+ groups; show just the + button when 1 group -->
   <div v-if="groups.length > 1" class="groups-bar">
     <button
       v-for="g in groups"
@@ -91,7 +91,7 @@ function handleContextAction(action: "rename" | "delete") {
         <span class="group-count">{{ groupsStore.sessionCount(g.id) }}</span>
       </template>
     </button>
-    <button class="group-tab add-tab" @click="groupsStore.createGroup('New Group')">
+    <button class="group-tab add-tab" @click="groupsStore.createGroup('New Group')" title="New Group">
       +
     </button>
 
