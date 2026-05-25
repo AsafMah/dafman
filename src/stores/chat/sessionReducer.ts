@@ -104,6 +104,224 @@ function trackSessionArtifact(record: SessionRecord, payload: SessionEventPayloa
   }
 }
 
+// ── Per-event-type handlers ──────────────────────────────────────
+// Each handler is a small, focused function keyed by event type.
+// The dispatch table at the bottom maps event types to handlers,
+// replacing the original CC-60 if/else chain with O(1) lookup.
+
+type EventHandler = (record: SessionRecord, payload: SessionEventPayload) => void;
+
+// Keep model + reasoning effort in sync with backend-initiated
+// changes (rate-limit auto-switch, /model commands, etc.).
+function handleModelChange(record: SessionRecord, payload: SessionEventPayload): void {
+  const data = payload.data as {
+    newModel?: unknown;
+    reasoningEffort?: unknown;
+  };
+
+  if (typeof data.newModel === 'string') {
+    record.model = data.newModel;
+  }
+
+  if (typeof data.reasoningEffort === 'string') {
+    record.reasoningEffort = data.reasoningEffort;
+  }
+}
+
+// Backend may auto-switch the agent run mode (e.g. /plan command).
+function handleModeChanged(record: SessionRecord, payload: SessionEventPayload): void {
+  const data = payload.data as { newMode?: unknown };
+
+  if (data.newMode !== 'interactive' && data.newMode !== 'plan' && data.newMode !== 'autopilot') {
+    return;
+  }
+
+  record.mode = data.newMode;
+
+  if (data.newMode === 'autopilot' && record.pendingRequests.length > 0) {
+    const requestIds = record.pendingRequests.map((p) => p.requestId);
+
+    record.pendingRequests.splice(0, record.pendingRequests.length);
+
+    for (const requestId of requestIds) {
+      appendEvent(record, {
+        sessionId: record.id,
+        eventType: 'dafman.pending_response',
+        data: { requestId },
+      });
+    }
+  }
+}
+
+// Track the SDK's auto-summarised title for the dockview tab.
+function handleTitleChanged(record: SessionRecord, payload: SessionEventPayload): void {
+  const title = (payload.data as { title?: unknown }).title;
+
+  if (typeof title === 'string' && title.length > 0) {
+    record.title = title;
+  }
+}
+
+// Session-level custom agent selection for header chip + rail.
+function handleSubagentSelected(record: SessionRecord, payload: SessionEventPayload): void {
+  const d = (payload.data ?? {}) as {
+    agentName?: unknown;
+    agentDisplayName?: unknown;
+    agentDescription?: unknown;
+    agentPath?: unknown;
+    parentToolCallId?: unknown;
+  };
+
+  if (
+    typeof d.agentName === 'string' &&
+    (typeof d.parentToolCallId !== 'string' || d.parentToolCallId.length === 0)
+  ) {
+    record.currentAgent = {
+      name: d.agentName,
+      displayName: typeof d.agentDisplayName === 'string' ? d.agentDisplayName : d.agentName,
+      description: typeof d.agentDescription === 'string' ? d.agentDescription : '',
+      ...(typeof d.agentPath === 'string' ? { path: d.agentPath } : {}),
+    };
+  }
+}
+
+function handleSubagentDeselected(record: SessionRecord): void {
+  record.currentAgent = null;
+}
+
+// Bump the tasks refresh counter so the rail re-reads via `listTasks`.
+function handleTasksRefresh(record: SessionRecord): void {
+  record.tasksRefreshCounter += 1;
+}
+
+function handlePlanChanged(record: SessionRecord): void {
+  record.planRefreshCounter += 1;
+}
+
+// MCP OAuth lifecycle toasts — nudge the user on `_required`,
+// confirm on `_completed`, de-dup by requestId.
+function handleOauthRequired(record: SessionRecord, payload: SessionEventPayload): void {
+  const d = (payload.data ?? {}) as {
+    serverName?: unknown;
+    requestId?: unknown;
+  };
+
+  if (typeof d.serverName !== 'string') return;
+
+  const toasts = useToastStore();
+  const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
+
+  if (!key || !record._toastedOauthRequests.has(key)) {
+    if (key) record._toastedOauthRequests.add(key);
+
+    toasts.info(
+      'MCP server needs sign-in',
+      `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
+    );
+  }
+}
+
+function handleOauthCompleted(record: SessionRecord, payload: SessionEventPayload): void {
+  const d = (payload.data ?? {}) as { requestId?: unknown };
+  const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
+
+  if (key && record._toastedOauthRequests.has(key)) {
+    record._toastedOauthRequests.delete(key);
+    useToastStore().success('MCP signed in', 'Connection established');
+  }
+}
+
+// Extract workspace cwd from session.start / session.resume.
+function handleSessionCwd(record: SessionRecord, payload: SessionEventPayload): void {
+  const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
+  const cwd = ctx?.cwd;
+
+  if (typeof cwd === 'string' && cwd.length > 0) {
+    record.workingDirectory = cwd;
+  }
+}
+
+// Mid-turn indicator: flips on at turn_start.
+function handleTurnStart(record: SessionRecord): void {
+  record.isThinking = true;
+  record.sawTurnBoundary = true;
+}
+
+// Turn end: clear thinking, fire unseen-activity dot + OS notification
+// when the session isn't the dock's active panel.
+function handleTurnEnd(record: SessionRecord): void {
+  record.isThinking = false;
+
+  const layoutStore = useLayoutStore();
+
+  if (layoutStore.activeSessionId === record.id) return;
+
+  record.unseenTurns += 1;
+
+  if (shouldFireForRecord(record)) {
+    useNotificationsStore().notify({
+      kind: 'turnEnd',
+      title: record.title ?? `Session ${record.id.slice(0, 8)}`,
+      body: 'Turn complete.',
+      sessionId: record.id,
+      tag: `${record.id}:turnEnd`,
+    });
+  }
+}
+
+function handleThinkingOff(record: SessionRecord): void {
+  record.isThinking = false;
+}
+
+// Stale-state cleanup for SDK-emitted `*.completed` events.
+const COMPLETED_KIND_MAP: Record<string, PendingRecordRequest['kind']> = {
+  'permission.completed': 'permission',
+  'user_input.completed': 'userInput',
+  'elicitation.completed': 'elicitation',
+  'exit_plan_mode.completed': 'exitPlanMode',
+  'auto_mode_switch.completed': 'autoModeSwitch',
+};
+
+function handlePendingCompleted(record: SessionRecord, payload: SessionEventPayload): void {
+  const kind = COMPLETED_KIND_MAP[payload.eventType];
+
+  if (!kind) return;
+
+  const idx = record.pendingRequests.findIndex((p) => p.kind === kind);
+
+  if (idx >= 0) record.pendingRequests.splice(idx, 1);
+}
+
+// ── Dispatch table ──────────────────────────────────────────────
+// Maps event types to handler functions. Multiple event types can
+// share the same handler (e.g. session.start/resume → handleSessionCwd).
+
+const EVENT_HANDLERS: Record<string, EventHandler> = {
+  'session.model_change': handleModelChange,
+  'session.mode_changed': handleModeChanged,
+  'session.title_changed': handleTitleChanged,
+  'subagent.selected': handleSubagentSelected,
+  'subagent.deselected': handleSubagentDeselected,
+  'subagent.started': handleTasksRefresh,
+  'subagent.completed': handleTasksRefresh,
+  'subagent.failed': handleTasksRefresh,
+  'session.background_tasks_changed': handleTasksRefresh,
+  'session.plan_changed': handlePlanChanged,
+  'mcp.oauth_required': handleOauthRequired,
+  'mcp.oauth_completed': handleOauthCompleted,
+  'session.start': handleSessionCwd,
+  'session.resume': handleSessionCwd,
+  'assistant.turn_start': handleTurnStart,
+  'assistant.turn_end': handleTurnEnd,
+  'session.idle': handleThinkingOff,
+  'session.error': handleThinkingOff,
+  'permission.completed': handlePendingCompleted,
+  'user_input.completed': handlePendingCompleted,
+  'elicitation.completed': handlePendingCompleted,
+  'exit_plan_mode.completed': handlePendingCompleted,
+  'auto_mode_switch.completed': handlePendingCompleted,
+};
+
 /// Main event reducer. Dispatches a single SessionEventPayload to
 /// the appropriate SessionRecord fields. Called from the store's
 /// `handleEvent` and from `drainPending` during session create/resume.
@@ -116,214 +334,9 @@ export function applyToRecord(record: SessionRecord, payload: SessionEventPayloa
 
   trackSessionArtifact(record, payload);
 
-  // Keep model + reasoning effort in sync with backend-initiated changes
-  // (rate-limit auto-switch, /model commands, etc.). The session.model_change
-  // event ships both fields when applicable.
-  if (payload.eventType === 'session.model_change') {
-    const data = payload.data as {
-      newModel?: unknown;
-      reasoningEffort?: unknown;
-    };
+  const handler = EVENT_HANDLERS[payload.eventType];
 
-    if (typeof data.newModel === 'string') {
-      record.model = data.newModel;
-    }
-
-    if (typeof data.reasoningEffort === 'string') {
-      record.reasoningEffort = data.reasoningEffort;
-    }
-  }
-
-  // Backend may auto-switch the agent run mode (e.g. /plan command).
-  if (payload.eventType === 'session.mode_changed') {
-    const data = payload.data as { newMode?: unknown };
-
-    if (data.newMode === 'interactive' || data.newMode === 'plan' || data.newMode === 'autopilot') {
-      record.mode = data.newMode;
-
-      if (data.newMode === 'autopilot' && record.pendingRequests.length > 0) {
-        const requestIds = record.pendingRequests.map((p) => p.requestId);
-
-        record.pendingRequests.splice(0, record.pendingRequests.length);
-
-        for (const requestId of requestIds) {
-          appendEvent(record, {
-            sessionId: record.id,
-            eventType: 'dafman.pending_response',
-            data: { requestId },
-          });
-        }
-      }
-    }
-  }
-
-  // Track the SDK's auto-summarised title so the dockview tab can
-  // show something meaningful instead of the raw uuid.
-  if (payload.eventType === 'session.title_changed') {
-    const title = (payload.data as { title?: unknown }).title;
-
-    if (typeof title === 'string' && title.length > 0) {
-      record.title = title;
-    }
-  }
-
-  // 19a: track session-level custom agent selection so the header
-  // chip + rail react without mounting the chat panel. Mirror the
-  // chat reducer's `ambient.currentAgent` derivation: only treat
-  // events that carry `agentName` as session-level selection
-  // (transient delegation during fleet/task runs has a
-  // `parentToolCallId`).
-  if (payload.eventType === 'subagent.selected') {
-    const d = (payload.data ?? {}) as {
-      agentName?: unknown;
-      agentDisplayName?: unknown;
-      agentDescription?: unknown;
-      agentPath?: unknown;
-      parentToolCallId?: unknown;
-    };
-
-    if (
-      typeof d.agentName === 'string' &&
-      (typeof d.parentToolCallId !== 'string' || d.parentToolCallId.length === 0)
-    ) {
-      record.currentAgent = {
-        name: d.agentName,
-        displayName: typeof d.agentDisplayName === 'string' ? d.agentDisplayName : d.agentName,
-        description: typeof d.agentDescription === 'string' ? d.agentDescription : '',
-        ...(typeof d.agentPath === 'string' ? { path: d.agentPath } : {}),
-      };
-    }
-  } else if (payload.eventType === 'subagent.deselected') {
-    record.currentAgent = null;
-  }
-
-  // 19b.1: refetch the Tasks rail section on subagent.* + the
-  // dedicated `session.background_tasks_changed` event the SDK
-  // also emits. The wire payload for the started/completed events
-  // doesn't carry the full TaskInfo shape, so we just bump the
-  // counter and let the rail re-read via `listTasks`.
-  if (
-    payload.eventType === 'subagent.started' ||
-    payload.eventType === 'subagent.completed' ||
-    payload.eventType === 'subagent.failed' ||
-    payload.eventType === 'session.background_tasks_changed'
-  ) {
-    record.tasksRefreshCounter += 1;
-  }
-
-  if (payload.eventType === 'session.plan_changed') {
-    record.planRefreshCounter += 1;
-  }
-
-  // 22a: surface MCP OAuth lifecycle as user-visible toasts.
-  // `mcp.oauth_required` fires when an MCP server needs sign-in
-  // (typically right after the server is configured + connection
-  // attempted). The SDK handles the actual flow via
-  // `loginToMcpServer` + URL elicitation; here we just nudge the
-  // user. `mcp.oauth_completed` fires on success and we
-  // de-dup by requestId so we don't show duplicate completion
-  // toasts on resume / replay.
-  if (payload.eventType === 'mcp.oauth_required') {
-    const d = (payload.data ?? {}) as {
-      serverName?: unknown;
-      requestId?: unknown;
-    };
-
-    if (typeof d.serverName === 'string') {
-      const toasts = useToastStore();
-      const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
-
-      if (!key || !record._toastedOauthRequests.has(key)) {
-        if (key) record._toastedOauthRequests.add(key);
-
-        toasts.info(
-          'MCP server needs sign-in',
-          `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
-        );
-      }
-    }
-  } else if (payload.eventType === 'mcp.oauth_completed') {
-    const d = (payload.data ?? {}) as { requestId?: unknown };
-    const toasts = useToastStore();
-    const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
-
-    // Only fire if we toasted the matching `_required`; suppresses
-    // stray `_completed` events on resume + the case where another
-    // client (e.g. CLI) drove the OAuth flow.
-    if (key && record._toastedOauthRequests.has(key)) {
-      record._toastedOauthRequests.delete(key);
-      toasts.success('MCP signed in', 'Connection established');
-    }
-  }
-
-  // Both `session.start` (fresh create) and `session.resume` carry
-  // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
-  // Resumed sessions don't fire `session.start` again, so we have
-  // to listen on both — otherwise the workspace would only appear
-  // on freshly-created sessions and never on restored ones.
-  if (payload.eventType === 'session.start' || payload.eventType === 'session.resume') {
-    const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
-    const cwd = ctx?.cwd;
-
-    if (typeof cwd === 'string' && cwd.length > 0) {
-      record.workingDirectory = cwd;
-    }
-  }
-
-  // Mid-turn indicator: flips on at turn_start, off at turn_end /
-  // session.idle / session.error. The reducer (`ChatAmbient`)
-  // tracks the same thing inside the chat panel; this mirror lives
-  // on the record so the tab + sidebar dot react without the
-  // panel being mounted.
-  if (payload.eventType === 'assistant.turn_start') {
-    record.isThinking = true;
-    record.sawTurnBoundary = true;
-  } else if (payload.eventType === 'assistant.turn_end') {
-    record.isThinking = false;
-    // Unseen-activity dot + optional OS notification when the
-    // session ISN'T the dock's active panel. Cleared on focus by
-    // the activeSessionId watcher below.
-    const layoutStore = useLayoutStore();
-
-    if (layoutStore.activeSessionId !== record.id) {
-      record.unseenTurns += 1;
-
-      if (shouldFireForRecord(record)) {
-        const notifications = useNotificationsStore();
-
-        notifications.notify({
-          kind: 'turnEnd',
-          title: record.title ?? `Session ${record.id.slice(0, 8)}`,
-          body: 'Turn complete.',
-          sessionId: record.id,
-          // Same tag → multiple turn-ends collapse to one entry
-          // in the OS tray.
-          tag: `${record.id}:turnEnd`,
-        });
-      }
-    }
-  } else if (payload.eventType === 'session.idle' || payload.eventType === 'session.error') {
-    record.isThinking = false;
-  }
-
-  // Stale-state cleanup for SDK-emitted `*.completed` events. The
-  // dafman-internal `pendingRequest` channel is the canonical
-  // source for adds (handled in `handlePendingRequest` below); we
-  // remove on `_completed` as well in case the SDK resolves a
-  // callback out-of-band (e.g. resume-with-continue-pending-work
-  // re-emits). Best-effort match: remove the OLDEST entry of the
-  // same kind since SDK events lack our generated requestId.
-  let completedKind: PendingRecordRequest['kind'] | null = null;
-
-  if (payload.eventType === 'permission.completed') completedKind = 'permission';
-  else if (payload.eventType === 'user_input.completed') completedKind = 'userInput';
-  else if (payload.eventType === 'elicitation.completed') completedKind = 'elicitation';
-  else if (payload.eventType === 'exit_plan_mode.completed') completedKind = 'exitPlanMode';
-  else if (payload.eventType === 'auto_mode_switch.completed') completedKind = 'autoModeSwitch';
-
-  if (completedKind) {
-    const idx = record.pendingRequests.findIndex((p) => p.kind === completedKind);
-
-    if (idx >= 0) record.pendingRequests.splice(idx, 1);
+  if (handler) {
+    handler(record, payload);
   }
 }
