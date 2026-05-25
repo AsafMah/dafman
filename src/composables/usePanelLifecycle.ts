@@ -8,7 +8,7 @@
 // containerApi }` at the top level; on any later `update()`
 // everything is re-wrapped into `{ params: { params, api, … } }`.
 
-import { computed, onBeforeUnmount, ref, watchEffect, type Ref } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, ref, watchEffect, type Ref } from 'vue';
 import type { DockviewPanelApi } from 'dockview-core';
 
 export interface PanelProps {
@@ -63,10 +63,12 @@ export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
     });
   });
 
-  onBeforeUnmount(() => {
-    unsubTitle?.();
-    unsubActive?.();
-  });
+  if (getCurrentInstance()) {
+    onBeforeUnmount(() => {
+      unsubTitle?.();
+      unsubActive?.();
+    });
+  }
 
   function close(event: MouseEvent) {
     event.stopPropagation();

@@ -89,6 +89,24 @@ function applyThemeClass(isDark: boolean) {
   document.documentElement.classList.toggle('app-dark', isDark);
 }
 
+// Focus-session handler for OS notification clicks. Declared at
+// script-setup scope so onBeforeUnmount can capture the instance
+// (it's lost after awaits inside onMounted).
+const handleFocusSession = (e: Event) => {
+  const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+
+  if (!detail?.sessionId) return;
+
+  const dock = layoutStore.api;
+  const panel = dock?.getPanel(detail.sessionId);
+
+  panel?.api.setActive();
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener('dafman:focus-session', handleFocusSession);
+});
+
 onMounted(async () => {
   const mql = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -224,22 +242,11 @@ onMounted(async () => {
   // dispatches `dafman:focus-session` from a Notification's onclick;
   // we activate the matching panel here. Window focus is already
   // attempted on the store side.
-  const handleFocusSession = (e: Event) => {
-    const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
-
-    if (!detail?.sessionId) return;
-
-    const dock = layoutStore.api;
-    const panel = dock?.getPanel(detail.sessionId);
-
-    panel?.api.setActive();
-  };
-
   window.addEventListener('dafman:focus-session', handleFocusSession);
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('dafman:focus-session', handleFocusSession);
-  });
+  // NOTE: cleanup is registered at top-level <script setup> scope
+  // (not here) because onBeforeUnmount loses the component instance
+  // after awaits inside onMounted.
 
   // Auto-create a session when none exist and the URL carries
   // `?autosession=1`. One-shot per page load; will not loop on HMR
