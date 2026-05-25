@@ -18,12 +18,7 @@ describe('terminal ANSI cleanup', () => {
       expect(stripAnsi(raw)).toBe('hello');
     });
 
-    // NOTE: ST-terminated (`\x1b\\`) OSC sequences are currently not stripped
-    // correctly because OSC_PATTERN's `[^\x07]*` body allows ESC, which lets
-    // the greedy engine swallow nested sequences. The Phase A `strip-ansi`
-    // swap is expected to fix this — this test will be flipped to a regular
-    // assertion at that time.
-    test.todo('strips VS Code shell-integration OSC 633 sequences (ST terminator)', () => {
+    test('strips VS Code shell-integration OSC 633 sequences (ST terminator)', () => {
       const raw = '\x1b]633;A\x1b\\hello\x1b]633;B\x1b\\';
       expect(stripAnsi(raw)).toBe('hello');
     });

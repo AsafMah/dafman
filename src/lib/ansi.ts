@@ -1,13 +1,10 @@
-const OSC_PATTERN = /\x1B\][^\x07]*(?:\x07|\x1B\\)/g;
-const CSI_PATTERN = /[\x1B\x9B]\[[0-?]*[ -/]*[@-~]/g;
-const ESCAPE_PATTERN = /\x1B[()#;?]*(?:[0-9A-ORZcf-nqry=><~])/g;
+import baseStripAnsi from 'strip-ansi';
 
 export function stripAnsi(value: string): string {
-  return value
-    .replace(OSC_PATTERN, '')
-    .replace(CSI_PATTERN, '')
-    .replace(ESCAPE_PATTERN, '')
-    .replace(/\x07/g, '');
+  // strip-ansi handles CSI + OSC (BEL, ESC\, 0x9C terminators) properly,
+  // but does not remove lone BELs that aren't part of an OSC sequence —
+  // those leak out of some shells, so strip them too.
+  return baseStripAnsi(value).replace(/\x07/g, '');
 }
 
 export function cleanTerminalCommandOutput(value: string): string {
