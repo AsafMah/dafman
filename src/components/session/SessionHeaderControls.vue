@@ -86,7 +86,7 @@ const allGroupKeys = computed<Record<string, boolean>>(() => {
   const walk = (nodes: TreeNode[]): void => {
     for (const n of nodes) {
       if (n.children && n.children.length > 0) {
-        if (n.key) out[n.key as string] = true;
+        if (n.key) out[n.key] = true;
 
         walk(n.children);
       }
