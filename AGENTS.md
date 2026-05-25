@@ -433,6 +433,125 @@ test or fixture before fixing. Examples:
 Do not replace the repro with a nearby happy-path test. The bug the user saw is
 the test.
 
+### 16. Build vs Buy — search before you write infrastructure
+
+Before writing any "small helper" for infrastructure code (event bus,
+debounce, throttle, localStorage persistence, ANSI/log parsing,
+extension/MIME maps, color contrast, clipboard, focus management,
+resize/intersection observers, fuzzy search, virtual scroll, file-path
+manipulation, ID generation, deep-equal, URL parsing, date formatting,
+keybinding parsing, regex composition for known formats):
+
+1. **Check `package.json`** — is there already a dep that does it?
+2. **Check `@vueuse/core`** — covers most browser-API wrappers.
+3. **Check PrimeVue** — covers most UI primitives (tooltips, badges,
+   skeletons, spinners, accordions, virtual scroll, scroll panels).
+4. **Check npm** — for utility libraries, prefer popular battle-tested
+   packages (`strip-ansi`, `mitt`, `@codemirror/language-data` etc.)
+5. **Only then** consider writing it yourself.
+
+A 50-line "small helper" today is a 300-line god-helper in six months.
+The dafman May 2026 audit identified ~500 lines of hand-rolled
+infrastructure (ANSI regex, event bus, listener registry, localStorage
+glue, debounce timers, extension maps) every line of which had at least
+one subtle bug a library would have fixed for free.
+
+### 17. Install the proper dep instead of maintaining a workaround table
+
+When a library does 90% of what you need and the gap is "it doesn't
+know about my niche extensions / dialects / shapes":
+
+- **First option:** install the official sub-package (e.g.
+  `@codemirror/lang-vue` for Vue files, `@codemirror/lang-sass` for
+  Sass). Most ecosystems split language/dialect packs precisely so you
+  pay only for what you use.
+- **Second option:** open an issue or PR on the library.
+- **Last resort:** add a workaround table in our code.
+
+Workaround tables are the highest-maintenance form of code: invisible
+in tests, mutate every time the upstream library updates, and almost
+always indicate the gap is closeable by reading the docs more carefully.
+If the workaround table grows past 3 entries, it's a smell. (Precedent:
+commits `42be1a6` → `032d06d` — agent kept a 4-entry workaround table
+for vue/scss/jsonc/pyi instead of installing the obvious deps; user
+caught it on review.)
+
+### 18. Never `window.dispatchEvent(new CustomEvent('app:...'))`
+
+The window event bus is untyped global coupling. Use the typed
+event bus (`src/lib/bus.ts` once mitt lands; until then use stores or
+provide/inject). Window events:
+
+- Have no typing — listeners receive `any`.
+- Can't be traced — adding a listener doesn't tell you what dispatches.
+- Have no cleanup guarantee — leaked listeners across HMR are routine.
+- Cross every component boundary — turns the entire renderer into a
+  ball-of-mud message hub.
+
+If you find yourself reaching for a window event "to avoid plumbing
+through stores," the answer is to add the field to a store, not to add
+another global event. (Precedent: the May 2026 audit found 13 dispatch
+sites and 9 listener sites across 9 files — pure spaghetti.)
+
+### 19. Watch for god objects on every change
+
+Before adding code to a file, check its line count:
+
+- **>500 lines:** add to a new file in the same folder.
+- **>800 lines:** stop and split the existing file first; do not
+  contribute more code to a known god object.
+- **>1,200 lines:** the file is a structural bug; fix it before adding
+  anything new.
+
+This applies to `.vue` SFCs, Pinia stores, and backend modules
+equally. The dafman May 2026 audit's worst offenders all crossed
+1,000 lines by accretion of "small additions" — `sessions.ts` (1,929),
+`MessageComposer.vue` (1,396), `ChatWindow.vue` (1,209). Each was
+born under 400 lines.
+
+### 20. Cyclomatic complexity > 15 is the design talking
+
+ESLint's `complexity` rule fires at CC 15. When you see it:
+
+- **Do not bump the threshold.** That's hiding the problem.
+- **Do not extract a 3-line helper to drop CC by 1.** That's cosmetic.
+- **Look at the function as a whole.** CC > 15 almost always means
+  multiple unrelated concerns are interleaved. Find the natural seam
+  (input validation vs orchestration vs side effects; type-A handling
+  vs type-B handling) and split there.
+
+If the function genuinely needs the complexity (e.g. parsing a state
+machine, validating a deep schema), document why with a comment and
+add a `// eslint-disable-next-line complexity` — but explicitly, not
+by silencing the rule globally.
+
+### 21. Tables in CODE_AUDIT, STATUS, DEVLOG go stale within weeks
+
+When you complete a refactor that changes a metric the audit tracks
+(file size, ESLint warning count, event-bus dispatch count, jscpd
+duplication, complexity hotspots, `as unknown as` count), update the
+relevant row(s) in the same commit. Don't leave it for the next
+audit refresh.
+
+Cheap targeted greps to verify (one-liners):
+
+```pwsh
+# File size after split
+(Get-Content src/components/Foo.vue).Count
+
+# Event-bus dispatch sites
+rg "new CustomEvent\('dafman:" src
+
+# Direct IPC from .vue
+rg -t vue "invokeCommand\(" src
+
+# as unknown as count in a file
+rg "as unknown as" src/stores/shell/layoutStore.ts | Measure-Object | %{ $_.Count }
+```
+
+Forgotten rows accumulate into "30-70% drift" between audits, which
+turns the audit into vibes and undermines every decision based on it.
+
 ---
 
 ## Hard rules (do not violate)
@@ -450,6 +569,10 @@ anti-laziness rules above:
   history.
 - Never let `plans/` drift silently. Update the relevant doc when reality
   diverges.
+- **Never reach for `window.dispatchEvent`/`addEventListener('app:...')`
+  for in-app messaging** — see rule 18.
+- **Never silence ESLint's `complexity` rule globally to skirt rule 20**
+  — disable per-line with justification or fix the design.
 
 ## Monorepo / nested AGENTS.md
 
