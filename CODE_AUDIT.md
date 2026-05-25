@@ -1,8 +1,8 @@
 # Code Quality Audit
 
-> **Date:** 2026-05-25 (updated: ESLint warnings 92 → 31, complexity reductions applied)
+> **Date:** 2026-05-25 (deep review: architectural debt with receipts)
 > **Codebase:** ~33,000 lines of TypeScript + Vue across `src/` and `src-bun/`
-> **Tools used:** ESLint (strictTypeChecked), jscpd (copy-paste detection), manual review, IDE diagnostics
+> **Tools used:** ESLint (strictTypeChecked), jscpd (copy-paste detection), deep manual code review, IDE diagnostics
 
 ---
 
@@ -72,29 +72,20 @@ Files above **800 lines** are strong candidates for splitting.
 | `vue/one-component-per-file`                   | Test helpers / barrel exports (6 hits)               |
 | `vue/require-default-prop`                     | TypeScript handles prop defaults (5 hits)            |
 
-### 2.2  Files with Most Warnings
+### 2.2  Remaining Complexity Hotspots
 
-| Count | File                                               |
-| ----: | -------------------------------------------------- |
-|    27 | `src/components/session/SessionDetailsPanel.vue`   |
-|    17 | `src/components/terminal/TerminalPanel.vue`        |
-|    16 | `src/main.ts`                                      |
-|    13 | `src/App.vue`                                      |
-|    11 | `src/components/settings/SettingsPanel.vue`        |
-|    11 | `src/stores/chat/sessionsStore.ts`                 |
-|    10 | `src/components/chat/ChatWindow.vue`               |
-|    10 | `src/components/session/SessionsManager.vue`       |
-|     7 | `src/lib/chatEvents/notificationHandlers.ts`       |
-|     7 | `src/lib/modelTree.ts`                             |
-|     6 | `src/components/chat/SubagentBlock.vue`            |
-|     6 | `src/components/observability/JobsPanel.vue`       |
-|     6 | `src/components/shared/JsonSchemaField.vue`        |
-|     6 | `src/stores/terminal/terminalStore.ts`             |
-|     5 | `src/components/chat/MessageComposer.vue`          |
-|     5 | `src/components/observability/LogViewer.vue`       |
-|     5 | `src/ipc/wsBridge.ts`                              |
-|     5 | `src/lexical/plugins.ts`                           |
-|     5 | `src/lib/chatEvents.ts`                            |
+| CC | File                                                     | Function                    |
+| -: | -------------------------------------------------------- | --------------------------- |
+| 40 | `src/components/shared/JsonSchemaForm.vue`               | `validateNode`              |
+| 29 | `src/stores/shell/layoutStore.ts`                        | `openEdgePanel`             |
+| 28 | `src/components/permissions/ToolDetails.vue`             | (arrow fn)                  |
+| 24 | `src-bun/app/chat/sessions.ts`                           | `forward`                   |
+| 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`              |
+| 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`                 |
+| 22 | `src-bun/app/chat/sessions.ts`                           | `respond`                   |
+| 20 | `src-bun/app/config/settings.ts`                         | `coerceTerminal`            |
+| 19 | `src/lib/chatEvents/messageHandlers.ts`                  | `normalizeAttachments`      |
+| 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      |
 
 ### 2.3  Complexity Violations (Cyclomatic > 15)
 
@@ -202,23 +193,242 @@ Found by manual review and IDE diagnostics.
 ---
 
 
-## 5  Structural Issues
+## 5  Architectural / Design Debt (Deep Review)
 
-### 5.1  God Objects (top priority for splitting)
+These are the real problems — not ESLint numbers but structural patterns that
+make the codebase fragile, hard to reason about, and expensive to change.
 
-| File                                              | Lines | Problem                                                  |
-| ------------------------------------------------- | ----: | -------------------------------------------------------- |
-| `SessionDetailsPanel.vue`                         | 2,181 | ↓774 — composables extracted, template still large       |
-| `sessions.ts`                                     | 1,929 | ↓304 — helpers extracted, class still monolithic         |
-| `sessionsStore.ts`                                | 1,149 | ↓317 — reducer extracted via `sessionReducer.ts`         |
-| `MessageComposer.vue`                             | 1,396 | Lexical editor + toolbar + attachments + slash commands  |
-| `ChatWindow.vue`                                  | 1,319 | Message list + scroll + auto-scroll + selection          |
-| `layoutStore.ts`                                  | 1,145 | Dockview + edge panels + session tracking                |
+### 5.0  No utility libraries — everything is hand-rolled
 
-### 5.2  Cross-Boundary Duplication
+The project has **zero general-purpose utility libraries**: no VueUse, no lodash,
+no mitt, no date-fns, no pinia-plugin-persist. Every common pattern — event
+emitters, debounce, localStorage persistence, scroll management, resize
+observers, deferred execution — is reimplemented from scratch.
 
-- **Settings type shape** defined twice: `src/stores/app/settingsStore.ts` + `src-bun/app/config/settings.ts` — 36 lines identical
-- **ChatTab / SidebarTab** — ~~36 lines / 346 tokens of identical panel lifecycle logic~~ → extracted to `usePanelLifecycle` composable ✅
+This is the root cause of many items below. Adopting VueUse alone would delete
+hundreds of lines of bespoke plumbing.
+
+### 5.1  Window event bus — 8 custom events, untyped, scattered
+
+The codebase uses `window.dispatchEvent(new CustomEvent('dafman:*'))` as a
+global event bus. **13 dispatch sites** across 8 files, **10 listener sites**
+across 6 files. No type safety, no central registry, no cleanup guarantees.
+
+| Event name | Dispatched from | Listened in |
+|---|---|---|
+| `dafman:focus-session` | notificationsStore:120 | App.vue:245 |
+| `dafman:focus-composer` | TerminalPanel:266, CommandPalette:126, SessionsManager:362 | ChatWindow:139 |
+| `dafman:focus-terminal` | useCommandTerminal:94, SessionHeaderControls:257 | TerminalPanel:437 |
+| `dafman:open-command-terminal` | *(dispatched somewhere)* | ChatWindow:140 |
+| `dafman:close-command-terminal` | SessionHeaderControls:268 | ChatWindow:141 |
+| `dafman:scroll-to-bottom` | SessionsManager:357, jobsStore:149 | ChatWindow:142 |
+| `dafman:open-model-selector` | sessionCommands:163 | SessionHeaderControls:47 |
+| `dafman:library-activate-tab` | sessionCommands:81, useSessionSkills:64 | LibraryPanel:64 |
+| `dafman:rename-session` | sessionCommands:221 | *(listener not found in grep)* |
+
+**Problems:**
+- No TypeScript coverage — event names are bare strings, payloads are `any`
+- No guaranteed cleanup — some listeners use `removeEventListener` in `onUnmounted`,
+  but `App.vue:245` never removes the `dafman:focus-session` listener (HMR leak)
+- Untraceable data flow — you can't ctrl-click from dispatch to handler
+- Testing requires `window.dispatchEvent` mocking instead of direct calls
+
+**Fix:** Replace with a typed event bus (mitt — 200 bytes gzipped), or
+provide/inject for parent→child, or store subscriptions.
+
+### 5.2  invoke.ts — deferred listener queue (repeated 6×)
+
+`src/ipc/invoke.ts:100–221`: six identical blocks, each following the pattern:
+```ts
+const pendingXListeners = new Set<Listener>();
+export function onX(cb: Listener): () => void {
+  if (rpcBridge) { /* register directly */ }
+  else { pendingXListeners.add(cb); }
+  return () => { /* unsubscribe */ };
+}
+// later in setRpcBridge(): for (const cb of pendingXListeners) { ... }
+```
+
+The listenerRegistry.ts (`createListenerRegistry`) already abstracts the
+subscribe/fanOut part — but invoke.ts duplicates the **deferred registration**
+pattern 6 more times on top. This is ~120 lines of pure boilerplate.
+
+**Fix:** Single `createDeferredChannel<T>()` factory. Or just use mitt with
+lazy initialization.
+
+### 5.3  listenerRegistry.ts is hand-rolled mitt
+
+`src/ipc/listenerRegistry.ts:45–95` implements a typed pub/sub with
+`Set<Listener>`, `subscribe()`, and `fanOut()`. This is literally what
+`mitt` does in 200 bytes — but custom, with manual error swallowing.
+
+### 5.4  layoutStore vs dockview — 12 `as unknown as` casts
+
+`src/stores/shell/layoutStore.ts` has 12 `as unknown as` casts (counted from
+grep, not estimated), all probing dockview-vue's untyped internal objects:
+
+```ts
+// line 213: accessing group's panels
+(group as unknown as { panels?: unknown[] }).panels
+// line 250: accessing edge API
+edge as unknown as { isExpanded?: boolean; setExpanded?: (b: boolean) => void }
+// lines 286-287: reading dock dimensions
+(dock as unknown as { width?: number })?.width
+// line 769: panel move API mismatch
+target as unknown as Parameters<typeof panel.api.moveTo>[0]['group']
+// line 831: removePanel type mismatch
+dock.removePanel(panel as unknown as Parameters<typeof dock.removePanel>[0])
+// lines 932, 955-956, 1005, 1007, 1059: more shape probes
+```
+
+Also in `App.vue:71-73`:
+```ts
+dock.groups.filter((g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid')
+```
+
+**Root cause:** dockview-vue exports generic `IDockviewPanel` / `DockviewGroupPanel`
+types but the actual runtime objects have richer shape (`.panels`, `.width`,
+`.isExpanded`). The codebase reaches into these undocumented internals.
+
+**Fix:** Create a `dockviewTypes.ts` with typed interfaces that mirror the
+runtime shape we use, and centralize the cast to one `asDockviewInternal()`
+helper. Then when dockview upgrades, there's one place to fix.
+
+### 5.5  Store dependency graph — spaghetti
+
+Direct store-to-store imports (production code only, not tests):
+
+```
+sessionsStore ──→ layoutStore
+              ──→ notificationsStore
+              ──→ settingsStore
+              ──→ toastStore
+
+sessionReducer ──→ layoutStore
+               ──→ notificationsStore
+               ──→ toastStore
+
+terminalStore ──→ sessionsStore
+              ──→ toastStore
+
+jobsStore ──→ layoutStore
+          ──→ sessionsStore
+          ──→ toastStore
+
+settingsStore ──→ toastStore
+notificationsStore ──→ settingsStore
+clientStore ──→ toastStore
+sessionsListStore ──→ toastStore
+modelsStore ──→ toastStore
+commandResultsStore ──→ toastStore
+```
+
+**Circular conceptual dependency:** `sessionsStore → layoutStore` and
+`sessionReducer → layoutStore`, but `layoutStore` exposes `activeSessionId`
+which is derived from session panel state. Who owns "current session"?
+
+**toastStore is a universal dependency** — 8 stores import it. This is
+technically fine (it's a leaf node) but means every store mixes data logic
+with UI notification side effects.
+
+**Fix:** Stores should be pure data layers. Side effects (toasts,
+notifications, layout commands) should be triggered by watchers/subscribers
+at the App level or in composables that observe store state.
+
+### 5.6  Components bypassing stores for IPC
+
+12+ Vue components call `invokeCommand()` directly instead of going through
+stores. Business logic (API calls, error handling, retry) lives in `.vue` files
+where it can't be unit-tested without mounting the component.
+
+**Fix:** Strict rule: components → stores → IPC. Components only read reactive
+state and call store actions.
+
+### 5.7  terminalStore — hand-rolled localStorage persistence (duplicated 2×)
+
+`src/stores/terminal/terminalStore.ts:135–193`: two nearly-identical
+set/hydrate pairs for `sessionTerminalIds` and `sessionTerminalBuffers`:
+```ts
+function setSessionTerminalIds(map: Record<string, string>) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(map)); } catch { /* ignore */ }
+}
+function hydrateSessionTerminalIds(): Record<string, string> {
+  try { const raw = localStorage.getItem(LS_KEY); return JSON.parse(raw!); } catch { return {}; }
+}
+// repeated identically for sessionTerminalBuffers
+```
+
+**Fix:** Either `pinia-plugin-persistedstate` (zero-config Pinia persistence),
+or a generic `usePersistedRef<T>(key, defaultValue)` composable.
+
+### 5.8  20+ setTimeout / requestAnimationFrame timing hacks
+
+| File | Count | What they do |
+|---|---:|---|
+| `App.vue` | 6 | Splash watchdog, layout save debounce, boot retry, double-rAF settle |
+| `ChatWindow.vue` | 5 | Event processing scheduler (rAF), scroll-to-bottom (double rAF + nextTick) |
+| `MessageComposer.vue` | 4 | Focus hacks (`setTimeout(() => editor.focus(), 0)` × 3), esc timer |
+| `TerminalPanel.vue` | 4 | Search rAF debounce, focus terminal after init, fit after delay |
+| `SessionHeaderControls.vue` | 1 | Delayed focus after dropdown close |
+| `SessionsManager.vue` | 1 | Browse debounce timer |
+| `lexical/plugins.ts` | 2 | Prism highlight retry polling (`setTimeout(probe, 100)`) |
+| `FilePicker.vue` | 1 | Focus input after mount |
+| `openAttachment.ts` | 2 | Blob URL revocation delay |
+| `jobsStore.ts` | 1 | Delayed scroll-to-bottom dispatch |
+| `MessageEditorBody.vue` | 1 | Focus after mount |
+
+Many of these are legitimate (blob URL cleanup, debounce). But the `setTimeout(fn, 0)`
+focus hacks and double-rAF settle patterns are symptoms of missing lifecycle
+management. VueUse's `useEventListener`, `useDebounceFn`, `useRafFn` would
+formalize these.
+
+### 5.9  God objects — still the core problem
+
+| File | Lines | What's mixed together |
+|---|---:|---|
+| `sessions.ts` (backend) | 1,929 | Session CRUD + event forwarding + agent lifecycle + MCP + pending requests + workspace |
+| `MessageComposer.vue` | 1,396 | Lexical editor setup + toolbar + attachments + slash commands + file picker + send logic |
+| `ChatWindow.vue` | 1,319 | Transcript rendering + scroll management + command terminal + event processing + selection |
+| `layoutStore.ts` | 1,145 | Dockview API + edge panels + session tracking + panel lifecycle + size management |
+| `SessionsManager.vue` | 1,058 | Session list + creation form + workspace picker + sidebar rendering + sorting |
+| `SettingsPanel.vue` | 991 | Every settings category in one template |
+
+### 5.10  Settings type defined twice
+
+`src/stores/app/settingsStore.ts` and `src-bun/app/config/settings.ts` define
+the same settings shape independently. Changes to one silently break the other
+at runtime. Should be a shared type file imported by both sides.
+
+### 5.11  Missing abstractions
+
+- **No service layer:** Business operations are scattered across stores, components,
+  and `src/lib/` utilities with no clear ownership
+- **No error boundary pattern:** Error handling is ad-hoc (some try/catch + toast,
+  some `.catch(() => {})`, some silent swallow)
+- **Computed sorts/joins in components:** `ChatWindow.vue:231-244` merges transcript
+  items with command results in a computed — this belongs in a store selector
+- **Magic strings for panel/component IDs:** `'chat'`, `'sessionsManager'`,
+  `'settingsPanel'` etc. scattered across 15+ files instead of a single enum/const
+
+### 5.12  Potential dead/unused state
+
+- `terminalStore.droppedCommandCounts` — written in `finishCommand()` but only
+  read in `TerminalsPanel.vue` (may be unused in practice if panel doesn't
+  display it)
+- `dafman:rename-session` event — dispatched in `sessionCommands.ts:221` but
+  no corresponding listener found in grep
+
+### 5.13  Cross-boundary duplication summary
+
+| Pattern | Where | Impact |
+|---|---|---|
+| Settings type shape | settingsStore + settings.ts (backend) | Runtime drift risk |
+| localStorage set/hydrate | terminalStore (2× identical pairs) | Boilerplate |
+| Deferred listener queue | invoke.ts (6× identical blocks) | Boilerplate |
+| `as unknown as` shape probes | layoutStore (12×) + App.vue (1×) | Type safety hole |
+| Component → IPC direct calls | 12 .vue files, ~35 call sites | Architecture bypass |
+| Window event bus | 8 event names, 13 dispatchers, 10 listeners | Untyped global coupling |
+| setTimeout focus hacks | 6+ components, ~10 sites | Missing lifecycle mgmt |
 
 
 ---
@@ -227,7 +437,7 @@ Found by manual review and IDE diagnostics.
 ## 6  What's Been Done ✅
 
 - [x] **Code style:** gts + Prettier adopted, spacious padding lines
-- [x] **ESLint:** 2,354 issues → 38 warnings (0 errors) — tuned rules, fixed types/emits/catches
+- [x] **ESLint:** 2,354 issues → 31 warnings (0 errors) — dispatch tables, pick helpers, composable extraction
 - [x] **Shared utilities:** `createListenerRegistry`, `revealPath`, `MODE_OPTIONS`, `shellUtils`
 - [x] **Directory restructure:** stores (6 folders), components (9 folders), backend (8 folders)
 - [x] **Path aliases:** `@/` configured for all renderer imports (129 files)
@@ -239,6 +449,9 @@ Found by manual review and IDE diagnostics.
 - [x] **Type cleanup:** removed redundant `| unknown`, `| null`; fixed `void` in IPC; annotated catch callbacks
 - [x] **Vue emit modernization:** converted 5 components to tuple emit syntax
 - [x] **Nullish coalescing:** configured `ignorePrimitives` for intentional `||` on strings/booleans
+- [x] **Complexity reduction:** dispatch tables for sessionReducer, chatEvents, sessionHelpers
+- [x] **no-dynamic-delete:** destructuring rest pattern in terminalStore, SessionHeaderControls
+- [x] **Composable extraction:** `useCommandTerminal`, `watchDynamicCommands`, `usePanelLifecycle`
 
 
 ---
@@ -246,39 +459,51 @@ Found by manual review and IDE diagnostics.
 
 ## 7  Priority Cleanup Plan
 
-### Phase 3 — Split God Objects (partially done)
+### Phase A — Foundation: utility libraries + typed constants
 
-- [x] `SessionDetailsPanel.vue` → 7 composables extracted (2,954 → 2,181 lines)
-- [x] `sessions.ts` → pure helpers to `sessionHelpers.ts` (2,233 → 1,929 lines)
-- [x] `sessionsStore.ts` → `sessionReducer.ts` extracted (1,466 → 1,149 lines)
-- [ ] `ChatWindow.vue` (1,319 lines) → extract scroll manager composable
-- [ ] `MessageComposer.vue` (1,396 lines) → extract toolbar, attachment logic
-- [ ] `registerBuiltinCommands.ts` → split by command group
-- [ ] `layoutStore.ts` (1,145 lines) → separate edge panel logic
+1. **Add VueUse** — replace hand-rolled `useEventListener`, debounce/throttle,
+   `useLocalStorage`, `useResizeObserver`, `useDebounceFn`, `useRafFn`
+2. **Add mitt** (or VueUse's `useEventBus`) — replace all 8 `dafman:*` window
+   events with a typed, centrally-registered event bus
+3. **Add pinia-plugin-persistedstate** — replace terminalStore's manual
+   localStorage persistence
+4. **Panel ID constants** — single `src/constants/panels.ts` with typed
+   string literal union for all panel/component IDs
+5. **Shared settings type** — single `src/shared/settings.ts` imported by
+   both renderer and backend
 
-### Phase 4 — Reduce Remaining Warnings (38 total — structural)
+### Phase B — Data flow: decouple stores + kill event bus
 
-All remaining warnings require refactoring, not quick fixes:
-- [ ] 21 `complexity` — reduce CC on functions above 15 (split switch/if chains)
-- [ ] 6 `no-non-null-assertion` — safe patterns in addon closures, needs API redesign
-- [ ] 5 `max-lines-per-function` — large store bodies, needs god object splitting
-- [ ] 3 `no-dynamic-delete` — terminal cleanup, needs Map-based alternative
-- [ ] 2 `max-depth` — deeply nested conditionals, needs early returns
-- [ ] 1 `no-redundant-type-constituents` — ESLint parser error type (not fixable)
+1. **Store-only IPC rule** — move all `invokeCommand` calls from 12 .vue files
+   into stores/composables
+2. **Decouple stores** — extract cross-store side effects (toasts, notifications,
+   layout commands) into App-level watchers or composables
+3. **Kill window event bus** — replace 13 dispatch sites + 10 listener sites
+   with mitt bus or provide/inject
+4. **Deferred listener generic** — replace 6 identical blocks in invoke.ts with
+   a single `createDeferredChannel<T>()` (or just use mitt + lazy init)
 
-### Phase 5 — Runtime Safety
+### Phase C — Type safety: dockview + IPC
 
-- [x] Fix event listener leak in `App.vue` (HMR `dafman:focus-session`)
-- [x] Add `.catch()` to unguarded IPC calls (TerminalPanel `openUrl`)
-- [x] Clear `flushTimer` on terminal kill/exit
-- [x] Fix `onBeforeUnmount` in async `onMounted` (moved to setup scope)
-- [ ] Type IPC bridge payloads — eliminate `as unknown as` in wsBridge
-- [ ] Add runtime validation for WS bridge messages
-- [ ] Deduplicate `addConfig`/`updateConfig` in mcpRegistry
+1. **Typed dockview wrapper** — `dockviewTypes.ts` with interfaces for the
+   runtime shape we actually use; centralize all 13 `as unknown as` casts
+2. **Reduce unsafe casts in sessionsStore** — typed discriminated unions for
+   event payloads instead of `payload.data as {...}`
 
-### Phase 6 — Additional Cleanup
+### Phase D — Split god objects
 
-- [x] ChatTab/SidebarTab → `usePanelLifecycle` composable
-- [ ] Settings type → shared file imported by both sides
-- [ ] Remove/mark unused exports
-- [ ] Add import sorting plugin
+- [ ] `sessions.ts` → session CRUD, event forwarding, agent lifecycle modules
+- [ ] `MessageComposer.vue` → toolbar composable, attachment composable, send logic
+- [ ] `ChatWindow.vue` → scroll composable, event processing composable
+- [ ] `layoutStore.ts` → edge panel module, panel tracking module
+- [ ] `SettingsPanel.vue` → per-category sub-components
+
+### Phase E — Clean up timing hacks + remaining ESLint
+
+- [ ] Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
+- [ ] Replace double-rAF patterns with proper settle helpers
+- [ ] 14 `complexity` — CC > 15 functions
+- [ ] 6 `no-non-null-assertion` — xterm addon closures
+- [ ] 4 `max-lines-per-function` — Pinia store bodies (structural, low priority)
+- [ ] 2 `max-depth` — nested conditionals
+- [ ] 5 misc
