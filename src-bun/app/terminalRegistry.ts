@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
 import type { TerminalCreateParams, TerminalEventPayload, TerminalSummary } from '../rpc';
 import { AppError } from './errors';
 import { log } from './logging';
 import { toErrorMessage } from './errorMessage';
+import { defaultShell } from './shellUtils';
 
 type TerminalStatus = TerminalSummary['status'];
 
@@ -35,38 +35,6 @@ type EmitTerminal = (payload: TerminalEventPayload) => void;
 
 const OUTPUT_FLUSH_MS = 8;
 const MAX_QUEUED_CHUNKS = 256;
-
-function commandExists(command: string): boolean {
-  if (command.includes('\\') || command.includes('/')) return existsSync(command);
-
-  const lookup = process.platform === 'win32' ? 'where.exe' : 'which';
-  const result = Bun.spawnSync([lookup, command], {
-    stdout: 'ignore',
-    stderr: 'ignore',
-  });
-
-  return result.exitCode === 0;
-}
-
-function defaultShell(): { shell: string; args: string[] } {
-  if (process.platform === 'win32') {
-    if (commandExists('pwsh.exe')) return { shell: 'pwsh.exe', args: ['-NoLogo'] };
-
-    if (commandExists('powershell.exe')) {
-      return { shell: 'powershell.exe', args: ['-NoLogo'] };
-    }
-
-    return { shell: 'cmd.exe', args: ['/d', '/q'] };
-  }
-
-  const shell = process.env.SHELL;
-
-  if (shell && existsSync(shell)) return { shell, args: [] };
-
-  if (commandExists('bash')) return { shell: 'bash', args: [] };
-
-  return { shell: 'sh', args: [] };
-}
 
 function shellName(shell: string): string {
   return shell.split(/[\\/]/).pop()?.toLowerCase() ?? shell.toLowerCase();

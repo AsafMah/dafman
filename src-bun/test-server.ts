@@ -269,7 +269,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   openUrl: rpcGuard(async (args) => {
     const { url } = args as { url: string };
 
-    recordUrl({ url, allowed: false, reason: 'stubbed-test-server' });
+    void recordUrl({ url, allowed: false, reason: 'stubbed-test-server' });
 
     return false;
   }),

@@ -7,6 +7,7 @@ import { AppError } from './errors';
 import { log } from './logging';
 import { recordCommand } from './audit';
 import { toErrorMessage } from './errorMessage';
+import { resolveShellForCommand } from './shellUtils';
 
 const OUTPUT_CAP_BYTES = 1024 * 1024;
 const TIMEOUT_MS = 60_000;
@@ -22,32 +23,6 @@ interface ActiveCommand {
   cancelled: boolean;
   timedOut: boolean;
   totalBytes: number;
-}
-
-function commandExists(command: string): boolean {
-  if (command.includes('\\') || command.includes('/')) return existsSync(command);
-
-  const lookup = process.platform === 'win32' ? 'where.exe' : 'which';
-  const result = Bun.spawnSync([lookup, command], {
-    stdout: 'ignore',
-    stderr: 'ignore',
-  });
-
-  return result.exitCode === 0;
-}
-
-function resolveShell(command: string): { shell: string; args: string[] } {
-  if (process.platform === 'win32') {
-    if (commandExists('pwsh.exe')) {
-      return { shell: 'pwsh.exe', args: ['-NoLogo', '-NoProfile', '-Command', command] };
-    }
-
-    return { shell: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-Command', command] };
-  }
-
-  const shell = process.env.SHELL && existsSync(process.env.SHELL) ? process.env.SHELL : '/bin/sh';
-
-  return { shell, args: ['-lc', command] };
 }
 
 export class CommandResultRegistry {
@@ -78,7 +53,7 @@ export class CommandResultRegistry {
       throw AppError.sdk('A command is already running for this session');
     }
 
-    const { shell, args } = resolveShell(command);
+    const { shell, args } = resolveShellForCommand(command);
     const now = new Date().toISOString();
     const record: CommandResultRecord = {
       id: randomUUID(),

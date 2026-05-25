@@ -341,7 +341,7 @@ function flush(): void {
     }
   }
 
-  scrollToBottom();
+  void scrollToBottom();
 }
 
 watch(

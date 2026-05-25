@@ -402,7 +402,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         // custom protocol handlers like ms-windows-store:, etc.).
         if (!/^https?:\/\//i.test(trimmed)) {
           log.warn('openUrl rejected non-http scheme', { url: trimmed });
-          recordUrl({ url: trimmed, allowed: false, reason: 'scheme-blocked' });
+          void recordUrl({ url: trimmed, allowed: false, reason: 'scheme-blocked' });
 
           return false;
         }
@@ -410,7 +410,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         try {
           const opened = Utils.openExternal(trimmed);
 
-          recordUrl({
+          void recordUrl({
             url: trimmed,
             allowed: opened,
             reason: opened ? 'ok' : 'openExternal-returned-false',
@@ -422,7 +422,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
             url: trimmed,
             error: toErrorMessage(err),
           });
-          recordUrl({
+          void recordUrl({
             url: trimmed,
             allowed: false,
             reason: `openExternal-threw: ${toErrorMessage(err)}`,

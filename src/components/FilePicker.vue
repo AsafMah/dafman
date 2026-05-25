@@ -119,11 +119,11 @@ async function fetchResults(): Promise<void> {
 watch(effectiveQuery, fetchResults, { immediate: true });
 watch(showHidden, (v) => {
   writePref(LS_HIDDEN, v);
-  fetchResults();
+  void fetchResults();
 });
 watch(showIgnored, (v) => {
   writePref(LS_IGNORED, v);
-  fetchResults();
+  void fetchResults();
 });
 
 onMounted(() => {
