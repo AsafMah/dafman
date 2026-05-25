@@ -68,3 +68,7 @@ test-results/
 e2e/.cache/
 .commit-msg.tmp
 
+
+# JetBrains Inspections HTML export (Tools > Export > HTML File)
+report/
+
