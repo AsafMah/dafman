@@ -131,7 +131,7 @@ function pickEnum(
   key: string,
   allowed: readonly string[],
 ): void {
-  if (allowed.includes(raw[key] as T)) out[key] = raw[key];
+  if (allowed.includes(raw[key] as string)) out[key] = raw[key];
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

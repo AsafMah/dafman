@@ -362,7 +362,17 @@ export interface SessionEventPayload {
 /// Mirrors `PermissionRequestData` in `src-bun/rpc.ts`. Permission
 /// request surfaced to the renderer for the pending-request modal.
 export interface PermissionRequestData {
-  kind: 'shell' | 'write' | 'mcp' | 'read' | 'url' | 'custom-tool' | 'memory' | 'hook';
+  kind:
+    | 'shell'
+    | 'write'
+    | 'mcp'
+    | 'read'
+    | 'url'
+    | 'custom-tool'
+    | 'memory'
+    | 'hook'
+    | 'extension-management'
+    | 'extension-permission-access';
   toolCallId?: string;
   /// Best-effort summary computed bun-side (e.g. "shell: ls -la").
   summary: string;

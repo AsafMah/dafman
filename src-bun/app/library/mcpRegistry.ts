@@ -48,7 +48,7 @@ export class McpRegistry {
 
   async listConfigs(): Promise<Record<string, Record<string, unknown>>> {
     return this.withClient(async (client) => {
-      const result = (await client.rpc.mcp.config.list()) as {
+      const result = (await client.rpc.mcp.config.list()) as unknown as {
         servers?: Record<string, Record<string, unknown>>;
       };
 
@@ -58,7 +58,7 @@ export class McpRegistry {
 
   async addConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
     return this.withClient(async (client) => {
-      await client.rpc.mcp.config.add({ name, config } as unknown as Record<string, unknown>);
+      await (client.rpc.mcp.config.add as (args: unknown) => Promise<unknown>)({ name, config });
 
       return true;
     });
@@ -66,7 +66,7 @@ export class McpRegistry {
 
   async updateConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
     return this.withClient(async (client) => {
-      await client.rpc.mcp.config.update({ name, config } as unknown as Record<string, unknown>);
+      await (client.rpc.mcp.config.update as (args: unknown) => Promise<unknown>)({ name, config });
 
       return true;
     });

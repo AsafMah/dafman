@@ -19,7 +19,7 @@ interface TerminalEntry {
   createdAt: string;
   proc: Bun.Subprocess;
   terminal: {
-    write(data: string | BufferSource): number | undefined;
+    write(data: string | Bun.BufferSource): number;
     resize(cols: number, rows: number): void;
     close(): void;
   };
@@ -203,7 +203,7 @@ export class TerminalRegistry {
           });
         }
 
-        this.markExited(id, exitCode, signalCode);
+        this.markExited(id, exitCode, signalCode === null ? null : String(signalCode));
       },
     });
 

@@ -67,7 +67,7 @@ export function buildBuiltInTools(registry: SessionRegistry): Tool[] {
 
         const result = await session.ui.elicitation({
           message,
-          requestedSchema: schema as Parameters<
+          requestedSchema: schema as unknown as Parameters<
             typeof session.ui.elicitation
           >[0]['requestedSchema'],
         });

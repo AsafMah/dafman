@@ -459,7 +459,17 @@ export interface SessionEventPayload {
 /// tree into the wire surface, and the renderer treats it as
 /// display-only (formatted JSON) anyway.
 export interface PermissionRequestData {
-  kind: 'shell' | 'write' | 'mcp' | 'read' | 'url' | 'custom-tool' | 'memory' | 'hook';
+  kind:
+    | 'shell'
+    | 'write'
+    | 'mcp'
+    | 'read'
+    | 'url'
+    | 'custom-tool'
+    | 'memory'
+    | 'hook'
+    | 'extension-management'
+    | 'extension-permission-access';
   toolCallId?: string;
   /// Best-effort summary string we compute on the bun side from the
   /// SDK's `PermissionRequest` discriminated union (e.g. a shell

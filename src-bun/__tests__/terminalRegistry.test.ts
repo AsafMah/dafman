@@ -61,7 +61,7 @@ describe('TerminalRegistry', () => {
 
   test('surfaces an error instead of falling back when native PTY is unavailable', () => {
     let spawnCalls = 0;
-    (Bun as unknown as { spawn: typeof Bun.spawn }).spawn = ((cmd, options) => {
+    (Bun as unknown as { spawn: typeof Bun.spawn }).spawn = ((_cmd, options) => {
       spawnCalls++;
       const opts = options as { terminal?: unknown };
       expect(opts.terminal).toBeDefined();

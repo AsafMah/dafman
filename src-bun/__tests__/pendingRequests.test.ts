@@ -5,7 +5,7 @@
 // own contract: typed cancellations per kind, mismatch checks,
 // audit hand-off, and the `settleForSession` / `settleAll` drains.
 
-import { afterEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { PendingRequestQueue, type AuditPermission } from '../app/chat/pendingRequests';
 import type { RespondToRequestParams } from '../rpc';
 import type { PermissionAuditEntry } from '../app/observability/audit';
@@ -124,8 +124,8 @@ describe('PendingRequestQueue.respond', () => {
         kind: 'userInput',
         answer: 'x',
         wasFreeform: true,
-      } as RespondToRequestParams['response'],
-    });
+      },
+    } as RespondToRequestParams);
     expect(ok).toBe(false);
     expect(q.size).toBe(1);
     q.cancel(rid!, 'test-cleanup');
@@ -180,8 +180,8 @@ describe('PendingRequestQueue.respond', () => {
         decision: 'approveForSession',
         approval: { kind: 'commands', commandIdentifiers: ['git'] },
         domain: 'github.com',
-      } as RespondToRequestParams['response'],
-    });
+      },
+    } as RespondToRequestParams);
     expect(ok).toBe(true);
     expect(await p).toEqual({
       kind: 'approve-for-session',

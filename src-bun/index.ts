@@ -459,6 +459,8 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
             log.error(tagged, data);
             break;
         }
+
+        return undefined;
       }),
       getLogState: rpcGuard(async ({ recentLimit }) => ({
         level: getLogLevel(),

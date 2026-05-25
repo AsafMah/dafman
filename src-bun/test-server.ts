@@ -236,7 +236,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       reasoningEffort?: string;
     };
 
-    return sessions.setModel(sessionId, model, reasoningEffort);
+    return sessions.setModel(sessionId, model, reasoningEffort ?? null);
   }),
   resumeSession: rpcGuard(async (args) => {
     const { sessionId, model, reasoningEffort } = args as {
@@ -264,12 +264,15 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   deleteSession: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
 
-    return sessions.delete(sessionId);
+    return sessions.deleteCliSession(sessionId);
   }),
   getSessionMetadata: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+    // Mirror index.ts: SessionRegistry exposes getCwd (which itself
+    // consults SDK metadata) rather than a flat getMetadata.
+    const cwd = (await sessions.getCwd(sessionId)) ?? null;
 
-    return sessions.getMetadata(sessionId);
+    return { sessionId, cwd };
   }),
   openUrl: rpcGuard(async (args) => {
     const { url } = args as { url: string };

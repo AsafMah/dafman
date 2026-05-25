@@ -118,8 +118,7 @@ export class SessionRegistry {
   /// stays focused on session lifecycle. The queue knows nothing
   /// about approve-all (the handler short-circuits before reaching
   /// it) or the registry's entry map (callers must call
-  /// `pending.settleForSession` BEFORE deleting their entry — see
-  /// `removeEntry`).
+  /// `pending.settleForSession` BEFORE deleting their entry).
   private readonly pending = new PendingRequestQueue();
 
   /// Registry-owned per-session "approve every permission" toggle.
@@ -356,30 +355,6 @@ export class SessionRegistry {
   /// instead of throwing. Delegates to the queue subobject.
   async respondToRequest(params: RespondToRequestParams): Promise<boolean> {
     return this.pending.respond(params);
-  }
-
-  /// Centralized session-entry removal. The queue's
-  /// settleForSession MUST run before deleting our entry, otherwise
-  /// pending callbacks for that session would survive in the queue
-  /// until app shutdown drains them.
-  private removeEntry(sessionId: string, reason: string): void {
-    this.pending.settleForSession(sessionId, reason);
-    const entry = this.entries.get(sessionId);
-
-    if (entry) {
-      try {
-        entry.unsubscribe();
-      } catch (err) {
-        log.warn('session unsubscribe threw during removeEntry', {
-          sessionId,
-          error: toErrorMessage(err),
-        });
-      }
-    }
-
-    this.entries.delete(sessionId);
-    this.approveAllBySession.delete(sessionId);
-    this.modeBySession.delete(sessionId);
   }
 
   async create(
@@ -1308,7 +1283,7 @@ export class SessionRegistry {
     if (!entry) throw AppError.sessionNotFound(sessionId);
 
     try {
-      const result = (await entry.session.rpc.tasks.list()) as {
+      const result = (await entry.session.rpc.tasks.list()) as unknown as {
         tasks?: Array<Record<string, unknown>>;
       };
 
@@ -1597,7 +1572,7 @@ export class SessionRegistry {
     if (!entry) throw AppError.sessionNotFound(sessionId);
 
     try {
-      return (await entry.session.rpc.usage.getMetrics()) as Record<string, unknown>;
+      return (await entry.session.rpc.usage.getMetrics()) as unknown as Record<string, unknown>;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
@@ -1712,7 +1687,7 @@ export class SessionRegistry {
     if (!client) throw AppError.clientNotStarted();
 
     try {
-      const result = (await client.rpc.account.getQuota()) as {
+      const result = (await client.rpc.account.getQuota({})) as unknown as {
         quotaSnapshots?: Record<string, Record<string, unknown>>;
       };
       const snaps = result.quotaSnapshots ?? {};

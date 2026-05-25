@@ -45,7 +45,7 @@ describe('buildBuiltInTools', () => {
       },
     };
     const [tool] = buildBuiltInTools(fakeRegistry(session));
-    const result = await tool!.handler(
+    const result = await tool!.handler!(
       { message: 'Set up DB', schema: { type: 'object' } },
       { sessionId: 's1', toolCallId: 't1', toolName: 'request_form_input', arguments: {} },
     );
@@ -60,7 +60,7 @@ describe('buildBuiltInTools', () => {
       },
     };
     const [tool] = buildBuiltInTools(fakeRegistry(session));
-    const result = await tool!.handler(
+    const result = await tool!.handler!(
       { message: '?', schema: {} },
       { sessionId: 's1', toolCallId: 't1', toolName: 'request_form_input', arguments: {} },
     );
@@ -69,7 +69,7 @@ describe('buildBuiltInTools', () => {
 
   test("returns an error result when the session isn't registered", async () => {
     const [tool] = buildBuiltInTools(fakeRegistry(null));
-    const result = (await tool!.handler(
+    const result = (await tool!.handler!(
       { message: '?', schema: {} },
       { sessionId: 'gone', toolCallId: 't1', toolName: 'request_form_input', arguments: {} },
     )) as { error: string };

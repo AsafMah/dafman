@@ -6,7 +6,7 @@
 
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CopilotClient } from './copilotSdk';
+import { CopilotClient, RuntimeConnection } from './copilotSdk';
 import { AppError } from '../shared/errors';
 import { log } from '../observability/logging';
 import { toErrorMessage } from '../shared/errorMessage';
@@ -64,7 +64,9 @@ export async function ensureClient(): Promise<CopilotClient> {
       );
     }
 
-    const client = new CopilotClient(cliPath ? { cliPath } : undefined);
+    const client = new CopilotClient(
+      cliPath ? { connection: RuntimeConnection.forStdio({ path: cliPath }) } : undefined,
+    );
 
     try {
       await client.start();

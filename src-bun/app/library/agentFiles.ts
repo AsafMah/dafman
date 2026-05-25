@@ -293,10 +293,10 @@ export async function listAgentFiles(opts: {
 async function scanDir(dir: string, scope: AgentScope, out: DiscoveredAgentFile[]): Promise<void> {
   if (!existsSync(dir)) return;
 
-  let entries: Awaited<ReturnType<typeof readdir>>;
+  let entries: string[];
 
   try {
-    entries = await readdir(dir);
+    entries = await readdir(dir, { encoding: 'utf-8' });
   } catch (err) {
     log.warn('listAgentFiles: failed to read dir', {
       dir,

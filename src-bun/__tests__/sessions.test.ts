@@ -78,6 +78,7 @@ interface FakeSession {
       list: () => Promise<{ tasks: Array<Record<string, unknown>> }>;
       cancel: (params: { id: string }) => Promise<{ cancelled: boolean }>;
       remove: (params: { id: string }) => Promise<{ removed: boolean }>;
+      promoteToBackground: (params: { id: string }) => Promise<{ promoted: boolean }>;
     };
     fleet: {
       start: (params?: { prompt?: string }) => Promise<{ started: boolean }>;

@@ -555,21 +555,17 @@ bun run lint:tsc-bun
 Forgotten rows accumulate into "30-70% drift" between audits, which
 turns the audit into vibes and undermines every decision based on it.
 
-### 22. The renderer is fully type-checked; the backend is NOT (yet)
+### 22. Backend TypeScript: gate is now active (no new errors allowed)
 
-`bun run lint` runs `vue-tsc --noEmit` over the renderer only. The
-backend's `tsconfig.bun.json` exists but **isn't gated in `bun run
-check`**. As of 2026-05-25 there are 54 TS errors in `src-bun/` —
-covering SDK shape drift, stale test fixtures, missing `?.` chains,
-and `extension-*` permission kinds we don't know about.
+The renderer's `vue-tsc` runs in `bun run lint`. The backend's
+`tsc -p tsconfig.bun.json --noEmit` runs as `bun run lint:tsc-bun`
+and is wired into `bun run check` as of 2026-05-25 (after Phase A.5
+cleared 63 stale errors).
 
-- Run `bun run lint:tsc-bun` to check the backend.
-- **Don't add new `src-bun/` errors.** When you touch a file in
-  `src-bun/`, run `bun run lint:tsc-bun` and verify your changes
-  didn't add to the error count.
-- The eventual goal (CODE_AUDIT §8 Phase A.5) is to clear all 54 and
-  wire `lint:tsc-bun` into `bun run check`. Until then this rule keeps
-  the count from drifting up.
+- Always run `bun run check` before pushing. It will catch any new
+  `src-bun/` TypeScript errors the same way it catches renderer ones.
+- If a Bun/Node/SDK upgrade reintroduces errors, treat them like any
+  other gate failure: fix immediately, don't push around them.
 
 ---
 

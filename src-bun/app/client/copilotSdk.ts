@@ -8,6 +8,7 @@
 
 export {
   CopilotClient,
+  RuntimeConnection,
   approveAll,
   convertMcpCallToolResult,
   createSessionFsAdapter,
@@ -46,6 +47,12 @@ export type {
   Tool,
   ToolInvocation,
   ToolResultObject,
+} from '../../../node_modules/@github/copilot/copilot-sdk/index.js';
+
+/// UserInputRequest/Response live in `types.js`; the SDK's index.d.ts
+/// re-exports `UserInputHandler` but not the request/response types
+/// directly (as of 2026-05). Pull them from the deeper path.
+export type {
   UserInputRequest,
   UserInputResponse,
-} from '../../../node_modules/@github/copilot/copilot-sdk/index.js';
+} from '../../../node_modules/@github/copilot/copilot-sdk/types.js';

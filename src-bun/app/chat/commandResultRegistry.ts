@@ -104,8 +104,16 @@ export class CommandResultRegistry {
       shell,
       status: 'started',
     });
-    const stdoutDone = this.pump(active, 'stdout', proc.stdout);
-    const stderrDone = this.pump(active, 'stderr', proc.stderr);
+    const stdoutDone = this.pump(
+      active,
+      'stdout',
+      proc.stdout instanceof ReadableStream ? proc.stdout : null,
+    );
+    const stderrDone = this.pump(
+      active,
+      'stderr',
+      proc.stderr instanceof ReadableStream ? proc.stderr : null,
+    );
 
     void this.awaitExit(active, [stdoutDone, stderrDone]);
 

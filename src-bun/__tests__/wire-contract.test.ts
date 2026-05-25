@@ -25,6 +25,31 @@ import type { AppErrorPayload } from '../app/shared/errors';
 // renames a field, this test breaks loudly. Keep these in sync with the
 // types in `../rpc.ts`.
 
+const DEFAULT_TERMINAL_ADDONS = {
+  search: true,
+  webLinks: true,
+  clipboard: true,
+  unicode11: true,
+  webFonts: true,
+  progress: true,
+  ligatures: true,
+  image: true,
+  unicodeGraphemes: true,
+  webgl: true,
+  serialize: true,
+} as const;
+
+function makeTerminalPrefs(defaultProfileId: string): import('../rpc').TerminalPrefs {
+  return {
+    defaultProfileId,
+    fontFamily: 'Cascadia Mono, Consolas, ui-monospace, monospace',
+    fontSize: 13,
+    scrollback: 10_000,
+    theme: { background: '#111827', foreground: '#d1d5db' },
+    addons: { ...DEFAULT_TERMINAL_ADDONS },
+  };
+}
+
 describe('IPC wire contracts', () => {
   test('Settings shape', () => {
     const sample: Settings = {
@@ -45,7 +70,7 @@ describe('IPC wire contracts', () => {
       notifications: { turnEnd: false, waitingForInput: true },
       tools: { defaultExcluded: [], defaultAllowed: [] },
       permissions: { defaultApproveAll: false },
-      terminal: { defaultProfileId: 'platform-default' },
+      terminal: makeTerminalPrefs('platform-default'),
     };
     expect(sample).toMatchSnapshot();
   });
@@ -77,7 +102,7 @@ describe('IPC wire contracts', () => {
       notifications: { turnEnd: true, waitingForInput: true },
       tools: { defaultExcluded: ['bash'], defaultAllowed: [] },
       permissions: { defaultApproveAll: true },
-      terminal: { defaultProfileId: 'pwsh' },
+      terminal: makeTerminalPrefs('pwsh'),
     };
     expect(sample).toMatchSnapshot();
   });

@@ -36,6 +36,12 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+/// Recursive shape for the fake SDK rpc namespace: a method (function)
+/// or another nested namespace. Mirrors how the real SDK exposes
+/// `mcp.config.list`, `mcp.oauth.login`, etc.
+type RpcMethod = (args?: unknown) => Promise<unknown>;
+type RpcNamespace = { [key: string]: RpcMethod | RpcNamespace };
+
 interface FakeSessionState {
   sessionId: string;
   cwd?: string;
@@ -87,7 +93,7 @@ class FakeCopilotSession {
   public readonly sessionId: string;
   private readonly state: FakeSessionState;
   private readonly scriptRef: { current: SendScript };
-  public readonly rpc: Record<string, Record<string, (args?: unknown) => Promise<unknown>>>;
+  public readonly rpc: Record<string, RpcNamespace>;
   private readonly skillsDisabled = new Set<string>();
 
   constructor(state: FakeSessionState, scriptRef: { current: SendScript }) {
@@ -450,7 +456,7 @@ export class FakeCopilotClient {
     ];
   }
 
-  get rpc(): Record<string, Record<string, (args?: unknown) => Promise<unknown>>> {
+  get rpc(): Record<string, RpcNamespace> {
     return {
       sessions: {
         fork: async (args) => {

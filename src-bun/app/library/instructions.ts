@@ -6,6 +6,7 @@
 
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 
@@ -92,10 +93,10 @@ async function findNestedAgents(root: string): Promise<string[]> {
   async function walk(dir: string): Promise<void> {
     if (found.length >= MAX_NESTED_AGENTS) return;
 
-    let entries: Awaited<ReturnType<typeof readdir>>;
+    let entries: Dirent[];
 
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      entries = (await readdir(dir, { withFileTypes: true })) as Dirent[];
     } catch {
       return;
     }
