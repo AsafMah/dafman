@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto';
 import { recordPermission, type PermissionAuditEntry } from '../observability/audit';
 import { log } from '../observability/logging';
-import type { RespondToRequestParams } from '../rpc';
+import type { RespondToRequestParams } from '../../rpc';
 import { toErrorMessage } from '../shared/errorMessage';
 
 export type PendingKind =

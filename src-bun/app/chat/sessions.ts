@@ -69,7 +69,7 @@ import type {
   AgentInfo,
   JobRecord,
   TaskInfo,
-} from '../rpc';
+} from '../../rpc';
 
 /// Subset of SDK reasoning effort levels. The SDK's `ReasoningEffort`
 /// type alias isn't re-exported from the package root, so we mirror it

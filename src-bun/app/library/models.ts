@@ -7,7 +7,7 @@
 // override.
 
 import type { ModelInfo } from '../client/copilotSdk';
-import type { ModelSummary } from '../rpc';
+import type { ModelSummary } from '../../rpc';
 
 export function toModelSummary(model: ModelInfo): ModelSummary {
   const efforts = model.supportedReasoningEfforts ?? [];

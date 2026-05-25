@@ -21,6 +21,7 @@
     "e2e:run": "playwright test --config=e2e/full/playwright.config.ts",
     "lint": "vue-tsc --noEmit",
     "lint:bun": "bun run tools/check-bun-entry.ts",
+    "lint:tsc-bun": "tsc -p tsconfig.bun.json --noEmit",
     "lint:eslint": "eslint --no-error-on-unmatched-pattern 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "format": "prettier --write 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",

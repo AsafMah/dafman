@@ -24,7 +24,7 @@ import type {
   ThemeChoice,
   ToolsPrefs,
   Workspaces,
-} from '../rpc';
+} from '../../rpc';
 import { AppError } from '../shared/errors';
 import { log } from '../observability/logging';
 import { toErrorMessage } from '../shared/errorMessage';

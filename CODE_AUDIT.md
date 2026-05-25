@@ -129,6 +129,60 @@ Files above **800 lines** are strong candidates for splitting.
 |   249 | `src/stores/terminal/terminalStore.ts`              | Entire store body           |
 |   225 | `src/stores/observability/jobsStore.ts`             | Entire store body           |
 
+### 2.5  Backend TypeScript errors (`src-bun/`)
+
+The renderer is fully type-checked by `vue-tsc` in `bun run lint`. The
+backend is **not** in that gate — `bun run lint:bun` only does a Bun.build
+reachability check, not full `tsc`. As of 2026-05-25, **54 TS errors**
+exist in `src-bun/` (down from 63 after the trivial path/shim fixes in
+this audit refresh).
+
+Run `bun run lint:tsc-bun` to reproduce.
+
+**Errors by code (top):**
+
+| Count | Rule | What it indicates |
+| ----: | ---- | ----------------- |
+|    10 | `TS2345` | Argument type incompatible — usually outdated test fixtures or SDK signature drift |
+|     6 | `TS7006` | Implicit `any` parameter (`noImplicitAny` violation in test helpers + fakeClient) |
+|     5 | `TS2352` | Type-assertion overlap rejected (often `SDKType -> Record<string, unknown>` cross-casts) |
+|     5 | `TS2339` | Property doesn't exist (stale SDK surfaces — e.g. `registry.delete`, `registry.getMetadata` on `SessionRegistry`) |
+|     4 | `TS2322` | Type-shape mismatch (e.g. `extension-management`/`-permission-access` permission kinds added but not in our `PermissionKind` union) |
+|     4 | `TS2353` | "Object literal may only specify known properties" — test fixtures missing/extra fields |
+|     3 | `TS6133` | Unused locals (`afterEach`, `cmd`, `removeEntry`) |
+|     3 | `TS2722` | Possibly-undefined invocation (`tools.test.ts` chains lookups without `?.`) |
+|     2 | `TS2305` | `UserInputRequest` / `UserInputResponse` no longer exported from `@github/copilot/copilot-sdk` (SDK upgrade debt) |
+|     2 | `TS2532` | Object is possibly `undefined` |
+|     2 | `TS2538` | Index signature using `undefined` |
+|     2 | `TS2739` | Test fixtures missing required `TerminalPrefs`/`Appearance` properties |
+
+**Errors by file (top):**
+
+| Count | File |
+| ----: | ---- |
+| 9 | `src-bun/app/client/fakeClient.ts` (SDK shape drift) |
+| 6 | `src-bun/app/chat/sessions.ts` |
+| 6 | `src-bun/test-server.ts` (uses removed `SessionRegistry.delete/getMetadata`) |
+| 5 | `src-bun/__tests__/tools.test.ts` (missing `?.`) |
+| 5 | `src-bun/app/library/agentFiles.ts` |
+| 4 | `src-bun/app/library/instructions.ts` (Bun `Dirent<NonSharedBuffer>` vs string) |
+| 3 | `src-bun/app/chat/commandResultRegistry.ts` |
+| 3 | `src-bun/app/terminal/terminalRegistry.ts` (Bun.Terminal signature drift) |
+| 3 | `src-bun/app/config/settings.ts` |
+| 3 | `src-bun/app/library/mcpRegistry.ts` |
+
+**Why this matters:** the renderer is fully type-safe; the backend has 54
+holes the type system would catch in CI if we wired `lint:tsc-bun` into
+`bun run check`. Several errors flag legitimate runtime risks — e.g.
+`extension-management` permission kind silently mismatching our union,
+`UserInputRequest`/`Response` SDK exports gone, `SessionRegistry.delete`
+called from `test-server.ts` against an API surface that no longer has
+that method.
+
+**Phase plan:** see §8 Phase A.5 (added below) — a dedicated TS error
+cleanup pass. Items group naturally: test-fixture updates, SDK-shape
+drift, real undefined-checks. Most are 1-line fixes.
+
 
 ---
 
@@ -670,6 +724,36 @@ cumulative delta. Highlights:
 **Deferred to Phase C** (was item 7): shared settings type between renderer
 and backend. This is cross-boundary architecture work, not a library swap,
 and needs explicit wire-shape tests.
+
+### Phase A.5 — Backend TypeScript errors
+
+Per §2.5: 54 errors in `src-bun/` go unblocked because `lint:tsc-bun`
+isn't wired into `bun run check`. Fix in this order (cheapest first,
+so we can gate the whole thing into `bun run check` at the end):
+
+1. **Unused locals** (3 × `TS6133`) — `afterEach` import, `cmd`
+   destructure, `removeEntry` function. Trivial deletes.
+2. **Missing `?.` / `??`** (5 × `TS2532` / `TS2722`) — `tools.test.ts`
+   chains `tools.foo()` where `foo` is `unknown`. Add optional chaining.
+3. **Test fixtures missing fields** (4 × `TS2739` / `TS2353` in
+   `wire-contract.test.ts`, `settings.test.ts`, `sessions.test.ts`) —
+   add the missing `fontFamily`/`fontSize`/`defaultModelId`/etc.
+4. **Stale path/shim leftovers** — fixed in this audit refresh
+   (7 × `../rpc` → `../../rpc`, 3 × `./app/audit` → `./app/observability/audit`,
+   `tools/vue-shim.d.ts`). ✅ Done.
+5. **SDK shape drift** (`TS2305`, `TS2339`, `TS2322`) — `UserInputRequest`/
+   `Response` no longer exported; `SessionRegistry.delete/getMetadata`
+   removed; `extension-management`/`extension-permission-access`
+   permission kinds added upstream but our `PermissionKind` union is
+   stale. Audit each against current SDK and remove/widen.
+6. **fakeClient drift** (9 errors) — SDK's `MethodMap` shape changed
+   from `(args) => Promise<R>` plus side-channels (`login`, `list`) to
+   pure functions. Fix `fakeClient.ts` to match.
+7. **Bun.Terminal signature mismatch** (`terminalRegistry.ts`) — new Bun
+   PTY types use `Bun.BufferSource` and require number-return on `write`.
+8. **Node fs Dirent typing** (`instructions.ts`) — `Dirent<NonSharedBuffer>`
+   vs `string` after Bun's @types/node update. Cast or use the `string` overload.
+9. **Wire `lint:tsc-bun` into `bun run check`** once all errors clear.
 
 ### Phase B — Data flow: decouple stores + kill event bus
 

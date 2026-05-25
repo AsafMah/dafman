@@ -547,10 +547,29 @@ rg -t vue "invokeCommand\(" src
 
 # as unknown as count in a file
 rg "as unknown as" src/stores/shell/layoutStore.ts | Measure-Object | %{ $_.Count }
+
+# Backend TypeScript errors (NOT in `bun run check` yet — see Phase A.5)
+bun run lint:tsc-bun
 ```
 
 Forgotten rows accumulate into "30-70% drift" between audits, which
 turns the audit into vibes and undermines every decision based on it.
+
+### 22. The renderer is fully type-checked; the backend is NOT (yet)
+
+`bun run lint` runs `vue-tsc --noEmit` over the renderer only. The
+backend's `tsconfig.bun.json` exists but **isn't gated in `bun run
+check`**. As of 2026-05-25 there are 54 TS errors in `src-bun/` —
+covering SDK shape drift, stale test fixtures, missing `?.` chains,
+and `extension-*` permission kinds we don't know about.
+
+- Run `bun run lint:tsc-bun` to check the backend.
+- **Don't add new `src-bun/` errors.** When you touch a file in
+  `src-bun/`, run `bun run lint:tsc-bun` and verify your changes
+  didn't add to the error count.
+- The eventual goal (CODE_AUDIT §8 Phase A.5) is to clear all 54 and
+  wire `lint:tsc-bun` into `bun run check`. Until then this rule keeps
+  the count from drifting up.
 
 ---
 
@@ -573,6 +592,9 @@ anti-laziness rules above:
   for in-app messaging** — see rule 18.
 - **Never silence ESLint's `complexity` rule globally to skirt rule 20**
   — disable per-line with justification or fix the design.
+- **Never add new `src-bun/` TypeScript errors** (rule 22). When you
+  touch any `src-bun/` file, run `bun run lint:tsc-bun` first and
+  verify the error count doesn't go up.
 
 ## Monorepo / nested AGENTS.md
 

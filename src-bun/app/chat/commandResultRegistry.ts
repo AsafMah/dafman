@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { CommandResultEvent, CommandResultRecord } from '../rpc';
+import type { CommandResultEvent, CommandResultRecord } from '../../rpc';
 import { AppError } from '../shared/errors';
 import { log } from '../observability/logging';
 import { recordCommand } from '../observability/audit';

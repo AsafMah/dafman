@@ -5,7 +5,7 @@
 // these touch the SDK session or IPC — they're pure data transforms.
 
 import type { PermissionRequest } from '../client/copilotSdk';
-import type { AgentInfo, CommandResultRecord, JobRecord, TaskInfo, TaskStatus } from '../rpc';
+import type { AgentInfo, CommandResultRecord, JobRecord, TaskInfo, TaskStatus } from '../../rpc';
 
 // ---------------------------------------------------------------------------
 // Command-result helpers
