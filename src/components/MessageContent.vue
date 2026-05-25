@@ -24,7 +24,7 @@ import { renderMarkdownSegments } from '../lib/markdown';
 import '../lexical/prismExtraLanguages';
 import CodeEditor from './CodeEditor.vue';
 import MermaidBlock from './MermaidBlock.vue';
-import { useSettingsStore } from '../stores/settingsStore';
+import { useSettingsStore } from '../stores/app/settingsStore';
 
 const props = withDefaults(
   defineProps<{

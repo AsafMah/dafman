@@ -11,9 +11,9 @@
 /// unknown slash text is left alone so manual SDK commands can still be
 /// sent intentionally.
 
-import { useLayoutStore } from '../stores/layoutStore';
-import { useSessionsStore } from '../stores/sessionsStore';
-import { useToastStore } from '../stores/toastStore';
+import { useLayoutStore } from '../stores/shell/layoutStore';
+import { useSessionsStore } from '../stores/chat/sessionsStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { invokeCommand } from '../ipc/invoke';
 import { toErrorMessage } from './errorMessage';
 

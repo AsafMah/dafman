@@ -25,8 +25,8 @@
 // flush and lets it overlay popouts cleanly.
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useBootStore } from '../stores/bootStore';
-import { useSettingsStore } from '../stores/settingsStore';
+import { useBootStore } from '../stores/app/bootStore';
+import { useSettingsStore } from '../stores/app/settingsStore';
 import { resolveIsDark } from '../lib/theme';
 
 const bootStore = useBootStore();

@@ -5,7 +5,7 @@
 // component (not a slot template) because dockview-vue's
 // `findComponent(name)` walks `instance.components[name]`, not slots.
 
-import { useClientStore } from '../stores/clientStore';
+import { useClientStore } from '../stores/app/clientStore';
 import { storeToRefs } from 'pinia';
 
 const clientStore = useClientStore();

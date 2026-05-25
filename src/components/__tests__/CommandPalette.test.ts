@@ -4,7 +4,7 @@ import { cleanup, render, fireEvent } from '@testing-library/vue';
 import { nextTick } from 'vue';
 import CommandPalette from '../CommandPalette.vue';
 import { searchValueFor } from '../../lib/palette';
-import { useCommandRegistry } from '../../stores/commandRegistry';
+import { useCommandRegistry } from '../../stores/shell/commandRegistry';
 
 /// Mounts the palette and pops it open via the test-only `__testOpen`
 /// expose. Returns the test-library handle + the dialog root element

@@ -36,8 +36,8 @@
 
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Command } from 'vue-command-palette';
-import { useCommandRegistry, type Command as CommandDef } from '../stores/commandRegistry';
-import { useLayoutStore } from '../stores/layoutStore';
+import { useCommandRegistry, type Command as CommandDef } from '../stores/shell/commandRegistry';
+import { useLayoutStore } from '../stores/shell/layoutStore';
 import { searchValueFor } from '../lib/palette';
 
 const registry = useCommandRegistry();

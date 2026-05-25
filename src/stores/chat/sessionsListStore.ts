@@ -7,11 +7,11 @@
 
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { invokeCommand } from '../ipc/invoke';
-import type { SessionMetadataSummary } from '../ipc/types';
-import { basename } from './layoutStore';
-import { useToastStore } from './toastStore';
-import { toErrorMessage } from '../lib/errorMessage';
+import { invokeCommand } from '../../ipc/invoke';
+import type { SessionMetadataSummary } from '../../ipc/types';
+import { basename } from '../shell/layoutStore';
+import { useToastStore } from '../app/toastStore';
+import { toErrorMessage } from '../../lib/errorMessage';
 
 export interface WorkspaceGroup {
   /// Stable key for the group — full workspace path, or "" for the

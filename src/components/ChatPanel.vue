@@ -16,8 +16,8 @@
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
 import type { DockviewPanelApi } from 'dockview-core';
-import { useSessionsStore } from '../stores/sessionsStore';
-import { useLayoutStore } from '../stores/layoutStore';
+import { useSessionsStore } from '../stores/chat/sessionsStore';
+import { useLayoutStore } from '../stores/shell/layoutStore';
 import ChatWindow from './ChatWindow.vue';
 
 type UserParams = { sessionId?: string };

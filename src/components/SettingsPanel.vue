@@ -17,9 +17,9 @@ import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { useNotificationsStore } from '../stores/notificationsStore';
-import { useSettingsStore } from '../stores/settingsStore';
-import { useToastStore } from '../stores/toastStore';
+import { useNotificationsStore } from '../stores/app/notificationsStore';
+import { useSettingsStore } from '../stores/app/settingsStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { invokeCommand } from '../ipc/invoke';
 import type {
   ModelSummary,
@@ -27,7 +27,7 @@ import type {
   TerminalAddonPrefs,
   ThemeChoice,
 } from '../ipc/types';
-import { useModelsStore } from '../stores/modelsStore';
+import { useModelsStore } from '../stores/library/modelsStore';
 import { toErrorMessage } from '../lib/errorMessage';
 import { revealPath } from '../lib/pathActions';
 

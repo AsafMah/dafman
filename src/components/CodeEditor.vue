@@ -21,7 +21,7 @@ import { EditorView, lineNumbers } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
 import { resolveLanguageExtension, resolveLanguageForFile } from '../lib/codeLanguage';
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { toErrorMessage } from '../lib/errorMessage';
 
 const props = withDefaults(

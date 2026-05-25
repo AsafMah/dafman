@@ -7,9 +7,9 @@
 
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { invokeCommand } from '../ipc/invoke';
+import { invokeCommand } from '../../ipc/invoke';
 import { useToastStore } from './toastStore';
-import { toErrorMessage } from '../lib/errorMessage';
+import { toErrorMessage } from '../../lib/errorMessage';
 
 export const useClientStore = defineStore('client', () => {
   const ready = ref(false);

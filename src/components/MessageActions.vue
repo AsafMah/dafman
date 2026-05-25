@@ -14,7 +14,7 @@
 
 import { computed } from 'vue';
 import Button from 'primevue/button';
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { toErrorMessage } from '../lib/errorMessage';
 
 type Kind = 'user' | 'assistant' | 'reasoning' | 'tool' | 'system';

@@ -4,10 +4,10 @@ import Button from 'primevue/button';
 import Textarea from 'primevue/textarea';
 import { storeToRefs } from 'pinia';
 import type { JobRecord } from '../ipc/types';
-import { useJobsStore } from '../stores/jobsStore';
-import { useLayoutStore } from '../stores/layoutStore';
-import { useSessionsStore } from '../stores/sessionsStore';
-import { useToastStore } from '../stores/toastStore';
+import { useJobsStore } from '../stores/observability/jobsStore';
+import { useLayoutStore } from '../stores/shell/layoutStore';
+import { useSessionsStore } from '../stores/chat/sessionsStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { toErrorMessage } from '../lib/errorMessage';
 
 const jobsStore = useJobsStore();

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import { registerBuiltinCommands, type ConfirmHandle } from '../registerBuiltinCommands';
-import { useCommandRegistry } from '../../stores/commandRegistry';
-import { useSessionsStore } from '../../stores/sessionsStore';
-import { useClientStore } from '../../stores/clientStore';
-import { useLayoutStore } from '../../stores/layoutStore';
+import { useCommandRegistry } from '../../stores/shell/commandRegistry';
+import { useSessionsStore } from '../../stores/chat/sessionsStore';
+import { useClientStore } from '../../stores/app/clientStore';
+import { useLayoutStore } from '../../stores/shell/layoutStore';
 import { setRpcBridge, type RpcBridge } from '../../ipc/invoke';
 
 // Lightweight stub for the PrimeVue useConfirm() return value.

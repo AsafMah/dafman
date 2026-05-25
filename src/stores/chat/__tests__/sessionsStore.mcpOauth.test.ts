@@ -8,7 +8,7 @@
 import { describe, expect, test, beforeEach } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import { useSessionsStore, type SessionRecord } from '../sessionsStore';
-import { useToastStore } from '../toastStore';
+import { useToastStore } from '../../app/toastStore';
 
 function makeRecord(id: string): SessionRecord {
   return {

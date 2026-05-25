@@ -38,9 +38,9 @@ import type {
   PermissionRequestData,
   UserInputRequestData,
 } from '../ipc/types';
-import { useSessionsStore } from '../stores/sessionsStore';
+import { useSessionsStore } from '../stores/chat/sessionsStore';
 import MessageContent from './MessageContent.vue';
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { invokeCommand } from '../ipc/invoke';
 import { styleFor } from '../lib/notificationStyles';
 import PermissionDetails from './PermissionDetails.vue';

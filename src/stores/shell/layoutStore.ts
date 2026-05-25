@@ -539,7 +539,7 @@ export const useLayoutStore = defineStore('layout', () => {
       try {
         // Dynamic import avoids circular dependency between layoutStore and sessionsStore
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { useSessionsStore } = require('../stores/sessionsStore') as {
+        const { useSessionsStore } = require('../chat/sessionsStore') as {
           useSessionsStore: () => { getSession: (id: string) => { title?: string } | undefined };
         };
         const sessionsStore = useSessionsStore();

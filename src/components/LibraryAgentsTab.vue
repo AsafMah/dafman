@@ -20,9 +20,9 @@ import Textarea from 'primevue/textarea';
 import ToggleSwitch from 'primevue/toggleswitch';
 import { invokeCommand } from '../ipc/invoke';
 import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from '../ipc/types';
-import { useLayoutStore } from '../stores/layoutStore';
-import { useSessionsStore } from '../stores/sessionsStore';
-import { useToastStore } from '../stores/toastStore';
+import { useLayoutStore } from '../stores/shell/layoutStore';
+import { useSessionsStore } from '../stores/chat/sessionsStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { toErrorMessage } from '../lib/errorMessage';
 
 const toasts = useToastStore();

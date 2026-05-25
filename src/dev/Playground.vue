@@ -23,8 +23,8 @@ import type {
   UserInputRequestData,
 } from '../ipc/types';
 import { accentForIndex } from '../lib/color';
-import { useSessionsStore, type SessionRecord } from '../stores/sessionsStore';
-import { useToastStore } from '../stores/toastStore';
+import { useSessionsStore, type SessionRecord } from '../stores/chat/sessionsStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { toErrorMessage } from '../lib/errorMessage';
 
 const toastStore = useToastStore();

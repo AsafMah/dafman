@@ -26,13 +26,13 @@ import type {
   SendMessageAttachment,
   SessionEventPayload,
 } from '../ipc/types';
-import { useSessionsStore, type DefaultSendMode } from '../stores/sessionsStore';
-import { useSessionsListStore } from '../stores/sessionsListStore';
-import { useLayoutStore } from '../stores/layoutStore';
-import { useSettingsStore } from '../stores/settingsStore';
-import { useCommandResultsStore } from '../stores/commandResultsStore';
-import { useTerminalStore } from '../stores/terminalStore';
-import { useToastStore } from '../stores/toastStore';
+import { useSessionsStore, type DefaultSendMode } from '../stores/chat/sessionsStore';
+import { useSessionsListStore } from '../stores/chat/sessionsListStore';
+import { useLayoutStore } from '../stores/shell/layoutStore';
+import { useSettingsStore } from '../stores/app/settingsStore';
+import { useCommandResultsStore } from '../stores/chat/commandResultsStore';
+import { useTerminalStore } from '../stores/terminal/terminalStore';
+import { useToastStore } from '../stores/app/toastStore';
 import ReasoningBlock from './ReasoningBlock.vue';
 import type { ComposerSubmitPayload } from '../lexical/plugins';
 import { styleFor } from '../lib/notificationStyles';

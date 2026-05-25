@@ -72,9 +72,9 @@ import {
 import { markdownNodes } from '../lexical/nodes';
 import { $createAttachmentNode } from '../lexical/AttachmentNode';
 import { lexicalTheme } from '../lexical/theme';
-import type { DefaultSendMode } from '../stores/sessionsStore';
+import type { DefaultSendMode } from '../stores/chat/sessionsStore';
 import type { SendMessageAttachment } from '../ipc/types';
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { runLocalSlashCommand } from '../lib/sessionCommands';
 import SlashCommandPlugin from './SlashCommandPlugin.vue';
 import MentionPlugin from './MentionPlugin.vue';

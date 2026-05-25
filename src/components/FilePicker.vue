@@ -24,7 +24,7 @@
 
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { invokeCommand } from '../ipc/invoke';
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from '../stores/app/toastStore';
 import type { WorkspaceFileMatch, SendMessageAttachment } from '../ipc/types';
 import { toErrorMessage } from '../lib/errorMessage';
 

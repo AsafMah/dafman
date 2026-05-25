@@ -5,16 +5,16 @@
 
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { invokeCommand } from '../ipc/invoke';
+import { invokeCommand } from '../../ipc/invoke';
 import type {
   NotificationPrefs,
   ReasoningVisibility,
   Settings,
   TerminalPrefs,
   ThemeChoice,
-} from '../ipc/types';
+} from '../../ipc/types';
 import { useToastStore } from './toastStore';
-import { toErrorMessage } from '../lib/errorMessage';
+import { toErrorMessage } from '../../lib/errorMessage';
 
 function defaultSettings(): Settings {
   return {

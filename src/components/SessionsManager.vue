@@ -13,13 +13,13 @@ import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocompl
 import Button from 'primevue/button';
 import { useConfirm } from 'primevue/useconfirm';
 import ConfirmPopup from 'primevue/confirmpopup';
-import { useSessionsListStore } from '../stores/sessionsListStore';
-import { useSessionsStore } from '../stores/sessionsStore';
+import { useSessionsListStore } from '../stores/chat/sessionsListStore';
+import { useSessionsStore } from '../stores/chat/sessionsStore';
 import { indicatorStyle, type NotificationStyle } from '../lib/notificationStyles';
-import { useSettingsStore } from '../stores/settingsStore';
-import { useClientStore } from '../stores/clientStore';
-import { useLayoutStore, composePanelTitle } from '../stores/layoutStore';
-import { useToastStore } from '../stores/toastStore';
+import { useSettingsStore } from '../stores/app/settingsStore';
+import { useClientStore } from '../stores/app/clientStore';
+import { useLayoutStore, composePanelTitle } from '../stores/shell/layoutStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { invokeCommand } from '../ipc/invoke';
 import type { SessionMetadataSummary } from '../ipc/types';
 

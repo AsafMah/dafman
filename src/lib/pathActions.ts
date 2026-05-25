@@ -2,7 +2,7 @@
 /// error-toast fallback.  Deduplicates 5+ identical try/catch blocks.
 
 import { invokeCommand } from '../ipc/invoke';
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from '../stores/app/toastStore';
 import { toErrorMessage } from './errorMessage';
 
 /**

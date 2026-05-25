@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { invokeCommand, onTerminalEvent } from '../ipc/invoke';
-import type { TerminalEventPayload, TerminalSummary } from '../ipc/types';
-import { useToastStore } from './toastStore';
-import { useSessionsStore } from './sessionsStore';
+import { invokeCommand, onTerminalEvent } from '../../ipc/invoke';
+import type { TerminalEventPayload, TerminalSummary } from '../../ipc/types';
+import { useToastStore } from '../app/toastStore';
+import { useSessionsStore } from '../chat/sessionsStore';
 
 const MAX_BUFFER = 256_000;
 const MAX_COMMANDS_PER_TERMINAL = 200;

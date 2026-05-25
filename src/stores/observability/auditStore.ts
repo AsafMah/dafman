@@ -7,8 +7,8 @@
 
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
-import { invokeCommand, onAuditEvent } from '../ipc/invoke';
-import type { AuditEntry } from '../ipc/types';
+import { invokeCommand, onAuditEvent } from '../../ipc/invoke';
+import type { AuditEntry } from '../../ipc/types';
 
 const RENDERER_CAP = 1000;
 

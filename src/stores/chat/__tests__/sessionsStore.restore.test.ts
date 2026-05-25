@@ -12,14 +12,14 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
-import { setRpcBridge, type RpcBridge, type SessionEventListener } from '../../ipc/invoke';
-import type { CommandMap, CommandName, SessionEventPayload } from '../../ipc/types';
+import { setRpcBridge, type RpcBridge, type SessionEventListener } from '../../../ipc/invoke';
+import type { CommandMap, CommandName, SessionEventPayload } from '../../../ipc/types';
 import { useSessionsStore, _resetSessionsStoreForTest } from '../sessionsStore';
 
 function makeFakeBridge(): {
   bridge: RpcBridge;
   fire: (payload: SessionEventPayload) => void;
-  firePending: (payload: import('../../ipc/types').PendingRequestPayload) => void;
+  firePending: (payload: import('../../../ipc/types').PendingRequestPayload) => void;
   calls: Array<{ name: string; args: unknown }>;
   handlers: Partial<{
     [K in CommandName]: (
@@ -32,8 +32,8 @@ function makeFakeBridge(): {
   const fire = (payload: SessionEventPayload) => {
     for (const l of listeners) l(payload);
   };
-  const pendingListeners = new Set<(p: import('../../ipc/types').PendingRequestPayload) => void>();
-  const firePending = (payload: import('../../ipc/types').PendingRequestPayload) => {
+  const pendingListeners = new Set<(p: import('../../../ipc/types').PendingRequestPayload) => void>();
+  const firePending = (payload: import('../../../ipc/types').PendingRequestPayload) => {
     for (const l of pendingListeners) l(payload);
   };
   const calls: Array<{ name: string; args: unknown }> = [];
@@ -322,8 +322,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
     // AND assistant.turn_end — not just permission. Each event for
     // a non-active session should produce a notificationsStore.notify
     // call with the right `kind`.
-    const { useNotificationsStore } = await import('../notificationsStore');
-    const { useSettingsStore } = await import('../settingsStore');
+    const { useNotificationsStore } = await import('../../app/notificationsStore');
+    const { useSettingsStore } = await import('../../app/settingsStore');
     const notifications = useNotificationsStore();
     const settings = useSettingsStore();
     // Allow both kinds so we can observe firing decisions purely
