@@ -18,8 +18,8 @@ import Button from 'primevue/button';
 import { useTerminalStore } from '@/stores/terminal/terminalStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
-import { invokeCommand } from '@/ipc/invoke';
 import { emit as busEmit, on as busOn } from '@/lib/bus';
+import { openUrl } from '@/lib/pathActions';
 import { useResizeObserver } from '@vueuse/core';
 import { parseTerminalOsc, type TerminalShellEvent } from '@/lib/terminalShellIntegration';
 
@@ -323,9 +323,7 @@ function initXterm(): void {
 
   if (addons.webLinks) {
     const links = new WebLinksAddon((_event, uri) => {
-      void invokeCommand('openUrl', { url: uri }).catch(() => {
-        /* best-effort link open */
-      });
+      void openUrl(uri, { notify: false });
     });
 
     loadAddon(links, () => term?.loadAddon(links));

@@ -17,7 +17,7 @@ import SelectButton from 'primevue/selectbutton';
 import { useLogStore, LEVEL_NAMES } from '@/stores/observability/logStore';
 import { useAuditStore } from '@/stores/observability/auditStore';
 import { useToastStore } from '@/stores/app/toastStore';
-import { invokeCommand } from '@/ipc/invoke';
+import { revealPath } from '@/lib/pathActions';
 import type { AuditEntry, LogLevel, LogRecord } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
 
@@ -106,11 +106,7 @@ async function exportNow(): Promise<void> {
     );
 
     // Reveal the directory so the user can zip it up for a bug report.
-    try {
-      await invokeCommand('revealPath', { path: result.path });
-    } catch {
-      /* best-effort */
-    }
+    await revealPath(result.path);
   } catch (err) {
     toasts.error('Diagnostics export failed', toErrorMessage(err));
   }

@@ -287,11 +287,7 @@ async function onExport(format: 'markdown' | 'json'): Promise<void> {
       `${(saved.bytes / 1024).toFixed(1)} KiB`,
     );
 
-    try {
-      await invokeCommand('revealPath', { path: saved.path });
-    } catch {
-      /* best-effort */
-    }
+    await revealPath(saved.path);
   } catch (err) {
     toasts.error('Export failed', toErrorMessage(err));
   }
@@ -580,7 +576,7 @@ async function onForkSession() {
               text
               :title="`Open ${agent.path}`"
               :aria-label="`Open agent file ${agent.displayName}`"
-              @click="invokeCommand('revealPath', { path: agent.path! })"
+              @click="revealPath(agent.path!)"
             />
             <div
               v-if="agent.description && isItemExpanded('agent', agent.name)"

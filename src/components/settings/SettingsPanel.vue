@@ -20,7 +20,6 @@ import ToggleSwitch from 'primevue/toggleswitch';
 import { useNotificationsStore } from '@/stores/app/notificationsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
-import { invokeCommand } from '@/ipc/invoke';
 import type {
   ModelSummary,
   ReasoningVisibility,
@@ -28,8 +27,8 @@ import type {
   ThemeChoice,
 } from '@/ipc/types';
 import { useModelsStore } from '@/stores/library/modelsStore';
-import { toErrorMessage } from '@/lib/errorMessage';
-import { revealPath } from '@/lib/pathActions';
+import { revealPath, openLogFolder as openLogFolderAction } from '@/lib/pathActions';
+import { useFolderPicker } from '@/composables/useFolderPicker';
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelsStore();
@@ -231,17 +230,9 @@ async function askPermission() {
 }
 
 async function openLogFolder() {
-  const toasts = useToastStore();
+  const ok = await openLogFolderAction();
 
-  try {
-    const ok = await invokeCommand('openLogFolder', {});
-
-    if (!ok) toasts.warn('Log folder not available yet');
-  } catch (err) {
-    const message = toErrorMessage(err);
-
-    toasts.error("Couldn't open log folder", message);
-  }
+  if (!ok) useToastStore().warn('Log folder not available yet');
 }
 
 /// Default-workspace draft kept separate from the persisted value so
@@ -267,28 +258,14 @@ async function commitDefaultWorkspace() {
   await settingsStore.setDefaultWorkspace(next);
 }
 
-const isPickingDefault = ref(false);
+const { isPicking: isPickingDefault, pick: pickDefaultFolder } = useFolderPicker();
 
 async function pickDefaultWorkspace() {
-  if (isPickingDefault.value) return;
+  const picked = await pickDefaultFolder(defaultWorkspaceDraft.value.trim() || undefined);
 
-  isPickingDefault.value = true;
-
-  try {
-    const picked = await invokeCommand('pickFolder', {
-      startingFolder: defaultWorkspaceDraft.value.trim() || undefined,
-    });
-
-    if (picked) {
-      defaultWorkspaceDraft.value = picked;
-      await settingsStore.setDefaultWorkspace(picked);
-    }
-  } catch (err) {
-    const message = toErrorMessage(err);
-
-    useToastStore().error("Couldn't pick folder", message);
-  } finally {
-    isPickingDefault.value = false;
+  if (picked) {
+    defaultWorkspaceDraft.value = picked;
+    await settingsStore.setDefaultWorkspace(picked);
   }
 }
 

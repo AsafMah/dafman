@@ -24,6 +24,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { revealPath } from '@/lib/pathActions';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -234,11 +235,7 @@ async function deleteFile(entry: AgentFileEntry) {
 }
 
 async function reveal(path: string) {
-  try {
-    await invokeCommand('revealPath', { path });
-  } catch (err) {
-    toasts.error('Reveal failed', toErrorMessage(err));
-  }
+  await revealPath(path, 'Reveal failed');
 }
 </script>
 

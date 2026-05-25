@@ -41,12 +41,11 @@ import type {
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
 import { useToastStore } from '@/stores/app/toastStore';
-import { invokeCommand } from '@/ipc/invoke';
+import { openUrl } from '@/lib/pathActions';
 import { styleFor } from '@/lib/notificationStyles';
 import PermissionDetails from '@/components/permissions/PermissionDetails.vue';
 import PermissionRuleEditor from '@/components/permissions/PermissionRuleEditor.vue';
 import JsonSchemaForm from '@/components/shared/JsonSchemaForm.vue';
-import { toErrorMessage } from '@/lib/errorMessage';
 
 const props = defineProps<{
   sessionId: string;
@@ -217,16 +216,10 @@ async function openElicitationUrl(): Promise<void> {
     return;
   }
 
-  try {
-    const ok = await invokeCommand('openUrl', { url: req.url });
+  const ok = await openUrl(req.url);
 
-    if (ok) {
-      urlOpened.value = true;
-    } else {
-      toasts.error("Couldn't open URL", req.url);
-    }
-  } catch (err) {
-    toasts.error("Couldn't open URL", toErrorMessage(err));
+  if (ok) {
+    urlOpened.value = true;
   }
 }
 

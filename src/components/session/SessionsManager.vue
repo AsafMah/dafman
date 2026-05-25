@@ -21,6 +21,7 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useClientStore } from '@/stores/app/clientStore';
 import { useLayoutStore, composePanelTitle } from '@/stores/shell/layoutStore';
 import { useToastStore } from '@/stores/app/toastStore';
+import { useFolderPicker } from '@/composables/useFolderPicker';
 import { invokeCommand } from '@/ipc/invoke';
 import type { SessionMetadataSummary } from '@/ipc/types';
 
@@ -131,7 +132,7 @@ function sortedGroupSessions(group: { sessions: SessionMetadataSummary[] }) {
 
 const workspaceDraft = ref('');
 const workspaceSuggestions = ref<string[]>([]);
-const isPickingFolder = ref(false);
+const { isPicking: isPickingFolder, pick: pickWorkspaceFolder } = useFolderPicker();
 
 const recentWorkspaces = computed(() => settings.value.workspaces?.recent ?? []);
 
@@ -255,21 +256,9 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
 }
 
 async function onPickFolder() {
-  if (isPickingFolder.value) return;
+  const picked = await pickWorkspaceFolder(workspaceDraft.value.trim() || undefined);
 
-  isPickingFolder.value = true;
-
-  try {
-    const picked = await invokeCommand('pickFolder', {
-      ...(workspaceDraft.value.trim() ? { startingFolder: workspaceDraft.value.trim() } : {}),
-    });
-
-    if (picked) workspaceDraft.value = picked;
-  } catch {
-    /* toast already shown */
-  } finally {
-    isPickingFolder.value = false;
-  }
+  if (picked) workspaceDraft.value = picked;
 }
 
 async function onCreateSession() {
