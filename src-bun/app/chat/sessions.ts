@@ -44,6 +44,14 @@ import {
   type AgentScope as AgentFileScope,
 } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
+import {
+  commandResultBlobAttachment,
+  jobFromTask,
+  normalizeAgent,
+  normalizeTask,
+  summarizePermission,
+  toPlainObject,
+} from './sessionHelpers';
 import type {
   AutoModeSwitchRequestData,
   ElicitationRequestData,
@@ -61,7 +69,6 @@ import type {
   AgentInfo,
   JobRecord,
   TaskInfo,
-  TaskStatus,
   CommandResultRecord,
 } from '../rpc';
 
@@ -89,222 +96,6 @@ const HISTORY_REPLAY_BATCH = 50;
 /// the rest.
 const SHUTDOWN_TIMEOUT_MS = 2000;
 
-function commandResultMarkdown(result: CommandResultRecord): string {
-  const clean = (value: string): string =>
-    value
-      .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, '')
-      .replace(/[\x1B\x9B]\[[0-?]*[ -/]*[@-~]/g, '')
-      .replace(/\x1B[()#;?]*(?:[0-9A-ORZcf-nqry=><~])/g, '')
-      .replace(/\x07/g, '')
-      .replace(/\r/g, '')
-      .trimEnd();
-  const status = result.status === 'completed' && result.exitCode === 0 ? 'success' : result.status;
-  const lines = [
-    '# Command result',
-    '',
-    `- Command: \`${result.command.replace(/`/g, '\\`')}\``,
-    `- CWD: \`${result.cwd.replace(/`/g, '\\`')}\``,
-    `- Shell: \`${result.shell.replace(/`/g, '\\`')}\``,
-    `- Status: ${status}`,
-    ...(typeof result.exitCode === 'number' ? [`- Exit code: ${result.exitCode}`] : []),
-    ...(typeof result.durationMs === 'number' ? [`- Duration: ${result.durationMs} ms`] : []),
-    ...(result.truncated ? ['- Output: truncated'] : []),
-    '',
-    '## stdout',
-    '```text',
-    clean(result.stdout) || '(empty)',
-    '```',
-    '',
-    '## stderr',
-    '```text',
-    clean(result.stderr) || '(empty)',
-    '```',
-    '',
-  ];
-
-  return lines.join('\n');
-}
-
-function safeFilePart(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'command-result';
-}
-
-function commandResultBlobAttachment(
-  result: CommandResultRecord,
-  displayName?: string,
-): { type: 'blob'; data: string; mimeType: string; displayName: string } {
-  const markdown = commandResultMarkdown(result);
-  const data = Buffer.from(markdown, 'utf8').toString('base64');
-
-  return {
-    type: 'blob',
-    data,
-    mimeType: 'text/markdown',
-    displayName: displayName ?? `command-result-${safeFilePart(result.id)}.md`,
-  };
-}
-
-/// 19a: normalize the SDK's loose AgentInfo wire shape (everything is
-/// `unknown`) into our typed `AgentInfo`. Caller pre-checks
-/// `typeof name === "string"` so the cast is safe; we still default
-/// the optional fields defensively because the SDK has shipped shape
-/// drifts before (see prismExtraLanguages.ts:1 for the load-order
-/// example).
-function normalizeAgent(raw: {
-  name?: unknown;
-  displayName?: unknown;
-  description?: unknown;
-  path?: unknown;
-}): AgentInfo {
-  const out: AgentInfo = {
-    name: String(raw.name),
-    displayName: typeof raw.displayName === 'string' ? raw.displayName : String(raw.name),
-    description: typeof raw.description === 'string' ? raw.description : '',
-  };
-
-  if (typeof raw.path === 'string' && raw.path.length > 0) out.path = raw.path;
-
-  return out;
-}
-
-const TASK_STATUSES: TaskStatus[] = ['running', 'idle', 'completed', 'failed', 'cancelled'];
-
-function normalizeTaskStatus(status: unknown): TaskStatus {
-  return typeof status === 'string' && TASK_STATUSES.includes(status as TaskStatus)
-    ? (status as TaskStatus)
-    : 'running';
-}
-
-/// 19b.1/Long Jobs: normalize the SDK's loose TaskInfo union into our
-/// typed `TaskInfo`. Caller has pre-filtered on `typeof id === "string"`;
-/// defensive defaults for everything else.
-function normalizeTask(raw: Record<string, unknown>): TaskInfo {
-  const common = {
-    id: String(raw.id),
-    description: typeof raw.description === 'string' ? raw.description : '',
-    status: normalizeTaskStatus(raw.status),
-  };
-
-  if (typeof raw.type === 'string' && raw.type === 'shell') {
-    const out: TaskInfo = {
-      ...common,
-      type: 'shell',
-      command: typeof raw.command === 'string' ? raw.command : '',
-    };
-
-    if (typeof raw.startedAt === 'string') out.startedAt = raw.startedAt;
-
-    if (typeof raw.completedAt === 'string') out.completedAt = raw.completedAt;
-
-    if (typeof raw.activeTimeMs === 'number') out.activeTimeMs = raw.activeTimeMs;
-
-    if (typeof raw.error === 'string') out.error = raw.error;
-
-    if (raw.executionMode === 'sync' || raw.executionMode === 'background')
-      out.executionMode = raw.executionMode;
-
-    if (typeof raw.canPromoteToBackground === 'boolean')
-      out.canPromoteToBackground = raw.canPromoteToBackground;
-
-    if (raw.attachmentMode === 'pty' || raw.attachmentMode === 'detached')
-      out.attachmentMode = raw.attachmentMode;
-
-    if (typeof raw.logPath === 'string') out.logPath = raw.logPath;
-
-    if (typeof raw.pid === 'number') out.pid = raw.pid;
-
-    return out;
-  }
-
-  const out: TaskInfo = {
-    ...common,
-    type: 'agent',
-    agentType: typeof raw.agentType === 'string' ? raw.agentType : 'agent',
-  };
-
-  if (typeof raw.toolCallId === 'string') out.toolCallId = raw.toolCallId;
-
-  if (typeof raw.startedAt === 'string') out.startedAt = raw.startedAt;
-
-  if (typeof raw.completedAt === 'string') out.completedAt = raw.completedAt;
-
-  if (typeof raw.activeTimeMs === 'number') out.activeTimeMs = raw.activeTimeMs;
-
-  if (typeof raw.error === 'string') out.error = raw.error;
-
-  if (raw.executionMode === 'sync' || raw.executionMode === 'background')
-    out.executionMode = raw.executionMode;
-
-  if (typeof raw.canPromoteToBackground === 'boolean')
-    out.canPromoteToBackground = raw.canPromoteToBackground;
-
-  if (typeof raw.agentName === 'string') out.agentName = raw.agentName;
-
-  if (typeof raw.agentDisplayName === 'string') out.agentDisplayName = raw.agentDisplayName;
-
-  if (typeof raw.prompt === 'string') out.prompt = raw.prompt;
-
-  if (typeof raw.result === 'string') out.result = raw.result;
-
-  if (typeof raw.model === 'string') out.model = raw.model;
-
-  if (typeof raw.latestResponse === 'string') out.latestResponse = raw.latestResponse;
-
-  if (typeof raw.idleSince === 'string') out.idleSince = raw.idleSince;
-
-  return out;
-}
-
-function jobFromTask(sessionId: string, task: TaskInfo): JobRecord {
-  const running = task.status === 'running' || task.status === 'idle';
-  const terminal =
-    task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
-  const base = {
-    id: `${sessionId}:${task.id}`,
-    sessionId,
-    source: 'sdk-task' as const,
-    kind: task.type,
-    status: task.status,
-    title:
-      task.type === 'agent'
-        ? (task.agentDisplayName ?? task.agentName ?? task.agentType)
-        : task.command || task.description || 'Shell task',
-    description: task.description,
-    startedAt: task.startedAt,
-    completedAt: task.completedAt,
-    activeTimeMs: task.activeTimeMs,
-    error: task.error,
-    executionMode: task.executionMode,
-    canCancel: running,
-    canRemove: terminal,
-    canPromoteToBackground: task.canPromoteToBackground === true,
-    canOpenSession: true,
-  };
-
-  if (task.type === 'agent') {
-    return {
-      ...base,
-      kind: 'agent',
-      agentType: task.agentType,
-      agentName: task.agentName,
-      agentDisplayName: task.agentDisplayName,
-      model: task.model,
-      prompt: task.prompt,
-      latestResponse: task.latestResponse,
-      result: task.result,
-      toolCallId: task.toolCallId,
-    };
-  }
-
-  return {
-    ...base,
-    kind: 'shell',
-    command: task.command,
-    logPath: task.logPath,
-    pid: task.pid,
-  };
-}
-
 type Emit = (payload: SessionEventPayload) => void;
 type EmitPending = (payload: PendingRequestPayload) => void;
 
@@ -318,100 +109,6 @@ interface Entry {
   /// freshly-created session or its `cwd` field. The composer's
   /// @file picker needs this to resolve relative paths.
   workingDirectory?: string;
-}
-
-/// Pending callback shape + queue lifecycle now live in
-/// `./pendingRequests.ts`; this module composes one queue per
-/// registry. See `PendingRequestQueue` for the typed cancellation
-/// semantics and the registry contract around teardown ordering.
-
-/// Build a one-line human-readable summary of a permission request
-/// from whatever extra fields the SDK happens to put on the runtime
-/// object. The SDK's TypeScript type lies about the shape — at
-/// runtime each `kind` carries extra payload (a `command` for shell,
-/// a `path` for write/read, a `url` for url, etc.). We probe common
-/// names and fall back to the kind so the modal always has something
-/// to display.
-/// Short message line shown above the bespoke per-kind detail block
-/// in `PermissionDetails.vue`. Keep these terse — the rich payload
-/// (command, path, args, etc.) is rendered by the bespoke component
-/// from the `raw` field, so the message line is just a one-glance
-/// "what kind of permission and against what target".
-function summarizePermission(request: PermissionRequest): string {
-  const raw = request as unknown as Record<string, unknown>;
-  // SDK shape varies by kind. Field names verified via the CLI
-  // changelog notes (1.0.44+) and runtime inspection: shell uses
-  // `fullCommandText` (not `command`), write/read use `fileName`
-  // (not `path`). Keep the older aliases as fallbacks in case
-  // any SDK upgrade renames them again.
-  const path =
-    typeof raw.fileName === 'string'
-      ? raw.fileName
-      : typeof raw.path === 'string'
-        ? raw.path
-        : null;
-  const command =
-    typeof raw.fullCommandText === 'string'
-      ? raw.fullCommandText
-      : typeof raw.command === 'string'
-        ? raw.command
-        : typeof raw.cmd === 'string'
-          ? raw.cmd
-          : null;
-  const url = typeof raw.url === 'string' ? raw.url : null;
-  const server = typeof raw.serverName === 'string' ? raw.serverName : null;
-  const tool = typeof raw.toolName === 'string' ? raw.toolName : null;
-
-  switch (request.kind) {
-    case 'shell':
-      return command ? `Run \`${command}\`` : 'Run a shell command';
-    case 'write':
-      return path ? `Modify ${path}` : 'Modify a file';
-    case 'read':
-      return path ? `Read ${path}` : 'Read a file';
-    case 'url':
-      return url ? `Open ${url}` : 'Open a URL';
-    case 'mcp':
-      return server && tool
-        ? `Call ${server} / ${tool}`
-        : server
-          ? `Call MCP server ${server}`
-          : 'Call an MCP tool';
-    case 'custom-tool':
-      return tool ? `Run ${tool}` : 'Run a custom tool';
-    case 'memory':
-      return 'Save to memory';
-    case 'hook':
-      return 'Run a hook';
-  }
-}
-
-/// Plain-object copy of an SDK runtime payload. Recursively traverses
-/// only enumerable own properties and skips functions / non-JSON
-/// types — the wire layer otherwise serializes silently to `{}` on a
-/// `Date` or method-bearing object. Good enough for diagnostic
-/// display; the renderer never inspects the result.
-function toPlainObject(value: unknown): Record<string, unknown> {
-  if (value === null || typeof value !== 'object') return {};
-
-  const out: Record<string, unknown> = {};
-
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof v === 'function') continue;
-
-    if (typeof v === 'object' && v !== null) {
-      try {
-        JSON.stringify(v);
-        out[k] = v;
-      } catch {
-        /* skip un-serializable */
-      }
-    } else {
-      out[k] = v;
-    }
-  }
-
-  return out;
 }
 
 export class SessionRegistry {

@@ -1,21 +1,8 @@
 <script setup lang="ts">
 /// Right-edge dockview panel hosting all per-session settings + actions.
 ///
-/// Replaces the gear-popover that previously hung off
-/// `SessionHeaderControls.vue`. Content is the same (rename, mode,
-/// reasoning view, workspace, approve-all toggle, skills, usage,
-/// export, compact, reset approvals) plus a new **Fork session**
-/// action at the top.
-///
-/// One panel per session, id `session-details-${sessionId}`. The
-/// panel is registered globally in `src/main.ts` as
-/// `sessionDetails` (alongside `chat`, `sessionsManager`, etc.).
-/// The panel reads `params.sessionId` from the dockview panel API.
-///
-/// Per the user's spec (2026-05-22): opens by default on session
-/// create + on resume; dockview persists the open/closed state via
-/// `toJSON()`/`fromJSON()` in `layoutStore.snapshot/restore`, so no
-/// settings v9 bump is required.
+/// Logic for each section is extracted into composables under
+/// `./details/`. This file orchestrates them and owns the template.
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -24,7 +11,7 @@ import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import SelectButton from 'primevue/selectbutton';
 import ToggleSwitch from 'primevue/toggleswitch';
-import type { AgentInfo, ReasoningVisibility, SessionMode, TaskInfo } from '@/ipc/types';
+import type { ReasoningVisibility, SessionMode } from '@/ipc/types';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
@@ -34,27 +21,112 @@ import MessageContent from '@/components/chat/MessageContent.vue';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
 import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
-
-const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
-
-function normalizeContextLimit(value: number): number | null {
-  if (!Number.isFinite(value) || value <= 0) return null;
-
-  if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
-
-  return value;
-}
+import {
+  useSessionAgents,
+  useSessionTasks,
+  formatTaskElapsed,
+  taskTitle,
+  useSessionTools,
+  toolStateOptions,
+  useSessionUsage,
+  formatDurationMs,
+  useSessionPlan,
+  useSessionSkills,
+  useDetailsSections,
+  type ToolState,
+} from './details';
 
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
 
-// Singleton rail: bind to whichever chat panel is active. The
-// component is mounted ONCE; the watch on `sessionId` below tears
-// down + re-loads per-session data when the user switches tabs.
+// Singleton rail: bind to whichever chat panel is active.
 const sessionId = computed<string>(() => layoutStore.activeSessionId ?? '');
-
 const record = computed(() => sessionsStore.getSession(sessionId.value));
+
+// ---------- Composables ----------
+const {
+  sessionAgents,
+  agentsLoaded,
+  agentsError,
+  agentBusyName,
+  loadAgents,
+  reloadAgents,
+  selectAgent,
+  deselectAgent,
+  agentSourceLabel,
+  reset: resetAgents,
+} = useSessionAgents(sessionId, record);
+
+const {
+  sessionTasks,
+  tasksLoaded,
+  tasksError,
+  taskBusyId,
+  loadTasks,
+  cancelTask,
+  removeTask,
+  reset: resetTasks,
+} = useSessionTasks(sessionId);
+
+const {
+  builtinTools,
+  mcpServers,
+  toolsLoaded,
+  toolsError,
+  loadBuiltinTools,
+  loadMcpServers,
+  setMcpServerEnabled,
+  mcpEnabled,
+  toolKey,
+  toolState,
+  setToolState,
+  isCriticalTool,
+  toolGroups,
+  allowlistActive,
+  resetMcp,
+} = useSessionTools(sessionId);
+
+const {
+  usage,
+  usageError,
+  loadUsage,
+  resetUsage,
+  quota,
+  quotaError,
+  loadQuota,
+} = useSessionUsage(sessionId, record);
+
+const {
+  planExists,
+  planContent,
+  planEditing,
+  planDraft,
+  planError,
+  planLoaded,
+  loadPlan,
+  startEditPlan,
+  savePlan,
+  cancelEditPlan,
+  resetPlan,
+} = useSessionPlan(sessionId);
+
+const {
+  sessionSkills,
+  skillsLoaded,
+  skillsError,
+  loadSkills,
+  toggleSkill,
+  openSkillsLibrary,
+  reset: resetSkills,
+} = useSessionSkills(sessionId);
+
+const {
+  sectionOpen,
+  toggleSection,
+  isItemExpanded,
+  toggleItemExpansion,
+} = useDetailsSections();
 
 // ---------- Name ----------
 const nameDraft = ref<string>(record.value?.title ?? '');
@@ -65,12 +137,10 @@ watch(
     nameDraft.value = record.value?.title ?? '';
   },
 );
+
 watch(
   () => record.value?.title,
   (next) => {
-    // Reflect SDK-side title changes (auto-summary, /rename) into
-    // the draft so the input stays in sync when not actively
-    // edited. Skip if the input has user-pending edits.
     const trimmed = nameDraft.value.trim();
 
     if (!trimmed || trimmed === (next ?? '')) {
@@ -139,297 +209,7 @@ function onToggleApproveAll(next: boolean) {
   void sessionsStore.setSessionApproveAll(sessionId.value, next);
 }
 
-// ---------- Agents (19a) ----------
-//
-// SDK auto-discovers custom agents (enableConfigDiscovery=true on
-// session create + resume). The rail just lists them via the
-// @experimental session.rpc.agent.* surface. Source disambiguation
-// (Project vs User) is derived from the agent's `path` field — if
-// it sits under `<workingDirectory>/.github/agents/` it's a Project
-// agent; otherwise it came from the user config dir.
-const sessionAgents = ref<AgentInfo[]>([]);
-const agentsLoaded = ref(false);
-const agentsError = ref<string | null>(null);
-/// Selecting/deselecting is async; we set this so the clicked row
-/// can show a spinner without optimistically updating the selection
-/// (subagent.selected event is the source of truth — see rubber-duck
-/// finding 5 from 19a.1).
-const agentBusyName = ref<string | null>(null);
-
-async function loadAgents() {
-  if (!sessionId.value) return;
-
-  agentsError.value = null;
-
-  try {
-    sessionAgents.value = await invokeCommand('listAgents', {
-      sessionId: sessionId.value,
-    });
-    agentsLoaded.value = true;
-  } catch (err) {
-    agentsError.value = toErrorMessage(err);
-    agentsLoaded.value = true;
-  }
-}
-
-async function reloadAgents() {
-  if (!sessionId.value) return;
-
-  agentsError.value = null;
-
-  try {
-    sessionAgents.value = await invokeCommand('reloadAgents', {
-      sessionId: sessionId.value,
-    });
-    toasts.success('Agents reloaded', `${sessionAgents.value.length} available`);
-  } catch (err) {
-    agentsError.value = toErrorMessage(err);
-    toasts.error('Failed to reload agents', toErrorMessage(err));
-  }
-}
-
-async function selectAgent(name: string) {
-  if (!sessionId.value || agentBusyName.value) return;
-
-  agentBusyName.value = name;
-
-  try {
-    await invokeCommand('selectAgent', {
-      sessionId: sessionId.value,
-      name,
-    });
-    // currentAgent updates via the subagent.selected event handler in
-    // sessionsStore.applySessionEvent — no manual store mutation here.
-  } catch (err) {
-    toasts.error('Failed to select agent', toErrorMessage(err));
-  } finally {
-    agentBusyName.value = null;
-  }
-}
-
-async function deselectAgent() {
-  if (!sessionId.value || agentBusyName.value) return;
-
-  agentBusyName.value = '__deselect__';
-
-  try {
-    await invokeCommand('deselectAgent', { sessionId: sessionId.value });
-  } catch (err) {
-    toasts.error('Failed to deselect agent', toErrorMessage(err));
-  } finally {
-    agentBusyName.value = null;
-  }
-}
-
-/// Derive "Project" vs "User" source from the agent's absolute path.
-/// Returns `null` when the agent has no path (remote/inline — none in
-/// our case but defensive).
-function agentSourceLabel(agent: AgentInfo): 'Project' | 'User' | null {
-  if (!agent.path) return null;
-
-  const wd = record.value?.workingDirectory;
-
-  if (!wd) return 'User';
-
-  // Case-insensitive on Windows; the path may use forward or back
-  // slashes. Normalize both.
-  const norm = (s: string) => s.replace(/\\/g, '/').toLowerCase();
-  const projectPrefix = `${norm(wd)}/.github/agents/`;
-
-  return norm(agent.path).startsWith(projectPrefix) ? 'Project' : 'User';
-}
-
-// ---------- Tasks (19b.1) ----------
-//
-// Observational view of agent-delegated tasks for the active session.
-// The agent itself calls into the SDK's built-in `task` tool to spawn
-// background work; we just surface what's there. Cancel + Remove are
-// user actions.
-//
-// Refresh triggers:
-//   - rail mount + session switch
-//   - record.tasksRefreshCounter ticks (driven by subagent.* +
-//     session.background_tasks_changed in sessionsStore.applySessionEvent)
-//   - after a successful cancel/remove RPC
-//
-// Sequence guard: increment a request token on each fetch; only the
-// response matching the most-recent token gets to write `sessionTasks`,
-// so a stale slow response can't overwrite a fresh fast one.
-const sessionTasks = ref<TaskInfo[]>([]);
-const tasksLoaded = ref(false);
-const tasksError = ref<string | null>(null);
-const taskBusyId = ref<string | null>(null);
-let tasksRequestToken = 0;
-
-async function loadTasks() {
-  if (!sessionId.value) return;
-
-  tasksError.value = null;
-  const token = ++tasksRequestToken;
-
-  try {
-    const tasks = await invokeCommand('listTasks', {
-      sessionId: sessionId.value,
-    });
-
-    if (token !== tasksRequestToken) return;
-
-    sessionTasks.value = tasks;
-    tasksLoaded.value = true;
-  } catch (err) {
-    if (token !== tasksRequestToken) return;
-
-    tasksError.value = toErrorMessage(err);
-    tasksLoaded.value = true;
-  }
-}
-
-async function cancelTask(task: TaskInfo) {
-  if (!sessionId.value || taskBusyId.value) return;
-
-  taskBusyId.value = task.id;
-
-  try {
-    await invokeCommand('cancelTask', {
-      sessionId: sessionId.value,
-      id: task.id,
-    });
-    toasts.info('Task cancelled', `Cancelled "${task.description || task.id}".`);
-  } catch (err) {
-    toasts.error('Failed to cancel task', toErrorMessage(err));
-  } finally {
-    taskBusyId.value = null;
-    void loadTasks();
-  }
-}
-
-async function removeTask(task: TaskInfo) {
-  if (!sessionId.value || taskBusyId.value) return;
-
-  taskBusyId.value = task.id;
-
-  try {
-    await invokeCommand('removeTask', {
-      sessionId: sessionId.value,
-      id: task.id,
-    });
-  } catch (err) {
-    toasts.error('Failed to remove task', toErrorMessage(err));
-  } finally {
-    taskBusyId.value = null;
-    void loadTasks();
-  }
-}
-
-/// Format `activeTimeMs` (or fall back to `startedAt`→now) as a
-/// terse human-readable duration. Tasks rarely live longer than
-/// a few minutes; the precision drops off above an hour.
-function formatTaskElapsed(task: TaskInfo): string {
-  let ms: number | null = null;
-
-  if (typeof task.activeTimeMs === 'number') {
-    ms = task.activeTimeMs;
-  } else if (task.startedAt) {
-    const start = Date.parse(task.startedAt);
-    const end = task.completedAt ? Date.parse(task.completedAt) : Date.now();
-
-    if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
-  }
-
-  if (ms === null) return '';
-
-  if (ms < 1000) return `${ms}ms`;
-
-  const s = Math.round(ms / 1000);
-
-  if (s < 60) return `${s}s`;
-
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-
-  if (m < 60) return `${m}m ${rem}s`;
-
-  const h = Math.floor(m / 60);
-
-  return `${h}h ${m % 60}m`;
-}
-
-function taskTitle(task: TaskInfo): string {
-  return task.type === 'agent'
-    ? task.agentDisplayName || task.agentName || task.agentType
-    : task.command || task.description || 'Shell task';
-}
-
-// ---------- Skills ----------
-type SessionSkill = {
-  name: string;
-  description: string;
-  source: string;
-  enabled: boolean;
-  userInvocable: boolean;
-};
-const sessionSkills = ref<SessionSkill[]>([]);
-const skillsLoaded = ref(false);
-const skillsError = ref<string | null>(null);
-
-async function loadSkills() {
-  if (!sessionId.value) return;
-
-  skillsError.value = null;
-
-  try {
-    sessionSkills.value = await invokeCommand('listSessionSkills', {
-      sessionId: sessionId.value,
-    });
-    skillsLoaded.value = true;
-  } catch (err) {
-    skillsError.value = toErrorMessage(err);
-    skillsLoaded.value = true;
-  }
-}
-
-async function toggleSkill(skill: SessionSkill) {
-  const next = !skill.enabled;
-
-  skill.enabled = next;
-
-  try {
-    await invokeCommand('setSessionSkillEnabled', {
-      sessionId: sessionId.value,
-      name: skill.name,
-      enabled: next,
-    });
-  } catch {
-    skill.enabled = !next;
-  }
-}
-
-/// Opens the Library activity-bar panel and switches it to the
-/// Skills tab. localStorage write is what LibraryPanel.vue reads on
-/// mount; the custom event tells it to re-read if it's already
-/// mounted (otherwise switching tabs would only take effect on the
-/// next reload).
-function openSkillsLibrary() {
-  try {
-    localStorage.setItem('dafman.library.activeTab', 'skills');
-  } catch {
-    /* private mode — ignore */
-  }
-
-  window.dispatchEvent(
-    new CustomEvent('dafman:library-activate-tab', { detail: { tab: 'skills' } }),
-  );
-  layoutStore.openEdgePanel('left', {
-    id: 'library',
-    component: 'library',
-    tabComponent: 'sidebarTab',
-    title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
-    initialSize: 360,
-    minimumSize: 320,
-    exclusive: true,
-  });
-}
-
+// ---------- Jobs panel ----------
 function openJobsPanel() {
   layoutStore.openEdgePanel('left', {
     id: 'jobs-panel',
@@ -442,145 +222,7 @@ function openJobsPanel() {
   });
 }
 
-// ---------- Usage metrics ----------
-const usage = ref<{
-  totalUserRequests: number;
-  totalPremiumRequestCost: number;
-  totalApiDurationMs: number;
-  lastCallInputTokens: number;
-  lastCallOutputTokens: number;
-  currentTokens: number;
-  tokenLimit: number;
-} | null>(null);
-const usageError = ref<string | null>(null);
-
-async function loadUsage() {
-  if (!sessionId.value) return;
-
-  usageError.value = null;
-
-  try {
-    const raw = await invokeCommand('getSessionUsageMetrics', {
-      sessionId: sessionId.value,
-    });
-    const fromRpc = {
-      totalUserRequests: typeof raw.totalUserRequests === 'number' ? raw.totalUserRequests : 0,
-      totalPremiumRequestCost:
-        typeof raw.totalPremiumRequestCost === 'number' ? raw.totalPremiumRequestCost : 0,
-      totalApiDurationMs: typeof raw.totalApiDurationMs === 'number' ? raw.totalApiDurationMs : 0,
-      lastCallInputTokens:
-        typeof raw.lastCallInputTokens === 'number' ? raw.lastCallInputTokens : 0,
-      lastCallOutputTokens:
-        typeof raw.lastCallOutputTokens === 'number' ? raw.lastCallOutputTokens : 0,
-      currentTokens:
-        typeof raw.currentTokens === 'number'
-          ? raw.currentTokens
-          : typeof raw.inputTokens === 'number'
-            ? raw.inputTokens
-            : 0,
-      tokenLimit:
-        typeof raw.tokenLimit === 'number'
-          ? (normalizeContextLimit(raw.tokenLimit) ?? 0)
-          : typeof raw.maxTokens === 'number'
-            ? (normalizeContextLimit(raw.maxTokens) ?? 0)
-            : 0,
-    };
-    const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
-
-    usage.value =
-      fromRpc.totalUserRequests > 0 || fromRpc.lastCallInputTokens > 0 || fromRpc.tokenLimit > 0
-        ? fromRpc
-        : fromEvents;
-  } catch (err) {
-    const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
-
-    if (fromEvents.totalUserRequests > 0 || fromEvents.tokenLimit > 0) {
-      usage.value = fromEvents;
-
-      return;
-    }
-
-    usageError.value = toErrorMessage(err);
-  }
-}
-
-function deriveUsageFromEvents(
-  events: Array<{ eventType: string; data: Record<string, unknown> }>,
-) {
-  let totalUserRequests = 0;
-  let totalPremiumRequestCost = 0;
-  let totalApiDurationMs = 0;
-  let lastCallInputTokens = 0;
-  let lastCallOutputTokens = 0;
-  let currentTokens = 0;
-  let tokenLimit = 0;
-
-  for (const event of events) {
-    const data = event.data;
-
-    if (event.eventType === 'assistant.usage') {
-      totalUserRequests += 1;
-      const cost = data.cost;
-
-      if (typeof cost === 'number') totalPremiumRequestCost += cost;
-
-      const duration = data.duration;
-
-      if (typeof duration === 'number') totalApiDurationMs += duration;
-
-      const input = data.inputTokens;
-
-      if (typeof input === 'number') {
-        lastCallInputTokens = input;
-        currentTokens = input;
-      }
-
-      const output = data.outputTokens;
-
-      if (typeof output === 'number') lastCallOutputTokens = output;
-    } else if (event.eventType === 'session.usage_info') {
-      const current = data.currentTokens;
-
-      if (typeof current === 'number') currentTokens = current;
-
-      const limit = data.tokenLimit;
-
-      if (typeof limit === 'number') tokenLimit = normalizeContextLimit(limit) ?? 0;
-    }
-  }
-
-  return {
-    totalUserRequests,
-    totalPremiumRequestCost,
-    totalApiDurationMs,
-    lastCallInputTokens,
-    lastCallOutputTokens,
-    currentTokens,
-    tokenLimit,
-  };
-}
-
-function formatDurationMs(ms: number): string {
-  if (ms < 1000) return `${ms} ms`;
-
-  const s = ms / 1000;
-
-  if (s < 60) return `${s.toFixed(1)} s`;
-
-  const min = Math.floor(s / 60);
-  const sec = Math.round(s % 60);
-
-  return `${min}m ${sec}s`;
-}
-
-// Lazy-load skills + usage + tools + plan + quota on mount + when session changes.
-//
-// U1: split into per-session vs global loaders. `builtinTools` is the
-// SDK's static built-in tool list (never changes); `quota` is the
-// user's account-wide quota (poll-refresh, not session-scoped). Both
-// load ONCE on mount and shouldn't re-fire on every session tab
-// switch. The per-session fetches (`skills`, `usage`, `mcp`, `plan`)
-// still re-fetch.
+// ---------- Lifecycle ----------
 onMounted(() => {
   void loadBuiltinTools();
   void loadQuota();
@@ -591,34 +233,17 @@ onMounted(() => {
   void loadMcpServers();
   void loadPlan();
 });
+
 watch(
   () => sessionId.value,
   () => {
     void nextTick(() => layoutStore.restoreSessionDetailsWidth());
-    sessionAgents.value = [];
-    agentsLoaded.value = false;
-    agentsError.value = null;
-    agentBusyName.value = null;
-    sessionTasks.value = [];
-    tasksLoaded.value = false;
-    tasksError.value = null;
-    taskBusyId.value = null;
-    sessionSkills.value = [];
-    skillsLoaded.value = false;
-    skillsError.value = null;
-    usage.value = null;
-    usageError.value = null;
-    mcpServers.value = [];
-    planExists.value = false;
-    planContent.value = '';
-    planEditing.value = false;
-    planError.value = null;
-    planLoaded.value = false;
-    // U2: don't reset `warnedThresholds` on session switch — the
-    // quota is account-wide, so a 90%-used warning that already
-    // fired shouldn't re-fire just because the user clicked a
-    // different session tab. The Set persists for the whole
-    // component lifetime (i.e. as long as the rail is mounted).
+    resetAgents();
+    resetTasks();
+    resetSkills();
+    resetUsage();
+    resetMcp();
+    resetPlan();
     void loadAgents();
     void loadTasks();
     void loadSkills();
@@ -628,16 +253,13 @@ watch(
   },
 );
 
-// 19b.1: refetch the Tasks section whenever the store's per-record
-// counter ticks (driven by subagent.* + session.background_tasks_changed
-// events). Counter pattern avoids the "two events in a row" miss a
-// boolean flag would suffer from.
 watch(
   () => record.value?.tasksRefreshCounter ?? 0,
   () => {
     void loadTasks();
   },
 );
+
 watch(
   () => record.value?.planRefreshCounter ?? 0,
   () => {
@@ -697,396 +319,11 @@ async function onForkSession() {
   try {
     const newId = await sessionsStore.forkSession(sessionId.value);
 
-    // forkSession internally calls restoreSession, which creates the
-    // SessionRecord. We still need to open the dockview panel.
     layoutStore.addPanel(newId);
     toasts.success('Session forked', `New session: ${newId.slice(0, 8)}`);
   } catch (err) {
     toasts.error('Fork failed', toErrorMessage(err));
   }
-}
-
-// ---------- Tools (18b) ----------
-//
-// Built-in tools (global, never changes) + MCP servers (per-session
-// status). Split into two loaders so a session-tab switch only re-
-// fetches the per-session MCP list, not the static built-in list.
-// Toggles edit the global `settings.tools.defaultExcluded` list (the
-// SDK does not support runtime mutation, so changes only take effect
-// for newly-created sessions — we surface a "Restart session to apply"
-// toast).
-type ToolItem = { name: string; description: string; namespacedName?: string };
-type McpItem = { name: string; status: string; error?: string };
-const builtinTools = ref<ToolItem[]>([]);
-const mcpServers = ref<McpItem[]>([]);
-const toolsLoaded = ref(false);
-const toolsError = ref<string | null>(null);
-const settingsStore = useSettingsStore();
-
-async function loadBuiltinTools() {
-  toolsError.value = null;
-
-  try {
-    const tools = await invokeCommand('listBuiltinTools', {});
-
-    builtinTools.value = tools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      ...(t.namespacedName ? { namespacedName: t.namespacedName } : {}),
-    }));
-    toolsLoaded.value = true;
-  } catch (err) {
-    toolsError.value = toErrorMessage(err);
-    toolsLoaded.value = true;
-  }
-}
-
-async function loadMcpServers() {
-  if (!sessionId.value) return;
-
-  try {
-    const servers = await invokeCommand('listSessionMcpServers', {
-      sessionId: sessionId.value,
-    });
-
-    mcpServers.value = servers.map((s) => ({
-      name: s.name,
-      status: s.status,
-      ...(s.error ? { error: s.error } : {}),
-    }));
-  } catch (err) {
-    toolsError.value = toErrorMessage(err);
-  }
-}
-
-async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
-  if (!sessionId.value) return;
-
-  // Optimistic local flip so the toggle responds immediately;
-  // reload to pick up the SDK-side status change.
-  server.status = enabled ? 'connected' : 'disabled';
-
-  try {
-    await invokeCommand('setSessionMcpEnabled', {
-      sessionId: sessionId.value,
-      serverName: server.name,
-      enabled,
-    });
-    // Re-fetch to surface the real status (might be "connecting"
-    // or an error). Only re-fetch the per-session MCP list, not
-    // the static built-in tools.
-    await loadMcpServers();
-  } catch (err) {
-    toasts.error('Failed to toggle MCP server', toErrorMessage(err));
-    server.status = enabled ? 'disabled' : 'connected';
-  }
-}
-
-function mcpEnabled(s: McpItem): boolean {
-  // SDK's McpServerStatus uses "disabled" specifically for the
-  // user-toggled-off state; anything else (connected, pending,
-  // disconnected, error) counts as enabled.
-  return s.status !== 'disabled';
-}
-
-/// 22b: canonical tool key. SDK filters use `namespacedName` when
-/// present (e.g. `playwright/navigate`); fall back to `name` for
-/// built-in tools. ALL persistence and SDK config uses this key.
-function toolKey(t: ToolItem): string {
-  return t.namespacedName ?? t.name;
-}
-
-/// 22b: tri-state per tool. "default" = neither list mentions it.
-/// "forbidden" = in `defaultExcluded`. "only-allow" = in
-/// `defaultAllowed`. Mutually exclusive — setting one removes the
-/// other so the persisted state stays clean.
-type ToolState = 'default' | 'forbidden' | 'only-allow';
-
-function toolState(t: ToolItem): ToolState {
-  const key = toolKey(t);
-
-  if (settings.value.tools?.defaultExcluded?.includes(key)) return 'forbidden';
-
-  if (settings.value.tools?.defaultAllowed?.includes(key)) return 'only-allow';
-
-  return 'default';
-}
-
-async function setToolState(t: ToolItem, next: ToolState) {
-  const key = toolKey(t);
-  const excluded = (settings.value.tools?.defaultExcluded ?? []).filter((n) => n !== key);
-  const allowed = (settings.value.tools?.defaultAllowed ?? []).filter((n) => n !== key);
-
-  if (next === 'forbidden') excluded.push(key);
-
-  if (next === 'only-allow') allowed.push(key);
-
-  await settingsStore.update({
-    ...settings.value,
-    tools: { defaultExcluded: excluded, defaultAllowed: allowed },
-  });
-  toasts.info(
-    'Tool change recorded',
-    'Restart or recreate the session to apply (SDK does not support runtime tool mutation).',
-  );
-}
-
-/// 22b: critical built-in tools — disabling these makes the agent
-/// effectively unusable. Surface a warning badge, don't block.
-const CRITICAL_TOOLS: ReadonlySet<string> = new Set([
-  'bash',
-  'shell',
-  'str_replace_editor',
-  'write_file',
-  'create_file',
-  'edit_file',
-]);
-
-function isCriticalTool(t: ToolItem): boolean {
-  return CRITICAL_TOOLS.has(t.name);
-}
-
-/// 22b: group tools by namespace. Returns `[ ['Built-in', [...]],
-/// ['playwright', [...]], ... ]`. Built-in (no `namespacedName`) is
-/// always first, then namespaced groups sorted alphabetically.
-type ToolGroup = { label: string; items: ToolItem[]; isBuiltin: boolean };
-const toolGroups = computed<ToolGroup[]>(() => {
-  const byPrefix = new Map<string, ToolItem[]>();
-  const builtins: ToolItem[] = [];
-
-  for (const t of builtinTools.value) {
-    if (!t.namespacedName) {
-      builtins.push(t);
-      continue;
-    }
-
-    const prefix = t.namespacedName.split('/')[0] || 'namespaced';
-    const list = byPrefix.get(prefix) ?? [];
-
-    list.push(t);
-    byPrefix.set(prefix, list);
-  }
-
-  const groups: ToolGroup[] = [];
-
-  if (builtins.length > 0) groups.push({ label: 'Built-in', items: builtins, isBuiltin: true });
-
-  for (const prefix of Array.from(byPrefix.keys()).sort()) {
-    groups.push({
-      label: prefix,
-      items: byPrefix.get(prefix) ?? [],
-      isBuiltin: false,
-    });
-  }
-
-  return groups;
-});
-
-const allowlistActive = computed(() => (settings.value.tools?.defaultAllowed ?? []).length > 0);
-
-/// 22b: tri-state SelectButton options. Order matches the visual
-/// left→right of the segmented control.
-const toolStateOptions: { label: string; value: ToolState }[] = [
-  { label: 'Default', value: 'default' },
-  { label: 'Only allow', value: 'only-allow' },
-  { label: 'Forbid', value: 'forbidden' },
-];
-
-// ---------- Plan (18b) ----------
-const planExists = ref(false);
-const planContent = ref<string>('');
-const planEditing = ref(false);
-const planDraft = ref<string>('');
-const planError = ref<string | null>(null);
-const planLoaded = ref(false);
-
-async function loadPlan() {
-  if (!sessionId.value) return;
-
-  planError.value = null;
-
-  try {
-    const result = await invokeCommand('readSessionPlan', {
-      sessionId: sessionId.value,
-    });
-
-    planExists.value = result.exists;
-    planContent.value = result.content ?? '';
-    planLoaded.value = true;
-  } catch (err) {
-    planError.value = toErrorMessage(err);
-    planLoaded.value = true;
-  }
-}
-
-function startEditPlan() {
-  planDraft.value = planContent.value;
-  planEditing.value = true;
-}
-
-async function savePlan() {
-  try {
-    await invokeCommand('writeSessionPlan', {
-      sessionId: sessionId.value,
-      content: planDraft.value,
-    });
-    planContent.value = planDraft.value;
-    planExists.value = true;
-    planEditing.value = false;
-    toasts.success('Plan saved');
-  } catch (err) {
-    toasts.error('Plan save failed', toErrorMessage(err));
-  }
-}
-
-function cancelEditPlan() {
-  planEditing.value = false;
-}
-
-// ---------- Quota (18b) ----------
-type QuotaSnapshot = {
-  type: string;
-  isUnlimitedEntitlement: boolean;
-  entitlementRequests: number;
-  usedRequests: number;
-  remainingPercentage: number;
-  overage: number;
-  resetDate?: string;
-};
-const quota = ref<QuotaSnapshot[]>([]);
-const quotaError = ref<string | null>(null);
-const warnedThresholds = new Set<string>();
-
-async function loadQuota() {
-  quotaError.value = null;
-
-  try {
-    const raw = await invokeCommand('getAccountQuota', {});
-    const snapshots: QuotaSnapshot[] = Object.entries(raw).map(([type, snap]) => ({
-      type,
-      ...snap,
-    }));
-
-    quota.value = snapshots;
-
-    // Threshold warning toasts at 75% + 90% used (= 25% / 10% remaining).
-    // Dedup per (type:threshold) so a poll-refresh doesn't re-fire.
-    for (const snap of snapshots) {
-      if (snap.isUnlimitedEntitlement) continue;
-
-      const usedPct = 100 - snap.remainingPercentage;
-
-      for (const threshold of [90, 75]) {
-        const key = `${snap.type}:${threshold}`;
-
-        if (usedPct >= threshold && !warnedThresholds.has(key)) {
-          warnedThresholds.add(key);
-          const severity = threshold === 90 ? 'warn' : 'info';
-
-          toasts[severity](
-            `Quota at ${usedPct.toFixed(0)}%`,
-            `${snap.type}: ${snap.usedRequests}/${snap.entitlementRequests} used`,
-          );
-          break;
-        }
-      }
-    }
-  } catch (err) {
-    quotaError.value = toErrorMessage(err);
-  }
-}
-
-// ---------- Collapsible sections (persisted via localStorage) ----------
-//
-// Each section's open/closed state lives in localStorage under a stable
-// key. Defaults: tools collapsed (long); skills + mcp + plan + usage +
-// quota expanded. Toggling persists immediately.
-type SectionKey =
-  | 'settings'
-  | 'agents'
-  | 'tasks'
-  | 'files'
-  | 'skills'
-  | 'tools'
-  | 'mcp'
-  | 'plan'
-  | 'usage'
-  | 'quota';
-
-const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
-  settings: false,
-  agents: true,
-  tasks: false,
-  files: false,
-  skills: true,
-  tools: false,
-  mcp: true,
-  plan: true,
-  usage: true,
-  quota: true,
-};
-
-function readSectionState(key: SectionKey): boolean {
-  if (typeof localStorage === 'undefined') return SECTION_DEFAULTS[key];
-
-  try {
-    const raw = localStorage.getItem(`dafman.details.section.${key}`);
-
-    if (raw === null) return SECTION_DEFAULTS[key];
-
-    return raw === '1';
-  } catch {
-    return SECTION_DEFAULTS[key];
-  }
-}
-
-const sectionOpen = ref<Record<SectionKey, boolean>>({
-  settings: readSectionState('settings'),
-  agents: readSectionState('agents'),
-  tasks: readSectionState('tasks'),
-  files: readSectionState('files'),
-  skills: readSectionState('skills'),
-  tools: readSectionState('tools'),
-  mcp: readSectionState('mcp'),
-  plan: readSectionState('plan'),
-  usage: readSectionState('usage'),
-  quota: readSectionState('quota'),
-});
-
-function toggleSection(key: SectionKey): void {
-  const next = !sectionOpen.value[key];
-
-  sectionOpen.value = { ...sectionOpen.value, [key]: next };
-
-  try {
-    localStorage.setItem(`dafman.details.section.${key}`, next ? '1' : '0');
-  } catch {
-    /* private mode / quota — ignore, in-memory state still works */
-  }
-}
-
-// ---------- Per-item "show more" for long descriptions ----------
-//
-// Both tools and skills carry verbose descriptions. We truncate to
-// one line by default and let the user expand individual rows.
-// Expansion state is keyed by `${kind}:${name}` and lives in-memory
-// (per-panel-mount), not persisted — descriptions don't change often
-// enough to be worth a localStorage hop.
-
-const expandedItems = ref<Set<string>>(new Set());
-
-function isItemExpanded(kind: 'tool' | 'skill' | 'agent', name: string): boolean {
-  return expandedItems.value.has(`${kind}:${name}`);
-}
-
-function toggleItemExpansion(kind: 'tool' | 'skill' | 'agent', name: string): void {
-  const key = `${kind}:${name}`;
-  const next = new Set(expandedItems.value);
-
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-
-  expandedItems.value = next;
 }
 </script>
 
