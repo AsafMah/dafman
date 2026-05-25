@@ -30,7 +30,6 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useModelsStore } from "../stores/modelsStore";
 import { useToastStore } from "../stores/toastStore";
 import { useTerminalStore } from "../stores/terminalStore";
-import { useGroupsStore } from "../stores/groupsStore";
 import { SESSION_COMMANDS } from "./sessionCommands";
 import type { SessionMode } from "../ipc/types";
 import { toErrorMessage } from "./errorMessage";
@@ -265,17 +264,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     });
   }
-
-  // ---------- Groups commands ----------
-  const groupsStore = useGroupsStore();
-  statics.push({
-    id: "groups.new",
-    label: "New Group",
-    group: "Groups",
-    icon: "pi pi-th-large",
-    keywords: ["workspace", "group", "tab"],
-    run: () => void groupsStore.createGroup("New Group"),
-  });
 
   for (const cmd of statics) registry.register(cmd);
 

@@ -162,10 +162,6 @@ export interface EdgePanelOptions {
 
 export const useLayoutStore = defineStore("layout", () => {
   const api = ref<DockviewApi | null>(null);
-  /// True while a group switch is in progress. Suppresses
-  /// `closeSession` in `onDidRemovePanel` — we're just swapping
-  /// layouts, not dismissing sessions.
-  let switching = false;
   /// Reactive id of the currently-focused chat panel, or `null` when no
   /// chat panel is active (focus on Sessions sidebar, Settings, dev
   /// playground, or nothing at all). Subscribers on dockview's
@@ -978,8 +974,6 @@ export const useLayoutStore = defineStore("layout", () => {
     api,
     activeSessionId,
     detailsOpen,
-    get switching() { return switching; },
-    set switching(v: boolean) { switching = v; },
     enforceKnownEdgeMinimums,
     rememberSessionDetailsWidth,
     restoreSessionDetailsWidth,

@@ -10,9 +10,7 @@
 
 ## Solved (2026-06-01)
 
-- The word "attachment" triggers an issue with the sql, we need to reword "see attachment"
-- Sessions still don't get their title sometimes when they are resumed
-- 
+- [x] clicking on a detached closed session doesn't resume it
 
 
 ## Solved (2026-05-22 sweep)

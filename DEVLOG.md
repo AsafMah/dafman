@@ -10,50 +10,6 @@
 
 ---
 
-## 2026-05-24 — Groups v2: single-dockview layout swap
-
-**Takeaway:** Shipped groups feature using a completely different architecture
-from the reverted v1. Instead of multiple DockviewVue instances (~1900 lines),
-we use a single dockview with layout swap (~380 lines of new code).
-
-### Architecture
-
-- ONE DockviewVue stays mounted at all times
-- Each group stores a body-panel layout snapshot (grid + body panels, no edges)
-- Switching groups: `stripEdges(toJSON())` → save to old group → `fromJSON(mergeBodyWithEdges(target, current))` → restore target
-- Edge panels (sidebars) shared across all groups — not per-group
-- `layoutStore.switching` flag suppresses `closeSession` in `onDidRemovePanel` during swap
-- GroupsBar hidden when only 1 group exists — zero overhead for non-users
-
-### Key files
-
-- `src/stores/groupsStore.ts` (~190 lines) — CRUD, switchGroup, hydrate/persist
-- `src/components/GroupsBar.vue` (~250 lines) — tab strip with context menu
-- `src/lib/layoutSanitize.ts` — `stripEdges`, `extractEdges`, `mergeBodyWithEdges`, `edgesOnlyLayout`
-- Types: `GroupConfig` added to both `src/ipc/types.ts` and `src-bun/rpc.ts`
-
-### Migration
-
-When `settings.layout.groups` is undefined, hydrate creates a "Default" group
-from the legacy `layout.dockview` blob. Existing users see no change until they
-create a second group.
-
-### Rubber-duck findings incorporated
-
-1. `fromJSON()` calls `clear()` internally — no separate clearBodyPanels needed
-2. Edge panel definitions live in BOTH `edgeGroups` AND `panels` dict — `edgePanelIds()` extracts both
-3. `onDidRemovePanel` → `closeSession` must be suppressed during switch
-4. Debounced layout save is group-aware (saves to active group's slot)
-
-### Validation
-
-- 563 unit tests pass
-- 90 Playwright smoke tests pass
-- vue-tsc lint clean
-- Commit: `658bcf0`
-
----
-
 ## 2026-05-24 — Groups revert + session bug fixes
 
 **Takeaway:** Groups feature fully reverted after persistent runtime failures.
