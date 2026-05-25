@@ -28,9 +28,11 @@ const props = withDefaults(
 
 const cappedCode = computed(() => {
   if (!props.code) return '';
+
   if (props.maxLength > 0 && props.code.length > props.maxLength) {
     return props.code.slice(0, props.maxLength) + '\n... (truncated)';
   }
+
   return props.code;
 });
 
@@ -38,6 +40,7 @@ const cappedCode = computed(() => {
 // the lib doesn't recognize falls through to plain-text rendering.
 const cmLanguage = computed<string | undefined>(() => {
   const l = props.lang?.toLowerCase();
+
   switch (l) {
     case 'bash':
     case 'sh':

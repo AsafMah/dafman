@@ -87,11 +87,13 @@ export interface InitAuditOptions {
 
 export async function initAudit(opts: InitAuditOptions): Promise<void> {
   config.dir = opts.dir;
+
   try {
     await mkdir(opts.dir, { recursive: true });
   } catch {
     // Best-effort — never block startup on audit log init.
   }
+
   // Hydrate the in-memory ring from the persisted JSONL files so
   // the Activity view shows history immediately on app restart
   // (otherwise the panel reads empty until the next live event).
@@ -101,21 +103,29 @@ export async function initAudit(opts: InitAuditOptions): Promise<void> {
 
 async function hydrateRecent(): Promise<void> {
   const dir = config.dir;
+
   if (!dir) return;
+
   const files = ['permissions.jsonl', 'urls.jsonl', 'commands.jsonl'];
   const collected: AuditEntry[] = [];
+
   for (const name of files) {
     const path = join(dir, name);
+
     if (!existsSync(path)) continue;
+
     try {
       const raw = await readFile(path, 'utf8');
       const lines = raw.split(/\r?\n/);
       // Take the tail of the file; sufficient for the ring cap.
       const tail = lines.slice(Math.max(0, lines.length - RECENT_CAP));
+
       for (const line of tail) {
         if (!line.trim()) continue;
+
         try {
           const parsed = JSON.parse(line) as AuditEntry;
+
           if (parsed && typeof parsed === 'object' && (parsed as { kind?: string }).kind) {
             collected.push(parsed);
           }
@@ -130,17 +140,20 @@ async function hydrateRecent(): Promise<void> {
       });
     }
   }
+
   // Sort by ts so interleaved categories restore in chronological
   // order. Trim to ring cap.
   collected.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
   const start = Math.max(0, collected.length - RECENT_CAP);
+
   for (let i = start; i < collected.length; i++) {
-    recent.push(collected[i]!);
+    recent.push(collected[i]);
   }
 }
 
 export function subscribeAudit(fn: Subscriber): () => void {
   subscribers.add(fn);
+
   return () => {
     subscribers.delete(fn);
   };
@@ -148,11 +161,13 @@ export function subscribeAudit(fn: Subscriber): () => void {
 
 export function recentAudit(limit?: number): AuditEntry[] {
   if (limit === undefined || limit >= recent.length) return recent.slice();
+
   return recent.slice(recent.length - limit);
 }
 
 async function append(entry: AuditEntry): Promise<void> {
   pushRecent(entry);
+
   for (const sub of subscribers) {
     try {
       sub(entry);
@@ -160,8 +175,11 @@ async function append(entry: AuditEntry): Promise<void> {
       /* swallow */
     }
   }
+
   const dir = config.dir;
+
   if (!dir) return;
+
   const file = join(
     dir,
     entry.kind === 'permission'
@@ -171,6 +189,7 @@ async function append(entry: AuditEntry): Promise<void> {
         : 'commands.jsonl',
   );
   const line = `${JSON.stringify(entry)}\n`;
+
   try {
     await appendFile(file, line);
   } catch (err) {
@@ -183,6 +202,7 @@ async function append(entry: AuditEntry): Promise<void> {
 
 function pushRecent(entry: AuditEntry): void {
   recent.push(entry);
+
   if (recent.length > RECENT_CAP) {
     recent.splice(0, recent.length - RECENT_CAP);
   }

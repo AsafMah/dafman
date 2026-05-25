@@ -55,8 +55,11 @@ const record = computed(() => sessionsStore.getSession(props.sessionId));
 
 function onOpenModelSelector(event: Event): void {
   const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
+
   if (detail?.sessionId !== props.sessionId) return;
+
   if (props.area !== 'all' && props.area !== 'composer-right') return;
+
   modelTreeRef.value?.show();
 }
 
@@ -66,12 +69,13 @@ const effectiveModelId = computed(
 
 const selectedModel = computed<ModelSummary | undefined>(() => {
   const id = effectiveModelId.value;
+
   return id ? models.value.find((m) => m.id === id) : undefined;
 });
 
 /// Hierarchical model picker — see `lib/modelTree.ts` for the
 /// taxonomy (Auto pinned on top, provider → optional type → version).
-const modelTree = computed<TreeNode[]>(() => buildModelTree(models.value) as unknown as TreeNode[]);
+const modelTree = computed<TreeNode[]>(() => buildModelTree(models.value));
 
 /// All group (non-leaf) keys in the tree. Used to expand the whole
 /// tree by default so the user sees every option without manually
@@ -83,11 +87,14 @@ const allGroupKeys = computed<Record<string, boolean>>(() => {
     for (const n of nodes) {
       if (n.children && n.children.length > 0) {
         if (n.key) out[String(n.key)] = true;
+
         walk(n.children);
       }
     }
   };
+
   walk(modelTree.value);
+
   return out;
 });
 
@@ -103,8 +110,10 @@ watch(
     // First population: take everything.
     if (!prev || Object.keys(expandedKeys.value).length === 0) {
       expandedKeys.value = { ...next };
+
       return;
     }
+
     // Subsequent updates: add NEW groups (those not in prev) as
     // expanded, but leave existing user collapses alone.
     for (const key of Object.keys(next)) {
@@ -121,6 +130,7 @@ watch(
 function toggleGroupExpansion(key: string) {
   if (expandedKeys.value[key]) {
     const next = { ...expandedKeys.value };
+
     delete next[key];
     expandedKeys.value = next;
   } else {
@@ -134,18 +144,26 @@ function toggleGroupExpansion(key: string) {
 const modelTreeChoice = computed<Record<string, unknown> | null>({
   get: () => {
     const id = effectiveModelId.value;
+
     if (!id) return null;
+
     return { [id]: true };
   },
   set: (value) => {
     if (!value || !record.value) return;
+
     const id = Object.keys(value)[0];
+
     if (!id) return;
+
     const fresh = models.value.find((m) => m.id === id);
+
     if (!fresh) return;
+
     const effort = fresh.supportsReasoningEffort
       ? (record.value.reasoningEffort ?? fresh.defaultReasoningEffort ?? null)
       : null;
+
     void sessionsStore.setSessionModel(props.sessionId, id, effort);
   },
 });
@@ -165,6 +183,7 @@ const effortChoice = computed<string | null>({
     null,
   set: (value) => {
     if (!value || !record.value?.model) return;
+
     void sessionsStore.setSessionModel(props.sessionId, record.value.model, value);
   },
 });
@@ -183,7 +202,9 @@ const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
 const reasoningChoice = computed<ReasoningVisibility>({
   get: () => {
     const v = record.value?.reasoningVisibilityOverride;
+
     if (!v || v === 'default') return settings.value.appearance.reasoningVisibility;
+
     return v;
   },
   set: (value) => {
@@ -192,8 +213,10 @@ const reasoningChoice = computed<ReasoningVisibility>({
 });
 
 const approveAll = computed(() => record.value?.approveAll ?? false);
+
 function toggleApproveAll() {
   if (!record.value) return;
+
   void sessionsStore.setSessionApproveAll(props.sessionId, !approveAll.value);
 }
 
@@ -201,6 +224,7 @@ function toggleApproveAll() {
 /// dockview panel). Replaces the gear popover that previously hung
 /// off this header.
 const detailsOpen = computed(() => layoutStore.isSessionDetailsOpen());
+
 function toggleDetails() {
   layoutStore.toggleSessionDetailsPanel();
 }
@@ -211,7 +235,9 @@ const workspaceLabel = computed(() => basename(record.value?.workingDirectory));
 
 function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
+
   if (!path) return;
+
   invokeCommand('revealPath', { path }).catch((err: unknown) => {
     useToastStore().error("Couldn't open workspace", toErrorMessage(err));
   });
@@ -222,6 +248,7 @@ function onWorkspaceClick() {
 /// keep the header clutter-free for users not using this feature.
 /// Clicking opens the right rail where the user can pick/deselect.
 const agentChipLabel = computed(() => record.value?.currentAgent?.displayName ?? null);
+
 function onAgentChipClick() {
   if (!detailsOpen.value) layoutStore.toggleSessionDetailsPanel();
 }
@@ -246,6 +273,7 @@ async function openSessionTerminal() {
       }),
     );
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
+
     layoutStore.addTerminalPanel(terminal.id, terminal.title);
     await nextTick();
     requestTerminalFocus(terminal.id);
@@ -314,9 +342,9 @@ async function openSessionTerminal() {
     <TreeSelect
       v-if="props.area === 'all' || props.area === 'composer-right'"
       ref="modelTreeRef"
-      :input-id="`model-${props.sessionId}`"
       v-model="modelTreeChoice"
       v-model:expanded-keys="expandedKeys"
+      :input-id="`model-${props.sessionId}`"
       :options="modelTree"
       selection-mode="single"
       size="small"
@@ -346,8 +374,8 @@ async function openSessionTerminal() {
         selectedModel?.supportsReasoningEffort &&
         (props.area === 'all' || props.area === 'composer-right')
       "
-      :input-id="`effort-${props.sessionId}`"
       v-model="effortChoice"
+      :input-id="`effort-${props.sessionId}`"
       :options="effortOptions"
       option-label="label"
       option-value="value"
@@ -360,8 +388,8 @@ async function openSessionTerminal() {
     />
     <Select
       v-if="props.area === 'all'"
-      :input-id="`reasoning-inline-${props.sessionId}`"
       v-model="reasoningChoice"
+      :input-id="`reasoning-inline-${props.sessionId}`"
       :options="reasoningOptions"
       option-label="label"
       option-value="value"

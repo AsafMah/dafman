@@ -32,6 +32,7 @@ const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props
 
 const sessionId = computed(() => {
   const fromUserParams = props.params?.params?.sessionId ?? props.params?.sessionId;
+
   return fromUserParams ?? panelApi.value?.id ?? '';
 });
 
@@ -51,7 +52,9 @@ let unsubActive: (() => void) | null = null;
 
 watchEffect((onCleanup) => {
   const api = panelApi.value;
+
   if (!api) return;
+
   title.value = api.title ?? '';
   isActive.value = api.isActive;
   unsubTitle?.();
@@ -62,6 +65,7 @@ watchEffect((onCleanup) => {
   const activeSub = api.onDidActiveChange(() => {
     isActive.value = api.isActive;
   });
+
   unsubTitle = () => titleSub.dispose();
   unsubActive = () => activeSub.dispose();
   onCleanup(() => {
@@ -81,6 +85,7 @@ const accent = computed(() => record.value?.accent ?? 'var(--p-primary-color)');
 
 const displayTitle = computed(() => {
   if (title.value) return title.value;
+
   return record.value?.title ?? sessionId.value.slice(0, 8);
 });
 

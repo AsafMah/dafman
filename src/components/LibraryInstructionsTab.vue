@@ -26,7 +26,9 @@ const expanded = ref<Set<string>>(new Set());
 
 const activeSession = computed(() => {
   const id = layoutStore.activeSessionId;
+
   if (!id) return null;
+
   return sessionsStore.getSession(id) ?? null;
 });
 
@@ -46,21 +48,27 @@ function isExpanded(src: InstructionSource): boolean {
 function toggle(src: InstructionSource) {
   const next = new Set(expanded.value);
   const key = keyFor(src);
+
   if (next.has(key)) next.delete(key);
   else next.add(key);
+
   expanded.value = next;
 }
 
 function sizeLabel(src: InstructionSource): string {
   if (!src.exists) return 'missing';
+
   if (src.sizeBytes == null) return 'unknown';
+
   if (src.sizeBytes < 1024) return `${src.sizeBytes} B`;
+
   return `${(src.sizeBytes / 1024).toFixed(1)} KB`;
 }
 
 async function load() {
   error.value = null;
   loaded.value = false;
+
   try {
     sources.value = await invokeCommand('listInstructionSources', {
       ...(activeSession.value?.workingDirectory
@@ -76,6 +84,7 @@ async function load() {
 
 async function reveal(src: InstructionSource) {
   if (!src.exists) return;
+
   try {
     await invokeCommand('revealPath', { path: src.path });
   } catch (err) {

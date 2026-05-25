@@ -34,17 +34,21 @@ const expandedItems = ref<Set<string>>(new Set());
 
 const grouped = computed(() => {
   const out = new Map<string, Skill[]>();
+
   for (const s of skills.value) {
     const list = out.get(s.source) ?? [];
+
     list.push(s);
     out.set(s.source, list);
   }
+
   return [...out.entries()].sort(([a], [b]) => a.localeCompare(b));
 });
 
 async function load() {
   error.value = null;
   loaded.value = false;
+
   try {
     // Use session-scoped skills when a session is open — the session's
     // working directory drives .github/skills/ discovery correctly.
@@ -57,8 +61,10 @@ async function load() {
       skills.value = await invokeCommand('listSessionSkills', { sessionId });
     } else {
       const wd = sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory || '';
+
       skills.value = await invokeCommand('discoverSkills', wd ? { workingDirectory: wd } : {});
     }
+
     loaded.value = true;
   } catch (err) {
     error.value = toErrorMessage(err);
@@ -68,8 +74,10 @@ async function load() {
 
 async function toggleSkill(skill: Skill) {
   const next = !skill.enabled;
+
   // Optimistic: flip the local view, then push the change.
   skill.enabled = next;
+
   try {
     // Use session-scoped skill toggle when a session is open, otherwise
     // push the full global disabled set.
@@ -86,6 +94,7 @@ async function toggleSkill(skill: Skill) {
       });
     } else {
       const disabled = skills.value.filter((s) => !s.enabled).map((s) => s.name);
+
       await invokeCommand('setGloballyDisabledSkills', { disabledSkills: disabled });
     }
   } catch (err) {
@@ -100,13 +109,16 @@ function isExpanded(name: string): boolean {
 
 function toggleExpansion(name: string) {
   const next = new Set(expandedItems.value);
+
   if (next.has(name)) next.delete(name);
   else next.add(name);
+
   expandedItems.value = next;
 }
 
 async function revealSkillFile(path: string | undefined) {
   if (!path) return;
+
   try {
     await invokeCommand('revealPath', { path });
   } catch (err) {

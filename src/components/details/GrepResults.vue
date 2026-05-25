@@ -24,23 +24,29 @@ const groups = computed<Array<{ path: string; hits: Hit[] }>>(() => {
   const trimmedLast = lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
 
   const map = new Map<string, Hit[]>();
+
   for (const raw of trimmedLast) {
     if (raw.length === 0) continue;
+
     // Match `path:line:content` (path may itself contain `:` on
     // Windows so we anchor to the FIRST `:\d+:` boundary).
     const m = raw.match(/^(.+?):(\d+):(.*)$/);
+
     if (m) {
       const [, path, lineStr, content] = m;
-      const hits = map.get(path!) ?? [];
-      hits.push({ lineNumber: parseInt(lineStr!, 10), content: content ?? '' });
-      map.set(path!, hits);
+      const hits = map.get(path) ?? [];
+
+      hits.push({ lineNumber: parseInt(lineStr, 10), content: content ?? '' });
+      map.set(path, hits);
     } else {
       // No `:line:` — treat as a path-only hit (e.g. `grep -l`).
       const hits = map.get(raw) ?? [];
+
       hits.push({ lineNumber: null, content: '' });
       map.set(raw, hits);
     }
   }
+
   return Array.from(map.entries()).map(([path, hits]) => ({ path, hits }));
 });
 
@@ -54,12 +60,16 @@ const totalMatches = computed(() => groups.value.reduce((sum, g) => sum + g.hits
 function highlight(content: string): string {
   const escaped = escapeHtml(content);
   const pat = props.pattern;
+
   if (!pat || pat.length === 0) return escaped;
+
   const escPat = escapeHtml(pat);
   // Case-sensitive match (grep default). i flag would need a runtime
   // setting; skip for now.
   const parts = escaped.split(escPat);
+
   if (parts.length === 1) return escaped;
+
   return parts.join(`<mark class="grep-mark">${escPat}</mark>`);
 }
 

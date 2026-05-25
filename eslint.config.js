@@ -1,6 +1,7 @@
 import gts from "gts";
 import tseslint from "typescript-eslint";
 import pluginVue from "eslint-plugin-vue";
+import stylistic from "@stylistic/eslint-plugin";
 
 export default tseslint.config(
   // ── Google TypeScript Style (base) ───────────────────────────
@@ -29,6 +30,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
+        project: null, // override gts's project setting — projectService takes precedence
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: [".vue"],
@@ -47,6 +49,9 @@ export default tseslint.config(
 
   // ── Project rules (layered on top of gts) ────────────────────
   {
+    plugins: {
+      "@stylistic": stylistic,
+    },
     rules: {
       // Code quality
       complexity: ["warn", 15],
@@ -81,6 +86,25 @@ export default tseslint.config(
       "vue/max-attributes-per-line": "off",
       "vue/singleline-html-element-content-newline": "off",
       "vue/html-self-closing": "off",
+
+      // Spacious style — blank lines around control flow and returns
+      "@stylistic/padding-line-between-statements": [
+        "warn",
+        // Blank line before return
+        { blankLine: "always", prev: "*", next: "return" },
+        // Blank line after variable declarations
+        { blankLine: "always", prev: ["const", "let", "var"], next: "*" },
+        { blankLine: "any", prev: ["const", "let", "var"], next: ["const", "let", "var"] },
+        // Blank line before and after control flow
+        { blankLine: "always", prev: "*", next: ["if", "for", "while", "do", "switch", "try"] },
+        { blankLine: "always", prev: ["if", "for", "while", "do", "switch", "try"], next: "*" },
+        // Blank line before and after function declarations
+        { blankLine: "always", prev: "*", next: ["function"] },
+        { blankLine: "always", prev: ["function"], next: "*" },
+        // Blank line after import block
+        { blankLine: "always", prev: "import", next: "*" },
+        { blankLine: "any", prev: "import", next: "import" },
+      ],
     },
   },
 );

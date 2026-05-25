@@ -40,8 +40,10 @@ const userToggled = ref(false);
 const userExpanded = ref(true);
 const expanded = computed(() => {
   if (userToggled.value) return userExpanded.value;
+
   return props.status === 'running';
 });
+
 function toggle() {
   userToggled.value = true;
   userExpanded.value = !expanded.value;
@@ -50,18 +52,30 @@ function toggle() {
 /// Format elapsed: `startedAt`→`completedAt` or `startedAt`→now.
 const elapsedLabel = computed(() => {
   if (!props.startedAt) return '';
+
   const start = Date.parse(props.startedAt);
+
   if (!Number.isFinite(start)) return '';
+
   const end = props.completedAt ? Date.parse(props.completedAt) : Date.now();
+
   if (!Number.isFinite(end)) return '';
+
   const ms = end - start;
+
   if (ms < 1000) return `${ms}ms`;
+
   const s = Math.round(ms / 1000);
+
   if (s < 60) return `${s}s`;
+
   const m = Math.floor(s / 60);
   const rem = s % 60;
+
   if (m < 60) return `${m}m ${rem}s`;
+
   const h = Math.floor(m / 60);
+
   return `${h}h ${m % 60}m`;
 });
 </script>

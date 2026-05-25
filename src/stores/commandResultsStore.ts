@@ -9,9 +9,11 @@ export const useCommandResultsStore = defineStore('commandResults', () => {
 
   const runningBySession = computed(() => {
     const out: Record<string, CommandResultRecord | undefined> = {};
+
     for (const [sessionId, records] of Object.entries(recordsBySession.value)) {
       out[sessionId] = records.find((record) => record.status === 'running');
     }
+
     return out;
   });
 
@@ -22,6 +24,7 @@ export const useCommandResultsStore = defineStore('commandResults', () => {
       idx >= 0
         ? existing.map((item) => (item.id === record.id ? record : item))
         : [...existing, record];
+
     recordsBySession.value = {
       ...recordsBySession.value,
       [record.sessionId]: next,
@@ -38,6 +41,7 @@ export const useCommandResultsStore = defineStore('commandResults', () => {
     updater: (record: CommandResultRecord) => CommandResultRecord,
   ): void {
     const existing = recordsBySession.value[sessionId] ?? [];
+
     recordsBySession.value = {
       ...recordsBySession.value,
       [sessionId]: existing.map((record) => (record.id === commandId ? updater(record) : record)),
@@ -47,15 +51,19 @@ export const useCommandResultsStore = defineStore('commandResults', () => {
   function applyEvent(event: CommandResultEvent): void {
     if (event.kind === 'started' || event.kind === 'completed' || event.kind === 'cancelled') {
       upsert(event.record);
+
       return;
     }
+
     if (event.kind === 'stdout' || event.kind === 'stderr') {
       patch(event.sessionId, event.commandId, (record) => ({
         ...record,
         [event.kind]: `${record[event.kind]}${event.data}`,
       }));
+
       return;
     }
+
     if (event.kind === 'truncated') {
       patch(event.sessionId, event.commandId, (record) => ({ ...record, truncated: true }));
     }
@@ -63,17 +71,23 @@ export const useCommandResultsStore = defineStore('commandResults', () => {
 
   async function refresh(sessionId: string): Promise<void> {
     const records = await invokeCommand('listCommandResults', { sessionId });
+
     recordsBySession.value = { ...recordsBySession.value, [sessionId]: records };
   }
 
   async function start(sessionId: string, command: string): Promise<CommandResultRecord> {
     const running = runningBySession.value[sessionId];
+
     if (running) {
       useToastStore().warn('Command already running', 'Wait for it to finish or cancel it first.');
+
       return running;
     }
+
     const record = await invokeCommand('startSessionCommand', { sessionId, command });
+
     upsert(record);
+
     return record;
   }
 
@@ -82,8 +96,10 @@ export const useCommandResultsStore = defineStore('commandResults', () => {
   }
 
   let unsubscribe: (() => void) | null = null;
+
   function ensureSubscription(): void {
     if (unsubscribe) return;
+
     unsubscribe = onCommandResultEvent(applyEvent);
   }
 

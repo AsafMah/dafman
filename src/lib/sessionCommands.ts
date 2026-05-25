@@ -42,16 +42,22 @@ export interface SessionCommand {
 
 function parseSlashCommand(text: string): { slash: string; args: string } | null {
   const trimmed = text.trim();
+
   if (!trimmed.startsWith('/')) return null;
+
   const match = trimmed.match(/^(\/\S+)(?:\s+([\s\S]*))?$/);
+
   if (!match) return null;
+
   return { slash: match[1].toLowerCase(), args: (match[2] ?? '').trim() };
 }
 
 function pushLocalSystem(sessionId: string, text: string): void {
   const sessions = useSessionsStore();
   const record = sessions.getSession(sessionId);
+
   if (!record) return;
+
   sessions.appendEvent(record, {
     sessionId,
     eventType: 'system.notification',
@@ -63,11 +69,13 @@ const LIBRARY_TABS = new Set(['mcp', 'skills', 'agents', 'instructions']);
 
 function openLibraryTab(tab = 'mcp'): void {
   const normalized = LIBRARY_TABS.has(tab) ? tab : 'mcp';
+
   try {
     localStorage.setItem('dafman.library.activeTab', normalized);
   } catch {
     /* private mode — ignore */
   }
+
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('dafman:library-activate-tab', {
@@ -75,6 +83,7 @@ function openLibraryTab(tab = 'mcp'): void {
       }),
     );
   }
+
   useLayoutStore().openEdgePanel('left', {
     id: 'library',
     component: 'library',
@@ -92,10 +101,15 @@ function openLibraryTab(tab = 'mcp'): void {
 /// session with a new `workingDirectory`.
 export async function runLocalSlashCommand(sessionId: string, text: string): Promise<boolean> {
   const parsed = parseSlashCommand(text);
+
   if (!parsed) return false;
+
   const cmd = SESSION_COMMANDS.find((c) => c.slash.toLowerCase() === parsed.slash);
+
   if (!cmd) return false;
+
   await cmd.run(sessionId, parsed.args);
+
   return true;
 }
 
@@ -161,6 +175,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
       const sessions = useSessionsStore();
       const record = sessions.getSession(sessionId);
       const next = record?.mode === 'autopilot' ? 'interactive' : 'autopilot';
+
       await sessions.setSessionMode(sessionId, next);
     },
   },
@@ -173,6 +188,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['summarize', 'history', 'context', 'tokens'],
     run: async (sessionId) => {
       const sessions = useSessionsStore();
+
       await sessions.compactSessionHistory(sessionId);
     },
   },
@@ -187,6 +203,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
       const sessions = useSessionsStore();
       const layout = useLayoutStore();
       const newId = await sessions.forkSession(sessionId);
+
       layout.addPanel(newId);
       layout.activatePanel(newId);
     },
@@ -214,16 +231,20 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     run: async (sessionId, args = '') => {
       const sessions = useSessionsStore();
       const trimmed = args.trim();
+
       if (!trimmed) {
         const record = sessions.getSession(sessionId);
+
         pushLocalSystem(
           sessionId,
           record?.workingDirectory
             ? `Current working directory: ${record.workingDirectory}`
             : 'Current working directory: default Copilot CLI process cwd',
         );
+
         return;
       }
+
       await sessions.setSessionWorkingDirectory(sessionId, trimmed);
     },
   },
@@ -236,6 +257,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['hide', 'panel', 'tab'],
     run: (sessionId) => {
       const layout = useLayoutStore();
+
       layout.closePanel(sessionId);
     },
   },
@@ -248,12 +270,14 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['parallel', 'subagent', 'delegate', 'fleet'],
     run: async (sessionId, args = '') => {
       const toasts = useToastStore();
+
       try {
         const prompt = args.trim();
         const started = await invokeCommand('startFleet', {
           sessionId,
           ...(prompt.length > 0 ? { prompt } : {}),
         });
+
         if (started) {
           toasts.success(
             'Fleet started',
@@ -276,6 +300,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['mcp', 'skills', 'agents', 'instructions', 'sidebar'],
     run: (_sessionId, args = '') => {
       const tab = args.trim().split(/\s+/)[0]?.toLowerCase() || 'mcp';
+
       openLibraryTab(tab);
     },
   },
@@ -288,15 +313,19 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['mode', 'planning', 'implementation'],
     run: async (sessionId, args = '') => {
       const sessions = useSessionsStore();
+
       await sessions.setSessionMode(sessionId, 'plan');
       const prompt = args.trim();
+
       if (!prompt) {
         pushLocalSystem(
           sessionId,
           'Plan mode enabled. Type your request or use /plan <request> to start a planning turn.',
         );
+
         return;
       }
+
       await sessions.sendMessage(sessionId, `[[PLAN]] ${prompt}`);
     },
   },
@@ -310,6 +339,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     run: () => {
       const toasts = useToastStore();
       const names = SESSION_COMMANDS.map((c) => c.slash).join(', ');
+
       toasts.info(
         'dafman slash commands',
         `${names}. SDK commands stay editable and are sent to Copilot CLI.`,
@@ -326,6 +356,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     run: () => {
       const toasts = useToastStore();
       const names = SESSION_COMMANDS.map((c) => c.slash).join(', ');
+
       toasts.info(
         'dafman slash commands',
         `${names}. Type "/" to autocomplete; or open the command palette with Ctrl+K.`,

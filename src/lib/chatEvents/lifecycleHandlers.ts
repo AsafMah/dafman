@@ -15,12 +15,15 @@ import type { Handler } from './context';
 export const lifecycleHandlers: Record<string, Handler> = {
   'session.idle': (ctx) => {
     ctx.setIdle();
+
     if (ctx.ambient.sawTurnBoundary) ctx.ambient.turnActive = false;
+
     ctx.ambient.intent = null;
   },
 
   'session.error': (ctx, data) => {
     const message = pickString(data, ['message']) || 'Unknown session error';
+
     ctx.pushSystem(`Session error: ${message}`, 'error');
     ctx.setError();
     ctx.ambient.turnActive = false;

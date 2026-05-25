@@ -25,6 +25,7 @@ export function rendererLog(
 /// everything to the bun log. Idempotent.
 export function installRendererLogBridge(): void {
   if (installed) return;
+
   installed = true;
 
   window.addEventListener('error', (event: ErrorEvent) => {
@@ -42,6 +43,7 @@ export function installRendererLogBridge(): void {
       reason instanceof Error
         ? `unhandledrejection ${reason.message}`
         : `unhandledrejection ${String(reason)}`;
+
     send('error', message, {
       stack: reason instanceof Error ? reason.stack : undefined,
     });
@@ -52,6 +54,7 @@ export function installRendererLogBridge(): void {
   // still see the message in the WebView2 console.
   const wrap = (level: RendererLogLevel, method: 'log' | 'info' | 'warn' | 'error') => {
     const original = (console[method] as (...a: unknown[]) => void).bind(console);
+
     (console[method] as unknown as (...a: unknown[]) => void) = (...args: unknown[]) => {
       try {
         const message = args
@@ -63,13 +66,16 @@ export function installRendererLogBridge(): void {
                 : safeStringify(a),
           )
           .join(' ');
+
         send(level, message);
       } catch {
         /* swallow — we never want logging to break the page */
       }
+
       original(...args);
     };
   };
+
   wrap('error', 'error');
   wrap('warn', 'warn');
   wrap('info', 'info');

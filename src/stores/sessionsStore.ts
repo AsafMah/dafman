@@ -222,16 +222,20 @@ export function _resetSessionsStoreForTest(): void {
     } catch {
       /* best effort */
     }
+
     unsubscribe = null;
   }
+
   if (unsubscribePending) {
     try {
       unsubscribePending();
     } catch {
       /* best effort */
     }
+
     unsubscribePending = null;
   }
+
   pendingEvents.clear();
   pendingRequestBuffer.clear();
 }
@@ -239,29 +243,37 @@ export function _resetSessionsStoreForTest(): void {
 export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref<SessionRecord[]>([]);
   const sessionById = computed(() => new Map(sessions.value.map((s) => [s.id, s])));
+
   function getSession(id: string | null | undefined): SessionRecord | undefined {
     if (!id) return undefined;
+
     return sessionById.value.get(id);
   }
+
   const isCreating = ref(false);
   let creationCount = 0;
 
   function handleEvent(payload: SessionEventPayload): void {
     const record = getSession(payload.sessionId);
+
     if (!record) {
       // Buffer for later — the SessionRecord is still in flight (see
       // `pendingEvents` comment). `drainPending` will replay these
       // through `applyToRecord` in order once the record materializes.
       const list = pendingEvents.get(payload.sessionId) ?? [];
+
       if (list.length < MAX_PENDING_PER_SESSION) {
         list.push(payload);
         pendingEvents.set(payload.sessionId, list);
       }
+
       if (import.meta.env.DEV) {
         console.debug('[session-event] buffered', payload.eventType, payload.sessionId);
       }
+
       return;
     }
+
     applyToRecord(record, payload);
   }
 
@@ -273,8 +285,10 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// trim. Centralised so every push site bounds memory automatically.
   function appendEvent(record: SessionRecord, payload: SessionEventPayload): void {
     record.events.push(payload);
+
     if (record.events.length > MAX_EVENTS_PER_SESSION) {
       const overflow = record.events.length - MAX_EVENTS_PER_SESSION;
+
       record.events.splice(0, overflow);
       record.droppedEventCount += overflow;
     }
@@ -297,9 +311,11 @@ export const useSessionsStore = defineStore('sessions', () => {
         newModel?: unknown;
         reasoningEffort?: unknown;
       };
+
       if (typeof data.newModel === 'string') {
         record.model = data.newModel;
       }
+
       if (typeof data.reasoningEffort === 'string') {
         record.reasoningEffort = data.reasoningEffort;
       }
@@ -308,15 +324,19 @@ export const useSessionsStore = defineStore('sessions', () => {
     // Backend may auto-switch the agent run mode (e.g. /plan command).
     if (payload.eventType === 'session.mode_changed') {
       const data = payload.data as { newMode?: unknown };
+
       if (
         data.newMode === 'interactive' ||
         data.newMode === 'plan' ||
         data.newMode === 'autopilot'
       ) {
         record.mode = data.newMode;
+
         if (data.newMode === 'autopilot' && record.pendingRequests.length > 0) {
           const requestIds = record.pendingRequests.map((p) => p.requestId);
+
           record.pendingRequests.splice(0, record.pendingRequests.length);
+
           for (const requestId of requestIds) {
             appendEvent(record, {
               sessionId: record.id,
@@ -332,6 +352,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     // show something meaningful instead of the raw uuid.
     if (payload.eventType === 'session.title_changed') {
       const title = (payload.data as { title?: unknown }).title;
+
       if (typeof title === 'string' && title.length > 0) {
         record.title = title;
       }
@@ -351,6 +372,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         agentPath?: unknown;
         parentToolCallId?: unknown;
       };
+
       if (
         typeof d.agentName === 'string' &&
         (typeof d.parentToolCallId !== 'string' || d.parentToolCallId.length === 0)
@@ -379,6 +401,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     ) {
       record.tasksRefreshCounter += 1;
     }
+
     if (payload.eventType === 'session.plan_changed') {
       record.planRefreshCounter += 1;
     }
@@ -396,11 +419,14 @@ export const useSessionsStore = defineStore('sessions', () => {
         serverName?: unknown;
         requestId?: unknown;
       };
+
       if (typeof d.serverName === 'string') {
         const toasts = useToastStore();
         const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
+
         if (!key || !record._toastedOauthRequests.has(key)) {
           if (key) record._toastedOauthRequests.add(key);
+
           toasts.info(
             'MCP server needs sign-in',
             `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
@@ -411,6 +437,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       const d = (payload.data ?? {}) as { requestId?: unknown };
       const toasts = useToastStore();
       const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
+
       // Only fire if we toasted the matching `_required`; suppresses
       // stray `_completed` events on resume + the case where another
       // client (e.g. CLI) drove the OAuth flow.
@@ -419,6 +446,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         toasts.success('MCP signed in', 'Connection established');
       }
     }
+
     // Both `session.start` (fresh create) and `session.resume` carry
     // `data.context.cwd` from the SDK's `WorkingDirectoryContext`.
     // Resumed sessions don't fire `session.start` again, so we have
@@ -427,6 +455,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     if (payload.eventType === 'session.start' || payload.eventType === 'session.resume') {
       const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
       const cwd = ctx?.cwd;
+
       if (typeof cwd === 'string' && cwd.length > 0) {
         record.workingDirectory = cwd;
       }
@@ -446,10 +475,13 @@ export const useSessionsStore = defineStore('sessions', () => {
       // session ISN'T the dock's active panel. Cleared on focus by
       // the activeSessionId watcher below.
       const layoutStore = useLayoutStore();
+
       if (layoutStore.activeSessionId !== record.id) {
         record.unseenTurns += 1;
+
         if (shouldFireForRecord(record)) {
           const notifications = useNotificationsStore();
+
           notifications.notify({
             kind: 'turnEnd',
             title: record.title ?? `Session ${record.id.slice(0, 8)}`,
@@ -473,13 +505,16 @@ export const useSessionsStore = defineStore('sessions', () => {
     // re-emits). Best-effort match: remove the OLDEST entry of the
     // same kind since SDK events lack our generated requestId.
     let completedKind: PendingRecordRequest['kind'] | null = null;
+
     if (payload.eventType === 'permission.completed') completedKind = 'permission';
     else if (payload.eventType === 'user_input.completed') completedKind = 'userInput';
     else if (payload.eventType === 'elicitation.completed') completedKind = 'elicitation';
     else if (payload.eventType === 'exit_plan_mode.completed') completedKind = 'exitPlanMode';
     else if (payload.eventType === 'auto_mode_switch.completed') completedKind = 'autoModeSwitch';
+
     if (completedKind) {
       const idx = record.pendingRequests.findIndex((p) => p.kind === completedKind);
+
       if (idx >= 0) record.pendingRequests.splice(idx, 1);
     }
   }
@@ -491,20 +526,26 @@ export const useSessionsStore = defineStore('sessions', () => {
     ) {
       return;
     }
+
     const d = payload.data as {
       toolCallId?: unknown;
       toolName?: unknown;
       arguments?: unknown;
     };
     const toolCallId = typeof d.toolCallId === 'string' ? d.toolCallId : null;
+
     if (toolCallId && record._artifactToolCallIds.has(toolCallId)) return;
+
     if (toolCallId) record._artifactToolCallIds.add(toolCallId);
 
     const toolName = typeof d.toolName === 'string' ? d.toolName.toLowerCase() : '';
+
     if (['shell', 'bash', 'exec', 'execute'].includes(toolName)) {
       record.commandsRun += 1;
+
       return;
     }
+
     if (
       !['edit', 'write', 'apply_patch', 'create', 'str_replace'].some((needle) =>
         toolName.includes(needle),
@@ -512,12 +553,18 @@ export const useSessionsStore = defineStore('sessions', () => {
     ) {
       return;
     }
+
     const args = d.arguments;
+
     if (!args || typeof args !== 'object') return;
+
     const obj = args as Record<string, unknown>;
     const path = obj.path ?? obj.filePath ?? obj.fileName ?? obj.filename ?? obj.targetFile;
+
     if (typeof path !== 'string' || !path.trim()) return;
+
     const trimmed = path.trim();
+
     if (!record.touchedFiles.includes(trimmed)) {
       record.touchedFiles.push(trimmed);
     }
@@ -530,9 +577,13 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// user is actively watching.
   function shouldFireForRecord(record: SessionRecord): boolean {
     const layoutStore = useLayoutStore();
+
     if (layoutStore.activeSessionId !== record.id) return true;
+
     if (typeof document !== 'undefined' && document.hidden) return true;
+
     if (typeof document !== 'undefined' && !document.hasFocus()) return true;
+
     return false;
   }
 
@@ -545,16 +596,20 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// `applyPendingToRecord`.
   function handlePendingRequest(payload: PendingRequestPayload): void {
     const record = getSession(payload.sessionId);
+
     if (!record) {
       // Bun's pendingRequest channel can fire before the
       // createSession RPC promise resolves (early-session race —
       // same shape as the sessionEvent buffer). Stash on a parallel
       // queue keyed by sessionId so `drainPending` can replay.
       const list = pendingRequestBuffer.get(payload.sessionId) ?? [];
+
       list.push(payload);
       pendingRequestBuffer.set(payload.sessionId, list);
+
       return;
     }
+
     applyPendingToRecord(record, payload);
   }
 
@@ -563,7 +618,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     if (record.pendingRequests.some((p) => p.requestId === payload.requestId)) {
       return;
     }
+
     let entry: PendingRecordRequest;
+
     switch (payload.kind) {
       case 'permission':
         entry = {
@@ -608,6 +665,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         };
         break;
     }
+
     record.pendingRequests.push(entry);
     // Also push a synthetic `dafman.pending_request` event into the
     // record's event buffer so the reducer (which only sees the
@@ -615,10 +673,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     appendEvent(record, {
       sessionId: record.id,
       eventType: 'dafman.pending_request',
-      data: payload as unknown as Record<string, unknown>,
+      data: payload,
     });
+
     if (shouldFireForRecord(record)) {
       const notifications = useNotificationsStore();
+
       notifications.notify({
         kind: 'waitingForInput',
         title: record.title ?? `Session ${record.id.slice(0, 8)}`,
@@ -631,20 +691,27 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   function drainPending(sessionId: string, record: SessionRecord): number {
     const list = pendingEvents.get(sessionId);
+
     if (list) {
       pendingEvents.delete(sessionId);
+
       for (const event of list) applyToRecord(record, event);
     }
+
     const pendingList = pendingRequestBuffer.get(sessionId);
+
     if (pendingList) {
       pendingRequestBuffer.delete(sessionId);
+
       for (const p of pendingList) applyPendingToRecord(record, p);
     }
+
     return (list?.length ?? 0) + (pendingList?.length ?? 0);
   }
 
   function ensureSubscription(): void {
     if (unsubscribe) return;
+
     unsubscribe = onSessionEvent(handleEvent);
     unsubscribePending = onPendingRequest(handlePendingRequest);
     // Clear the "unseen activity" dot on the session the user just
@@ -652,11 +719,14 @@ export const useSessionsStore = defineStore('sessions', () => {
     // we react to dockview's onDidActivePanelChange + onDidActiveGroupChange
     // (those drive activeSessionId in layoutStore.setApi).
     const layoutStore = useLayoutStore();
+
     watch(
       () => layoutStore.activeSessionId,
       (sid) => {
         if (!sid) return;
+
         const record = getSession(sid);
+
         if (record && record.unseenTurns > 0) {
           record.unseenTurns = 0;
         }
@@ -673,9 +743,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     } = {},
   ): Promise<SessionRecord | null> {
     if (isCreating.value) return null;
+
     ensureSubscription();
     const toasts = useToastStore();
+
     isCreating.value = true;
+
     try {
       const wd = opts.workingDirectory?.trim();
       const settingsStore = useSettingsStore();
@@ -716,6 +789,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         _toastedOauthRequests: new Set<string>(),
         _artifactToolCallIds: new Set<string>(),
       });
+
       sessions.value.push(record);
       drainPending(id, record);
       toasts.success('Session created', id);
@@ -724,12 +798,14 @@ export const useSessionsStore = defineStore('sessions', () => {
       // we don't need a backend RPC change — just call the existing
       // per-session setter. Skipped when false (default) so we don't
       // emit a spurious approve-all flip on every session create.
-      const defaultApprove = settingsStore.settings.permissions?.defaultApproveAll === true;
+      const defaultApprove = settingsStore.settings.permissions?.defaultApproveAll;
+
       if (defaultApprove) {
         void setSessionApproveAll(id, true).catch(() => {
           /* toast already surfaced by the setter */
         });
       }
+
       // Fire-and-forget: get the current run mode so the UI shows it.
       // Re-look up the record by id when the RPC resolves — if the
       // session was closed in the meantime it's no longer in
@@ -737,6 +813,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       void invokeCommand('getSessionMode', { sessionId: id })
         .then((mode) => {
           const current = getSession(id);
+
           if (current) current.mode = mode;
         })
         .catch(() => {
@@ -749,14 +826,17 @@ export const useSessionsStore = defineStore('sessions', () => {
       void invokeCommand('getCurrentAgent', { sessionId: id })
         .then((agent) => {
           const current = getSession(id);
+
           if (current) current.currentAgent = agent;
         })
         .catch(() => {
           /* agent RPC may be unavailable; ignore */
         });
+
       return record;
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to create session', message);
       throw err;
     } finally {
@@ -773,6 +853,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   async function restoreSession(sessionId: string): Promise<SessionRecord | null> {
     ensureSubscription();
     const toasts = useToastStore();
+
     try {
       // The bun RPC handler may return a different id if the SDK
       // forked on resume (rare, but the contract allows it). `cwd`
@@ -788,12 +869,16 @@ export const useSessionsStore = defineStore('sessions', () => {
       // Idempotent: if a record for this id is already present (e.g.
       // double-restore), just return it.
       const existing = getSession(actualId);
+
       if (existing) {
         // Still backfill cwd if the existing record is missing it.
         if (!existing.workingDirectory && response.cwd) existing.workingDirectory = response.cwd;
+
         if (!existing.model && response.model) existing.model = response.model;
+
         return existing;
       }
+
       const accent = accentForIndex(creationCount++);
       const record: SessionRecord = reactive({
         id: actualId,
@@ -822,12 +907,14 @@ export const useSessionsStore = defineStore('sessions', () => {
         _toastedOauthRequests: new Set<string>(),
         _artifactToolCallIds: new Set<string>(),
       });
+
       sessions.value.push(record);
       // Drain any events that arrived between bun-side `resume()` and
       // the RPC response reaching us — chiefly the history replay
       // (assistant.message_*, tool.*, session.start, …), which would
       // otherwise be lost and the pane would render blank.
       const drained = drainPending(actualId, record);
+
       if (import.meta.env.DEV) {
         console.debug('[restoreSession] resumed', {
           requestedId: sessionId,
@@ -836,11 +923,13 @@ export const useSessionsStore = defineStore('sessions', () => {
           recordEvents: record.events.length,
         });
       }
+
       // Pick up the run mode the SDK is currently using for the
       // restored session — same fire-and-forget shape as createSession.
       void invokeCommand('getSessionMode', { sessionId: actualId })
         .then((mode) => {
           const current = getSession(actualId);
+
           if (current) current.mode = mode;
         })
         .catch(() => {
@@ -850,6 +939,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       void invokeCommand('getCurrentAgent', { sessionId: actualId })
         .then((agent) => {
           const current = getSession(actualId);
+
           if (current) current.currentAgent = agent;
         })
         .catch(() => {
@@ -863,25 +953,31 @@ export const useSessionsStore = defineStore('sessions', () => {
       void invokeCommand('getSessionName', { sessionId: actualId })
         .then((name) => {
           const current = getSession(actualId);
+
           if (current && name && !current.title) current.title = name;
         })
         .catch(() => {
           /* name RPC may be unavailable; ignore */
         });
+
       return record;
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.info('Session not restored', `${sessionId.slice(0, 8)}…: ${message}`);
+
       return null;
     }
   }
 
   async function closeSession(id: string): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('disconnectSession', { sessionId: id });
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to close session', message);
     } finally {
       sessions.value = sessions.value.filter((s) => s.id !== id);
@@ -913,21 +1009,27 @@ export const useSessionsStore = defineStore('sessions', () => {
             JSON.stringify(attachments),
           ) as import('../ipc/types').SendMessageAttachment[])
         : undefined;
+
     if (mode === 'interrupt') {
       try {
         await invokeCommand('abortSession', { sessionId });
       } catch (err) {
         const message = toErrorMessage(err);
+
         useToastStore().warn('Abort failed; sending anyway', message);
       }
+
       await invokeCommand('sendMessage', {
         sessionId,
         text,
         ...(atts ? { attachments: atts } : {}),
       });
+
       return;
     }
+
     const sdkMode = mode === 'steer' ? 'immediate' : 'enqueue';
+
     await invokeCommand('sendMessage', {
       sessionId,
       text,
@@ -938,10 +1040,12 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function abortSession(sessionId: string): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('abortSession', { sessionId });
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to abort turn', message);
       throw err;
     }
@@ -952,6 +1056,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// which the composer subscribes to.
   function setDefaultSendMode(sessionId: string, next: DefaultSendMode): void {
     const record = getSession(sessionId);
+
     if (record) record.defaultSendMode = next;
   }
 
@@ -961,6 +1066,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     reasoningEffort: string | null,
   ): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('setSessionModel', {
         sessionId,
@@ -968,12 +1074,14 @@ export const useSessionsStore = defineStore('sessions', () => {
         reasoningEffort,
       });
       const record = getSession(sessionId);
+
       if (record) {
         record.model = model;
         record.reasoningEffort = reasoningEffort;
       }
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to switch model', message);
       throw err;
     }
@@ -981,12 +1089,15 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function setSessionMode(sessionId: string, mode: SessionMode): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('setSessionMode', { sessionId, mode });
       const record = getSession(sessionId);
+
       if (record) record.mode = mode;
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to change run mode', message);
       throw err;
     }
@@ -998,16 +1109,22 @@ export const useSessionsStore = defineStore('sessions', () => {
     // reflects the toggle for inline testing.
     if (sessionId === PLAYGROUND_PENDING_SESSION_ID) {
       const record = getSession(sessionId);
+
       if (record) record.approveAll = enabled;
+
       return;
     }
+
     const toasts = useToastStore();
+
     try {
       await invokeCommand('setSessionApproveAll', { sessionId, enabled });
       const record = getSession(sessionId);
+
       if (record) record.approveAll = enabled;
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to update auto-approval', message);
       throw err;
     }
@@ -1015,11 +1132,13 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function resetSessionApprovals(sessionId: string): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('resetSessionApprovals', { sessionId });
       toasts.success('Session approvals cleared', sessionId);
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to reset approvals', message);
       throw err;
     }
@@ -1035,6 +1154,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     // capture the record reference itself — it may be unmounted by
     // the time the RPC resolves. Re-lookup after.
     const baseWd = getSession(sessionId)?.workingDirectory;
+
     try {
       const next = await invokeCommand('setSessionWorkingDirectory', {
         sessionId,
@@ -1045,6 +1165,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       // mid-RPC, in which case there's nothing to update locally
       // (the SDK side already committed the change).
       const record = getSession(sessionId);
+
       if (record) {
         record.workingDirectory = next;
         appendEvent(record, {
@@ -1053,10 +1174,13 @@ export const useSessionsStore = defineStore('sessions', () => {
           data: { content: `Working directory changed to ${next}` },
         });
       }
+
       toasts.success('Working directory changed', next);
+
       return next;
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to change working directory', message);
       throw err;
     }
@@ -1064,24 +1188,30 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function compactSessionHistory(sessionId: string): Promise<void> {
     const toasts = useToastStore();
+
     try {
       const result = await invokeCommand('compactSessionHistory', {
         sessionId,
       });
+
       if (result.success) {
         const parts: string[] = [];
+
         if (result.tokensFreed !== null) {
           parts.push(`${result.tokensFreed.toLocaleString()} tokens freed`);
         }
+
         if (result.messagesRemoved !== null) {
           parts.push(`${result.messagesRemoved} messages removed`);
         }
+
         toasts.success('History compacted', parts.length > 0 ? parts.join(', ') : undefined);
       } else {
         toasts.warn('Compaction did not complete', sessionId);
       }
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to compact history', message);
       throw err;
     }
@@ -1098,18 +1228,23 @@ export const useSessionsStore = defineStore('sessions', () => {
     newText: string,
   ): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('truncateSessionHistory', { sessionId, eventId });
       // Drop local items at the truncation point too — otherwise we
       // double-render the edited message until the SDK echoes it.
       const record = getSession(sessionId);
+
       if (record) {
         const idx = record.events.findIndex((e) => e.eventId === eventId);
+
         if (idx >= 0) record.events.splice(idx);
       }
+
       await invokeCommand('sendMessage', { sessionId, text: newText });
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to edit message', message);
       throw err;
     }
@@ -1132,15 +1267,19 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// the new session id so the caller can route to it / focus it.
   async function forkSession(sessionId: string, toEventId?: string): Promise<string> {
     const toasts = useToastStore();
+
     try {
       const result = await invokeCommand('forkSession', {
         sessionId,
         ...(toEventId ? { toEventId } : {}),
       });
+
       await restoreSession(result.sessionId);
+
       return result.sessionId;
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to fork session', message);
       throw err;
     }
@@ -1156,7 +1295,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     newText: string,
   ): Promise<string> {
     const newId = await forkSession(sessionId, toEventId);
+
     await sendMessage(newId, newText);
+
     return newId;
   }
 
@@ -1167,28 +1308,38 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// (CLI's default fork name format is `Session <8 hex>...`).
   function findSessionByName(name: string): SessionRecord | undefined {
     if (!name) return undefined;
+
     const trimmed = name.trim();
     const lower = trimmed.toLowerCase();
     const records = sessions.value;
     const exact = records.find((s) => (s.title ?? '').toLowerCase() === lower);
+
     if (exact) return exact;
+
     const titleStarts = records.find((s) => (s.title ?? '').toLowerCase().startsWith(lower));
+
     if (titleStarts) return titleStarts;
+
     const m = trimmed.match(/([0-9a-f]{4,})/i);
+
     if (m && m[1]) {
       const prefix = m[1].toLowerCase();
       const byId = records.find((s) => s.id.toLowerCase().startsWith(prefix));
+
       if (byId) return byId;
     }
+
     return undefined;
   }
 
   async function setSessionName(sessionId: string, name: string): Promise<void> {
     const toasts = useToastStore();
+
     try {
       await invokeCommand('setSessionName', { sessionId, name });
     } catch (err) {
       const message = toErrorMessage(err);
+
       toasts.error('Failed to rename session', message);
       throw err;
     }
@@ -1202,6 +1353,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     value: ReasoningVisibility | 'default',
   ): void {
     const record = getSession(sessionId);
+
     if (record) record.reasoningVisibilityOverride = value;
   }
 
@@ -1227,13 +1379,16 @@ export const useSessionsStore = defineStore('sessions', () => {
     // dutifully render.
     let restoredEntry: PendingRecordRequest | null = null;
     let restoredIdx = -1;
+
     if (record) {
       restoredIdx = record.pendingRequests.findIndex((p) => p.requestId === params.requestId);
+
       if (restoredIdx >= 0) {
         restoredEntry = record.pendingRequests[restoredIdx] ?? null;
         record.pendingRequests.splice(restoredIdx, 1);
       }
     }
+
     if (params.sessionId === PLAYGROUND_PENDING_SESSION_ID) {
       // Playground: synthesise the response event locally so the demo
       // UI can show the closed-out card without a real RPC.
@@ -1244,10 +1399,13 @@ export const useSessionsStore = defineStore('sessions', () => {
           data: { requestId: params.requestId, kind: params.response.kind },
         });
       }
+
       return;
     }
+
     try {
       await invokeCommand('respondToRequest', params);
+
       // Only emit the response event after the RPC succeeds — the
       // chat reducer uses it to clear the pending card from the
       // transcript view.
@@ -1265,7 +1423,9 @@ export const useSessionsStore = defineStore('sessions', () => {
       if (record && restoredEntry) {
         record.pendingRequests.splice(restoredIdx, 0, restoredEntry);
       }
+
       const toasts = useToastStore();
+
       toasts.error('Failed to send response', toErrorMessage(err));
     }
   }

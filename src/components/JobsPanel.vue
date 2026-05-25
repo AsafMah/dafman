@@ -21,7 +21,9 @@ const startingAutopilot = ref(false);
 
 const activeSession = computed(() => {
   const id = layoutStore.activeSessionId;
+
   if (!id) return null;
+
   return sessionsStore.getSession(id) ?? null;
 });
 
@@ -32,20 +34,25 @@ const groupedJobs = computed(() => {
     failed: [],
     cancelled: [],
   };
+
   for (const job of jobs.value) {
     if (job.status === 'failed') groups.failed.push(job);
     else if (job.status === 'cancelled') groups.cancelled.push(job);
     else if (job.status === 'completed') groups.completed.push(job);
     else groups.active.push(job);
   }
+
   return groups;
 });
 
 async function startAutopilot(): Promise<void> {
   const session = activeSession.value;
   const trimmed = goal.value.trim();
+
   if (!session || !trimmed || startingAutopilot.value) return;
+
   startingAutopilot.value = true;
+
   try {
     await jobsStore.startAutopilot(session.id, trimmed);
     goal.value = '';
@@ -59,22 +66,32 @@ async function startAutopilot(): Promise<void> {
 
 function sessionLabel(sessionId: string): string {
   const record = sessionsStore.getSession(sessionId);
+
   return record?.title ?? record?.workingDirectory ?? sessionId.slice(0, 8);
 }
 
 function elapsed(job: JobRecord): string {
   let ms = job.activeTimeMs ?? null;
+
   if (ms === null && job.startedAt) {
     const start = Date.parse(job.startedAt);
     const end = job.completedAt ? Date.parse(job.completedAt) : Date.now();
+
     if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
   }
+
   if (ms === null) return '';
+
   if (ms < 1000) return `${ms}ms`;
+
   const s = Math.round(ms / 1000);
+
   if (s < 60) return `${s}s`;
+
   const m = Math.floor(s / 60);
+
   if (m < 60) return `${m}m ${s % 60}s`;
+
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 

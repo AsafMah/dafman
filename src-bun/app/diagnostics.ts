@@ -80,6 +80,7 @@ export async function exportDiagnostics(opts: ExportOptions): Promise<Diagnostic
   const stamp = timestamp();
   const dir = join(opts.outputRoot, `dafman-diagnostics-${stamp}`);
   const logSubdir = join(dir, 'logs');
+
   try {
     await mkdir(logSubdir, { recursive: true });
   } catch (err) {
@@ -91,16 +92,21 @@ export async function exportDiagnostics(opts: ExportOptions): Promise<Diagnostic
 
   // Copy every daily log file in the configured log dir.
   const sourceLogs = getLogDir();
+
   if (sourceLogs) {
     try {
       const entries = await readdir(sourceLogs);
+
       for (const name of entries) {
         if (!name.startsWith('dafman-') || !name.endsWith('.log')) continue;
+
         const src = join(sourceLogs, name);
         const dst = join(logSubdir, name);
+
         try {
           await copyFile(src, dst);
           const s = await stat(dst);
+
           totalBytes += s.size;
           files.push(`logs/${name}`);
         } catch (err) {
@@ -124,6 +130,7 @@ export async function exportDiagnostics(opts: ExportOptions): Promise<Diagnostic
     const recent = recentLogs();
     const recentPath = join(logSubdir, 'recent.json');
     const recentJson = JSON.stringify(recent, null, 2);
+
     await writeFile(recentPath, recentJson);
     totalBytes += Buffer.byteLength(recentJson);
     files.push('logs/recent.json');
@@ -137,6 +144,7 @@ export async function exportDiagnostics(opts: ExportOptions): Promise<Diagnostic
   try {
     const settingsPath = join(dir, 'settings.json');
     const settingsJson = JSON.stringify(opts.settings, null, 2);
+
     await writeFile(settingsPath, settingsJson);
     totalBytes += Buffer.byteLength(settingsJson);
     files.push('settings.json');
@@ -149,6 +157,7 @@ export async function exportDiagnostics(opts: ExportOptions): Promise<Diagnostic
   // README.
   try {
     const readmePath = join(dir, 'README.md');
+
     await writeFile(readmePath, BUNDLE_README);
     totalBytes += Buffer.byteLength(BUNDLE_README);
     files.push('README.md');
@@ -170,6 +179,7 @@ export async function exportDiagnostics(opts: ExportOptions): Promise<Diagnostic
 function timestamp(): string {
   const d = new Date();
   const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+
   return (
     `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
     `-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`

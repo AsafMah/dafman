@@ -50,24 +50,29 @@ const visibleCommands = computed(() => registry.visibleCommands);
 
 const valueToCommand = computed(() => {
   const map = new Map<string, CommandDef>();
+
   for (const cmd of visibleCommands.value) {
     map.set(searchValueFor(cmd), cmd);
   }
+
   return map;
 });
 
 const grouped = computed(() => {
   const sections = new Map<string, CommandDef[]>();
   const ungrouped: CommandDef[] = [];
+
   for (const cmd of visibleCommands.value) {
     if (cmd.group) {
       const bucket = sections.get(cmd.group) ?? [];
+
       bucket.push(cmd);
       sections.set(cmd.group, bucket);
     } else {
       ungrouped.push(cmd);
     }
   }
+
   return { sections: Array.from(sections.entries()), ungrouped };
 });
 
@@ -77,21 +82,30 @@ function isOtherOverlayOpen(): boolean {
 
 function onHotkey(e: KeyboardEvent): void {
   if (e.repeat) return;
+
   if (e.key !== 'k' && e.key !== 'K') return;
+
   const isMac = navigator.platform.toUpperCase().includes('MAC');
   const cmdChord = isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+
   if (!cmdChord) return;
+
   if (e.altKey || e.shiftKey) return;
+
   if (!open.value && isOtherOverlayOpen()) return;
+
   e.preventDefault();
   e.stopPropagation();
+
   if (open.value) closePalette();
   else openPalette();
 }
 
 function onEscape(e: KeyboardEvent): void {
   if (!open.value) return;
+
   if (e.key !== 'Escape') return;
+
   e.preventDefault();
   e.stopPropagation();
   closePalette();
@@ -114,19 +128,24 @@ function closePalette(): void {
         }),
       );
     }
+
     prevFocus = null;
   });
 }
 
 function onSelectItem(item: { key: string; value: string }): void {
   const cmd = valueToCommand.value.get(item.value);
+
   closePalette();
+
   if (!cmd) return;
+
   void nextTick(() => {
     try {
       const result = cmd.run();
-      if (result && typeof (result as Promise<void>).then === 'function') {
-        void (result as Promise<void>).catch((err) => {
+
+      if (result && typeof result.then === 'function') {
+        void result.catch((err) => {
           console.error(`[command palette] ${cmd.id} failed`, err);
         });
       }
@@ -138,8 +157,11 @@ function onSelectItem(item: { key: string; value: string }): void {
 
 function onWindowClick(e: MouseEvent): void {
   if (!open.value) return;
+
   const target = e.target as HTMLElement | null;
+
   if (!target) return;
+
   if (target.hasAttribute('command-dialog-mask')) {
     closePalette();
   }

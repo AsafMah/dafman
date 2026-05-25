@@ -11,6 +11,7 @@ const props = defineProps<{ url: string }>();
 const parts = computed(() => {
   try {
     const p = new URL(props.url);
+
     return {
       origin: `${p.protocol}//${p.host}`,
       path: p.pathname || '/',

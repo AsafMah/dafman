@@ -18,15 +18,20 @@ export const useClientStore = defineStore('client', () => {
 
   async function createClient(): Promise<void> {
     if (ready.value || isCreating.value) return;
+
     const toasts = useToastStore();
+
     isCreating.value = true;
     lastError.value = null;
+
     try {
       const status = await invokeCommand('createClient', {});
+
       ready.value = true;
       toasts.success(status);
     } catch (err) {
       const message = toErrorMessage(err);
+
       lastError.value = message;
       toasts.error('Failed to start client', message);
       throw err;

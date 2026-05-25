@@ -40,6 +40,7 @@ function describePermission(data: PermissionRequestData | unknown): string {
   ) {
     return (data as PermissionRequestData).summary;
   }
+
   return (
     pickString(data, ['summary', 'description', 'message']) ||
     pickString(data, ['tool', 'toolName']) ||
@@ -55,6 +56,7 @@ function describeInput(data: UserInputRequestData | unknown): string {
   ) {
     return (data as UserInputRequestData).question;
   }
+
   return (
     pickString(data, ['question', 'prompt', 'summary', 'message', 'description']) ||
     'Awaiting input'
@@ -69,6 +71,7 @@ function describeElicitation(data: ElicitationRequestData | unknown): string {
   ) {
     return (data as ElicitationRequestData).message;
   }
+
   return (
     pickString(data, ['message', 'prompt', 'summary', 'description', 'url']) || 'Awaiting input'
   );
@@ -82,6 +85,7 @@ function describeExitPlan(data: ExitPlanModeRequestData | unknown): string {
   ) {
     return (data as ExitPlanModeRequestData).summary;
   }
+
   return 'Plan ready for approval';
 }
 
@@ -93,6 +97,7 @@ function describeAutoModeSwitch(data: AutoModeSwitchRequestData | unknown): stri
   ) {
     return `Switch to auto mode after rate limit: ${(data as AutoModeSwitchRequestData).errorCode}`;
   }
+
   return 'Switch to auto mode?';
 }
 
@@ -113,15 +118,20 @@ function removePending(
   // removing oldest-by-kind from ambient and oldest-by-kind from
   // items, where they could legitimately differ).
   let targetId = requestId;
+
   if (!targetId) {
     const found = ctx.ambient.pendingRequests.find((p) => p.kind === kind);
+
     targetId = found?.requestId;
   }
+
   if (!targetId) return;
+
   ctx.ambient.pendingRequests = ctx.ambient.pendingRequests.filter((p) => p.requestId !== targetId);
   const itemIdx = ctx.items.findIndex(
     (i) => i.kind === 'pendingRequest' && i.requestId === targetId,
   );
+
   if (itemIdx >= 0) ctx.items.splice(itemIdx, 1);
 }
 
@@ -144,21 +154,26 @@ export const notificationHandlers: Record<string, Handler> = {
             | unknown;
         }
       | undefined;
+
     if (!d || typeof d.requestId !== 'string' || typeof d.kind !== 'string') {
       return;
     }
+
     // Idempotency: ignore re-pushes of the same requestId.
     if (ctx.ambient.pendingRequests.some((p) => p.requestId === d.requestId)) {
       return;
     }
+
     let ambientEntry: PendingRequest | null = null;
     let cardItem: ChatItem | null = null;
     const requestId = d.requestId;
     const id = ctx.counter.next++;
+
     switch (d.kind) {
       case 'permission': {
         const req = d.request as PermissionRequestData;
         const message = describePermission(req);
+
         ambientEntry = { kind: 'permission', requestId, message, request: req };
         cardItem = {
           id,
@@ -173,6 +188,7 @@ export const notificationHandlers: Record<string, Handler> = {
       case 'userInput': {
         const req = d.request as UserInputRequestData;
         const message = describeInput(req);
+
         ambientEntry = { kind: 'userInput', requestId, message, request: req };
         cardItem = {
           id,
@@ -187,6 +203,7 @@ export const notificationHandlers: Record<string, Handler> = {
       case 'elicitation': {
         const req = d.request as ElicitationRequestData;
         const message = describeElicitation(req);
+
         ambientEntry = { kind: 'elicitation', requestId, message, request: req };
         cardItem = {
           id,
@@ -201,6 +218,7 @@ export const notificationHandlers: Record<string, Handler> = {
       case 'exitPlanMode': {
         const req = d.request as ExitPlanModeRequestData;
         const message = describeExitPlan(req);
+
         ambientEntry = { kind: 'exitPlanMode', requestId, message, request: req };
         cardItem = {
           id,
@@ -215,6 +233,7 @@ export const notificationHandlers: Record<string, Handler> = {
       case 'autoModeSwitch': {
         const req = d.request as AutoModeSwitchRequestData;
         const message = describeAutoModeSwitch(req);
+
         ambientEntry = { kind: 'autoModeSwitch', requestId, message, request: req };
         cardItem = {
           id,
@@ -227,6 +246,7 @@ export const notificationHandlers: Record<string, Handler> = {
         break;
       }
     }
+
     if (ambientEntry && cardItem) {
       ctx.ambient.pendingRequests.push(ambientEntry);
       ctx.items.push(cardItem);
@@ -239,7 +259,9 @@ export const notificationHandlers: Record<string, Handler> = {
   /// SDK's `_completed` echo, which can lag).
   'dafman.pending_response': (ctx, data) => {
     const d = data as { requestId?: unknown } | undefined;
+
     if (!d || typeof d.requestId !== 'string') return;
+
     removePending(ctx, 'permission', d.requestId); // kind is ignored when requestId is supplied — it removes the matching entry regardless of kind.
   },
 

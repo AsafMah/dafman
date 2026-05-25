@@ -26,11 +26,13 @@ interface ActiveCommand {
 
 function commandExists(command: string): boolean {
   if (command.includes('\\') || command.includes('/')) return existsSync(command);
+
   const lookup = process.platform === 'win32' ? 'where.exe' : 'which';
   const result = Bun.spawnSync([lookup, command], {
     stdout: 'ignore',
     stderr: 'ignore',
   });
+
   return result.exitCode === 0;
 }
 
@@ -39,9 +41,12 @@ function resolveShell(command: string): { shell: string; args: string[] } {
     if (commandExists('pwsh.exe')) {
       return { shell: 'pwsh.exe', args: ['-NoLogo', '-NoProfile', '-Command', command] };
     }
+
     return { shell: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-Command', command] };
   }
+
   const shell = process.env.SHELL && existsSync(process.env.SHELL) ? process.env.SHELL : '/bin/sh';
+
   return { shell, args: ['-lc', command] };
 }
 
@@ -62,10 +67,13 @@ export class CommandResultRegistry {
 
   start(params: { sessionId: string; command: string; cwd: string }): CommandResultRecord {
     const command = params.command.trim();
+
     if (!command) throw AppError.sdk('Command is required');
+
     if (command.length > MAX_COMMAND_LENGTH) {
       throw AppError.sdk(`Command is too long (max ${MAX_COMMAND_LENGTH} characters)`);
     }
+
     if (this.activeBySession.has(params.sessionId)) {
       throw AppError.sdk('A command is already running for this session');
     }
@@ -86,6 +94,7 @@ export class CommandResultRegistry {
     };
 
     let proc: Bun.Subprocess;
+
     try {
       proc = Bun.spawn([shell, ...args], {
         cwd: params.cwd,
@@ -108,6 +117,7 @@ export class CommandResultRegistry {
         this.kill(active);
       }, TIMEOUT_MS),
     };
+
     this.activeBySession.set(params.sessionId, active);
     this.appendRecord(record);
     this.emit({ kind: 'started', sessionId: params.sessionId, commandId: record.id, record });
@@ -121,15 +131,20 @@ export class CommandResultRegistry {
     });
     const stdoutDone = this.pump(active, 'stdout', proc.stdout);
     const stderrDone = this.pump(active, 'stderr', proc.stderr);
+
     void this.awaitExit(active, [stdoutDone, stderrDone]);
+
     return record;
   }
 
   cancel(sessionId: string, commandId: string): boolean {
     const active = this.activeBySession.get(sessionId);
+
     if (!active || active.record.id !== commandId) return false;
+
     active.cancelled = true;
     this.kill(active);
+
     return true;
   }
 
@@ -146,21 +161,30 @@ export class CommandResultRegistry {
     source: ReadableStream<Uint8Array> | null,
   ): Promise<void> {
     if (!source) return;
+
     const reader = source.getReader();
     const decoder = new TextDecoder();
+
     try {
       while (true) {
         const { done, value } = await reader.read();
+
         if (done) break;
+
         if (!value || value.byteLength === 0) continue;
+
         const remaining = OUTPUT_CAP_BYTES - active.totalBytes;
+
         if (remaining <= 0) {
           this.markTruncated(active);
           continue;
         }
+
         const accepted = value.byteLength > remaining ? value.slice(0, remaining) : value;
+
         active.totalBytes += accepted.byteLength;
         const text = decoder.decode(accepted, { stream: true });
+
         active.record[stream] += text;
         this.emit({
           kind: stream,
@@ -168,9 +192,12 @@ export class CommandResultRegistry {
           commandId: active.record.id,
           data: text,
         });
+
         if (value.byteLength > remaining) this.markTruncated(active);
       }
+
       const tail = decoder.decode();
+
       if (tail) {
         active.record[stream] += tail;
         this.emit({
@@ -192,6 +219,7 @@ export class CommandResultRegistry {
 
   private async awaitExit(active: ActiveCommand, streamReads: Promise<void>[]): Promise<void> {
     let exitCode: number | null = null;
+
     try {
       exitCode = await active.proc.exited;
     } catch (err) {
@@ -203,6 +231,7 @@ export class CommandResultRegistry {
     } finally {
       clearTimeout(active.timeout);
     }
+
     await Promise.all(streamReads);
 
     const now = new Date();
@@ -214,6 +243,7 @@ export class CommandResultRegistry {
         : exitCode === 0
           ? 'completed'
           : 'failed';
+
     active.record.status = status;
     active.record.exitCode = exitCode;
     active.record.completedAt = now.toISOString();
@@ -241,6 +271,7 @@ export class CommandResultRegistry {
 
   private markTruncated(active: ActiveCommand): void {
     if (active.record.truncated) return;
+
     active.record.truncated = true;
     this.emit({
       kind: 'truncated',
@@ -264,6 +295,7 @@ export class CommandResultRegistry {
 
   private appendRecord(record: CommandResultRecord): void {
     const next = [...(this.records.get(record.sessionId) ?? []), record];
+
     this.records.set(record.sessionId, next.slice(-MAX_RECORDS_PER_SESSION));
     void this.persist();
   }
@@ -275,15 +307,18 @@ export class CommandResultRegistry {
       idx >= 0
         ? existing.map((item) => (item.id === record.id ? record : item))
         : [...existing, record];
+
     this.records.set(record.sessionId, next.slice(-MAX_RECORDS_PER_SESSION));
     void this.persist();
   }
 
   private load(): void {
     if (!existsSync(this.storagePath)) return;
+
     try {
       const raw = readFileSync(this.storagePath, 'utf8');
       const parsed = JSON.parse(raw) as Record<string, CommandResultRecord[]>;
+
       for (const [sessionId, records] of Object.entries(parsed)) {
         if (Array.isArray(records))
           this.records.set(sessionId, records.slice(-MAX_RECORDS_PER_SESSION));
@@ -299,6 +334,7 @@ export class CommandResultRegistry {
     try {
       await mkdir(dirname(this.storagePath), { recursive: true });
       const data = Object.fromEntries(this.records.entries());
+
       await writeFile(this.storagePath, JSON.stringify(data, null, 2), 'utf8');
     } catch (err) {
       log.warn('command results persist failed', {

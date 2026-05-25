@@ -47,11 +47,13 @@ const canAnchor = computed(() => Boolean(props.eventId));
 
 async function copyToClipboard(value: string, label = 'Copied'): Promise<void> {
   if (!value) return;
+
   try {
     await navigator.clipboard.writeText(value);
     toasts.success(label);
   } catch (err) {
     const message = toErrorMessage(err);
+
     toasts.error('Copy failed', message);
   }
 }
@@ -62,6 +64,7 @@ function quoteToCommand(text: string): string {
     .split('\n')
     .map((line) => `> ${line}`)
     .join('\n');
+
   return `${block}\n\n`;
 }
 </script>

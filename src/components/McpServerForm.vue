@@ -71,11 +71,15 @@ const jsonError = ref<string | null>(null);
 function configFromStructured(): McpConfig {
   if (transport.value === 'local') {
     const env: Record<string, string> = {};
+
     for (const e of envEntries.value) {
       const k = e.key.trim();
+
       if (!k) continue;
+
       env[k] = e.value;
     }
+
     const out: McpConfig = {
       type: 'local',
       command: command.value.trim(),
@@ -84,37 +88,53 @@ function configFromStructured(): McpConfig {
         .map((s) => s.trim())
         .filter(Boolean),
     };
+
     if (Object.keys(env).length > 0) out.env = env;
+
     return out;
   }
+
   // http
   const hdr: Record<string, string> = {};
+
   for (const h of headers.value) {
     const k = h.key.trim();
+
     if (!k) continue;
+
     hdr[k] = h.value;
   }
+
   const out: McpConfig = {
     type: 'http',
     url: url.value.trim(),
   };
+
   if (Object.keys(hdr).length > 0) out.headers = hdr;
+
   if (oauthClientId.value.trim()) out.oauthClientId = oauthClientId.value.trim();
+
   if (oauthPublicClient.value) out.oauthPublicClient = true;
+
   if (oauthGrantType.value.trim()) out.oauthGrantType = oauthGrantType.value.trim();
+
   return out;
 }
 
 function structuredFromConfig(config: McpConfig): void {
-  const type = typeof config.type === 'string' ? (config.type as string) : null;
+  const type = typeof config.type === 'string' ? config.type : null;
   const inferredTransport: Transport =
     type === 'http' || type === 'sse' || typeof config.url === 'string' ? 'http' : 'local';
+
   transport.value = inferredTransport;
+
   if (inferredTransport === 'local') {
     command.value = typeof config.command === 'string' ? config.command : '';
     const a = config.args;
+
     argsText.value = Array.isArray(a) ? (a as unknown[]).map(String).join(' ') : '';
     const env = config.env;
+
     envEntries.value =
       env && typeof env === 'object' && !Array.isArray(env)
         ? Object.entries(env as Record<string, unknown>).map(([key, value]) => ({
@@ -130,6 +150,7 @@ function structuredFromConfig(config: McpConfig): void {
   } else {
     url.value = typeof config.url === 'string' ? config.url : '';
     const h = config.headers;
+
     headers.value =
       h && typeof h === 'object' && !Array.isArray(h)
         ? Object.entries(h as Record<string, unknown>).map(([key, value]) => ({
@@ -150,6 +171,7 @@ function structuredFromConfig(config: McpConfig): void {
 if (props.initialConfig && Object.keys(props.initialConfig).length > 0) {
   structuredFromConfig(props.initialConfig);
 }
+
 watch(
   () => props.initialConfig,
   (next) => {
@@ -159,6 +181,7 @@ watch(
 
 function onModeChange(next: Mode) {
   if (!next || next === mode.value) return;
+
   if (next === 'json') {
     // Serialize current structured payload.
     jsonDraft.value = JSON.stringify(configFromStructured(), null, 2);
@@ -167,55 +190,68 @@ function onModeChange(next: Mode) {
     // Parse + repopulate, but only commit if it parses.
     try {
       const parsed = JSON.parse(jsonDraft.value) as McpConfig;
+
       structuredFromConfig(parsed);
       jsonError.value = null;
     } catch (err) {
       jsonError.value = toErrorMessage(err);
+
       return; // Stay in JSON mode until valid.
     }
   }
+
   mode.value = next;
 }
 
 function addEnvRow() {
   envEntries.value.push({ key: '', value: '' });
 }
+
 function removeEnvRow(i: number) {
   envEntries.value.splice(i, 1);
 }
+
 function addHeaderRow() {
   headers.value.push({ key: '', value: '' });
 }
+
 function removeHeaderRow(i: number) {
   headers.value.splice(i, 1);
 }
 
 const canSubmit = computed(() => {
   if (!name.value.trim()) return false;
+
   if (mode.value === 'json') {
     try {
       JSON.parse(jsonDraft.value);
+
       return true;
     } catch {
       return false;
     }
   }
+
   if (transport.value === 'local') return command.value.trim().length > 0;
+
   return url.value.trim().length > 0;
 });
 
 function onSubmit() {
   let config: McpConfig;
+
   if (mode.value === 'json') {
     try {
       config = JSON.parse(jsonDraft.value) as McpConfig;
     } catch (err) {
       jsonError.value = toErrorMessage(err);
+
       return;
     }
   } else {
     config = configFromStructured();
   }
+
   emit('submit', { name: name.value.trim(), config });
 }
 </script>

@@ -35,13 +35,17 @@ export const useToastStore = defineStore('toast', () => {
       detail,
       life: Math.max(1, life),
     };
+
     pending.value.push(msg);
+
     return msg;
   }
 
   function consume(): ToastMessage[] {
     const drained = pending.value.slice();
+
     pending.value = [];
+
     return drained;
   }
 

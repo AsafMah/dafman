@@ -38,25 +38,33 @@ const MAX_QUEUED_CHUNKS = 256;
 
 function commandExists(command: string): boolean {
   if (command.includes('\\') || command.includes('/')) return existsSync(command);
+
   const lookup = process.platform === 'win32' ? 'where.exe' : 'which';
   const result = Bun.spawnSync([lookup, command], {
     stdout: 'ignore',
     stderr: 'ignore',
   });
+
   return result.exitCode === 0;
 }
 
 function defaultShell(): { shell: string; args: string[] } {
   if (process.platform === 'win32') {
     if (commandExists('pwsh.exe')) return { shell: 'pwsh.exe', args: ['-NoLogo'] };
+
     if (commandExists('powershell.exe')) {
       return { shell: 'powershell.exe', args: ['-NoLogo'] };
     }
+
     return { shell: 'cmd.exe', args: ['/d', '/q'] };
   }
+
   const shell = process.env.SHELL;
+
   if (shell && existsSync(shell)) return { shell, args: [] };
+
   if (commandExists('bash')) return { shell: 'bash', args: [] };
+
   return { shell: 'sh', args: [] };
 }
 
@@ -100,6 +108,7 @@ function powerShellIntegrationCommand(): string {
 
 function withShellIntegration(shell: string, args: string[]): string[] {
   const name = shellName(shell);
+
   if (
     (name === 'pwsh.exe' ||
       name === 'pwsh' ||
@@ -109,10 +118,13 @@ function withShellIntegration(shell: string, args: string[]): string[] {
   ) {
     return [...args, '-NoExit', '-Command', powerShellIntegrationCommand()];
   }
+
   if ((name === 'cmd.exe' || name === 'cmd') && !args.some((arg) => /^\/c$/i.test(arg))) {
     const prompt = '$E]7;file:///$P$E\\$E]133;A$E\\$P$G';
+
     return [...args, '/k', `prompt ${prompt}`];
   }
+
   return args;
 }
 
@@ -163,15 +175,19 @@ export class TerminalRegistry {
       sessionId: params.sessionId,
     };
     let entry: TerminalEntry;
+
     try {
       entry = this.createNativeTerminal(options);
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     this.entries.set(id, entry);
     const summary = toSummary(entry);
+
     this.emit({ terminalId: id, kind: 'status', summary });
     log.info('terminal created', { terminalId: id, shell, cwd, backend: 'pty' });
+
     return summary;
   }
 
@@ -218,19 +234,23 @@ export class TerminalRegistry {
             error: error.message,
           });
         }
+
         this.markExited(id, exitCode, signalCode);
       },
     });
+
     if (!proc.terminal) {
       try {
         proc.kill();
       } catch {
         /* ignore */
       }
+
       throw new Error(
         `Bun native terminal unsupported in this runtime (Bun ${process.versions.bun ?? 'unknown'} ${process.platform} ${process.arch})`,
       );
     }
+
     return {
       id,
       title,
@@ -252,40 +272,53 @@ export class TerminalRegistry {
 
   write(id: string, data: string): boolean {
     const entry = this.entries.get(id);
+
     if (!entry || entry.status !== 'running') return false;
+
     entry.terminal.write(data);
+
     return true;
   }
 
   resize(id: string, cols: number, rows: number): boolean {
     const entry = this.entries.get(id);
+
     if (!entry || entry.status === 'exited' || entry.status === 'failed') return false;
+
     const nextCols = Math.max(10, Math.floor(cols));
     const nextRows = Math.max(3, Math.floor(rows));
+
     entry.cols = nextCols;
     entry.rows = nextRows;
     entry.terminal.resize(nextCols, nextRows);
     this.emit({ terminalId: id, kind: 'status', summary: toSummary(entry) });
+
     return true;
   }
 
   kill(id: string): boolean {
     const entry = this.entries.get(id);
+
     if (!entry) return false;
+
     if (entry.status === 'running') {
       entry.status = 'exiting';
+
       try {
         entry.proc.kill();
       } catch {
         // fall through to terminal close
       }
     }
+
     try {
       entry.terminal.close();
     } catch {
       // already closed
     }
+
     this.markExited(id, entry.exitCode ?? null, entry.signal ?? null);
+
     return true;
   }
 
@@ -295,28 +328,39 @@ export class TerminalRegistry {
 
   private enqueueOutput(id: string, data: string): void {
     const entry = this.entries.get(id);
+
     if (!entry) return;
+
     entry.outputQueue.push(data);
+
     if (entry.outputQueue.length > MAX_QUEUED_CHUNKS) {
       entry.outputQueue.splice(0, entry.outputQueue.length - MAX_QUEUED_CHUNKS);
       entry.outputQueue.unshift('\r\n[terminal output truncated]\r\n');
     }
+
     if (entry.flushTimer) return;
+
     entry.flushTimer = setTimeout(() => this.flushOutput(id), OUTPUT_FLUSH_MS);
   }
 
   private flushOutput(id: string): void {
     const entry = this.entries.get(id);
+
     if (!entry) return;
+
     entry.flushTimer = null;
     const data = entry.outputQueue.join('');
+
     entry.outputQueue = [];
+
     if (data) this.emit({ terminalId: id, kind: 'output', data });
   }
 
   private markExited(id: string, exitCode: number | null, signal: string | null): void {
     const entry = this.entries.get(id);
+
     if (!entry || entry.status === 'exited') return;
+
     this.flushOutput(id);
     entry.status = 'exited';
     entry.exitCode = exitCode;

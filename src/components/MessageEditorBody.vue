@@ -38,11 +38,15 @@ onMounted(() => {
   // newlines round-trip cleanly.
   editor.update(() => {
     const root = $getRoot();
+
     root.clear();
     const lines = props.originalText.split('\n');
+
     for (const line of lines) {
       const para = $createParagraphNode();
+
       if (line.length > 0) para.append($createTextNode(line));
+
       root.append(para);
     }
   });
@@ -53,15 +57,20 @@ onMounted(() => {
       KEY_ENTER_COMMAND,
       (event: KeyboardEvent | null) => {
         if (!event) return false;
+
         if (!(event.ctrlKey || event.metaKey)) return false;
+
         event.preventDefault();
         const text = editor
           .getEditorState()
           .read(() => $getRoot().getTextContent())
           .trimEnd();
+
         if (text.length === 0) return true;
+
         if (event.shiftKey && props.canFork) emit('saveAndFork', text);
         else emit('save', text);
+
         return true;
       },
       COMMAND_PRIORITY_HIGH,
@@ -73,6 +82,7 @@ onMounted(() => {
       KEY_ESCAPE_COMMAND,
       () => {
         emit('cancel');
+
         return true;
       },
       COMMAND_PRIORITY_HIGH,
@@ -90,6 +100,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   for (const fn of cleanups) fn();
+
   cleanups = [];
 });
 </script>

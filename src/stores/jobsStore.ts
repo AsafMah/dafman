@@ -32,9 +32,12 @@ export const useJobsStore = defineStore('jobs', () => {
       const rank = (j: JobRecord) => (isActiveStatus(j.status) ? 0 : 1);
       const ar = rank(a);
       const br = rank(b);
+
       if (ar !== br) return ar - br;
+
       const at = a.startedAt ? Date.parse(a.startedAt) : 0;
       const bt = b.startedAt ? Date.parse(b.startedAt) : 0;
+
       return bt - at;
     }),
   );
@@ -44,6 +47,7 @@ export const useJobsStore = defineStore('jobs', () => {
   async function refresh(): Promise<void> {
     isLoading.value = true;
     error.value = null;
+
     try {
       sdkJobs.value = await invokeCommand('listJobs', {});
     } catch (err) {
@@ -60,6 +64,7 @@ export const useJobsStore = defineStore('jobs', () => {
 
   async function cancelJob(job: JobRecord): Promise<void> {
     busyJobId.value = job.id;
+
     try {
       if (job.source === 'autopilot-session') {
         await useSessionsStore().abortSession(job.sessionId);
@@ -95,6 +100,7 @@ export const useJobsStore = defineStore('jobs', () => {
 
   async function removeJob(job: JobRecord): Promise<void> {
     busyJobId.value = job.id;
+
     try {
       if (job.source === 'autopilot-session') {
         localJobs.value = localJobs.value.filter((j) => j.id !== job.id);
@@ -115,7 +121,9 @@ export const useJobsStore = defineStore('jobs', () => {
 
   async function promoteJob(job: JobRecord): Promise<void> {
     if (job.source !== 'sdk-task') return;
+
     busyJobId.value = job.id;
+
     try {
       await invokeCommand('promoteTask', {
         sessionId: job.sessionId,
@@ -131,7 +139,9 @@ export const useJobsStore = defineStore('jobs', () => {
 
   function openOwningSession(sessionId: string): void {
     const layout = useLayoutStore();
+
     if (!layout.isPanelOpen(sessionId)) layout.addPanel(sessionId);
+
     layout.activatePanel(sessionId);
     // Scroll to the bottom so the user sees the active work
     setTimeout(() => {
@@ -145,7 +155,9 @@ export const useJobsStore = defineStore('jobs', () => {
 
   async function startAutopilot(sessionId: string, goal: string): Promise<void> {
     const trimmed = goal.trim();
+
     if (!trimmed) return;
+
     const id = `autopilot:${sessionId}:${Date.now()}`;
     const session = useSessionsStore().getSession(sessionId);
     const job: JobRecord = {
@@ -166,10 +178,13 @@ export const useJobsStore = defineStore('jobs', () => {
         ? `Workspace: ${session.workingDirectory}`
         : 'Current session',
     };
+
     localJobs.value = [job, ...localJobs.value];
     localMeta.set(id, { seenThinking: false });
+
     try {
       const sessions = useSessionsStore();
+
       await sessions.setSessionMode(sessionId, 'autopilot');
       updateLocalJob(id, { status: 'running' });
       await sessions.sendMessage(sessionId, trimmed, 'steer');
@@ -194,6 +209,7 @@ export const useJobsStore = defineStore('jobs', () => {
   }
 
   const sessionsStore = useSessionsStore();
+
   watch(
     () => sessionsStore.sessions.map((s) => `${s.id}:${s.tasksRefreshCounter}`).join('|'),
     () => {
@@ -213,11 +229,17 @@ export const useJobsStore = defineStore('jobs', () => {
     () => {
       for (const job of localJobs.value) {
         if (job.source !== 'autopilot-session' || !isActiveStatus(job.status)) continue;
+
         const session = sessionsStore.getSession(job.sessionId);
+
         if (!session) continue;
+
         const meta = localMeta.get(job.id);
+
         if (!meta) continue;
+
         const lastEvent = session.events[session.events.length - 1];
+
         if (lastEvent?.eventType === 'session.error') {
           updateLocalJob(job.id, {
             status: 'failed',
@@ -229,7 +251,9 @@ export const useJobsStore = defineStore('jobs', () => {
           });
           continue;
         }
+
         if (session.isThinking) meta.seenThinking = true;
+
         if (meta.seenThinking && !session.isThinking) {
           updateLocalJob(job.id, {
             status: 'completed',

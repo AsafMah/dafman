@@ -30,5 +30,6 @@ const PALETTE = [
 /// Picks one of the curated palette colours by creation index.
 export function accentForIndex(index: number): string {
   const slot = ((index % PALETTE.length) + PALETTE.length) % PALETTE.length;
-  return PALETTE[slot] as string;
+
+  return PALETTE[slot];
 }

@@ -14,46 +14,57 @@ type LangFactory = () => Promise<Extension>;
 const factories: Record<string, LangFactory> = {
   javascript: async () => {
     const { javascript } = await import('@codemirror/lang-javascript');
+
     return javascript();
   },
   typescript: async () => {
     const { javascript } = await import('@codemirror/lang-javascript');
+
     return javascript({ typescript: true });
   },
   jsx: async () => {
     const { javascript } = await import('@codemirror/lang-javascript');
+
     return javascript({ jsx: true });
   },
   tsx: async () => {
     const { javascript } = await import('@codemirror/lang-javascript');
+
     return javascript({ typescript: true, jsx: true });
   },
   json: async () => {
     const { json } = await import('@codemirror/lang-json');
+
     return json();
   },
   markdown: async () => {
     const { markdown } = await import('@codemirror/lang-markdown');
+
     return markdown();
   },
   css: async () => {
     const { css } = await import('@codemirror/lang-css');
+
     return css();
   },
   html: async () => {
     const { html } = await import('@codemirror/lang-html');
+
     return html();
   },
   python: async () => {
     const { python } = await import('@codemirror/lang-python');
+
     return python();
   },
   rust: async () => {
     const { rust } = await import('@codemirror/lang-rust');
+
     return rust();
   },
   go: async () => {
     const { go } = await import('@codemirror/lang-go');
+
     return go();
   },
 };
@@ -90,20 +101,29 @@ export async function resolveLanguageExtension(
   langId: string | null | undefined,
 ): Promise<Extension | null> {
   if (!langId) return null;
+
   const key = langId.toLowerCase();
+
   if (cache.has(key)) return cache.get(key)!;
+
   // Direct factory lookup first…
   let factory = factories[key];
+
   // …then fall through aliases ("ts" → "typescript", "py" → "python",
   // "md" → "markdown", "rs" → "rust", "vue" → "html", etc.). Reuses
   // the file-extension table so we only maintain one mapping.
   if (!factory) {
     const aliased = extensionMap[key];
+
     if (aliased) factory = factories[aliased];
   }
+
   if (!factory) return null;
+
   const ext = await factory();
+
   cache.set(key, ext);
+
   return ext;
 }
 
@@ -113,8 +133,10 @@ export async function resolveLanguageForFile(
   fileOrExt: string | null | undefined,
 ): Promise<Extension | null> {
   if (!fileOrExt) return null;
+
   const cleaned = fileOrExt.replace(/^.*[\\\/.]/, '').toLowerCase();
   const langId = extensionMap[cleaned];
+
   return resolveLanguageExtension(langId);
 }
 

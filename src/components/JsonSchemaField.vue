@@ -78,6 +78,7 @@ const enumValue = computed({
 
 const arrayValue = computed(() => {
   const v = current.value;
+
   return Array.isArray(v) ? v : [];
 });
 
@@ -89,6 +90,7 @@ const nestedProperties = computed(() => {
       required: (props.schema.required ?? []).includes(key),
     }));
   }
+
   return [];
 });
 
@@ -104,17 +106,20 @@ function addArrayItem(): void {
           : items.type === 'object'
             ? {}
             : '';
+
   props.update(props.path, [...arrayValue.value, seed]);
 }
 
 function removeArrayItem(idx: number): void {
   const next = [...arrayValue.value];
+
   next.splice(idx, 1);
   props.update(props.path, next);
 }
 
 function updateArrayItem(idx: number, v: unknown): void {
   const next = [...arrayValue.value];
+
   next[idx] = v;
   props.update(props.path, next);
 }

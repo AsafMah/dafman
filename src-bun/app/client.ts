@@ -34,21 +34,27 @@ export function setClientForTest(c: unknown): void {
 /// in which case we let the SDK use its bundled JS path.
 function resolvePlatformCliBinary(): string | undefined {
   const pkg = `@github/copilot-${process.platform}-${process.arch}`;
+
   try {
     const resolved = import.meta.resolve(pkg);
     const path = fileURLToPath(resolved);
+
     if (existsSync(path)) return path;
   } catch {
     /* package not installed for this platform; fall through */
   }
+
   return undefined;
 }
 
 export async function ensureClient(): Promise<CopilotClient> {
   if (instance) return instance;
+
   if (starting) return starting;
+
   starting = (async () => {
     const cliPath = resolvePlatformCliBinary();
+
     if (cliPath) {
       log.info('using prebuilt copilot binary', { cliPath });
     } else {
@@ -57,32 +63,41 @@ export async function ensureClient(): Promise<CopilotClient> {
         { platform: process.platform, arch: process.arch },
       );
     }
+
     const client = new CopilotClient(cliPath ? { cliPath } : undefined);
+
     try {
       await client.start();
     } catch (err) {
       starting = null;
       const message = toErrorMessage(err);
+
       log.error('failed to start copilot client', { error: message });
       throw AppError.sdk(message);
     }
+
     instance = client;
     starting = null;
     log.info('copilot client started');
+
     return client;
   })();
+
   return starting;
 }
 
 export function tryGetClient(): CopilotClient {
   if (!instance) throw AppError.clientNotStarted();
+
   return instance;
 }
 
 export async function shutdownClient(): Promise<void> {
   if (!instance) return;
+
   try {
     const errs = await instance.stop();
+
     if (errs.length) {
       log.warn('copilot client stopped with errors', {
         count: errs.length,

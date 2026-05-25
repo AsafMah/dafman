@@ -91,8 +91,10 @@ const effectiveQuery = computed(() =>
 /// Stale-fetch guard via incrementing tag. The bun-side index is
 /// cached so calls are sub-ms in steady state.
 let fetchTag = 0;
+
 async function fetchResults(): Promise<void> {
   const tag = ++fetchTag;
+
   try {
     const r = await invokeCommand('searchWorkspaceFiles', {
       sessionId: props.sessionId,
@@ -101,11 +103,14 @@ async function fetchResults(): Promise<void> {
       includeHidden: showHidden.value,
       includeIgnored: showIgnored.value,
     });
+
     if (tag !== fetchTag) return;
+
     results.value = r;
     highlightedIndex.value = 0;
   } catch {
     if (tag !== fetchTag) return;
+
     results.value = [];
     highlightedIndex.value = 0;
   }
@@ -135,7 +140,9 @@ function toAttachment(match: WorkspaceFileMatch): SendMessageAttachment {
 
 function selectAt(index: number): void {
   const match = results.value[index];
+
   if (!match) return;
+
   emit('select', toAttachment(match));
 }
 
@@ -163,7 +170,9 @@ function onInputKey(e: KeyboardEvent): void {
 /// fighting other surfaces.
 function onWindowKey(e: KeyboardEvent): void {
   if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+
   const k = e.key.toLowerCase();
+
   if (k === 'h') {
     e.preventDefault();
     showHidden.value = !showHidden.value;
@@ -181,15 +190,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true));
 defineExpose({
   moveHighlight(direction: 1 | -1): void {
     if (results.value.length === 0) return;
+
     if (direction > 0) {
       highlightedIndex.value = Math.min(results.value.length - 1, highlightedIndex.value + 1);
     } else {
       highlightedIndex.value = Math.max(0, highlightedIndex.value - 1);
     }
+
     scrollHighlightIntoView();
   },
   pickCurrent(): SendMessageAttachment | null {
     const match = results.value[highlightedIndex.value];
+
     return match ? toAttachment(match) : null;
   },
   hasResults(): boolean {
@@ -199,15 +211,20 @@ defineExpose({
 
 function scrollHighlightIntoView(): void {
   const list = listRef.value;
+
   if (!list) return;
+
   const child = list.querySelector<HTMLElement>(`[data-index="${highlightedIndex.value}"]`);
+
   child?.scrollIntoView({ block: 'nearest' });
 }
 
 async function browse(kind: 'file' | 'directory'): Promise<void> {
   try {
     const picked = await invokeCommand('pickAttachment', { kind });
+
     if (!picked) return;
+
     emit(
       'select',
       picked.kind === 'directory'

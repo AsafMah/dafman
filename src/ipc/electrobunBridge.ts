@@ -130,30 +130,37 @@ export function createElectrobunBridge(): {
       const requester = (
         electroview as { rpc: { request: Record<CommandName, (a: unknown) => Promise<unknown>> } }
       ).rpc.request[name];
+
       return requester(args);
     }) as RpcBridge['request'],
     onSessionEvent(listener) {
       sessionListeners.add(listener);
+
       return () => sessionListeners.delete(listener);
     },
     onPendingRequest(listener) {
       pendingListeners.add(listener);
+
       return () => pendingListeners.delete(listener);
     },
     onLogEvent(listener) {
       logListeners.add(listener);
+
       return () => logListeners.delete(listener);
     },
     onAuditEvent(listener) {
       auditListeners.add(listener);
+
       return () => auditListeners.delete(listener);
     },
     onTerminalEvent(listener) {
       terminalListeners.add(listener);
+
       return () => terminalListeners.delete(listener);
     },
     onCommandResultEvent(listener) {
       commandResultListeners.add(listener);
+
       return () => commandResultListeners.delete(listener);
     },
   };

@@ -27,6 +27,7 @@ export const turnHandlers: Record<string, Handler> = {
 
   'assistant.intent': (ctx, data) => {
     const intent = pickString(data, ['intent']);
+
     if (intent) ctx.ambient.intent = intent;
   },
 };

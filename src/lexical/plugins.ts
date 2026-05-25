@@ -44,23 +44,29 @@ export function consumeComposerText(
 ): { text: string; attachments: SendMessageAttachment[] } | null {
   const state = editor.getEditorState();
   const plain = state.read(() => $getRoot().getTextContent());
+
   if (plain.trim().length === 0) return null;
+
   const markdown = state.read(() => $convertToMarkdownString(TRANSFORMERS));
   // Walk in document order picking up every AttachmentNode payload.
   // This is read OUTSIDE the editor.update() so the editor state is
   // still intact when we walk; the clear() below then discards
   // everything we already captured.
   const attachments: SendMessageAttachment[] = [];
+
   state.read(() => {
     const visit = (node: LexicalNode): void => {
       if ($isAttachmentNode(node)) {
         attachments.push(node.getAttachment());
+
         return;
       }
+
       if ($isElementNode(node)) {
         for (const child of node.getChildren()) visit(child);
       }
     };
+
     visit($getRoot());
   });
   editor.update(() => {
@@ -68,6 +74,7 @@ export function consumeComposerText(
   });
   const trimmed = markdown.trim();
   const text = trimmed.length === 0 ? plain.trim() : trimmed;
+
   return { text, attachments };
 }
 
@@ -79,7 +86,9 @@ export const RegisterMarkdownShortcuts = defineComponent({
   setup() {
     const editor = useLexicalComposer();
     const unregister = registerMarkdownShortcuts(editor, TRANSFORMERS);
+
     onBeforeUnmount(() => unregister());
+
     return () => null;
   },
 });
@@ -92,11 +101,13 @@ export const EditableSync = defineComponent({
   props: { editable: { type: Boolean, required: true } },
   setup(props) {
     const editor = useLexicalComposer();
+
     watch(
       () => props.editable,
       (next) => editor.setEditable(next),
       { immediate: true },
     );
+
     return () => null;
   },
 });
@@ -139,9 +150,12 @@ export const SubmitOnEnter = defineComponent({
     const unregister = editor.registerCommand(
       KEY_ENTER_COMMAND,
       (event) => {
-        const e = event as KeyboardEvent | null;
+        const e = event;
+
         if (!e) return false;
+
         if (e.isComposing || e.keyCode === 229) return false;
+
         // We only handle modifier chords. Plain Enter / Shift+Enter
         // fall through to Lexical's default paragraph / soft-break
         // commands so markdown block breaks work.
@@ -150,25 +164,33 @@ export const SubmitOnEnter = defineComponent({
         const isCtrlShiftEnter = ctrl && e.shiftKey && !e.altKey;
         const isAltEnter = e.altKey && !ctrl && !e.shiftKey;
         let mode: ComposerSubmitMode | null = null;
+
         if (isCtrlEnter) mode = 'default';
         else if (isCtrlShiftEnter) mode = 'interrupt';
         else if (isAltEnter) mode = 'queue';
+
         if (mode === null) return false;
+
         e.preventDefault();
         const result = consumeComposerText(editor);
+
         if (result !== null) {
           const payload: ComposerSubmitPayload = {
             text: result.text,
             mode,
             ...(result.attachments.length > 0 ? { attachments: result.attachments } : {}),
           };
+
           emit('submit', payload);
         }
+
         return true;
       },
       COMMAND_PRIORITY_HIGH,
     );
+
     onBeforeUnmount(() => unregister());
+
     return () => null;
   },
 });
@@ -197,6 +219,7 @@ export const TypingDiagnostic = defineComponent({
     function probe() {
       try {
         const root = editor.getRootElement();
+
         rendererLog('info', 'typing-diagnostic probe', {
           editable: editor.isEditable(),
           rootElement: root
@@ -216,19 +239,26 @@ export const TypingDiagnostic = defineComponent({
         // works; any typing issue is in the browser input pipeline.
         editor.update(() => {
           const r = $getRoot();
+
           if (r.getChildrenSize() === 0) {
             const p = $createParagraphNode();
+
             r.append(p);
           }
+
           const para = r.getFirstChild();
+
           if (para && 'select' in para && typeof para.select === 'function') {
             (para as { select: () => unknown }).select();
           }
+
           const sel = $getSelection();
+
           if ($isRangeSelection(sel)) {
             sel.insertText('X');
           } else {
             const p = r.getFirstChild();
+
             if (p && 'append' in p && typeof p.append === 'function') {
               (p as { append: (n: ReturnType<typeof $createTextNode>) => unknown }).append(
                 $createTextNode('X'),
@@ -240,6 +270,7 @@ export const TypingDiagnostic = defineComponent({
         setTimeout(() => {
           editor.getEditorState().read(() => {
             const text = $getRoot().getTextContent();
+
             rendererLog('info', 'typing-diagnostic post-insert', {
               text,
               charCount: text.length,

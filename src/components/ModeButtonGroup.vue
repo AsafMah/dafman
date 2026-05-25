@@ -29,6 +29,7 @@ const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
   set: (value) => {
     if (!value || value === record.value?.mode) return;
+
     void sessionsStore.setSessionMode(props.sessionId, value);
   },
 });

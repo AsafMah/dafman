@@ -60,10 +60,13 @@ const openIds = ref<Set<string>>(new Set());
 
 function syncOpenState() {
   const next = new Set<string>();
+
   for (const item of props.items) {
     if (item.kind !== 'panel') continue;
+
     if (layoutStore.isPanelOpen(item.id)) next.add(item.id);
   }
+
   openIds.value = next;
 }
 
@@ -74,8 +77,10 @@ onMounted(() => {
 function activate(item: ActivityItem) {
   if (item.kind === 'action') {
     item.onClick();
+
     return;
   }
+
   if (layoutStore.isPanelOpen(item.id)) {
     layoutStore.closePanel(item.id);
   } else {
@@ -86,11 +91,14 @@ function activate(item: ActivityItem) {
     // before opening the new one.
     for (const other of props.items) {
       if (other.kind !== 'panel') continue;
+
       if (other.id === item.id) continue;
+
       if (layoutStore.isPanelOpen(other.id)) {
         layoutStore.closePanel(other.id);
       }
     }
+
     layoutStore.openEdgePanel('left', {
       id: item.id,
       component: item.component,
@@ -101,6 +109,7 @@ function activate(item: ActivityItem) {
       ...(item.minimumSize !== undefined ? { minimumSize: item.minimumSize } : {}),
     });
   }
+
   // Optimistic flip; the onDidLayoutChange subscription in App.vue
   // reconciles via `sync()` if the layout disagrees.
   syncOpenState();

@@ -91,7 +91,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['background', 'tasks', 'autopilot'],
       run: () => {
         const id = 'jobs-panel';
+
         if (layoutStore.isPanelOpen(id)) return;
+
         layoutStore.openEdgePanel('left', {
           id,
           component: 'jobsPanel',
@@ -111,7 +113,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['shell', 'terminal', 'pty', 'settings'],
       run: () => {
         const id = 'terminals-panel';
+
         if (layoutStore.isPanelOpen(id)) return;
+
         layoutStore.openEdgePanel('left', {
           id,
           component: 'terminalsPanel',
@@ -135,6 +139,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           cols: 80,
           rows: 24,
         });
+
         layoutStore.addTerminalPanel(summary.id, summary.title);
       },
     },
@@ -157,6 +162,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           ...(record ? { sessionId: record.id } : {}),
           title: cwd ? `Terminal · ${cwd.split(/[\\/]/).pop()}` : 'Session Terminal',
         });
+
         layoutStore.addTerminalPanel(summary.id, summary.title);
       },
     },
@@ -168,7 +174,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['preferences', 'config'],
       run: () => {
         const id = 'settings-panel';
+
         if (layoutStore.isPanelOpen(id)) return;
+
         layoutStore.openEdgePanel('left', {
           id,
           component: 'settingsPanel',
@@ -192,6 +200,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       run: async () => {
         try {
           const ok = await invokeCommand('openLogFolder', {});
+
           if (!ok) toasts.warn("Couldn't open log folder", 'Path was returned as falsy.');
         } catch (err) {
           toasts.error("Couldn't open log folder", toErrorMessage(err));
@@ -207,6 +216,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       when: () => clientStore.ready,
       run: async () => {
         const record = await sessionsStore.createSession();
+
         if (record) layoutStore.addPanel(record.id);
       },
     },
@@ -222,6 +232,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         // "dark"; "dark" → "light". Simpler than threading the resolved
         // ref through.
         const next = current === 'dark' ? 'light' : 'dark';
+
         await settingsStore.setTheme(next);
       },
     },
@@ -237,13 +248,19 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       run: () => {
         // The dock api is the source of truth; reach in via layoutStore.
         const dock = layoutStore.api;
+
         if (!dock) return;
+
         const existing = dock.getPanel('playground');
+
         if (existing) {
           existing.api.setActive();
+
           return;
         }
+
         const bodyId = layoutStore.firstBodyGroupId();
+
         if (bodyId) {
           dock.addPanel({
             id: 'playground',
@@ -279,7 +296,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       when: () => layoutStore.activeSessionId !== null,
       run: async () => {
         const id = layoutStore.activeSessionId;
+
         if (!id) return;
+
         await sc.run(id);
       },
     });
@@ -287,12 +306,15 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
   // ---------- Dynamic: New Session in <workspace> (MRU) ----------
   const workspaceCommandIds = new Set<string>();
+
   watch(
     () => settingsStore.settings.workspaces.recent,
     (recent) => {
       const nextIds = new Set<string>();
+
       for (const path of recent) {
         const id = `session.new.workspace.${path}`;
+
         nextIds.add(id);
         registry.register({
           id,
@@ -305,6 +327,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             const record = await sessionsStore.createSession({
               workingDirectory: path,
             });
+
             if (record) {
               void settingsStore.recordWorkspaceUse(path);
               layoutStore.addPanel(record.id);
@@ -313,11 +336,14 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           when: () => clientStore.ready,
         });
       }
+
       // Sweep entries that fell off the MRU.
       for (const id of workspaceCommandIds) {
         if (!nextIds.has(id)) registry.unregister(id);
       }
+
       workspaceCommandIds.clear();
+
       for (const id of nextIds) workspaceCommandIds.add(id);
     },
     { immediate: true, deep: true },
@@ -325,12 +351,15 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
   // ---------- Dynamic: Switch Model: <model> ----------
   const modelCommandIds = new Set<string>();
+
   watch(
     () => modelsStore.models,
     (models) => {
       const nextIds = new Set<string>();
+
       for (const m of models) {
         const id = `model.switch.${m.id}`;
+
         nextIds.add(id);
         registry.register({
           id,
@@ -342,20 +371,26 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           when: () => clientStore.ready && layoutStore.activeSessionId !== null,
           run: async () => {
             const sid = layoutStore.activeSessionId;
+
             if (!sid) return;
+
             // Preserve the current reasoning effort when switching
             // models (sessionsStore overwrites it otherwise — `null`
             // means "use the SDK default", which would silently drop
             // a "high" preference the user set on the previous model).
             const record = sessionsStore.getSession(sid);
+
             await sessionsStore.setSessionModel(sid, m.id, record?.reasoningEffort ?? null);
           },
         });
       }
+
       for (const id of modelCommandIds) {
         if (!nextIds.has(id)) registry.unregister(id);
       }
+
       modelCommandIds.clear();
+
       for (const id of nextIds) modelCommandIds.add(id);
     },
     { immediate: true, deep: true },
@@ -363,14 +398,18 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
   // ---------- Dynamic: Switch to Session: <title> ----------
   const sessionCommandIds = new Set<string>();
+
   watch(
     () => sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
     (records) => {
       const nextIds = new Set<string>();
+
       for (const r of records) {
         const id = `session.switch.${r.id}`;
+
         nextIds.add(id);
         const label = r.title ?? `Session ${r.id.slice(0, 8)}…`;
+
         registry.register({
           id,
           label: `Switch to: ${label}`,
@@ -388,14 +427,18 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           when: () => Boolean(layoutStore.api?.getPanel(r.id)),
           run: () => {
             const panel = layoutStore.api?.getPanel(r.id);
+
             panel?.api.setActive();
           },
         });
       }
+
       for (const id of sessionCommandIds) {
         if (!nextIds.has(id)) registry.unregister(id);
       }
+
       sessionCommandIds.clear();
+
       for (const id of nextIds) sessionCommandIds.add(id);
     },
     { immediate: true, deep: true },
@@ -407,6 +450,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     { mode: 'plan', label: 'Plan', icon: 'pi pi-list-check' },
     { mode: 'autopilot', label: 'Autopilot', icon: 'pi pi-bolt' },
   ];
+
   for (const { mode, label, icon } of RUN_MODES) {
     registry.register({
       id: `runMode.set.${mode}`,
@@ -417,7 +461,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       when: () => clientStore.ready && layoutStore.activeSessionId !== null,
       run: async () => {
         const sid = layoutStore.activeSessionId;
+
         if (!sid) return;
+
         await sessionsStore.setSessionMode(sid, mode);
       },
     });
@@ -434,6 +480,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       const openSessionCount = sessionsStore.sessions.length;
       const doReset = () => {
         layoutStore.resetToDefault();
+
         if (openSessionCount > 0) {
           toasts.info(
             'Layout reset',
@@ -443,6 +490,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           toasts.info('Layout reset', 'Sessions sidebar re-opened.');
         }
       };
+
       // Confirm when 2+ sessions are open. The action is reversible
       // (sessions stay resumable from the Sessions Manager) but
       // mass-closing tabs by accident is annoying enough that an
@@ -470,8 +518,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 /// the `hint` (right column) and fuzzy-search corpus.
 function shortPath(path: string): string {
   if (!path) return '';
+
   const sep = path.includes('\\') ? '\\' : '/';
   const parts = path.split(sep).filter(Boolean);
+
   if (parts.length <= 2) return path;
+
   return `${parts[0]}${sep}…${sep}${parts[parts.length - 1]}`;
 }

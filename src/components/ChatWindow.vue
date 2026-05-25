@@ -84,6 +84,7 @@ const messagesEl = ref<HTMLElement | null>(null);
 const tileEl = ref<HTMLElement | null>(null);
 const composerRef = ref<{
   focus: () => void;
+  appendText?: (text: string) => void;
   addAttachment?: (attachment: SendMessageAttachment) => void;
   exitCommandMode?: () => void;
   enterCommandMode?: () => void;
@@ -99,25 +100,33 @@ const commandResultOrder = ref<Record<string, number>>({});
 /// Filter by sessionId so the event only acts on the matching tile.
 function onExternalFocusRequest(e: Event) {
   const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+
   if (!detail || detail.sessionId !== props.sessionId) return;
+
   void scrollToBottom().then(() => composerRef.value?.focus());
 }
 
 function onExternalCommandTerminalRequest(e: Event) {
   const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+
   if (!detail || detail.sessionId !== props.sessionId) return;
-  void composerRef.value?.enterCommandMode?.();
+
+  composerRef.value?.enterCommandMode?.();
 }
 
 function onExternalCloseCommandTerminalRequest(e: Event) {
   const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+
   if (!detail || detail.sessionId !== props.sessionId) return;
+
   composerRef.value?.exitCommandMode?.();
 }
 
 function onExternalScrollToBottom(e: Event) {
   const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+
   if (!detail || detail.sessionId !== props.sessionId) return;
+
   void scrollToBottom();
 }
 
@@ -157,6 +166,7 @@ let tileResizeRaf: number | null = null;
 
 onMounted(() => {
   if (typeof ResizeObserver === 'undefined' || !tileEl.value) return;
+
   const el = tileEl.value;
   const update = () => {
     tileResizeRaf = null;
@@ -164,8 +174,10 @@ onMounted(() => {
   };
   const schedule = () => {
     if (tileResizeRaf !== null) return;
+
     tileResizeRaf = requestAnimationFrame(update);
   };
+
   update();
   tileResizeObserver = new ResizeObserver(schedule);
   tileResizeObserver.observe(el);
@@ -174,6 +186,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   tileResizeObserver?.disconnect();
   tileResizeObserver = null;
+
   if (tileResizeRaf !== null) {
     cancelAnimationFrame(tileResizeRaf);
     tileResizeRaf = null;
@@ -205,8 +218,11 @@ const isSending = computed(() =>
 /// — the tab + sidebar dot read `record.isThinking` directly.
 const recordIsThinking = computed(() => {
   const r = sessionsStore.getSession(props.sessionId);
+
   if (!r) return false;
+
   if (r.sawTurnBoundary) return r.isThinking;
+
   return isSending.value;
 });
 
@@ -221,6 +237,7 @@ const commandResults = computed(() => commandResultsStore.recordsBySession[props
 const timelineItems = computed(() => {
   const out: Array<ChatItem | { kind: 'commandResult'; id: number; record: CommandResultRecord }> =
     [...items.value];
+
   for (const record of commandResults.value) {
     out.push({
       kind: 'commandResult',
@@ -228,16 +245,20 @@ const timelineItems = computed(() => {
       record,
     });
   }
+
   return out.sort((a, b) => a.id - b.id);
 });
 
 async function scrollToBottom() {
   await nextTick();
+
   if (typeof requestAnimationFrame !== 'undefined') {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
+
   const el = messagesEl.value;
+
   if (el) el.scrollTop = el.scrollHeight;
 }
 
@@ -250,14 +271,18 @@ let isFirstBatch = true;
 /// gating the work behind requestAnimationFrame we collapse all
 /// events that landed in the same frame into a single reducer pass.
 let pendingFlush: number | null = null;
+
 function scheduleFlush(): void {
   if (pendingFlush !== null) return;
+
   if (typeof requestAnimationFrame === 'undefined') {
     // Test environments (jsdom etc.) — flush synchronously so the
     // existing chatEvents tests don't have to wait for a frame.
     flush();
+
     return;
   }
+
   pendingFlush = requestAnimationFrame(() => {
     pendingFlush = null;
     flush();
@@ -267,22 +292,29 @@ function scheduleFlush(): void {
 function flush(): void {
   const dropped = props.droppedEventCount ?? 0;
   const target = dropped + props.events.length;
+
   if (processedAbsolute >= target) return;
+
   // Slice index inside the (possibly trimmed) events array. clamped
   // to 0 in case the ring buffer trimmed events we hadn't processed
   // yet — those are lost, but the cap is high enough that this only
   // happens for surfaces that mount very late in a long session.
   const startIdx = Math.max(0, processedAbsolute - dropped);
   const fresh = props.events.slice(startIdx);
+
   processedAbsolute = target;
   const live = !isFirstBatch;
+
   isFirstBatch = false;
   const result = processEvents(items.value, ambient.value, fresh, idCounter, {
     live,
   });
+
   items.value = result.items;
   ambient.value = result.ambient;
+
   if (result.idle || result.error) isSendingFallback.value = false;
+
   for (const t of result.toasts) {
     switch (t.severity) {
       case 'success':
@@ -298,14 +330,17 @@ function flush(): void {
         toasts.info(t.summary, t.detail);
     }
   }
+
   if (result.error && live) {
     const lastSystem = [...result.items]
       .reverse()
       .find((i) => i.kind === 'system' && i.severity === 'error');
+
     if (lastSystem && lastSystem.kind === 'system') {
       toasts.error('Session error', lastSystem.text);
     }
   }
+
   scrollToBottom();
 }
 
@@ -353,6 +388,7 @@ async function sendMessage(
   },
 ) {
   if (!payload.text) return;
+
   const concreteMode = payload.mode === 'default' ? props.defaultSendMode : payload.mode;
 
   items.value = appendUserMessage(items.value, payload.text, idCounter, payload.attachments);
@@ -372,6 +408,7 @@ async function sendMessage(
     }
   } catch (error) {
     const message = toErrorMessage(error);
+
     items.value = appendSystemMessage(items.value, `Error: ${message}`, idCounter);
     toasts.error('Failed to send message', message);
     isSendingFallback.value = false;
@@ -385,14 +422,19 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
 
 async function ensureCommandTerminal(): Promise<string | null> {
   if (commandTerminalId.value) return commandTerminalId.value;
+
   try {
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
+
     commandTerminalId.value = terminal.id;
     layoutStore.closePanel(`terminal-${terminal.id}`);
+
     return terminal.id;
   } catch (err) {
     const message = toErrorMessage(err);
+
     toasts.error('Failed to open session terminal', message);
+
     return null;
   }
 }
@@ -401,6 +443,7 @@ async function onRequestCommandTerminal(): Promise<void> {
   commandModeOpenedAt.value = Date.now();
   await ensureCommandTerminal();
   await nextTick();
+
   if (commandTerminalId.value) {
     window.dispatchEvent(
       new CustomEvent('dafman:focus-terminal', {
@@ -412,9 +455,12 @@ async function onRequestCommandTerminal(): Promise<void> {
 
 async function openFullSessionTerminal(): Promise<void> {
   const terminalId = await ensureCommandTerminal();
+
   if (!terminalId) return;
+
   composerRef.value?.exitCommandMode?.();
   const terminal = terminalStore.terminals.find((t) => t.id === terminalId);
+
   layoutStore.addTerminalPanel(terminalId, terminal?.title ?? 'Session Shell');
 }
 
@@ -438,7 +484,9 @@ watch(commandResults, (records) => {
         [record.id]: idCounter.next++,
       };
     }
+
     if (record.status === 'running' || autoAttachedCommandIds.has(record.id)) continue;
+
     autoAttachedCommandIds.add(record.id);
     addCommandResultAttachment(record);
   }
@@ -449,10 +497,13 @@ watch(
   (commands) => {
     for (const command of commands) {
       if (!command.command || capturedTerminalCommandIds.has(command.id)) continue;
+
       if (new Date(command.startedAt).getTime() < commandModeOpenedAt.value) continue;
+
       capturedTerminalCommandIds.add(command.id);
       const now = new Date().toISOString();
       const output = cleanTerminalCommandOutput(command.output ?? '');
+
       commandResultsStore.addLocal({
         id: command.id,
         sessionId: props.sessionId,
@@ -483,10 +534,8 @@ function onMessageEdit(itemId: number) {
 }
 
 function onMessageQuote(quotedText: string) {
-  const composer = composerRef.value as {
-    appendText?: (v: string) => void;
-    focus: () => void;
-  } | null;
+  const composer = composerRef.value;
+
   composer?.appendText?.(quotedText);
 }
 
@@ -494,10 +543,13 @@ function onMessageQuote(quotedText: string) {
 /// and re-send the new text in the SAME session.
 async function onEditorSave(eventId: string, newText: string): Promise<void> {
   editingItemId.value = null;
+
   if (!eventId) {
     toasts.warn("Can't save edit", 'Missing server anchor for this message.');
+
     return;
   }
+
   try {
     await sessionsStore.editUserMessage(props.sessionId, eventId, newText);
     items.value = [];
@@ -516,12 +568,16 @@ async function onEditorSave(eventId: string, newText: string): Promise<void> {
 /// is left intact. The new session opens as a new dockview panel.
 async function onEditorSaveFork(eventId: string, newText: string): Promise<void> {
   editingItemId.value = null;
+
   if (!eventId) {
     toasts.warn("Can't fork", 'Missing server anchor for this message.');
+
     return;
   }
+
   try {
     const newId = await sessionsStore.forkAndSend(props.sessionId, eventId, newText);
+
     layoutStore.addPanel(newId);
     layoutStore.activatePanel(newId);
   } catch {
@@ -539,15 +595,18 @@ async function onMessageRetry(assistantItemIndex: number) {
   // we resend.
   for (let i = assistantItemIndex - 1; i >= 0; i--) {
     const it = items.value[i];
+
     if (it && it.kind === 'user' && it.eventId) {
       try {
         await sessionsStore.retryFromEvent(props.sessionId, it.eventId, it.text);
       } catch {
         // Toast already shown by the store action.
       }
+
       return;
     }
   }
+
   toasts.warn(
     "Can't retry from here",
     'No preceding user message with a server-acknowledged anchor.',
@@ -566,26 +625,35 @@ async function onMessageRetry(assistantItemIndex: number) {
 /// For user messages we just use their own eventId.
 function resolveForkAnchor(itemIndex: number): string | undefined {
   const item = items.value[itemIndex];
+
   if (!item) return undefined;
+
   if (item.kind === 'user' && item.eventId) return item.eventId;
+
   for (let i = itemIndex; i >= 0; i--) {
     const it = items.value[i];
+
     if (it && it.kind === 'user' && it.eventId) return it.eventId;
   }
+
   return undefined;
 }
 
 async function onMessageFork(itemIndex: number) {
   const anchor = resolveForkAnchor(itemIndex);
+
   if (!anchor) {
     toasts.warn(
       "Can't fork from here",
       'Need a preceding user message with a server-acknowledged anchor.',
     );
+
     return;
   }
+
   try {
     const newId = await sessionsStore.forkSession(props.sessionId, anchor);
+
     layoutStore.addPanel(newId);
     layoutStore.activatePanel(newId);
   } catch {
@@ -602,29 +670,37 @@ async function onMessageFork(itemIndex: number) {
 /// 3. Nothing matched → toast hint to open via the sidebar.
 async function onForkNoticeClick(referenceName: string) {
   const loaded = sessionsStore.findSessionByName(referenceName);
+
   if (loaded) {
     if (!layoutStore.isPanelOpen(loaded.id)) {
       layoutStore.addPanel(loaded.id);
     }
+
     layoutStore.activatePanel(loaded.id);
+
     return;
   }
 
   if (!sessionsListStore.hasLoaded) {
     await sessionsListStore.refresh();
   }
+
   const catalogHit = sessionsListStore.findByName(referenceName);
+
   if (catalogHit) {
     try {
       const restored = await sessionsStore.restoreSession(catalogHit.sessionId);
       const id = restored?.id ?? catalogHit.sessionId;
+
       if (!layoutStore.isPanelOpen(id)) {
         layoutStore.addPanel(id);
       }
+
       layoutStore.activatePanel(id);
     } catch {
       // restoreSession surfaces its own toast on failure.
     }
+
     return;
   }
 
@@ -638,14 +714,19 @@ async function onForkNoticeClick(referenceName: string) {
 /// the paths are actually useful and expandable.
 const commandsRun = computed(() => {
   if (typeof props.commandsRun === 'number') return props.commandsRun;
+
   let total = 0;
+
   for (const it of items.value) {
     if (it.kind !== 'tool') continue;
+
     const name = it.toolName.toLowerCase();
+
     if (name === 'shell' || name === 'bash' || name === 'exec' || name === 'execute') {
       total++;
     }
   }
+
   return total;
 });
 
@@ -662,7 +743,9 @@ const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
 /// global modal's queue count.
 const pendingStyle = computed(() => {
   const req = pendingHead.value;
+
   if (!req) return null;
+
   return styleFor(req.kind);
 });
 </script>

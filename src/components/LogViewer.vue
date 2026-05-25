@@ -76,28 +76,35 @@ onBeforeUnmount(() => {
 
 watch(filtered, () => {
   if (!followTail.value) return;
+
   void nextTick(() => scrollToBottom());
 });
 
 function scrollToBottom(): void {
   const el = listEl.value;
+
   if (el) el.scrollTop = el.scrollHeight;
 }
 
 function onScroll(): void {
   const el = listEl.value;
+
   if (!el) return;
+
   const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+
   followTail.value = atBottom;
 }
 
 async function exportNow(): Promise<void> {
   try {
     const result = await logStore.exportBundle();
+
     toasts.success(
       'Diagnostics ready',
       `${result.files.length} file(s), ${(result.totalBytes / 1024).toFixed(1)} KiB`,
     );
+
     // Reveal the directory so the user can zip it up for a bug report.
     try {
       await invokeCommand('revealPath', { path: result.path });
@@ -116,6 +123,7 @@ function clearAll(): void {
 
 function fmtTime(ts: string): string {
   const t = ts.slice(11, 23);
+
   return t || ts;
 }
 
@@ -131,29 +139,37 @@ function auditLabel(entry: AuditEntry): string {
       ? `domain ${entry.approvalDomain}`
       : (entry.approvalKind ?? '');
     const tail = scope ? ` · ${scope}` : '';
+
     return `${entry.permissionKind} ${verb}${tail}`;
   }
+
   if (entry.kind === 'command') {
     const exit = typeof entry.exitCode === 'number' ? ` · exit ${entry.exitCode}` : '';
+
     return `${entry.status} · ${entry.command}${exit}`;
   }
+
   return `${entry.allowed ? 'opened' : 'blocked'} · ${entry.url}`;
 }
 
 function formatTime(ts: string): string {
   // Strip date for compactness; full ISO available via tooltip.
   const t = ts.slice(11, 23);
+
   return t || ts;
 }
 
 function fieldsFor(record: LogRecord): Record<string, unknown> {
   const { ts: _ts, level: _level, message: _msg, ...rest } = record;
+
   return rest;
 }
 
 function formatFields(fields: Record<string, unknown>): string {
   const keys = Object.keys(fields);
+
   if (keys.length === 0) return '';
+
   try {
     return JSON.stringify(fields);
   } catch {

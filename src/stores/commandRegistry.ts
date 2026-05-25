@@ -70,6 +70,7 @@ export const useCommandRegistry = defineStore('commandRegistry', () => {
 
   function register(command: Command): () => void {
     commands.value.set(command.id, command);
+
     return () => unregister(command.id);
   }
 
@@ -79,6 +80,7 @@ export const useCommandRegistry = defineStore('commandRegistry', () => {
 
   function safeWhen(cmd: Command): boolean {
     if (!cmd.when) return true;
+
     try {
       return cmd.when();
     } catch {

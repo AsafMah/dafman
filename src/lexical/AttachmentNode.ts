@@ -76,18 +76,24 @@ export class AttachmentNode extends DecoratorNode<null> {
     const label = labelForAttachment(attachment);
 
     const dom = document.createElement('span');
+
     dom.className = 'composer-attachment-pill';
     dom.dataset.attachmentType = attachment.type;
+
     if (attachment.type === 'commandResult') {
       dom.dataset.attachmentKind = 'command-result';
     }
+
     if (isImage) {
       dom.dataset.attachmentKind = 'image';
     }
+
     const icon = document.createElement('i');
+
     icon.className = `pi ${iconClassForAttachment(attachment, isImage)} composer-attachment-pill-icon`;
     icon.setAttribute('aria-hidden', 'true');
     const text = document.createElement('span');
+
     text.className = 'composer-attachment-pill-label';
     text.textContent = label;
     dom.appendChild(icon);
@@ -109,6 +115,7 @@ export class AttachmentNode extends DecoratorNode<null> {
       e.stopPropagation();
       void openAttachment(attachment);
     });
+
     return dom;
   }
 
@@ -145,8 +152,11 @@ export function labelForAttachment(a: SendMessageAttachment): string {
   if (a.type === 'file' || a.type === 'directory') {
     return a.displayName ?? a.path.split(/[\\/]/).pop() ?? a.path;
   }
+
   if (a.type === 'blob') return a.displayName ?? 'attachment';
+
   if (a.type === 'commandResult') return a.displayName ?? `Command: ${a.result.command}`;
+
   return 'selection';
 }
 
@@ -156,9 +166,13 @@ function promptTextForAttachment(a: SendMessageAttachment): string {
 
 function iconClassForAttachment(a: SendMessageAttachment, isImage: boolean): string {
   if (a.type === 'directory') return 'pi-folder';
+
   if (a.type === 'selection') return 'pi-bookmark';
+
   if (a.type === 'commandResult') return 'pi-terminal';
+
   if (isImage) return 'pi-image';
+
   return 'pi-file';
 }
 

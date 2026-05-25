@@ -35,11 +35,13 @@ function endsWithSeparator(prefix: string): boolean {
 /// normalization (which would coerce `/` <-> `\` on Windows).
 function leafOf(prefix: string): string {
   const lastSlash = Math.max(prefix.lastIndexOf('/'), prefix.lastIndexOf('\\'));
+
   return lastSlash === -1 ? prefix : prefix.slice(lastSlash + 1);
 }
 
 export function browseDirectorySync(prefix: string): string[] {
   const trimmed = prefix.trim();
+
   if (!trimmed) return [];
 
   // If the input ends with a separator, treat the whole thing as the
@@ -47,6 +49,7 @@ export function browseDirectorySync(prefix: string): string[] {
   // Otherwise the trailing segment is the search prefix.
   let parent: string;
   let leafPrefix: string;
+
   if (endsWithSeparator(trimmed)) {
     parent = trimmed;
     leafPrefix = '';
@@ -58,6 +61,7 @@ export function browseDirectorySync(prefix: string): string[] {
   }
 
   let entries: string[];
+
   try {
     entries = readdirSync(parent);
   } catch {
@@ -66,25 +70,33 @@ export function browseDirectorySync(prefix: string): string[] {
 
   const lowerPrefix = leafPrefix.toLowerCase();
   const matches: string[] = [];
+
   for (const name of entries) {
     if (lowerPrefix.length > 0 && !name.toLowerCase().startsWith(lowerPrefix)) {
       continue;
     }
+
     // Skip hidden / dot-prefixed entries unless the user is explicitly
     // typing a dot — saves them from `.git` / `.next` / `node_modules`
     // noise on every keystroke.
     if (lowerPrefix.length === 0 && name.startsWith('.')) continue;
+
     const full = join(parent, name);
+
     try {
       if (!statSync(full).isDirectory()) continue;
     } catch {
       continue;
     }
+
     matches.push(full);
+
     if (matches.length >= MAX_RESULTS) break;
   }
+
   // Sort case-insensitively — matches the way Explorer presents
   // entries and is more useful than the FS-default insertion order.
   matches.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
   return matches;
 }

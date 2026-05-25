@@ -34,15 +34,22 @@ export const useBootStore = defineStore('boot', () => {
   /// currently the slowest active path.
   const statusText = computed<string>(() => {
     if (phase.value === 'ready') return 'Ready';
+
     if (phase.value === 'failed') return error.value ?? 'Failed to start';
+
     if (phase.value === 'applying') return 'Applying layout…';
+
     if (phase.value === 'sessions') {
       if (sessionsTotal.value === 0) return 'Restoring sessions…';
+
       return `Restoring sessions… ${sessionsRestored.value} of ${sessionsTotal.value}`;
     }
+
     // Parallel phase: advertise whichever piece isn't done yet.
     if (!clientReady.value) return 'Starting Copilot CLI…';
+
     if (!settingsLoaded.value) return 'Loading settings…';
+
     return 'Starting up…';
   });
 

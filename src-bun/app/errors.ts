@@ -73,12 +73,15 @@ export function rpcGuard<TArgs, TResult>(
       return await fn(args);
     } catch (err) {
       let payload: AppErrorPayload;
+
       if (err instanceof AppError) {
         payload = err.payload;
       } else {
         const message = toErrorMessage(err);
+
         payload = { kind: 'Sdk', data: message };
       }
+
       throw new Error(`${APP_ERROR_PREFIX}${JSON.stringify(payload)}`);
     }
   };

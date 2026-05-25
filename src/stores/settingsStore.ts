@@ -58,6 +58,7 @@ function defaultSettings(): Settings {
 /// Hard upper bound on the workspace MRU; matches the backend constant
 /// `WORKSPACES_MRU_LIMIT`. Anything past this is trimmed off the tail.
 const WORKSPACES_MRU_LIMIT = 10;
+
 type TerminalPrefsPatch = Omit<Partial<TerminalPrefs>, 'addons' | 'theme'> & {
   addons?: Partial<TerminalPrefs['addons']>;
   theme?: Partial<TerminalPrefs['theme']>;
@@ -71,11 +72,14 @@ export const useSettingsStore = defineStore('settings', () => {
   async function load(): Promise<Settings> {
     try {
       const next = await invokeCommand('getSettings', {});
+
       settings.value = next;
       loaded.value = true;
+
       return next;
     } catch (err) {
       const message = toErrorMessage(err);
+
       useToastStore().error('Failed to load settings', message);
       throw err;
     }
@@ -83,12 +87,16 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function update(next: Settings): Promise<Settings> {
     isSaving.value = true;
+
     try {
       const written = await invokeCommand('updateSettings', { next });
+
       settings.value = written;
+
       return written;
     } catch (err) {
       const message = toErrorMessage(err);
+
       useToastStore().error('Failed to save settings', message);
       throw err;
     } finally {
@@ -190,14 +198,18 @@ export const useSettingsStore = defineStore('settings', () => {
   /// capped at WORKSPACES_MRU_LIMIT.
   async function recordWorkspaceUse(path: string): Promise<void> {
     const trimmed = path.trim();
+
     if (!trimmed) return;
+
     const prev = settings.value.workspaces.recent;
     const filtered = prev.filter((p) => p !== trimmed);
     const next = [trimmed, ...filtered].slice(0, WORKSPACES_MRU_LIMIT);
+
     // Avoid a write if nothing changed (same head, same length).
     if (prev.length === next.length && prev.every((p, i) => p === next[i])) {
       return;
     }
+
     try {
       await update({
         ...settings.value,
@@ -213,6 +225,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /// real — the backend doesn't validate at this layer.
   async function setDefaultWorkspace(path: string): Promise<void> {
     const trimmed = path.trim();
+
     try {
       await update({
         ...settings.value,

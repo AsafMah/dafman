@@ -20,16 +20,21 @@ export const useModelsStore = defineStore('models', () => {
 
   async function load(): Promise<ModelSummary[]> {
     if (loaded.value) return models.value;
+
     if (inflight) return inflight;
+
     isLoading.value = true;
     inflight = (async () => {
       try {
         const next = await invokeCommand('listModels', {});
+
         models.value = next;
         loaded.value = true;
+
         return next;
       } catch (err) {
         const message = toErrorMessage(err);
+
         useToastStore().error('Failed to load models', message);
         throw err;
       } finally {
@@ -37,6 +42,7 @@ export const useModelsStore = defineStore('models', () => {
         inflight = null;
       }
     })();
+
     return inflight;
   }
 

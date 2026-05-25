@@ -104,9 +104,13 @@ export function shortPanelTitle(sessionId: string): string {
 /// "C:\\repo\\dafman\\" and "C:\\repo\\dafman" produce the same result.
 export function basename(path: string | null | undefined): string {
   if (!path) return '';
+
   const trimmed = path.trim().replace(/[\\/]+$/, '');
+
   if (!trimmed) return '';
+
   const match = trimmed.match(/[\\/]([^\\/]+)$/);
+
   return match ? match[1] : trimmed;
 }
 
@@ -122,6 +126,7 @@ export function basename(path: string | null | undefined): string {
 /// rather than a positional arg.)
 export function composePanelTitle(sessionId: string, title: string | null): string {
   if (title) return title;
+
   return shortPanelTitle(sessionId);
 }
 
@@ -171,30 +176,42 @@ export const useLayoutStore = defineStore('layout', () => {
 
   function panelId(panel: unknown): string | null {
     const api = (panel as { api?: { id?: unknown } }).api;
+
     if (typeof api?.id === 'string') return api.id;
+
     const flat = (panel as { id?: unknown }).id;
+
     return typeof flat === 'string' ? flat : null;
   }
 
   function edgePanels(edge: unknown): unknown[] {
     const panels = (edge as { panels?: unknown[] }).panels;
+
     return Array.isArray(panels) ? panels : [];
   }
 
   function edgeId(edge: unknown): string | null {
     const id = (edge as { id?: unknown }).id;
+
     return typeof id === 'string' ? id : null;
   }
 
   function edgePanelsFromDock(edge: unknown): unknown[] {
     const direct = edgePanels(edge);
+
     if (direct.length > 0) return direct;
+
     const id = edgeId(edge);
     const dock = api.value;
+
     if (!id || !dock) return [];
+
     const group = dock.groups.find((g) => g.id === id);
+
     if (!group) return [];
+
     const panels = (group as unknown as { panels?: unknown[] }).panels;
+
     return Array.isArray(panels) ? panels : [];
   }
 
@@ -204,21 +221,31 @@ export const useLayoutStore = defineStore('layout', () => {
         ? SESSION_DETAILS_MIN_WIDTH
         : undefined;
     }
+
     if (position !== 'left') return undefined;
+
     let min: number | undefined;
+
     for (const panel of edgePanelsFromDock(edge)) {
       const id = panelId(panel);
+
       if (!id) continue;
+
       const candidate = LEFT_EDGE_MIN_BY_PANEL_ID[id];
+
       if (candidate === undefined) continue;
+
       min = Math.max(min ?? 0, candidate);
     }
+
     return min;
   }
 
   function applyEdgeMinimum(position: EdgeGroupPosition, minimumSize: number | undefined): void {
     const edge = api.value?.getEdgeGroup(position);
+
     if (!edge || minimumSize === undefined) return;
+
     const effectiveMinimum = effectiveEdgeMinimum(position, minimumSize);
     const edgeApi = edge as unknown as {
       width?: number;
@@ -226,6 +253,7 @@ export const useLayoutStore = defineStore('layout', () => {
       setSize?: (value: { width?: number; height?: number }) => void;
       setConstraints?: (value: { minimumWidth?: number; minimumHeight?: number }) => void;
     };
+
     if (typeof edgeApi.setConstraints === 'function') {
       if (position === 'left' || position === 'right') {
         edgeApi.setConstraints.call(edge, { minimumWidth: effectiveMinimum });
@@ -233,7 +261,9 @@ export const useLayoutStore = defineStore('layout', () => {
         edgeApi.setConstraints.call(edge, { minimumHeight: effectiveMinimum });
       }
     }
+
     const current = position === 'left' || position === 'right' ? edgeApi.width : edgeApi.height;
+
     if (
       typeof current === 'number' &&
       current < effectiveMinimum &&
@@ -255,16 +285,20 @@ export const useLayoutStore = defineStore('layout', () => {
       position === 'left' || position === 'right'
         ? ((dock as unknown as { width?: number } | null)?.width ?? viewportWidth)
         : ((dock as unknown as { height?: number } | null)?.height ?? viewportHeight);
+
     if (available === undefined || !Number.isFinite(available) || available <= 0) {
       return desired;
     }
+
     const floor = position === 'left' || position === 'right' ? 160 : 120;
     const maxEdge = Math.max(floor, Math.floor(available * 0.46));
+
     return Math.min(desired, maxEdge);
   }
 
   function edgeSize(position: EdgeGroupPosition, edge: unknown): number | undefined {
     const edgeApi = edge as { width?: number; height?: number };
+
     return position === 'left' || position === 'right' ? edgeApi.width : edgeApi.height;
   }
 
@@ -274,7 +308,9 @@ export const useLayoutStore = defineStore('layout', () => {
     minimumSize: number | undefined,
   ): boolean {
     if (minimumSize === undefined) return false;
+
     const current = edgeSize(position, edge);
+
     return typeof current === 'number' && current < effectiveEdgeMinimum(position, minimumSize);
   }
 
@@ -284,16 +320,22 @@ export const useLayoutStore = defineStore('layout', () => {
     minimumSize: number,
   ): boolean {
     const dock = api.value;
+
     if (!dock) return false;
+
     const panels = edgePanelsFromDock(edge);
     const knownPanels = panels
       .map((panel) => {
         const id = panelId(panel);
+
         return id ? EDGE_PANEL_DEFINITIONS[id] : undefined;
       })
       .filter((panel): panel is Omit<EdgePanelOptions, 'exclusive'> => !!panel);
+
     if (knownPanels.length === 0) return false;
+
     const effectiveMinimum = effectiveEdgeMinimum(position, minimumSize);
+
     dock.removeEdgeGroup(position);
     const initialSize = Math.max(
       effectiveMinimum,
@@ -306,6 +348,7 @@ export const useLayoutStore = defineStore('layout', () => {
       initialSize,
       minimumSize: effectiveMinimum,
     });
+
     for (const panel of knownPanels) {
       dock.addPanel({
         id: panel.id,
@@ -316,19 +359,26 @@ export const useLayoutStore = defineStore('layout', () => {
         position: { referenceGroup: recreatedEdge.id },
       });
     }
+
     if (knownPanels.some((panel) => panel.id === SESSION_DETAILS_PANEL_ID)) {
       detailsOpen.value = true;
     }
+
     return true;
   }
 
   function enforceKnownEdgeMinimums(): void {
     const dock = api.value;
+
     if (!dock) return;
+
     for (const position of ['left', 'right'] as const) {
       const edge = dock.getEdgeGroup(position);
+
       if (!edge) continue;
+
       const minimumSize = minimumForEdgeGroup(position, edge);
+
       if (
         minimumSize !== undefined &&
         isEdgeBelowMinimum(position, edge, minimumSize) &&
@@ -336,16 +386,20 @@ export const useLayoutStore = defineStore('layout', () => {
       ) {
         continue;
       }
+
       applyEdgeMinimum(position, minimumSize);
     }
   }
 
   function recomputeActiveSession(dock: DockviewApi): void {
     const panel = dock.activeGroup?.activePanel;
+
     if (panel && panel.api.component === 'chat') {
       activeSessionId.value = panel.api.id;
+
       return;
     }
+
     // The active panel may be a non-chat surface (the rail itself,
     // Settings, Dev playground). Don't clobber `activeSessionId`
     // unless the previously-bound session is gone — otherwise the
@@ -353,44 +407,62 @@ export const useLayoutStore = defineStore('layout', () => {
     // tab steals focus. Walk the body groups for the currently-
     // active chat panel; only null out when none exists.
     const current = activeSessionId.value;
+
     if (current && dock.getPanel(current)) return;
+
     const panelComponent = (p: unknown): string | null => {
       const api = (p as { api?: { component?: unknown } }).api;
+
       if (typeof api?.component === 'string') return api.component;
+
       const flat = (p as { component?: unknown }).component;
+
       return typeof flat === 'string' ? flat : null;
     };
     const panelId = (p: unknown): string | null => {
       const api = (p as { api?: { id?: unknown } }).api;
+
       if (typeof api?.id === 'string') return api.id;
+
       const flat = (p as { id?: unknown }).id;
+
       return typeof flat === 'string' ? flat : null;
     };
+
     for (const group of dock.groups) {
       if (group.model.location.type !== 'grid') continue;
+
       const activeChat = group.activePanel;
+
       if (activeChat && panelComponent(activeChat) === 'chat') {
         const id = panelId(activeChat);
+
         if (id) {
           activeSessionId.value = id;
+
           return;
         }
       }
+
       for (const p of group.panels) {
         if (panelComponent(p) === 'chat') {
           const id = panelId(p);
+
           if (id) {
             activeSessionId.value = id;
+
             return;
           }
         }
       }
     }
+
     activeSessionId.value = null;
   }
 
   function rescanOpenDetails(dock: DockviewApi): void {
     let found = false;
+
     for (const group of dock.groups) {
       for (const panel of group.panels) {
         const rawApi = (panel as { api?: { id?: unknown } }).api;
@@ -400,25 +472,32 @@ export const useLayoutStore = defineStore('layout', () => {
             : typeof (panel as { id?: unknown }).id === 'string'
               ? (panel as { id: string }).id
               : null;
+
         if (id === SESSION_DETAILS_PANEL_ID) {
           found = true;
           break;
         }
       }
+
       if (found) break;
     }
+
     if (detailsOpen.value !== found) detailsOpen.value = found;
   }
 
   function setApi(next: DockviewApi | null): void {
     for (const unsub of activeUnsubs) unsub();
+
     activeUnsubs = [];
     api.value = next;
+
     if (!next) {
       activeSessionId.value = null;
       detailsOpen.value = false;
+
       return;
     }
+
     recomputeActiveSession(next);
     rescanOpenDetails(next);
     enforceKnownEdgeMinimums();
@@ -429,6 +508,7 @@ export const useLayoutStore = defineStore('layout', () => {
       rescanOpenDetails(next);
     });
     const addSub = next.onDidAddPanel(() => rescanOpenDetails(next));
+
     activeUnsubs = [
       () => groupSub.dispose(),
       () => panelSub.dispose(),
@@ -444,7 +524,9 @@ export const useLayoutStore = defineStore('layout', () => {
     opts: { title?: string; targetGroupId?: string } = {},
   ): void {
     const dock = api.value;
+
     if (!dock) return;
+
     if (dock.getPanel(sessionId)) return;
 
     // Resolve the best available title: explicit `opts.title` first,
@@ -452,11 +534,13 @@ export const useLayoutStore = defineStore('layout', () => {
     // then the short GUID prefix. The lazy import avoids a circular
     // dependency between layoutStore and sessionsStore.
     let resolvedTitle = opts.title;
+
     if (!resolvedTitle) {
       try {
         const { useSessionsStore } = require('../stores/sessionsStore');
         const sessionsStore = useSessionsStore();
         const record = sessionsStore.getSession(sessionId);
+
         if (record?.title) {
           resolvedTitle = composePanelTitle(sessionId, record.title);
         }
@@ -464,6 +548,7 @@ export const useLayoutStore = defineStore('layout', () => {
         // sessionsStore not available yet — fall through
       }
     }
+
     resolvedTitle ??= shortPanelTitle(sessionId);
     // Three placement cases:
     //
@@ -487,12 +572,16 @@ export const useLayoutStore = defineStore('layout', () => {
     // tab bar / lands in sidebar" cluster. Covered by tests now.
     let referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
     let createdBodyGroup = false;
+
     if (!referenceGroup) {
       const body = dock.addGroup();
+
       referenceGroup = body.id;
       createdBodyGroup = true;
     }
+
     const direction = opts.targetGroupId || createdBodyGroup ? 'within' : 'right';
+
     dock.addPanel({
       id: sessionId,
       component: 'chat',
@@ -500,6 +589,7 @@ export const useLayoutStore = defineStore('layout', () => {
       params: { sessionId },
       position: { referenceGroup, direction },
     });
+
     // Auto-open the session-details right-rail singleton alongside
     // the first chat panel (subsequent panels reuse the same rail
     // — it re-binds to whichever chat tab is active). Skips if the
@@ -512,20 +602,28 @@ export const useLayoutStore = defineStore('layout', () => {
 
   function addTerminalPanel(terminalId: string, title = 'Terminal'): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const panelId = `terminal-${terminalId}`;
     const existing = dock.getPanel(panelId);
+
     if (existing) {
       existing.api.setActive();
+
       return;
     }
+
     let referenceGroup = firstBodyGroupId();
     let createdBodyGroup = false;
+
     if (!referenceGroup) {
       const body = dock.addGroup();
+
       referenceGroup = body.id;
       createdBodyGroup = true;
     }
+
     dock.addPanel({
       id: panelId,
       component: 'terminal',
@@ -562,8 +660,11 @@ export const useLayoutStore = defineStore('layout', () => {
   /// Toggles the details rail. If open, closes; if closed, opens.
   function toggleSessionDetailsPanel(): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const panel = dock.getPanel(SESSION_DETAILS_PANEL_ID);
+
     if (panel) {
       dock.removePanel(panel);
     } else {
@@ -573,8 +674,11 @@ export const useLayoutStore = defineStore('layout', () => {
 
   function rememberSessionDetailsWidth(): void {
     const edge = api.value?.getEdgeGroup('right');
+
     if (!edge) return;
+
     const width = edge.width;
+
     if (Number.isFinite(width) && width >= SESSION_DETAILS_MIN_WIDTH) {
       lastSessionDetailsWidth.value = width;
     }
@@ -598,12 +702,17 @@ export const useLayoutStore = defineStore('layout', () => {
   /// placement).
   function firstBodyGroupId(): string | undefined {
     const dock = api.value;
+
     if (!dock) return undefined;
+
     const active = dock.activeGroup;
+
     if (active && active.model.location.type === 'grid') return active.id;
+
     for (const group of dock.groups) {
       if (group.model.location.type === 'grid') return group.id;
     }
+
     return undefined;
   }
 
@@ -616,26 +725,38 @@ export const useLayoutStore = defineStore('layout', () => {
   /// creates a fresh body group when none exists.
   function rescueChatPanelsFromEdgeGroups(): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const stuck: Array<{ panelId: string }> = [];
+
     for (const group of dock.groups) {
       if (group.model.location.type === 'grid') continue;
+
       for (const panel of group.panels) {
         if (panel.api.component === 'chat') {
           stuck.push({ panelId: panel.api.id });
         }
       }
     }
+
     if (stuck.length === 0) return;
+
     let bodyGroupId = firstBodyGroupId();
+
     if (!bodyGroupId) {
       const body = dock.addGroup();
+
       bodyGroupId = body.id;
     }
+
     const target = dock.getGroup(bodyGroupId);
+
     if (!target) return;
+
     for (const { panelId } of stuck) {
       const panel = dock.getPanel(panelId);
+
       // `moveTo` takes the concrete DockviewGroupPanel class but
       // `dock.getGroup()` is typed as IDockviewGroupPanel here. The
       // runtime value is the same instance; cast through unknown.
@@ -653,12 +774,18 @@ export const useLayoutStore = defineStore('layout', () => {
   /// Returns `true` if the swap happened (orphan was found).
   function replaceMissingPanel(orphanId: string, newSessionId: string): boolean {
     const dock = api.value;
+
     if (!dock) return false;
+
     const orphan = dock.getPanel(orphanId);
+
     if (!orphan) return false;
+
     const groupId = orphan.api.group.id;
+
     addPanel(newSessionId, { targetGroupId: groupId });
     dock.removePanel(orphan);
+
     return true;
   }
 
@@ -680,7 +807,9 @@ export const useLayoutStore = defineStore('layout', () => {
   /// touch persistence directly here.
   function resetToDefault(): void {
     const dock = api.value;
+
     if (!dock) return;
+
     // Copy the list — dockview mutates it during removePanel. The
     // typed `panels: readonly IDockviewPanel[]` is structurally
     // compatible with `removePanel(panel: DockviewGroupPanel)` at
@@ -692,14 +821,15 @@ export const useLayoutStore = defineStore('layout', () => {
     // partial / unknown state — one panel's removal throwing must
     // not strand the user with a half-cleared layout.
     const panels = dock.panels.slice();
+
     for (const panel of panels) {
       try {
         dock.removePanel(panel as unknown as Parameters<typeof dock.removePanel>[0]);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[layoutStore.resetToDefault] removePanel threw', err);
       }
     }
+
     // Re-open the Sessions sidebar at default size. Wrapped because
     // a broken dock may also throw on openEdgePanel; we'd rather log
     // and let the user create a session from the (empty) topbar than
@@ -715,15 +845,17 @@ export const useLayoutStore = defineStore('layout', () => {
         exclusive: true,
       });
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[layoutStore.resetToDefault] openEdgePanel threw', err);
     }
   }
 
   function removePanel(sessionId: string): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const panel = dock.getPanel(sessionId);
+
     if (panel) dock.removePanel(panel);
     // The session-details rail is a singleton bound to the active
     // session — closing one chat panel doesn't close the rail. It
@@ -735,15 +867,21 @@ export const useLayoutStore = defineStore('layout', () => {
   /// when a pending request fires for a non-active panel.
   function activatePanel(sessionId: string): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const panel = dock.getPanel(sessionId);
+
     if (panel) panel.api.setActive();
   }
 
   function renamePanel(sessionId: string, title: string): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const panel = dock.getPanel(sessionId);
+
     if (panel) panel.api.setTitle(title);
   }
 
@@ -762,25 +900,33 @@ export const useLayoutStore = defineStore('layout', () => {
   /// Without this, "close → reopen" produces a tiny strip.
   function openEdgePanel(position: EdgeGroupPosition, options: EdgePanelOptions): void {
     const dock = api.value;
+
     if (!dock) return;
+
     let existingGroup = dock.getEdgeGroup(position);
     let existing = dock.getPanel(options.id);
+
     if (existingGroup && isEdgeBelowMinimum(position, existingGroup, options.minimumSize)) {
       dock.removeEdgeGroup(position);
       existingGroup = undefined;
       existing = undefined;
     }
+
     if (existing) {
       existing.api.setActive();
       applyEdgeMinimum(
         position,
         options.minimumSize ?? minimumForEdgeGroup(position, existingGroup),
       );
+
       return;
     }
+
     applyEdgeMinimum(position, options.minimumSize);
+
     if (options.exclusive && existingGroup) {
       const panels = (existingGroup as unknown as { panels?: unknown[] }).panels ?? [];
+
       for (const panel of [...panels]) {
         const panelId =
           typeof (panel as { id?: unknown }).id === 'string'
@@ -788,11 +934,13 @@ export const useLayoutStore = defineStore('layout', () => {
             : typeof (panel as { api?: { id?: unknown } }).api?.id === 'string'
               ? (panel as { api: { id: string } }).api.id
               : '';
+
         if (panelId && panelId !== options.id) {
           dock.removePanel(panel as Parameters<typeof dock.removePanel>[0]);
         }
       }
     }
+
     if (existingGroup && options.initialSize !== undefined) {
       // dockview-vue's EdgeGroupApi exposes `width` / `height` via the
       // underlying group element. Read defensively — if the property
@@ -809,10 +957,12 @@ export const useLayoutStore = defineStore('layout', () => {
       // half-of-initialSize heuristic that just rescues "sliver"
       // panels.
       const recreateBelow = options.minimumSize ?? Math.max(40, options.initialSize / 2);
+
       if (typeof w === 'number' && w < recreateBelow) {
         dock.removeEdgeGroup(position);
       }
     }
+
     const edge =
       dock.getEdgeGroup(position) ??
       dock.addEdgeGroup(position, {
@@ -820,6 +970,7 @@ export const useLayoutStore = defineStore('layout', () => {
         ...(options.initialSize !== undefined ? { initialSize: options.initialSize } : {}),
         ...(options.minimumSize !== undefined ? { minimumSize: options.minimumSize } : {}),
       });
+
     dock.addPanel({
       id: options.id,
       component: options.component,
@@ -839,18 +990,27 @@ export const useLayoutStore = defineStore('layout', () => {
   /// `initialSize`.
   function pruneEmptyEdgeGroup(groupId: string): boolean {
     const dock = api.value;
+
     if (!dock) return false;
+
     for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
       const edge = dock.getEdgeGroup(pos);
+
       if (!edge) continue;
+
       if ((edge as unknown as { id?: string }).id !== groupId) continue;
+
       const panels = (edge as unknown as { panels?: unknown[] }).panels;
+
       if (Array.isArray(panels) && panels.length === 0) {
         dock.removeEdgeGroup(pos);
+
         return true;
       }
+
       return false;
     }
+
     return false;
   }
 
@@ -859,7 +1019,9 @@ export const useLayoutStore = defineStore('layout', () => {
   /// Manager, Library, …) to decide between open/close.
   function isPanelOpen(id: string): boolean {
     const dock = api.value;
+
     if (!dock) return false;
+
     return !!dock.getPanel(id);
   }
 
@@ -870,12 +1032,18 @@ export const useLayoutStore = defineStore('layout', () => {
   /// collapsed size. Idempotent for unknown ids.
   function closePanel(id: string): void {
     const dock = api.value;
+
     if (!dock) return;
+
     const panel = dock.getPanel(id);
+
     if (!panel) return;
+
     const group = panel.api.group;
     const wasLastInGroup = group.panels.length <= 1;
+
     dock.removePanel(panel);
+
     // If the group it lived in is now empty *and* it's an edge group,
     // remove it so size persistence resets. Body groups are left for
     // dockview to clean up on its own — body layout is the user's
@@ -883,6 +1051,7 @@ export const useLayoutStore = defineStore('layout', () => {
     if (wasLastInGroup) {
       for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
         const edge = dock.getEdgeGroup(pos);
+
         if (edge && (edge as unknown as { id?: string }).id === group.id) {
           dock.removeEdgeGroup(pos);
           break;
@@ -895,8 +1064,11 @@ export const useLayoutStore = defineStore('layout', () => {
   /// without destroying its contents).
   function toggleEdgeGroup(position: EdgeGroupPosition): void {
     const dock = api.value;
+
     if (!dock) return;
+
     if (!dock.getEdgeGroup(position)) return;
+
     dock.setEdgeGroupVisible(position, !dock.isEdgeGroupVisible(position));
   }
 
@@ -923,14 +1095,17 @@ export const useLayoutStore = defineStore('layout', () => {
   /// can fall back to opening the Sessions sidebar at default size).
   function restore(layout: unknown): boolean {
     const dock = api.value;
+
     if (!dock || !layout || typeof layout !== 'object') return false;
+
     try {
       dock.fromJSON(layout as Parameters<DockviewApi['fromJSON']>[0]);
       enforceKnownEdgeMinimums();
+
       return true;
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[layoutStore.restore] dockview.fromJSON threw — clearing layout', err);
+
       return false;
     }
   }

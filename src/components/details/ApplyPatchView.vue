@@ -35,6 +35,7 @@ function hunkBefore(
   lines: Array<{ kind: 'added' | 'removed' | 'context'; text: string }>,
 ): string {
   if (op === 'add') return '';
+
   return lines
     .filter((l) => l.kind !== 'added')
     .map((l) => l.text)
@@ -48,6 +49,7 @@ function hunkAfter(
   lines: Array<{ kind: 'added' | 'removed' | 'context'; text: string }>,
 ): string {
   if (op === 'delete') return '';
+
   return lines
     .filter((l) => l.kind !== 'removed')
     .map((l) => l.text)

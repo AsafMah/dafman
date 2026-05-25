@@ -71,25 +71,31 @@ function commonExtensions(): Extension[] {
 
 async function resolveLang(): Promise<void> {
   let ext: Extension | null = null;
+
   if (props.language) {
     ext = await resolveLanguageExtension(props.language);
   }
+
   if (!ext && props.filename) {
     ext = await resolveLanguageForFile(props.filename);
   }
+
   resolvedLang = ext;
 }
 
 function buildSync(): void {
   if (!host.value) return;
+
   if (mergeView) {
     mergeView.destroy();
     mergeView = null;
   }
+
   if (inlineView) {
     inlineView.destroy();
     inlineView = null;
   }
+
   host.value.innerHTML = '';
   host.value.classList.remove('merge-inline');
 

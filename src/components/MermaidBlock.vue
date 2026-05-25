@@ -33,31 +33,38 @@ type MermaidModule = {
 };
 
 let mermaidPromise: Promise<MermaidModule['default']> | null = null;
+
 function loadMermaid(): Promise<MermaidModule['default']> {
   if (mermaidPromise) return mermaidPromise;
+
   mermaidPromise = import('mermaid').then((mod) => {
     const m = (mod as unknown as MermaidModule).default;
     // Theme picks up our PrimeVue palette — colors flip with .app-dark
     // because mermaid pulls them from CSS variables on render.
     const isDark =
       typeof document !== 'undefined' && document.documentElement.classList.contains('app-dark');
+
     m.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
       theme: isDark ? 'dark' : 'default',
       fontFamily: 'inherit',
     });
+
     return m;
   });
+
   return mermaidPromise;
 }
 
 async function renderDiagram() {
   ready.value = false;
   error.value = '';
+
   try {
     const m = await loadMermaid();
     const { svg: out } = await m.render(localId, props.source);
+
     svg.value = out;
     ready.value = true;
   } catch (e) {

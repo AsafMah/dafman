@@ -62,6 +62,7 @@ function defaultSendScript(
   // SDK event envelope is { type, data, id, timestamp }. Reducer
   // expects messageId on data.* + content on data.content.
   const ts = new Date().toISOString();
+
   push({
     type: 'user.message',
     id: randomUUID(),
@@ -134,16 +135,19 @@ class FakeCopilotSession {
               userInvocable: true,
             },
           ];
+
           return {
             skills: catalog.map((s) => ({ ...s, enabled: !this.skillsDisabled.has(s.name) })),
           };
         },
         enable: async (args?: unknown) => {
           const { name } = (args ?? {}) as { name: string };
+
           this.skillsDisabled.delete(name);
         },
         disable: async (args?: unknown) => {
           const { name } = (args ?? {}) as { name: string };
+
           this.skillsDisabled.add(name);
         },
       },
@@ -177,14 +181,17 @@ class FakeCopilotSession {
 
   on(callback: (event: Record<string, unknown>) => void): () => void {
     this.state.listeners.add(callback);
+
     return () => this.state.listeners.delete(callback);
   }
 
   async send(args: { prompt: string; mode?: string; attachments?: unknown[] }): Promise<void> {
     const push = (event: Record<string, unknown>) => {
       this.state.history.push(event);
+
       for (const cb of this.state.listeners) cb(event);
     };
+
     await this.scriptRef.current(args, push, this.state);
   }
 
@@ -226,13 +233,16 @@ export class FakeCopilotClient {
 
   private loadCatalog(): void {
     if (!this.catalogPath || !existsSync(this.catalogPath)) return;
+
     try {
       const raw = readFileSync(this.catalogPath, 'utf8');
       const parsed = JSON.parse(raw) as {
         nextSeq?: number;
         sessions?: Array<{ sessionId: string; cwd?: string; model?: string }>;
       };
+
       if (typeof parsed.nextSeq === 'number') this.nextSeq = parsed.nextSeq;
+
       for (const s of parsed.sessions ?? []) {
         this.sessions.set(s.sessionId, {
           sessionId: s.sessionId,
@@ -250,6 +260,7 @@ export class FakeCopilotClient {
 
   private saveCatalog(): void {
     if (!this.catalogPath) return;
+
     try {
       mkdirSync(dirname(this.catalogPath), { recursive: true });
       const data = {
@@ -260,6 +271,7 @@ export class FakeCopilotClient {
           ...(s.model ? { model: s.model } : {}),
         })),
       };
+
       writeFileSync(this.catalogPath, JSON.stringify(data, null, 2));
     } catch {
       /* non-fatal */
@@ -271,10 +283,13 @@ export class FakeCopilotClient {
   /// resolved value so tests can assert the decision shape.
   async triggerPermission(sessionId: string, request: unknown): Promise<unknown> {
     const state = this.sessions.get(sessionId);
+
     if (!state) throw new Error(`fake session not found: ${sessionId}`);
+
     if (!state.onPermissionRequest) {
       throw new Error(`session ${sessionId} has no onPermissionRequest handler`);
     }
+
     return state.onPermissionRequest(request);
   }
 
@@ -292,6 +307,7 @@ export class FakeCopilotClient {
 
   async stop(): Promise<Error[]> {
     this.sessions.clear();
+
     return [];
   }
 
@@ -311,12 +327,15 @@ export class FakeCopilotClient {
       disposed: false,
       ...(opts.onPermissionRequest ? { onPermissionRequest: opts.onPermissionRequest } : {}),
     };
+
     this.sessions.set(sessionId, state);
     this.saveCatalog();
     const session = new FakeCopilotSession(state, this.sendScriptRef);
+
     if (opts.onEvent) {
       state.listeners.add(opts.onEvent);
     }
+
     // Push a session-ready event so dafman's reducer sees one.
     const ts = new Date().toISOString();
     const ready = {
@@ -325,8 +344,11 @@ export class FakeCopilotClient {
       timestamp: ts,
       data: { sessionId },
     };
+
     state.history.push(ready);
+
     for (const cb of state.listeners) cb(ready);
+
     return session;
   }
 
@@ -339,6 +361,7 @@ export class FakeCopilotClient {
     } = {},
   ): Promise<FakeCopilotSession> {
     let state = this.sessions.get(sessionId);
+
     if (!state) {
       state = {
         sessionId,
@@ -350,15 +373,20 @@ export class FakeCopilotClient {
       this.sessions.set(sessionId, state);
       this.saveCatalog();
     }
+
     if (opts.onPermissionRequest) state.onPermissionRequest = opts.onPermissionRequest;
+
     // Resume keeps the persisted cwd unless caller explicitly
     // overrides — same semantics dafman expects from the real SDK.
     if (opts.workingDirectory) {
       state.cwd = opts.workingDirectory;
       this.saveCatalog();
     }
+
     const session = new FakeCopilotSession(state, this.sendScriptRef);
+
     if (opts.onEvent) state.listeners.add(opts.onEvent);
+
     return session;
   }
 
@@ -373,6 +401,7 @@ export class FakeCopilotClient {
     }>
   > {
     const now = new Date();
+
     return [...this.sessions.values()].map((s) => ({
       sessionId: s.sessionId,
       startTime: now,
@@ -382,9 +411,7 @@ export class FakeCopilotClient {
     }));
   }
 
-  async getSessionMetadata(
-    sessionId: string,
-  ): Promise<
+  async getSessionMetadata(sessionId: string): Promise<
     | {
         sessionId: string;
         startTime: Date;
@@ -395,8 +422,11 @@ export class FakeCopilotClient {
     | undefined
   > {
     const s = this.sessions.get(sessionId);
+
     if (!s) return undefined;
+
     const now = new Date();
+
     return {
       sessionId: s.sessionId,
       startTime: now,
@@ -427,6 +457,7 @@ export class FakeCopilotClient {
           const opts = (args ?? {}) as { sessionId?: string };
           const src = opts.sessionId ? this.sessions.get(opts.sessionId) : undefined;
           const newId = `fake-session-${this.nextSeq++}`;
+
           this.sessions.set(newId, {
             sessionId: newId,
             ...(src?.cwd ? { cwd: src.cwd } : {}),
@@ -434,6 +465,7 @@ export class FakeCopilotClient {
             history: src ? [...src.history] : [],
             disposed: false,
           });
+
           return { sessionId: newId };
         },
       },
@@ -478,6 +510,7 @@ export class FakeCopilotClient {
               name: string;
               config: Record<string, unknown>;
             };
+
             this.mcpConfigs.set(name, config);
           },
           update: async (args) => {
@@ -485,19 +518,23 @@ export class FakeCopilotClient {
               name: string;
               config: Record<string, unknown>;
             };
+
             this.mcpConfigs.set(name, config);
           },
           remove: async (args) => {
             const { name } = (args ?? {}) as { name: string };
+
             this.mcpConfigs.delete(name);
             this.mcpDisabled.delete(name);
           },
           enable: async (args) => {
             const { names } = (args ?? {}) as { names: string[] };
+
             for (const n of names ?? []) this.mcpDisabled.delete(n);
           },
           disable: async (args) => {
             const { names } = (args ?? {}) as { names: string[] };
+
             for (const n of names ?? []) this.mcpDisabled.add(n);
           },
         },
@@ -522,7 +559,9 @@ export class FakeCopilotClient {
         config: {
           setDisabledSkills: async (args) => {
             const { disabledSkills } = (args ?? {}) as { disabledSkills: string[] };
+
             this.skillsDisabled.clear();
+
             for (const n of disabledSkills ?? []) this.skillsDisabled.add(n);
           },
         },
@@ -552,6 +591,7 @@ export class FakeCopilotClient {
               userInvocable: true,
             },
           ];
+
           return {
             skills: catalog.map((s) => ({
               ...s,

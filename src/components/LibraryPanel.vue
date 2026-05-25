@@ -24,18 +24,24 @@ import LibraryInstructionsTab from './LibraryInstructionsTab.vue';
 // Persist the last-active tab across panel re-mounts so toggling the
 // activity bar doesn't lose the user's place.
 const STORAGE_KEY = 'dafman.library.activeTab';
+
 function readActiveTab(): string {
   if (typeof localStorage === 'undefined') return 'mcp';
+
   try {
     return localStorage.getItem(STORAGE_KEY) ?? 'mcp';
   } catch {
     return 'mcp';
   }
 }
+
 const activeTab = ref<string>(readActiveTab());
+
 function onTabChange(value: string | number) {
   const next = String(value);
+
   activeTab.value = next;
+
   try {
     localStorage.setItem(STORAGE_KEY, next);
   } catch {
@@ -50,8 +56,10 @@ function onTabChange(value: string | number) {
 // on next reload).
 function onActivateRequest(e: Event) {
   const detail = (e as CustomEvent<{ tab?: string }>).detail;
+
   if (detail?.tab) onTabChange(detail.tab);
 }
+
 onMounted(() => {
   window.addEventListener('dafman:library-activate-tab', onActivateRequest);
 });
@@ -67,8 +75,8 @@ onBeforeUnmount(() => {
     </header>
     <Tabs
       :value="activeTab"
-      @update:value="onTabChange"
       class="library-tabs"
+      @update:value="onTabChange"
     >
       <TabList>
         <Tab value="mcp">MCP</Tab>

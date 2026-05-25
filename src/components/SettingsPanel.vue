@@ -88,6 +88,7 @@ const defaultModel = computed<string>({
     const effort = model?.supportsReasoningEffort
       ? (settings.value.appearance.defaultReasoningEffort ?? model.defaultReasoningEffort)
       : null;
+
     void settingsStore.setDefaultModel(value, effort);
   },
 });
@@ -138,16 +139,18 @@ function hexNoHash(value: string): string {
 
 function hexWithHash(value: string): string {
   const clean = hexNoHash(value);
+
   return clean ? `#${clean}` : '';
 }
 
 function setTerminalColor(which: 'background' | 'foreground', value: string): void {
   const next = hexWithHash(value) || terminalPrefs.value.theme[which];
+
   void settingsStore.setTerminalPrefs({ theme: { [which]: next } });
 }
 
 function setTerminalAddon(key: keyof TerminalAddonPrefs, value: boolean): void {
-  void settingsStore.setTerminalPrefs({ addons: { [key]: value } as Partial<TerminalAddonPrefs> });
+  void settingsStore.setTerminalPrefs({ addons: { [key]: value } });
 }
 
 const theme = computed<ThemeChoice>({
@@ -187,6 +190,7 @@ const notifyTurnEnd = computed<boolean>({
   get: () => settings.value.notifications?.turnEnd ?? false,
   set: (value) => {
     void settingsStore.setNotifications({ turnEnd: value });
+
     // If the user just turned ON a notification and the browser
     // doesn't have permission yet, kick off the prompt so they
     // don't enable a no-op toggle. Skipped when turning OFF.
@@ -200,6 +204,7 @@ const notifyWaitingForInput = computed<boolean>({
   get: () => settings.value.notifications?.waitingForInput ?? true,
   set: (value) => {
     void settingsStore.setNotifications({ waitingForInput: value });
+
     if (value && notificationsStore.permission === 'default') {
       void notificationsStore.requestPermission();
     }
@@ -226,11 +231,14 @@ async function askPermission() {
 
 async function openLogFolder() {
   const toasts = useToastStore();
+
   try {
     const ok = await invokeCommand('openLogFolder', {});
+
     if (!ok) toasts.warn('Log folder not available yet');
   } catch (err) {
     const message = toErrorMessage(err);
+
     toasts.error("Couldn't open log folder", message);
   }
 }
@@ -240,6 +248,7 @@ async function openLogFolder() {
 /// Committed on blur / Enter. Synced from the store whenever the
 /// canonical value changes (e.g. the startup backfill landed).
 const defaultWorkspaceDraft = ref<string>(settings.value.workspaces.defaultWorkspace ?? '');
+
 watch(
   () => settings.value.workspaces.defaultWorkspace,
   (next) => {
@@ -251,24 +260,31 @@ watch(
 
 async function commitDefaultWorkspace() {
   const next = defaultWorkspaceDraft.value.trim();
+
   if (next === settings.value.workspaces.defaultWorkspace) return;
+
   await settingsStore.setDefaultWorkspace(next);
 }
 
 const isPickingDefault = ref(false);
+
 async function pickDefaultWorkspace() {
   if (isPickingDefault.value) return;
+
   isPickingDefault.value = true;
+
   try {
     const picked = await invokeCommand('pickFolder', {
       startingFolder: defaultWorkspaceDraft.value.trim() || undefined,
     });
+
     if (picked) {
       defaultWorkspaceDraft.value = picked;
       await settingsStore.setDefaultWorkspace(picked);
     }
   } catch (err) {
     const message = toErrorMessage(err);
+
     useToastStore().error("Couldn't pick folder", message);
   } finally {
     isPickingDefault.value = false;
@@ -277,11 +293,14 @@ async function pickDefaultWorkspace() {
 
 async function revealDefaultWorkspace() {
   const path = defaultWorkspaceDraft.value.trim();
+
   if (!path) return;
+
   try {
     await invokeCommand('revealPath', { path });
   } catch (err) {
     const message = toErrorMessage(err);
+
     useToastStore().error("Couldn't reveal folder", message);
   }
 }
@@ -299,6 +318,7 @@ const defaultApproveAll = computed<boolean>({
 /// expanded so a fresh open shows every option, matching how a
 /// search UI will eventually surface them.
 const collapsed = reactive<Record<string, boolean>>({});
+
 function toggle(id: string) {
   collapsed[id] = !collapsed[id];
 }
@@ -452,8 +472,8 @@ function toggle(id: string) {
       >
         <div class="field">
           <span
-            class="field-label"
             id="default-workspace-label"
+            class="field-label"
           >
             Default workspace
           </span>

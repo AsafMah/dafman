@@ -48,6 +48,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   function detectInitialPermission(): PermissionState {
     if (typeof Notification === 'undefined') return 'unsupported';
+
     return Notification.permission;
   }
 
@@ -56,20 +57,27 @@ export const useNotificationsStore = defineStore('notifications', () => {
   async function requestPermission(): Promise<PermissionState> {
     if (typeof Notification === 'undefined') {
       permission.value = 'unsupported';
+
       return 'unsupported';
     }
+
     if (Notification.permission === 'granted') {
       permission.value = 'granted';
+
       return 'granted';
     }
+
     try {
       const result = await Notification.requestPermission();
+
       permission.value = result;
+
       return result;
     } catch {
       // Some browsers throw on the legacy callback path; treat as
       // denied so the UI can show the right state.
       permission.value = 'denied';
+
       return 'denied';
     }
   }
@@ -78,8 +86,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
   /// is enabled in settings, permission is granted).
   const canFire = computed(() => (kind: NotificationKind): boolean => {
     if (permission.value !== 'granted') return false;
+
     const prefs = settingsStore.settings.notifications;
+
     if (!prefs) return false;
+
     return prefs[kind];
   });
 
@@ -89,18 +100,21 @@ export const useNotificationsStore = defineStore('notifications', () => {
   /// inner indicators alone.
   function notify(options: NotifyOptions): boolean {
     if (!canFire.value(options.kind)) return false;
+
     try {
       const n = new Notification(options.title, {
         body: options.body,
         tag: options.tag,
         // Future: an icon path here. Branding ticket carries this.
       });
+
       n.onclick = () => {
         try {
           window.focus();
         } catch {
           /* no-op */
         }
+
         if (options.sessionId) {
           window.dispatchEvent(
             new CustomEvent('dafman:focus-session', {
@@ -108,12 +122,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
             }),
           );
         }
+
         n.close();
       };
+
       return true;
     } catch (err) {
       // Don't toast — this fires from a hot path (every turn_end).
       console.error('[notifications] new Notification threw', err);
+
       return false;
     }
   }

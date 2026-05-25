@@ -43,8 +43,10 @@ const raw = computed<Record<string, unknown>>(() => props.request.raw ?? {});
 function pickStr(...keys: string[]): string | null {
   for (const k of keys) {
     const v = raw.value[k];
+
     if (typeof v === 'string' && v.length > 0) return v;
   }
+
   return null;
 }
 
@@ -66,6 +68,7 @@ const shellCommand = computed(() => pickStr('fullCommandText', 'command', 'cmd')
 /// re-approval".
 const offeredIdentifiers = computed<string[]>(() => {
   const v = raw.value.commandIdentifiers;
+
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 });
 
@@ -76,6 +79,7 @@ const offeredIdentifiers = computed<string[]>(() => {
 const broadIdentifier = computed<string>(() => {
   const offered = offeredIdentifiers.value;
   const wildcard = offered.find((id) => id.endsWith(':*'));
+
   return wildcard ?? offered[0] ?? '';
 });
 
@@ -89,7 +93,9 @@ const shellCustom = ref(shellCommand.value);
 
 const shellRule = computed<PermissionApprovalRule | null>(() => {
   if (props.request.kind !== 'shell' && props.request.kind !== 'hook') return null;
+
   let id: string;
+
   if (shellChoice.value === 'exact') id = shellCommand.value.trim();
   else if (shellChoice.value === 'broad') id = broadIdentifier.value;
   else {
@@ -98,10 +104,13 @@ const shellRule = computed<PermissionApprovalRule | null>(() => {
     // matcher rules). Bare custom strings without `:*` would
     // only match literal equality.
     const c = shellCustom.value.trim();
+
     if (!c) id = '';
     else id = c.endsWith(':*') ? c : `${c}:*`;
   }
+
   if (!id) return null;
+
   return { kind: 'commands', commandIdentifiers: [id] };
 });
 
@@ -114,7 +123,9 @@ const mcpChoice = ref<McpChoice>(mcpTool.value ? 'this-tool' : 'all-tools');
 
 const mcpRule = computed<PermissionApprovalRule | null>(() => {
   if (props.request.kind !== 'mcp') return null;
+
   if (!mcpServer.value) return null;
+
   return mcpChoice.value === 'this-tool' && mcpTool.value
     ? { kind: 'mcp', serverName: mcpServer.value, toolName: mcpTool.value }
     : { kind: 'mcp', serverName: mcpServer.value, toolName: null };
@@ -124,7 +135,9 @@ const mcpRule = computed<PermissionApprovalRule | null>(() => {
 const customToolName = computed(() => pickStr('toolName', 'tool') ?? '');
 const customToolRule = computed<PermissionApprovalRule | null>(() => {
   if (props.request.kind !== 'custom-tool') return null;
+
   if (!customToolName.value) return null;
+
   return { kind: 'custom-tool', toolName: customToolName.value };
 });
 
@@ -143,25 +156,37 @@ const domainInput = ref(urlHost.value);
 const submitPayload = computed<{ approval?: PermissionApprovalRule; domain?: string } | null>(
   () => {
     const k = props.request.kind;
+
     if (k === 'shell') {
       const r = shellRule.value;
+
       return r ? { approval: r } : null;
     }
+
     if (k === 'read') return { approval: { kind: 'read' } };
+
     if (k === 'write') return { approval: { kind: 'write' } };
+
     if (k === 'memory') return { approval: { kind: 'memory' } };
+
     if (k === 'mcp') {
       const r = mcpRule.value;
+
       return r ? { approval: r } : null;
     }
+
     if (k === 'custom-tool') {
       const r = customToolRule.value;
+
       return r ? { approval: r } : null;
     }
+
     if (k === 'url') {
       const d = domainInput.value.trim();
+
       return d ? { domain: d } : null;
     }
+
     // hook + anything we don't know -> blanket
     return {};
   },
@@ -171,6 +196,7 @@ const canSubmit = computed(() => submitPayload.value !== null);
 
 function submit() {
   const p = submitPayload.value;
+
   if (p) emit('submit', p);
 }
 </script>

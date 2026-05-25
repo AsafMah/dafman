@@ -122,14 +122,17 @@ export function validateAgentName(name: string): void {
   if (!name || typeof name !== 'string') {
     throw AppError.sdk('agent name is required');
   }
+
   if (name.length > 64) {
     throw AppError.sdk('agent name too long (max 64 chars)');
   }
+
   if (!NAME_RE.test(name)) {
     throw AppError.sdk(
       'agent name must match [A-Za-z0-9][A-Za-z0-9._-]{0,63} (letters, digits, dot, hyphen, underscore)',
     );
   }
+
   if (WINDOWS_RESERVED.has(name.toLowerCase())) {
     throw AppError.sdk(`agent name "${name}" is a Windows reserved device name`);
   }
@@ -148,28 +151,34 @@ function resolveTargetPath(
 ): { path: string; root: string } {
   validateAgentName(name);
   let root: string;
+
   if (scope === 'user') {
     root = userAgentsDir();
   } else if (scope === 'project') {
     if (!workingDirectory) {
       throw AppError.sdk('project scope requires a workingDirectory');
     }
+
     if (!isAbsolute(workingDirectory)) {
       throw AppError.sdk('workingDirectory must be absolute');
     }
+
     root = projectAgentsDir(workingDirectory);
   } else {
     throw AppError.sdk(`unknown agent scope: ${scope}`);
   }
+
   const normalizedRoot = normalize(root);
   const filename = `${name}.agent.md`;
   const candidate = resolve(normalizedRoot, filename);
   const rel = relative(normalizedRoot, candidate);
+
   if (rel.startsWith('..') || isAbsolute(rel) || rel.includes('..')) {
     throw AppError.sdk(
       `resolved agent path escapes scope root: ${candidate} not under ${normalizedRoot}`,
     );
   }
+
   return { path: candidate, root: normalizedRoot };
 }
 
@@ -191,20 +200,31 @@ function serializeFrontmatter(spec: AgentFileSpec): string {
   const emitArray = (key: string, items: string[]): void => {
     if (items.length === 0) {
       lines.push(`${key}: []`);
+
       return;
     }
+
     lines.push(`${key}:`);
+
     for (const item of items) lines.push(`  - ${quote(item)}`);
   };
+
   lines.push(`name: ${quote(spec.name)}`);
+
   if (spec.displayName !== undefined && spec.displayName !== spec.name) {
     lines.push(`displayName: ${quote(spec.displayName)}`);
   }
+
   lines.push(`description: ${quote(spec.description)}`);
+
   if (spec.tools && spec.tools.length > 0) emitArray('tools', spec.tools);
+
   if (spec.skills && spec.skills.length > 0) emitArray('skills', spec.skills);
+
   if (spec.model) lines.push(`model: ${quote(spec.model)}`);
-  if (spec.userInvocable === false) lines.push(`user-invocable: false`);
+
+  if (spec.userInvocable === false) lines.push('user-invocable: false');
+
   return lines.join('\n');
 }
 
@@ -214,13 +234,16 @@ function serializeFrontmatter(spec: AgentFileSpec): string {
 /// writes don't collide. On crash the temp leaks but we ignore it.
 async function atomicWrite(path: string, content: string): Promise<void> {
   const tmp = `${path}.tmp-${randomSuffix()}`;
+
   await writeFile(tmp, content, 'utf-8');
+
   try {
     // Use writeFile to do an atomic-enough overwrite via rename
     // fallback. Node's rename is atomic on POSIX; on Windows we
     // rely on it overwriting the destination if it exists (Node
     // 22+ supports it; otherwise we'd unlink first).
     const { rename } = await import('node:fs/promises');
+
     await rename(tmp, path);
   } catch (err) {
     // Cleanup tmp on failure so we don't leave it on disk.
@@ -229,6 +252,7 @@ async function atomicWrite(path: string, content: string): Promise<void> {
     } catch {
       /* ignore */
     }
+
     throw err;
   }
 }
@@ -252,19 +276,25 @@ export async function listAgentFiles(opts: {
 }): Promise<DiscoveredAgentFile[]> {
   const out: DiscoveredAgentFile[] = [];
   const tasks: Array<Promise<void>> = [];
+
   if (opts.includeUser !== false) {
     tasks.push(scanDir(userAgentsDir(), 'user', out));
   }
+
   if (opts.includeProject !== false && opts.workingDirectory) {
     tasks.push(scanDir(projectAgentsDir(opts.workingDirectory), 'project', out));
   }
+
   await Promise.all(tasks);
+
   return out;
 }
 
 async function scanDir(dir: string, scope: AgentScope, out: DiscoveredAgentFile[]): Promise<void> {
   if (!existsSync(dir)) return;
+
   let entries: Awaited<ReturnType<typeof readdir>>;
+
   try {
     entries = await readdir(dir);
   } catch (err) {
@@ -272,12 +302,16 @@ async function scanDir(dir: string, scope: AgentScope, out: DiscoveredAgentFile[
       dir,
       error: toErrorMessage(err),
     });
+
     return;
   }
+
   for (const entry of entries) {
     if (!entry.endsWith('.md')) continue;
+
     const canonical = entry.endsWith('.agent.md');
     const name = entry.replace(/(\.agent)?\.md$/, '');
+
     out.push({
       scope,
       name,
@@ -295,16 +329,21 @@ export async function writeAgent(spec: AgentFileSpec, workingDirectory?: string)
   if (!spec.description || spec.description.trim().length === 0) {
     throw AppError.sdk('description is required');
   }
+
   const { path, root } = resolveTargetPath(spec.scope, spec.name, workingDirectory);
+
   if (existsSync(path)) {
     throw AppError.sdk(`agent already exists at ${path}; delete it first to overwrite`);
   }
+
   await mkdir(root, { recursive: true });
   const frontmatter = serializeFrontmatter(spec);
   const body = spec.prompt.trim().length > 0 ? `${spec.prompt.trim()}\n` : '';
   const content = `---\n${frontmatter}\n---\n\n${body}`;
+
   await atomicWrite(path, content);
   log.info('wrote agent file', { path, scope: spec.scope, name: spec.name });
+
   return path;
 }
 
@@ -317,12 +356,17 @@ export async function deleteAgent(
   workingDirectory?: string,
 ): Promise<boolean> {
   const { path } = resolveTargetPath(scope, name, workingDirectory);
+
   if (!existsSync(path)) return false;
+
   const info = await stat(path);
+
   if (!info.isFile()) {
     throw AppError.sdk(`refusing to delete non-file at ${path}`);
   }
+
   await rm(path, { force: true });
   log.info('deleted agent file', { path, scope, name });
+
   return true;
 }

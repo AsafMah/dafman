@@ -43,13 +43,17 @@ const openSessionIds = computed(() => new Set(sessionsStore.sessions.map((s) => 
 /// without iterating `sessionsStore.sessions` per row.
 const recordsById = computed(() => {
   const map = new Map<string, (typeof sessionsStore.sessions)[number]>();
+
   for (const r of sessionsStore.sessions) map.set(r.id, r);
+
   return map;
 });
 
 function indicatorFor(sessionId: string): NotificationStyle | null {
   const r = recordsById.value.get(sessionId);
+
   if (!r) return null;
+
   return indicatorStyle(r.pendingRequests[0]?.kind, r.isThinking, r.unseenTurns);
 }
 
@@ -66,25 +70,32 @@ function sessionKindIcon(sessionId: string): {
   muted: boolean;
 } {
   const open = openSessionIds.value.has(sessionId);
+
   if (!open) {
     return { iconClass: 'pi-comments', tooltip: 'Closed session', muted: true };
   }
+
   const r = recordsById.value.get(sessionId);
+
   if (!r) {
     return { iconClass: 'pi-comments', tooltip: 'Open session', muted: false };
   }
+
   // Heuristic: a session with zero user/assistant message events is
   // still a "draft". We don't count tool/reasoning events because
   // those can fire mid-creation before any user typing.
   const hasUserOrAssistantMessage = r.events.some(
     (e) => e.eventType === 'user.message' || e.eventType === 'assistant.message',
   );
+
   if (!hasUserOrAssistantMessage) {
     return { iconClass: 'pi-pencil', tooltip: 'Draft — no messages yet', muted: false };
   }
+
   if (r.isThinking) {
     return { iconClass: 'pi-bolt', tooltip: 'Turn active', muted: false };
   }
+
   return { iconClass: 'pi-comments', tooltip: 'Open session', muted: false };
 }
 
@@ -94,7 +105,9 @@ function sessionKindIcon(sessionId: string): {
 /// busy.
 function extraPendingCount(sessionId: string): number {
   const r = recordsById.value.get(sessionId);
+
   if (!r) return 0;
+
   return Math.max(0, r.pendingRequests.length - 1);
 }
 
@@ -105,9 +118,11 @@ function extraPendingCount(sessionId: string): number {
 function sortedGroupSessions(group: { sessions: SessionMetadataSummary[] }) {
   const open: SessionMetadataSummary[] = [];
   const closed: SessionMetadataSummary[] = [];
+
   for (const s of group.sessions) {
     (openSessionIds.value.has(s.sessionId) ? open : closed).push(s);
   }
+
   return [...open, ...closed];
 }
 
@@ -136,12 +151,16 @@ const sessionWorkspaces = computed<string[]>(() =>
 const allKnownWorkspaces = computed<string[]>(() => {
   const seen = new Set<string>();
   const out: string[] = [];
+
   for (const p of [...recentWorkspaces.value, ...sessionWorkspaces.value]) {
     const key = p.toLowerCase();
+
     if (seen.has(key)) continue;
+
     seen.add(key);
     out.push(p);
   }
+
   return out;
 });
 
@@ -150,9 +169,12 @@ const allKnownWorkspaces = computed<string[]>(() => {
 // hasn't typed anything yet (empty → non-empty transition).
 const initialWorkspaceCandidate = computed<string>(() => {
   const def = settings.value.workspaces?.defaultWorkspace ?? '';
+
   if (def) return def;
+
   return allKnownWorkspaces.value[0] ?? '';
 });
+
 watch(
   initialWorkspaceCandidate,
   (next) => {
@@ -174,7 +196,9 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
   // Empty input → all known workspaces (MRU + session-derived).
   if (!query) {
     workspaceSuggestions.value = [...known];
+
     if (browseTimer !== null) clearTimeout(browseTimer);
+
     return;
   }
 
@@ -185,8 +209,10 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
 
   // Filesystem browse only when the input looks pathy (has a separator).
   const looksLikePath = /[/\\]/.test(query);
+
   if (!looksLikePath) {
     workspaceSuggestions.value = knownMatches;
+
     return;
   }
 
@@ -194,35 +220,47 @@ async function onSearchWorkspaces(event: AutoCompleteCompleteEvent) {
   workspaceSuggestions.value = knownMatches;
 
   if (browseTimer !== null) clearTimeout(browseTimer);
+
   const seq = ++browseSeq;
+
   browseTimer = setTimeout(async () => {
     browseTimer = null;
     let fs: string[] = [];
+
     try {
       fs = await invokeCommand('browseDirectory', { prefix: query });
     } catch {
       /* expected while typing — keep known-matches-only */
     }
+
     if (seq !== browseSeq) return;
+
     const seenLower = new Set(knownMatches.map((p) => p.toLowerCase()));
     const merged = [...knownMatches];
+
     for (const candidate of fs) {
       const k = candidate.toLowerCase();
+
       if (seenLower.has(k)) continue;
+
       seenLower.add(k);
       merged.push(candidate);
     }
+
     workspaceSuggestions.value = merged;
   }, 120);
 }
 
 async function onPickFolder() {
   if (isPickingFolder.value) return;
+
   isPickingFolder.value = true;
+
   try {
     const picked = await invokeCommand('pickFolder', {
       ...(workspaceDraft.value.trim() ? { startingFolder: workspaceDraft.value.trim() } : {}),
     });
+
     if (picked) workspaceDraft.value = picked;
   } catch {
     /* toast already shown */
@@ -233,10 +271,13 @@ async function onPickFolder() {
 
 async function onCreateSession() {
   const wd = workspaceDraft.value.trim();
+
   try {
     const record = await sessionsStore.createSession(wd ? { workingDirectory: wd } : {});
+
     if (record) {
       if (wd) void settingsStore.recordWorkspaceUse(wd);
+
       layoutStore.addPanel(record.id, {
         title: composePanelTitle(record.id, record.title),
       });
@@ -248,10 +289,13 @@ async function onCreateSession() {
 
 async function onNewInWorkspace(workspacePath: string) {
   const wd = workspacePath.trim();
+
   try {
     const record = await sessionsStore.createSession(wd ? { workingDirectory: wd } : {});
+
     if (record) {
       if (wd) void settingsStore.recordWorkspaceUse(wd);
+
       layoutStore.addPanel(record.id, {
         title: composePanelTitle(record.id, record.title),
       });
@@ -296,6 +340,7 @@ async function onResume(session: SessionMetadataSummary) {
   if (openSessionIds.value.has(session.sessionId)) {
     const dock = layoutStore.api;
     const panel = dock?.getPanel(session.sessionId);
+
     if (panel) {
       panel.api.setActive();
     } else {
@@ -305,6 +350,7 @@ async function onResume(session: SessionMetadataSummary) {
       // another panel grabbed focus during the addPanel flow.
       layoutStore.activatePanel(session.sessionId);
     }
+
     window.dispatchEvent(
       new CustomEvent('dafman:scroll-to-bottom', {
         detail: { sessionId: session.sessionId },
@@ -315,22 +361,28 @@ async function onResume(session: SessionMetadataSummary) {
         detail: { sessionId: session.sessionId },
       }),
     );
+
     return;
   }
+
   // Optimistic flip + finally-cleanup so a failed resume doesn't
   // strand the spinner. The Set copy/reassign dance is so Vue's
   // reactivity picks up the change — mutating the underlying Set
   // doesn't notify watchers.
   const next = new Set(resumingIds.value);
+
   next.add(session.sessionId);
   resumingIds.value = next;
+
   try {
     const record = await sessionsStore.restoreSession(session.sessionId);
+
     if (record) layoutStore.addPanel(record.id);
   } catch {
     /* toast already shown */
   } finally {
     const after = new Set(resumingIds.value);
+
     after.delete(session.sessionId);
     resumingIds.value = after;
   }
@@ -338,6 +390,7 @@ async function onResume(session: SessionMetadataSummary) {
 
 function onDelete(event: Event, session: SessionMetadataSummary) {
   const label = session.summary ?? `session ${session.sessionId.slice(0, 8)}…`;
+
   confirm.require({
     group: 'sessions-manager',
     target: event.currentTarget as HTMLElement,
@@ -351,6 +404,7 @@ function onDelete(event: Event, session: SessionMetadataSummary) {
       if (openSessionIds.value.has(session.sessionId)) {
         layoutStore.removePanel(session.sessionId);
       }
+
       try {
         await sessionsList.deleteSession(session.sessionId);
       } catch {
@@ -362,20 +416,31 @@ function onDelete(event: Event, session: SessionMetadataSummary) {
 
 function relativeTime(iso: string): string {
   const then = Date.parse(iso);
+
   if (Number.isNaN(then)) return iso;
+
   const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+
   if (diffSec < 60) return 'just now';
+
   const m = Math.floor(diffSec / 60);
+
   if (m < 60) return `${m}m ago`;
+
   const h = Math.floor(m / 60);
+
   if (h < 24) return `${h}h ago`;
+
   const d = Math.floor(h / 24);
+
   if (d < 7) return `${d}d ago`;
+
   return new Date(then).toLocaleDateString();
 }
 
 function sessionLabel(session: SessionMetadataSummary): string {
   if (session.summary && session.summary.trim()) return session.summary;
+
   return `session ${session.sessionId.slice(0, 8)}…`;
 }
 

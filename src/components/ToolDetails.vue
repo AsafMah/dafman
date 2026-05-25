@@ -51,6 +51,7 @@ const kind = computed<
   | 'generic'
 >(() => {
   if (props.mcpServerName) return 'mcp';
+
   switch (props.toolName) {
     case 'shell':
     case 'bash':
@@ -96,11 +97,15 @@ const kind = computed<
 // Args probes — defensive on `unknown` shape.
 function s(...keys: string[]): string {
   const a = props.args;
+
   if (!a) return '';
+
   for (const k of keys) {
     const v = a[k];
+
     if (typeof v === 'string' && v.length > 0) return v;
   }
+
   return '';
 }
 
@@ -121,9 +126,11 @@ const globPattern = computed(() => s('pattern', 'glob'));
 
 const viewRange = computed<[number, number] | null>(() => {
   const r = props.args?.view_range;
+
   if (Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === 'number')) {
-    return [r[0] as number, r[1] as number];
+    return [r[0], r[1]];
   }
+
   return null;
 });
 
@@ -131,6 +138,7 @@ const fetchUrl = computed(() => s('url'));
 
 const todoItems = computed<Array<{ id?: unknown; title?: unknown; status?: unknown }>>(() => {
   const t = props.args?.todos;
+
   return Array.isArray(t) ? (t as Array<{ id?: unknown; title?: unknown; status?: unknown }>) : [];
 });
 
@@ -139,39 +147,51 @@ const todoItems = computed<Array<{ id?: unknown; title?: unknown; status?: unkno
 // content lines (without leading +/- space).
 const viewContent = computed(() => {
   const raw = liveResult.value;
+
   if (!raw) return '';
+
   // Detect unified diff format
   if (/^diff --git /m.test(raw) || /^---\s+a\//m.test(raw)) {
     const lines = raw.split('\n');
     const content: string[] = [];
     let inHunk = false;
+
     for (const line of lines) {
       if (line.startsWith('@@')) {
         inHunk = true;
         continue;
       }
+
       if (!inHunk) continue;
+
       // Skip removed lines (leading -)
       if (line.startsWith('-')) continue;
+
       // Added or context lines: strip leading + or space
       if (line.startsWith('+')) content.push(line.slice(1));
       else content.push(line.startsWith(' ') ? line.slice(1) : line);
     }
+
     return content.join('\n');
   }
+
   return raw;
 });
 
 // Language inference for results
 const fileExtension = computed(() => {
   const p = filePath.value;
+
   if (!p) return '';
+
   const m = /\.([a-z0-9]+)$/i.exec(p);
-  return m ? m[1]!.toLowerCase() : '';
+
+  return m ? m[1].toLowerCase() : '';
 });
 
 const argsJson = computed(() => {
   if (!props.args) return '';
+
   try {
     return JSON.stringify(props.args, null, 2);
   } catch {
@@ -183,7 +203,9 @@ const argsJson = computed(() => {
 // when complete. Always returned as a string for CommandBlock.
 const liveResult = computed(() => {
   if (props.resultContent && props.resultContent.length > 0) return props.resultContent;
+
   if (props.partialOutput && props.partialOutput.length > 0) return props.partialOutput;
+
   return '';
 });
 const hasResult = computed(() => liveResult.value.length > 0);
@@ -194,10 +216,15 @@ const hasResult = computed(() => liveResult.value.length > 0);
 // truncated JSON, so failure is expected and silent.
 const parsedResult = computed<unknown | undefined>(() => {
   if (!hasResult.value) return undefined;
+
   const trimmed = liveResult.value.trim();
+
   if (trimmed.length === 0) return undefined;
+
   const firstChar = trimmed[0];
+
   if (firstChar !== '{' && firstChar !== '[') return undefined;
+
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -206,6 +233,7 @@ const parsedResult = computed<unknown | undefined>(() => {
 });
 const isStructuredResult = computed(() => {
   const v = parsedResult.value;
+
   return v !== undefined && v !== null && (Array.isArray(v) || typeof v === 'object');
 });
 </script>

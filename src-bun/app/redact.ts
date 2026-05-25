@@ -84,10 +84,14 @@ function summariseString(value: string): {
 /// hits zero we stop and return a shape descriptor.
 function redactValue(value: unknown, depth: number, parentKey?: string): unknown {
   if (value === null || value === undefined) return value;
+
   const t = typeof value;
+
   if (t === 'boolean' || t === 'number') return value;
+
   if (t === 'string') {
     const s = value as string;
+
     // If we're inside a sensitive- or content-key context the key
     // already triggered the redaction (handled by caller); here we
     // guard against orphan strings that may be a prompt embedded
@@ -95,32 +99,41 @@ function redactValue(value: unknown, depth: number, parentKey?: string): unknown
     if (s.length > MAX_STRING_LEN) {
       return { ...summariseString(s), elided: true };
     }
+
     return s;
   }
+
   if (depth <= 0) {
     return { _truncated: 'max-depth' };
   }
+
   if (Array.isArray(value)) {
     const out = value.slice(0, MAX_ARRAY_ITEMS).map((v) => redactValue(v, depth - 1, parentKey));
+
     if (value.length > MAX_ARRAY_ITEMS) {
       out.push({ _truncated: `${value.length - MAX_ARRAY_ITEMS} more` });
     }
+
     return out;
   }
+
   if (t === 'object') {
     return redactObject(value as Record<string, unknown>, depth - 1);
   }
+
   // function / symbol / bigint -> string shape
   return { _kind: t };
 }
 
 function redactObject(obj: Record<string, unknown>, depth: number): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+
   for (const [key, val] of Object.entries(obj)) {
     if (isSensitiveKey(key)) {
       out[key] = REDACTED;
       continue;
     }
+
     if (isContentKey(key)) {
       if (typeof val === 'string') {
         out[key] = summariseString(val);
@@ -131,10 +144,13 @@ function redactObject(obj: Record<string, unknown>, depth: number): Record<strin
         // — we don't want a nested prompt to slip through.
         out[key] = { _redacted: 'content', _type: Array.isArray(val) ? 'array' : typeof val };
       }
+
       continue;
     }
+
     out[key] = redactValue(val, depth, key);
   }
+
   return out;
 }
 

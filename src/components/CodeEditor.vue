@@ -64,10 +64,13 @@ const headerLabel = computed<string>(() => {
   if (props.language && props.language.trim().length > 0) {
     return props.language;
   }
+
   if (props.filename) {
     const ext = props.filename.replace(/^.*[\\\/.]/, '');
+
     if (ext && ext.length <= 5) return ext;
   }
+
   return 'code';
 });
 
@@ -77,6 +80,7 @@ async function copyAll(): Promise<void> {
     toasts.success('Code copied');
   } catch (err) {
     const message = toErrorMessage(err);
+
     toasts.error('Copy failed', message);
   }
 }
@@ -116,14 +120,19 @@ function baseExtensions(): Extension[] {
 
 async function loadLanguage(): Promise<void> {
   if (!view) return;
+
   let ext: Extension | null = null;
+
   if (props.language) {
     ext = await resolveLanguageExtension(props.language);
   }
+
   if (!ext && props.filename) {
     ext = await resolveLanguageForFile(props.filename);
   }
+
   if (!view) return; // disposed during await
+
   view.dispatch({
     effects: langCompartment.reconfigure(ext ?? []),
   });
@@ -131,6 +140,7 @@ async function loadLanguage(): Promise<void> {
 
 onMounted(() => {
   if (!host.value) return;
+
   view = new EditorView({
     state: EditorState.create({
       doc: props.modelValue,
@@ -150,7 +160,9 @@ watch(
   () => props.modelValue,
   (next) => {
     if (!view) return;
+
     if (next === view.state.doc.toString()) return;
+
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: next },
     });
@@ -168,6 +180,7 @@ watch(
   () => props.readonly,
   (ro) => {
     if (!view) return;
+
     view.dispatch({
       effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(ro)),
     });

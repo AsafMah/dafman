@@ -21,24 +21,31 @@ function tryDecodeUriComponent(value: string): string {
 
 function parseExitCode(value: string): number | undefined {
   const match = value.match(/(?:^|;)(-?\d+)(?:;|$)/);
+
   if (!match) return undefined;
+
   const parsed = Number(match[1]);
+
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function parseOsc633(data: string, integrationNonce: string): ParsedTerminalOsc {
   const [kind = '', ...parts] = data.split(';');
+
   if (kind === 'C') {
     return { handled: true, events: [{ kind: 'commandStart', protocol: 'osc633' }] };
   }
+
   if (kind === 'D') {
     return {
       handled: true,
       events: [{ kind: 'commandFinish', exitCode: parseExitCode(parts.join(';')) }],
     };
   }
+
   if (kind === 'E') {
     const nonce = parts[parts.length - 1];
+
     return {
       handled: true,
       events: [
@@ -51,8 +58,10 @@ function parseOsc633(data: string, integrationNonce: string): ParsedTerminalOsc 
       ],
     };
   }
+
   if (kind === 'P') {
     const cwdPart = parts.find((part) => part.startsWith('Cwd='));
+
     if (cwdPart) {
       return {
         handled: true,
@@ -60,29 +69,35 @@ function parseOsc633(data: string, integrationNonce: string): ParsedTerminalOsc 
       };
     }
   }
+
   return { handled: true, events: [] };
 }
 
 function parseOsc133(data: string): ParsedTerminalOsc {
   const [kind = '', ...parts] = data.split(';');
+
   if (kind === 'C') {
     return { handled: true, events: [{ kind: 'commandStart', protocol: 'osc133' }] };
   }
+
   if (kind === 'D') {
     return {
       handled: true,
       events: [{ kind: 'commandFinish', exitCode: parseExitCode(parts.join(';')) }],
     };
   }
+
   return { handled: true, events: [] };
 }
 
 function parseOsc7(data: string): ParsedTerminalOsc {
   if (!data.startsWith('file://')) return { handled: true, events: [] };
+
   const pathname = data
     .slice('file://'.length)
     .replace(/^[^/]*(\/.*)$/, '$1')
     .replace(/^\/([A-Za-z]:\/)/, '$1');
+
   return {
     handled: true,
     events: [{ kind: 'cwd', cwd: tryDecodeUriComponent(pathname) }],
@@ -95,16 +110,21 @@ export function parseTerminalOsc(
   integrationNonce = '',
 ): ParsedTerminalOsc {
   if (ident === 633) return parseOsc633(data, integrationNonce);
+
   if (ident === 133) return parseOsc133(data);
+
   if (ident === 7) return parseOsc7(data);
+
   if (ident === 9 && data.startsWith('9;')) {
     return { handled: true, events: [{ kind: 'cwd', cwd: data.slice(2) }] };
   }
+
   if (ident === 1337 && data.startsWith('CurrentDir=')) {
     return {
       handled: true,
       events: [{ kind: 'cwd', cwd: tryDecodeUriComponent(data.slice('CurrentDir='.length)) }],
     };
   }
+
   return { handled: false, events: [] };
 }

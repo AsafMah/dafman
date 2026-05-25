@@ -35,7 +35,9 @@ const { activeSessionId } = storeToRefs(layoutStore);
 /// and disable Project radio in the form.
 const activeSession = computed(() => {
   const id = activeSessionId.value;
+
   if (!id) return null;
+
   return sessionsStore.getSession(id) ?? null;
 });
 
@@ -46,6 +48,7 @@ const error = ref<string | null>(null);
 async function load() {
   error.value = null;
   loaded.value = false;
+
   try {
     if (activeSession.value) {
       files.value = await invokeCommand('listAgentFiles', {
@@ -55,6 +58,7 @@ async function load() {
       // No session: user-scope only.
       files.value = await invokeCommand('listAgentFilesGlobal', {});
     }
+
     loaded.value = true;
   } catch (err) {
     error.value = toErrorMessage(err);
@@ -67,6 +71,7 @@ onMounted(load);
 const grouped = computed(() => {
   const user = files.value.filter((f) => f.scope === 'user');
   const project = files.value.filter((f) => f.scope === 'project');
+
   return { user, project };
 });
 
@@ -88,11 +93,13 @@ const scopeOptions = computed(() => {
   const out: Array<{ label: string; value: AgentFileScope; disabled?: boolean }> = [
     { label: 'User (global)', value: 'user' },
   ];
+
   out.push({
     label: 'Project (.github/agents)',
     value: 'project',
     disabled: !activeSession.value,
   });
+
   return out;
 });
 
@@ -123,19 +130,27 @@ function splitCsv(input: string): string[] {
 
 async function submitForm() {
   formError.value = null;
+
   if (!formName.value.trim()) {
     formError.value = 'Name is required';
+
     return;
   }
+
   if (!formDescription.value.trim()) {
     formError.value = 'Description is required';
+
     return;
   }
+
   if (formScope.value === 'project' && !activeSession.value) {
     formError.value = 'Project scope requires an active session';
+
     return;
   }
+
   formBusy.value = true;
+
   try {
     // Session id is required for both scopes (writeAgentFile uses
     // it to call session.rpc.agent.reload after the write); for
@@ -144,8 +159,10 @@ async function submitForm() {
     // remaining cases all have a session.
     if (!activeSession.value) {
       formError.value = 'An active session is required to create agents';
+
       return;
     }
+
     const spec: AgentFileSpec = {
       scope: formScope.value,
       name: formName.value.trim(),
@@ -153,16 +170,24 @@ async function submitForm() {
       prompt: formPrompt.value,
       userInvocable: formUserInvocable.value,
     };
+
     if (formDisplayName.value.trim()) spec.displayName = formDisplayName.value.trim();
+
     const tools = splitCsv(formTools.value);
+
     if (tools.length > 0) spec.tools = tools;
+
     const skills = splitCsv(formSkills.value);
+
     if (skills.length > 0) spec.skills = skills;
+
     if (formModel.value.trim()) spec.model = formModel.value.trim();
+
     const path = await invokeCommand('writeAgentFile', {
       sessionId: activeSession.value.id,
       spec,
     });
+
     toasts.success('Agent created', path);
     closeForm();
     await load();
@@ -179,23 +204,29 @@ async function deleteFile(entry: AgentFileEntry) {
       'Need an active session',
       'Open a session to delete project-scope agents. User-scope deletion also requires the session for SDK reload.',
     );
+
     return;
   }
+
   const ok = confirm(
     `Delete agent "${entry.name}" (${entry.scope})?\n\nThis removes the file at:\n${entry.path}`,
   );
+
   if (!ok) return;
+
   try {
     const removed = await invokeCommand('deleteAgentFile', {
       sessionId: activeSession.value.id,
       scope: entry.scope,
       name: entry.name,
     });
+
     if (removed) {
       toasts.success('Agent deleted', entry.name);
     } else {
       toasts.info('Already gone', `No file at ${entry.path}`);
     }
+
     await load();
   } catch (err) {
     toasts.error('Delete failed', toErrorMessage(err));

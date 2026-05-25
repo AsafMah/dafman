@@ -11,6 +11,7 @@ import type { ModelSummary } from '../rpc';
 
 export function toModelSummary(model: ModelInfo): ModelSummary {
   const efforts = model.supportedReasoningEfforts ?? [];
+
   return {
     id: model.id,
     name: model.name,

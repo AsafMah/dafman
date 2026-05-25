@@ -78,11 +78,14 @@ function replaceTriggerWith(
   attachment: SendMessageAttachment,
 ): void {
   if (!textNodeContainingQuery) return;
+
   editor.update(() => {
     if ($isTextNode(textNodeContainingQuery)) {
       const pill = $createAttachmentNode(attachment);
+
       textNodeContainingQuery.replace(pill);
       const space = $createTextNode(' ');
+
       pill.insertAfter(space);
       space.selectEnd();
     }
@@ -98,15 +101,19 @@ function onSelectOption(payload: {
   // Click path: pendingAttachment is set. Enter-from-editor path:
   // pendingAttachment is null, pull from the picker's highlight.
   const attachment = pendingAttachment.value ?? pickerRef.value?.pickCurrent?.() ?? null;
+
   pendingAttachment.value = null;
+
   if (attachment) {
     replaceTriggerWith(textNodeContainingQuery, attachment);
   }
+
   closeMenu();
 }
 
 function onWindowKey(e: KeyboardEvent): void {
   if (!pickerRef.value?.hasResults?.()) return;
+
   if (e.key === 'ArrowDown') {
     pickerRef.value.moveHighlight(1);
     e.preventDefault();

@@ -52,16 +52,19 @@ function classifyTransport(config: McpConfig): {
   transport: 'local' | 'http';
   hasOauth: boolean;
 } {
-  const type = typeof config.type === 'string' ? (config.type as string) : null;
+  const type = typeof config.type === 'string' ? config.type : null;
+
   if (type === 'http' || type === 'sse') {
     return {
       transport: 'http',
       hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType),
     };
   }
+
   if (type === 'local' || type === 'stdio') {
     return { transport: 'local', hasOauth: false };
   }
+
   // No explicit type — infer from shape. `url` field implies http.
   if (typeof config.url === 'string') {
     return {
@@ -69,12 +72,14 @@ function classifyTransport(config: McpConfig): {
       hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType),
     };
   }
+
   return { transport: 'local', hasOauth: false };
 }
 
 async function loadAll() {
   error.value = null;
   loaded.value = false;
+
   try {
     // Pass the active session's workingDirectory (or any open
     // session's, falling back to none) so the SDK's discovery picks
@@ -102,8 +107,10 @@ async function loadAll() {
       invokeCommand('discoverMcpServers', wd ? { workingDirectory: wd } : {}),
       sessionMcpsPromise,
     ]);
+
     configured.value = Object.entries(configs).map(([name, config]) => {
       const c = classifyTransport(config);
+
       return { name, config, ...c };
     });
     // Merge session-side MCP names into the Discovered list. A live
@@ -112,15 +119,19 @@ async function loadAll() {
     // resolve against a real session). Tag them as discovered with
     // source="session" so the user knows where they came from.
     const merged = new Map<string, DiscoveredEntry>();
+
     for (const d of disc) merged.set(d.name, { ...d });
+
     for (const s of sessionMcps) {
       if (merged.has(s.name)) continue;
+
       merged.set(s.name, {
         name: s.name,
         source: 'session',
         enabled: true,
       });
     }
+
     discovered.value = [...merged.values()];
     loaded.value = true;
   } catch (err) {
@@ -152,12 +163,14 @@ async function toggleEnable(entry: ConfiguredEntry) {
   const discoveredHit = discovered.value.find((d) => d.name === entry.name);
   const currentlyEnabled = discoveredHit ? discoveredHit.enabled : true;
   const next = !currentlyEnabled;
+
   try {
     if (next) {
       await invokeCommand('enableMcpServers', { names: [entry.name] });
     } else {
       await invokeCommand('disableMcpServers', { names: [entry.name] });
     }
+
     // Push the change to active sessions so it takes effect immediately
     // (config-level enable/disable only affects new sessions).
     await syncToggleToActiveSessions(entry.name, next);
@@ -169,6 +182,7 @@ async function toggleEnable(entry: ConfiguredEntry) {
 
 function isEnabled(name: string): boolean {
   const hit = discovered.value.find((d) => d.name === name);
+
   // When the discover list doesn't include the configured server
   // (e.g. broken plugin), assume enabled — matches the SDK default
   // which auto-enables anything not in the disabled set.
@@ -177,6 +191,7 @@ function isEnabled(name: string): boolean {
 
 async function removeEntry(entry: ConfiguredEntry) {
   if (!confirm(`Remove MCP server "${entry.name}"?`)) return;
+
   try {
     await invokeCommand('removeMcpConfig', { name: entry.name });
     configured.value = configured.value.filter((e) => e.name !== entry.name);
@@ -215,6 +230,7 @@ async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
       await invokeCommand('addMcpConfig', payload);
       toasts.success('MCP server added', payload.name);
     }
+
     dialogOpen.value = false;
     await loadAll();
   } catch (err) {
@@ -230,6 +246,7 @@ async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
     } else {
       await invokeCommand('disableMcpServers', { names: [entry.name] });
     }
+
     // Push to active sessions so the toggle takes effect immediately.
     await syncToggleToActiveSessions(entry.name, enabled);
     await loadAll();
@@ -242,18 +259,22 @@ async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
 // ---------- OAuth sign-in ----------
 async function signIn(entry: ConfiguredEntry) {
   const session = sessionsStore.sessions[0];
+
   if (!session) {
     toasts.warn(
       'No session to authenticate',
       'Create a session first; the OAuth flow runs through any active session.',
     );
+
     return;
   }
+
   try {
     const result = await invokeCommand('loginToMcpServer', {
       sessionId: session.id,
       serverName: entry.name,
     });
+
     if (result.authorizationUrl) {
       await invokeCommand('openUrl', { url: result.authorizationUrl });
       toasts.info(

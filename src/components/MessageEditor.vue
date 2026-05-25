@@ -46,11 +46,13 @@ const hasContent = () => draftText.value.trim().length > 0;
 
 function onSave() {
   if (!hasContent()) return;
+
   emit('save', draftText.value.trimEnd());
 }
 
 function onSaveFork() {
   if (!hasContent()) return;
+
   emit('saveAndFork', draftText.value.trimEnd());
 }
 

@@ -121,6 +121,7 @@ function commandResultMarkdown(result: CommandResultRecord): string {
     '```',
     '',
   ];
+
   return lines.join('\n');
 }
 
@@ -134,6 +135,7 @@ function commandResultBlobAttachment(
 ): { type: 'blob'; data: string; mimeType: string; displayName: string } {
   const markdown = commandResultMarkdown(result);
   const data = Buffer.from(markdown, 'utf8').toString('base64');
+
   return {
     type: 'blob',
     data,
@@ -159,7 +161,9 @@ function normalizeAgent(raw: {
     displayName: typeof raw.displayName === 'string' ? raw.displayName : String(raw.name),
     description: typeof raw.description === 'string' ? raw.description : '',
   };
+
   if (typeof raw.path === 'string' && raw.path.length > 0) out.path = raw.path;
+
   return out;
 }
 
@@ -180,47 +184,74 @@ function normalizeTask(raw: Record<string, unknown>): TaskInfo {
     description: typeof raw.description === 'string' ? raw.description : '',
     status: normalizeTaskStatus(raw.status),
   };
+
   if (typeof raw.type === 'string' && raw.type === 'shell') {
     const out: TaskInfo = {
       ...common,
       type: 'shell',
       command: typeof raw.command === 'string' ? raw.command : '',
     };
+
     if (typeof raw.startedAt === 'string') out.startedAt = raw.startedAt;
+
     if (typeof raw.completedAt === 'string') out.completedAt = raw.completedAt;
+
     if (typeof raw.activeTimeMs === 'number') out.activeTimeMs = raw.activeTimeMs;
+
     if (typeof raw.error === 'string') out.error = raw.error;
+
     if (raw.executionMode === 'sync' || raw.executionMode === 'background')
       out.executionMode = raw.executionMode;
+
     if (typeof raw.canPromoteToBackground === 'boolean')
       out.canPromoteToBackground = raw.canPromoteToBackground;
+
     if (raw.attachmentMode === 'pty' || raw.attachmentMode === 'detached')
       out.attachmentMode = raw.attachmentMode;
+
     if (typeof raw.logPath === 'string') out.logPath = raw.logPath;
+
     if (typeof raw.pid === 'number') out.pid = raw.pid;
+
     return out;
   }
+
   const out: TaskInfo = {
     ...common,
     type: 'agent',
     agentType: typeof raw.agentType === 'string' ? raw.agentType : 'agent',
   };
+
   if (typeof raw.toolCallId === 'string') out.toolCallId = raw.toolCallId;
+
   if (typeof raw.startedAt === 'string') out.startedAt = raw.startedAt;
+
   if (typeof raw.completedAt === 'string') out.completedAt = raw.completedAt;
+
   if (typeof raw.activeTimeMs === 'number') out.activeTimeMs = raw.activeTimeMs;
+
   if (typeof raw.error === 'string') out.error = raw.error;
+
   if (raw.executionMode === 'sync' || raw.executionMode === 'background')
     out.executionMode = raw.executionMode;
+
   if (typeof raw.canPromoteToBackground === 'boolean')
     out.canPromoteToBackground = raw.canPromoteToBackground;
+
   if (typeof raw.agentName === 'string') out.agentName = raw.agentName;
+
   if (typeof raw.agentDisplayName === 'string') out.agentDisplayName = raw.agentDisplayName;
+
   if (typeof raw.prompt === 'string') out.prompt = raw.prompt;
+
   if (typeof raw.result === 'string') out.result = raw.result;
+
   if (typeof raw.model === 'string') out.model = raw.model;
+
   if (typeof raw.latestResponse === 'string') out.latestResponse = raw.latestResponse;
+
   if (typeof raw.idleSince === 'string') out.idleSince = raw.idleSince;
+
   return out;
 }
 
@@ -249,6 +280,7 @@ function jobFromTask(sessionId: string, task: TaskInfo): JobRecord {
     canPromoteToBackground: task.canPromoteToBackground === true,
     canOpenSession: true,
   };
+
   if (task.type === 'agent') {
     return {
       ...base,
@@ -263,6 +295,7 @@ function jobFromTask(sessionId: string, task: TaskInfo): JobRecord {
       toolCallId: task.toolCallId,
     };
   }
+
   return {
     ...base,
     kind: 'shell',
@@ -328,6 +361,7 @@ function summarizePermission(request: PermissionRequest): string {
   const url = typeof raw.url === 'string' ? raw.url : null;
   const server = typeof raw.serverName === 'string' ? raw.serverName : null;
   const tool = typeof raw.toolName === 'string' ? raw.toolName : null;
+
   switch (request.kind) {
     case 'shell':
       return command ? `Run \`${command}\`` : 'Run a shell command';
@@ -359,9 +393,12 @@ function summarizePermission(request: PermissionRequest): string {
 /// display; the renderer never inspects the result.
 function toPlainObject(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object') return {};
+
   const out: Record<string, unknown> = {};
+
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     if (typeof v === 'function') continue;
+
     if (typeof v === 'object' && v !== null) {
       try {
         JSON.stringify(v);
@@ -373,6 +410,7 @@ function toPlainObject(value: unknown): Record<string, unknown> {
       out[k] = v;
     }
   }
+
   return out;
 }
 
@@ -441,18 +479,22 @@ export class SessionRegistry {
       commands: this.buildRegisteredCommands(sessionId),
       onPermissionRequest: (request: PermissionRequest): Promise<PermissionRequestResult> => {
         const sid = sessionId();
+
         // Per-session approveAll short-circuit. Returns the SDK's
         // minimal `approve-once` shape — no rule editor here.
         if (this.approveAllBySession.get(sid) === true) {
           return Promise.resolve({ kind: 'approve-once' });
         }
+
         if (this.modeBySession.get(sid) === 'autopilot') {
           log.info('permission unavailable in autopilot', {
             sessionId: sid,
             permissionKind: request.kind,
           });
+
           return Promise.resolve({ kind: 'user-not-available' });
         }
+
         return this.pending.enqueue(
           sid,
           'permission',
@@ -463,6 +505,7 @@ export class SessionRegistry {
               summary: summarizePermission(request),
               raw: toPlainObject(request),
             };
+
             this.emitPending({
               sessionId: sid,
               requestId,
@@ -478,19 +521,23 @@ export class SessionRegistry {
       },
       onUserInputRequest: (request: UserInputRequest): Promise<UserInputResponse> => {
         const sid = sessionId();
+
         if (this.modeBySession.get(sid) === 'autopilot') {
           log.info('user input unavailable in autopilot', { sessionId: sid });
+
           return Promise.resolve({
             answer: 'User is unavailable in autopilot mode.',
             wasFreeform: true,
           });
         }
+
         return this.pending.enqueue(sid, 'userInput', (requestId) => {
           const data: UserInputRequestData = {
             question: request.question,
             ...(request.choices ? { choices: request.choices } : {}),
             allowFreeform: request.allowFreeform ?? true,
           };
+
           this.emitPending({
             sessionId: sid,
             requestId,
@@ -501,13 +548,16 @@ export class SessionRegistry {
       },
       onElicitationRequest: (context: ElicitationContext): Promise<ElicitationResult> => {
         const sid = sessionId();
+
         if (this.modeBySession.get(sid) === 'autopilot') {
           log.info('elicitation declined in autopilot', {
             sessionId: sid,
             mode: context.mode ?? 'form',
           });
+
           return Promise.resolve({ action: 'decline' });
         }
+
         return this.pending.enqueue(sid, 'elicitation', (requestId) => {
           const data: ElicitationRequestData = {
             message: context.message,
@@ -518,6 +568,7 @@ export class SessionRegistry {
               ? { requestedSchema: toPlainObject(context.requestedSchema) }
               : {}),
           };
+
           this.emitPending({
             sessionId: sid,
             requestId,
@@ -528,6 +579,7 @@ export class SessionRegistry {
       },
       onExitPlanMode: (request: ExitPlanModeRequest): Promise<ExitPlanModeResult> => {
         const sid = sessionId();
+
         return this.pending.enqueue(sid, 'exitPlanMode', (requestId) => {
           const data: ExitPlanModeRequestData = {
             summary: request.summary,
@@ -535,6 +587,7 @@ export class SessionRegistry {
             actions: request.actions,
             recommendedAction: request.recommendedAction,
           };
+
           this.emitPending({
             sessionId: sid,
             requestId,
@@ -545,6 +598,7 @@ export class SessionRegistry {
       },
       onAutoModeSwitch: (request: AutoModeSwitchRequest): Promise<AutoModeSwitchResponse> => {
         const sid = sessionId();
+
         return this.pending.enqueue(sid, 'autoModeSwitch', (requestId) => {
           const data: AutoModeSwitchRequestData = {
             ...(request.errorCode ? { errorCode: request.errorCode } : {}),
@@ -552,6 +606,7 @@ export class SessionRegistry {
               ? { retryAfterSeconds: request.retryAfterSeconds }
               : {}),
           };
+
           this.emitPending({
             sessionId: sid,
             requestId,
@@ -571,7 +626,9 @@ export class SessionRegistry {
         // would interpret that as "allow no tools").
         const allowed = this.allowedToolsResolver();
         const excluded = this.excludedToolsResolver();
+
         if (allowed.length > 0) return { availableTools: allowed };
+
         return excluded.length > 0 ? { excludedTools: excluded } : {};
       })(),
     };
@@ -585,6 +642,7 @@ export class SessionRegistry {
           "Open Dafman's Library panel. In Dafman UI, use /library [mcp|skills|agents|instructions].",
         handler: (context) => {
           const tab = context.args.trim().split(/\s+/)[0] || 'mcp';
+
           this.emit({
             sessionId: sessionId(),
             eventType: 'system.notification',
@@ -611,6 +669,7 @@ export class SessionRegistry {
   private removeEntry(sessionId: string, reason: string): void {
     this.pending.settleForSession(sessionId, reason);
     const entry = this.entries.get(sessionId);
+
     if (entry) {
       try {
         entry.unsubscribe();
@@ -621,6 +680,7 @@ export class SessionRegistry {
         });
       }
     }
+
     this.entries.delete(sessionId);
     this.approveAllBySession.delete(sessionId);
     this.modeBySession.delete(sessionId);
@@ -657,17 +717,22 @@ export class SessionRegistry {
       ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort as ReasoningEffort } : {}),
     });
     const sessionId = session.sessionId;
+
     resolvedSessionId = sessionId;
     // `onEvent` is one-shot for the early window; switch to `session.on`
     // for the live stream and grab its unsubscribe handle.
     const unsubscribe = session.on((event) => {
       this.forward(sessionId, event);
     });
+
     this.entries.set(sessionId, { session, unsubscribe, ...(wd ? { workingDirectory: wd } : {}) });
     this.modeBySession.set(sessionId, 'interactive');
+
     // Drain anything that fired during the createSession await.
     for (const event of earlyEventBuffer) this.forward(sessionId, event);
+
     log.info('session created', { sessionId, workingDirectory: wd ?? null });
+
     return sessionId;
   }
 
@@ -688,8 +753,10 @@ export class SessionRegistry {
       log.debug('resume on already-registered session, returning id', {
         sessionId,
       });
+
       return sessionId;
     }
+
     const client = tryGetClient();
     // Look up the persisted cwd BEFORE resume so we can hand it
     // back to the SDK explicitly. The SDK is supposed to remember
@@ -698,18 +765,22 @@ export class SessionRegistry {
     // Electrobun exe folder). Reading the catalog and pinning the
     // value here closes that gap end-to-end.
     let persistedCwd: string | undefined;
+
     try {
       const meta = await client.getSessionMetadata(sessionId);
+
       if (meta?.context?.workingDirectory) persistedCwd = meta.context.workingDirectory;
     } catch {
       /* non-fatal */
     }
+
     const effectiveCwd = opts.workingDirectory ?? persistedCwd;
     let resolvedSessionId: string | null = null;
     const earlyForward = (event: SessionEvent) => {
       this.forward(resolvedSessionId ?? sessionId, event);
     };
     let session: CopilotSession;
+
     try {
       session = await client.resumeSession(sessionId, {
         ...this.baseSessionConfig(() => resolvedSessionId ?? sessionId),
@@ -722,20 +793,25 @@ export class SessionRegistry {
       });
     } catch (err) {
       const message = toErrorMessage(err);
+
       log.warn('session resume failed', { sessionId, error: message });
       throw AppError.sdk(message);
     }
+
     const actualId = session.sessionId;
+
     resolvedSessionId = actualId;
     const unsubscribe = session.on((event) => {
       this.forward(actualId, event);
     });
+
     this.entries.set(actualId, {
       session,
       unsubscribe,
       ...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
     });
     this.modeBySession.set(actualId, 'interactive');
+
     // Hydrate transcript. Failures here aren't fatal — the session is
     // connected and will receive live events; we just won't have the
     // scrollback.
@@ -750,6 +826,7 @@ export class SessionRegistry {
       const total = history.length;
       const capped =
         total > HISTORY_REPLAY_CAP ? history.slice(total - HISTORY_REPLAY_CAP) : history;
+
       await this.replayHistory(actualId, capped);
       log.info('session resumed', {
         sessionId: actualId,
@@ -763,19 +840,24 @@ export class SessionRegistry {
         error: toErrorMessage(err),
       });
     }
+
     // Poll the title immediately after resume so restored sessions show
     // their persisted title without needing a new turn (session.idle).
     this.pollTitleFromMetadata(actualId);
+
     return actualId;
   }
 
   async getCurrentModel(sessionId: string): Promise<string | null> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const current = (await entry.session.rpc.model.getCurrent()) as {
         modelId?: unknown;
       };
+
       return typeof current.modelId === 'string' && current.modelId.trim() ? current.modelId : null;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -792,7 +874,9 @@ export class SessionRegistry {
   ): Promise<void> {
     for (let i = 0; i < events.length; i += HISTORY_REPLAY_BATCH) {
       const chunk = events.slice(i, i + HISTORY_REPLAY_BATCH);
+
       for (const event of chunk) this.forward(sessionId, event);
+
       if (i + HISTORY_REPLAY_BATCH < events.length) {
         await new Promise<void>((r) => queueMicrotask(r));
       }
@@ -805,17 +889,23 @@ export class SessionRegistry {
     baseWorkingDirectory?: string | null,
   ): Promise<string> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     const requested = workingDirectory.trim();
+
     if (!requested) throw AppError.sdk('workingDirectory is required');
+
     const base = baseWorkingDirectory?.trim() || process.cwd();
     const next = isAbsolute(requested) ? requested : resolve(base, requested);
     let info: Awaited<ReturnType<typeof stat>>;
+
     try {
       info = await stat(next);
     } catch {
       throw AppError.sdk(`workingDirectory does not exist: ${next}`);
     }
+
     if (!info.isDirectory()) {
       throw AppError.sdk(`workingDirectory is not a directory: ${next}`);
     }
@@ -826,6 +916,7 @@ export class SessionRegistry {
     // predictable SessionNotFound after, instead of mid-teardown.
     this.pending.settleForSession(sessionId, 'session working directory changed');
     entry.unsubscribe();
+
     try {
       await entry.session.disconnect();
     } catch (err) {
@@ -834,10 +925,12 @@ export class SessionRegistry {
         error: toErrorMessage(err),
       });
     }
+
     this.entries.delete(sessionId);
 
     const client = tryGetClient();
     let resumed: CopilotSession;
+
     try {
       resumed = await client.resumeSession(sessionId, {
         ...this.baseSessionConfig(() => sessionId),
@@ -846,23 +939,28 @@ export class SessionRegistry {
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     const actualId = resumed.sessionId;
     const unsubscribe = resumed.on((event) => {
       this.forward(actualId, event);
     });
+
     this.entries.set(actualId, { session: resumed, unsubscribe, workingDirectory: next });
     log.info('session working directory changed', {
       sessionId: actualId,
       workingDirectory: next,
     });
+
     return next;
   }
 
   async list(): Promise<SessionMetadataSummary[]> {
     const client = tryGetClient();
     const items = await client.listSessions();
+
     return items.map((m) => {
       const localEntry = this.entries.get(m.sessionId);
+
       return {
         sessionId: m.sessionId,
         startTime: m.startTime instanceof Date ? m.startTime.toISOString() : String(m.startTime),
@@ -888,8 +986,10 @@ export class SessionRegistry {
     // gone.
     this.pending.settleForSession(sessionId, 'session deleted');
     const entry = this.entries.get(sessionId);
+
     if (entry) {
       entry.unsubscribe();
+
       try {
         await entry.session.disconnect();
       } catch (err) {
@@ -898,20 +998,25 @@ export class SessionRegistry {
           error: toErrorMessage(err),
         });
       }
+
       // S3: delete AFTER disconnect resolves. Concurrent RPCs see
       // the entry as live during the disconnect window so they
       // can fail predictably with SessionNotFound after, rather
       // than mid-teardown.
       this.entries.delete(sessionId);
     }
+
     this.approveAllBySession.delete(sessionId);
     const client = tryGetClient();
+
     try {
       await client.deleteSession(sessionId);
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     log.info('session deleted', { sessionId });
+
     return sessionId;
   }
 
@@ -923,6 +1028,7 @@ export class SessionRegistry {
   private pollTitleFromMetadata(sessionId: string): void {
     try {
       const client = tryGetClient();
+
       client
         .getSessionMetadata(sessionId)
         .then((meta) => {
@@ -954,6 +1060,7 @@ export class SessionRegistry {
       eventType === 'session.error' ||
       eventType === 'session.warning' ||
       eventType === 'model.call_failure';
+
     if (isDiagnostic) {
       log.debug('session event', {
         sessionId,
@@ -963,6 +1070,7 @@ export class SessionRegistry {
     } else {
       log.trace('session event', { sessionId, eventType });
     }
+
     // The SDK wraps each event as { type, data, id, parentId, ts, ... }.
     // The Rust port forwarded only `event.data`, and our `chatEvents.ts`
     // reads fields like `payload.data.messageId` directly off the
@@ -985,6 +1093,7 @@ export class SessionRegistry {
     const rawData = envelope.data;
     const isPlainObject =
       rawData !== null && typeof rawData === 'object' && !Array.isArray(rawData);
+
     if (!isPlainObject && rawData !== undefined) {
       log.warn('dropping malformed event.data on forward', {
         sessionId,
@@ -992,16 +1101,21 @@ export class SessionRegistry {
         dataType: rawData === null ? 'null' : Array.isArray(rawData) ? 'array' : typeof rawData,
       });
     }
+
     const data = (isPlainObject ? rawData : {}) as Record<string, unknown>;
+
     if (eventType === 'session.mode_changed') {
       const newMode = data.newMode;
+
       if (newMode === 'interactive' || newMode === 'plan' || newMode === 'autopilot') {
         this.modeBySession.set(sessionId, newMode);
+
         if (newMode === 'autopilot') {
           this.pending.settleForSession(sessionId, 'autopilot-mode');
         }
       }
     }
+
     // When the CLI signals idle (turn finished), proactively fetch
     // the session title from metadata. The CLI auto-summarises the
     // conversation but may only emit `session.title_changed` inside
@@ -1010,9 +1124,11 @@ export class SessionRegistry {
     if (eventType === 'session.idle') {
       this.pollTitleFromMetadata(sessionId);
     }
+
     if (eventType === 'session.title_changed') {
       log.info('session.title_changed received', { sessionId, title: data.title });
     }
+
     try {
       this.emit({
         sessionId,
@@ -1038,7 +1154,9 @@ export class SessionRegistry {
     attachments?: SendMessageAttachment[],
   ): Promise<string> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     if (attachments && attachments.length > 0) {
       log.info('session.send with attachments', {
         sessionId,
@@ -1049,20 +1167,20 @@ export class SessionRegistry {
         names: attachments.map((a) => ('displayName' in a ? a.displayName : null)),
       });
     }
+
     try {
       const sdkAttachments = (attachments ?? []).map((attachment) =>
         attachment.type === 'commandResult'
           ? commandResultBlobAttachment(attachment.result, attachment.displayName)
           : attachment,
       );
+
       return await entry.session.send({
         prompt: text,
         ...(mode ? { mode } : {}),
         ...(sdkAttachments && sdkAttachments.length > 0
           ? {
-              attachments: sdkAttachments as Parameters<
-                typeof entry.session.send
-              >[0]['attachments'],
+              attachments: sdkAttachments,
             }
           : {}),
       });
@@ -1081,12 +1199,17 @@ export class SessionRegistry {
     options: { includeHidden?: boolean; includeIgnored?: boolean } = {},
   ): Promise<WorkspaceFileMatch[]> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) return [];
+
     const cwd = await this.cwdFor(sessionId);
+
     if (!cwd) {
       log.warn('searchWorkspaceFiles: cwd unresolved', { sessionId });
+
       return [];
     }
+
     return searchWorkspaceFiles(cwd, query, limit, options);
   }
 
@@ -1109,46 +1232,62 @@ export class SessionRegistry {
   /// dir as its workspace.
   private async cwdFor(sessionId: string): Promise<string | undefined> {
     const entry = this.entries.get(sessionId);
+
     if (entry?.workingDirectory) return entry.workingDirectory;
+
     const client = tryGetClient();
+
     if (!client) return undefined;
+
     try {
       const meta = await client.getSessionMetadata(sessionId);
       // U6: re-check after the await — a concurrent cwdFor call
       // (or a setWorkingDirectory) may have backfilled while we
       // awaited. Skip the write to avoid a stale overwrite.
       const current = this.entries.get(sessionId);
+
       if (current?.workingDirectory) return current.workingDirectory;
+
       if (meta?.context?.workingDirectory) {
         if (current) current.workingDirectory = meta.context.workingDirectory;
+
         return meta.context.workingDirectory;
       }
     } catch {
       /* fall through to listSessions */
     }
+
     try {
       const summaries = await client.listSessions();
       const current = this.entries.get(sessionId);
+
       if (current?.workingDirectory) return current.workingDirectory;
+
       const summary = summaries.find((s) => s.sessionId === sessionId);
+
       if (summary?.context?.workingDirectory) {
         if (current) current.workingDirectory = summary.context.workingDirectory;
+
         return summary.context.workingDirectory;
       }
     } catch {
       /* non-fatal */
     }
+
     return undefined;
   }
 
   async abort(sessionId: string): Promise<string> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       await entry.session.abort();
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     return 'Aborted';
   }
 
@@ -1158,84 +1297,110 @@ export class SessionRegistry {
     reasoningEffort: string | null,
   ): Promise<string> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     const opts = reasoningEffort
       ? { reasoningEffort: reasoningEffort as ReasoningEffort }
       : undefined;
+
     try {
       await entry.session.setModel(model, opts);
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     return model;
   }
 
   async getMode(sessionId: string): Promise<SessionMode> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = await entry.session.rpc.mode.get();
+
       if (result !== 'interactive' && result !== 'plan' && result !== 'autopilot') {
         throw AppError.sdk(`unexpected session mode from SDK: ${JSON.stringify(result)}`);
       }
+
       this.modeBySession.set(sessionId, result);
+
       return result;
     } catch (err) {
       if (err instanceof AppError) throw err;
+
       throw AppError.sdk(toErrorMessage(err));
     }
   }
 
   async setMode(sessionId: string, mode: SessionMode): Promise<SessionMode> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       await entry.session.rpc.mode.set({ mode });
       this.modeBySession.set(sessionId, mode);
+
       if (mode === 'autopilot') {
         this.pending.settleForSession(sessionId, 'autopilot-mode');
       }
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     return mode;
   }
 
   async getName(sessionId: string): Promise<string | null> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = await entry.session.rpc.name.get();
       const name = (result as { name?: unknown }).name;
+
       if (typeof name === 'string') return name;
+
       if (name === null || name === undefined) return null;
+
       throw AppError.sdk(`unexpected session name from SDK: ${JSON.stringify(name)}`);
     } catch (err) {
       if (err instanceof AppError) throw err;
+
       throw AppError.sdk(toErrorMessage(err));
     }
   }
 
   async setName(sessionId: string, name: string): Promise<string> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       await entry.session.rpc.name.set({ name });
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
     }
+
     return name;
   }
 
   async compactHistory(sessionId: string): Promise<SessionHistoryCompactionResult> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.history.compact()) as {
         success?: boolean;
         tokensFreed?: number;
         messagesRemoved?: number;
       };
+
       return {
         success: result.success ?? true,
         tokensFreed: typeof result.tokensFreed === 'number' ? result.tokensFreed : null,
@@ -1251,11 +1416,14 @@ export class SessionRegistry {
   /// `sendMessage` (Edit / Retry flows).
   async truncateHistory(sessionId: string, eventId: string): Promise<{ eventsRemoved: number }> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.history.truncate({
         eventId,
       })) as { eventsRemoved?: number };
+
       return { eventsRemoved: result.eventsRemoved ?? 0 };
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1267,35 +1435,46 @@ export class SessionRegistry {
   /// resume flow once it has the id (keeps lifecycle uniform).
   async fork(sessionId: string, toEventId?: string): Promise<{ sessionId: string }> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     const client = tryGetClient();
+
     if (!client) throw AppError.clientNotStarted();
+
     try {
       const result = (await client.rpc.sessions.fork({
         sessionId,
         ...(toEventId ? { toEventId } : {}),
       })) as { sessionId?: string };
+
       if (!result.sessionId) {
         throw AppError.sdk('fork: SDK returned no sessionId');
       }
+
       return { sessionId: result.sessionId };
     } catch (err) {
       if (err instanceof AppError) throw err;
+
       throw AppError.sdk(toErrorMessage(err));
     }
   }
 
   async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     // Source of truth for OUR onPermissionRequest handler. Mirror to
     // the SDK so any SDK-internal short-circuits that respect this
     // flag stay consistent.
     this.approveAllBySession.set(sessionId, enabled);
+
     try {
       const result = (await entry.session.rpc.permissions.setApproveAll({
         enabled,
       })) as { success?: boolean };
+
       return result.success ?? true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1317,7 +1496,9 @@ export class SessionRegistry {
 
   async listAgents(sessionId: string): Promise<AgentInfo[]> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.agent.list()) as {
         agents?: Array<{
@@ -1327,6 +1508,7 @@ export class SessionRegistry {
           path?: unknown;
         }>;
       };
+
       return (result.agents ?? []).filter((a) => typeof a.name === 'string').map(normalizeAgent);
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1335,7 +1517,9 @@ export class SessionRegistry {
 
   async getCurrentAgent(sessionId: string): Promise<AgentInfo | null> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.agent.getCurrent()) as {
         agent?: {
@@ -1345,7 +1529,9 @@ export class SessionRegistry {
           path?: unknown;
         } | null;
       };
+
       if (!result.agent || typeof result.agent.name !== 'string') return null;
+
       return normalizeAgent(result.agent);
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1354,7 +1540,9 @@ export class SessionRegistry {
 
   async selectAgent(sessionId: string, name: string): Promise<AgentInfo> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.agent.select({ name })) as {
         agent?: {
@@ -1364,21 +1552,27 @@ export class SessionRegistry {
           path?: unknown;
         };
       };
+
       if (!result.agent || typeof result.agent.name !== 'string') {
         throw AppError.sdk('selectAgent: SDK returned no agent');
       }
+
       return normalizeAgent(result.agent);
     } catch (err) {
       if (err instanceof AppError) throw err;
+
       throw AppError.sdk(toErrorMessage(err));
     }
   }
 
   async deselectAgent(sessionId: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       await entry.session.rpc.agent.deselect();
+
       return true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1387,7 +1581,9 @@ export class SessionRegistry {
 
   async reloadAgents(sessionId: string): Promise<AgentInfo[]> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.agent.reload()) as {
         agents?: Array<{
@@ -1397,6 +1593,7 @@ export class SessionRegistry {
           path?: unknown;
         }>;
       };
+
       return (result.agents ?? []).filter((a) => typeof a.name === 'string').map(normalizeAgent);
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1411,11 +1608,14 @@ export class SessionRegistry {
 
   async listTasks(sessionId: string): Promise<TaskInfo[]> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.tasks.list()) as {
         tasks?: Array<Record<string, unknown>>;
       };
+
       return (result.tasks ?? [])
         .filter((t) => (t.type === 'agent' || t.type === 'shell') && typeof t.id === 'string')
         .map(normalizeTask);
@@ -1426,9 +1626,11 @@ export class SessionRegistry {
 
   async listJobs(): Promise<JobRecord[]> {
     const jobs: JobRecord[] = [];
+
     for (const [sessionId] of this.entries) {
       try {
         const tasks = await this.listTasks(sessionId);
+
         for (const task of tasks) jobs.push(jobFromTask(sessionId, task));
       } catch (err) {
         log.warn('listJobs failed for session', {
@@ -1437,20 +1639,25 @@ export class SessionRegistry {
         });
       }
     }
+
     return jobs.sort((a, b) => {
       const at = a.startedAt ? Date.parse(a.startedAt) : 0;
       const bt = b.startedAt ? Date.parse(b.startedAt) : 0;
+
       return bt - at;
     });
   }
 
   async cancelTask(sessionId: string, id: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.tasks.cancel({ id })) as {
         cancelled?: boolean;
       };
+
       return result.cancelled === true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1459,11 +1666,14 @@ export class SessionRegistry {
 
   async removeTask(sessionId: string, id: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.tasks.remove({ id })) as {
         removed?: boolean;
       };
+
       return result.removed === true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1472,11 +1682,14 @@ export class SessionRegistry {
 
   async promoteTask(sessionId: string, id: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.tasks.promoteToBackground({ id })) as {
         promoted?: boolean;
       };
+
       return result.promoted === true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1494,11 +1707,14 @@ export class SessionRegistry {
 
   async startFleet(sessionId: string, prompt?: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.fleet.start(prompt ? { prompt } : {})) as {
         started?: boolean;
       };
+
       return result.started === true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1525,12 +1741,16 @@ export class SessionRegistry {
     }>
   > {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     const opts: Parameters<typeof listAgentFiles>[0] = {
       includeUser: true,
       includeProject: true,
     };
+
     if (entry.workingDirectory) opts.workingDirectory = entry.workingDirectory;
+
     return listAgentFiles(opts);
   }
 
@@ -1554,12 +1774,17 @@ export class SessionRegistry {
     // — defense in depth: a malicious renderer could otherwise
     // pass an arbitrary path).
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     const wd = spec.scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
+
     if (spec.scope === 'project' && !wd) {
       throw AppError.sdk('project scope requires a session with a working directory');
     }
+
     const path = await writeAgent(spec, wd);
+
     // Tell the SDK to re-scan so the new agent shows up in
     // `session.rpc.agent.list` immediately. Best-effort: a
     // failed reload doesn't block the user's write.
@@ -1571,17 +1796,23 @@ export class SessionRegistry {
         error: toErrorMessage(err),
       });
     }
+
     return path;
   }
 
   async deleteAgentFile(sessionId: string, scope: AgentFileScope, name: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     const wd = scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
+
     if (scope === 'project' && !wd) {
       throw AppError.sdk('project scope requires a session with a working directory');
     }
+
     const removed = await deleteAgent(scope, name, wd);
+
     if (removed) {
       try {
         await entry.session.rpc.agent.reload();
@@ -1592,6 +1823,7 @@ export class SessionRegistry {
         });
       }
     }
+
     return removed;
   }
 
@@ -1611,7 +1843,9 @@ export class SessionRegistry {
     }>
   > {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.skills.list()) as {
         skills?: Array<{
@@ -1624,6 +1858,7 @@ export class SessionRegistry {
         }>;
       };
       const skills = result.skills ?? [];
+
       return skills
         .filter((s) => typeof s.name === 'string')
         .map((s) => ({
@@ -1641,13 +1876,16 @@ export class SessionRegistry {
 
   async setSkillEnabled(sessionId: string, name: string, enabled: boolean): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       if (enabled) {
         await entry.session.rpc.skills.enable({ name });
       } else {
         await entry.session.rpc.skills.disable({ name });
       }
+
       return true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1659,7 +1897,9 @@ export class SessionRegistry {
   /// renderer cherry-picks what to display.
   async getUsageMetrics(sessionId: string): Promise<Record<string, unknown>> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       return (await entry.session.rpc.usage.getMetrics()) as Record<string, unknown>;
     } catch (err) {
@@ -1674,7 +1914,9 @@ export class SessionRegistry {
     Array<{ name: string; namespacedName?: string; description: string }>
   > {
     const client = tryGetClient();
+
     if (!client) throw AppError.clientNotStarted();
+
     try {
       const result = (await client.rpc.tools.list({})) as {
         tools?: Array<{
@@ -1684,6 +1926,7 @@ export class SessionRegistry {
         }>;
       };
       const tools = result.tools ?? [];
+
       return tools
         .filter((t) => typeof t.name === 'string')
         .map((t) => ({
@@ -1702,7 +1945,9 @@ export class SessionRegistry {
     sessionId: string,
   ): Promise<Array<{ name: string; status: string; source?: string; error?: string }>> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.mcp.list()) as {
         servers?: Array<{
@@ -1713,6 +1958,7 @@ export class SessionRegistry {
         }>;
       };
       const servers = result.servers ?? [];
+
       return servers
         .filter((s) => typeof s.name === 'string')
         .map((s) => ({
@@ -1736,13 +1982,16 @@ export class SessionRegistry {
     enabled: boolean,
   ): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       if (enabled) {
         await entry.session.rpc.mcp.enable({ serverName });
       } else {
         await entry.session.rpc.mcp.disable({ serverName });
       }
+
       return true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1763,7 +2012,9 @@ export class SessionRegistry {
     >
   > {
     const client = tryGetClient();
+
     if (!client) throw AppError.clientNotStarted();
+
     try {
       const result = (await client.rpc.account.getQuota()) as {
         quotaSnapshots?: Record<string, Record<string, unknown>>;
@@ -1780,6 +2031,7 @@ export class SessionRegistry {
           resetDate?: string;
         }
       > = {};
+
       for (const [key, snap] of Object.entries(snaps)) {
         out[key] = {
           isUnlimitedEntitlement: snap.isUnlimitedEntitlement === true,
@@ -1792,6 +2044,7 @@ export class SessionRegistry {
           ...(typeof snap.resetDate === 'string' ? { resetDate: snap.resetDate } : {}),
         };
       }
+
       return out;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1802,13 +2055,16 @@ export class SessionRegistry {
     sessionId: string,
   ): Promise<{ exists: boolean; content: string | null; path: string | null }> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.plan.read()) as {
         exists?: unknown;
         content?: unknown;
         path?: unknown;
       };
+
       return {
         exists: result.exists === true,
         content: typeof result.content === 'string' ? result.content : null,
@@ -1821,9 +2077,12 @@ export class SessionRegistry {
 
   async writePlan(sessionId: string, content: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       await entry.session.rpc.plan.update({ content });
+
       return true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1832,9 +2091,12 @@ export class SessionRegistry {
 
   async deletePlan(sessionId: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       await entry.session.rpc.plan.delete();
+
       return true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1856,13 +2118,16 @@ export class SessionRegistry {
     opts: { forceReauth?: boolean; clientName?: string } = {},
   ): Promise<{ authorizationUrl: string | null }> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.mcp.oauth.login({
         serverName,
         ...(opts.forceReauth ? { forceReauth: opts.forceReauth } : {}),
         ...(opts.clientName ? { clientName: opts.clientName } : {}),
       })) as { authorizationUrl?: unknown };
+
       return {
         authorizationUrl:
           typeof result.authorizationUrl === 'string' ? result.authorizationUrl : null,
@@ -1880,11 +2145,14 @@ export class SessionRegistry {
 
   async resetApprovals(sessionId: string): Promise<boolean> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     try {
       const result = (await entry.session.rpc.permissions.resetSessionApprovals()) as {
         success?: boolean;
       };
+
       return result.success ?? true;
     } catch (err) {
       throw AppError.sdk(toErrorMessage(err));
@@ -1893,12 +2161,15 @@ export class SessionRegistry {
 
   async disconnect(sessionId: string): Promise<string> {
     const entry = this.entries.get(sessionId);
+
     if (!entry) throw AppError.sessionNotFound(sessionId);
+
     // Settle pending callbacks BEFORE tearing down the session so
     // the SDK never sees a hung onPermissionRequest / etc.
     this.pending.settleForSession(sessionId, 'session disconnected');
     this.approveAllBySession.delete(sessionId);
     entry.unsubscribe();
+
     try {
       await entry.session.disconnect();
     } catch (err) {
@@ -1907,10 +2178,12 @@ export class SessionRegistry {
         error: toErrorMessage(err),
       });
     }
+
     // S3: delete AFTER disconnect so concurrent RPCs see the entry
     // as live during the disconnect window.
     this.entries.delete(sessionId);
     log.info('session closed', { sessionId });
+
     return 'Session closed successfully';
   }
 
@@ -1927,14 +2200,18 @@ export class SessionRegistry {
     // gets force-cleared below) don't leave dangling Promises.
     this.pending.settleAll('app shutdown');
     const ids = [...this.entries.keys()];
+
     for (const id of ids) {
       const entry = this.entries.get(id);
+
       if (!entry) continue;
+
       try {
         entry.unsubscribe();
       } catch {
         /* best-effort */
       }
+
       try {
         await Promise.race([
           entry.session.disconnect(),
@@ -1948,6 +2225,7 @@ export class SessionRegistry {
           error: toErrorMessage(err),
         });
       }
+
       this.entries.delete(id);
       this.approveAllBySession.delete(id);
     }

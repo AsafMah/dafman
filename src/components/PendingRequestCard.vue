@@ -162,17 +162,24 @@ async function permissionAllowForSession(payload: {
 // User-input actions.
 const userInputSubmittable = computed(() => {
   const req = asUserInput.value;
+
   if (!req) return false;
+
   if (req.allowFreeform && inputAnswer.value.trim().length > 0) return true;
+
   if (req.choices && req.choices.length > 0 && inputChoice.value !== null) return true;
+
   return false;
 });
 
 async function userInputSubmit(): Promise<void> {
   const req = asUserInput.value;
+
   if (!req) return;
+
   let answer = '';
   let wasFreeform = false;
+
   if (req.allowFreeform && inputAnswer.value.trim().length > 0) {
     answer = inputAnswer.value;
     wasFreeform = true;
@@ -180,6 +187,7 @@ async function userInputSubmit(): Promise<void> {
     answer = inputChoice.value;
     wasFreeform = false;
   }
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -198,13 +206,18 @@ async function userInputCancel(): Promise<void> {
 // Elicitation actions.
 async function openElicitationUrl(): Promise<void> {
   const req = asElicitation.value;
+
   if (!req) return;
+
   if (!req.url) {
     toasts.warn('No URL provided', "The agent didn't supply a URL to open.");
+
     return;
   }
+
   try {
     const ok = await invokeCommand('openUrl', { url: req.url });
+
     if (ok) {
       urlOpened.value = true;
     } else {
@@ -219,13 +232,17 @@ async function elicitationAccept(): Promise<void> {
   // Form-mode: validate first, then ship the collected content.
   if (asElicitation.value && asElicitation.value.mode === 'form') {
     const formRef = formComponentRef.value;
+
     if (formRef) {
       const err = formRef.validate();
+
       if (err) {
         toasts.warn('Form incomplete', `Please fill in ${err}.`);
+
         return;
       }
     }
+
     await sessionsStore.respondToPending({
       sessionId: props.sessionId,
       requestId: props.requestId,
@@ -235,8 +252,10 @@ async function elicitationAccept(): Promise<void> {
         content: formContent.value,
       },
     });
+
     return;
   }
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -433,8 +452,8 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
       <JsonSchemaForm
         v-if="asElicitation.requestedSchema"
         ref="formComponentRef"
-        :schema="asElicitation.requestedSchema as Record<string, unknown>"
         v-model="formContent"
+        :schema="asElicitation.requestedSchema as Record<string, unknown>"
       />
       <p
         v-else

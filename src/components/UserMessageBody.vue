@@ -30,11 +30,14 @@ type Segment =
 
 const segments = computed<Segment[]>(() => {
   if (!props.attachments || props.attachments.length === 0) return [];
+
   const out: Segment[] = [];
   let cursor = 0;
+
   for (const a of props.attachments) {
     const label = labelForAttachment(a);
     const idx = props.text.indexOf(label, cursor);
+
     if (idx === -1) {
       // Filename wasn't found in the text — could happen if the user
       // edited the message after sending. Emit the pill anyway so the
@@ -42,23 +45,31 @@ const segments = computed<Segment[]>(() => {
       out.push({ kind: 'pill', attachment: a });
       continue;
     }
+
     if (idx > cursor) {
       out.push({ kind: 'text', value: props.text.slice(cursor, idx) });
     }
+
     out.push({ kind: 'pill', attachment: a });
     cursor = idx + label.length;
   }
+
   if (cursor < props.text.length) {
     out.push({ kind: 'text', value: props.text.slice(cursor) });
   }
+
   return out;
 });
 
 function iconClass(a: SendMessageAttachment): string {
   if (a.type === 'directory') return 'pi-folder';
+
   if (a.type === 'selection') return 'pi-bookmark';
+
   if (a.type === 'commandResult') return 'pi-terminal';
+
   if (a.type === 'blob' && (a.mimeType ?? '').startsWith('image/')) return 'pi-image';
+
   return 'pi-file';
 }
 </script>

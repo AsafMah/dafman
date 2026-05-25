@@ -21,7 +21,9 @@ const OPAQUE_BODY =
 
 const preview = computed(() => {
   if (props.opaque) return OPAQUE_PREVIEW;
+
   const firstLine = props.text.split('\n', 1)[0] ?? '';
+
   return firstLine.length > 120 ? `${firstLine.slice(0, 120)}...` : firstLine;
 });
 

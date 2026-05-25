@@ -36,10 +36,12 @@ export class McpRegistry {
   /// renderer's error UX stays predictable.
   private async withClient<T>(fn: (client: CopilotClient) => Promise<T>): Promise<T> {
     const client = this.getClient();
+
     try {
       return await fn(client);
     } catch (err) {
       if (err instanceof AppError) throw err;
+
       throw AppError.sdk(toErrorMessage(err));
     }
   }
@@ -49,6 +51,7 @@ export class McpRegistry {
       const result = (await client.rpc.mcp.config.list()) as {
         servers?: Record<string, Record<string, unknown>>;
       };
+
       return result.servers ?? {};
     });
   }
@@ -56,6 +59,7 @@ export class McpRegistry {
   async addConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
     return this.withClient(async (client) => {
       await client.rpc.mcp.config.add({ name, config } as unknown as Record<string, unknown>);
+
       return true;
     });
   }
@@ -63,6 +67,7 @@ export class McpRegistry {
   async updateConfig(name: string, config: Record<string, unknown>): Promise<boolean> {
     return this.withClient(async (client) => {
       await client.rpc.mcp.config.update({ name, config } as unknown as Record<string, unknown>);
+
       return true;
     });
   }
@@ -70,6 +75,7 @@ export class McpRegistry {
   async removeConfig(name: string): Promise<boolean> {
     return this.withClient(async (client) => {
       await client.rpc.mcp.config.remove({ name });
+
       return true;
     });
   }
@@ -77,6 +83,7 @@ export class McpRegistry {
   async enable(names: string[]): Promise<boolean> {
     return this.withClient(async (client) => {
       await client.rpc.mcp.config.enable({ names });
+
       return true;
     });
   }
@@ -84,6 +91,7 @@ export class McpRegistry {
   async disable(names: string[]): Promise<boolean> {
     return this.withClient(async (client) => {
       await client.rpc.mcp.config.disable({ names });
+
       return true;
     });
   }
@@ -105,6 +113,7 @@ export class McpRegistry {
         }>;
       };
       const servers = result.servers ?? [];
+
       return servers
         .filter((s) => typeof s.name === 'string')
         .map((s) => ({

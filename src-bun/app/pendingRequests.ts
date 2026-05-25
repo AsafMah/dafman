@@ -79,6 +79,7 @@ export class PendingRequestQueue {
         ...(extras?.summary ? { summary: extras.summary } : {}),
       });
     });
+
     try {
       emit(requestId);
     } catch (err) {
@@ -92,6 +93,7 @@ export class PendingRequestQueue {
       });
       this.cancel(requestId, 'emit-failure');
     }
+
     return promise;
   }
 
@@ -100,7 +102,9 @@ export class PendingRequestQueue {
   /// fallback above.
   cancel(requestId: string, _reason: string): void {
     const entry = this.entries.get(requestId);
+
     if (!entry || entry.settled) return;
+
     entry.settled = true;
     this.entries.delete(requestId);
     const cancellation: unknown =
@@ -113,6 +117,7 @@ export class PendingRequestQueue {
             : entry.kind === 'exitPlanMode'
               ? { approved: false }
               : 'no';
+
     try {
       entry.resolve(cancellation);
     } catch (err) {
@@ -133,9 +138,11 @@ export class PendingRequestQueue {
   /// would leak pending callbacks until shutdown drains them.
   settleForSession(sessionId: string, reason: string): void {
     const requestIds: string[] = [];
+
     for (const [id, entry] of this.entries) {
       if (entry.sessionId === sessionId) requestIds.push(id);
     }
+
     for (const id of requestIds) this.cancel(id, reason);
   }
 
@@ -152,33 +159,41 @@ export class PendingRequestQueue {
   /// response shape into the SDK's wider one.
   async respond(params: RespondToRequestParams): Promise<boolean> {
     const entry = this.entries.get(params.requestId);
+
     if (!entry || entry.settled) {
       log.debug('respondToRequest on already-resolved request', {
         requestId: params.requestId,
       });
+
       return false;
     }
+
     if (entry.sessionId !== params.sessionId) {
       log.warn('respondToRequest sessionId mismatch', {
         requestId: params.requestId,
         expected: entry.sessionId,
         got: params.sessionId,
       });
+
       return false;
     }
+
     if (entry.kind !== params.response.kind) {
       log.warn('respondToRequest kind mismatch', {
         requestId: params.requestId,
         expected: entry.kind,
         got: params.response.kind,
       });
+
       return false;
     }
+
     entry.settled = true;
     this.entries.delete(params.requestId);
     let sdkResult: unknown;
     let approvalKind: string | undefined;
     let approvalDomain: string | undefined;
+
     switch (params.response.kind) {
       case 'permission':
         if (params.response.decision === 'approveOnce') {
@@ -196,16 +211,20 @@ export class PendingRequestQueue {
           // `domain` is exclusive to `url` permission requests and
           // goes at the top level (not inside `approval`).
           const out: Record<string, unknown> = { kind: 'approve-for-session' };
+
           if (params.response.approval) {
             out.approval = params.response.approval;
             approvalKind = params.response.approval.kind;
           }
+
           if (params.response.domain) {
             out.domain = params.response.domain;
             approvalDomain = params.response.domain;
           }
+
           sdkResult = out;
         }
+
         // Audit log: every permission decision recorded as one
         // line in <userData>/audit/permissions.jsonl. Captures
         // what + when + who + scope without leaking command
@@ -245,6 +264,7 @@ export class PendingRequestQueue {
         sdkResult = params.response.response;
         break;
     }
+
     try {
       entry.resolve(sdkResult);
     } catch (err) {
@@ -252,8 +272,10 @@ export class PendingRequestQueue {
         requestId: params.requestId,
         error: toErrorMessage(err),
       });
+
       return false;
     }
+
     return true;
   }
 }

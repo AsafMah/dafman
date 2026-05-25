@@ -28,27 +28,35 @@ function toolKey(tool: ToolItem): string {
 const groups = computed<ToolGroup[]>(() => {
   const builtins: ToolItem[] = [];
   const byPrefix = new Map<string, ToolItem[]>();
+
   for (const tool of tools.value) {
     if (!tool.namespacedName) {
       builtins.push(tool);
       continue;
     }
+
     const prefix = tool.namespacedName.split('/')[0] || 'namespaced';
     const list = byPrefix.get(prefix) ?? [];
+
     list.push(tool);
     byPrefix.set(prefix, list);
   }
+
   const out: ToolGroup[] = [];
+
   if (builtins.length > 0) out.push({ label: 'Built-in', items: builtins });
+
   for (const prefix of [...byPrefix.keys()].sort()) {
     out.push({ label: prefix, items: byPrefix.get(prefix) ?? [] });
   }
+
   return out;
 });
 
 async function load() {
   error.value = null;
   loaded.value = false;
+
   try {
     tools.value = await invokeCommand('listBuiltinTools', {});
     loaded.value = true;
@@ -65,7 +73,9 @@ function isEnabled(tool: ToolItem): boolean {
 async function setToolEnabled(tool: ToolItem, enabled: boolean) {
   const key = toolKey(tool);
   const excluded = (settings.value.tools?.defaultExcluded ?? []).filter((k) => k !== key);
+
   if (!enabled) excluded.push(key);
+
   await settingsStore.update({
     ...settings.value,
     tools: {
@@ -99,8 +109,10 @@ function isExpanded(key: string): boolean {
 
 function toggleExpanded(key: string) {
   const next = new Set(expanded.value);
+
   if (next.has(key)) next.delete(key);
   else next.add(key);
+
   expanded.value = next;
 }
 

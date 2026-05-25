@@ -58,8 +58,11 @@ const recent: LogRecord[] = [];
 
 function parseLevel(raw: string | undefined): LogLevel | null {
   if (!raw) return null;
+
   const lc = raw.toLowerCase().trim();
+
   if (lc in LEVEL_ORDER) return lc as LogLevel;
+
   return null;
 }
 
@@ -69,8 +72,10 @@ function shouldEmit(level: LogLevel): boolean {
 
 function currentLogFile(): string | null {
   if (!config.logDir) return null;
+
   const now = new Date();
   const stamp = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`;
+
   return join(config.logDir, `dafman-${stamp}.log`);
 }
 
@@ -88,6 +93,7 @@ export function buildRecord(
   fields?: Record<string, unknown>,
 ): LogRecord {
   const redacted = fields ? redactFields(fields) : undefined;
+
   return {
     ts: new Date().toISOString(),
     level,
@@ -102,10 +108,12 @@ async function emit(
   fields?: Record<string, unknown>,
 ): Promise<void> {
   const record = buildRecord(level, message, fields);
+
   // Fan-out happens irrespective of the configured level so subscribers
   // (in-app log viewer) see everything. The viewer applies its own
   // filter.
   pushRecent(record);
+
   for (const sub of subscribers) {
     try {
       sub(record);
@@ -113,16 +121,22 @@ async function emit(
       // Subscriber errors are not logger's problem.
     }
   }
+
   // Below-level records skip stderr + file IO but DO still feed
   // subscribers + the ring buffer (so a user who flips the filter to
   // debug sees recent debug context).
   if (!shouldEmit(level)) return;
+
   const line = `${JSON.stringify(record)}\n`;
+
   if (level === 'error' || level === 'warn' || isDev()) {
     process.stderr.write(line);
   }
+
   const file = currentLogFile();
+
   if (!file) return;
+
   try {
     await appendFile(file, line);
   } catch {
@@ -132,6 +146,7 @@ async function emit(
 
 function pushRecent(record: LogRecord) {
   recent.push(record);
+
   if (recent.length > RECENT_CAP) {
     recent.splice(0, recent.length - RECENT_CAP);
   }
@@ -156,7 +171,9 @@ export interface InitLoggerOptions {
 
 export async function initLogger(opts: InitLoggerOptions): Promise<void> {
   config.logDir = opts.logDir;
+
   if (opts.level) config.level = opts.level;
+
   try {
     await mkdir(opts.logDir, { recursive: true });
   } catch {
@@ -175,6 +192,7 @@ export function getLogLevel(): LogLevel {
 /// Mutate the level at runtime. Used by Settings → Diagnostics.
 export function setLogLevel(level: LogLevel): LogLevel {
   config.level = level;
+
   return level;
 }
 
@@ -183,6 +201,7 @@ export function setLogLevel(level: LogLevel): LogLevel {
 /// in-app viewer can switch its filter without losing history.
 export function subscribeLogs(fn: Subscriber): () => void {
   subscribers.add(fn);
+
   return () => {
     subscribers.delete(fn);
   };
@@ -194,6 +213,7 @@ export function recentLogs(limit?: number): LogRecord[] {
   if (limit === undefined || limit >= recent.length) {
     return recent.slice();
   }
+
   return recent.slice(recent.length - limit);
 }
 

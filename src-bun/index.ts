@@ -68,10 +68,15 @@ const settings = SettingsService.loadOrDefault(settingsPath);
 // `settings.workspaces.defaultWorkspace` lazily via `getSettings`.
 void (async () => {
   const current = settings.get().workspaces.defaultWorkspace;
+
   if (current && current.length > 0) return;
+
   const resolved = await ensureDefaultWorkspace();
+
   if (!resolved) return;
+
   const snap = settings.get();
+
   await settings
     .update({
       ...snap,
@@ -134,6 +139,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
     requests: {
       createClient: rpcGuard(async () => {
         await ensureClient();
+
         return 'Copilot client created';
       }),
       createSession: rpcGuard(async ({ workingDirectory, model, reasoningEffort }) =>
@@ -154,9 +160,12 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         // hands back an empty comma-separated string). Treat
         // any empty / whitespace-only entry as a cancel.
         const first = paths[0]?.trim();
+
         if (!first || first.length === 0) return null;
+
         // Force absolute (see pickAttachment above for why).
         const { resolve, isAbsolute } = await import('node:path');
+
         return isAbsolute(first) ? first : resolve(first);
       }),
       pickAttachment: rpcGuard(async ({ kind, startingFolder }) => {
@@ -169,7 +178,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
           ...(startingFolder ? { startingFolder } : {}),
         });
         const first = paths[0]?.trim();
+
         if (!first) return null;
+
         // CRITICAL: Electrobun's `openFileDialog` can return a
         // path relative to the *bun process cwd* (the exe's
         // `bin/` folder in prod), producing pills like
@@ -178,6 +189,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         // input, so it's safe regardless.
         const { resolve, isAbsolute } = await import('node:path');
         const abs = isAbsolute(first) ? first : resolve(first);
+
         return { path: abs, kind };
       }),
       disconnectSession: rpcGuard(async ({ sessionId }) => sessions.disconnect(sessionId)),
@@ -195,6 +207,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       listModels: rpcGuard(async () => {
         const client = tryGetClient();
         const models = await client.listModels();
+
         return models.map(toModelSummary);
       }),
       setSessionModel: rpcGuard(async ({ sessionId, model, reasoningEffort }) =>
@@ -212,6 +225,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         // display the exe folder as the workspace.
         const cwd = (await sessions.getCwd(actualId)) ?? null;
         const currentModel = await sessions.getCurrentModel(actualId).catch(() => null);
+
         return { sessionId: actualId, cwd, model: currentModel };
       }),
       listSessions: rpcGuard(async () => sessions.list()),
@@ -303,6 +317,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       listTerminals: rpcGuard(async () => terminals.list()),
       startSessionCommand: rpcGuard(async ({ sessionId, command }) => {
         const cwd = (await sessions.getCwd(sessionId)) ?? process.cwd();
+
         return commandResults.start({ sessionId, command, cwd });
       }),
       cancelSessionCommand: rpcGuard(async ({ sessionId, commandId }) =>
@@ -314,18 +329,25 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       getLogDir: rpcGuard(async () => currentLogDir()),
       openLogFolder: rpcGuard(async () => {
         const dir = currentLogDir();
+
         if (!dir) return false;
+
         Utils.showItemInFolder(dir);
+
         return true;
       }),
       revealPath: rpcGuard(async ({ path }) => {
         const trimmed = path.trim();
+
         if (!trimmed) return false;
+
         try {
           const { stat } = await import('node:fs/promises');
           let isDir = false;
+
           try {
             const st = await stat(trimmed);
+
             isDir = st.isDirectory();
           } catch {
             // Path missing — let the OS show whatever default
@@ -333,8 +355,10 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
             // dialog). We log and continue rather than silently
             // no-op'ing.
           }
+
           if (process.platform === 'win32') {
             const { spawn } = await import('node:child_process');
+
             if (isDir) {
               // Folder → open it in Explorer.
               spawn('explorer.exe', [trimmed], { detached: true, stdio: 'ignore' }).unref();
@@ -349,24 +373,29 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
                 stdio: 'ignore',
               }).unref();
             }
+
             return true;
           }
+
           // macOS / Linux: openExternal delegates to the OS
           // (open / xdg-open), which opens both files and folders
           // with their default handler — exactly the behaviour
           // we want.
           Utils.openExternal(trimmed);
+
           return true;
         } catch (err) {
           log.warn('revealPath failed', {
             path: trimmed,
             error: toErrorMessage(err),
           });
+
           return false;
         }
       }),
       openUrl: rpcGuard(async ({ url }) => {
         const trimmed = url.trim();
+
         // Strict scheme allowlist. The handler is reachable by the
         // renderer + any compromised renderer should not be able to
         // shell out to arbitrary URI handlers (file:, javascript:,
@@ -374,15 +403,19 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         if (!/^https?:\/\//i.test(trimmed)) {
           log.warn('openUrl rejected non-http scheme', { url: trimmed });
           recordUrl({ url: trimmed, allowed: false, reason: 'scheme-blocked' });
+
           return false;
         }
+
         try {
           const opened = Utils.openExternal(trimmed);
+
           recordUrl({
             url: trimmed,
-            allowed: opened !== false,
-            reason: opened !== false ? 'ok' : 'openExternal-returned-false',
+            allowed: opened,
+            reason: opened ? 'ok' : 'openExternal-returned-false',
           });
+
           return opened;
         } catch (err) {
           log.warn('openUrl threw', {
@@ -394,6 +427,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
             allowed: false,
             reason: `openExternal-threw: ${toErrorMessage(err)}`,
           });
+
           return false;
         }
       }),
@@ -406,6 +440,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         // bun-originated entries.
         const tagged = `[renderer] ${message}`;
         const data = extra ?? {};
+
         switch (level) {
           case 'debug':
             log.debug(tagged, data);
@@ -445,7 +480,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
     },
     messages: {},
   },
-}) as unknown as ReturnType<typeof BrowserView.defineRPC<DafmanRPC>>;
+});
 
 async function getMainViewUrl(): Promise<string> {
   const channel = await Updater.localInfo.channel();
@@ -458,15 +493,18 @@ async function getMainViewUrl(): Promise<string> {
   // diagnostic, which needs a mounted MessageComposer to fire.
   const autosession = channel === 'dev' && process.env.DAFMAN_AUTO_SESSION === '1';
   const suffix = playground ? '?dev' : autosession ? '?autosession=1' : '';
+
   if (channel === 'dev') {
     try {
       await fetch(DEV_SERVER_URL, { method: 'HEAD' });
       log.info(`HMR enabled: using Vite dev server at ${DEV_SERVER_URL}`);
+
       return `${DEV_SERVER_URL}/${suffix}`;
     } catch {
       log.info('Vite dev server not running. Run `bun run dev:hmr` for HMR.');
     }
   }
+
   return `views://mainview/index.html${suffix}`;
 }
 
@@ -493,6 +531,7 @@ const mainWindow = new BrowserWindow({
 /// painted, the clip is gone.
 function nudgeWindow(): void {
   const { x, y, width, height } = mainWindow.getFrame();
+
   mainWindow.setFrame(x, y, width + 1, height + 1);
   setTimeout(() => {
     mainWindow.setFrame(x, y, width, height);
@@ -504,6 +543,7 @@ mainWindow.webview.on('dom-ready', () => {
     setTimeout(nudgeWindow, delay);
   }
 });
+
 // Belt-and-suspenders fallback in case `dom-ready` is missed (HMR reloads,
 // dev-server reconnects, etc.). Cheap no-ops if the renderer is already
 // laid out.
@@ -569,6 +609,7 @@ log.info('dafman started', { version: '0.1.0' });
 // exit.
 const handleShutdownSignal = async (signal: string): Promise<void> => {
   log.info('shutdown signal received', { signal });
+
   try {
     await sessions.shutdownAll();
   } catch (err) {
@@ -577,6 +618,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
       error: toErrorMessage(err),
     });
   }
+
   try {
     terminals.shutdownAll();
   } catch (err) {
@@ -585,6 +627,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
       error: toErrorMessage(err),
     });
   }
+
   try {
     commandResults.shutdownAll();
   } catch (err) {
@@ -593,6 +636,7 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
       error: toErrorMessage(err),
     });
   }
+
   try {
     await shutdownClient();
   } catch (err) {
@@ -601,7 +645,9 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
       error: toErrorMessage(err),
     });
   }
+
   process.exit(0);
 };
+
 process.on('SIGINT', () => void handleShutdownSignal('SIGINT'));
 process.on('SIGTERM', () => void handleShutdownSignal('SIGTERM'));

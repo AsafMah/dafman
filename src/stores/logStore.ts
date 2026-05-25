@@ -55,15 +55,19 @@ export const useLogStore = defineStore('logs', () => {
   /// from multiple panels.
   async function ensureInitialised(): Promise<void> {
     if (initialised.value) return;
+
     initialised.value = true;
+
     try {
       const state = await invokeCommand('getLogState', { recentLimit: 500 });
+
       level.value = state.level;
       displayLevel.value = state.level;
       records.value = state.recent;
     } catch (err) {
       console.warn('[logStore] failed to load initial state', err);
     }
+
     unsubscribe = onLogEvent((record) => {
       pushRecord(record);
     });
@@ -71,6 +75,7 @@ export const useLogStore = defineStore('logs', () => {
 
   function pushRecord(record: LogRecord): void {
     records.value.push(record);
+
     if (records.value.length > RENDERER_CAP) {
       records.value.splice(0, records.value.length - RENDERER_CAP);
     }
@@ -82,11 +87,13 @@ export const useLogStore = defineStore('logs', () => {
   /// was swallowed by Electrobun's plain-object bridge.
   async function setLevel(next: LogLevel): Promise<LogLevel> {
     const updated = await invokeCommand('setLogLevel', { level: next });
+
     level.value = updated;
     // Default the display filter to follow the bun-side level when the
     // user changes it. They can still override per-session via the
     // display dropdown.
     displayLevel.value = updated;
+
     return updated;
   }
 
@@ -111,9 +118,12 @@ export const useLogStore = defineStore('logs', () => {
   const filtered = computed<LogRecord[]>(() => {
     const minRank = LEVEL_RANK[displayLevel.value];
     const needle = search.value.trim().toLowerCase();
+
     return records.value.filter((r) => {
       if (LEVEL_RANK[r.level] < minRank) return false;
+
       if (!needle) return true;
+
       // Cheap substring on the serialised record. We could pre-index
       // for speed, but 4000 records with a tight search runs in ~3 ms
       // and we re-evaluate only on filter change.
@@ -130,6 +140,7 @@ export const useLogStore = defineStore('logs', () => {
       unsubscribe();
       unsubscribe = null;
     }
+
     initialised.value = false;
   }
 

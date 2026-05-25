@@ -59,6 +59,7 @@ const terminalId = computed(() => overrideTerminalId.value ?? propTerminalId.val
 const rendererRole = computed<'compact' | 'full'>(() => (compact.value ? 'compact' : 'full'));
 const isOwnedByOther = computed(() => {
   const owner = terminalStore.activeRendererOwner[terminalId.value];
+
   return owner !== undefined && owner !== rendererRole.value;
 });
 const summary = computed(() => terminalStore.terminals.find((t) => t.id === terminalId.value));
@@ -68,6 +69,7 @@ const integrationNonce = computed(() => summary.value?.integrationNonce ?? '');
 
 function fitAndNotify(): void {
   if (!fit || !term || !terminalId.value) return;
+
   try {
     fit.fit();
     void terminalStore.resizeTerminal(terminalId.value, term.cols, term.rows);
@@ -82,6 +84,7 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
     addonDisposables.push(addon);
   } catch (err) {
     console.warn('[terminal addon] failed to load', err);
+
     try {
       addon.dispose();
     } catch {
@@ -92,9 +95,11 @@ function loadAddon(addon: { dispose(): void }, activate: () => void): void {
 
 function applyShellEvent(event: TerminalShellEvent): void {
   if (!terminalId.value) return;
+
   if (event.kind === 'commandStart') {
     commandCaptureActive = true;
     commandCaptureBuffer = '';
+
     if (!terminalStore.activeCommands[terminalId.value]) {
       terminalStore.startCommand(terminalId.value, {
         cwd: terminalStore.currentCwd[terminalId.value] ?? summary.value?.cwd,
@@ -102,15 +107,20 @@ function applyShellEvent(event: TerminalShellEvent): void {
         trusted: false,
       });
     }
+
     return;
   }
+
   if (event.kind === 'commandFinish') {
     const output = commandCaptureBuffer;
+
     commandCaptureActive = false;
     commandCaptureBuffer = '';
     terminalStore.finishCommand(terminalId.value, event.exitCode, output);
+
     return;
   }
+
   if (event.kind === 'commandLine') {
     const patch = {
       command: event.command,
@@ -118,11 +128,14 @@ function applyShellEvent(event: TerminalShellEvent): void {
       protocol: event.protocol,
       trusted: event.trusted,
     };
+
     if (terminalStore.activeCommands[terminalId.value])
       terminalStore.updateActiveCommand(terminalId.value, patch);
     else terminalStore.startCommand(terminalId.value, patch);
+
     return;
   }
+
   if (event.kind === 'cwd') {
     terminalStore.updateTerminalCwd(terminalId.value, event.cwd);
   }
@@ -130,13 +143,17 @@ function applyShellEvent(event: TerminalShellEvent): void {
 
 function handleOsc(ident: 7 | 9 | 133 | 633 | 1337, data: string): boolean {
   const parsed = parseTerminalOsc(ident, data, integrationNonce.value);
+
   if (replayingBuffer) return parsed.handled;
+
   parsed.events.forEach(applyShellEvent);
+
   return parsed.handled;
 }
 
 function registerShellIntegrationHandlers(): void {
   if (!term) return;
+
   addonDisposables.push(
     term.parser.registerOscHandler(633, (data) => handleOsc(633, data)),
     term.parser.registerOscHandler(133, (data) => handleOsc(133, data)),
@@ -161,27 +178,35 @@ function runSearch(
   queryOverride?: string,
 ): void {
   const query = (queryOverride ?? searchQuery.value).trim();
+
   if (!query) {
     search?.clearDecorations();
     searchResultLabel.value = '';
+
     return;
   }
+
   if (!search) {
     searchResultLabel.value = 'Search unavailable';
+
     return;
   }
+
   const options = {
     incremental,
     decorations: searchDecorations(),
   };
   const found =
     direction === 'next' ? search.findNext(query, options) : search.findPrevious(query, options);
+
   if (!found) searchResultLabel.value = 'No matches';
 }
 
 function scheduleSearch(incremental = true): void {
   if (!searchOpen.value || !searchQuery.value.trim()) return;
+
   if (pendingSearchFrame !== null) cancelAnimationFrame(pendingSearchFrame);
+
   pendingSearchFrame = requestAnimationFrame(() => {
     pendingSearchFrame = null;
     runSearch('next', incremental);
@@ -198,32 +223,42 @@ function findPrevious(): void {
 
 function onSearchInput(event: Event): void {
   const next = (event.target as HTMLInputElement).value;
+
   searchQuery.value = next;
   runSearch('next', true, next);
 }
 
 async function copySelection(): Promise<void> {
   const selected = term?.getSelection();
+
   if (selected) await navigator.clipboard.writeText(selected);
 }
 
 function registerCopyShortcuts(): void {
   term?.attachCustomKeyEventHandler((event) => {
     if (event.type !== 'keydown') return true;
+
     const isCopyShortcut =
       (event.ctrlKey && event.shiftKey && event.code === 'KeyC') ||
       (event.altKey && event.code === 'Insert');
+
     if (!isCopyShortcut) return true;
+
     const selected = term?.getSelection();
+
     if (!selected) return true;
+
     void navigator.clipboard.writeText(selected);
+
     return false;
   });
 }
 
 function focusSession(): void {
   const sessionId = summary.value?.sessionId;
+
   if (!sessionId) return;
+
   layoutStore.addPanel(sessionId);
   layoutStore.activatePanel(sessionId);
   setTimeout(() => {
@@ -237,6 +272,7 @@ function focusSession(): void {
 
 function initXterm(): void {
   if (term || !host.value || isOwnedByOther.value) return;
+
   terminalStore.claimRenderer(terminalId.value, rendererRole.value);
   term = new Terminal({
     allowProposedApi: true,
@@ -251,6 +287,7 @@ function initXterm(): void {
   term.loadAddon(fit);
   addonDisposables.push(fit);
   const addons = terminalPrefs.value.addons;
+
   if (addons.search) {
     search = new SearchAddon();
     loadAddon(search, () => {
@@ -263,31 +300,43 @@ function initXterm(): void {
       );
     });
   }
+
   if (addons.serialize) {
     const serializeAddon = new SerializeAddon();
+
     loadAddon(serializeAddon, () => term?.loadAddon(serializeAddon));
   }
+
   if (addons.unicode11) {
     const unicode11 = new Unicode11Addon();
+
     loadAddon(unicode11, () => {
       term?.loadAddon(unicode11);
+
       if (term) term.unicode.activeVersion = '11';
     });
   }
+
   if (addons.unicodeGraphemes) {
     const unicodeGraphemes = new UnicodeGraphemesAddon();
+
     loadAddon(unicodeGraphemes, () => term?.loadAddon(unicodeGraphemes));
   }
+
   if (addons.webLinks) {
     const links = new WebLinksAddon((_event, uri) => {
       void invokeCommand('openUrl', { url: uri });
     });
+
     loadAddon(links, () => term?.loadAddon(links));
   }
+
   if (addons.clipboard) {
     const clipboard = new ClipboardAddon();
+
     loadAddon(clipboard, () => term?.loadAddon(clipboard));
   }
+
   if (addons.webFonts) {
     webFonts = new WebFontsAddon(true);
     loadAddon(webFonts, () => {
@@ -298,8 +347,10 @@ function initXterm(): void {
         .catch(() => {});
     });
   }
+
   if (addons.progress) {
     const progressAddon = new ProgressAddon();
+
     loadAddon(progressAddon, () => {
       term?.loadAddon(progressAddon);
       addonDisposables.push(
@@ -309,10 +360,13 @@ function initXterm(): void {
       );
     });
   }
+
   if (addons.image) {
     const image = new ImageAddon({ storageLimit: 64 });
+
     loadAddon(image, () => term?.loadAddon(image));
   }
+
   if (addons.webgl) {
     webgl = new WebglAddon();
     loadAddon(webgl, () => {
@@ -325,11 +379,15 @@ function initXterm(): void {
       );
     });
   }
+
   term.open(host.value);
+
   if (addons.ligatures) {
     const ligatures = new LigaturesAddon();
+
     loadAddon(ligatures, () => term?.loadAddon(ligatures));
   }
+
   if (buffer.value) {
     replayingBuffer = true;
     term.write(buffer.value, () => {
@@ -337,6 +395,7 @@ function initXterm(): void {
       scheduleSearch(false);
     });
   }
+
   registerShellIntegrationHandlers();
   registerCopyShortcuts();
   term.onData((data) => {
@@ -350,6 +409,7 @@ function initXterm(): void {
 
 onMounted(async () => {
   await nextTick();
+
   if (!host.value) return;
 
   // Recovery: if this terminal doesn't exist on the backend (e.g. after restart),
@@ -358,9 +418,11 @@ onMounted(async () => {
     const sessionId = Object.entries(terminalStore.sessionTerminalIds).find(
       ([, tid]) => tid === propTerminalId.value,
     )?.[0];
+
     if (sessionId) {
       try {
         const newTerminal = await terminalStore.getOrCreateSessionTerminal(sessionId);
+
         overrideTerminalId.value = newTerminal.id;
         await nextTick();
       } catch {
@@ -382,12 +444,15 @@ watch(isOwnedByOther, (blocked) => {
 
 watch(buffer, (next, prev) => {
   if (!term) return;
+
   if (next.length < prev.length) {
     term.reset();
     term.write(next, () => scheduleSearch(false));
   } else if (next.length > prev.length) {
     const delta = next.slice(prev.length);
+
     if (commandCaptureActive) commandCaptureBuffer += delta;
+
     term.write(delta, () => scheduleSearch(false));
   }
 });
@@ -397,8 +462,10 @@ watch(searchOpen, async (open) => {
     search?.clearDecorations();
     searchResultLabel.value = '';
     term?.focus();
+
     return;
   }
+
   await nextTick();
   searchInput.value?.focus();
   searchInput.value?.select();
@@ -411,10 +478,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('dafman:focus-terminal', onFocusTerminal);
   resizeObserver?.disconnect();
   resizeObserver = null;
+
   if (pendingSearchFrame !== null) {
     cancelAnimationFrame(pendingSearchFrame);
     pendingSearchFrame = null;
   }
+
   while (addonDisposables.length) {
     try {
       addonDisposables.pop()?.dispose();
@@ -422,6 +491,7 @@ onBeforeUnmount(() => {
       /* ignore addon dispose failures */
     }
   }
+
   term?.dispose();
   term = null;
   fit = null;
@@ -429,7 +499,9 @@ onBeforeUnmount(() => {
 
 function onFocusTerminal(event: Event): void {
   const detail = (event as CustomEvent<{ terminalId?: string }>).detail;
+
   if (detail?.terminalId !== terminalId.value) return;
+
   term?.focus();
 }
 </script>

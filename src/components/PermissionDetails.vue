@@ -26,18 +26,22 @@ const raw = computed<Record<string, unknown>>(() => props.request.raw ?? {});
 function pickStr(...keys: string[]): string | null {
   for (const k of keys) {
     const v = raw.value[k];
+
     if (typeof v === 'string' && v.length > 0) return v;
   }
+
   return null;
 }
 
 function pickObj(...keys: string[]): Record<string, unknown> | null {
   for (const k of keys) {
     const v = raw.value[k];
+
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       return v as Record<string, unknown>;
     }
   }
+
   return null;
 }
 
@@ -49,9 +53,12 @@ const filePath = computed(() => pickStr('path', 'filePath', 'fileName'));
 const contentPreview = computed(() => pickStr('contentPreview', 'content', 'preview'));
 const writeExtension = computed(() => {
   const p = filePath.value;
+
   if (!p) return '';
+
   const m = /\.([a-z0-9]+)$/i.exec(p);
-  return m ? m[1]!.toLowerCase() : '';
+
+  return m ? m[1].toLowerCase() : '';
 });
 
 const urlString = computed(() => pickStr('url'));
@@ -61,7 +68,9 @@ const toolName = computed(() => pickStr('toolName', 'mcpToolName', 'tool'));
 const toolArgs = computed(() => pickObj('arguments', 'args', 'params'));
 const toolArgsJson = computed(() => {
   const args = toolArgs.value;
+
   if (!args) return '';
+
   try {
     return JSON.stringify(args, null, 2);
   } catch {
@@ -81,6 +90,7 @@ const intention = computed(() => pickStr('intention'));
 const rawJsonHtml = computed(() => {
   try {
     const j = JSON.stringify(raw.value, null, 2);
+
     return renderMarkdown('```json\n' + j + '\n```');
   } catch {
     return '';

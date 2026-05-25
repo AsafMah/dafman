@@ -56,30 +56,40 @@ interface CliFlags {
 
 function parseFlags(argv: string[]): CliFlags {
   const out: Partial<CliFlags> = {};
+
   for (const arg of argv) {
     const [k, v] = arg.replace(/^--/, '').split('=');
+
     if (!k) continue;
+
     if (k === 'port') out.port = Number(v);
     else if (k === 'workspace') out.workspace = v;
     else if (k === 'user-data') out.userData = v;
     else if (k === 'stub-picker') out.stubPickerPath = v;
   }
+
   if (!out.port) throw new Error('--port=NNN required');
+
   if (!out.workspace) throw new Error('--workspace=/abs/path required');
+
   if (!out.userData) {
     out.userData = join(out.workspace, '.dafman-userdata');
   }
+
   if (out.stubPickerPath === undefined && process.env.DAFMAN_TEST_PICKER_PATH) {
     out.stubPickerPath = process.env.DAFMAN_TEST_PICKER_PATH;
   }
+
   return out as CliFlags;
 }
 
 const flags = parseFlags(process.argv.slice(2));
+
 mkdirSync(flags.userData, { recursive: true });
 mkdirSync(flags.workspace, { recursive: true });
 
 const logDir = join(flags.userData, 'logs');
+
 mkdirSync(logDir, { recursive: true });
 await initLogger({ logDir });
 await initAudit({ dir: join(flags.userData, 'audit') });
@@ -88,6 +98,7 @@ await initAudit({ dir: join(flags.userData, 'audit') });
 const fakeClient = new FakeCopilotClient({
   catalogPath: join(flags.userData, 'fake-sessions.json'),
 });
+
 setClientForTest(fakeClient);
 
 const settingsPath = join(flags.userData, 'settings.json');
@@ -101,6 +112,7 @@ const sockets = new Set<Sock>();
 
 function broadcast(name: string, payload: unknown): void {
   const json = JSON.stringify({ type: 'message', name, payload });
+
   for (const s of sockets) {
     try {
       s.send(json);
@@ -150,12 +162,15 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   createSession: rpcGuard(async (args) => {
     const { workingDirectory } = args as { workingDirectory?: string };
     const cwd = workingDirectory ?? flags.workspace;
+
     return sessions.create({ workingDirectory: cwd });
   }),
   pickFolder: rpcGuard(async () => flags.stubPickerPath ?? null),
   pickAttachment: rpcGuard(async (args) => {
     const { kind } = args as { kind: 'file' | 'directory' };
+
     if (!flags.stubPickerPath) return null;
+
     // Test mode stubs both modes to the same configured path,
     // reporting back whatever kind the caller asked for. Tests
     // that need kind-specific files just set DAFMAN_TEST_PICKER_PATH
@@ -164,6 +179,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       const { stat } = await import('node:fs/promises');
       const st = await stat(flags.stubPickerPath);
       const actualKind: 'file' | 'directory' = st.isDirectory() ? 'directory' : 'file';
+
       return { path: flags.stubPickerPath, kind: kind === actualKind ? kind : actualKind };
     } catch {
       return null;
@@ -171,6 +187,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   }),
   disconnectSession: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.disconnect(sessionId);
   }),
   sendMessage: rpcGuard(async (args) => {
@@ -180,6 +197,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       mode?: 'enqueue' | 'immediate';
       attachments?: unknown[];
     };
+
     return sessions.send(sessionId, text, mode, attachments as Parameters<typeof sessions.send>[3]);
   }),
   searchWorkspaceFiles: rpcGuard(async (args) => {
@@ -190,6 +208,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       includeHidden?: boolean;
       includeIgnored?: boolean;
     };
+
     return sessions.searchWorkspaceFiles(sessionId, query, limit ?? 40, {
       includeHidden: includeHidden ?? false,
       includeIgnored: includeIgnored ?? false,
@@ -197,10 +216,12 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   }),
   abortSession: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.abort(sessionId);
   }),
   listModels: rpcGuard(async () => {
     const models = await tryGetClient().listModels();
+
     return models.map(toModelSummary);
   }),
   setSessionModel: rpcGuard(async (args) => {
@@ -209,6 +230,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       model: string;
       reasoningEffort?: string;
     };
+
     return sessions.setModel(sessionId, model, reasoningEffort);
   }),
   resumeSession: rpcGuard(async (args) => {
@@ -222,42 +244,54 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       ...(reasoningEffort ? { reasoningEffort } : {}),
     });
     const cwd = (await sessions.getCwd(actualId)) ?? null;
+
     return { sessionId: actualId, cwd };
   }),
   getSettings: rpcGuard(async () => settings.get()),
   updateSettings: rpcGuard(async (args) => {
     const { settings: next } = args as { settings: ReturnType<typeof settings.get> };
+
     await settings.update(next);
+
     return settings.get();
   }),
   listSessions: rpcGuard(async () => sessions.list()),
   deleteSession: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.delete(sessionId);
   }),
   getSessionMetadata: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.getMetadata(sessionId);
   }),
   openUrl: rpcGuard(async (args) => {
     const { url } = args as { url: string };
+
     recordUrl({ url, allowed: false, reason: 'stubbed-test-server' });
+
     return false;
   }),
   revealPath: rpcGuard(async (args) => {
     const { path } = args as { path: string };
     const trimmed = path.trim();
+
     if (!trimmed) return false;
+
     // Mirror production isDir-detection but record the decision
     // into spyReveal.calls (used by F11 E2E to assert that
     // file/folder are revealed with the right strategy).
     try {
       const { stat } = await import('node:fs/promises');
       const st = await stat(trimmed);
+
       spyReveal.calls.push({ isDir: st.isDirectory(), path: trimmed });
+
       return true;
     } catch {
       spyReveal.calls.push({ isDir: false, path: trimmed });
+
       return false;
     }
   }),
@@ -266,6 +300,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   ),
   browseDirectory: rpcGuard(async (args) => {
     const { prefix } = args as { prefix: string };
+
     return browseDirectorySync(prefix);
   }),
   rendererLog: rpcGuard(async (args) => {
@@ -274,14 +309,17 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       message: string;
       extra?: Record<string, unknown>;
     };
+
     log[level](`[renderer] ${message}`, extra ?? {});
   }),
   getLogState: rpcGuard(async (args) => {
     const { recentLimit } = (args ?? {}) as { recentLimit?: number };
+
     return { level: getLogLevel(), recent: recentLogs(recentLimit) };
   }),
   setLogLevel: rpcGuard(async (args) => {
     const { level } = args as { level: 'debug' | 'info' | 'warn' | 'error' };
+
     setLogLevel(level);
   }),
   exportDiagnostics: rpcGuard(async () =>
@@ -289,19 +327,23 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   ),
   saveExportFile: rpcGuard(async (args) => {
     const { fileName, contents } = args as { fileName: string; contents: string };
+
     return saveExportFile({ outputRoot: flags.userData, fileName, contents });
   }),
   getAuditState: rpcGuard(async (args) => {
     const { recentLimit } = (args ?? {}) as { recentLimit?: number };
+
     return { recent: recentAudit(recentLimit) };
   }),
   listBuiltinTools: rpcGuard(async () => sessions.listBuiltinTools()),
   listSessionMcpServers: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.listSessionMcpServers(sessionId);
   }),
   listSessionSkills: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.listSkills(sessionId);
   }),
   setSessionSkillEnabled: rpcGuard(async (args) => {
@@ -310,6 +352,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       name: string;
       enabled: boolean;
     };
+
     return sessions.setSkillEnabled(sessionId, name, enabled);
   }),
   setSessionMcpEnabled: rpcGuard(async (args) => {
@@ -318,48 +361,59 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       serverName: string;
       enabled: boolean;
     };
+
     return sessions.setSessionMcpEnabled(sessionId, serverName, enabled);
   }),
   getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
   listAgents: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.listAgents(sessionId);
   }),
   getCurrentAgent: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.getCurrentAgent(sessionId);
   }),
   selectAgent: rpcGuard(async (args) => {
     const { sessionId, name } = args as { sessionId: string; name: string };
+
     return sessions.selectAgent(sessionId, name);
   }),
   deselectAgent: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.deselectAgent(sessionId);
   }),
   reloadAgents: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.reloadAgents(sessionId);
   }),
   listTasks: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.listTasks(sessionId);
   }),
   cancelTask: rpcGuard(async (args) => {
     const { sessionId, id } = args as { sessionId: string; id: string };
+
     return sessions.cancelTask(sessionId, id);
   }),
   removeTask: rpcGuard(async (args) => {
     const { sessionId, id } = args as { sessionId: string; id: string };
+
     return sessions.removeTask(sessionId, id);
   }),
   promoteTask: rpcGuard(async (args) => {
     const { sessionId, id } = args as { sessionId: string; id: string };
+
     return sessions.promoteTask(sessionId, id);
   }),
   listJobs: rpcGuard(async () => sessions.listJobs()),
   listAgentFiles: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.listAgentFiles(sessionId);
   }),
   listAgentFilesGlobal: rpcGuard(async () => sessions.listAgentFilesGlobal()),
@@ -368,6 +422,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       sessionId: string;
       spec: Parameters<typeof sessions.writeAgentFile>[1];
     };
+
     return sessions.writeAgentFile(sessionId, spec);
   }),
   deleteAgentFile: rpcGuard(async (args) => {
@@ -376,47 +431,58 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       scope: 'user' | 'project';
       name: string;
     };
+
     return sessions.deleteAgentFile(sessionId, scope, name);
   }),
   startFleet: rpcGuard(async (args) => {
     const { sessionId, prompt } = args as { sessionId: string; prompt?: string };
+
     return sessions.startFleet(sessionId, prompt);
   }),
   readSessionPlan: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.readPlan(sessionId);
   }),
   writeSessionPlan: rpcGuard(async (args) => {
     const { sessionId, content } = args as { sessionId: string; content: string };
+
     return sessions.writePlan(sessionId, content);
   }),
   deleteSessionPlan: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return sessions.deletePlan(sessionId);
   }),
   listMcpConfigs: rpcGuard(async () => mcp.listConfigs()),
   addMcpConfig: rpcGuard(async (args) => {
     const { name, config } = args as { name: string; config: Record<string, unknown> };
+
     return mcp.addConfig(name, config);
   }),
   updateMcpConfig: rpcGuard(async (args) => {
     const { name, config } = args as { name: string; config: Record<string, unknown> };
+
     return mcp.updateConfig(name, config);
   }),
   removeMcpConfig: rpcGuard(async (args) => {
     const { name } = args as { name: string };
+
     return mcp.removeConfig(name);
   }),
   enableMcpServers: rpcGuard(async (args) => {
     const { names } = args as { names: string[] };
+
     return mcp.enable(names);
   }),
   disableMcpServers: rpcGuard(async (args) => {
     const { names } = args as { names: string[] };
+
     return mcp.disable(names);
   }),
   discoverMcpServers: rpcGuard(async (args) => {
     const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
+
     return mcp.discover(workingDirectory);
   }),
   loginToMcpServer: rpcGuard(async (args) => {
@@ -426,6 +492,7 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       forceReauth?: boolean;
       clientName?: string;
     };
+
     return sessions.loginToMcpServer(sessionId, serverName, {
       ...(forceReauth !== undefined ? { forceReauth } : {}),
       ...(clientName !== undefined ? { clientName } : {}),
@@ -433,19 +500,23 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   }),
   discoverSkills: rpcGuard(async (args) => {
     const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
+
     return skills.discover(workingDirectory);
   }),
   setGloballyDisabledSkills: rpcGuard(async (args) => {
     const { disabledSkills } = args as { disabledSkills: string[] };
+
     return skills.setGloballyDisabled(disabledSkills);
   }),
   listInstructionSources: rpcGuard(async (args) => {
     const { workingDirectory } = (args ?? {}) as { workingDirectory?: string };
+
     return listInstructionSources({ workingDirectory });
   }),
   createTerminal: rpcGuard(async (args) => terminals.create(args as TerminalCreateParams)),
   writeTerminal: rpcGuard(async (args) => {
     const { terminalId, data } = args as { terminalId: string; data: string };
+
     return terminals.write(terminalId, data);
   }),
   resizeTerminal: rpcGuard(async (args) => {
@@ -454,24 +525,29 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       cols: number;
       rows: number;
     };
+
     return terminals.resize(terminalId, cols, rows);
   }),
   killTerminal: rpcGuard(async (args) => {
     const { terminalId } = args as { terminalId: string };
+
     return terminals.kill(terminalId);
   }),
   listTerminals: rpcGuard(async () => terminals.list()),
   startSessionCommand: rpcGuard(async (args) => {
     const { sessionId, command } = args as { sessionId: string; command: string };
     const cwd = (await sessions.getCwd(sessionId)) ?? flags.workspace;
+
     return commandResults.start({ sessionId, command, cwd });
   }),
   cancelSessionCommand: rpcGuard(async (args) => {
     const { sessionId, commandId } = args as { sessionId: string; commandId: string };
+
     return commandResults.cancel(sessionId, commandId);
   }),
   listCommandResults: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
+
     return commandResults.list(sessionId);
   }),
 };
@@ -483,17 +559,21 @@ const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
   '__test.setSendScript': async (args) => {
     const { script } = args as { script: string };
     const fn = new Function('sendArgs', 'push', 'state', script);
+
     fakeClient.setSendScript(async (sendArgs, push, state) => {
       await fn(sendArgs, push, state);
     });
+
     return 'ok';
   },
   '__test.resetSendScript': async () => {
     fakeClient.resetSendScript();
+
     return 'ok';
   },
   '__test.triggerPermission': async (args) => {
     const { sessionId, request } = args as { sessionId: string; request: unknown };
+
     return fakeClient.triggerPermission(sessionId, request);
   },
   '__test.recordAudit': async (args) => {
@@ -503,17 +583,22 @@ const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
         | (Omit<import('./app/audit').UrlAuditEntry, 'ts' | 'kind'> & { kind: 'url' });
     };
     const { recordPermission, recordUrl } = await import('./app/audit');
+
     if (entry.kind === 'permission') {
       const { kind: _kind, ...rest } = entry;
+
       await recordPermission(rest);
     } else {
       const { kind: _kind, ...rest } = entry;
+
       await recordUrl(rest);
     }
+
     return 'ok';
   },
   '__test.resetRevealSpy': async () => {
     spyReveal.calls = [];
+
     return 'ok';
   },
   '__test.getRevealSpy': async () => spyReveal.calls,
@@ -524,27 +609,32 @@ const server = Bun.serve({
   port: flags.port,
   fetch(req, srv) {
     if (srv.upgrade(req)) return;
+
     return new Response('dafman test-server', { status: 200 });
   },
   websocket: {
     open(ws) {
-      sockets.add(ws as unknown as Sock);
+      sockets.add(ws);
       log.info('test-server: ws client connected');
     },
     close(ws) {
-      sockets.delete(ws as unknown as Sock);
+      sockets.delete(ws);
       log.info('test-server: ws client disconnected');
     },
     async message(ws, raw) {
       let msg: { type: string; id?: number; name?: string; args?: unknown };
+
       try {
         msg = JSON.parse(String(raw));
       } catch {
         return;
       }
+
       if (msg.type !== 'request' || !msg.name) return;
+
       const handler = handlers[msg.name] ?? controlHandlers[msg.name];
       const id = msg.id;
+
       if (!handler) {
         ws.send(
           JSON.stringify({
@@ -553,13 +643,17 @@ const server = Bun.serve({
             error: { kind: 'unknown', message: `unknown rpc: ${msg.name}` },
           }),
         );
+
         return;
       }
+
       try {
         const result = await handler(msg.args ?? {});
+
         ws.send(JSON.stringify({ type: 'response', id, result }));
       } catch (err) {
         const message = toErrorMessage(err);
+
         ws.send(
           JSON.stringify({
             type: 'error',

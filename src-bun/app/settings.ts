@@ -41,14 +41,19 @@ export const SETTINGS_VERSION = 14;
 export async function ensureDefaultWorkspace(): Promise<string> {
   try {
     const home = homedir();
+
     if (!home) return '';
+
     const target = join(home, 'dafman');
+
     await mkdir(target, { recursive: true });
+
     return target;
   } catch (err) {
     log.warn('ensureDefaultWorkspace failed', {
       error: toErrorMessage(err),
     });
+
     return '';
   }
 }
@@ -109,20 +114,28 @@ export function defaultSettings(): Settings {
 
 function coerceTools(raw: unknown): ToolsPrefs {
   if (!raw || typeof raw !== 'object') return { defaultExcluded: [], defaultAllowed: [] };
+
   const obj = raw as { defaultExcluded?: unknown; defaultAllowed?: unknown };
   const dedupeStringList = (input: unknown): string[] => {
     if (!Array.isArray(input)) return [];
+
     const out: string[] = [];
     const seen = new Set<string>();
+
     for (const entry of input) {
       if (typeof entry !== 'string') continue;
+
       const trimmed = entry.trim();
+
       if (!trimmed || seen.has(trimmed)) continue;
+
       seen.add(trimmed);
       out.push(trimmed);
     }
+
     return out;
   };
+
   return {
     defaultExcluded: dedupeStringList(obj.defaultExcluded),
     defaultAllowed: dedupeStringList(obj.defaultAllowed),
@@ -131,7 +144,9 @@ function coerceTools(raw: unknown): ToolsPrefs {
 
 function coerceAppearance(raw: unknown): Appearance {
   const base = defaultSettings().appearance;
+
   if (!raw || typeof raw !== 'object') return base;
+
   const obj = raw as Record<string, unknown>;
   const theme = VALID_THEMES.includes(obj.theme as ThemeChoice)
     ? (obj.theme as ThemeChoice)
@@ -148,6 +163,7 @@ function coerceAppearance(raw: unknown): Appearance {
     typeof obj.defaultReasoningEffort === 'string' && obj.defaultReasoningEffort.trim()
       ? obj.defaultReasoningEffort.trim()
       : null;
+
   return {
     theme,
     reasoningVisibility: rv,
@@ -164,8 +180,10 @@ function coerceAppearance(raw: unknown): Appearance {
 /// causes startup-resume to skip layout restoration entirely.
 function coerceLayout(raw: unknown): Layout {
   if (!raw || typeof raw !== 'object') return { dockview: null };
+
   const obj = raw as Record<string, unknown>;
   const dv = obj.dockview;
+
   return {
     dockview: dv && typeof dv === 'object' && !Array.isArray(dv) ? dv : null,
   };
@@ -177,21 +195,29 @@ function coerceLayout(raw: unknown): Layout {
 /// avoids inserting a path that already exists modulo trim).
 function coerceWorkspaces(raw: unknown): Workspaces {
   if (!raw || typeof raw !== 'object') return { recent: [], defaultWorkspace: '' };
+
   const list = (raw as { recent?: unknown }).recent;
   const seen = new Set<string>();
   const out: string[] = [];
+
   if (Array.isArray(list)) {
     for (const entry of list) {
       if (typeof entry !== 'string') continue;
+
       const trimmed = entry.trim();
+
       if (!trimmed || seen.has(trimmed)) continue;
+
       seen.add(trimmed);
       out.push(trimmed);
+
       if (out.length >= WORKSPACES_MRU_LIMIT) break;
     }
   }
+
   const rawDefault = (raw as { defaultWorkspace?: unknown }).defaultWorkspace;
   const defaultWorkspace = typeof rawDefault === 'string' ? rawDefault.trim() : '';
+
   return { recent: out, defaultWorkspace };
 }
 
@@ -201,11 +227,14 @@ function coerceWorkspaces(raw: unknown): Workspaces {
 /// behaviour out of the box (waiting-for-input ON, turn-end OFF).
 function coerceNotifications(raw: unknown): NotificationPrefs {
   const base = defaultSettings().notifications;
+
   if (!raw || typeof raw !== 'object') return base;
+
   const obj = raw as Record<string, unknown>;
   const turnEnd = typeof obj.turnEnd === 'boolean' ? obj.turnEnd : base.turnEnd;
   const waitingForInput =
     typeof obj.waitingForInput === 'boolean' ? obj.waitingForInput : base.waitingForInput;
+
   return { turnEnd, waitingForInput };
 }
 
@@ -214,16 +243,21 @@ function coerceNotifications(raw: unknown): NotificationPrefs {
 /// fall back to the default (off).
 function coercePermissions(raw: unknown): PermissionsPrefs {
   const base = defaultSettings().permissions;
+
   if (!raw || typeof raw !== 'object') return base;
+
   const obj = raw as Record<string, unknown>;
   const defaultApproveAll =
     typeof obj.defaultApproveAll === 'boolean' ? obj.defaultApproveAll : base.defaultApproveAll;
+
   return { defaultApproveAll };
 }
 
 function coerceTerminal(raw: unknown): TerminalPrefs {
   const base = defaultSettings().terminal;
+
   if (!raw || typeof raw !== 'object') return base;
+
   const obj = raw as Record<string, unknown>;
   const defaultProfileId =
     typeof obj.defaultProfileId === 'string' && obj.defaultProfileId.trim()
@@ -252,9 +286,11 @@ function coerceTerminal(raw: unknown): TerminalPrefs {
       : base.theme.foreground;
   const rawAddons = obj.addons as Record<string, unknown> | undefined;
   const addons = { ...base.addons };
+
   for (const key of Object.keys(addons) as Array<keyof typeof addons>) {
     if (typeof rawAddons?.[key] === 'boolean') addons[key] = rawAddons[key];
   }
+
   return {
     defaultProfileId,
     fontFamily,
@@ -267,8 +303,11 @@ function coerceTerminal(raw: unknown): TerminalPrefs {
 
 export function migrate(input: unknown): Settings {
   const defaults = defaultSettings();
+
   if (!input || typeof input !== 'object') return defaults;
+
   const raw = input as Record<string, unknown>;
+
   return {
     version: SETTINGS_VERSION,
     appearance: coerceAppearance(raw.appearance),
@@ -294,17 +333,21 @@ export class SettingsService {
   static loadOrDefault(path: string): SettingsService {
     if (!existsSync(path)) {
       log.info('settings file not found, using defaults', { path });
+
       return new SettingsService(path, defaultSettings());
     }
+
     try {
       const raw = readFileSync(path, 'utf-8');
       const parsed = JSON.parse(raw) as unknown;
+
       return new SettingsService(path, migrate(parsed));
     } catch (err) {
       log.warn('failed to read settings, falling back to defaults', {
         path,
         error: toErrorMessage(err),
       });
+
       return new SettingsService(path, defaultSettings());
     }
   }
@@ -315,14 +358,18 @@ export class SettingsService {
 
   async update(next: Settings): Promise<Settings> {
     const stamped: Settings = { ...migrate(next), version: SETTINGS_VERSION };
+
     this.cache = stamped;
+
     try {
       await mkdir(dirname(this.path), { recursive: true });
       await Bun.write(this.path, JSON.stringify(stamped, null, 2));
     } catch (err) {
       const message = toErrorMessage(err);
+
       throw AppError.settings(message);
     }
+
     return structuredClone(stamped);
   }
 }

@@ -33,10 +33,12 @@ export class SkillsRegistry {
   /// UX stays predictable; everything else becomes `AppError.sdk`.
   private async withClient<T>(fn: (client: CopilotClient) => Promise<T>): Promise<T> {
     const client = this.getClient();
+
     try {
       return await fn(client);
     } catch (err) {
       if (err instanceof AppError) throw err;
+
       throw AppError.sdk(toErrorMessage(err));
     }
   }
@@ -61,6 +63,7 @@ export class SkillsRegistry {
         }>;
       };
       const skills = result.skills ?? [];
+
       return skills
         .filter((s) => typeof s.name === 'string')
         .map((s) => ({
@@ -81,6 +84,7 @@ export class SkillsRegistry {
   async setGloballyDisabled(disabledSkills: string[]): Promise<boolean> {
     return this.withClient(async (client) => {
       await client.rpc.skills.config.setDisabledSkills({ disabledSkills });
+
       return true;
     });
   }

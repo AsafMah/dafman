@@ -37,7 +37,9 @@ const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 
 function normalizeContextLimit(value: number): number | null {
   if (!Number.isFinite(value) || value <= 0) return null;
+
   if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
+
   return value;
 }
 
@@ -54,6 +56,7 @@ const record = computed(() => sessionsStore.getSession(sessionId.value));
 
 // ---------- Name ----------
 const nameDraft = ref<string>(record.value?.title ?? '');
+
 watch(
   () => sessionId.value,
   () => {
@@ -67,14 +70,18 @@ watch(
     // the draft so the input stays in sync when not actively
     // edited. Skip if the input has user-pending edits.
     const trimmed = nameDraft.value.trim();
+
     if (!trimmed || trimmed === (next ?? '')) {
       nameDraft.value = next ?? '';
     }
   },
 );
+
 function onRenameSubmit() {
   const trimmed = nameDraft.value.trim();
+
   if (!trimmed) return;
+
   nameDraft.value = trimmed;
   void sessionsStore.setSessionName(sessionId.value, trimmed);
 }
@@ -89,6 +96,7 @@ const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
   set: (value) => {
     if (!value || value === record.value?.mode) return;
+
     void sessionsStore.setSessionMode(sessionId.value, value);
   },
 });
@@ -104,7 +112,9 @@ const reasoningOptions: { label: string; value: ReasoningVisibility }[] = [
 const reasoningChoice = computed<ReasoningVisibility>({
   get: () => {
     const v = record.value?.reasoningVisibilityOverride;
+
     if (!v || v === 'default') return settings.value.appearance.reasoningVisibility;
+
     return v;
   },
   set: (value) => {
@@ -115,7 +125,9 @@ const reasoningChoice = computed<ReasoningVisibility>({
 // ---------- Workspace ----------
 function onWorkspaceClick() {
   const path = record.value?.workingDirectory;
+
   if (!path) return;
+
   invokeCommand('revealPath', { path }).catch((err: unknown) => {
     toasts.error("Couldn't open workspace", toErrorMessage(err));
   });
@@ -129,6 +141,7 @@ function revealFile(path: string) {
 
 // ---------- Approve-all ----------
 const approveAll = computed(() => record.value?.approveAll ?? false);
+
 function onToggleApproveAll(next: boolean) {
   void sessionsStore.setSessionApproveAll(sessionId.value, next);
 }
@@ -152,7 +165,9 @@ const agentBusyName = ref<string | null>(null);
 
 async function loadAgents() {
   if (!sessionId.value) return;
+
   agentsError.value = null;
+
   try {
     sessionAgents.value = await invokeCommand('listAgents', {
       sessionId: sessionId.value,
@@ -166,7 +181,9 @@ async function loadAgents() {
 
 async function reloadAgents() {
   if (!sessionId.value) return;
+
   agentsError.value = null;
+
   try {
     sessionAgents.value = await invokeCommand('reloadAgents', {
       sessionId: sessionId.value,
@@ -180,7 +197,9 @@ async function reloadAgents() {
 
 async function selectAgent(name: string) {
   if (!sessionId.value || agentBusyName.value) return;
+
   agentBusyName.value = name;
+
   try {
     await invokeCommand('selectAgent', {
       sessionId: sessionId.value,
@@ -197,7 +216,9 @@ async function selectAgent(name: string) {
 
 async function deselectAgent() {
   if (!sessionId.value || agentBusyName.value) return;
+
   agentBusyName.value = '__deselect__';
+
   try {
     await invokeCommand('deselectAgent', { sessionId: sessionId.value });
   } catch (err) {
@@ -212,12 +233,16 @@ async function deselectAgent() {
 /// our case but defensive).
 function agentSourceLabel(agent: AgentInfo): 'Project' | 'User' | null {
   if (!agent.path) return null;
+
   const wd = record.value?.workingDirectory;
+
   if (!wd) return 'User';
+
   // Case-insensitive on Windows; the path may use forward or back
   // slashes. Normalize both.
   const norm = (s: string) => s.replace(/\\/g, '/').toLowerCase();
   const projectPrefix = `${norm(wd)}/.github/agents/`;
+
   return norm(agent.path).startsWith(projectPrefix) ? 'Project' : 'User';
 }
 
@@ -245,17 +270,22 @@ let tasksRequestToken = 0;
 
 async function loadTasks() {
   if (!sessionId.value) return;
+
   tasksError.value = null;
   const token = ++tasksRequestToken;
+
   try {
     const tasks = await invokeCommand('listTasks', {
       sessionId: sessionId.value,
     });
+
     if (token !== tasksRequestToken) return;
+
     sessionTasks.value = tasks;
     tasksLoaded.value = true;
   } catch (err) {
     if (token !== tasksRequestToken) return;
+
     tasksError.value = toErrorMessage(err);
     tasksLoaded.value = true;
   }
@@ -263,7 +293,9 @@ async function loadTasks() {
 
 async function cancelTask(task: TaskInfo) {
   if (!sessionId.value || taskBusyId.value) return;
+
   taskBusyId.value = task.id;
+
   try {
     await invokeCommand('cancelTask', {
       sessionId: sessionId.value,
@@ -280,7 +312,9 @@ async function cancelTask(task: TaskInfo) {
 
 async function removeTask(task: TaskInfo) {
   if (!sessionId.value || taskBusyId.value) return;
+
   taskBusyId.value = task.id;
+
   try {
     await invokeCommand('removeTask', {
       sessionId: sessionId.value,
@@ -299,21 +333,31 @@ async function removeTask(task: TaskInfo) {
 /// a few minutes; the precision drops off above an hour.
 function formatTaskElapsed(task: TaskInfo): string {
   let ms: number | null = null;
+
   if (typeof task.activeTimeMs === 'number') {
     ms = task.activeTimeMs;
   } else if (task.startedAt) {
     const start = Date.parse(task.startedAt);
     const end = task.completedAt ? Date.parse(task.completedAt) : Date.now();
+
     if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
   }
+
   if (ms === null) return '';
+
   if (ms < 1000) return `${ms}ms`;
+
   const s = Math.round(ms / 1000);
+
   if (s < 60) return `${s}s`;
+
   const m = Math.floor(s / 60);
   const rem = s % 60;
+
   if (m < 60) return `${m}m ${rem}s`;
+
   const h = Math.floor(m / 60);
+
   return `${h}h ${m % 60}m`;
 }
 
@@ -334,9 +378,12 @@ type SessionSkill = {
 const sessionSkills = ref<SessionSkill[]>([]);
 const skillsLoaded = ref(false);
 const skillsError = ref<string | null>(null);
+
 async function loadSkills() {
   if (!sessionId.value) return;
+
   skillsError.value = null;
+
   try {
     sessionSkills.value = await invokeCommand('listSessionSkills', {
       sessionId: sessionId.value,
@@ -347,9 +394,12 @@ async function loadSkills() {
     skillsLoaded.value = true;
   }
 }
+
 async function toggleSkill(skill: SessionSkill) {
   const next = !skill.enabled;
+
   skill.enabled = next;
+
   try {
     await invokeCommand('setSessionSkillEnabled', {
       sessionId: sessionId.value,
@@ -372,6 +422,7 @@ function openSkillsLibrary() {
   } catch {
     /* private mode — ignore */
   }
+
   window.dispatchEvent(
     new CustomEvent('dafman:library-activate-tab', { detail: { tab: 'skills' } }),
   );
@@ -409,9 +460,12 @@ const usage = ref<{
   tokenLimit: number;
 } | null>(null);
 const usageError = ref<string | null>(null);
+
 async function loadUsage() {
   if (!sessionId.value) return;
+
   usageError.value = null;
+
   try {
     const raw = await invokeCommand('getSessionUsageMetrics', {
       sessionId: sessionId.value,
@@ -439,19 +493,24 @@ async function loadUsage() {
             : 0,
     };
     const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
+
     usage.value =
       fromRpc.totalUserRequests > 0 || fromRpc.lastCallInputTokens > 0 || fromRpc.tokenLimit > 0
         ? fromRpc
         : fromEvents;
   } catch (err) {
     const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
+
     if (fromEvents.totalUserRequests > 0 || fromEvents.tokenLimit > 0) {
       usage.value = fromEvents;
+
       return;
     }
+
     usageError.value = toErrorMessage(err);
   }
 }
+
 function deriveUsageFromEvents(
   events: Array<{ eventType: string; data: Record<string, unknown> }>,
 ) {
@@ -462,28 +521,41 @@ function deriveUsageFromEvents(
   let lastCallOutputTokens = 0;
   let currentTokens = 0;
   let tokenLimit = 0;
+
   for (const event of events) {
     const data = event.data;
+
     if (event.eventType === 'assistant.usage') {
       totalUserRequests += 1;
       const cost = data.cost;
+
       if (typeof cost === 'number') totalPremiumRequestCost += cost;
+
       const duration = data.duration;
+
       if (typeof duration === 'number') totalApiDurationMs += duration;
+
       const input = data.inputTokens;
+
       if (typeof input === 'number') {
         lastCallInputTokens = input;
         currentTokens = input;
       }
+
       const output = data.outputTokens;
+
       if (typeof output === 'number') lastCallOutputTokens = output;
     } else if (event.eventType === 'session.usage_info') {
       const current = data.currentTokens;
+
       if (typeof current === 'number') currentTokens = current;
+
       const limit = data.tokenLimit;
+
       if (typeof limit === 'number') tokenLimit = normalizeContextLimit(limit) ?? 0;
     }
   }
+
   return {
     totalUserRequests,
     totalPremiumRequestCost,
@@ -494,12 +566,17 @@ function deriveUsageFromEvents(
     tokenLimit,
   };
 }
+
 function formatDurationMs(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
+
   const s = ms / 1000;
+
   if (s < 60) return `${s.toFixed(1)} s`;
+
   const min = Math.floor(s / 60);
   const sec = Math.round(s % 60);
+
   return `${min}m ${sec}s`;
 }
 
@@ -578,7 +655,9 @@ watch(
 // ---------- Actions ----------
 async function onExport(format: 'markdown' | 'json'): Promise<void> {
   const rec = record.value;
+
   if (!rec) return;
+
   try {
     const { processEvents, defaultAmbient } = await import('../lib/chatEvents');
     const { formatConversation, exportFilenameStem } = await import('../lib/exportConversation');
@@ -597,10 +676,12 @@ async function onExport(format: 'markdown' | 'json'): Promise<void> {
     );
     const fileName = exportFilenameStem(title, format);
     const saved = await invokeCommand('saveExportFile', { fileName, contents });
+
     toasts.success(
       `Conversation exported (${format === 'markdown' ? 'MD' : 'JSON'})`,
       `${(saved.bytes / 1024).toFixed(1)} KiB`,
     );
+
     try {
       await invokeCommand('revealPath', { path: saved.path });
     } catch {
@@ -610,15 +691,19 @@ async function onExport(format: 'markdown' | 'json'): Promise<void> {
     toasts.error('Export failed', toErrorMessage(err));
   }
 }
+
 function onCompactNow() {
   void sessionsStore.compactSessionHistory(sessionId.value);
 }
+
 function onResetApprovals() {
   void sessionsStore.resetSessionApprovals(sessionId.value);
 }
+
 async function onForkSession() {
   try {
     const newId = await sessionsStore.forkSession(sessionId.value);
+
     // forkSession internally calls restoreSession, which creates the
     // SessionRecord. We still need to open the dockview panel.
     layoutStore.addPanel(newId);
@@ -644,10 +729,13 @@ const mcpServers = ref<McpItem[]>([]);
 const toolsLoaded = ref(false);
 const toolsError = ref<string | null>(null);
 const settingsStore = useSettingsStore();
+
 async function loadBuiltinTools() {
   toolsError.value = null;
+
   try {
     const tools = await invokeCommand('listBuiltinTools', {});
+
     builtinTools.value = tools.map((t) => ({
       name: t.name,
       description: t.description,
@@ -659,12 +747,15 @@ async function loadBuiltinTools() {
     toolsLoaded.value = true;
   }
 }
+
 async function loadMcpServers() {
   if (!sessionId.value) return;
+
   try {
     const servers = await invokeCommand('listSessionMcpServers', {
       sessionId: sessionId.value,
     });
+
     mcpServers.value = servers.map((s) => ({
       name: s.name,
       status: s.status,
@@ -674,11 +765,14 @@ async function loadMcpServers() {
     toolsError.value = toErrorMessage(err);
   }
 }
+
 async function setMcpServerEnabled(server: McpItem, enabled: boolean) {
   if (!sessionId.value) return;
+
   // Optimistic local flip so the toggle responds immediately;
   // reload to pick up the SDK-side status change.
   server.status = enabled ? 'connected' : 'disabled';
+
   try {
     await invokeCommand('setSessionMcpEnabled', {
       sessionId: sessionId.value,
@@ -714,18 +808,26 @@ function toolKey(t: ToolItem): string {
 /// `defaultAllowed`. Mutually exclusive — setting one removes the
 /// other so the persisted state stays clean.
 type ToolState = 'default' | 'forbidden' | 'only-allow';
+
 function toolState(t: ToolItem): ToolState {
   const key = toolKey(t);
+
   if (settings.value.tools?.defaultExcluded?.includes(key)) return 'forbidden';
+
   if (settings.value.tools?.defaultAllowed?.includes(key)) return 'only-allow';
+
   return 'default';
 }
+
 async function setToolState(t: ToolItem, next: ToolState) {
   const key = toolKey(t);
   const excluded = (settings.value.tools?.defaultExcluded ?? []).filter((n) => n !== key);
   const allowed = (settings.value.tools?.defaultAllowed ?? []).filter((n) => n !== key);
+
   if (next === 'forbidden') excluded.push(key);
+
   if (next === 'only-allow') allowed.push(key);
+
   await settingsStore.update({
     ...settings.value,
     tools: { defaultExcluded: excluded, defaultAllowed: allowed },
@@ -746,6 +848,7 @@ const CRITICAL_TOOLS: ReadonlySet<string> = new Set([
   'create_file',
   'edit_file',
 ]);
+
 function isCriticalTool(t: ToolItem): boolean {
   return CRITICAL_TOOLS.has(t.name);
 }
@@ -757,18 +860,24 @@ type ToolGroup = { label: string; items: ToolItem[]; isBuiltin: boolean };
 const toolGroups = computed<ToolGroup[]>(() => {
   const byPrefix = new Map<string, ToolItem[]>();
   const builtins: ToolItem[] = [];
+
   for (const t of builtinTools.value) {
     if (!t.namespacedName) {
       builtins.push(t);
       continue;
     }
+
     const prefix = t.namespacedName.split('/')[0] || 'namespaced';
     const list = byPrefix.get(prefix) ?? [];
+
     list.push(t);
     byPrefix.set(prefix, list);
   }
+
   const groups: ToolGroup[] = [];
+
   if (builtins.length > 0) groups.push({ label: 'Built-in', items: builtins, isBuiltin: true });
+
   for (const prefix of Array.from(byPrefix.keys()).sort()) {
     groups.push({
       label: prefix,
@@ -776,6 +885,7 @@ const toolGroups = computed<ToolGroup[]>(() => {
       isBuiltin: false,
     });
   }
+
   return groups;
 });
 
@@ -796,13 +906,17 @@ const planEditing = ref(false);
 const planDraft = ref<string>('');
 const planError = ref<string | null>(null);
 const planLoaded = ref(false);
+
 async function loadPlan() {
   if (!sessionId.value) return;
+
   planError.value = null;
+
   try {
     const result = await invokeCommand('readSessionPlan', {
       sessionId: sessionId.value,
     });
+
     planExists.value = result.exists;
     planContent.value = result.content ?? '';
     planLoaded.value = true;
@@ -811,10 +925,12 @@ async function loadPlan() {
     planLoaded.value = true;
   }
 }
+
 function startEditPlan() {
   planDraft.value = planContent.value;
   planEditing.value = true;
 }
+
 async function savePlan() {
   try {
     await invokeCommand('writeSessionPlan', {
@@ -829,6 +945,7 @@ async function savePlan() {
     toasts.error('Plan save failed', toErrorMessage(err));
   }
 }
+
 function cancelEditPlan() {
   planEditing.value = false;
 }
@@ -846,25 +963,33 @@ type QuotaSnapshot = {
 const quota = ref<QuotaSnapshot[]>([]);
 const quotaError = ref<string | null>(null);
 const warnedThresholds = new Set<string>();
+
 async function loadQuota() {
   quotaError.value = null;
+
   try {
     const raw = await invokeCommand('getAccountQuota', {});
     const snapshots: QuotaSnapshot[] = Object.entries(raw).map(([type, snap]) => ({
       type,
       ...snap,
     }));
+
     quota.value = snapshots;
+
     // Threshold warning toasts at 75% + 90% used (= 25% / 10% remaining).
     // Dedup per (type:threshold) so a poll-refresh doesn't re-fire.
     for (const snap of snapshots) {
       if (snap.isUnlimitedEntitlement) continue;
+
       const usedPct = 100 - snap.remainingPercentage;
+
       for (const threshold of [90, 75]) {
         const key = `${snap.type}:${threshold}`;
+
         if (usedPct >= threshold && !warnedThresholds.has(key)) {
           warnedThresholds.add(key);
           const severity = threshold === 90 ? 'warn' : 'info';
+
           toasts[severity](
             `Quota at ${usedPct.toFixed(0)}%`,
             `${snap.type}: ${snap.usedRequests}/${snap.entitlementRequests} used`,
@@ -910,9 +1035,12 @@ const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
 
 function readSectionState(key: SectionKey): boolean {
   if (typeof localStorage === 'undefined') return SECTION_DEFAULTS[key];
+
   try {
     const raw = localStorage.getItem(`dafman.details.section.${key}`);
+
     if (raw === null) return SECTION_DEFAULTS[key];
+
     return raw === '1';
   } catch {
     return SECTION_DEFAULTS[key];
@@ -934,7 +1062,9 @@ const sectionOpen = ref<Record<SectionKey, boolean>>({
 
 function toggleSection(key: SectionKey): void {
   const next = !sectionOpen.value[key];
+
   sectionOpen.value = { ...sectionOpen.value, [key]: next };
+
   try {
     localStorage.setItem(`dafman.details.section.${key}`, next ? '1' : '0');
   } catch {
@@ -959,8 +1089,10 @@ function isItemExpanded(kind: 'tool' | 'skill' | 'agent', name: string): boolean
 function toggleItemExpansion(kind: 'tool' | 'skill' | 'agent', name: string): void {
   const key = `${kind}:${name}`;
   const next = new Set(expandedItems.value);
+
   if (next.has(key)) next.delete(key);
   else next.add(key);
+
   expandedItems.value = next;
 }
 </script>
@@ -1059,8 +1191,8 @@ function toggleItemExpansion(kind: 'tool' | 'skill' | 'agent', name: string): vo
         >
           <span class="row-label">Reasoning view</span>
           <Select
-            :input-id="`details-reasoning-${sessionId}`"
             v-model="reasoningChoice"
+            :input-id="`details-reasoning-${sessionId}`"
             :options="reasoningOptions"
             option-label="label"
             option-value="value"

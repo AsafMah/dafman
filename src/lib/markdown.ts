@@ -45,13 +45,10 @@ const md: MarkdownIt = new MarkdownIt({
   breaks: false,
   highlight(code, lang) {
     const language = (lang || '').trim().toLowerCase();
+
     if (language && Prism.languages[language]) {
       try {
-        const highlighted = Prism.highlight(
-          code,
-          Prism.languages[language] as Prism.Grammar,
-          language,
-        );
+        const highlighted = Prism.highlight(code, Prism.languages[language], language);
         // Prism emits `<span class="token comment">`, but our CSS in
         // `lexical.css` is keyed to `.lex-token-*` (the class names
         // Lexical's CodeHighlightNode applies via the `codeHighlight`
@@ -64,6 +61,7 @@ const md: MarkdownIt = new MarkdownIt({
           /class="token ([\w-]+)"/g,
           (_match, type: string) => `class="token lex-token-${type}"`,
         );
+
         return (
           `<pre class="lex-code" data-highlight-language="${escapeAttr(language)}">` +
           `<code class="language-${escapeAttr(language)}">${relabeled}</code></pre>`
@@ -72,6 +70,7 @@ const md: MarkdownIt = new MarkdownIt({
         // fall through to unhighlighted rendering
       }
     }
+
     return `<pre class="lex-code"><code>${escapeHtml(code)}</code></pre>`;
   },
 });
@@ -89,11 +88,14 @@ md.use(texmath, {
 /// Re-tag a block-level open token with one of our `lex-*` class names.
 function addOpenClass(tag: string, cls: string): void {
   const original = md.renderer.rules[`${tag}_open`];
+
   md.renderer.rules[`${tag}_open`] = (tokens, idx, opts, env, self) => {
-    tokens[idx]!.attrJoin('class', cls);
+    tokens[idx].attrJoin('class', cls);
+
     return original ? original(tokens, idx, opts, env, self) : self.renderToken(tokens, idx, opts);
   };
 }
+
 addOpenClass('paragraph', 'lex-paragraph');
 addOpenClass('blockquote', 'lex-quote');
 addOpenClass('bullet_list', 'lex-ul');
@@ -103,37 +105,46 @@ addOpenClass('table', 'md-table');
 
 // Headings: tag varies (h1..h6); pick the matching lex class.
 md.renderer.rules.heading_open = (tokens, idx, opts, _env, self) => {
-  const t = tokens[idx]!;
+  const t = tokens[idx];
+
   t.attrJoin('class', `lex-${t.tag}`);
+
   return self.renderToken(tokens, idx, opts);
 };
 
 // Inline tokens (no _open/_close pair on these — they're self-rendering).
 const codeInline = md.renderer.rules.code_inline;
+
 md.renderer.rules.code_inline = (tokens, idx, opts, env, self) => {
-  tokens[idx]!.attrJoin('class', 'lex-text-code');
+  tokens[idx].attrJoin('class', 'lex-text-code');
+
   return codeInline
     ? codeInline(tokens, idx, opts, env, self)
     : self.renderToken(tokens, idx, opts);
 };
 
 const linkOpen = md.renderer.rules.link_open;
+
 md.renderer.rules.link_open = (tokens, idx, opts, env, self) => {
-  const t = tokens[idx]!;
+  const t = tokens[idx];
+
   t.attrJoin('class', 'lex-link');
   t.attrSet('target', '_blank');
   t.attrSet('rel', 'noopener noreferrer');
+
   return linkOpen ? linkOpen(tokens, idx, opts, env, self) : self.renderToken(tokens, idx, opts);
 };
 
 md.renderer.rules.s_open = (tokens, idx, opts, _env, self) => {
-  tokens[idx]!.attrJoin('class', 'lex-text-strike');
+  tokens[idx].attrJoin('class', 'lex-text-strike');
+
   return self.renderToken(tokens, idx, opts);
 };
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
 function escapeAttr(s: string): string {
   return escapeHtml(s).replace(/"/g, '&quot;');
 }
@@ -256,16 +267,21 @@ const PURIFY_CONFIG = {
 // Anything else (color, position, transform, font-family, etc.) is
 // stripped. This is run once at module load.
 let purifyHookInstalled = false;
+
 function ensurePurifyHook(): void {
   if (purifyHookInstalled) return;
+
   if (typeof DOMPurify.addHook !== 'function') return;
+
   DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
     if (data.attrName !== 'style') return;
+
     // KaTeX uses: width, height, margin-left, margin-right, margin-top,
     // top, left, vertical-align, padding-left/right, position:relative.
     // Tighter than the general "ALLOW_STYLE" sledgehammer.
     const allowed =
       /^(?:\s*(?:width|height|margin(?:-(?:left|right|top|bottom))?|top|left|right|bottom|vertical-align|padding(?:-(?:left|right|top|bottom))?|position)\s*:\s*[^;:]+;?\s*)+$/;
+
     if (!allowed.test(data.attrValue)) {
       data.attrValue = '';
       data.keepAttr = false;
@@ -276,8 +292,10 @@ function ensurePurifyHook(): void {
 
 export function renderMarkdown(source: string): string {
   if (!source) return '';
+
   ensurePurifyHook();
   const dirty = md.render(source);
+
   return DOMPurify.sanitize(dirty, PURIFY_CONFIG);
 }
 
@@ -304,6 +322,7 @@ export type MarkdownSegment =
 /// markdown-it highlighting path.
 export function renderMarkdownSegments(source: string): MarkdownSegment[] {
   if (!source) return [];
+
   // Strip <system_notification>...</system_notification> XML blocks
   // that the CLI agent embeds in assistant messages for sub-agent lifecycle.
   const cleaned = source
@@ -312,7 +331,9 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
     // strip the dangling open tag so it never flashes in the UI.
     .replace(/<system_notification>[\s\S]*$/g, '')
     .trim();
+
   if (!cleaned) return [];
+
   ensurePurifyHook();
   const tokens = md.parse(cleaned, {});
   const segments: MarkdownSegment[] = [];
@@ -320,11 +341,14 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
 
   const flushHtml = () => {
     if (buffer.length === 0) return;
+
     const html = md.renderer.render(buffer, md.options, {});
     const clean = DOMPurify.sanitize(html, PURIFY_CONFIG);
+
     if (clean.trim().length > 0) {
       segments.push({ kind: 'html', html: clean });
     }
+
     buffer = [];
   };
 
@@ -335,12 +359,15 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
       // markdown-it appends a trailing newline to fence content; drop
       // it so the editor doesn't show a phantom blank last line.
       const code = token.content.replace(/\n$/, '');
+
       segments.push({ kind: 'code', code, language });
     } else {
       buffer.push(token);
     }
   }
+
   flushHtml();
+
   return segments;
 }
 
@@ -358,8 +385,10 @@ export function renderMarkdownSegments(source: string): MarkdownSegment[] {
 /// through `partialOutput` / `resultContent` without conditioning.
 export function fenced(content: string, language: string): string {
   if (!content) return '';
+
   const body = content.endsWith('\n') ? content : `${content}\n`;
   const longestRun = (body.match(/`+/g) ?? []).reduce((max, run) => Math.max(max, run.length), 0);
   const fence = '`'.repeat(Math.max(3, longestRun + 1));
+
   return `${fence}${language}\n${body}${fence}`;
 }

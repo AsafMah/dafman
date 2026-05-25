@@ -39,10 +39,12 @@ const layoutStore = useLayoutStore();
 /// is currently using.
 const userParams = computed<UserParams>(() => {
   const p = props.params;
+
   if (p && typeof p === 'object' && 'params' in p && p.params) {
     return p.params;
   }
-  return (p as UserParams) ?? {};
+
+  return p ?? {};
 });
 
 const panelApi = computed<DockviewPanelApi | undefined>(() => props.api ?? props.params?.api);
@@ -59,12 +61,18 @@ const replacing = ref(false);
 /// `sessionsStore.createSession`.
 async function startReplacement() {
   if (replacing.value) return;
+
   replacing.value = true;
+
   try {
     const created = await sessionsStore.createSession();
+
     if (!created) return;
+
     const orphanId = sessionId.value;
+
     if (!orphanId) return;
+
     layoutStore.replaceMissingPanel(orphanId, created.id);
   } catch {
     /* toast already shown */

@@ -54,12 +54,17 @@ const PLAYGROUND_PANEL_ID = 'playground';
 /// sidebar edge panel). Subsequent calls just focus the existing tab.
 function openPlayground() {
   const dock = layoutStore.api;
+
   if (!dock) return;
+
   const existing = dock.getPanel(PLAYGROUND_PANEL_ID);
+
   if (existing) {
     dock.removePanel(existing);
+
     return;
   }
+
   // Resolve a body (non-edge) group inline rather than going through
   // layoutStore — exposing a new store method mid-session breaks
   // Pinia's HMR, which left users on an older bundle staring at
@@ -68,6 +73,7 @@ function openPlayground() {
     (g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid',
   );
   const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
+
   dock.addPanel({
     id: PLAYGROUND_PANEL_ID,
     component: 'playground',
@@ -86,6 +92,7 @@ function applyThemeClass(isDark: boolean) {
 
 onMounted(async () => {
   const mql = window.matchMedia('(prefers-color-scheme: dark)');
+
   prefersDark.value = mql.matches;
   mql.addEventListener('change', (e) => {
     prefersDark.value = e.matches;
@@ -125,6 +132,7 @@ onMounted(async () => {
     .load()
     .then((s) => {
       bootStore.markSettingsLoaded();
+
       return s;
     })
     .catch((err) => {
@@ -133,6 +141,7 @@ onMounted(async () => {
       // surfaced by the store.
       bootStore.markSettingsLoaded();
       console.error('[boot] settings.load failed; continuing with defaults', err);
+
       return null;
     });
 
@@ -143,6 +152,7 @@ onMounted(async () => {
     })
     .catch((err) => {
       const message = toErrorMessage(err);
+
       bootStore.markFailed(message);
       // Re-throw is unnecessary — Promise.all below will see the
       // failure via clientStore.ready remaining false.
@@ -180,11 +190,12 @@ onMounted(async () => {
   // toast, and continue to `markReady` — better to surface a
   // half-restored app the user can fix than to lock them out.
   console.info('[boot] starting restoreFromLayout');
+
   try {
     await restoreFromLayout();
   } catch (err) {
     const message = toErrorMessage(err);
-    // eslint-disable-next-line no-console
+
     console.error('[App] restoreFromLayout threw — continuing to ready', err);
     toastStore.error(
       'Layout restore failed',
@@ -216,9 +227,12 @@ onMounted(async () => {
   // attempted on the store side.
   window.addEventListener('dafman:focus-session', (e: Event) => {
     const detail = (e as CustomEvent<{ sessionId?: string }>).detail;
+
     if (!detail?.sessionId) return;
+
     const dock = layoutStore.api;
     const panel = dock?.getPanel(detail.sessionId);
+
     panel?.api.setActive();
   });
 
@@ -250,24 +264,32 @@ const pendingRestoreLayout = ref<unknown | null>(null);
 
 async function restoreFromLayout() {
   const layout = settingsStore.settings.layout?.dockview;
+
   if (!layout || typeof layout !== 'object') {
     console.info('[boot] restoreFromLayout: no layout to restore');
+
     return;
   }
+
   const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
   const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
   const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
   const sessionIds = extractChatPanelIds(sanitized);
+
   console.info(`[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`);
+
   if (sessionIds.length === 0) {
     if (layoutStore.api) {
       const ok = layoutStore.restore(sanitized);
+
       if (!ok) layoutStore.resetToDefault();
     } else {
       pendingRestoreLayout.value = sanitized;
     }
+
     return;
   }
+
   bootStore.beginSessions(sessionIds.length);
   // Parallel resumes — safe again now that rpcGuard throws a real
   // Error (encoded AppErrorPayload). Previously this hung because
@@ -282,9 +304,12 @@ async function restoreFromLayout() {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   bootStore.beginApplying();
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
   if (layoutStore.api) {
     const ok = layoutStore.restore(sanitized);
+
     console.info(`[boot] restoreFromLayout: fromJSON ok=${ok}`);
+
     if (!ok) {
       // fromJSON threw — toast and fall back to a default layout
       // so the user has something to work with instead of a blank
@@ -308,6 +333,7 @@ watch(
   () => toastStore.pending.length,
   (len) => {
     if (len === 0) return;
+
     for (const msg of toastStore.consume()) {
       primeToast.add({
         severity: msg.severity,
@@ -350,12 +376,14 @@ function onDockReady(event: DockviewReadyEvent) {
     // — at this point the panel still has its `api.group` reference,
     // but its `group.panels.length` reflects the post-removal count.
     const groupId = panel.api.group.id;
+
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
       const record = sessionsStore.getSession(panel.id);
       const sessionBusy =
         jobsStore.hasActiveJobsForSession(panel.id) ||
         record?.isThinking ||
         (record?.pendingRequests?.length ?? 0) > 0;
+
       if (sessionBusy) {
         toastStore.info(
           'Session detached',
@@ -365,6 +393,7 @@ function onDockReady(event: DockviewReadyEvent) {
         void sessionsStore.closeSession(panel.id);
       }
     }
+
     // If this panel was the last one in its edge group (e.g. user
     // closed the Sessions sidebar via dockview's own X), tear down
     // the edge group too so the next open recreates at the
@@ -373,14 +402,18 @@ function onDockReady(event: DockviewReadyEvent) {
     // group isn't an edge group.
     layoutStore.pruneEmptyEdgeGroup(groupId);
   });
+
   // If startup-resume already produced a pruned layout, hand it over
   // now that the api is alive. Done before subscribing to layout
   // changes so the restore itself doesn't trigger a write.
   if (pendingRestoreLayout.value) {
     const ok = layoutStore.restore(pendingRestoreLayout.value);
+
     if (!ok) layoutStore.resetToDefault();
+
     pendingRestoreLayout.value = null;
   }
+
   // One-shot rescue: older builds (or a stale persisted layout) could
   // leave chat panels stuck inside the Sessions sidebar's edge group,
   // where they have no tab/header chrome and look broken. Move any
@@ -403,8 +436,10 @@ function onDockReady(event: DockviewReadyEvent) {
 /// Debounced write — drag-resize fires `onDidLayoutChange` continuously
 /// at frame rate; we coalesce into one settings write per ~300ms.
 let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
 function scheduleLayoutSave() {
   if (layoutSaveTimer !== null) clearTimeout(layoutSaveTimer);
+
   layoutSaveTimer = setTimeout(() => {
     layoutSaveTimer = null;
     void settingsStore.persistLayout(layoutStore.snapshot());
@@ -467,6 +502,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
     },
   ];
+
   if (isDev) {
     items.push({
       kind: 'action',
@@ -477,6 +513,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       onClick: openPlayground,
     });
   }
+
   items.push({
     kind: 'panel',
     id: LOG_VIEWER_PANEL_ID,
@@ -501,6 +538,7 @@ const activityItems = computed<ActivityItem[]>(() => {
     initialSize: 400,
     minimumSize: 380,
   });
+
   return items;
 });
 
@@ -533,9 +571,12 @@ function openSessionsByDefault(attempt = 0) {
         '[boot] openSessionsByDefault: dockview api never became ready after 20 retries; Sessions panel will not auto-open',
       );
     }
+
     return;
   }
+
   if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) return;
+
   layoutStore.openEdgePanel('left', {
     id: SESSIONS_PANEL_ID,
     component: 'sessionsManager',

@@ -27,6 +27,7 @@ const displayName = computed(() => {
   if (props.mcpServerName && props.mcpToolName) {
     return `${props.mcpServerName} · ${props.mcpToolName}`;
   }
+
   return props.toolName;
 });
 
@@ -75,10 +76,15 @@ const renderHints = computed(() =>
 /// when the tool has no registered renderer.
 const previewLine = computed(() => {
   if (props.status === 'error' && props.errorMessage) return props.errorMessage;
+
   if (renderHints.value.summary) return renderHints.value.summary;
+
   const source = props.resultContent || props.progressMessage || props.partialOutput || '';
+
   if (!source) return '';
+
   const firstLine = source.split('\n', 1)[0] ?? '';
+
   return firstLine.length > 160 ? `${firstLine.slice(0, 160)}…` : firstLine;
 });
 

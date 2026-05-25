@@ -19,15 +19,20 @@ export const useAuditStore = defineStore('audit', () => {
 
   async function ensureInitialised(): Promise<void> {
     if (initialised.value) return;
+
     initialised.value = true;
+
     try {
       const state = await invokeCommand('getAuditState', { recentLimit: 500 });
+
       entries.value = state.recent;
     } catch (err) {
       console.warn('[auditStore] initial load failed', err);
     }
+
     unsubscribe = onAuditEvent((entry) => {
       entries.value.push(entry);
+
       if (entries.value.length > RENDERER_CAP) {
         entries.value.splice(0, entries.value.length - RENDERER_CAP);
       }
@@ -43,6 +48,7 @@ export const useAuditStore = defineStore('audit', () => {
       unsubscribe();
       unsubscribe = null;
     }
+
     initialised.value = false;
   }
 

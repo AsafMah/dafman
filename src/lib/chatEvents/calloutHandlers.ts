@@ -14,7 +14,9 @@ const COMPACTION_FAILED_PREFIX = 'Compaction failed:';
 function lastCompactionItem(items: ChatItem[]): ChatItem | null {
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i];
+
     if (item?.kind !== 'system') continue;
+
     if (
       item.text === COMPACTION_START ||
       item.text === COMPACTION_COMPLETE ||
@@ -23,6 +25,7 @@ function lastCompactionItem(items: ChatItem[]): ChatItem | null {
       return item;
     }
   }
+
   return null;
 }
 
@@ -35,21 +38,28 @@ function parseForkInfo(
   message: string,
 ): { direction: 'into' | 'from'; referenceName: string } | null {
   const into = message.match(/^Forked this session into\s+(.+?)\s*(?:\.|$)/i);
+
   if (into && into[1]) {
     return { direction: 'into', referenceName: into[1].trim() };
   }
+
   const from = message.match(/^Forked from\s+(.+?)(?:\s+before\s+event\s+\S+)?\s+as\s+/i);
+
   if (from && from[1]) {
     return { direction: 'from', referenceName: from[1].trim() };
   }
+
   return null;
 }
 
 export const calloutHandlers: Record<string, Handler> = {
   'session.info': (ctx, data, payload) => {
     const message = pickString(data, ['message']);
+
     if (!message) return;
+
     const infoType = pickString(data, ['infoType']);
+
     if (infoType === 'fork') {
       // Dedupe by envelope eventId — the CLI re-emits the same
       // session.info on replay, so live + persisted both arrive on
@@ -58,10 +68,14 @@ export const calloutHandlers: Record<string, Handler> = {
         const seen = ctx.items.find(
           (i) => i.kind === 'forkNotice' && i.eventId === payload.eventId,
         );
+
         if (seen) return;
       }
+
       const parsed = parseForkInfo(message);
+
       if (!parsed) return; // unknown wording — fall back below
+
       ctx.items.push({
         id: ctx.counter.next++,
         kind: 'forkNotice',
@@ -69,24 +83,30 @@ export const calloutHandlers: Record<string, Handler> = {
         direction: parsed.direction,
         referenceName: parsed.referenceName,
       });
+
       return;
     }
+
     const tip = pickString(data, ['tip']);
+
     ctx.pushSystem(tip ? `${message} (${tip})` : message, 'info');
   },
 
   'session.warning': (ctx, data) => {
     const message = pickString(data, ['message']);
+
     if (message) ctx.pushSystem(message, 'warn');
   },
 
   'system.notification': (ctx, data) => {
     const content = pickString(data, ['content']);
+
     if (content) ctx.pushSystem(content, 'info');
   },
 
   'session.truncation': (ctx, data) => {
     const removed = pickNumber(data, ['messagesRemovedDuringTruncation']);
+
     ctx.pushSystem(
       removed ? `Context truncated (${removed} messages removed).` : 'Context truncated.',
       'info',
@@ -95,7 +115,9 @@ export const calloutHandlers: Record<string, Handler> = {
 
   'session.compaction_start': (ctx) => {
     const last = lastCompactionItem(ctx.items);
+
     if (last?.kind === 'system' && last.text === COMPACTION_START) return;
+
     ctx.pushSystem(COMPACTION_START, 'info');
   },
 
@@ -103,13 +125,16 @@ export const calloutHandlers: Record<string, Handler> = {
     const err = pickString(data, ['errorMessage']);
     const text = err ? `Compaction failed: ${err}` : COMPACTION_COMPLETE;
     const last = lastCompactionItem(ctx.items);
+
     if (last?.kind === 'system' && last.text === text) return;
+
     ctx.pushSystem(text, err ? 'warn' : 'info');
   },
 
   'model.call_failure': (ctx, data) => {
     const errMsg = pickString(data, ['errorMessage']) || 'Model call failed';
     const status = pickNumber(data, ['statusCode']);
+
     ctx.pushSystem(status ? `${errMsg} (HTTP ${status})` : errMsg, 'error');
   },
 };

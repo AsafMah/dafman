@@ -13,11 +13,13 @@ export function stripAnsi(value: string): string {
 export function cleanTerminalCommandOutput(value: string): string {
   const stripped = stripAnsi(value).replace(/\r/g, '');
   const lines = stripped.split('\n');
+
   while (
     lines.length > 0 &&
     /^\s*(?:PS [^>]*>|[^\s>]+[>$#])\s*$/.test(lines[lines.length - 1] ?? '')
   ) {
     lines.pop();
   }
+
   return lines.join('\n').trimEnd();
 }

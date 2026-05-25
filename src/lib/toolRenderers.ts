@@ -41,10 +41,13 @@ export type ToolRenderer = (input: ToolRendererArgs) => ToolRenderResult;
 /// if the field is missing or not a string.
 function s(args: Record<string, unknown> | undefined, ...keys: string[]): string {
   if (!args) return '';
+
   for (const key of keys) {
     const value = args[key];
+
     if (typeof value === 'string' && value.length > 0) return value;
   }
+
   return '';
 }
 
@@ -53,7 +56,9 @@ function s(args: Record<string, unknown> | undefined, ...keys: string[]): string
 /// behaviour so the look-and-feel doesn't jump when summaries arrive.
 function clip(value: string, max = 160): string {
   if (!value) return '';
+
   const oneLine = value.replace(/\s*\n+\s*/g, ' ').trim();
+
   return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
@@ -62,8 +67,11 @@ function clip(value: string, max = 160): string {
 /// case-sensitive ids; @lexical/code maps friendly names → grammars).
 function languageForFile(path: string): string {
   if (!path) return 'text';
+
   const dot = path.lastIndexOf('.');
+
   if (dot === -1) return 'text';
+
   const ext = path.slice(dot + 1).toLowerCase();
   // Keep this map intentionally short — prismjs loads grammars on
   // demand via @lexical/code's lazy loader, but only for the ones it
@@ -106,6 +114,7 @@ function languageForFile(path: string): string {
     swift: 'swift',
     kt: 'kotlin',
   };
+
   return map[ext] ?? 'text';
 }
 
@@ -113,6 +122,7 @@ function languageForFile(path: string): string {
 
 const shellRenderer: ToolRenderer = ({ args }) => {
   const command = s(args, 'command', 'cmd', 'script');
+
   return {
     summary: command ? clip(command) : undefined,
     argsLanguage: 'bash',
@@ -122,6 +132,7 @@ const shellRenderer: ToolRenderer = ({ args }) => {
 
 const readFileRenderer: ToolRenderer = ({ args }) => {
   const path = s(args, 'file_path', 'path', 'filePath', 'filename');
+
   return {
     summary: path ? clip(path) : undefined,
     argsLanguage: 'json',
@@ -131,6 +142,7 @@ const readFileRenderer: ToolRenderer = ({ args }) => {
 
 const writeFileRenderer: ToolRenderer = ({ args }) => {
   const path = s(args, 'file_path', 'path', 'filePath', 'filename');
+
   return {
     summary: path ? `write ${clip(path)}` : undefined,
     argsLanguage: 'json',
@@ -141,6 +153,7 @@ const writeFileRenderer: ToolRenderer = ({ args }) => {
 const editRenderer: ToolRenderer = ({ args }) => {
   const path = s(args, 'file_path', 'path', 'filePath', 'filename');
   const oldStr = s(args, 'old_str', 'search');
+
   return {
     summary: path ? `edit ${clip(path)}${oldStr ? `  · ${clip(oldStr, 60)}` : ''}` : undefined,
     argsLanguage: 'json',
@@ -152,6 +165,7 @@ const applyPatchRenderer: ToolRenderer = ({ args }) => {
   const patch = s(args, 'patch', 'diff');
   const fileMatch = patch.match(/^\*\*\* (?:Update|Add|Delete) File: (.+)$/m);
   const path = fileMatch?.[1] ?? '';
+
   return {
     summary: path ? `patch ${clip(path)}` : 'apply patch',
     argsLanguage: 'diff',
@@ -162,6 +176,7 @@ const applyPatchRenderer: ToolRenderer = ({ args }) => {
 const grepRenderer: ToolRenderer = ({ args }) => {
   const pattern = s(args, 'pattern', 'query', 'regex');
   const path = s(args, 'path', 'paths', 'directory');
+
   return {
     summary: pattern
       ? `grep "${clip(pattern, 60)}"${path ? ` in ${clip(path, 50)}` : ''}`
@@ -173,6 +188,7 @@ const grepRenderer: ToolRenderer = ({ args }) => {
 
 const globRenderer: ToolRenderer = ({ args }) => {
   const pattern = s(args, 'pattern', 'glob');
+
   return {
     summary: pattern ? `glob ${clip(pattern)}` : undefined,
     argsLanguage: 'json',
@@ -184,9 +200,11 @@ const viewRenderer: ToolRenderer = ({ args }) => {
   const path = s(args, 'path', 'file_path', 'filePath');
   const range = args?.view_range;
   let rangeStr = '';
+
   if (Array.isArray(range) && range.length === 2) {
     rangeStr = ` [${range[0]}–${range[1]}]`;
   }
+
   return {
     summary: path ? `view ${clip(path)}${rangeStr}` : undefined,
     argsLanguage: 'json',
@@ -196,6 +214,7 @@ const viewRenderer: ToolRenderer = ({ args }) => {
 
 const fetchRenderer: ToolRenderer = ({ args }) => {
   const url = s(args, 'url');
+
   return {
     summary: url ? clip(url) : undefined,
     argsLanguage: 'json',
@@ -205,6 +224,7 @@ const fetchRenderer: ToolRenderer = ({ args }) => {
 
 const todoRenderer: ToolRenderer = ({ args }) => {
   const todos = args?.todos;
+
   if (Array.isArray(todos)) {
     return {
       summary: `${todos.length} todo${todos.length === 1 ? '' : 's'}`,
@@ -212,6 +232,7 @@ const todoRenderer: ToolRenderer = ({ args }) => {
       resultLanguage: 'json',
     };
   }
+
   return { argsLanguage: 'json', resultLanguage: 'json' };
 };
 
@@ -265,7 +286,10 @@ export function getToolRenderer(toolName: string, mcpServerName?: string): ToolR
     // on the tool itself; assume markdown for richer MCP outputs.
     return ({ args: _a }) => ({ argsLanguage: 'json', resultLanguage: 'markdown' });
   }
+
   const renderer = RENDERERS[toolName];
+
   if (renderer) return renderer;
+
   return () => ({ argsLanguage: 'json', resultLanguage: 'text' });
 }

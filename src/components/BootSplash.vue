@@ -36,16 +36,19 @@ const prefersDark = ref(false);
 
 onMounted(() => {
   const mql = window.matchMedia('(prefers-color-scheme: dark)');
+
   prefersDark.value = mql.matches;
   const onChange = (e: MediaQueryListEvent) => {
     prefersDark.value = e.matches;
   };
+
   mql.addEventListener('change', onChange);
   onBeforeUnmount(() => mql.removeEventListener('change', onChange));
 });
 
 const isDark = computed(() => {
   if (!settingsStore.loaded) return prefersDark.value;
+
   return resolveIsDark(settingsStore.settings.appearance.theme, prefersDark.value);
 });
 
@@ -55,6 +58,7 @@ const showDeterminateBar = computed(
 
 const progressPct = computed(() => {
   if (bootStore.sessionsTotal === 0) return 0;
+
   return Math.min(100, Math.round((bootStore.sessionsRestored / bootStore.sessionsTotal) * 100));
 });
 

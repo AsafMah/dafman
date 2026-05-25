@@ -32,25 +32,33 @@ export async function openAttachment(a: SendMessageAttachment): Promise<void> {
       '```',
     ].join('\n');
     const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
+
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
     return;
   }
+
   if (a.type === 'file' || a.type === 'directory') {
     try {
       await invokeCommand('revealPath', { path: a.path });
     } catch {
       /* best-effort */
     }
+
     return;
   }
+
   if (a.type === 'blob') {
     try {
       const bin = atob(a.data);
       const bytes = new Uint8Array(bin.length);
+
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
       const blob = new Blob([bytes], { type: a.mimeType });
       const url = URL.createObjectURL(blob);
+
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {

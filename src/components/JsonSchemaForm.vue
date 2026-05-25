@@ -64,27 +64,34 @@ const value = ref<Record<string, unknown>>({ ...props.modelValue });
 // presents the user with sensible starting values).
 function seedDefaults(schema: JsonSchema, target: Record<string, unknown>): void {
   if (schema.type !== 'object' || !schema.properties) return;
+
   for (const [key, sub] of Object.entries(schema.properties)) {
     if (target[key] !== undefined) continue;
+
     if (sub.default !== undefined) {
       target[key] = structuredClone(sub.default);
       continue;
     }
+
     if (sub.type === 'object') {
       const child: Record<string, unknown> = {};
+
       seedDefaults(sub, child);
       target[key] = child;
       continue;
     }
+
     if (sub.type === 'array') {
       target[key] = [];
       continue;
     }
+
     if (sub.type === 'boolean') {
       target[key] = false;
     }
   }
 }
+
 seedDefaults(props.schema, value.value);
 emit('update:modelValue', value.value);
 
@@ -101,19 +108,23 @@ function update(path: string[], v: unknown): void {
   // Walk path on a shallow-cloned chain so Vue picks up the change.
   const root: Record<string, unknown> = { ...value.value };
   let cursor: Record<string, unknown> = root;
+
   for (let i = 0; i < path.length - 1; i++) {
-    const seg = path[i]!;
+    const seg = path[i];
     const next = { ...(cursor[seg] as Record<string, unknown>) };
+
     cursor[seg] = next;
     cursor = next;
   }
-  cursor[path[path.length - 1]!] = v;
+
+  cursor[path[path.length - 1]] = v;
   value.value = root;
   emit('update:modelValue', root);
 }
 
 function readPath(path: string[]): unknown {
   let cursor: unknown = value.value;
+
   for (const seg of path) {
     if (cursor && typeof cursor === 'object') {
       cursor = (cursor as Record<string, unknown>)[seg];
@@ -121,6 +132,7 @@ function readPath(path: string[]): unknown {
       return undefined;
     }
   }
+
   return cursor;
 }
 
@@ -149,9 +161,11 @@ function enumOptions(schema: JsonSchema): Array<{ value: unknown; label: string 
       label: opt.title ?? String(opt.const),
     }));
   }
+
   if (schema.enum && schema.enum.length > 0) {
     return schema.enum.map((v) => ({ value: v, label: String(v) }));
   }
+
   return [];
 }
 
@@ -161,6 +175,7 @@ function validateNode(schema: JsonSchema, v: unknown, path: string[]): string | 
   if (schema.type === 'object') {
     const obj = (v ?? {}) as Record<string, unknown>;
     const req = schema.required ?? [];
+
     for (const key of req) {
       const child = obj[key];
       const isEmpty =
@@ -168,43 +183,55 @@ function validateNode(schema: JsonSchema, v: unknown, path: string[]): string | 
         child === null ||
         (typeof child === 'string' && child.trim() === '') ||
         (Array.isArray(child) && child.length === 0);
+
       if (isEmpty) return [...path, key].join('.') || key;
     }
+
     if (schema.properties) {
       for (const [key, sub] of Object.entries(schema.properties)) {
         const err = validateNode(sub, obj[key], [...path, key]);
+
         if (err) return err;
       }
     }
+
     return null;
   }
+
   if (schema.type === 'array') {
     if (Array.isArray(v)) {
       if (schema.minItems !== undefined && v.length < schema.minItems) {
         return path.join('.') || '(array)';
       }
+
       if (schema.maxItems !== undefined && v.length > schema.maxItems) {
         return path.join('.') || '(array)';
       }
     }
+
     return null;
   }
+
   if (schema.type === 'string' && typeof v === 'string') {
     if (schema.minLength !== undefined && v.length < schema.minLength) {
       return path.join('.') || '(string)';
     }
+
     if (schema.maxLength !== undefined && v.length > schema.maxLength) {
       return path.join('.') || '(string)';
     }
   }
+
   if ((schema.type === 'number' || schema.type === 'integer') && typeof v === 'number') {
     if (schema.minimum !== undefined && v < schema.minimum) {
       return path.join('.') || '(number)';
     }
+
     if (schema.maximum !== undefined && v > schema.maximum) {
       return path.join('.') || '(number)';
     }
   }
+
   return null;
 }
 
@@ -224,6 +251,7 @@ const rootProperties = computed(() => {
       required: (props.schema.required ?? []).includes(key),
     }));
   }
+
   return [];
 });
 </script>

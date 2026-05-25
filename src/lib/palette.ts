@@ -17,8 +17,12 @@ import type { Command } from '../stores/commandRegistry';
 
 export function searchValueFor(cmd: Command): string {
   const parts: string[] = [cmd.id, cmd.label];
+
   if (cmd.group) parts.push(cmd.group);
+
   if (cmd.hint) parts.push(cmd.hint);
+
   if (cmd.keywords && cmd.keywords.length > 0) parts.push(...cmd.keywords);
+
   return parts.join(' ');
 }

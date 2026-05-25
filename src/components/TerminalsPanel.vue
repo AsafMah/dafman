@@ -44,6 +44,7 @@ async function createTerminal(useSessionCwd = false): Promise<void> {
       ...(useSessionCwd && activeSession.value ? { sessionId: activeSession.value.id } : {}),
       title: shell.value.trim() || (useSessionCwd ? 'Session Terminal' : 'Terminal'),
     });
+
     layoutStore.addTerminalPanel(summary.id, summary.title);
   } catch (err) {
     toasts.error('Failed to create terminal', toErrorMessage(err));
@@ -60,7 +61,9 @@ function displayCwd(terminalId: string, fallback: string): string {
 
 function activeCommandLabel(terminalId: string): string | null {
   const active = terminalStore.activeCommands[terminalId];
+
   if (!active) return null;
+
   return active.command ? `Running: ${active.command}` : 'Running command';
 }
 
@@ -70,6 +73,7 @@ function recentCommands(terminalId: string) {
 
 async function copyCommand(command: string | undefined): Promise<void> {
   if (!command) return;
+
   await navigator.clipboard.writeText(command);
   toasts.success('Command copied');
 }

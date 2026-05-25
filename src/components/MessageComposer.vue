@@ -124,11 +124,17 @@ let bangArmed = false;
 const formatActions = computed(() => editorFormatActions);
 const visibleFormatCount = computed(() => {
   const width = toolbarWidth.value;
+
   if (width >= 860) return formatActions.value.length;
+
   if (width >= 740) return 8;
+
   if (width >= 620) return 6;
+
   if (width >= 500) return 4;
+
   if (width >= 390) return 2;
+
   return 0;
 });
 const inlineFormatActions = computed(() => formatActions.value.slice(0, visibleFormatCount.value));
@@ -152,12 +158,15 @@ onBeforeUnmount(() => {
 
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor) return;
+
   editor.update(
     () => {
       const node = $createAttachmentNode(a);
       const space = $createTextNode(' ');
       const sel = $getSelection();
+
       if ($isRangeSelection(sel)) {
         sel.insertNodes([node, space]);
       } else {
@@ -165,13 +174,16 @@ function addAttachment(a: SendMessageAttachment): void {
         // Ensure there's a paragraph to append to, then append both nodes.
         const root = $getRoot();
         let last = root.getLastChild();
+
         if (!$isElementNode(last)) {
           last = $createParagraphNode();
           root.append(last);
         }
+
         (last as ElementNode).append(node);
         (last as ElementNode).append(space);
       }
+
       // Place caret AFTER the trailing space so the next keystroke
       // continues plain typing.
       space.selectEnd();
@@ -191,7 +203,9 @@ function addAttachment(a: SendMessageAttachment): void {
 
 function clearEditor(): void {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor) return;
+
   editor.update(() => {
     $getRoot().clear();
   });
@@ -208,17 +222,22 @@ async function blobFromFile(file: File): Promise<SendMessageAttachment | null> {
       'File too large',
       `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MiB. Max is 8 MiB.`,
     );
+
     return null;
   }
+
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
   // Chunk to avoid stack overflows on String.fromCharCode(...big-array).
   let bin = '';
   const CHUNK = 0x8000;
+
   for (let i = 0; i < bytes.length; i += CHUNK) {
     bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
+
   const data = btoa(bin);
+
   return {
     type: 'blob',
     data,
@@ -230,22 +249,31 @@ async function blobFromFile(file: File): Promise<SendMessageAttachment | null> {
 async function onDrop(event: DragEvent): Promise<void> {
   event.preventDefault();
   const files = event.dataTransfer?.files;
+
   if (!files || files.length === 0) return;
+
   for (const f of Array.from(files)) {
     const a = await blobFromFile(f);
+
     if (a) addAttachment(a);
   }
 }
 
 async function onPaste(event: ClipboardEvent): Promise<void> {
   const items = event.clipboardData?.items;
+
   if (!items) return;
+
   for (const item of Array.from(items)) {
     if (item.kind !== 'file') continue;
+
     const f = item.getAsFile();
+
     if (!f) continue;
+
     event.preventDefault();
     const a = await blobFromFile(f);
+
     if (a) addAttachment(a);
   }
 }
@@ -265,7 +293,9 @@ const emit = defineEmits<{
 /// into focus without going through normal click-to-focus.
 function focusComposer(): void {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor) return;
+
   editor.focus();
 }
 
@@ -276,12 +306,17 @@ function focusComposer(): void {
 /// consumeComposerText pass that we don't shortcut here.
 function setText(value: string): void {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor) return;
+
   editor.update(() => {
     const root = $getRoot();
+
     root.clear();
     const para = $createParagraphNode();
+
     if (value.length > 0) para.append($createTextNode(value));
+
     root.append(para);
   });
   // Move caret to the end so the user can keep typing.
@@ -293,13 +328,18 @@ function setText(value: string): void {
 /// style flows that build up multi-line prompts.
 function appendText(value: string): void {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor) return;
+
   editor.update(() => {
     const root = $getRoot();
     const lines = value.split('\n');
+
     for (const line of lines) {
       const para = $createParagraphNode();
+
       if (line.length > 0) para.append($createTextNode(line));
+
       root.append(para);
     }
   });
@@ -328,7 +368,9 @@ function onPickerSelect(att: SendMessageAttachment): void {
 
 function formatEditor(action: EditorFormatAction): void {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor || props.disabled) return;
+
   if (TEXT_FORMAT_ACTIONS.has(action)) {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, action as TextFormatType);
   } else if (action === 'bullet') {
@@ -338,7 +380,9 @@ function formatEditor(action: EditorFormatAction): void {
   } else {
     editor.update(() => {
       const selection = $getSelection();
+
       if (!$isRangeSelection(selection)) return;
+
       if (action === 'h1') {
         $setBlocksType(selection, () => $createHeadingNode('h1'));
       } else if (action === 'h2') {
@@ -350,6 +394,7 @@ function formatEditor(action: EditorFormatAction): void {
       }
     });
   }
+
   editor.focus();
 }
 
@@ -444,14 +489,17 @@ function readEditorFormatState(): void {
   let inHeading2 = false;
   let inQuote = false;
   let inCodeBlock = false;
+
   if ($isRangeSelection(selection)) {
     let node = selection.anchor.getNode();
+
     while (node) {
       if ($isListNode(node)) {
         inBulletList = node.getListType() === 'bullet';
         inNumberList = node.getListType() === 'number';
         break;
       }
+
       if ($isHeadingNode(node)) {
         inHeading1 = node.getTag() === 'h1';
         inHeading2 = node.getTag() === 'h2';
@@ -460,11 +508,15 @@ function readEditorFormatState(): void {
       } else if ($isCodeNode(node)) {
         inCodeBlock = true;
       }
+
       const parent = node.getParent();
+
       if (!parent) break;
+
       node = parent;
     }
   }
+
   editorFormatState.value = {
     bold: $isRangeSelection(selection) && selection.hasFormat('bold'),
     italic: $isRangeSelection(selection) && selection.hasFormat('italic'),
@@ -506,28 +558,38 @@ function onCommandModeKeydown(event: KeyboardEvent): void {
       event.preventDefault();
       event.stopPropagation();
       escArmed = false;
+
       if (escTimer) {
         clearTimeout(escTimer);
         escTimer = null;
       }
+
       exitCommandMode();
+
       return;
     }
+
     escArmed = true;
+
     if (escTimer) clearTimeout(escTimer);
+
     escTimer = setTimeout(() => {
       escArmed = false;
       escTimer = null;
     }, 400);
+
     return;
   }
+
   // Ctrl+Backspace exits command mode
   if (event.key === 'Backspace' && event.ctrlKey) {
     event.preventDefault();
     event.stopPropagation();
     exitCommandMode();
+
     return;
   }
+
   escArmed = false;
 }
 
@@ -535,31 +597,43 @@ function exitCommandMode(): void {
   commandMode.value = false;
   bangArmed = false;
   escArmed = false;
+
   if (escTimer) {
     clearTimeout(escTimer);
     escTimer = null;
   }
+
   setTimeout(() => focusComposer(), 0);
 }
 
 function onComposerKeydown(event: KeyboardEvent): void {
   if (props.disabled || commandMode.value) return;
+
   if (event.key !== '!' || event.ctrlKey || event.altKey || event.metaKey) {
     bangArmed = false;
+
     return;
   }
+
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor) return;
+
   const text = editor.getEditorState().read(() => $getRoot().getTextContent());
+
   if (!bangArmed && text.length === 0) {
     bangArmed = true;
+
     return;
   }
+
   if (bangArmed && text === '!') {
     event.preventDefault();
     void enterCommandMode();
+
     return;
   }
+
   bangArmed = false;
 }
 
@@ -584,6 +658,7 @@ async function onSubmit(payload: ComposerSubmitPayload) {
   if (props.sessionId && (await runLocalSlashCommand(props.sessionId, payload.text))) {
     return;
   }
+
   emit('submit', payload);
 }
 
@@ -615,11 +690,16 @@ const defaultModeItems = computed<MenuItem[]>(() => [
 /// entry. Reaches into the editor via the editor-ref established by
 /// `EditorRefCapture` below.
 const editorRef = ref<unknown>(null);
+
 function triggerSubmit(mode: ComposerSubmitMode) {
   const editor = editorRef.value as LexicalEditor | null;
+
   if (!editor || props.disabled) return;
+
   const result = consumeComposerText(editor);
+
   if (result === null) return;
+
   emit('submit', {
     text: result.text,
     mode,
@@ -637,6 +717,7 @@ const EditorRefCapture = defineComponent({
   name: 'EditorRefCapture',
   setup() {
     const editor = useLexicalComposer();
+
     editorRef.value = editor;
     const unregisterUpdate = editor.registerUpdateListener(({ editorState }) => {
       editorState.read(readEditorFormatState);
@@ -645,14 +726,17 @@ const EditorRefCapture = defineComponent({
       SELECTION_CHANGE_COMMAND,
       () => {
         editor.getEditorState().read(readEditorFormatState);
+
         return false;
       },
       COMMAND_PRIORITY_LOW,
     );
+
     onBeforeUnmount(() => {
       unregisterUpdate();
       unregisterSelection();
     });
+
     return () => null;
   },
 });
@@ -682,18 +766,23 @@ const SubmitButton = defineComponent({
   emits: ['submit'],
   setup(p, { emit: emitInner }) {
     const editor = useLexicalComposer();
+
     function fire() {
       if (p.disabled) return;
+
       const result = consumeComposerText(editor);
+
       if (result !== null) {
         const payload: ComposerSubmitPayload = {
           text: result.text,
           mode: 'default',
           ...(result.attachments.length > 0 ? { attachments: result.attachments } : {}),
         };
+
         emitInner('submit', payload);
       }
     }
+
     return () =>
       h(SplitButton, {
         label: p.label,

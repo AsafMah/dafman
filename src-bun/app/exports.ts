@@ -33,24 +33,31 @@ export interface SaveExportResult {
 
 export async function saveExportFile(opts: SaveExportOptions): Promise<SaveExportResult> {
   const dir = join(opts.outputRoot, 'exports');
+
   try {
     await mkdir(dir, { recursive: true });
   } catch (err) {
     throw AppError.io(`failed to create exports dir: ${toErrorMessage(err)}`);
   }
+
   // Defence in depth: strip any path components from the filename so
   // the renderer can't escape `exports/` with a `..` traversal.
   const safe = basename(normalize(opts.fileName)).slice(0, 200);
+
   if (!safe || safe === '.' || safe === '..') {
     throw AppError.io('invalid filename');
   }
+
   const path = join(dir, safe);
   const bytes = Buffer.byteLength(opts.contents);
+
   try {
     await writeFile(path, opts.contents);
   } catch (err) {
     throw AppError.io(`failed to write export file: ${toErrorMessage(err)}`);
   }
+
   log.info('conversation export saved', { path, bytes });
+
   return { path, bytes };
 }

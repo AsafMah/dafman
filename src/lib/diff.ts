@@ -37,27 +37,34 @@ export function parseApplyPatch(input: string): PatchFile[] {
   let currentHunk: PatchHunk | null = null;
 
   const lines = input.split('\n');
+
   for (const raw of lines) {
     if (raw.startsWith('*** Begin Patch') || raw.startsWith('*** End Patch')) {
       continue;
     }
+
     const op = parseFileHeader(raw);
+
     if (op) {
       current = { op: op.op, path: op.path, hunks: [] };
       files.push(current);
       currentHunk = null;
       continue;
     }
+
     if (!current) continue;
+
     if (raw.startsWith('@@')) {
       currentHunk = { lines: [] };
       current.hunks.push(currentHunk);
       continue;
     }
+
     if (!currentHunk) {
       currentHunk = { lines: [] };
       current.hunks.push(currentHunk);
     }
+
     if (raw.startsWith('+')) {
       currentHunk.lines.push({ kind: 'added', text: raw.slice(1) });
     } else if (raw.startsWith('-')) {
@@ -69,12 +76,16 @@ export function parseApplyPatch(input: string): PatchFile[] {
       currentHunk.lines.push({ kind: 'added', text: raw });
     }
   }
+
   return files;
 }
 
 function parseFileHeader(line: string): { op: PatchOp; path: string } | null {
   const match = line.match(/^\*\*\* (Update|Add|Delete) File: (.+)$/);
+
   if (!match) return null;
-  const op = match[1]!.toLowerCase() as PatchOp;
-  return { op, path: match[2]!.trim() };
+
+  const op = match[1].toLowerCase() as PatchOp;
+
+  return { op, path: match[2].trim() };
 }

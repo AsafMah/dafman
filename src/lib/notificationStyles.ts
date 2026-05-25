@@ -123,7 +123,10 @@ export function indicatorStyle(
   unseenTurns: number,
 ): NotificationStyle | null {
   if (pendingRequestType) return styleFor(pendingRequestType);
+
   if (isThinking) return styleFor('thinking');
+
   if (unseenTurns > 0) return styleFor('unseenActivity');
+
   return null;
 }

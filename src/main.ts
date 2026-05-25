@@ -78,11 +78,14 @@ const testBridge =
 
 function pickBridge(): import('./ipc/invoke').RpcBridge {
   if (testBridge) return testBridge;
+
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     const wsUrl = params.get('testBridge');
+
     if (wsUrl) return createWebSocketBridge(wsUrl);
   }
+
   return createElectrobunBridge().bridge;
 }
 
@@ -98,18 +101,17 @@ installRendererLogBridge();
 // production bundles via Vite's chunk-splitting.
 async function mountWith(Root: typeof App) {
   const app = createApp(Root);
+
   // Forward Vue lifecycle errors (render, watch, async setup, …) to
   // the bun log. We deliberately rethrow into `console.error` so the
   // global console interceptor installed by `installRendererLogBridge`
   // covers devtools too — without double-logging through `rendererLog`
   // here.
   app.config.errorHandler = (err, instance, info) => {
-    const componentName =
-      (instance?.$options?.name as string | undefined) ??
-      (instance?.$options?.__name as string | undefined) ??
-      '<unknown>';
+    const componentName = instance?.$options?.name ?? instance?.$options?.__name ?? '<unknown>';
     const message = toErrorMessage(err);
     const stack = err instanceof Error ? err.stack : undefined;
+
     // Single log path via the console interceptor (one bun log entry,
     // visible in devtools).
     console.error(`[vue] ${message}`, { component: componentName, info, stack });
@@ -131,23 +133,26 @@ async function mountWith(Root: typeof App) {
   // every consumer (App.vue, Playground if it ever uses dockview, …)
   // can refer to them by name in `addPanel({ component })` and the
   // `watermark-component` prop.
-  app.component('chat', ChatPanel);
-  app.component('jobsPanel', JobsPanel);
-  app.component('library', LibraryPanel);
-  app.component('sessionDetails', SessionDetailsPanel);
-  app.component('sessionsManager', SessionsManager);
-  app.component('settingsPanel', SettingsPanel);
-  app.component('logViewer', LogViewer);
-  app.component('terminal', TerminalPanel);
-  app.component('terminalsPanel', TerminalsPanel);
-  app.component('watermark', Watermark);
-  app.component('chatTabActions', ChatTabActions);
-  app.component('chatTab', ChatTab);
-  app.component('sidebarTab', SidebarTab);
+  app.component('Chat', ChatPanel);
+  app.component('JobsPanel', JobsPanel);
+  app.component('Library', LibraryPanel);
+  app.component('SessionDetails', SessionDetailsPanel);
+  app.component('SessionsManager', SessionsManager);
+  app.component('SettingsPanel', SettingsPanel);
+  app.component('LogViewer', LogViewer);
+  app.component('Terminal', TerminalPanel);
+  app.component('TerminalsPanel', TerminalsPanel);
+  app.component('Watermark', Watermark);
+  app.component('ChatTabActions', ChatTabActions);
+  app.component('ChatTab', ChatTab);
+  app.component('SidebarTab', SidebarTab);
+
   if (import.meta.env.DEV) {
     const mod = await import('./dev/Playground.vue');
-    app.component('playground', mod.default);
+
+    app.component('Playground', mod.default);
   }
+
   app.mount('#app');
 }
 

@@ -15,13 +15,16 @@ const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
 
 function normalizeContextLimit(value: number): number | null {
   if (!Number.isFinite(value) || value <= 0) return null;
+
   if (value > MAX_PLAUSIBLE_CONTEXT_TOKENS) return null;
+
   return value;
 }
 
 export const sessionMetaHandlers: Record<string, Handler> = {
   'session.title_changed': (ctx, data) => {
     const title = pickString(data, ['title']);
+
     if (title) ctx.ambient.title = title;
   },
 
@@ -30,18 +33,26 @@ export const sessionMetaHandlers: Record<string, Handler> = {
     const prev = pickString(data, ['previousModel']);
     const effort = pickString(data, ['reasoningEffort']);
     const prevEffort = pickString(data, ['previousReasoningEffort']);
+
     if (!newModel) return;
+
     ctx.ambient.model = newModel;
+
     if (effort) ctx.ambient.reasoningEffort = effort;
+
     if (!prev || !ctx.isLive) return;
+
     const key = [prev, newModel, prevEffort, effort].join('\0');
+
     if (ctx.ambient.lastModelChangeToastKey === key) return;
+
     const modelDetail = `${prev} → ${newModel}`;
     const detail = effort
       ? prevEffort && prevEffort !== effort
         ? `${modelDetail} (${prevEffort} → ${effort} effort)`
         : `${modelDetail} (${effort} effort)`
       : modelDetail;
+
     ctx.toasts.push({
       severity: 'info',
       summary: 'Model changed',
@@ -78,12 +89,15 @@ export const sessionMetaHandlers: Record<string, Handler> = {
       agentPath?: unknown;
       parentToolCallId?: unknown;
     };
+
     if (typeof d.agentName !== 'string') return;
+
     // Transient delegation events carry a parentToolCallId; session
     // selection does not. Skip the transient ones for the header chip.
     if (typeof d.parentToolCallId === 'string' && d.parentToolCallId.length > 0) {
       return;
     }
+
     ctx.ambient.currentAgent = {
       name: d.agentName,
       displayName: typeof d.agentDisplayName === 'string' ? d.agentDisplayName : d.agentName,
@@ -101,6 +115,7 @@ function mergeUsage(ctx: Parameters<Handler>[0], data: unknown): void {
   const current = pickNumber(data, ['currentTokens', 'inputTokens']);
   const rawLimit = pickNumber(data, ['tokenLimit']);
   const limit = rawLimit === null ? null : normalizeContextLimit(rawLimit);
+
   if (current !== null && limit !== null) {
     ctx.ambient.usage = { currentTokens: current, tokenLimit: limit };
   } else if (current !== null && ctx.ambient.usage) {

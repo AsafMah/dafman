@@ -47,7 +47,9 @@ function formatAppError(payload: AppErrorPayload): string {
 
 function isAppErrorPayload(value: unknown): value is AppErrorPayload {
   if (!value || typeof value !== 'object') return false;
+
   const kind = (value as { kind?: unknown }).kind;
+
   return (
     kind === 'ClientNotStarted' ||
     kind === 'SessionNotFound' ||
@@ -65,8 +67,10 @@ const APP_ERROR_PREFIX = 'AppErrorPayload:';
 
 function tryDecodeAppErrorMessage(message: string): AppErrorPayload | null {
   if (!message.startsWith(APP_ERROR_PREFIX)) return null;
+
   try {
     const payload = JSON.parse(message.slice(APP_ERROR_PREFIX.length));
+
     return isAppErrorPayload(payload) ? payload : null;
   } catch {
     return null;
@@ -103,30 +107,43 @@ const pendingCommandResultListeners = new Set<CommandResultEventListener>();
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
+
   if (!next) return;
+
   for (const listener of pendingSessionListeners) {
     next.onSessionEvent(listener);
   }
+
   pendingSessionListeners.clear();
+
   for (const listener of pendingPendingRequestListeners) {
     next.onPendingRequest(listener);
   }
+
   pendingPendingRequestListeners.clear();
+
   for (const listener of pendingLogListeners) {
     next.onLogEvent(listener);
   }
+
   pendingLogListeners.clear();
+
   for (const listener of pendingAuditListeners) {
     next.onAuditEvent(listener);
   }
+
   pendingAuditListeners.clear();
+
   for (const listener of pendingTerminalListeners) {
     next.onTerminalEvent?.(listener);
   }
+
   pendingTerminalListeners.clear();
+
   for (const listener of pendingCommandResultListeners) {
     next.onCommandResultEvent?.(listener);
   }
+
   pendingCommandResultListeners.clear();
 }
 
@@ -137,51 +154,68 @@ export async function invokeCommand<N extends CommandName>(
   if (!bridge) {
     throw new Error(`RPC bridge not initialized; cannot invoke '${String(name)}'`);
   }
+
   try {
     return await bridge.request(name, args);
   } catch (raw) {
     if (isAppErrorPayload(raw)) throw new AppError(raw);
+
     if (raw instanceof Error) {
       const decoded = tryDecodeAppErrorMessage(raw.message);
+
       if (decoded) throw new AppError(decoded);
+
       throw raw;
     }
+
     throw new Error(String(raw));
   }
 }
 
 export function onSessionEvent(listener: SessionEventListener): () => void {
   if (bridge) return bridge.onSessionEvent(listener);
+
   pendingSessionListeners.add(listener);
+
   return () => pendingSessionListeners.delete(listener);
 }
 
 export function onPendingRequest(listener: PendingRequestListener): () => void {
   if (bridge) return bridge.onPendingRequest(listener);
+
   pendingPendingRequestListeners.add(listener);
+
   return () => pendingPendingRequestListeners.delete(listener);
 }
 
 export function onLogEvent(listener: LogEventListener): () => void {
   if (bridge) return bridge.onLogEvent(listener);
+
   pendingLogListeners.add(listener);
+
   return () => pendingLogListeners.delete(listener);
 }
 
 export function onAuditEvent(listener: AuditEventListener): () => void {
   if (bridge) return bridge.onAuditEvent(listener);
+
   pendingAuditListeners.add(listener);
+
   return () => pendingAuditListeners.delete(listener);
 }
 
 export function onTerminalEvent(listener: TerminalEventListener): () => void {
   if (bridge?.onTerminalEvent) return bridge.onTerminalEvent(listener);
+
   pendingTerminalListeners.add(listener);
+
   return () => pendingTerminalListeners.delete(listener);
 }
 
 export function onCommandResultEvent(listener: CommandResultEventListener): () => void {
   if (bridge?.onCommandResultEvent) return bridge.onCommandResultEvent(listener);
+
   pendingCommandResultListeners.add(listener);
+
   return () => pendingCommandResultListeners.delete(listener);
 }

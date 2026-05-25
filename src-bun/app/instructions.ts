@@ -53,7 +53,9 @@ async function readSource(
       sizeBytes: null,
     };
   }
+
   const info = await stat(path);
+
   if (!info.isFile()) {
     return {
       name,
@@ -65,12 +67,14 @@ async function readSource(
       sizeBytes: null,
     };
   }
+
   const raw = await readFile(path);
   const truncated = raw.length > MAX_CONTENT_BYTES;
   const slice = truncated ? raw.subarray(0, MAX_CONTENT_BYTES) : raw;
   const suffix = truncated
     ? `\n\n[truncated at ${MAX_CONTENT_BYTES} bytes; file is ${raw.length} bytes]`
     : '';
+
   return {
     name,
     scope,
@@ -84,27 +88,38 @@ async function readSource(
 
 async function findNestedAgents(root: string): Promise<string[]> {
   const found: string[] = [];
+
   async function walk(dir: string): Promise<void> {
     if (found.length >= MAX_NESTED_AGENTS) return;
+
     let entries: Awaited<ReturnType<typeof readdir>>;
+
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
+
     for (const entry of entries) {
       if (found.length >= MAX_NESTED_AGENTS) return;
+
       const path = join(dir, entry.name);
+
       if (entry.isFile() && entry.name === 'AGENTS.md' && path !== join(root, 'AGENTS.md')) {
         found.push(path);
         continue;
       }
+
       if (!entry.isDirectory()) continue;
+
       if (SKIP_DIRS.has(entry.name)) continue;
+
       await walk(path);
     }
   }
+
   await walk(root);
+
   return found;
 }
 
@@ -117,11 +132,13 @@ export async function listInstructionSources(opts: {
   const globalCandidates = [
     { name: 'Copilot user instructions', path: join(home, '.copilot', 'copilot-instructions.md') },
   ];
+
   for (const candidate of globalCandidates) {
     out.push(await readSource('global', candidate.name, candidate.path, home));
   }
 
   const wd = opts.workingDirectory?.trim();
+
   if (!wd) return out;
 
   const projectCandidates = [
@@ -131,11 +148,14 @@ export async function listInstructionSources(opts: {
       path: join(wd, '.github', 'copilot-instructions.md'),
     },
   ];
+
   for (const candidate of projectCandidates) {
     out.push(await readSource('project', candidate.name, candidate.path, wd));
   }
+
   for (const nested of await findNestedAgents(wd)) {
     out.push(await readSource('project', `Nested ${relative(wd, nested)}`, nested, wd));
   }
+
   return out;
 }

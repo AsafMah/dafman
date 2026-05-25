@@ -34,7 +34,9 @@ let unsubActive: (() => void) | null = null;
 
 watchEffect((onCleanup) => {
   const api = panelApi.value;
+
   if (!api) return;
+
   title.value = api.title ?? '';
   isActive.value = api.isActive;
   unsubTitle?.();
@@ -45,6 +47,7 @@ watchEffect((onCleanup) => {
   const activeSub = api.onDidActiveChange(() => {
     isActive.value = api.isActive;
   });
+
   unsubTitle = () => titleSub.dispose();
   unsubActive = () => activeSub.dispose();
   onCleanup(() => {

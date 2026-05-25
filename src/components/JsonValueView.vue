@@ -34,8 +34,11 @@ const props = withDefaults(
 
 const kind = computed<'null' | 'boolean' | 'number' | 'string' | 'array' | 'object'>(() => {
   const v = props.value;
+
   if (v === null) return 'null';
+
   if (Array.isArray(v)) return 'array';
+
   switch (typeof v) {
     case 'boolean':
       return 'boolean';
@@ -53,6 +56,7 @@ const kind = computed<'null' | 'boolean' | 'number' | 'string' | 'array' | 'obje
 const asArray = computed<unknown[]>(() => (Array.isArray(props.value) ? props.value : []));
 const asObject = computed<Array<[string, unknown]>>(() => {
   if (kind.value !== 'object') return [];
+
   return Object.entries(props.value as Record<string, unknown>);
 });
 const asString = computed(() => (typeof props.value === 'string' ? props.value : ''));
@@ -61,9 +65,11 @@ const isMultilineString = computed(() => kind.value === 'string' && asString.val
 
 const initiallyExpanded = computed(() => {
   if (props.depth >= 3) return false;
+
   if (kind.value === 'array' && asArray.value.length > props.collapseArrayThreshold) {
     return false;
   }
+
   return true;
 });
 
@@ -75,7 +81,9 @@ function toggle(): void {
 
 const summary = computed(() => {
   if (kind.value === 'array') return `Array(${asArray.value.length})`;
+
   if (kind.value === 'object') return `Object(${asObject.value.length})`;
+
   return '';
 });
 </script>

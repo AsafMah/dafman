@@ -58,20 +58,24 @@ export function buildBuiltInTools(registry: SessionRegistry): Tool[] {
       handler: async (args: unknown, invocation: ToolInvocation): Promise<unknown> => {
         const { message, schema } = args as RequestFormInputArgs;
         const session = registry.sessionFor(invocation.sessionId);
+
         if (!session) {
           return {
             error: `Session ${invocation.sessionId} not registered.`,
           };
         }
+
         const result = await session.ui.elicitation({
           message,
           requestedSchema: schema as Parameters<
             typeof session.ui.elicitation
           >[0]['requestedSchema'],
         });
+
         if (result.action === 'accept') {
           return { ok: true, content: result.content ?? {} };
         }
+
         return { ok: false, action: result.action };
       },
     },

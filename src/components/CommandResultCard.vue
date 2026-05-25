@@ -12,6 +12,7 @@ const emit = defineEmits<{
 function markdownFor(record: CommandResultRecord): string {
   const stdout = cleanTerminalCommandOutput(record.stdout);
   const stderr = cleanTerminalCommandOutput(record.stderr);
+
   return [
     '```shell',
     record.command,

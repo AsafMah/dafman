@@ -74,9 +74,12 @@ export function createWebSocketBridge(url: string): RpcBridge {
 
   function ensureOpen(): Promise<void> {
     if (socket && socket.readyState === WebSocket.OPEN) return Promise.resolve();
+
     if (openPromise) return openPromise;
+
     openPromise = new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);
+
       socket = ws;
       ws.addEventListener('open', () => {
         resolve();
@@ -89,25 +92,32 @@ export function createWebSocketBridge(url: string): RpcBridge {
         for (const [, p] of pending) {
           p.reject(new Error('WebSocket closed'));
         }
+
         pending.clear();
         socket = null;
         openPromise = null;
       });
       ws.addEventListener('message', (event) => {
         let parsed: WireResponse | WireError | WireMessage;
+
         try {
           parsed = JSON.parse(String(event.data));
         } catch {
           return;
         }
+
         if (parsed.type === 'response') {
           const slot = pending.get(parsed.id);
+
           if (!slot) return;
+
           pending.delete(parsed.id);
           slot.resolve(parsed.result);
         } else if (parsed.type === 'error') {
           const slot = pending.get(parsed.id);
+
           if (!slot) return;
+
           pending.delete(parsed.id);
           slot.reject(
             new Error(parsed.error?.message ?? `RPC error: ${parsed.error?.kind ?? 'unknown'}`),
@@ -117,6 +127,7 @@ export function createWebSocketBridge(url: string): RpcBridge {
         }
       });
     });
+
     return openPromise;
   }
 
@@ -141,11 +152,14 @@ export function createWebSocketBridge(url: string): RpcBridge {
     args: CommandMap[N]['args'],
   ): Promise<CommandMap[N]['result']> {
     await ensureOpen();
+
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not open');
     }
+
     const id = nextId++;
     const wire: WireRequest = { type: 'request', id, name, args };
+
     return new Promise<CommandMap[N]['result']>((resolve, reject) => {
       pending.set(id, {
         resolve: (v) => resolve(v as CommandMap[N]['result']),
@@ -165,26 +179,32 @@ export function createWebSocketBridge(url: string): RpcBridge {
     request,
     onSessionEvent(listener) {
       sessionListeners.add(listener);
+
       return () => sessionListeners.delete(listener);
     },
     onPendingRequest(listener) {
       pendingListeners.add(listener);
+
       return () => pendingListeners.delete(listener);
     },
     onLogEvent(listener) {
       logListeners.add(listener);
+
       return () => logListeners.delete(listener);
     },
     onAuditEvent(listener) {
       auditListeners.add(listener);
+
       return () => auditListeners.delete(listener);
     },
     onTerminalEvent(listener) {
       terminalListeners.add(listener);
+
       return () => terminalListeners.delete(listener);
     },
     onCommandResultEvent(listener) {
       commandResultListeners.add(listener);
+
       return () => commandResultListeners.delete(listener);
     },
   };

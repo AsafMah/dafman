@@ -57,29 +57,40 @@ const unregisterTab = editor.registerCommand(
   KEY_TAB_COMMAND,
   (event) => {
     if (!menuOpen.value) return false;
+
     const opts = filteredOptions.value;
+
     if (opts.length === 0) return false;
+
     const selected = opts[0];
+
     event.preventDefault();
     editor.update(() => {
       const sel = $getSelection();
+
       if (!$isRangeSelection(sel)) return;
+
       const anchor = sel.anchor.getNode();
+
       if ($isTextNode(anchor)) {
         const text = anchor.getTextContent();
         const slashIdx = text.lastIndexOf('/');
+
         if (slashIdx >= 0) {
           const before = text.slice(0, slashIdx);
+
           anchor.setTextContent(before + selected.cmd.slash + ' ');
           anchor.select(before.length + selected.cmd.slash.length + 1);
         }
       }
     });
     menuOpen.value = false;
+
     return true;
   },
   COMMAND_PRIORITY_HIGH,
 );
+
 onBeforeUnmount(() => unregisterTab());
 
 /// Force the typeahead anchor to mount inside <body> so it positions
@@ -88,6 +99,7 @@ onBeforeUnmount(() => unregisterTab());
 /// composer layout changes can't accidentally re-parent it. Defer
 /// to a ref so it's safe in SSR (body is undefined at module load).
 const menuParent = ref<HTMLElement | null>(null);
+
 onMounted(() => {
   if (typeof document !== 'undefined') menuParent.value = document.body;
 });
@@ -96,7 +108,9 @@ const allOptions = computed(() => SESSION_COMMANDS.map((c) => new SlashOption(c)
 
 const filteredOptions = computed(() => {
   const lower = query.value.toLowerCase();
+
   if (lower.length === 0 || lower === '?') return allOptions.value;
+
   return allOptions.value.filter(
     (o) =>
       o.cmd.slash.toLowerCase().includes(lower) ||
@@ -117,11 +131,15 @@ function keepSelectedVisible(
   selectedIndex: number | null,
 ): void {
   if (index !== (selectedIndex ?? 0) || !(el instanceof HTMLElement)) return;
+
   void nextTick(() => {
     const menu = el.closest('.slash-menu');
+
     if (!(menu instanceof HTMLElement)) return;
+
     const menuRect = menu.getBoundingClientRect();
     const itemRect = el.getBoundingClientRect();
+
     if (itemRect.top < menuRect.top) {
       menu.scrollTop = el.offsetTop;
     } else if (itemRect.bottom > menuRect.bottom) {
@@ -141,6 +159,7 @@ async function onSelectOption(payload: {
   closeMenu: () => void;
 }) {
   const { option, textNodeContainingQuery, closeMenu } = payload;
+
   editor.update(() => {
     if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
       textNodeContainingQuery.remove();
@@ -148,6 +167,7 @@ async function onSelectOption(payload: {
   });
   closeMenu();
   menuOpen.value = false;
+
   try {
     await option.cmd.run(props.sessionId);
   } catch {

@@ -23,6 +23,7 @@ import { reasoningHandlers } from './chatEvents/reasoningHandlers';
 import { sessionMetaHandlers } from './chatEvents/sessionMetaHandlers';
 import { toolHandlers } from './chatEvents/toolHandlers';
 import { turnHandlers } from './chatEvents/turnHandlers';
+
 export { clampOutput, pickNumber, pickString, TOOL_OUTPUT_CAP_BYTES } from './chatEvents/helpers';
 
 export type SystemSeverity = 'info' | 'warn' | 'error';
@@ -345,15 +346,19 @@ function makeReducerCtx(opts: {
   const assistantIdx = new Map<string, number>();
   const reasoningIdx = new Map<string, number>();
   const toolIdx = new Map<string, number>();
+
   for (let i = 0; i < items.length; i++) {
-    const it = items[i]!;
+    const it = items[i];
+
     if (it.kind === 'assistant' && it.messageId) assistantIdx.set(it.messageId, i);
     else if (it.kind === 'reasoning' && it.reasoningId) reasoningIdx.set(it.reasoningId, i);
     else if (it.kind === 'tool' && it.toolCallId) toolIdx.set(it.toolCallId, i);
   }
+
   const upsertAssistant = (messageId: string, eventId?: string): ChatItem => {
     const cached = assistantIdx.get(messageId);
     let existing = cached !== undefined ? items[cached] : undefined;
+
     if (!existing) {
       existing = {
         id: counter.next++,
@@ -367,11 +372,13 @@ function makeReducerCtx(opts: {
     } else if (eventId && existing.kind === 'assistant' && !existing.eventId) {
       existing.eventId = eventId;
     }
+
     return existing;
   };
   const upsertReasoning = (reasoningId: string, eventId?: string): ChatItem => {
     const cached = reasoningIdx.get(reasoningId);
     let existing = cached !== undefined ? items[cached] : undefined;
+
     if (!existing) {
       existing = {
         id: counter.next++,
@@ -385,11 +392,13 @@ function makeReducerCtx(opts: {
     } else if (eventId && existing.kind === 'reasoning' && !existing.eventId) {
       existing.eventId = eventId;
     }
+
     return existing;
   };
   const upsertTool = (toolCallId: string, fallbackName?: string, eventId?: string): ChatItem => {
     const cached = toolIdx.get(toolCallId);
     let existing = cached !== undefined ? items[cached] : undefined;
+
     if (!existing) {
       existing = {
         id: counter.next++,
@@ -405,11 +414,13 @@ function makeReducerCtx(opts: {
     } else if (eventId && existing.kind === 'tool' && !existing.eventId) {
       existing.eventId = eventId;
     }
+
     return existing;
   };
   const pushSystem = (text: string, severity: SystemSeverity) => {
     items.push({ id: counter.next++, kind: 'system', text, severity });
   };
+
   return {
     items,
     ambient,
@@ -461,6 +472,7 @@ export function processEvents(
   /// items buffer so a fresh `processEvents` call (resume / replay)
   /// can continue routing into them.
   const nestedByAgentId = new Map<string, { item: ChatItem; ctx: ReducerContext }>();
+
   for (const it of items) {
     if (it.kind === 'subagent' && it.status === 'running') {
       nestedByAgentId.set(it.agentId, {
@@ -491,14 +503,16 @@ export function processEvents(
         // No envelope agentId means we can't route subsequent events
         // to this sub-agent — drop the visual block but log so the
         // issue surfaces in diagnostics.
-        // eslint-disable-next-line no-console
+
         console.warn('subagent.started with no envelope agentId; ignoring', payload);
         continue;
       }
+
       // If this agentId already has a SubagentChatItem (rare —
       // shouldn't fire twice in normal flow; defensive against
       // replay), skip the duplicate.
       if (nestedByAgentId.has(envelopeAgentId)) continue;
+
       const d = (payload.data ?? {}) as {
         agentName?: unknown;
         agentDisplayName?: unknown;
@@ -520,6 +534,7 @@ export function processEvents(
         ...(payload.timestamp ? { startedAt: payload.timestamp } : {}),
         items: [],
       };
+
       items.push(subItem);
       nestedByAgentId.set(envelopeAgentId, {
         item: subItem,
@@ -538,21 +553,28 @@ export function processEvents(
 
     if (eventType === 'subagent.completed' || eventType === 'subagent.failed') {
       if (typeof envelopeAgentId !== 'string' || envelopeAgentId.length === 0) continue;
+
       // Find the SubagentChatItem by agentId. We rely on the
       // nestedByAgentId map (built from items[]) so this is O(1).
       const slot = nestedByAgentId.get(envelopeAgentId);
+
       if (slot && slot.item.kind === 'subagent') {
         slot.item.status = eventType === 'subagent.failed' ? 'failed' : 'completed';
+
         if (payload.timestamp) slot.item.completedAt = payload.timestamp;
+
         if (eventType === 'subagent.failed') {
           const errMsg = (payload.data as { error?: unknown }).error;
+
           if (typeof errMsg === 'string') slot.item.error = errMsg;
         }
+
         // Drop from the routing map — subsequent events with this
         // (now-stale) agentId won't get routed back into the
         // completed sub-agent.
         nestedByAgentId.delete(envelopeAgentId);
       }
+
       continue;
     }
 
@@ -566,8 +588,11 @@ export function processEvents(
         : undefined;
     const ctx = nestedSlot && isVisualEventType(eventType) ? nestedSlot.ctx : topCtx;
     const handler = HANDLERS[eventType];
+
     if (!handler) continue;
+
     const data = payload.data ?? {};
+
     handler(ctx, data, payload);
   }
 
