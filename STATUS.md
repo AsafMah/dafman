@@ -13,7 +13,52 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **Activity-rail → native dockview edge tabs landed (v2)** (2026-05-26).
+**Active milestone:** **Groups v3 (nested DockviewVue) shipped** (2026-05-27).
+Three-phase landing of the workspace-groups feature. After two failed prior
+attempts (v1 nested-dockview with `require()` + race bugs reverted at `a1d7a21`;
+v2 single-dockview body-swap reverted at `eaba37f` after 6 rubber-duck bugs +
+unexplained runtime failures), v3 ships a clean nested design on top of
+dockview 6.6.1's [#1304](https://github.com/mathuo/dockview/issues/1304) fix
+(fromJSON-re-entry orphan-group crash that likely sank v1/v2).
+
+**Architecture:** one outer `<DockviewVue>` owns the activity bar (edges).
+Its body grid contains one panel per group (`component='group'`,
+`tabComponent='groupTab'`). Each `GroupPanel.vue` renders its own inner
+`<DockviewVue>` holding chat / terminal / playground panels for that group.
+Switching groups = dockview's native panel activation toggles
+`visibility:hidden` on inactive group panels — **chat panel state preserved**
+across switches (no remount; v3 body-swap design lost state on every switch).
+
+**Shipped in 4 commits (`674e93a` → HEAD):**
+
+- Phase 1 (`674e93a`) — types + `composePersistLayout` (cache-first) +
+  `bootLayout` extracted from App.vue (650→508 LOC).
+- Phase 2 (`5d3943e`) — `groupsStore` data layer with v2→v3 migration in
+  `hydrate()`, prune-on-add, withMovingSession guard, 27 unit tests.
+- Phase 3 (`f6bfbd3`) — `GroupPanel.vue` + `GroupTab.vue` + outer mount,
+  `layoutStore.bodyApi` accessor, `LAYOUT_SCHEMA_VERSION=3`. Smoke proves
+  2 `.dv-dockview` nodes (nested mount works end-to-end).
+- Phase 4-8 (HEAD) — `useGroupsActions` composable (newGroup / deleteGroup
+  with session cleanup / moveSessionToGroup); consolidated `onWillShowOverlay`
+  policy denying group-panel content/edge drops + the existing activity-bar
+  rule; command palette entries `view.newGroup`, `view.nextGroup`,
+  `view.prevGroup`.
+
+**Out of scope (v3.1 candidates):** native cross-group drag via
+`onUnhandledDragOverEvent`/`onDidDrop` (~80 LOC); lazy-mount placeholder for
+groups (eager mount in v3); right-click "Move to group…" menu on chat tabs
+(action is wired, UI is a follow-up); per-group cwd ("Projects"); send-to-all;
+group locking; multi-window split.
+
+**Verification:** `bun run check` (lint + lint:bun + lint:tsc-bun + 662 tests
++ Vite + Electrobun + prod/hmr smoke). Smoke now asserts `.group-panel-root`
+attached + 2 `.dv-dockview` nodes (outer + inner). **Manual dev-boot
+verification of v2→v3 migration on real user data still owed per AGENTS
+rule 4a** — see MANUAL_TESTS Phase 26.
+
+---
+
+**Previous milestone:** Activity-rail → native dockview edge tabs landed (v2) (2026-05-26).
 Custom 48px `ActivityBar.vue` + `ActivityButton.vue` deleted. Left + right
 edges now render dockview's native vertical tab strips:
 

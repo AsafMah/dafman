@@ -10,6 +10,117 @@
 
 ---
 
+## 2026-05-27 — Groups v3 (nested DockviewVue) shipped in 4 commits
+
+**Takeaway:** Workspace groups landed on the third attempt. **v1 (nested
+dockview, 2026-05-24, reverted at `a1d7a21`)** died on `require()` in browser
+context + boot-order races. **v2 (single-dockview body-JSON swap, 2026-05-24,
+reverted at `eaba37f`)** died after 6 rubber-duck bugs + unexplained runtime
+failures (likely the [#1304](https://github.com/mathuo/dockview/issues/1304)
+`fromJSON` re-entry crash — orphan groups from a previous `fromJSON`'s
+`setTimeout` left in `_groups`, then `clear()` calls `gridview.remove()` on
+an unparented element and throws "Invalid grid element". That fix landed in
+dockview 6.6.1 on 2026-05-26; we upgraded the same day).
+
+v3 takes the nested approach again but with the post-revert + post-6.6.1
+context: one outer `<DockviewVue>` owns the activity bar, its body has one
+`group`-component panel per group, and each group panel renders its own
+inner `<DockviewVue>`. Switching groups = native dockview panel activation
+(visibility:hidden toggle since 6.1.1 [#1130](https://github.com/mathuo/dockview/pull/1130));
+no remount, no JSON swap, no `onDidRemovePanel` cascade — exactly the
+properties that body-swap couldn't deliver.
+
+### Commits (in order)
+
+| Commit | Phase | What |
+|---|---|---|
+| `9b9cf11` | (deps) | dockview 6.4.0 → 6.6.1, plus 5 other patch bumps. Critical because 6.6.1's #1304 fix retroactively explains v1/v2 instability. |
+| `674e93a` | 1 | Types + `composePersistLayout` (cache-first) + `bootLayout` extracted from App.vue (650→508 LOC; rule 19). No behavior change. |
+| `5d3943e` | 2 | `groupsStore` data layer + v2→v3 migration inline in `hydrate()`. 27 unit tests including real-DockviewComponent-fromJSON round-trip via `removeSessionFromBody`. |
+| `f6bfbd3` | 3 | `GroupPanel.vue` + `GroupTab.vue` + outer mount; `layoutStore.bodyApi` accessor (active group's inner OR outer fallback); `LAYOUT_SCHEMA_VERSION=3`. Smoke now asserts 2 `.dv-dockview` nodes — proves nesting end to end. |
+| (HEAD) | 4-8 | `useGroupsActions` composable, consolidated `onWillShowOverlay`, palette commands. |
+
+### Design decisions that survived rubber-duck round 2
+
+The pre-implementation rubber-duck found 10 issues that would have sunk
+nested-design v3 the same way v1/v2 went down. All addressed:
+
+1. **Active group id = `outer.activePanel?.id`** (not `outer.activeGroup` —
+   the latter is a dockview container concept that also includes edge groups,
+   which would corrupt routing).
+2. **`composePersistLayout` is cache-first**: start from `innerBodiesCache`
+   and OVERWRITE with live api `toJSON()`. v2's naive "iterate innerApis"
+   version dropped unmounted groups → exactly the "groups config never
+   persisting" bug.
+3. **`pruneSessionFromAllGroups`** is THE one-only enforcement point. It
+   walks mounted inners AND cached bodies. Used by both `addPanel` (any
+   chat add) and `moveSessionToGroup`.
+4. **Per-inner `onDidRemovePanel`** subscription in `GroupPanel.vue`, gated
+   by `groupsStore.isMovingSession(panel.id)` — clean separation between
+   user-close (→ `closeSession`) and programmatic-move (→ no close).
+5. **`withMovingSession` is synchronous** (no await inside) so the guard
+   can't leak across error or async boundaries.
+6. **Outer overlay restriction uses correct dockview kind names**
+   (`tab/header_space/content/edge` — no `'center'`). Single handler
+   covers both activity-bar and group-panel rules.
+7. **Eager mount in v3**, not lazy. Rubber-duck called lazy the hackiest
+   piece; deferred to v3.1 if boot regresses.
+
+### Dead ends + workarounds in this sprint
+
+- **Native cross-group drag doesn't work between separate `DockviewVue`
+  instances.** `PanelTransfer` carries `viewId` and dockview moves only
+  when source.viewId === target.viewId (same root DockviewComponent;
+  `dockview-core/dist/esm/dnd/dataTransfer.d.ts`; `dockviewComponent.js:1814-1819`
+  throws on cross-component). For v3 we ship the right-click "Move to
+  group…" menu action (`useGroupsActions.moveSessionToGroup`) and defer
+  native drag via `onUnhandledDragOverEvent` + `onDidDrop` to v3.1. ~80 LOC saved.
+- **Dev launcher startup behavior in tooling sessions:** running
+  `bun run dev` from a non-detached shell terminates the child process
+  when the shell session ends — three boots in a row hung on
+  "copilot client started" because my own session timeouts killed them
+  before restoreFromLayout could run. Workaround for future agents:
+  use `detach: true` AND/OR rely on smoke for structural verification.
+  Manual dev-boot verification of the v2→v3 migration on real user data
+  is still owed per AGENTS rule 4a — listed in MANUAL_TESTS Phase 26.
+- **Smoke can't assert `boundingBox()` dimensions on the GroupPanel
+  root.** dockview's `gridview` lays out body panels via ResizeObserver
+  in a deferred task that headless chromium under playwright's run loop
+  delays unpredictably. Removed the 0×0 check; structural (attached +
+  `.dv-dockview` count = 2) is enough for smoke.
+
+### Wins from the `bun run inspect` + smoke loop
+
+- Caught the `seedOuterGroupPanels: 0 group panel(s) added` regression in
+  a single smoke run after a typo in the active-id branch.
+- Caught the cross-package `dockview-core` duplication after my initial
+  `bun add` left a stale 6.4.0 nested under `dockview-vue/`. `bun run check`'s
+  `vue-tsc` step surfaced the "Type 'DockviewApi' is not assignable to
+  type 'DockviewApi' (separate declarations of private property 'component')"
+  TypeScript error immediately.
+
+### Known follow-ups (intentional out-of-scope)
+
+- Right-click "Move to group…" menu on chat tabs (Phase 6 of the plan,
+  deferred). `useGroupsActions.moveSessionToGroup` is wired; the UI is
+  a follow-up.
+- Native cross-group drag (`onUnhandledDragOverEvent` + `onDidDrop`).
+- Lazy-mount placeholder for inactive groups (eager mount in v3).
+- Per-group cwd / model / mode ("Projects" concept).
+- Send-to-all-sessions, group lock, multi-window split, Sessions Manager
+  grouped tree.
+
+### Verification at sprint close
+
+- `bun run check` green (lint + lint:bun + lint:tsc-bun + 662 tests +
+  Vite + Electrobun + prod/hmr smoke).
+- Smoke asserts `.group-panel-root` attached + 2 `.dv-dockview` nodes
+  (outer + inner). Nested mount end-to-end verified.
+- Manual dev-boot verification of v2→v3 migration on real user data:
+  **OWED**, listed as Phase 26 in MANUAL_TESTS.md.
+
+---
+
 ## 2026-05-26 (later) — Activity-rail → native dockview edge tabs
 
 **Takeaway:** Deleted the custom `ActivityBar.vue` rail and replaced

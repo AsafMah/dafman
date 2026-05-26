@@ -3,6 +3,30 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Groups v3 — nested DockviewVue per workspace group)
+- **Workspace groups landed (v3, nested-dockview design).** The body of the app now contains one or more named groups, each shown as a tab at the top of the body. Each group owns its own set of chat / terminal / playground panels — switching groups is a single native dockview panel-activation toggle (no remount: scroll, Lexical state, pending composer text all survive). The activity bar (Sessions / Terminals / Jobs / Logs / Settings / Library / Session Details) stays on the outer dockview and is shared across all groups.
+- **`view.newGroup`, `view.nextGroup`, `view.prevGroup`** in the command palette (`Layout` group). Use Ctrl+K, type "new group" / "next group" / "previous group".
+- **Per-group close button** — clicking the X on a group tab confirms, then closes every chat session in that group and removes the group meta. Last group can't be closed (one always remains).
+- **Color dot + session count badge** on each group tab. Color cycles automatically through an 8-swatch palette on create.
+
+### Changed (Groups v3)
+- **Schema-bumped persisted layout to v3.** Existing v2 layouts auto-migrate on first save: the old dockview body (panels + grid) becomes the inner body of a new "Default" group. Activity-bar edges are re-seeded from defaults (intentional — edges resize themselves and the persisted v2 edge state was rarely worth carrying forward).
+- **`settings.layout` field shape changed.** `dockview` is now legacy (kept for hydration only); `outer` + `groups` + `activeGroupId` + `innerBodies` are the v3 source of truth, written atomically via `composePersistLayout` (cache-first composition so unmounted groups' bodies never get dropped — closes the v1 "groups config never persisting" bug class).
+- **Outer drag-overlay policy consolidated.** A single `onWillShowOverlay` handler on the outer dockview now covers both (a) activity-bar tabs (can only drop into another edge group's tab strip) and (b) group panels (can only reorder within the body tab strip — no split-screen of two groups side by side).
+
+### Known follow-ups (v3 → v3.1 candidates)
+- Native cross-group drag of chat tabs via `onUnhandledDragOverEvent` + `onDidDrop` (~80 LOC). For v3, move sessions between groups via the (forthcoming) right-click "Move to group…" menu — the underlying `useGroupsActions.moveSessionToGroup` action is implemented and tested; the menu UI is the only piece outstanding.
+- Lazy-mount placeholder for inactive groups (eager mount in v3; revisit if boot regresses past the 130 ms gate).
+- Per-group cwd / model / mode (the "Projects" concept).
+
+### Upstream dependency bumps (shipped in `9b9cf11`)
+- `@github/copilot` 1.0.52 → 1.0.54
+- `dockview-core` / `dockview-vue` 6.4.0 → 6.6.1 (ships [#1304](https://github.com/mathuo/dockview/issues/1304) "cancel pending popout restorations on fromJSON re-entry" — the orphan-group crash that probably sank groups v1/v2; deduped a stale 6.4.0 nested copy under `dockview-vue/node_modules/`)
+- `dompurify` 3.4.5 → 3.4.6
+- `markdown-it` 14.1.1 → 14.2.0
+- `markdown-it-deflist` 3.0.0 → 3.0.1
+- `typescript-eslint` 8.59.4 → 8.60.0
+
 ### Changed
 - **Replaced the custom 48 px ActivityBar rail with dockview's native vertical tab strips on both edges.** Left edge shows Sessions / Terminals / Jobs / Logs / Settings as vertical tabs; right edge shows Session Details + Library (Library moved from left → right; Settings stayed on the left rail after a one-commit detour to body grid). Tabs are drag-reorderable within / across edge groups and auto-collapse to 44 px when no tab is active — all native dockview behavior. Activity-bar tabs can no longer be dropped into the main grid / floating windows / popout — enforced via `dock.api.onWillShowOverlay`. Sessions icon changed from `pi-list` to `pi-comments` (was visually identical to Logs's `pi-bars`).
 - **Added a thin 22 px status bar** at the bottom of the app shell. Hosts the brand logo (left), a future indicators slot (center), and a dev-only Playground wrench (right). Settings is no longer in the status bar — toggle via the left rail like any other activity tab.

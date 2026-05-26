@@ -14,6 +14,7 @@
 
 import { computed } from 'vue';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
+import { useGroupsActions } from '@/composables/useGroupsActions';
 import { useConfirm } from 'primevue/useconfirm';
 import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
 
@@ -31,6 +32,7 @@ const props = defineProps<{
 
 const { panelApi, isActive } = usePanelLifecycle(props);
 const groupsStore = useGroupsStore();
+const groupsActions = useGroupsActions();
 const confirm = useConfirm();
 
 const groupId = computed(
@@ -79,12 +81,10 @@ function onClose(event: MouseEvent): void {
     acceptLabel: 'Close',
     rejectLabel: 'Cancel',
     accept: () => {
-      // Phase 4 wires deletion + session-close into a store action. For
-      // now, drop a stub that just removes the group meta — sessions are
-      // closed by the outer panel removal cascading into per-inner
-      // onDidRemovePanel.
-      groupsStore.deleteGroup(id);
-      panelApi.value?.close();
+      // useGroupsActions.deleteGroup handles the full orchestration:
+      // closes sessions in this group, removes the outer body panel,
+      // calls groupsStore.deleteGroup. Idempotent + safe.
+      groupsActions.deleteGroup(id);
     },
   });
 }

@@ -15,6 +15,106 @@
 
 ---
 
+## Phase 26 — Groups v3 (nested DockviewVue per workspace group) (2026-05-27)
+
+1. ⏳ **Fresh boot — single Default group appears at top of body.**
+   - **Steps:** delete `userData/dafman/settings.json` and start the app.
+   - **Expected:** body shows one tab labeled "Default" with a colored dot
+     (cycle index 0 = blue `#3b82f6`). Activity bar (left + right edges)
+     present as before. No session count badge (0 sessions). No close X
+     (only one group — can't close the last).
+   - **Why not automated:** color-dot rendering + tab visual identity is
+     visual-only; smoke asserts structure (tab attached + 2 dockview nodes)
+     but not the visible styling.
+
+2. ⏳ **v2 → v3 migration on real user data.**
+   - **Steps:** with an existing `userData/dafman/settings.json` that has
+     `layout.schemaVersion: 2` and a populated `layout.dockview`
+     (with chat session panels), launch dev.
+   - **Expected:** boot completes; existing chat sessions appear inside the
+     newly-created "Default" group tab (same panel ids as before). The
+     persisted layout on disk after the first save shows
+     `schemaVersion: 3`, `outer: ...`, `groups: [{ id: 'grp-...', name:
+     'Default', color: '#3b82f6' }]`, `innerBodies: { 'grp-...': ... }`.
+   - **Why not automated:** the smoke RPC stub uses an empty
+     `dockview: null` layout — migration with REAL multi-session data needs
+     the actual local userData file.
+
+3. ⏳ **`view.newGroup` command palette entry creates + switches.**
+   - **Steps:** Ctrl+K → "new group" → Enter.
+   - **Expected:** a new tab appears at the right of the strip with auto-name
+     "Group 2" (or "Group N"), color cycle index 1 (`#f59e0b`), 0 sessions.
+     New group is the active one (no sessions visible in body).
+   - **Why not automated:** depends on global command palette + reactive
+     state propagation that's currently tested only at unit-test level.
+
+4. ⏳ **`view.nextGroup` / `view.prevGroup` cycle through groups.**
+   - **Steps:** with ≥2 groups, Ctrl+K → "next group" repeatedly.
+   - **Expected:** active group cycles forward; wraps at the end. Chat
+     panel state (scroll, composer text, Lexical) is PRESERVED across
+     each switch (no remount).
+   - **Why not automated:** state-preservation across switch is the
+     marquee benefit of the nested design vs body-swap; needs visual
+     confirmation that scroll & composer text don't reset.
+
+5. ⏳ **X on group tab closes group + sessions.**
+   - **Steps:** with ≥2 groups, the second of which has 2 chat sessions
+     open, hover over the second tab → click X → confirm.
+   - **Expected:** confirm popup says "Close 2 sessions in 'Group 2'?".
+     On accept: tab removed; those 2 sessions disappear from the sessions
+     list (they were closed); active group flips to the remaining one.
+   - **Why not automated:** confirm popup + cross-store cascade (groups →
+     sessions → outer panel removal) is exactly the kind of integration
+     where a passing unit test ≠ working UX.
+
+6. ⏳ **Last group cannot be closed.**
+   - **Steps:** close groups until one remains. Hover over the last tab.
+   - **Expected:** the X button is NOT rendered (GroupTab's `v-if`
+     suppresses it when `groups.length <= 1`).
+   - **Why not automated:** asserting a button is absent is straightforward,
+     but the combined state requires multi-step setup not yet in smoke.
+
+7. ⏳ **Adding a new chat session targets the active group.**
+   - **Steps:** create a new chat session via Sessions Manager or `+`.
+   - **Expected:** the chat tab appears inside the active group's inner
+     dockview (NOT outside, NOT in a different group). Switch groups —
+     the new chat is gone from the other groups' bodies but still in the
+     sessions list.
+   - **Why not automated:** the addPanel routing through bodyApi has a
+     unit test, but verifying it visually lands in the correct inner is
+     a layout assertion.
+
+8. ⏳ **Outer drag-overlay restrictions in effect.**
+   - **Steps:** drag a group tab onto the right edge of the body (try
+     to split-screen two groups side by side). Drag an activity-bar tab
+     (Sessions) into the body center.
+   - **Expected:** drop overlay appears in tab-strip positions only.
+     Body-center / edge drops are silently denied (no overlay shown).
+   - **Why not automated:** drag gestures aren't simulated by smoke;
+     full Playwright drag flows would be E2E-tier.
+
+9. ⏳ **Reload preserves group order + active + sessions.**
+   - **Steps:** with ≥2 groups (different colors, custom-named via
+     palette), each with chat sessions, reload (or close + reopen).
+   - **Expected:** all groups restored in the same order. Active group
+     is the one that was active. Sessions in each group are restored
+     into the correct group (no leakage across groups).
+   - **Why not automated:** lifecycle test depends on `composePersistLayout`'s
+     cache-first composition writing the right shape AND `bootLayout`
+     hydrating it correctly. Both are unit-tested separately but the
+     end-to-end persist+restore round-trip with multiple groups isn't.
+
+10. ⏳ **Closing a chat tab inside a group closes the session, doesn't
+   close the group.**
+    - **Steps:** hover an inner chat tab → click X.
+    - **Expected:** chat tab disappears, session is closed (sessions list
+      decrements), group tab + remaining inner tabs unaffected. No
+      cascade.
+    - **Why not automated:** the per-inner `onDidRemovePanel` handler is
+      where v1 went wrong; smoke doesn't exercise it.
+
+---
+
 ## Phase 25 — v2 activity-rail → native dockview edge tabs (2026-05-26)
 
 1. ⏳ **Fresh boot — edge groups render correctly.**

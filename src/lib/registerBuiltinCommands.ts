@@ -30,6 +30,8 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useModelsStore } from '@/stores/library/modelsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useTerminalStore } from '@/stores/terminal/terminalStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
+import { useGroupsActions } from '@/composables/useGroupsActions';
 import { SESSION_COMMANDS } from '@/lib/sessionCommands';
 import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
 import { toErrorMessage } from '@/lib/errorMessage';
@@ -56,6 +58,8 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   const sessionsStore = useSessionsStore();
   const settingsStore = useSettingsStore();
   const modelsStore = useModelsStore();
+  const groupsStore = useGroupsStore();
+  const groupsActions = useGroupsActions();
   const toasts = useToastStore();
   const confirm = opts.confirm;
 
@@ -179,12 +183,49 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['theme', 'light', 'dark'],
       run: async () => {
         const current = settingsStore.settings.appearance.theme;
-        // "system" → pick the opposite of the resolved value; "light" →
-        // "dark"; "dark" → "light". Simpler than threading the resolved
-        // ref through.
         const next = current === 'dark' ? 'light' : 'dark';
 
         await settingsStore.setTheme(next);
+      },
+    },
+    {
+      id: 'view.newGroup',
+      label: 'New Group',
+      group: 'Layout',
+      icon: 'pi pi-plus-circle',
+      keywords: ['workspace', 'tab', 'group', 'create'],
+      run: () => {
+        groupsActions.newGroup();
+      },
+    },
+    {
+      id: 'view.nextGroup',
+      label: 'Next Group',
+      group: 'Layout',
+      icon: 'pi pi-angle-right',
+      keywords: ['workspace', 'switch', 'cycle'],
+      run: () => {
+        const groups = groupsStore.groups;
+        if (groups.length <= 1) return;
+        const activeId = groupsStore.activeGroupId;
+        const idx = groups.findIndex((g) => g.id === activeId);
+        const next = groups[(idx + 1) % groups.length];
+        if (next) groupsActions.activateGroup(next.id);
+      },
+    },
+    {
+      id: 'view.prevGroup',
+      label: 'Previous Group',
+      group: 'Layout',
+      icon: 'pi pi-angle-left',
+      keywords: ['workspace', 'switch', 'cycle'],
+      run: () => {
+        const groups = groupsStore.groups;
+        if (groups.length <= 1) return;
+        const activeId = groupsStore.activeGroupId;
+        const idx = groups.findIndex((g) => g.id === activeId);
+        const prev = groups[(idx - 1 + groups.length) % groups.length];
+        if (prev) groupsActions.activateGroup(prev.id);
       },
     },
   ];

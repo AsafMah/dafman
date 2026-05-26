@@ -351,29 +351,45 @@ function onDockReady(event: DockviewReadyEvent) {
   // changes so the restore itself doesn't trigger a write.
   flushPendingLayout();
 
-  // Constrain activity-bar tab drag-and-drop: a tab that lives in an
-  // edge group (Sessions / Terminals / Jobs / Logs / SessionDetails /
-  // Library) can only be dropped INTO ANOTHER edge group's tab strip.
-  // Block any overlay that would land it in body / floating / popout
-  // / split-an-edge-into-two-columns positions.
+  // Consolidated drag-overlay policy on the OUTER dockview:
+  //
+  // 1. Activity-bar panels (Sessions / Terminals / Jobs / Logs /
+  //    SessionDetails / Library) can only drop into another edge group's
+  //    tab strip. Block body / floating / popout / split-an-edge-into-
+  //    two-columns positions.
+  //
+  // 2. Group panels (v3 nested-dockview body panels) can only drop into
+  //    the body tab strip — they're tabs at the top of the body, not a
+  //    surface to split-screen sideways. Block edge + content drops.
   event.api.onWillShowOverlay((evt) => {
     const draggedPanel = evt.getData()?.panelId;
 
     if (!draggedPanel) return;
-    if (!isActivityBarPanel(draggedPanel)) return;
+
+    const isActivity = isActivityBarPanel(draggedPanel);
+    const isGroup = groupsStore.isGroupPanelId(draggedPanel);
+
+    if (!isActivity && !isGroup) return;
 
     const targetLocation = evt.group?.api.location.type;
-
-    // Allow dropping into another edge group's tab strip (kind 'tab'
-    // or the empty area next to the tabs 'header_space'). Reject
-    // 'content' (would split the panel content), 'edge' (would split
-    // the edge group), and anything where the target isn't an edge
-    // group at all.
     const okKind = evt.kind === 'tab' || evt.kind === 'header_space';
-    const okTarget = targetLocation === 'edge';
 
-    if (!(okKind && okTarget)) {
-      evt.preventDefault();
+    if (isActivity) {
+      // Activity-bar panel: only land in another edge group's tab strip.
+      const okTarget = targetLocation === 'edge';
+      if (!(okKind && okTarget)) {
+        evt.preventDefault();
+      }
+      return;
+    }
+
+    if (isGroup) {
+      // Group panel: only reorder within the body tab strip. Reject any
+      // 'edge', 'content' drop (would split the body or move into a
+      // sidebar — neither is desired UX).
+      if (!okKind) {
+        evt.preventDefault();
+      }
     }
   });
 
