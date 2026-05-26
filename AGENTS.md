@@ -54,8 +54,43 @@ nothing else to install.
 | Start with frontend HMR | `bun run dev:hmr` |
 | Build a release bundle | `bun run build` |
 | Renderer smoke (Playwright + chromium) | `bun run smoke` |
+| Live-app DOM/CSS inspection            | `bun run inspect <selector>` (see `tools/inspect.ts`) |
 
 All commands live in `package.json` — that is the single source of truth.
+
+### `bun run inspect` — when to reach for it
+
+Built for the "visual reality ≠ what the code seems to say" debugging
+class: missing icons, blank panels, a CSS rule that *should* apply
+but doesn't, an element that's present in HTML but renders at 0×0.
+
+Diagnostic ladder (do these in order, stop at first answer):
+
+1. **`ide_search_text` for the suspect class / selector name** via the
+   JetBrains MCP. If a stale `display: none` lives in our own CSS,
+   this finds it in 200 ms. Almost every "why doesn't this style
+   apply" question lands here.
+2. **`ide_diagnostics`** on the file you're editing.
+3. **`bun run inspect <selector> --rules`** against a running
+   `bun run hmr` (or `vite preview` after `bun run build`). Returns
+   the bounding rect, computed styles, AND the full CSS cascade
+   matching the element — same as Chrome DevTools' "Computed" panel.
+4. **Playwright `e2e/probe-*.pwtest.ts`** — only when the bug
+   reproduces only under controlled stubs / clean storage / etc.
+5. **JetBrains debugger MCP** — for JS runtime state. NOT for DOM
+   or CSS rendering.
+
+The trap that motivated this tool: 2026-05-26's "no icons on edge
+tabs" bug. Burned ~45 minutes writing and iterating a Playwright
+probe to discover a `display: none !important` rule in our own
+`src/style.css:107` that an `ide_search_text` of the suspect class
+name would have surfaced instantly. `bun run inspect` collapses
+rung 3 from "write a probe test" to one command.
+
+Prerequisite: `bun run hmr` must be running on port 5173 (or pass
+`--url` to point at any vite/preview server). Pass `--rpc-stub` if
+you don't have a real backend bridge — otherwise the boot splash
+never dismisses.
 
 ## Code style
 

@@ -13,7 +13,24 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **Code-quality + architecture cleanup follow-through**.
+**Active milestone:** **Activity-rail → native dockview edge tabs landed** (2026-05-26).
+Custom `ActivityBar.vue` deleted; left + right edge groups now render native
+vertical tab strips with `ActivityBarTab.vue` as the icon renderer. Status bar
+added at the bottom for Settings + Dev wrench. Schema-bumped layout to v2 with
+narrow migration (preserves chat sessions; rebuilds body grid at default).
+Commits `e39bdc9` (initial), `22d92db` (un-hide strip + writing-mode fix).
+626 tests + prod/hmr smoke green.
+
+New tool: **`bun run inspect <selector>`** (see `tools/inspect.ts`). Live-app
+DOM/CSS introspection harness that surfaces computed styles + the full CSS
+cascade (`--rules`) against a running `bun run hmr` (or `vite preview`). Built
+after the 2026-05-26 debugging session where a stale `display: none` in our
+own `style.css` cost ~45 minutes of Playwright-probe round-trips that this
+tool resolves in one command. Diagnostic ladder added to personal Copilot
+instructions (rung 1 = `ide_search_text`; rung 3 = `bun run inspect`; rung 4 =
+`pwtest` probe).
+
+Previous sprint context (still relevant):
 The 2026-05-25 → 26 quality sprint landed Phases A / A.5 / B / C / D.1 (28 commits) —
 see [`DEVLOG.md`](DEVLOG.md) top entry for the full receipts. Headline:
 - **~600 lines of hand-rolled infrastructure deleted** (Phase A library swaps)
@@ -23,8 +40,7 @@ see [`DEVLOG.md`](DEVLOG.md) top entry for the full receipts. Headline:
 - **`.vue` direct invokeCommand calls 36 → 3** (Phase B composables)
 - **`as unknown as` in layoutStore 12 → 2** (Phase C dockview-types)
 - **SettingsPanel 968 → 339 lines** (Phase D.1 section components)
-- **600 tests** (was 551 at sprint start; +49 regression-net additions; 608 after
-  the 2026-05-26 ChatWindow safety-net add)
+- **626 tests** (was 551 at sprint start; +75 regression-net additions)
 - **AGENTS.md rules 16–22 added** with concrete sprint precedents
 
 Renderer imports now resolve through `tsconfig.json` (`@/*` → `src/*`) across 129 files.
@@ -405,6 +421,18 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
+
+- **2026-05-26 (later)** — **Activity-rail → native dockview edge tabs.**
+  Deleted `ActivityBar.vue` / `ActivityButton.vue` (~410 LOC). Left edge
+  hosts Sessions/Terminals/Jobs/Logs as native vertical tabs; right edge
+  hosts Session Details + Library (moved from left). Added 22 px `StatusBar.vue`
+  for Settings + Dev wrench. Schema bump v1 → v2 with narrow chat-resume
+  migration. Two-bug fix: stale `display: none !important` in `src/style.css`
+  was killing the tab strip; dockview's `writing-mode: vertical-rl` was
+  collapsing `.dv-vue-part` to 0×0 — fixed with horizontal-tb override on
+  the activity-tab cells. New `bun run inspect <selector>` tool
+  (`tools/inspect.ts`) for live-app DOM/CSS introspection. **626 tests**,
+  prod + hmr smoke green. Commits `0c6fc1b`, `e39bdc9`, `22d92db`.
 
 - **2026-05-25** — Code-quality + restructure pass shipped: gts/Prettier,
   spacious control-flow padding, `shellUtils` extraction, ESLint to **0 errors**,
