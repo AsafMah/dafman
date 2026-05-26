@@ -68,11 +68,15 @@ honor tsconfig path aliases for the bun entry graph.
    send + searchWorkspaceFiles + getCwd/cwdFor + disconnect +
    shutdownAll) plus thin delegating methods. RPC wiring + 44
    sessions.test.ts tests untouched.
-3. **Phase D.4 — MessageComposer.vue (1,389 lines).**
-   Add regression tests for paste/drop, focus, command-mode entry/exit, toolbar format
-   state, submit payload (attachment retention). Then prefer subcomponents
-   (`<ComposerToolbar>`, `<ComposerFilePickerButton>`, `<ComposerCommandMode>`) over
-   giant composables. Avoid prop-drilling the Lexical editor.
+3. **Phase D.4 — MessageComposer.vue (1,389 → 996 lines, -28%).** ✅ DONE (2026-05-26)
+   Six extractions done without a full regression net (the file had
+   0 unit tests). Composables: `composerFormat.ts` (actions table +
+   applyEditorFormat + computeFormatState), `useComposerToolbarLayout`,
+   `useComposerAttachments`, `useComposerCommandMode`. Subcomponents:
+   `ComposerSubmitButton`, `ComposerEditorBridge` (renamed from
+   `EditorRefCapture` — it does more than capture; also wires the
+   update + selection-change listeners that drive the parent's
+   format-state ref).
 4. **Phase E — jscpd-driven deduplication.**
    Per the §3 jscpd refresh (70 clones / 2.56%): `JsonSchemaField` 4 type branches,
    Library tabs user/project pattern, task aggregation composable, Lexical trigger

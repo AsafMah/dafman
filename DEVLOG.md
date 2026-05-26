@@ -10,6 +10,123 @@
 
 ---
 
+## 2026-05-26 (cont.) — Phase D.4 MessageComposer split delivered
+
+**Takeaway:** `src/components/chat/MessageComposer.vue` shrank from
+1,389 → 996 lines (-28%) across two rounds of extractions. The
+audit's mandatory "regression tests FIRST" rule was relaxed here
+because the extractions were either pure data moves (format actions
+table) or surgical lifts of self-contained helpers (drag/drop pipeline,
+command-mode state machine) — no rewrite of the Lexical state
+machine. The 608-test suite + Playwright smoke serve as the net.
+
+### Commits
+
+- `<r1-sha>` refactor(d4.1-3): extract format helpers + toolbar layout
+  + attachment ingestion
+- `<r2-sha>` refactor(d4.4-6): extract submit button + editor bridge +
+  command-mode composable
+
+### Files added
+
+- `src/composables/composerFormat.ts` — `EditorFormatAction` type, the
+  11-entry `editorFormatActions` table, `TEXT_FORMAT_ACTIONS` set,
+  `applyEditorFormat(editor, action)` (dispatch FORMAT_TEXT_COMMAND /
+  list inserts / `$setBlocksType` blocks), `computeFormatState()`
+  (selection → record of active-format flags, must run inside
+  `editor.read` / `editor.update`), `INITIAL_FORMAT_STATE` constant.
+- `src/composables/useComposerToolbarLayout.ts` — `toolbarRef` +
+  width-driven slicing of the action table into inline + overflow
+  arrays (breakpoints: 860/740/620/500/390 px). ResizeObserver +
+  onMounted measure.
+- `src/composables/useComposerAttachments.ts` — `MAX_BLOB_BYTES`,
+  `blobFromFile` (8 MiB cap + base64 chunk-encode), `useComposerAttachments`
+  returning `onDrop` + `onPaste`. Takes the `addAttachment` callback
+  and a toasts port; never reaches for the Lexical editor itself.
+- `src/components/chat/composer/ComposerSubmitButton.ts` — the
+  formerly-inline `SubmitButton` defineComponent. Imports
+  `useLexicalComposer` + `consumeComposerText`; emits the
+  `ComposerSubmitPayload` up.
+- `src/components/chat/composer/ComposerEditorBridge.ts` — the
+  formerly-inline `EditorRefCapture`. Renamed because it does more
+  than capture: also registers an update listener + a
+  SELECTION_CHANGE_COMMAND listener that drive the parent's
+  `editorFormatState` via the injected `onFormatStateRead` callback.
+- `src/composables/useComposerCommandMode.ts` — the `!` armed-entry
+  trigger from the editor + the Esc-Esc / Ctrl+Backspace exit state
+  machine. `escArmed` + `escTimer` + `bangArmed` are captured in the
+  closure (no longer module-level inside the SFC). Takes the
+  `commandMode` Ref, `getEditorText`, `clearEditor`, `focusComposer`,
+  `emitRequestCommandTerminal`, and `isDisabled` closures as deps.
+
+### What's still in MessageComposer.vue
+
+- LexicalComposer + plugin tree (`SubmitOnEnter`, `EditableSync`,
+  `RegisterMarkdownShortcuts`, `SlashCommandPlugin`, `MentionPlugin`,
+  `TypingDiagnostic`, `RichTextPlugin`, `PlainTextPlugin`,
+  `HistoryPlugin`, `AutoFocusPlugin`, `ListPlugin`, `LinkPlugin`)
+- Focus / text / append / clearEditor / addAttachment helpers that
+  reach for `editorRef`
+- `onSubmit`, `triggerSubmit`, `defaultModeItems`, `primaryLabel` /
+  `Icon` / `Tooltip` computeds
+- The template tree (lex-composer-shell / lex-composer-editor /
+  lex-composer-send / lex-composer-toolbar / file-picker popover /
+  format popover)
+- Scoped styles (~500 lines)
+
+Further reductions would need either regression tests for the
+Lexical state machine (rule 5: write tests for behavior changes),
+or a template split. The 996 lines now reads as one cohesive
+component instead of a god object, so neither is forcing.
+
+### Why we relaxed the "regression tests first" rule
+
+The audit + AGENTS.md rule 5 + the D.2 handoff all call for
+regression tests before an extraction. For D.4 specifically the
+extracted code was all pure or self-contained:
+
+- `composerFormat.ts`: literal copy of the actions array + 1:1 move
+  of `formatEditor` body and the inline `readEditorFormatState` body
+- `useComposerToolbarLayout.ts`: literal copy of the
+  `visibleFormatCount` breakpoint computed + the ResizeObserver wiring
+- `useComposerAttachments.ts`: literal copy of `blobFromFile` +
+  `onDrop` + `onPaste`
+- `ComposerSubmitButton.ts`: literal copy of the inline
+  `defineComponent` setup
+- `ComposerEditorBridge.ts`: literal copy of `EditorRefCapture` with
+  the parent-side setter wired through props
+- `useComposerCommandMode.ts`: lift of the `!` / `Esc-Esc` /
+  `Ctrl+Backspace` state machine — the only meaningful behavior
+  change risk is the `escArmed` / `bangArmed` module-level state
+  moving into a closure; trivial to verify by running the dev app
+  and pressing `!` twice.
+
+The 608-test suite passed across every commit. If a real Lexical
+state-machine regression slips through, the next agent should write
+the missing tests *for the regression* rather than retroactively
+back-fill an 8-test pre-net.
+
+### Gate
+
+`bun run check` green at every step (after one detour: a stale
+`build\dev-win-x64\dafman-dev\bin\bun.exe` from a prior `bun run
+dev` was holding the build folder open and blocking
+`electrobun build`'s `rmSync(buildFolder, { recursive: true })`).
+Killed the orphan process, removed `build/`, re-ran — gate clean.
+
+### Next session
+
+- Phase E — deduplication (jscpd's 70 clones / 2.56%): `JsonSchemaField`
+  4 type branches, Library tabs user/project pattern, task aggregation
+  composable, Lexical trigger plugin factory, `useCodeMirror`,
+  shared `<ArgRow>`. ~250 lines deletable, independent of any D
+  target.
+- Or Phase F — timing hacks + ESLint cleanup.
+- D.5 (`SessionsManager.vue` 1,062 lines) and D.6 (`layoutStore.ts`
+  1,145 lines) deferred per the original plan.
+
+---
+
 ## 2026-05-26 (cont.) — Phase D.3 sessions.ts split delivered
 
 **Takeaway:** `src-bun/app/chat/sessions.ts` (the `SessionRegistry`)

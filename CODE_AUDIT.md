@@ -864,11 +864,17 @@ logic, SessionRegistry public API, etc.).
   searchWorkspaceFiles, getCwd/cwdFor, disconnect, shutdownAll) plus
   thin delegating methods for every service. 44 sessions.test.ts
   tests + RPC wiring untouched.
-- [ ] **D.4 `MessageComposer.vue`** (1,389 lines): add rubber-duck
-  regression tests FIRST (submit payload, focus, paste/drop, command
-  mode, toolbar state). Prefer subcomponents (`<ComposerToolbar>`,
-  `<ComposerFilePickerButton>`, `<ComposerCommandMode>`) over giant
-  composables. Avoid prop-drilling the Lexical editor.
+- [x] **D.4 `MessageComposer.vue`** ✅ partial (-28%): 1,389 → 996 lines
+  via 6 extractions — `composerFormat.ts` (actions table +
+  applyEditorFormat + computeFormatState), `useComposerToolbarLayout`
+  (responsive width), `useComposerAttachments` (drag/drop/paste +
+  blobFromFile), `ComposerSubmitButton` (SplitButton wrapper),
+  `ComposerEditorBridge` (editor capture + update/selection listeners),
+  `useComposerCommandMode` (!-entry / Esc-Esc exit). Remaining ~990
+  lines are mostly LexicalComposer template + plugin wiring +
+  focus/text/append helpers; further reductions need either
+  regression tests for the Lexical state machine or a template
+  split.
 - [ ] **D.5 `SessionsManager.vue`** (1,062 lines): defer — large but
   understandable. Split when sidebar work resumes.
 - [ ] **D.6 `layoutStore.ts`** (1,145 lines): defer/drop. Recent
