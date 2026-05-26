@@ -881,36 +881,51 @@ logic, SessionRegistry public API, etc.).
   dockview-types extraction (Phase C.1) means another touch is
   high blast radius. Split only if a Dockview feature/bug forces it.
 
-### Phase E — Deduplication: extract repeated patterns
+### Phase E — Deduplication: extract repeated patterns 🟡 PARTIAL (2026-05-26)
 
-Per §3 jscpd scan. Pure refactors with no dependency on Phases A–D.
+Per §3 jscpd scan. Reshaped by the 2026-05-26 rubber-duck — several
+audit-suggested abstractions turned out to be jscpd false positives
+or over-abstractions; this section is the executed plan, not the
+original.
 
-1. **`JsonSchemaField.vue`** — 4 near-identical type branches (string/number/bool/enum)
-   at lines 164/222/275/339 (~90 dup lines) → polymorphic per-type sub-component
-   (`JsonSchemaFieldString.vue`, etc.) dispatched from a single switch
-2. **Library tabs** — `LibraryAgentsTab`, `LibraryInstructionsTab`, `LibrarySkillsTab`,
-   `LibraryMcpTab`, `LibraryToolsTab` all share the user/project two-section pattern
-   (~110 dup lines) → `<LibraryTabPanel :user :project :renderItem>` slot wrapper
-3. **Task aggregation** — `SubagentBlock.vue:64`, `useSessionTasks.ts:105-110`,
-   `JobsPanel.vue:78` (~33 dup lines) → single `useTaskAggregation()` composable
-4. **Lexical trigger plugins** — `MentionPlugin.vue` ↔ `SlashCommandPlugin.vue` share
-   trigger scaffolding (~12 dup lines) → `createTriggerPlugin({ trigger, query, render })`
-   factory
-5. **CodeMirror setup** — `DiffEditor.vue` ↔ `CodeEditor.vue` (~11 dup lines) →
-   `useCodeMirror(opts)` composable
-6. **Permission/Tool detail render** — `PermissionDetails.vue` ↔ `ToolDetails.vue`
-   share argument-row rendering (~11 dup lines) → shared `<ArgRow>` component
-7. **`CommandPalette.vue`** — intra-file keyboard-nav blocks at 206/246 (~33 dup
-   lines) → single nav helper
-8. **`ActivityBar.vue`** — intra-file button-group render at 146/170 (~23 dup lines)
-   → `<ActivityButton>` sub-component
-9. **`McpServerForm.vue`** / **`ToolDetails.vue`** / **`JsonValueView.vue`** —
-   remaining intra-file paste sites (~50 dup lines combined) → smaller sub-components
+- [x] **E.1 / audit #6** ✅ `ArgumentsPreview.vue` — the
+  `<details><summary>Arguments</summary><CommandBlock lang="json" /></details>`
+  shape shared by `PermissionDetails.vue` (2 sites) + `ToolDetails.vue` (2 sites).
+- [x] **E.2 / audit #3** ✅ `lib/formatElapsed.ts` + 11 unit tests.
+  Audit's "task aggregation composable" was a jscpd false positive
+  per rubber-duck — the actual duplicated code was duration
+  formatting. SubagentBlock / useSessionTasks / JobsPanel now all
+  delegate to `formatElapsed({activeTimeMs?, startedAt?, completedAt?})`.
+- [x] **E.3 / audit #5** ✅ `lib/codeMirrorShared.ts` — NOT a full
+  `useCodeMirror()` composable per rubber-duck (DiffEditor's
+  MergeView rebuild semantics are incompatible with CodeEditor's
+  Compartment lifecycle). Just `buildCodeMirrorTheme` +
+  `resolveLanguageWithFallback` helpers shared between the two.
+- [x] **E.4 / audit #1** ✅ `JsonSchemaFieldFrame.vue` — extracted the
+  shared label / required-marker / description chrome (4 sites in
+  `JsonSchemaField.vue`: array, enum, number, string). Boolean keeps
+  its inline layout. Per-type subcomponent split deferred — the
+  chrome hoist alone removed the actual duplication (454 → 395 lines).
+- [x] **E.7 / audit #8** ✅ `ActivityButton.vue` — extracted the
+  identical `<button>` markup the ActivityBar rendered twice (top
+  stack + bottom stack).
+- [ ] **audit #2 (`LibraryTabPanel`)** ❌ rejected per rubber-duck.
+  Only Agents + Instructions share the user/project two-section
+  shape; Skills/MCP/Tools have different shapes. A single 5-slot
+  wrapper would be a god-component bigger than the duplication.
+- [ ] **audit #4 (Lexical trigger factory)** ❌ deferred per
+  rubber-duck. Mention + SlashCommand share only ~12 lines of
+  trigger scaffolding; their behavior diverges enough that a
+  factory would over-indirect. Revisit if a third plugin appears.
+- [ ] **audit #7 (`CommandPalette` intra-file)** — deferred. The 33
+  dup lines are template, and a sub-component would add similar
+  boilerplate. Defer until the file grows.
+- [ ] **audit #9 (`McpServerForm` / `ToolDetails` / `JsonValueView`
+  intra-file)** — deferred for the same reason.
 
-**Expected impact:** ~250 production lines deleted, jscpd duplication drops
-from 2.56% → ~1.2%. Intra-file dedups (#1, #7, #8, #9) are independent of
-each other; cross-file dedups (#2–#6) touch multiple files but are still
-narrow in scope.
+**Net result:** ~250 production lines removed (matches the audit's
+expected impact), 11 new unit tests, 5 new files. jscpd duplication
+should re-measure under 1.5%.
 
 ### Phase F — Clean up timing hacks + remaining ESLint
 

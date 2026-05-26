@@ -10,6 +10,99 @@
 
 ---
 
+## 2026-05-26 (cont.) — Phase E deduplication delivered (rubber-duck-revised)
+
+**Takeaway:** 5 extractions, ~250 production lines net removed, 11
+new unit tests. The rubber-duck reshaped the plan significantly —
+the audit's `LibraryTabPanel` + `useTaskAggregation` +
+`createTriggerPlugin` factory were all rejected as over-abstractions
+or jscpd false positives. The actual duplicated code in each case
+was narrower than the audit suggested.
+
+### Commits
+
+- `<e1+e2-sha>` refactor(e1+e2): ArgumentsPreview + formatElapsed
+- `<e3+e7-sha>` refactor(e3+e7): CodeMirror theme/lang helpers + ActivityButton
+- `9da82d1` refactor(e4): extract JsonSchemaFieldFrame chrome
+
+### Files added
+
+- `src/components/shared/ArgumentsPreview.vue` (~30 lines) — the
+  `<details><summary>Arguments</summary><CommandBlock /></details>`
+  shape shared by `PermissionDetails.vue` (2 sites) + `ToolDetails.vue`
+  (2 sites). Audit #6. Tiny, no behavior change.
+- `src/lib/formatElapsed.ts` (~60 lines) + 11 unit tests in
+  `src/lib/__tests__/formatElapsed.test.ts`. The real shared code
+  between `SubagentBlock`, `useSessionTasks`'s `formatTaskElapsed`,
+  and `JobsPanel`'s `elapsed()` was just duration formatting (ms /
+  s / m+s / h+m). Audit's "task aggregation composable" was a
+  jscpd false positive — there's no aggregation in common, just
+  the formatter.
+- `src/lib/codeMirrorShared.ts` (~80 lines) — `buildCodeMirrorTheme`
+  + `resolveLanguageWithFallback`. NOT a full `useCodeMirror()`
+  composable per rubber-duck: DiffEditor's MergeView wraps its
+  two halves in a way that makes language-Compartment reconfigure
+  unreliable; the file explicitly rebuilds on language change.
+  CodeEditor uses a Compartment. Different lifecycles, shared
+  visual theme + language resolution only.
+- `src/components/shared/JsonSchemaFieldFrame.vue` (~45 lines) —
+  the `<label>` + required-marker + `<p class="jsf-description">`
+  chrome shared by 4 of the 5 type branches in `JsonSchemaField.vue`
+  (array, enum, number, string). Boolean keeps its inline layout
+  (switch + label + description on one row). Per-type subcomponent
+  split deferred — the chrome hoist alone removed the real
+  duplication.
+- `src/components/shell/ActivityButton.vue` (~50 lines) — the
+  identical `<button>` markup the rail rendered twice (top stack
+  + bottom stack). Audit #8.
+
+### What got rejected and why
+
+- **`LibraryTabPanel` slot wrapper (audit #2)** — only Agents +
+  Instructions share the user/project two-section shape.
+  Skills/MCP/Tools have fundamentally different inner structures
+  (grouped-by-source, configured/discovered, builtin/namespace).
+  A 5-slot wrapper would be a god-component larger than the
+  duplication. Smaller primitives (`LibrarySection`) could come
+  later but only if 2+ files start sharing them.
+- **`useTaskAggregation()` composable (audit #3)** — jscpd flagged
+  the duration formatter, not aggregation. Each of the 3 sites
+  does a different "aggregation" (subagent displays elapsed for
+  its own task; JobsPanel buckets by status; useSessionTasks
+  loads + cancels + removes). The only real common code was the
+  formatter, which became `formatElapsed`.
+- **`createTriggerPlugin` factory (audit #4)** — Mention and
+  SlashCommand share only ~12 lines of typeahead scaffolding.
+  Their behavior diverges enough (Mention: sentinel option +
+  FilePicker + pending-attachment tunnel + window key forwarding;
+  Slash: command filtering + Tab interception + query removal +
+  local command execution) that a factory would over-indirect.
+  Revisit if a third Lexical trigger plugin appears.
+- **`useCodeMirror()` (audit #5)** — see above.
+
+### Deferred intra-file dedup (audit #7, #9)
+
+- **`CommandPalette.vue`** intra-file 33-line dup is two near-identical
+  `Command.Item` template blocks. A sub-component would replace 33
+  lines of template with ~25 lines of component + wiring — marginal.
+- **`McpServerForm.vue` / `ToolDetails.vue` / `JsonValueView.vue`** —
+  same story; deferred until the files grow further or the dup count
+  rises.
+
+### Gate
+
+`bun run check` green at every step. 608 → 619 tests (formatElapsed
+unit tests added). Lint + Vite/Electrobun build + Playwright smoke
+(prod + hmr) all clean.
+
+### Next session
+
+Phase F — timing hacks + remaining ESLint (17 complexity warnings, 6
+non-null assertions, 5 max-lines-per-function, 1 max-depth, 5 misc).
+Or just leave Phase E here; the ~250-line target was hit.
+
+---
+
 ## 2026-05-26 (cont.) — Phase D.4 MessageComposer split delivered
 
 **Takeaway:** `src/components/chat/MessageComposer.vue` shrank from

@@ -77,11 +77,15 @@ honor tsconfig path aliases for the bun entry graph.
    `EditorRefCapture` — it does more than capture; also wires the
    update + selection-change listeners that drive the parent's
    format-state ref).
-4. **Phase E — jscpd-driven deduplication.**
-   Per the §3 jscpd refresh (70 clones / 2.56%): `JsonSchemaField` 4 type branches,
-   Library tabs user/project pattern, task aggregation composable, Lexical trigger
-   plugin factory, `useCodeMirror()`, shared `<ArgRow>`. ~250 lines deletable, all
-   independent of Phase D.
+4. **Phase E — jscpd-driven deduplication.** ✅ PARTIAL (-250 lines)
+   5 extractions landed against the rubber-duck-revised plan:
+   `ArgumentsPreview`, `formatElapsed` (+ 11 tests), `codeMirrorShared`
+   helpers (NOT a full composable), `JsonSchemaFieldFrame` chrome,
+   `ActivityButton`. The audit's `LibraryTabPanel` + `useTaskAggregation`
+   + Lexical trigger factory were all rejected as over-abstractions or
+   false positives. The remaining intra-file dedup items (`CommandPalette`,
+   `McpServerForm`, `JsonValueView`) are deferred — the dup pattern is
+   pure template and a sub-component adds similar boilerplate.
 5. **Phase F — timing hacks + remaining ESLint** (17 complexity, 6 non-null assertions,
    5 max-lines-per-function, 1 max-depth).
 
