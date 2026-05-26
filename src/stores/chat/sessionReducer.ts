@@ -56,6 +56,27 @@ export function shouldFireForRecord(record: SessionRecord): boolean {
   return false;
 }
 
+const SHELL_TOOL_NAMES = new Set(['shell', 'bash', 'exec', 'execute']);
+const WRITE_TOOL_NEEDLES = ['edit', 'write', 'apply_patch', 'create', 'str_replace'] as const;
+const WRITE_PATH_KEYS = ['path', 'filePath', 'fileName', 'filename', 'targetFile'] as const;
+
+/// Extract a `path`-shaped string from a tool's `arguments` payload.
+/// Returns `null` if none of the well-known keys hold a non-empty
+/// string.
+function extractTouchedPath(args: unknown): string | null {
+  if (!args || typeof args !== 'object') return null;
+
+  const obj = args as Record<string, unknown>;
+
+  for (const key of WRITE_PATH_KEYS) {
+    const value = obj[key];
+
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+
+  return null;
+}
+
 function trackSessionArtifact(record: SessionRecord, payload: SessionEventPayload): void {
   if (payload.eventType !== 'tool.user_requested' && payload.eventType !== 'tool.execution_start') {
     return;
@@ -74,33 +95,22 @@ function trackSessionArtifact(record: SessionRecord, payload: SessionEventPayloa
 
   const toolName = typeof d.toolName === 'string' ? d.toolName.toLowerCase() : '';
 
-  if (['shell', 'bash', 'exec', 'execute'].includes(toolName)) {
+  if (SHELL_TOOL_NAMES.has(toolName)) {
     record.commandsRun += 1;
 
     return;
   }
 
-  if (
-    !['edit', 'write', 'apply_patch', 'create', 'str_replace'].some((needle) =>
-      toolName.includes(needle),
-    )
-  ) {
+  if (!WRITE_TOOL_NEEDLES.some((needle) => toolName.includes(needle))) {
     return;
   }
 
-  const args = d.arguments;
+  const touchedPath = extractTouchedPath(d.arguments);
 
-  if (!args || typeof args !== 'object') return;
+  if (!touchedPath) return;
 
-  const obj = args as Record<string, unknown>;
-  const path = obj.path ?? obj.filePath ?? obj.fileName ?? obj.filename ?? obj.targetFile;
-
-  if (typeof path !== 'string' || !path.trim()) return;
-
-  const trimmed = path.trim();
-
-  if (!record.touchedFiles.includes(trimmed)) {
-    record.touchedFiles.push(trimmed);
+  if (!record.touchedFiles.includes(touchedPath)) {
+    record.touchedFiles.push(touchedPath);
   }
 }
 

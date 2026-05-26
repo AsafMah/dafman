@@ -53,6 +53,50 @@ export function isNoiseLine(line: string): boolean {
 
 let installed = false;
 
+/// Convert the heterogeneous `process.stderr.write(...)` chunk into
+/// a UTF-8 string. Returns `null` for chunk types we don't
+/// recognise (the caller falls back to the original write).
+function chunkToText(
+  chunk: unknown,
+  encoding: BufferEncoding | undefined,
+): string | null {
+  if (typeof chunk === 'string') return chunk;
+
+  if (Buffer.isBuffer(chunk)) return chunk.toString(encoding ?? 'utf8');
+
+  return null;
+}
+
+/// Filter per-line so a single noisy line in an otherwise useful
+/// chunk doesn't drop the rest. `split` preserves a trailing empty
+/// entry on chunks ending in `\n` so we don't accidentally strip
+/// newlines.
+function filterStderrLines(text: string): string[] {
+  const kept: string[] = [];
+
+  for (const line of text.split('\n')) {
+    if (isNoiseLine(line)) continue;
+
+    if (line.startsWith(CLI_SUBPROCESS_PREFIX)) {
+      const body = line.slice(CLI_SUBPROCESS_PREFIX.length);
+
+      if (body.trim()) {
+        try {
+          log.debug('cli subprocess stderr', { line: body });
+        } catch {
+          /* logger not ready yet; drop */
+        }
+      }
+
+      continue;
+    }
+
+    kept.push(line);
+  }
+
+  return kept;
+}
+
 export function installStderrFilter(): void {
   if (installed) return;
 
@@ -65,45 +109,16 @@ export function installStderrFilter(): void {
   const patched = (...args: WriteArgs): boolean => {
     const [chunk, encodingOrCb, maybeCb] = args;
     const cb = typeof encodingOrCb === 'function' ? encodingOrCb : maybeCb;
-    const encoding = typeof encodingOrCb === 'string' ? encodingOrCb : undefined;
-    const text =
-      typeof chunk === 'string'
-        ? chunk
-        : Buffer.isBuffer(chunk)
-          ? chunk.toString(encoding ?? 'utf8')
-          : null;
+    const encoding =
+      typeof encodingOrCb === 'string' ? (encodingOrCb as BufferEncoding) : undefined;
+    const text = chunkToText(chunk, encoding);
 
     if (text === null) {
       // Unknown chunk type — fall back to the original write.
       return originalWrite(...args);
     }
 
-    // Filter per-line so a single noisy line in an otherwise useful
-    // chunk doesn't drop the rest. `split` preserves a trailing
-    // empty entry on chunks ending in "\n" so we don't accidentally
-    // strip newlines.
-    const lines = text.split('\n');
-    const kept: string[] = [];
-
-    for (const line of lines) {
-      if (isNoiseLine(line)) continue;
-
-      if (line.startsWith(CLI_SUBPROCESS_PREFIX)) {
-        const body = line.slice(CLI_SUBPROCESS_PREFIX.length);
-
-        if (body.trim()) {
-          try {
-            log.debug('cli subprocess stderr', { line: body });
-          } catch {
-            /* logger not ready yet; drop */
-          }
-        }
-
-        continue;
-      }
-
-      kept.push(line);
-    }
+    const kept = filterStderrLines(text);
 
     if (kept.length === 0 || (kept.length === 1 && kept[0] === '')) {
       // Whole chunk filtered out — call the callback so the writer

@@ -121,6 +121,41 @@ function configFromStructured(): McpConfig {
   return out;
 }
 
+/// Build a `KeyValueEntry[]` from a raw object-shaped record.
+/// Used for both env (local transport) and headers (http transport).
+function entriesFromRecord(raw: unknown): Array<{ key: string; value: string }> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+
+  return Object.entries(raw as Record<string, unknown>).map(([key, value]) => ({
+    key,
+    value: String(value),
+  }));
+}
+
+function applyLocalConfig(config: McpConfig): void {
+  command.value = typeof config.command === 'string' ? config.command : '';
+  argsText.value = Array.isArray(config.args)
+    ? (config.args as unknown[]).map(String).join(' ')
+    : '';
+  envEntries.value = entriesFromRecord(config.env);
+  url.value = '';
+  headers.value = [];
+  oauthClientId.value = '';
+  oauthPublicClient.value = false;
+  oauthGrantType.value = '';
+}
+
+function applyHttpConfig(config: McpConfig): void {
+  url.value = typeof config.url === 'string' ? config.url : '';
+  headers.value = entriesFromRecord(config.headers);
+  oauthClientId.value = typeof config.oauthClientId === 'string' ? config.oauthClientId : '';
+  oauthPublicClient.value = config.oauthPublicClient === true;
+  oauthGrantType.value = typeof config.oauthGrantType === 'string' ? config.oauthGrantType : '';
+  command.value = '';
+  argsText.value = '';
+  envEntries.value = [];
+}
+
 function structuredFromConfig(config: McpConfig): void {
   const type = typeof config.type === 'string' ? config.type : null;
   const inferredTransport: Transport =
@@ -129,41 +164,9 @@ function structuredFromConfig(config: McpConfig): void {
   transport.value = inferredTransport;
 
   if (inferredTransport === 'local') {
-    command.value = typeof config.command === 'string' ? config.command : '';
-    const a = config.args;
-
-    argsText.value = Array.isArray(a) ? (a as unknown[]).map(String).join(' ') : '';
-    const env = config.env;
-
-    envEntries.value =
-      env && typeof env === 'object' && !Array.isArray(env)
-        ? Object.entries(env as Record<string, unknown>).map(([key, value]) => ({
-            key,
-            value: String(value),
-          }))
-        : [];
-    url.value = '';
-    headers.value = [];
-    oauthClientId.value = '';
-    oauthPublicClient.value = false;
-    oauthGrantType.value = '';
+    applyLocalConfig(config);
   } else {
-    url.value = typeof config.url === 'string' ? config.url : '';
-    const h = config.headers;
-
-    headers.value =
-      h && typeof h === 'object' && !Array.isArray(h)
-        ? Object.entries(h as Record<string, unknown>).map(([key, value]) => ({
-            key,
-            value: String(value),
-          }))
-        : [];
-    oauthClientId.value = typeof config.oauthClientId === 'string' ? config.oauthClientId : '';
-    oauthPublicClient.value = config.oauthPublicClient === true;
-    oauthGrantType.value = typeof config.oauthGrantType === 'string' ? config.oauthGrantType : '';
-    command.value = '';
-    argsText.value = '';
-    envEntries.value = [];
+    applyHttpConfig(config);
   }
 }
 

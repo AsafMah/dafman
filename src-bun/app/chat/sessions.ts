@@ -13,11 +13,7 @@
 // shutdown) settle every outstanding entry with a typed
 // "user-not-available" / "cancel" so the SDK never hangs.
 
-import {
-  type CopilotSession,
-  type ReasoningEffort,
-  type SessionEvent,
-} from '../client/copilotSdk';
+import { type CopilotSession, type ReasoningEffort, type SessionEvent } from '../client/copilotSdk';
 import { stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { tryGetClient } from '../client/client';
@@ -631,6 +627,23 @@ export class SessionRegistry {
   /// Electrobun exe folder in prod, which produced the v1 export
   /// regression where every session reported the binary's `bin/`
   /// dir as its workspace.
+  /// Backfill the entry's cached `workingDirectory` from a freshly-
+  /// resolved cwd. Re-checks the live entry post-await per the U6
+  /// invariant: a concurrent `cwdFor` / `setWorkingDirectory` may
+  /// have already backfilled while we awaited, in which case we
+  /// must not overwrite with a stale value.
+  private adoptCwd(sessionId: string, candidate: string | undefined): string | undefined {
+    if (!candidate) return undefined;
+
+    const current = this.entries.get(sessionId);
+
+    if (current?.workingDirectory) return current.workingDirectory;
+
+    if (current) current.workingDirectory = candidate;
+
+    return candidate;
+  }
+
   private async cwdFor(sessionId: string): Promise<string | undefined> {
     const entry = this.entries.get(sessionId);
 
@@ -642,35 +655,19 @@ export class SessionRegistry {
 
     try {
       const meta = await client.getSessionMetadata(sessionId);
-      // U6: re-check after the await — a concurrent cwdFor call
-      // (or a setWorkingDirectory) may have backfilled while we
-      // awaited. Skip the write to avoid a stale overwrite.
-      const current = this.entries.get(sessionId);
+      const adopted = this.adoptCwd(sessionId, meta?.context?.workingDirectory);
 
-      if (current?.workingDirectory) return current.workingDirectory;
-
-      if (meta?.context?.workingDirectory) {
-        if (current) current.workingDirectory = meta.context.workingDirectory;
-
-        return meta.context.workingDirectory;
-      }
+      if (adopted) return adopted;
     } catch {
       /* fall through to listSessions */
     }
 
     try {
       const summaries = await client.listSessions();
-      const current = this.entries.get(sessionId);
-
-      if (current?.workingDirectory) return current.workingDirectory;
-
       const summary = summaries.find((s) => s.sessionId === sessionId);
+      const adopted = this.adoptCwd(sessionId, summary?.context?.workingDirectory);
 
-      if (summary?.context?.workingDirectory) {
-        if (current) current.workingDirectory = summary.context.workingDirectory;
-
-        return summary.context.workingDirectory;
-      }
+      if (adopted) return adopted;
     } catch {
       /* non-fatal */
     }
