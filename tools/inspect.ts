@@ -63,6 +63,7 @@ type Args = {
   wait: string;
   headed: boolean;
   click: string | null;
+  evalExpr: string | null;
 };
 
 function parseArgs(argv: string[]): Args {
@@ -76,6 +77,7 @@ function parseArgs(argv: string[]): Args {
     wait: ".dv-dockview",
     headed: false,
     click: null,
+    evalExpr: null,
   };
 
   const rest: string[] = [];
@@ -88,6 +90,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--screenshot") args.screenshot = argv[++i] ?? null;
     else if (a === "--url") args.url = argv[++i] ?? args.url;
     else if (a === "--wait") args.wait = argv[++i] ?? args.wait;
+    else if (a === "--eval") args.evalExpr = argv[++i] ?? null;
     else if (a === "--click") args.click = argv[++i] ?? null;
     else if (a === "--help" || a === "-h") {
       // eslint-disable-next-line no-console
@@ -115,12 +118,12 @@ function parseArgs(argv: string[]): Args {
     }
   }
 
-  if (rest.length === 0) {
+  if (rest.length === 0 && !args.evalExpr) {
     // eslint-disable-next-line no-console
-    console.error("Missing selector. Pass one as the first positional arg.");
+    console.error("Missing selector. Pass one as the first positional arg, or use --eval.");
     process.exit(2);
   }
-  args.selector = rest[0]!;
+  args.selector = rest[0] ?? "";
 
   return args;
 }
@@ -361,25 +364,41 @@ async function main(): Promise<void> {
     }
   }
 
-  // eslint-disable-next-line no-console
-  console.log(`Probing "${args.selector}"…\n`);
-
-  const matches = await probeBasic(page, args.selector, args.all);
-  if (matches.length === 0) {
+  if (args.evalExpr) {
     // eslint-disable-next-line no-console
-    console.error(`No elements matched "${args.selector}".`);
-  } else {
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(matches, null, 2));
-  }
-
-  if (args.rules && matches.length > 0) {
-    // eslint-disable-next-line no-console
-    console.log("\n--- matching CSS rules (cascade order, last wins) ---");
-    const rules = await probeMatchingRules(page, args.selector);
-    for (const r of rules) {
+    console.log(`Evaluating "${args.evalExpr}"…\n`);
+    try {
+      const value = await page.evaluate((expr: string) => {
+        // eslint-disable-next-line no-new-func
+        return new Function(`return (${expr})`)();
+      }, args.evalExpr);
       // eslint-disable-next-line no-console
-      console.log(`[${r.origin}] ${r.selector}\n  ${r.ruleText.trim()}`);
+      console.log(JSON.stringify(value, null, 2));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`eval failed: ${(err as Error).message}`);
+    }
+  } else if (args.selector) {
+    // eslint-disable-next-line no-console
+    console.log(`Probing "${args.selector}"…\n`);
+
+    const matches = await probeBasic(page, args.selector, args.all);
+    if (matches.length === 0) {
+      // eslint-disable-next-line no-console
+      console.error(`No elements matched "${args.selector}".`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify(matches, null, 2));
+    }
+
+    if (args.rules && matches.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log("\n--- matching CSS rules (cascade order, last wins) ---");
+      const rules = await probeMatchingRules(page, args.selector);
+      for (const r of rules) {
+        // eslint-disable-next-line no-console
+        console.log(`[${r.origin}] ${r.selector}\n  ${r.ruleText.trim()}`);
+      }
     }
   }
 

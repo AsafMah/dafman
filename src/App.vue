@@ -26,6 +26,7 @@ import {
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
 } from '@/lib/layoutSanitize';
+import { isActivityBarPanel } from '@/constants/panels';
 import { LAYOUT_SCHEMA_VERSION } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
 
@@ -506,6 +507,32 @@ function onDockReady(event: DockviewReadyEvent) {
   // now that the api is alive. Done before subscribing to layout
   // changes so the restore itself doesn't trigger a write.
   flushPendingLayout();
+
+  // Constrain activity-bar tab drag-and-drop: a tab that lives in an
+  // edge group (Sessions / Terminals / Jobs / Logs / SessionDetails /
+  // Library) can only be dropped INTO ANOTHER edge group's tab strip.
+  // Block any overlay that would land it in body / floating / popout
+  // / split-an-edge-into-two-columns positions.
+  event.api.onWillShowOverlay((evt) => {
+    const draggedPanel = evt.getData()?.panelId;
+
+    if (!draggedPanel) return;
+    if (!isActivityBarPanel(draggedPanel)) return;
+
+    const targetLocation = evt.group?.api.location.type;
+
+    // Allow dropping into another edge group's tab strip (kind 'tab'
+    // or the empty area next to the tabs 'header_space'). Reject
+    // 'content' (would split the panel content), 'edge' (would split
+    // the edge group), and anything where the target isn't an edge
+    // group at all.
+    const okKind = evt.kind === 'tab' || evt.kind === 'header_space';
+    const okTarget = targetLocation === 'edge';
+
+    if (!(okKind && okTarget)) {
+      evt.preventDefault();
+    }
+  });
 
   // One-shot rescue: older builds (or a stale persisted layout) could
   // leave chat panels stuck inside the Sessions sidebar's edge group,

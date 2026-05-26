@@ -16,9 +16,15 @@
 // containerApi }` at the top level; on any later `update()`
 // everything is re-wrapped into `{ params: { params, api, … } }`.
 // We normalize both shapes below.
+//
+// Pressed-state semantics: dockview's `panel.api.isActive` stays true
+// on the last-activated tab even when the edge group collapses
+// (it's "which tab is selected in this group", not "the panel is
+// visible"). We additionally watch the group's `onDidCollapsedChange`
+// so the pressed look disappears when the strip is collapsed.
 
-import { computed } from 'vue';
-import type { DockviewPanelApi } from 'dockview-core';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import type { DockviewPanelApi, DockviewGroupPanelApi } from 'dockview-core';
 import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
 
 interface TabParams {
@@ -38,7 +44,49 @@ const props = defineProps<{
   api?: DockviewPanelApi;
 }>();
 
-const { isActive } = usePanelLifecycle(props);
+const { isActive, panelApi } = usePanelLifecycle(props);
+
+// Reactive flag for the group's collapsed state. Updated whenever
+// the panel's group emits onDidCollapsedChange (edge groups only;
+// the event never fires for body groups so this defaults to false).
+const groupCollapsed = ref<boolean>(false);
+let collapseUnsub: (() => void) | null = null;
+
+function readGroupApi(): DockviewGroupPanelApi | undefined {
+  return (panelApi.value as unknown as { group?: { api?: DockviewGroupPanelApi } } | undefined)
+    ?.group?.api;
+}
+
+watch(
+  panelApi,
+  (api) => {
+    collapseUnsub?.();
+    collapseUnsub = null;
+
+    if (!api) return;
+
+    const groupApi = readGroupApi();
+
+    if (!groupApi) return;
+
+    groupCollapsed.value = groupApi.isCollapsed?.() ?? false;
+    const sub = groupApi.onDidCollapsedChange((event) => {
+      groupCollapsed.value = event.isCollapsed;
+    });
+
+    collapseUnsub = () => sub.dispose();
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  collapseUnsub?.();
+});
+
+// "Pressed" = this tab is the active one in its group AND the group
+// is actually expanded. When the user collapses the strip, no tab
+// should look pressed.
+const pressed = computed(() => isActive.value && !groupCollapsed.value);
 
 // Resolve params through both possible wrap depths.
 const resolvedParams = computed<TabParams>(() => {
@@ -58,10 +106,10 @@ const tooltip = computed(() => resolvedParams.value.title ?? '');
 <template>
   <div
     class="activity-bar-tab"
-    :class="{ 'is-active': isActive }"
+    :class="{ 'is-active': pressed }"
     :title="tooltip"
     :aria-label="tooltip"
-    :aria-pressed="isActive"
+    :aria-pressed="pressed"
   >
     <i
       class="pi"

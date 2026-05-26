@@ -131,45 +131,15 @@ export const useLayoutStore = defineStore('layout', () => {
   const detailsOpen = ref<boolean>(false);
   let activeUnsubs: Array<() => void> = [];
 
-  function edgeId(edge: unknown): string | null {
-    const id = (edge as { id?: unknown }).id;
-
-    return typeof id === 'string' ? id : null;
-  }
-
-  /// Returns the active panel's id within an edge group, or null if
-  /// the group is empty or its active panel can't be identified.
-  function activePanelIdInEdge(position: EdgeGroupPosition): string | null {
-    const dock = api.value;
-
-    if (!dock) return null;
-
-    const edge = dock.getEdgeGroup(position);
-
-    if (!edge) return null;
-
-    const id = edgeId(edge);
-
-    if (!id) return null;
-
-    const group = dock.groups.find((g) => g.id === id);
-
-    if (!group) return null;
-
-    const activePanel = (group as { activePanel?: unknown }).activePanel;
-    const apiId = (activePanel as { api?: { id?: unknown } } | undefined)?.api?.id;
-
-    if (typeof apiId === 'string') return apiId;
-
-    const flatId = (activePanel as { id?: unknown } | undefined)?.id;
-
-    return typeof flatId === 'string' ? flatId : null;
-  }
-
   /// Apply the active-tab's `minimumSize` (from the seed metadata)
-  /// to the edge group's splitview constraints. Idempotent. No-op
-  /// when the edge group is collapsed (the 44px strip floor is
-  /// handled by dockview's `collapsedSize`).
+  /// to the edge group's splitview constraints. v2 semantics: dockview
+  /// doesn't expose a clean public API for mutating an edge group's
+  /// `_expandedMinimumSize` after creation. So we set the edge
+  /// group's constraint to `max(all-tab-mins)` at seed time (see
+  /// `seedDefaultLayout`) and this function is now a thin wrapper
+  /// kept for back-compat with the `enforceKnownEdgeMinimums` hook
+  /// — it re-applies via the api's `setConstraints` which DOES
+  /// propagate when applied on each layout-change tick.
   function applyActiveTabConstraints(position: EdgeGroupPosition): void {
     const dock = api.value;
 
@@ -180,15 +150,13 @@ export const useLayoutStore = defineStore('layout', () => {
     if (!edge) return;
     if (edge.isCollapsed()) return;
 
-    const activeId = activePanelIdInEdge(position);
+    const seeds = position === 'left' ? LEFT_ACTIVITY_TABS : RIGHT_ACTIVITY_TABS;
+    const staticMin = seeds.reduce(
+      (acc, s) => Math.max(acc, s.minimumSize),
+      0,
+    );
 
-    if (!activeId) return;
-
-    const seed = findActivityTabSeed(activeId);
-
-    if (!seed) return;
-
-    applyEdgeMinimum(position, seed.minimumSize);
+    if (staticMin > 0) applyEdgeMinimum(position, staticMin);
   }
 
   function applyEdgeMinimum(position: EdgeGroupPosition, minimumSize: number | undefined): void {
@@ -1028,12 +996,24 @@ export const useLayoutStore = defineStore('layout', () => {
       ['left', LEFT_ACTIVITY_TABS],
       ['right', RIGHT_ACTIVITY_TABS],
     ] as const) {
-      // Initial constraint = the FIRST seeded tab's preferred size.
-      // Active-tab tracking via `applyActiveTabConstraints` adjusts
-      // this whenever the user switches tabs.
+      // Edge group min = max(all tabs' minimums) because dockview's
+      // splitview enforces ONE static minimumSize per edge group
+      // and there's no clean public API to mutate it after creation
+      // (the splitview's view.minimumSize getter reads from a
+      // private `_expandedMinimumSize` field set only at addEdgeGroup
+      // time). Setting it to the max keeps the most-demanding tab
+      // (Logs needs 420 on the left; SessionDetails needs 380 on
+      // the right) from ever being clipped. Sessions/Library can
+      // technically tolerate a narrower strip, but pay a small
+      // strip-width cost in exchange for never breaking.
+      //
+      // Initial size = the FIRST seeded tab's preferred initial
+      // (Sessions's 260 on left, SessionDetails's 380 on right),
+      // clamped up to the max-min floor if necessary.
       const firstSeed = seeds[0];
-      const initialSize = firstSeed?.initialSize ?? 280;
-      const minimumSize = firstSeed?.minimumSize ?? 180;
+      const maxMin = seeds.reduce((acc, s) => Math.max(acc, s.minimumSize), 0);
+      const initialSize = Math.max(firstSeed?.initialSize ?? 280, maxMin);
+      const minimumSize = maxMin;
 
       const edge =
         dock.getEdgeGroup(position) ??

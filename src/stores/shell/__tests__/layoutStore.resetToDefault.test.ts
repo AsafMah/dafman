@@ -270,12 +270,15 @@ describe('layoutStore.resetToDefault', () => {
     expect(leftCreate).toBeDefined();
     expect(rightCreate).toBeDefined();
 
-    // Left edge group seeded with Sessions's preferred initial size
-    // (the first seed in LEFT_ACTIVITY_TABS).
-    expect(leftCreate?.initialSize).toBe(260);
-    expect(leftCreate?.minimumSize).toBe(180);
+    // Left edge group seeded with the max-of-all-tab-mins floor
+    // (Logs needs 420 — the highest on the left). Sessions's 260
+    // initialSize is clamped UP to 420 so the strip can't open
+    // smaller than its tightest tab.
+    expect(leftCreate?.initialSize).toBe(420);
+    expect(leftCreate?.minimumSize).toBe(420);
 
-    // Right edge group seeded with Session-details's preferred initial size.
+    // Right edge: max-of-all-mins is 380 (SessionDetails). Library
+    // would tolerate 320, but the strip is constrained to 380.
     expect(rightCreate?.initialSize).toBe(380);
     expect(rightCreate?.minimumSize).toBe(380);
   });

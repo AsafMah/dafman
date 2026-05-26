@@ -90,7 +90,7 @@ export const LEFT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
   {
     id: PANEL_IDS.sessionsManager,
     component: PANEL_COMPONENTS.sessionsManager,
-    icon: 'pi-list',
+    icon: 'pi-comments',
     title: 'Sessions',
     initialSize: 260,
     minimumSize: 180,
@@ -148,4 +148,12 @@ export function findActivityTabSeed(id: string): ActivityTabSeed | undefined {
   for (const t of RIGHT_ACTIVITY_TABS) if (t.id === id) return t;
 
   return undefined;
+}
+
+/// `true` if the given panel id is one of the seeded activity-bar
+/// tabs. Used by the drop-target restriction in App.vue to prevent
+/// dragging an activity-bar tab into the main grid / a floating
+/// window / a popout — those tabs are only valid in an edge group.
+export function isActivityBarPanel(id: string): boolean {
+  return findActivityTabSeed(id) !== undefined;
 }

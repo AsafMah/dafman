@@ -39,7 +39,7 @@ const emit = defineEmits<{
       <Button
         v-tooltip.top="'Open dev playground'"
         v-if="isDev"
-        class="status-bar-button"
+        class="status-bar-button status-bar-button-dev"
         icon="pi pi-wrench"
         text
         rounded
@@ -104,15 +104,28 @@ const emit = defineEmits<{
 }
 
 /* PrimeVue's text/rounded Button default height is 2rem — too tall
- * for a 22px strip. Override to a tight square. */
+ * for a 22px strip. Override to a tight square. Slightly larger now
+ * (20px) so the two icons are unmissable. */
 :deep(.status-bar-button) {
-  width: 18px !important;
-  height: 18px !important;
+  width: 20px !important;
+  height: 20px !important;
   padding: 0 !important;
   min-width: 0 !important;
 }
 
 :deep(.status-bar-button .p-button-icon) {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+}
+
+:deep(.status-bar-button:hover) {
+  background: color-mix(in srgb, var(--p-primary-color) 16%, transparent) !important;
+}
+
+/* The dev wrench is only mounted in dev mode (v-if="isDev"). Tint
+ * it brand-orange so it's visually distinct from the always-on
+ * Settings cog — "this is a dev affordance, not the same as
+ * permanent UI." */
+:deep(.status-bar-button-dev) {
+  color: var(--p-primary-color) !important;
 }
 </style>
