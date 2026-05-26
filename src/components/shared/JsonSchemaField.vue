@@ -13,6 +13,7 @@ import RadioButton from 'primevue/radiobutton';
 import Dropdown from 'primevue/dropdown';
 import InputSwitch from 'primevue/toggleswitch';
 import Button from 'primevue/button';
+import JsonSchemaFieldFrame from '@/components/shared/JsonSchemaFieldFrame.vue';
 
 type JsonSchema = {
   type?: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array';
@@ -160,28 +161,13 @@ function updateArrayItem(idx: number, v: unknown): void {
   </fieldset>
 
   <!-- Array: repeated rows of items -->
-  <div
+  <JsonSchemaFieldFrame
     v-else-if="schema.type === 'array'"
-    class="jsf-field"
+    :field-id="fieldId"
+    :label="label"
+    :required="required"
+    :description="schema.description"
   >
-    <label
-      class="jsf-label"
-      :for="fieldId"
-    >
-      {{ label
-      }}<span
-        v-if="required"
-        class="jsf-required"
-        aria-label="required"
-        >*</span
-      >
-    </label>
-    <p
-      v-if="schema.description"
-      class="jsf-description"
-    >
-      {{ schema.description }}
-    </p>
     <div class="jsf-array">
       <div
         v-for="(_item, idx) in arrayValue"
@@ -215,31 +201,16 @@ function updateArrayItem(idx: number, v: unknown): void {
         @click="addArrayItem"
       />
     </div>
-  </div>
+  </JsonSchemaFieldFrame>
 
   <!-- Enum (string with enum/oneOf): radio for ≤4, dropdown for >4 -->
-  <div
+  <JsonSchemaFieldFrame
     v-else-if="isEnum"
-    class="jsf-field"
+    :field-id="fieldId"
+    :label="label"
+    :required="required"
+    :description="schema.description"
   >
-    <label
-      class="jsf-label"
-      :for="fieldId"
-    >
-      {{ label
-      }}<span
-        v-if="required"
-        class="jsf-required"
-        aria-label="required"
-        >*</span
-      >
-    </label>
-    <p
-      v-if="schema.description"
-      class="jsf-description"
-    >
-      {{ schema.description }}
-    </p>
     <div
       v-if="useRadio"
       class="jsf-radios"
@@ -268,31 +239,16 @@ function updateArrayItem(idx: number, v: unknown): void {
       placeholder="Select…"
       @update:model-value="enumValue = $event"
     />
-  </div>
+  </JsonSchemaFieldFrame>
 
   <!-- Number / integer -->
-  <div
+  <JsonSchemaFieldFrame
     v-else-if="schema.type === 'number' || schema.type === 'integer'"
-    class="jsf-field"
+    :field-id="fieldId"
+    :label="label"
+    :required="required"
+    :description="schema.description"
   >
-    <label
-      class="jsf-label"
-      :for="fieldId"
-    >
-      {{ label
-      }}<span
-        v-if="required"
-        class="jsf-required"
-        aria-label="required"
-        >*</span
-      >
-    </label>
-    <p
-      v-if="schema.description"
-      class="jsf-description"
-    >
-      {{ schema.description }}
-    </p>
     <InputNumber
       :input-id="fieldId"
       :model-value="numberValue"
@@ -302,7 +258,7 @@ function updateArrayItem(idx: number, v: unknown): void {
       :use-grouping="false"
       @update:model-value="numberValue = $event"
     />
-  </div>
+  </JsonSchemaFieldFrame>
 
   <!-- Boolean -->
   <div
@@ -335,28 +291,13 @@ function updateArrayItem(idx: number, v: unknown): void {
   </div>
 
   <!-- String (text / email / uri / date / date-time) -->
-  <div
+  <JsonSchemaFieldFrame
     v-else
-    class="jsf-field"
+    :field-id="fieldId"
+    :label="label"
+    :required="required"
+    :description="schema.description"
   >
-    <label
-      class="jsf-label"
-      :for="fieldId"
-    >
-      {{ label
-      }}<span
-        v-if="required"
-        class="jsf-required"
-        aria-label="required"
-        >*</span
-      >
-    </label>
-    <p
-      v-if="schema.description"
-      class="jsf-description"
-    >
-      {{ schema.description }}
-    </p>
     <InputText
       :id="fieldId"
       :model-value="textValue"
@@ -365,7 +306,7 @@ function updateArrayItem(idx: number, v: unknown): void {
       :maxlength="schema.maxLength"
       @update:model-value="textValue = $event ?? ''"
     />
-  </div>
+  </JsonSchemaFieldFrame>
 </template>
 
 <style scoped>
