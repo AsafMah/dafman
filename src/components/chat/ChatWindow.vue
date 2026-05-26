@@ -25,11 +25,11 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useCommandTerminal } from '@/composables/useCommandTerminal';
 import { useChatScroll } from '@/composables/useChatScroll';
+import { useChatSubmit } from '@/composables/useChatSubmit';
 import { useChatTimelineState } from '@/composables/useChatTimelineState';
+import { useMessageActions } from '@/composables/useMessageActions';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
-import type { ComposerSubmitPayload } from '@/lexical/plugins';
 import { styleFor } from '@/lib/notificationStyles';
-import { toErrorMessage } from '@/lib/errorMessage';
 import { on as busOn } from '@/lib/bus';
 
 // Per-session header controls (model, effort, options gear, rename,
@@ -184,44 +184,22 @@ const timelineItems = computed(() => {
 /// `mode: "default"` (Ctrl+Enter, primary button), `mode: "queue"`
 /// (Alt+Enter — force queue regardless of default), or
 /// `mode: "interrupt"` (Ctrl+Shift+Enter / dropdown). We resolve
-/// `"default"` against the session's `defaultSendMode` here so the
-/// downstream sessionsStore action only sees concrete SendMode values.
-///
-/// Removed the busy guard (`isSending.value`) — queuing/steering
-/// while a turn is in flight is the whole point of this feature.
-/// The optimistic user bubble still appears immediately; the SDK
-/// reconciles it with the eventual `user.message` echo.
-async function sendMessage(
-  payload: ComposerSubmitPayload & {
-    attachments?: import('@/ipc/types').SendMessageAttachment[];
+/// `"default"` against the session's `defaultSendMode` inside
+/// `useChatSubmit` so the downstream sessionsStore action only sees
+/// concrete SendMode values.
+const { sendMessage } = useChatSubmit({
+  getSessionId: () => props.sessionId,
+  getDefaultSendMode: () => props.defaultSendMode,
+  getSendHandler: () => props.sendHandler,
+  appendOptimisticUser,
+  appendSystemError,
+  scrollToBottom,
+  toasts,
+  transport: {
+    sendMessage: (sessionId, text, mode, attachments) =>
+      sessionsStore.sendMessage(sessionId, text, mode, attachments),
   },
-) {
-  if (!payload.text) return;
-
-  const concreteMode = payload.mode === 'default' ? props.defaultSendMode : payload.mode;
-
-  appendOptimisticUser(payload.text, payload.attachments);
-  await scrollToBottom();
-
-  try {
-    if (props.sendHandler) {
-      await props.sendHandler(payload.text);
-    } else {
-      await sessionsStore.sendMessage(
-        props.sessionId,
-        payload.text,
-        concreteMode,
-        payload.attachments,
-      );
-    }
-  } catch (error) {
-    const message = toErrorMessage(error);
-
-    appendSystemError(`Error: ${message}`);
-    toasts.error('Failed to send message', message);
-    await scrollToBottom();
-  }
-}
+});
 
 function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
@@ -232,182 +210,43 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
 /// fork-and-save, or cancel. Keyed by ChatItem.id (counter-derived).
 const editingItemId = ref<number | null>(null);
 
-function onMessageEdit(itemId: number) {
-  editingItemId.value = itemId;
-}
+const {
+  onMessageEdit,
+  onMessageQuote,
+  onEditorSave,
+  onEditorSaveFork,
+  onEditorCancel,
+  onMessageRetry,
+  onMessageFork,
+  onForkNoticeClick,
+  itemIndexById,
+} = useMessageActions({
+  sessionId: sessionIdRef,
+  items,
+  composerRef,
+  editingItemId,
+  resetForReplay,
+  scrollToBottom,
+  toasts,
+  sessionsStore,
+  sessionsListStore,
+  layoutStore,
+});
 
-function onMessageQuote(quotedText: string) {
-  const composer = composerRef.value;
+const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
+/// Type-aware styling for the pending-request banner. Pulls the
+/// color + icon + label from the shared `notificationStyles` so the
+/// banner matches the dot color on the tab + sidebar. Reads the
+/// queue head: if more than one request is pending, the banner
+/// surfaces the oldest; additional requests are reflected in the
+/// global modal's queue count.
+const pendingStyle = computed(() => {
+  const req = pendingHead.value;
 
-  composer?.appendText?.(quotedText);
-}
+  if (!req) return null;
 
-/// Save the edit in place: truncate at the user message's eventId
-/// and re-send the new text in the SAME session.
-async function onEditorSave(eventId: string, newText: string): Promise<void> {
-  editingItemId.value = null;
-
-  if (!eventId) {
-    toasts.warn("Can't save edit", 'Missing server anchor for this message.');
-
-    return;
-  }
-
-  try {
-    await sessionsStore.editUserMessage(props.sessionId, eventId, newText);
-    resetForReplay({ markSending: true });
-    await scrollToBottom();
-  } catch {
-    // Toast surfaced by the store action.
-  }
-}
-
-/// Save & fork: open a brand-new session forked at the user
-/// message's eventId, send the edited text there. Original session
-/// is left intact. The new session opens as a new dockview panel.
-async function onEditorSaveFork(eventId: string, newText: string): Promise<void> {
-  editingItemId.value = null;
-
-  if (!eventId) {
-    toasts.warn("Can't fork", 'Missing server anchor for this message.');
-
-    return;
-  }
-
-  try {
-    const newId = await sessionsStore.forkAndSend(props.sessionId, eventId, newText);
-
-    layoutStore.addPanel(newId);
-    layoutStore.activatePanel(newId);
-  } catch {
-    // Toast surfaced by the store action.
-  }
-}
-
-function onEditorCancel(): void {
-  editingItemId.value = null;
-}
-
-async function onMessageRetry(assistantItemIndex: number) {
-  // Walk backwards to find the most recent user item BEFORE this
-  // assistant block. That's the anchor we truncate to + the text
-  // we resend.
-  for (let i = assistantItemIndex - 1; i >= 0; i--) {
-    const it = items.value[i];
-
-    if (it && it.kind === 'user' && it.eventId) {
-      try {
-        await sessionsStore.retryFromEvent(props.sessionId, it.eventId, it.text);
-      } catch {
-        // Toast already shown by the store action.
-      }
-
-      return;
-    }
-  }
-
-  toasts.warn(
-    "Can't retry from here",
-    'No preceding user message with a server-acknowledged anchor.',
-  );
-}
-
-/// Resolve the right fork anchor for the item at `itemIndex`.
-///
-/// "Fork from this assistant message" → branch at the user message
-/// that triggered this assistant turn. The SDK's `toEventId` is
-/// exclusive, so we'd otherwise land mid-turn (turn_start without
-/// turn_end → permanent loading spinner). Anchoring at the user
-/// message gives a clean state from the same conversation lead-up
-/// and lets the user re-prompt.
-///
-/// For user messages we just use their own eventId.
-function resolveForkAnchor(itemIndex: number): string | undefined {
-  const item = items.value[itemIndex];
-
-  if (!item) return undefined;
-
-  if (item.kind === 'user' && item.eventId) return item.eventId;
-
-  for (let i = itemIndex; i >= 0; i--) {
-    const it = items.value[i];
-
-    if (it && it.kind === 'user' && it.eventId) return it.eventId;
-  }
-
-  return undefined;
-}
-
-async function onMessageFork(itemIndex: number) {
-  const anchor = resolveForkAnchor(itemIndex);
-
-  if (!anchor) {
-    toasts.warn(
-      "Can't fork from here",
-      'Need a preceding user message with a server-acknowledged anchor.',
-    );
-
-    return;
-  }
-
-  try {
-    const newId = await sessionsStore.forkSession(props.sessionId, anchor);
-
-    layoutStore.addPanel(newId);
-    layoutStore.activatePanel(newId);
-  } catch {
-    // Toast already shown by the store action.
-  }
-}
-
-/// Fork-notice chip clicked → resolve the referenced session by
-/// name (best-effort) and surface it. Three-tier lookup:
-/// 1. Already-loaded sessions (sessionsStore) → activate the panel.
-/// 2. Catalog (sessionsListStore) → restore + add panel + activate.
-///    Refreshes the catalog first if it hasn't loaded yet, since
-///    forks done before this app started won't be in the cache.
-/// 3. Nothing matched → toast hint to open via the sidebar.
-async function onForkNoticeClick(referenceName: string) {
-  const loaded = sessionsStore.findSessionByName(referenceName);
-
-  if (loaded) {
-    if (!layoutStore.isPanelOpen(loaded.id)) {
-      layoutStore.addPanel(loaded.id);
-    }
-
-    layoutStore.activatePanel(loaded.id);
-
-    return;
-  }
-
-  if (!sessionsListStore.hasLoaded) {
-    await sessionsListStore.refresh();
-  }
-
-  const catalogHit = sessionsListStore.findByName(referenceName);
-
-  if (catalogHit) {
-    try {
-      const restored = await sessionsStore.restoreSession(catalogHit.sessionId);
-      const id = restored?.id ?? catalogHit.sessionId;
-
-      if (!layoutStore.isPanelOpen(id)) {
-        layoutStore.addPanel(id);
-      }
-
-      layoutStore.activatePanel(id);
-    } catch {
-      // restoreSession surfaces its own toast on failure.
-    }
-
-    return;
-  }
-
-  toasts.warn(
-    "Couldn't find that session",
-    `No session matches "${referenceName}". Open it from the sessions sidebar.`,
-  );
-}
+  return styleFor(req.kind);
+});
 
 /// Session command summary. File details moved to the right rail where
 /// the paths are actually useful and expandable.
@@ -427,25 +266,6 @@ const commandsRun = computed(() => {
   }
 
   return total;
-});
-
-function itemIndexById(itemId: number): number {
-  return items.value.findIndex((item) => item.id === itemId);
-}
-
-const pendingHead = computed(() => ambient.value.pendingRequests[0] ?? null);
-/// Type-aware styling for the pending-request banner. Pulls the
-/// color + icon + label from the shared `notificationStyles` so the
-/// banner matches the dot color on the tab + sidebar. Reads the
-/// queue head: if more than one request is pending, the banner
-/// surfaces the oldest; additional requests are reflected in the
-/// global modal's queue count.
-const pendingStyle = computed(() => {
-  const req = pendingHead.value;
-
-  if (!req) return null;
-
-  return styleFor(req.kind);
 });
 </script>
 
