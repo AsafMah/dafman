@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import MessageComposer from '@/components/chat/MessageComposer.vue';
 import MessageContent from '@/components/chat/MessageContent.vue';
@@ -32,12 +32,12 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useCommandTerminal } from '@/composables/useCommandTerminal';
+import { useChatScroll } from '@/composables/useChatScroll';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import type { ComposerSubmitPayload } from '@/lexical/plugins';
 import { styleFor } from '@/lib/notificationStyles';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { on as busOn } from '@/lib/bus';
-import { useResizeObserver } from '@vueuse/core';
 
 // Per-session header controls (model, effort, options gear, rename,
 // compact, reset) live in `SessionHeaderControls.vue`, hosted by
@@ -102,6 +102,8 @@ const {
   initCommandResults,
 } = useCommandTerminal(sessionIdRef, idCounter, { composerRef });
 
+const { scrollToBottom } = useChatScroll(messagesEl, tileEl);
+
 /// External "focus my composer" requests arrive from the Sessions
 /// sidebar (clicking an already-open session row). Filter by sessionId
 /// so the event only acts on the matching tile.
@@ -131,38 +133,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   for (const off of busSubscriptions.splice(0)) off();
-});
-/// Live `--tile-height` so the composer can cap itself at a percentage of
-/// the chat tile's height even though the tile lives inside a flex/grid
-/// layout with no fixed height. Resize events fire hundreds of times per
-/// second during a drag; coalesce to one CSS write per frame via rAF so
-/// style recalcs stay bounded.
-let tileResizeRaf: number | null = null;
-
-const stopTileObserver = useResizeObserver(tileEl, () => {
-  if (tileResizeRaf !== null) return;
-
-  tileResizeRaf = requestAnimationFrame(() => {
-    tileResizeRaf = null;
-    const el = tileEl.value;
-
-    if (el) el.style.setProperty('--tile-height', `${el.clientHeight}px`);
-  });
-});
-
-onMounted(() => {
-  const el = tileEl.value;
-
-  if (el) el.style.setProperty('--tile-height', `${el.clientHeight}px`);
-});
-
-onBeforeUnmount(() => {
-  stopTileObserver.stop();
-
-  if (tileResizeRaf !== null) {
-    cancelAnimationFrame(tileResizeRaf);
-    tileResizeRaf = null;
-  }
 });
 
 /// Fallback "thinking" flag used until we observe a turn boundary; after
@@ -218,19 +188,6 @@ const timelineItems = computed(() => {
 
   return out.sort((a, b) => a.id - b.id);
 });
-
-async function scrollToBottom() {
-  await nextTick();
-
-  if (typeof requestAnimationFrame !== 'undefined') {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  }
-
-  const el = messagesEl.value;
-
-  if (el) el.scrollTop = el.scrollHeight;
-}
 
 let isFirstBatch = true;
 
