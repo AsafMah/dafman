@@ -5,6 +5,7 @@ import type { TaskInfo } from '@/ipc/types';
 import { invokeCommand } from '@/ipc/invoke';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { formatElapsed } from '@/lib/formatElapsed';
 
 export function useSessionTasks(sessionId: ComputedRef<string>) {
   const toasts = useToastStore();
@@ -96,33 +97,11 @@ export function useSessionTasks(sessionId: ComputedRef<string>) {
 /// Format `activeTimeMs` (or fall back to `startedAt`→now) as a
 /// terse human-readable duration.
 export function formatTaskElapsed(task: TaskInfo): string {
-  let ms: number | null = null;
-
-  if (typeof task.activeTimeMs === 'number') {
-    ms = task.activeTimeMs;
-  } else if (task.startedAt) {
-    const start = Date.parse(task.startedAt);
-    const end = task.completedAt ? Date.parse(task.completedAt) : Date.now();
-
-    if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
-  }
-
-  if (ms === null) return '';
-
-  if (ms < 1000) return `${ms}ms`;
-
-  const s = Math.round(ms / 1000);
-
-  if (s < 60) return `${s}s`;
-
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-
-  if (m < 60) return `${m}m ${rem}s`;
-
-  const h = Math.floor(m / 60);
-
-  return `${h}h ${m % 60}m`;
+  return formatElapsed({
+    activeTimeMs: task.activeTimeMs,
+    startedAt: task.startedAt,
+    completedAt: task.completedAt,
+  });
 }
 
 export function taskTitle(task: TaskInfo): string {

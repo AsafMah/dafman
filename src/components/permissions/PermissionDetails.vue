@@ -18,6 +18,7 @@ import PathChip from '@/components/details/PathChip.vue';
 import CommandBlock from '@/components/details/CommandBlock.vue';
 import UrlChip from '@/components/details/UrlChip.vue';
 import ToolChip from '@/components/details/ToolChip.vue';
+import ArgumentsPreview from '@/components/shared/ArgumentsPreview.vue';
 
 const props = defineProps<{ request: PermissionRequestData }>();
 
@@ -184,16 +185,11 @@ const hasFocusedView = computed(() => {
         :server="mcpServerName ?? undefined"
         :tool="toolName ?? undefined"
       />
-      <details
+      <ArgumentsPreview
         v-if="toolArgsJson"
-        class="perm-preview"
-      >
-        <summary>Arguments</summary>
-        <CommandBlock
-          :code="toolArgsJson"
-          lang="json"
-        />
-      </details>
+        :code="toolArgsJson"
+        details-class="perm-preview"
+      />
     </template>
 
     <!-- custom-tool -->
@@ -202,16 +198,11 @@ const hasFocusedView = computed(() => {
         :tool="toolName ?? undefined"
         icon="bolt"
       />
-      <details
+      <ArgumentsPreview
         v-if="toolArgsJson"
-        class="perm-preview"
-      >
-        <summary>Arguments</summary>
-        <CommandBlock
-          :code="toolArgsJson"
-          lang="json"
-        />
-      </details>
+        :code="toolArgsJson"
+        details-class="perm-preview"
+      />
     </template>
 
     <!-- memory -->

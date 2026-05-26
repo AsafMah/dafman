@@ -18,6 +18,7 @@ import ApplyPatchView from '@/components/details/ApplyPatchView.vue';
 import GrepResults from '@/components/details/GrepResults.vue';
 import GlobResults from '@/components/details/GlobResults.vue';
 import JsonValueView from '@/components/shared/JsonValueView.vue';
+import ArgumentsPreview from '@/components/shared/ArgumentsPreview.vue';
 
 const props = defineProps<{
   toolName: string;
@@ -429,16 +430,11 @@ const isStructuredResult = computed(() => {
         :server="mcpServerName"
         :tool="mcpToolName ?? toolName"
       />
-      <details
+      <ArgumentsPreview
         v-if="argsJson"
-        class="tool-preview"
-      >
-        <summary>Arguments</summary>
-        <CommandBlock
-          :code="argsJson"
-          lang="json"
-        />
-      </details>
+        :code="argsJson"
+        details-class="tool-preview"
+      />
       <JsonValueView
         v-if="isStructuredResult"
         :value="parsedResult"
@@ -452,17 +448,12 @@ const isStructuredResult = computed(() => {
 
     <!-- generic fallback: JSON args + JSON-aware result -->
     <template v-else>
-      <details
+      <ArgumentsPreview
         v-if="argsJson"
-        class="tool-preview"
-        open
-      >
-        <summary>Arguments</summary>
-        <CommandBlock
-          :code="argsJson"
-          lang="json"
-        />
-      </details>
+        :code="argsJson"
+        details-class="tool-preview"
+        :open="true"
+      />
       <JsonValueView
         v-if="isStructuredResult"
         :value="parsedResult"

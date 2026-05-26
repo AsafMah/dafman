@@ -19,6 +19,7 @@ import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import ToolCallBlock from '@/components/chat/ToolCallBlock.vue';
 import type { ChatItem } from '@/lib/chatEvents';
 import type { ReasoningVisibility } from '@/ipc/types';
+import { formatElapsed } from '@/lib/formatElapsed';
 
 const props = defineProps<{
   agentId: string;
@@ -50,34 +51,12 @@ function toggle() {
 }
 
 /// Format elapsed: `startedAt`→`completedAt` or `startedAt`→now.
-const elapsedLabel = computed(() => {
-  if (!props.startedAt) return '';
-
-  const start = Date.parse(props.startedAt);
-
-  if (!Number.isFinite(start)) return '';
-
-  const end = props.completedAt ? Date.parse(props.completedAt) : Date.now();
-
-  if (!Number.isFinite(end)) return '';
-
-  const ms = end - start;
-
-  if (ms < 1000) return `${ms}ms`;
-
-  const s = Math.round(ms / 1000);
-
-  if (s < 60) return `${s}s`;
-
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-
-  if (m < 60) return `${m}m ${rem}s`;
-
-  const h = Math.floor(m / 60);
-
-  return `${h}h ${m % 60}m`;
-});
+const elapsedLabel = computed(() =>
+  formatElapsed({
+    startedAt: props.startedAt,
+    completedAt: props.completedAt,
+  }),
+);
 </script>
 
 <template>

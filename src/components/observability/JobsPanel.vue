@@ -9,6 +9,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { formatElapsed } from '@/lib/formatElapsed';
 
 const jobsStore = useJobsStore();
 const layoutStore = useLayoutStore();
@@ -71,28 +72,11 @@ function sessionLabel(sessionId: string): string {
 }
 
 function elapsed(job: JobRecord): string {
-  let ms = job.activeTimeMs ?? null;
-
-  if (ms === null && job.startedAt) {
-    const start = Date.parse(job.startedAt);
-    const end = job.completedAt ? Date.parse(job.completedAt) : Date.now();
-
-    if (Number.isFinite(start) && Number.isFinite(end)) ms = end - start;
-  }
-
-  if (ms === null) return '';
-
-  if (ms < 1000) return `${ms}ms`;
-
-  const s = Math.round(ms / 1000);
-
-  if (s < 60) return `${s}s`;
-
-  const m = Math.floor(s / 60);
-
-  if (m < 60) return `${m}m ${s % 60}s`;
-
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
+  return formatElapsed({
+    activeTimeMs: job.activeTimeMs,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+  });
 }
 
 function statusIcon(job: JobRecord): string {
