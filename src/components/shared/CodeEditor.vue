@@ -19,9 +19,12 @@ import { EditorState, Compartment, type Extension } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
-import { resolveLanguageExtension, resolveLanguageForFile } from '@/lib/codeLanguage';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import {
+  buildCodeMirrorTheme,
+  resolveLanguageWithFallback,
+} from '@/lib/codeMirrorShared';
 
 const props = withDefaults(
   defineProps<{
@@ -97,22 +100,9 @@ function baseExtensions(): Extension[] {
         emit('update:modelValue', update.state.doc.toString());
       }
     }),
-    EditorView.theme({
-      '&': {
-        fontSize: '0.82rem',
-        backgroundColor: 'transparent',
-      },
-      '.cm-scroller': {
-        fontFamily: 'var(--p-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-        maxHeight: props.maxHeight > 0 ? `${props.maxHeight}px` : 'none',
-      },
-      '.cm-content': {
-        padding: '0.4rem 0.6rem',
-      },
-      '.cm-gutters': {
-        backgroundColor: 'transparent',
-        borderRight: '1px solid var(--p-surface-border, rgba(255,255,255,0.08))',
-      },
+    buildCodeMirrorTheme({
+      maxHeight: props.maxHeight,
+      contentPadding: '0.4rem 0.6rem',
     }),
   ];
 }
@@ -120,15 +110,10 @@ function baseExtensions(): Extension[] {
 async function loadLanguage(): Promise<void> {
   if (!view) return;
 
-  let ext: Extension | null = null;
-
-  if (props.language) {
-    ext = await resolveLanguageExtension(props.language);
-  }
-
-  if (!ext && props.filename) {
-    ext = await resolveLanguageForFile(props.filename);
-  }
+  const ext = await resolveLanguageWithFallback({
+    language: props.language,
+    filename: props.filename,
+  });
 
   if (!view) return; // disposed during await
 

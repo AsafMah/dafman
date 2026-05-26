@@ -17,6 +17,7 @@
 
 import { computed, onMounted, ref } from 'vue';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
+import ActivityButton from '@/components/shell/ActivityButton.vue';
 
 interface ActivityItemBase {
   id: string;
@@ -142,52 +143,22 @@ defineExpose({ sync: syncOpenState });
           class="activity-brand-icon"
         />
       </a>
-      <button
+      <ActivityButton
         v-for="item in topItems"
         :key="item.id"
-        type="button"
-        class="activity-button"
-        :class="{ 'is-active': item.kind === 'panel' && isOpen(item.id) }"
-        :title="item.title"
-        :aria-label="item.title"
-        :aria-pressed="item.kind === 'panel' ? isOpen(item.id) : undefined"
-        @click="activate(item)"
-      >
-        <i
-          class="pi activity-icon"
-          :class="item.icon"
-          aria-hidden="true"
-        />
-        <span
-          v-if="item.badge"
-          class="activity-badge"
-          >{{ item.badge }}</span
-        >
-      </button>
+        :item="item"
+        :active="item.kind === 'panel' && isOpen(item.id)"
+        @activate="activate"
+      />
     </div>
     <div class="activity-stack activity-stack-bottom">
-      <button
+      <ActivityButton
         v-for="item in bottomItems"
         :key="item.id"
-        type="button"
-        class="activity-button"
-        :class="{ 'is-active': item.kind === 'panel' && isOpen(item.id) }"
-        :title="item.title"
-        :aria-label="item.title"
-        :aria-pressed="item.kind === 'panel' ? isOpen(item.id) : undefined"
-        @click="activate(item)"
-      >
-        <i
-          class="pi activity-icon"
-          :class="item.icon"
-          aria-hidden="true"
-        />
-        <span
-          v-if="item.badge"
-          class="activity-badge"
-          >{{ item.badge }}</span
-        >
-      </button>
+        :item="item"
+        :active="item.kind === 'panel' && isOpen(item.id)"
+        @activate="activate"
+      />
     </div>
   </nav>
 </template>
