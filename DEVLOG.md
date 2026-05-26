@@ -10,6 +10,203 @@
 
 ---
 
+## 2026-05-25 → 2026-05-26 — Phase A through D.1 sprint
+
+**Takeaway:** Big code-quality push. 7 phases planned, 4.5 phases delivered. ~600 lines of hand-rolled infrastructure deleted, 4 real bugs fixed, 63 backend TS errors cleared and gated, all behind a rubber-duck pass per phase. Next session picks up at Phase D.2 (ChatWindow).
+
+### Commits (newest → oldest, this sprint only)
+
+- `e932fba` docs(audit): Phase D plan reshaped per rubber-duck; D.1 done
+- `9125e50` refactor(d1): split SettingsPanel (968 → 339 lines) into 4 section components + shared chrome
+- `c9ea367` docs(audit): mark Phase C complete (C.1 done, C.2 + C.3 declined)
+- `fd9ae89` refactor(c1): typed dockview accessor module; layoutStore `as unknown as` 12 → 2
+- `b624a7a` docs(audit): mark Phase B complete + SDK simplification + circular dep gone
+- `c63b36a` refactor(b3): kill the layoutStore → sessionsStore `require()` circular hack
+- `829e069` refactor(b2): extract Library tab composables (Tools/Instructions/Skills/Agents/Mcp)
+- `e36087e` refactor(b1): centralize OS-action IPC into pathActions + useFolderPicker
+- `f703040` chore: remove accidental JetBrains inspections export + gitignore it
+- `95461c2` refactor(sdk): switch to `@github/copilot-sdk@1.0.0-beta.7` + simplify
+- `1c67fa2` fix(src-bun): clear all 63 TypeScript errors + wire `lint:tsc-bun` into check
+- `245eb85` docs+chore: add §2.5 backend TS errors + Phase A.5 + `lint:tsc-bun` script
+- `9dafcf3` docs(audit): mark Phase A complete + refresh stale rows
+- `1dfee83` refactor(8): `src/constants/panels.ts` typed panel IDs
+- `46f7048` refactor(vueuse): adopt useResizeObserver + useEventListener (selective)
+- `3b53bed` refactor(terminalStore): swap manual localStorage for usePersistedRef
+- `2accec4` refactor(ipc/invoke): collapse 6 deferred-listener blocks into a generic
+- `362fb2d` refactor(bus): replace 9 window CustomEvent channels with typed mitt bus
+- `48b587c` docs(AGENTS): add anti-laziness rules 16-21 from May 2026 audit lessons
+- `032d06d` refactor(codeLanguage): drop hand-rolled factories, install lang-vue + lang-sass
+- `42be1a6` refactor(codeLanguage): use `@codemirror/language-data` for ext→name lookup
+- `4073bca` refactor(ansi): replace hand-rolled stripAnsi with strip-ansi (npm)
+- `4396c7e` test: add Phase A regression safety net (ansi, codeLanguage, listenerRegistry, terminalStore)
+- `28ba78f` docs: revise Phase A per rubber-duck + add code-audit skill
+- `2543fb3` docs: add Phase E (deduplication) to cleanup plan
+- `932d28d` docs: refresh §3 jscpd table with fresh scan (70 clones, 2.56%)
+- `b0f634a` docs: refresh all stale CODE_AUDIT tables with verified data
+
+### Phase A — Foundation: library replacements + typed constants ✅ DONE
+
+8 steps, all per rubber-duck-reshaped order: regression tests first, then strip-ansi, language-data, mitt bus, deferred-channel generic, usePersistedRef, selective VueUse, panel ID constants.
+
+**Net Phase A:** ~370 production lines of hand-rolled infra deleted, 3 real bugs fixed for free (OSC ST-terminator strip, Vue/SCSS getting HTML highlighting, untyped event coupling), +49 tests (551 → 600), lint clean throughout.
+
+**Real bugs surfaced by the regression-tests-first approach:**
+- The OSC ST-terminator (ESC\) test failed before strip-ansi swap and passed after — confirming the old regex had a greedy-body bug.
+
+### Phase A.5 — Backend TypeScript cleanup ✅ DONE
+
+**User-spotted gap:** `bun run check` was hiding 63 TS errors in `src-bun/` because only the renderer's `vue-tsc` was in the lint gate.
+
+Cleared every single one and wired `bun run lint:tsc-bun` into `bun run check` so future regressions fail CI. Real risks surfaced (not just type noise):
+- `extension-management` + `extension-permission-access` permission kinds added to `PermissionRequestData` union (both renderer + backend) — they exist upstream but our union didn't include them, meaning those permission types were silently misrouting
+- `SessionRegistry.delete/getMetadata` calls in `test-server.ts` would crash at runtime — methods don't exist any more; replaced with `deleteCliSession`/`getCwd`
+- `CopilotClientOptions.cliPath` removed upstream → `RuntimeConnection.forStdio({path})`
+- `account.getQuota()` now requires `{}` arg
+- Bun subprocess `signalCode` is `number|null` not `string|null`
+
+AGENTS.md rule 22 added: "Never add new src-bun/ TypeScript errors. When you touch a src-bun/ file, run bun run lint:tsc-bun first and verify the error count doesn't go up."
+
+### SDK simplification ✅ DONE
+
+User asked "why are we using `@github/copilot` over `@github/copilot-sdk`?"
+
+Investigated both standalone versions:
+- `1.0.0-beta.4` (npm `latest`, 2026-05-24): lags the bundled SDK at 3 surfaces — `SessionContext.cwd` vs `workingDirectory`, `getMessages()` vs `getEvents()`, no `UserInputRequest`/`Response` exports
+- `1.0.0-beta.7` (`prerelease` tag, 2026-05-25): matches the bundled SDK — pinned this one explicitly
+
+3 deep `'../../../node_modules/...'` imports → clean `from '@github/copilot-sdk'`. Plus simplifications spotted in passing:
+- `ReasoningEffort` no longer hand-mirrored; derived from `SessionConfig['reasoningEffort']`
+- `UserInputRequest`/`Response` derived from `SessionConfig.onUserInputRequest` (package `exports` map blocks sub-paths)
+- Duplicate `setClientForTest`/`_setClientForTest` collapsed
+- Dead `SYSTEM_PROMPT_SECTIONS` re-export dropped (renamed upstream, unused)
+- `tsconfig.bun.json` extended to include `tools/**/*.vue` (TS6307 fix on Counter.vue)
+- §D.13 in plans/plan-sdk-audit.prompt.md added for Canvas API (new in beta.7) — tracked via `sdk-canvas-support` todo for after Phase B/C
+
+Restored: `index.html` (JetBrains IDE had overwritten it with an inspections export). Gitignored `report/` so future IDE exports stay out of source control.
+
+### Phase B — Data flow decoupling ✅ DONE
+
+Original plan ("store-only IPC rule") would have created store god objects. Per rubber-duck reshape: use composables for per-instance UI flows, not global stores.
+
+- **B.1** OS-helper centralization: 7 callsites migrated to `pathActions.openUrl`/`revealPath`/`openLogFolder` + new `useFolderPicker` composable
+- **B.2** 5 Library tab composables extracted: `useToolsLibrary`, `useInstructionsLibrary`, `useSkillsLibrary`, `useAgentsLibrary`, `useMcpLibrary` (the big one — 13 IPC calls + ~190 lines extracted from `LibraryMcpTab.vue`) + `browseDirectorySafe` helper
+- **B.3** Killed the `layoutStore → sessionsStore` `require()`-based circular dependency via `setSessionTitleResolver(fn)` injected at boot
+
+**Net Phase B:** .vue direct invokeCommand calls 36 → 3 (only picker-flow holdouts left). 6 new composables. 1 real circular dep eliminated.
+
+**Skipped per critique:** global toastStore decoupling (silent-failure risk), and 3 picker-flow IPC calls that didn't benefit from extraction.
+
+### Phase C — Type safety ✅ DONE
+
+- **C.1** New `src/stores/shell/dockviewTypes.ts` accessor module — `as unknown as` shape probes in layoutStore: 12 → 2 via typed `groupPanels()`, `groupId()`, `groupWidth/Height()`, `dockApiWidth/Height()`, `asRemovePanelArg()` accessors. Remaining 2 are intentional local casts (edgeApi 4-prop setter, panel.api.moveTo structural cast)
+- **C.2** sessionsStore reducer casts — re-examined, already safe. The `payload.data as {field?: unknown}` pattern is typed shape probe + runtime guards (`typeof d.field === 'string'`). No work needed.
+- **C.3** Shared settings type — **declined**. The duplication between `src/ipc/types.ts` and `src-bun/rpc.ts` is an intentional wire-shape mirror (per AGENTS.md). Sharing would break the per-side tsconfig boundary without real benefit; wire-contract snapshots already catch drift (Phase A.5 confirmed when `extension-management` drift was caught + propagated to both sides).
+
+### Phase D — God-object splits 🟡 IN PROGRESS (D.1 done, rest deferred to dedicated sessions)
+
+Rubber-duck critique on Phase D was the longest of the sprint. Headline: **these targets cannot be batched.** Each has wildly different risk profile (Lexical state coupling, Dockview restore semantics, SessionRegistry public API with 50 tests, zero unit-test coverage on the big .vue files).
+
+- **D.1 SettingsPanel** ✅ done (commit `9125e50`): 968 → 339 lines. 4 section components + shared `SettingsGroup` chrome. All bindings now route through typed `settingsStore.set*` setters; no more inline `update({...})` calls.
+
+### Pre-split work owed for the remaining D items (next session)
+
+Per the rubber-duck critique, **each remaining D target needs**:
+
+#### D.2 ChatWindow.vue (1,185 lines)
+
+**Before any extraction** — add 5 direct unit tests:
+- event stream flush respects `droppedEventCount`
+- timeline merges `commandResults` by synthetic order
+- send adds optimistic user message and forwards attachments
+- retry/fork anchor resolution
+- pending banner displays queue head
+
+Then extract: `useChatEventFlush`, `useChatScroll`, `useMessageActions`, optionally `<ChatTranscript>`.
+
+#### D.3 sessions.ts (1,929 lines)
+
+Keep `SessionRegistry` as the public boundary (tests import it). Extract **sibling SDK-wrapper services** with a tiny context port:
+- `SessionAgentsService`, `SessionTasksService`, `SessionSkillsService`, `SessionMcpService`, `SessionPlanService`, optionally `SessionModelService`
+- Internal services receive `{ getEntry(sessionId), getClient(), wrapSdkError() }` — **do NOT let services mutate `entries` directly**
+
+Keep these in `SessionRegistry`:
+- `entries` ownership
+- `create`/`resume`/`disconnect`/`shutdownAll`
+- `baseSessionConfig`
+- pending request handlers, `forward`, working-directory lifecycle
+
+These areas share lifecycle invariants — splitting them into sibling services would hide coupling, not remove it.
+
+#### D.4 MessageComposer.vue (1,389 lines)
+
+**Before any extraction** — add regression tests for:
+- submit payload including attachment deletion/retention
+- focus after toolbar/send/command-mode exit
+- paste/drop blob size handling
+- command mode `!`, double-Esc, Ctrl+Backspace
+- toolbar format state
+
+Lead with **subcomponents** where there's UI (`<ComposerToolbar>`, `<ComposerFormatMenu>`, `<ComposerFilePickerButton>`, `<ComposerCommandMode>`, maybe `<ComposerSubmitButton>`). Use composables only for stateful editor-adjacent logic (`useComposerAttachments`, `useComposerFormatting`, `useComposerCommandMode`). Do NOT prop-drill the raw Lexical editor everywhere; prefer provide/inject or a small local context object.
+
+#### D.5 SessionsManager.vue (1,062 lines) — **defer**
+
+Large but understandable. Seams less urgent: create form + list + sorting. Touch when sidebar work resumes.
+
+#### D.6 layoutStore.ts (1,145 lines) — **defer/drop**
+
+Recent dockview-types extraction (Phase C.1) means another touch is high blast radius. Existing tests cover some behavior but not enough to justify broad restructuring. Split only if a Dockview bug/feature forces it.
+
+### Phase E — Deduplication (not yet started)
+
+Per §3 jscpd scan (70 clones / 2.56%). Pure refactors with no dependency on Phase D. Top extraction candidates from the rubber-duck-ranked plan:
+1. `JsonSchemaField.vue` — 4 near-identical type branches (~90 lines)
+2. Library tabs share user/project pattern (~110 lines) → `<LibraryTabPanel :user :project>` wrapper
+3. Task aggregation (3 sites) → `useTaskAggregation` composable
+4. Lexical trigger plugins (Mention + SlashCommand) → `createTriggerPlugin({trigger, query, render})` factory
+5. CodeMirror setup (DiffEditor + CodeEditor) → `useCodeMirror()` composable
+6. Permission/Tool detail render → shared `<ArgRow>` component
+
+### Phase F — Timing hacks + remaining ESLint (not yet started)
+
+- Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
+- Replace double-rAF patterns with proper settle helpers
+- 17 `complexity` — CC > 15 functions
+- 6 `no-non-null-assertion` — xterm addon closures
+- 5 `max-lines-per-function` — Pinia store bodies
+- 1 `max-depth` — nested conditional
+
+### AGENTS.md anti-laziness rules added this sprint
+
+Rules 16–22 added with concrete precedents from this sprint:
+- **16** Build vs Buy — search package.json/VueUse/PrimeVue/npm first
+- **17** Install the proper dep instead of maintaining a workaround table (precedent: 4-entry vue/scss/jsonc/pyi workaround that the user caught)
+- **18** Never `window.dispatchEvent('app:...')` for in-app messaging (precedent: 13 dispatchers + 9 listeners across 9 files of untyped spaghetti)
+- **19** Watch for god objects on every change (>500/800/1200 thresholds)
+- **20** CC > 15 is the design talking; don't bump the threshold
+- **21** Tables in CODE_AUDIT/STATUS/DEVLOG go stale within weeks; update the same commit. Includes verification one-liners (grep + rg snippets).
+- **22** Backend TypeScript: gate is now active (no new errors allowed)
+
+### Code-audit skill added
+
+`.github/skills/code-audit/SKILL.md` — receipt-backed audit workflow. Enforces re-running ESLint, jscpd, file-size scans, architectural pattern greps every refresh (NO memory citations). Includes the verification one-liners. Triggered by phrases like "do a code audit", "refresh the audit", "build vs buy", etc.
+
+Also moved `.github/.claude/skills/` (a copy-paste error) to `.github/skills/`.
+
+### Pending todo for future sessions
+
+- `sdk-canvas-support` (queued in session_state SQL) — wire the new Canvas API from `@github/copilot-sdk@1.0.0-beta.7` (`createCanvas`, `CanvasAction`, `CanvasDeclaration`, `CanvasOpenContext`) once Phase D decoupling clears a place to host the canvas registry (analogous to `commandResultRegistry`). Tracked in `plans/plan-sdk-audit.prompt.md` §D.13.
+
+### Validation discipline (every commit)
+
+- `bun run lint` (renderer vue-tsc)
+- `bun run lint:tsc-bun` (backend tsc, NEW gate this sprint)
+- `bun test` (600 pass, was 551 at sprint start)
+- `bun run smoke` (both prod + hmr)
+
+Every gate stayed green throughout. No commit left the suite broken.
+
+---
+
 ## 2026-05-25 — Build-vs-buy analysis (session 3)
 
 **Takeaway:** Completed systematic audit of every hand-rolled pattern against npm
