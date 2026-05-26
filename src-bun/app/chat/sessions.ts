@@ -289,11 +289,20 @@ export class SessionRegistry {
     // Electrobun exe folder). Reading the catalog and pinning the
     // value here closes that gap end-to-end.
     let persistedCwd: string | undefined;
+    let persistedSummary: string | undefined;
 
     try {
       const meta = await client.getSessionMetadata(sessionId);
 
       if (meta?.context?.workingDirectory) persistedCwd = meta.context.workingDirectory;
+
+      // Also grab the persisted title so we don't have to wait for
+      // the post-resume re-poll (which only fires AFTER replayHistory
+      // finishes — can be 100s of ms on long sessions, during which
+      // the tab + sidebar show "untitled").
+      if (typeof meta?.summary === 'string' && meta.summary.trim()) {
+        persistedSummary = meta.summary;
+      }
     } catch {
       /* non-fatal */
     }
@@ -335,6 +344,19 @@ export class SessionRegistry {
       ...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
     });
     this.modeBySession.set(actualId, 'interactive');
+
+    // Emit the persisted title eagerly — before the (potentially
+    // slow) history replay — so the tab + sidebar show the right
+    // name immediately. The post-resume `pollTitleFromMetadata`
+    // below is the safety net for sessions that didn't have a
+    // summary at metadata-read time.
+    if (persistedSummary) {
+      this.emit({
+        sessionId: actualId,
+        eventType: 'session.title_changed',
+        data: { title: persistedSummary },
+      });
+    }
 
     // Hydrate transcript. Failures here aren't fatal — the session is
     // connected and will receive live events; we just won't have the

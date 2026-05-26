@@ -608,14 +608,13 @@ export const useLayoutStore = defineStore('layout', () => {
       position: { referenceGroup, direction },
     });
 
-    // Auto-open the session-details right-rail singleton alongside
-    // the first chat panel (subsequent panels reuse the same rail
-    // — it re-binds to whichever chat tab is active). Skips if the
-    // rail is already in the persisted layout (dockview restore
-    // re-creates it then) or if the user explicitly closed it.
-    if (!detailsOpen.value) {
-      openSessionDetailsPanel();
-    }
+    // Note: do NOT auto-open the session-details right-rail here.
+    // The previous behavior popped the rail open every time a session
+    // was created, which surprised users — they had to close it
+    // themselves on every new session. The rail is still openable on
+    // demand via the activity-bar toggle / `toggleSessionDetailsPanel`.
+    // (Issue: problems.md "Remove the thing that a session
+    // automatically opens its settings".)
   }
 
   function addTerminalPanel(terminalId: string, title = 'Terminal'): void {

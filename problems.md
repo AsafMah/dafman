@@ -6,8 +6,32 @@
 ## Open
 
 - The word "attachment" triggers an issue with the sql, we need to reword "see attachment"
-- Sessions still don't get their title sometimes when they are resumed
-- The "modes" button no longer shrinks to a select - it's just gone.
+- The left tab bar is broken - first, the exclusivity doesn't work sometimes, and secondly, you need to close and re-open tabs multiple times so they would show up
+
+## Solved (2026-05-26 sweep)
+
+- [x] Sessions don't get their title sometimes when they are resumed —
+  `resume()` was making TWO calls to `getSessionMetadata`: one for the
+  cwd (line 294) and a second one via `pollTitleFromMetadata` (line
+  370) AFTER history replay finished. The title was set late at best,
+  not at all if `meta.summary` flipped between the two reads. Fixed
+  by capturing both `meta.context.workingDirectory` AND `meta.summary`
+  off the early read and emitting `session.title_changed` immediately
+  after the entry is registered (before replay). The post-resume
+  poll stays as a safety net for sessions that genuinely had no
+  summary at metadata-read time.
+- [x] The "modes" button no longer shrinks to a select - it's just
+  gone. — The `@container (max-width: 620px)` rule in
+  `MessageComposer.vue` hid `.mode-button-group` and was supposed to
+  swap in a `.mode-select-shell` fallback, but the fallback was never
+  rendered (the class doesn't exist anywhere in the codebase). The
+  3-icon SelectButton is ~90 px wide; fits without the swap. Removed
+  the hide rule.
+- [x] Remove the thing that a session automatically opens its settings
+  — `layoutStore.addPanel` auto-opened the session-details right-rail
+  on every chat-panel add (Phase 18a behavior). Removed the
+  auto-open; the rail is still openable on demand via the
+  activity-bar toggle / `toggleSessionDetailsPanel`.
 
 ## Solved (2026-05-22 sweep)
 

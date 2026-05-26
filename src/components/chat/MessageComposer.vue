@@ -937,14 +937,15 @@ const primaryTooltip = computed(() =>
   }
 }
 
-/* Below 620px: collapse mode buttons to select */
+/* Below 620px: compact the session-terminal-button to icon-only.
+ *
+ * Historically this also hid `.mode-button-group` and was supposed
+ * to swap in a `.mode-select-shell` Select fallback — but the
+ * fallback was never rendered, so the mode picker silently
+ * vanished on narrow panes. The 3-icon SelectButton is ~90 px;
+ * fits without the swap. (Issue: problems.md "modes button no
+ * longer shrinks to a select - it's just gone".) */
 @container (max-width: 620px) {
-  .lex-composer-toolbar :deep(.mode-button-group) {
-    display: none;
-  }
-  .lex-composer-toolbar :deep(.mode-select-shell) {
-    display: inline-flex;
-  }
   .lex-composer-toolbar
     :deep(.session-header-controls.area-composer-right .session-terminal-button .p-button-label) {
     display: none;
