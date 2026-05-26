@@ -19,7 +19,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, ref } from 'vue';
 import SplitButton from 'primevue/splitbutton';
 import Popover from 'primevue/popover';
 import type { MenuItem } from 'primevue/menuitem';
@@ -39,25 +39,10 @@ import {
   $createParagraphNode,
   $createTextNode,
   COMMAND_PRIORITY_LOW,
-  FORMAT_TEXT_COMMAND,
   SELECTION_CHANGE_COMMAND,
   type ElementNode,
   type LexicalEditor,
-  type TextFormatType,
 } from 'lexical';
-import { $createCodeNode, $isCodeNode } from '@lexical/code';
-import {
-  $isListNode,
-  INSERT_ORDERED_LIST_COMMAND,
-  INSERT_UNORDERED_LIST_COMMAND,
-} from '@lexical/list';
-import {
-  $createHeadingNode,
-  $createQuoteNode,
-  $isHeadingNode,
-  $isQuoteNode,
-} from '@lexical/rich-text';
-import { $setBlocksType } from '@lexical/selection';
 import {
   EditableSync,
   RegisterMarkdownShortcuts,
@@ -74,12 +59,20 @@ import type { DefaultSendMode } from '@/stores/chat/sessionsStore';
 import type { SendMessageAttachment } from '@/ipc/types';
 import { useToastStore } from '@/stores/app/toastStore';
 import { runLocalSlashCommand } from '@/lib/sessionCommands';
-import { useResizeObserver } from '@vueuse/core';
 import SlashCommandPlugin from '@/components/chat/SlashCommandPlugin.vue';
 import MentionPlugin from '@/components/chat/MentionPlugin.vue';
 import FilePicker from '@/components/shared/FilePicker.vue';
 import ModeButtonGroup from '@/components/chat/ModeButtonGroup.vue';
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
+import {
+  applyEditorFormat,
+  computeFormatState,
+  INITIAL_FORMAT_STATE,
+  type EditorFormatAction,
+  type EditorFormatState,
+} from '@/composables/composerFormat';
+import { useComposerToolbarLayout } from '@/composables/useComposerToolbarLayout';
+import { useComposerAttachments } from '@/composables/useComposerAttachments';
 
 const props = withDefaults(
   defineProps<{
@@ -116,36 +109,11 @@ const diagEnabled =
 /// text" === "attachment index in array" naturally without a parallel
 /// ref array drifting from the editor state.
 const toasts = useToastStore();
-const toolbarRef = ref<HTMLElement | null>(null);
-const toolbarWidth = ref(1000);
 const commandMode = ref(false);
 let bangArmed = false;
-const formatActions = computed(() => editorFormatActions);
-const visibleFormatCount = computed(() => {
-  const width = toolbarWidth.value;
 
-  if (width >= 860) return formatActions.value.length;
-
-  if (width >= 740) return 8;
-
-  if (width >= 620) return 6;
-
-  if (width >= 500) return 4;
-
-  if (width >= 390) return 2;
-
-  return 0;
-});
-const inlineFormatActions = computed(() => formatActions.value.slice(0, visibleFormatCount.value));
-const overflowFormatActions = computed(() => formatActions.value.slice(visibleFormatCount.value));
-
-useResizeObserver(toolbarRef, () => {
-  if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
-});
-
-onMounted(() => {
-  if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
-});
+const { toolbarRef, inlineFormatActions, overflowFormatActions } =
+  useComposerToolbarLayout();
 
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
@@ -202,72 +170,10 @@ function clearEditor(): void {
   });
 }
 
-const MAX_BLOB_BYTES = 8 * 1024 * 1024; // 8 MiB safety cap
-
-/// Read a File/Blob into a base64 SDK blob attachment. Wraps the
-/// FileReader API in a promise so drag-drop / paste handlers stay
-/// flat.
-async function blobFromFile(file: File): Promise<SendMessageAttachment | null> {
-  if (file.size > MAX_BLOB_BYTES) {
-    toasts.warn(
-      'File too large',
-      `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MiB. Max is 8 MiB.`,
-    );
-
-    return null;
-  }
-
-  const buf = await file.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  // Chunk to avoid stack overflows on String.fromCharCode(...big-array).
-  let bin = '';
-  const CHUNK = 0x8000;
-
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-
-  const data = btoa(bin);
-
-  return {
-    type: 'blob',
-    data,
-    mimeType: file.type || 'application/octet-stream',
-    displayName: file.name,
-  };
-}
-
-async function onDrop(event: DragEvent): Promise<void> {
-  event.preventDefault();
-  const files = event.dataTransfer?.files;
-
-  if (!files || files.length === 0) return;
-
-  for (const f of Array.from(files)) {
-    const a = await blobFromFile(f);
-
-    if (a) addAttachment(a);
-  }
-}
-
-async function onPaste(event: ClipboardEvent): Promise<void> {
-  const items = event.clipboardData?.items;
-
-  if (!items) return;
-
-  for (const item of Array.from(items)) {
-    if (item.kind !== 'file') continue;
-
-    const f = item.getAsFile();
-
-    if (!f) continue;
-
-    event.preventDefault();
-    const a = await blobFromFile(f);
-
-    if (a) addAttachment(a);
-  }
-}
+const { onDrop, onPaste } = useComposerAttachments({
+  addAttachment,
+  toasts,
+});
 
 /// Emits a discriminated submit payload identifying which send mode
 /// the user invoked. The parent (`ChatWindow`) maps it to the
@@ -362,165 +268,13 @@ function formatEditor(action: EditorFormatAction): void {
 
   if (!editor || props.disabled) return;
 
-  if (TEXT_FORMAT_ACTIONS.has(action)) {
-    editor.dispatchCommand(FORMAT_TEXT_COMMAND, action as TextFormatType);
-  } else if (action === 'bullet') {
-    editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined);
-  } else if (action === 'number') {
-    editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined);
-  } else {
-    editor.update(() => {
-      const selection = $getSelection();
-
-      if (!$isRangeSelection(selection)) return;
-
-      if (action === 'h1') {
-        $setBlocksType(selection, () => $createHeadingNode('h1'));
-      } else if (action === 'h2') {
-        $setBlocksType(selection, () => $createHeadingNode('h2'));
-      } else if (action === 'quote') {
-        $setBlocksType(selection, () => $createQuoteNode());
-      } else if (action === 'codeblock') {
-        $setBlocksType(selection, () => $createCodeNode());
-      }
-    });
-  }
-
-  editor.focus();
+  applyEditorFormat(editor, action);
 }
 
-type EditorFormatAction =
-  | 'bold'
-  | 'italic'
-  | 'underline'
-  | 'strikethrough'
-  | 'code'
-  | 'bullet'
-  | 'number'
-  | 'h1'
-  | 'h2'
-  | 'quote'
-  | 'codeblock';
-
-const TEXT_FORMAT_ACTIONS = new Set<EditorFormatAction>([
-  'bold',
-  'italic',
-  'underline',
-  'strikethrough',
-  'code',
-]);
-
-const editorFormatActions: Array<{
-  label: string;
-  title: string;
-  action: EditorFormatAction;
-  icon?: string;
-  glyph?: string;
-  inline?: boolean;
-  priority: 1 | 2 | 3 | 4;
-}> = [
-  { label: 'Bold', glyph: 'B', title: 'Bold', action: 'bold', inline: true, priority: 1 },
-  { label: 'Italic', glyph: 'I', title: 'Italic', action: 'italic', inline: true, priority: 1 },
-  {
-    label: 'Code',
-    icon: 'pi pi-code',
-    title: 'Inline code',
-    action: 'code',
-    inline: true,
-    priority: 1,
-  },
-  {
-    label: 'Bullet list',
-    icon: 'pi pi-list',
-    title: 'Bullet list',
-    action: 'bullet',
-    inline: true,
-    priority: 1,
-  },
-  { label: 'Underline', glyph: 'U', title: 'Underline', action: 'underline', priority: 2 },
-  {
-    label: 'Numbered list',
-    icon: 'pi pi-list-check',
-    title: 'Numbered list',
-    action: 'number',
-    priority: 2,
-  },
-  {
-    label: 'Strikethrough',
-    glyph: 'S',
-    title: 'Strikethrough',
-    action: 'strikethrough',
-    priority: 3,
-  },
-  { label: 'Heading 1', glyph: 'H1', title: 'Heading 1', action: 'h1', priority: 3 },
-  { label: 'Heading 2', glyph: 'H2', title: 'Heading 2', action: 'h2', priority: 3 },
-  { label: 'Quote', glyph: '❝', title: 'Quote block', action: 'quote', priority: 4 },
-  { label: 'Code block', glyph: '{ }', title: 'Code block', action: 'codeblock', priority: 4 },
-] as const;
-
-const editorFormatState = ref<Record<EditorFormatAction, boolean>>({
-  bold: false,
-  italic: false,
-  underline: false,
-  strikethrough: false,
-  code: false,
-  bullet: false,
-  number: false,
-  h1: false,
-  h2: false,
-  quote: false,
-  codeblock: false,
-});
+const editorFormatState = ref<EditorFormatState>({ ...INITIAL_FORMAT_STATE });
 
 function readEditorFormatState(): void {
-  const selection = $getSelection();
-  let inBulletList = false;
-  let inNumberList = false;
-  let inHeading1 = false;
-  let inHeading2 = false;
-  let inQuote = false;
-  let inCodeBlock = false;
-
-  if ($isRangeSelection(selection)) {
-    let node = selection.anchor.getNode();
-
-    while (node) {
-      if ($isListNode(node)) {
-        inBulletList = node.getListType() === 'bullet';
-        inNumberList = node.getListType() === 'number';
-        break;
-      }
-
-      if ($isHeadingNode(node)) {
-        inHeading1 = node.getTag() === 'h1';
-        inHeading2 = node.getTag() === 'h2';
-      } else if ($isQuoteNode(node)) {
-        inQuote = true;
-      } else if ($isCodeNode(node)) {
-        inCodeBlock = true;
-      }
-
-      const parent = node.getParent();
-
-      if (!parent) break;
-
-      node = parent;
-    }
-  }
-
-  editorFormatState.value = {
-    bold: $isRangeSelection(selection) && selection.hasFormat('bold'),
-    italic: $isRangeSelection(selection) && selection.hasFormat('italic'),
-    underline: $isRangeSelection(selection) && selection.hasFormat('underline'),
-    strikethrough: $isRangeSelection(selection) && selection.hasFormat('strikethrough'),
-    code: $isRangeSelection(selection) && selection.hasFormat('code'),
-    bullet: inBulletList,
-    number: inNumberList,
-    h1: inHeading1,
-    h2: inHeading2,
-    quote: inQuote,
-    codeblock: inCodeBlock,
-  };
+  editorFormatState.value = computeFormatState();
 }
 
 defineExpose({
