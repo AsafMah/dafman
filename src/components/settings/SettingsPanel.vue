@@ -44,13 +44,19 @@ onMounted(() => {
 /// Collapse state per section id. In-memory only — defaults to all
 /// expanded so a fresh open shows every option, matching how a
 /// search UI will eventually surface them.
-const collapsed = reactive<Record<string, boolean>>({});
-
-function setCollapsed(id: string) {
-  return (value: boolean) => {
-    collapsed[id] = value;
-  };
-}
+/// All known section ids, each defaulting to `false` (expanded) so a
+/// fresh open shows every option. Listed explicitly so v-model:collapsed
+/// can write directly to `collapsed[id]` without an `?? false` fallback
+/// in the template (which would un-couple read and write paths).
+const collapsed = reactive<Record<string, boolean>>({
+  appearance: false,
+  workspaces: false,
+  terminal: false,
+  notifications: false,
+  permissions: false,
+  diagnostics: false,
+  about: false,
+});
 
 async function openLogFolder() {
   const ok = await openLogFolderAction();
@@ -70,33 +76,20 @@ const defaultApproveAll = computed<boolean>({
 
 <template>
   <div class="settings-panel">
-    <AppearanceSettingsSection
-      :collapsed="collapsed.appearance ?? false"
-      @update:collapsed="setCollapsed('appearance')"
-    />
+    <AppearanceSettingsSection v-model:collapsed="collapsed.appearance" />
 
-    <WorkspaceSettingsSection
-      :collapsed="collapsed.workspaces ?? false"
-      @update:collapsed="setCollapsed('workspaces')"
-    />
+    <WorkspaceSettingsSection v-model:collapsed="collapsed.workspaces" />
 
-    <TerminalSettingsSection
-      :collapsed="collapsed.terminal ?? false"
-      @update:collapsed="setCollapsed('terminal')"
-    />
+    <TerminalSettingsSection v-model:collapsed="collapsed.terminal" />
 
-    <NotificationSettingsSection
-      :collapsed="collapsed.notifications ?? false"
-      @update:collapsed="setCollapsed('notifications')"
-    />
+    <NotificationSettingsSection v-model:collapsed="collapsed.notifications" />
 
     <!-- Permissions (Phase 22c) -->
     <SettingsGroup
       id="permissions"
       icon="pi-shield"
       label="Permissions"
-      :collapsed="collapsed.permissions ?? false"
-      @update:collapsed="setCollapsed('permissions')"
+      v-model:collapsed="collapsed.permissions"
     >
       <div class="field field-inline">
         <label class="field-inline-label">
@@ -123,8 +116,7 @@ const defaultApproveAll = computed<boolean>({
       id="diagnostics"
       icon="pi-info-circle"
       label="Diagnostics"
-      :collapsed="collapsed.diagnostics ?? false"
-      @update:collapsed="setCollapsed('diagnostics')"
+      v-model:collapsed="collapsed.diagnostics"
     >
       <div class="field">
         <Button
@@ -146,8 +138,7 @@ const defaultApproveAll = computed<boolean>({
       id="about"
       icon="pi-tag"
       label="About"
-      :collapsed="collapsed.about ?? false"
-      @update:collapsed="setCollapsed('about')"
+      v-model:collapsed="collapsed.about"
     >
       <p class="field-hint">
         Schema version <strong>{{ settings.version }}</strong> — stored under
