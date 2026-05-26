@@ -169,67 +169,90 @@ function enumOptions(schema: JsonSchema): Array<{ value: unknown; label: string 
   return [];
 }
 
+/// Validate an object node — required + recurse into properties.
+function validateObjectNode(
+  schema: JsonSchema,
+  v: unknown,
+  path: string[],
+): string | null {
+  const obj = (v ?? {}) as Record<string, unknown>;
+  const req = schema.required ?? [];
+
+  for (const key of req) {
+    const child = obj[key];
+    const isEmpty =
+      child === undefined ||
+      child === null ||
+      (typeof child === 'string' && child.trim() === '') ||
+      (Array.isArray(child) && child.length === 0);
+
+    if (isEmpty) return [...path, key].join('.') || key;
+  }
+
+  if (schema.properties) {
+    for (const [key, sub] of Object.entries(schema.properties)) {
+      const err = validateNode(sub, obj[key], [...path, key]);
+
+      if (err) return err;
+    }
+  }
+
+  return null;
+}
+
+/// Validate an array node — minItems / maxItems.
+function validateArrayNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
+  if (!Array.isArray(v)) return null;
+
+  if (schema.minItems !== undefined && v.length < schema.minItems) {
+    return path.join('.') || '(array)';
+  }
+
+  if (schema.maxItems !== undefined && v.length > schema.maxItems) {
+    return path.join('.') || '(array)';
+  }
+
+  return null;
+}
+
+/// Validate a string node — minLength / maxLength.
+function validateStringNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
+  if (typeof v !== 'string') return null;
+
+  if (schema.minLength !== undefined && v.length < schema.minLength) {
+    return path.join('.') || '(string)';
+  }
+
+  if (schema.maxLength !== undefined && v.length > schema.maxLength) {
+    return path.join('.') || '(string)';
+  }
+
+  return null;
+}
+
+/// Validate a number/integer node — minimum / maximum.
+function validateNumberNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
+  if (typeof v !== 'number') return null;
+
+  if (schema.minimum !== undefined && v < schema.minimum) {
+    return path.join('.') || '(number)';
+  }
+
+  if (schema.maximum !== undefined && v > schema.maximum) {
+    return path.join('.') || '(number)';
+  }
+
+  return null;
+}
+
 /// Top-level required-set for validate(). Recursing only honors immediate
 /// `required` lists — nested schemas carry their own.
 function validateNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
-  if (schema.type === 'object') {
-    const obj = (v ?? {}) as Record<string, unknown>;
-    const req = schema.required ?? [];
-
-    for (const key of req) {
-      const child = obj[key];
-      const isEmpty =
-        child === undefined ||
-        child === null ||
-        (typeof child === 'string' && child.trim() === '') ||
-        (Array.isArray(child) && child.length === 0);
-
-      if (isEmpty) return [...path, key].join('.') || key;
-    }
-
-    if (schema.properties) {
-      for (const [key, sub] of Object.entries(schema.properties)) {
-        const err = validateNode(sub, obj[key], [...path, key]);
-
-        if (err) return err;
-      }
-    }
-
-    return null;
-  }
-
-  if (schema.type === 'array') {
-    if (Array.isArray(v)) {
-      if (schema.minItems !== undefined && v.length < schema.minItems) {
-        return path.join('.') || '(array)';
-      }
-
-      if (schema.maxItems !== undefined && v.length > schema.maxItems) {
-        return path.join('.') || '(array)';
-      }
-    }
-
-    return null;
-  }
-
-  if (schema.type === 'string' && typeof v === 'string') {
-    if (schema.minLength !== undefined && v.length < schema.minLength) {
-      return path.join('.') || '(string)';
-    }
-
-    if (schema.maxLength !== undefined && v.length > schema.maxLength) {
-      return path.join('.') || '(string)';
-    }
-  }
-
-  if ((schema.type === 'number' || schema.type === 'integer') && typeof v === 'number') {
-    if (schema.minimum !== undefined && v < schema.minimum) {
-      return path.join('.') || '(number)';
-    }
-
-    if (schema.maximum !== undefined && v > schema.maximum) {
-      return path.join('.') || '(number)';
-    }
+  if (schema.type === 'object') return validateObjectNode(schema, v, path);
+  if (schema.type === 'array') return validateArrayNode(schema, v, path);
+  if (schema.type === 'string') return validateStringNode(schema, v, path);
+  if (schema.type === 'number' || schema.type === 'integer') {
+    return validateNumberNode(schema, v, path);
   }
 
   return null;

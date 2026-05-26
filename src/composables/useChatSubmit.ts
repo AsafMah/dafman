@@ -69,9 +69,7 @@ export interface UseChatSubmitReturn {
 }
 
 export function useChatSubmit(opts: UseChatSubmitOptions): UseChatSubmitReturn {
-  async function sendMessage(
-    payload: ComposerSubmitPayloadWithAttachments,
-  ): Promise<void> {
+  async function sendMessage(payload: ComposerSubmitPayloadWithAttachments): Promise<void> {
     if (!payload.text) return;
 
     const defaultMode = opts.getDefaultSendMode();

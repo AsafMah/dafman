@@ -198,8 +198,7 @@ export function useChatTimelineState(
       items.value = [];
       ambient.value = defaultAmbient();
       isSendingFallback.value = false;
-      processedAbsolute =
-        (opts.droppedEventCount.value ?? 0) + opts.events.value.length;
+      processedAbsolute = (opts.droppedEventCount.value ?? 0) + opts.events.value.length;
     },
   );
 
@@ -210,10 +209,7 @@ export function useChatTimelineState(
     }
   });
 
-  function appendOptimisticUser(
-    text: string,
-    attachments?: SendMessageAttachment[],
-  ): void {
+  function appendOptimisticUser(text: string, attachments?: SendMessageAttachment[]): void {
     items.value = appendUserMessage(items.value, text, idCounter, attachments);
     isSendingFallback.value = true;
   }

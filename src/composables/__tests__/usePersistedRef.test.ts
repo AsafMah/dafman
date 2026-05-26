@@ -60,19 +60,23 @@ describe('usePersistedRef', () => {
   test('validate() can reject parsed values', () => {
     localStorage.setItem('typed', JSON.stringify({ wrong: true }));
 
-    const state = usePersistedRef<{ count: number }>('typed', { count: 0 }, {
-      validate: (parsed) => {
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          'count' in parsed &&
-          typeof (parsed as { count?: unknown }).count === 'number'
-        ) {
-          return parsed as { count: number };
-        }
-        return null;
+    const state = usePersistedRef<{ count: number }>(
+      'typed',
+      { count: 0 },
+      {
+        validate: (parsed) => {
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            'count' in parsed &&
+            typeof (parsed as { count?: unknown }).count === 'number'
+          ) {
+            return parsed as { count: number };
+          }
+          return null;
+        },
       },
-    });
+    );
 
     expect(state.value).toEqual({ count: 0 });
   });
@@ -80,16 +84,20 @@ describe('usePersistedRef', () => {
   test('validate() can normalise parsed values', () => {
     localStorage.setItem('map', JSON.stringify({ a: 'x', b: 123, c: null }));
 
-    const state = usePersistedRef<Record<string, string>>('map', {}, {
-      validate: (parsed) => {
-        if (!parsed || typeof parsed !== 'object') return null;
-        const out: Record<string, string> = {};
-        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-          if (typeof v === 'string') out[k] = v;
-        }
-        return out;
+    const state = usePersistedRef<Record<string, string>>(
+      'map',
+      {},
+      {
+        validate: (parsed) => {
+          if (!parsed || typeof parsed !== 'object') return null;
+          const out: Record<string, string> = {};
+          for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+            if (typeof v === 'string') out[k] = v;
+          }
+          return out;
+        },
       },
-    });
+    );
 
     expect(state.value).toEqual({ a: 'x' });
   });

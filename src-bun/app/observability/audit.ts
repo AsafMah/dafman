@@ -101,6 +101,24 @@ export async function initAudit(opts: InitAuditOptions): Promise<void> {
   await hydrateRecent();
 }
 
+/// Parse one JSONL audit-file line. Returns null for blanks and
+/// malformed entries instead of throwing so the caller can stay flat.
+function tryParseAuditLine(line: string): AuditEntry | null {
+  if (!line.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(line) as AuditEntry;
+
+    if (parsed && typeof parsed === 'object' && (parsed as { kind?: string }).kind) {
+      return parsed;
+    }
+  } catch {
+    /* skip malformed line */
+  }
+
+  return null;
+}
+
 async function hydrateRecent(): Promise<void> {
   const dir = config.dir;
 
@@ -121,17 +139,9 @@ async function hydrateRecent(): Promise<void> {
       const tail = lines.slice(Math.max(0, lines.length - RECENT_CAP));
 
       for (const line of tail) {
-        if (!line.trim()) continue;
+        const parsed = tryParseAuditLine(line);
 
-        try {
-          const parsed = JSON.parse(line) as AuditEntry;
-
-          if (parsed && typeof parsed === 'object' && (parsed as { kind?: string }).kind) {
-            collected.push(parsed);
-          }
-        } catch {
-          /* skip malformed line */
-        }
+        if (parsed) collected.push(parsed);
       }
     } catch (err) {
       log.warn('audit hydrate failed', {

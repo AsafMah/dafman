@@ -49,7 +49,9 @@ onMounted(() => {
   });
   offOpenModelSelector = busOn('open-model-selector', ({ sessionId }) => {
     if (sessionId !== props.sessionId) return;
+
     if (props.area !== 'all' && props.area !== 'composer-right') return;
+
     modelTreeRef.value?.show();
   });
 });

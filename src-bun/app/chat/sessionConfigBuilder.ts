@@ -66,10 +66,7 @@ export interface SessionConfigBuilderDeps {
 /// returned object captures every dep by reference — handlers close
 /// over the maps/queue/emit so a single resolved config remains
 /// "live" for the lifetime of the SDK session.
-export function buildBaseSessionConfig(
-  deps: SessionConfigBuilderDeps,
-  sessionId: () => string,
-) {
+export function buildBaseSessionConfig(deps: SessionConfigBuilderDeps, sessionId: () => string) {
   return {
     // Auto-discover workspace-level MCP server configs (.mcp.json,
     // .vscode/mcp.json) and skill directories. Defaults to false
@@ -241,10 +238,7 @@ export function buildBaseSessionConfig(
 /// Builds the slash-command list registered with the SDK. Today: just
 /// `/library`, which echoes a system notification so the CLI TUI can
 /// route the user back to dafman's Library sidebar.
-function buildRegisteredCommands(
-  emit: Emit,
-  sessionId: () => string,
-): CommandDefinition[] {
+function buildRegisteredCommands(emit: Emit, sessionId: () => string): CommandDefinition[] {
   return [
     {
       name: 'library',

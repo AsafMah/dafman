@@ -33,12 +33,7 @@ import PrimeVue from 'primevue/config';
 /// DO have tests, so we leave them alone.
 const composerStub = {
   name: 'MessageComposer',
-  emits: [
-    'submit',
-    'request-command-terminal',
-    'open-full-terminal',
-    'update:default-mode',
-  ],
+  emits: ['submit', 'request-command-terminal', 'open-full-terminal', 'update:default-mode'],
   template: '<div class="stub-composer" />',
 };
 const editorStub = {
@@ -130,12 +125,7 @@ function makeBridge(): BridgeHandle {
 const stubs = {
   MessageComposer: defineComponent({
     name: 'MessageComposer',
-    emits: [
-      'submit',
-      'request-command-terminal',
-      'open-full-terminal',
-      'update:default-mode',
-    ],
+    emits: ['submit', 'request-command-terminal', 'open-full-terminal', 'update:default-mode'],
     template: '<div class="stub-composer" />',
   }),
   MessageContent: defineComponent({
@@ -178,14 +168,12 @@ const stubs = {
   PendingRequestCard: defineComponent({
     name: 'PendingRequestCard',
     props: ['sessionId', 'requestId', 'pendingKind', 'message', 'request'],
-    template:
-      '<div class="stub-pending-card" :data-request-id="requestId">{{ message }}</div>',
+    template: '<div class="stub-pending-card" :data-request-id="requestId">{{ message }}</div>',
   }),
   CommandResultCard: defineComponent({
     name: 'CommandResultCard',
     props: ['record'],
-    template:
-      '<div class="stub-command-result" :data-id="record.id">{{ record.command }}</div>',
+    template: '<div class="stub-command-result" :data-id="record.id">{{ record.command }}</div>',
   }),
   ReasoningBlock: defineComponent({
     name: 'ReasoningBlock',
@@ -214,10 +202,7 @@ function assistantEvent(text: string, eventId?: string): SessionEventPayload {
   };
 }
 
-function pendingPermissionEvent(
-  requestId: string,
-  summary: string,
-): SessionEventPayload {
+function pendingPermissionEvent(requestId: string, summary: string): SessionEventPayload {
   const request: PermissionRequestData = {
     kind: 'shell',
     summary,
@@ -340,11 +325,7 @@ describe('ChatWindow', () => {
     await utils.rerender({
       sessionId: 's1',
       accent: '#abc',
-      events: [
-        userEvent('two', 'evt-2'),
-        userEvent('three', 'evt-3'),
-        userEvent('four', 'evt-4'),
-      ],
+      events: [userEvent('two', 'evt-2'), userEvent('three', 'evt-3'), userEvent('four', 'evt-4')],
       droppedEventCount: 1,
       reasoningVisibilityOverride: 'default',
       defaultSendMode: 'steer',
@@ -444,9 +425,7 @@ describe('ChatWindow', () => {
     const utils = await mountChat({ events });
 
     // Locate the assistant message-actions stub and trigger retry.
-    const actionBlocks = Array.from(
-      utils.container.querySelectorAll<HTMLElement>('.stub-actions'),
-    );
+    const actionBlocks = Array.from(utils.container.querySelectorAll<HTMLElement>('.stub-actions'));
     // Order in the DOM: user→assistant→user→assistant, so the second
     // assistant's actions panel is the last one. Its retry should
     // anchor to user-evt-2.
@@ -461,9 +440,7 @@ describe('ChatWindow', () => {
 
     // `retryFromEvent` is a store action, not an IPC command. It
     // invokes `truncateSessionHistory` + `sendMessage` on the bridge.
-    const truncateCalls = handle.calls.filter(
-      (c) => c.name === 'truncateSessionHistory',
-    );
+    const truncateCalls = handle.calls.filter((c) => c.name === 'truncateSessionHistory');
     expect(truncateCalls.length).toBe(1);
     const truncateArgs = truncateCalls[0]!.args as {
       sessionId: string;
@@ -473,9 +450,7 @@ describe('ChatWindow', () => {
     expect(truncateArgs.eventId).toBe('user-evt-2');
     const resendCalls = handle.calls.filter((c) => c.name === 'sendMessage');
     expect(resendCalls.length).toBe(1);
-    expect((resendCalls[0]!.args as { text: string }).text).toBe(
-      'second user msg',
-    );
+    expect((resendCalls[0]!.args as { text: string }).text).toBe('second user msg');
   });
 
   test('pending-request banner reflects the queue head', async () => {
@@ -510,9 +485,7 @@ describe('ChatWindow', () => {
     ];
     const utils = await mountChat({ events });
 
-    const actionBlocks = Array.from(
-      utils.container.querySelectorAll<HTMLElement>('.stub-actions'),
-    );
+    const actionBlocks = Array.from(utils.container.querySelectorAll<HTMLElement>('.stub-actions'));
     const assistantActions = actionBlocks.filter(
       (el) => el.getAttribute('data-kind') === 'assistant',
     );
@@ -556,9 +529,7 @@ describe('ChatWindow', () => {
     await nextTick();
     await flushFrames();
 
-    const composerEl = utils.container.querySelector(
-      '.stub-composer',
-    ) as HTMLElement & {
+    const composerEl = utils.container.querySelector('.stub-composer') as HTMLElement & {
       __vueParentComponent?: { emit: (e: string, p: unknown) => void };
     };
     composerEl.__vueParentComponent!.emit('submit', {
@@ -602,22 +573,16 @@ describe('ChatWindow', () => {
     userActionsHost.__vueParentComponent!.emit('edit');
     await flushFrames();
 
-    const editorHost = utils.container.querySelector(
-      '.stub-editor',
-    ) as HTMLElement & {
+    const editorHost = utils.container.querySelector('.stub-editor') as HTMLElement & {
       __vueParentComponent?: { emit: (e: string, p?: unknown) => void };
     };
     expect(editorHost).not.toBeNull();
     editorHost.__vueParentComponent!.emit('save', 'edited prompt');
     await flushFrames();
 
-    const truncateCalls = handle.calls.filter(
-      (c) => c.name === 'truncateSessionHistory',
-    );
+    const truncateCalls = handle.calls.filter((c) => c.name === 'truncateSessionHistory');
     expect(truncateCalls.length).toBe(1);
-    expect((truncateCalls[0]!.args as { eventId: string }).eventId).toBe(
-      'user-orig',
-    );
+    expect((truncateCalls[0]!.args as { eventId: string }).eventId).toBe('user-orig');
     const sendCalls = handle.calls.filter((c) => c.name === 'sendMessage');
     expect(sendCalls.length).toBe(1);
     expect((sendCalls[0]!.args as { text: string }).text).toBe('edited prompt');

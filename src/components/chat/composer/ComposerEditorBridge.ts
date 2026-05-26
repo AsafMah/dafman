@@ -37,7 +37,7 @@ export default defineComponent({
   setup(props) {
     const editor = useLexicalComposer();
 
-    props.onEditor(editor as unknown as LexicalEditor);
+    props.onEditor(editor);
     const unregisterUpdate = editor.registerUpdateListener(({ editorState }) => {
       editorState.read(() => props.onFormatStateRead());
     });

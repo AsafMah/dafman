@@ -48,11 +48,7 @@ export class SessionMcpService {
   /// (`session.rpc.mcp.enable/disable`) rather than the server-
   /// scoped allowlist — lets the user gate an MCP for one session
   /// without persistently disabling it everywhere.
-  async setEnabled(
-    sessionId: string,
-    serverName: string,
-    enabled: boolean,
-  ): Promise<boolean> {
+  async setEnabled(sessionId: string, serverName: string, enabled: boolean): Promise<boolean> {
     const entry = this.ctx.getEntry(sessionId);
 
     return this.ctx.wrapSdk(async () => {

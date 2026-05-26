@@ -15,6 +15,7 @@
 
 import {
   type CopilotSession,
+  type ReasoningEffort,
   type SessionEvent,
 } from '../client/copilotSdk';
 import { stat } from 'node:fs/promises';
@@ -25,10 +26,7 @@ import { log } from '../observability/logging';
 import { PendingRequestQueue } from './pendingRequests';
 import { buildBuiltInTools } from '../library/tools';
 import { searchWorkspaceFiles } from '../filesystem/fileSearch';
-import {
-  type AgentFileSpec,
-  type AgentScope as AgentFileScope,
-} from '../library/agentFiles';
+import { type AgentFileSpec, type AgentScope as AgentFileScope } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
 import { commandResultBlobAttachment } from './sessionHelpers';
 import {
@@ -61,7 +59,6 @@ import type {
 /// Subset of SDK reasoning effort levels. We re-export the SDK's
 /// canonical type via copilotSdk.ts so any future SDK additions
 /// flow through without a silent drift.
-import type { ReasoningEffort } from '../client/copilotSdk';
 
 /// S5: cap replay of `session.getEvents()` history at this many
 /// events. The SDK returns the full transcript without pagination —

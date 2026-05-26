@@ -42,8 +42,14 @@ const activeSession = computed(() => {
   return sessionsStore.getSession(id) ?? null;
 });
 
-const { files, loaded, error, load: loadFiles, write: writeAgent, remove: deleteAgent } =
-  useAgentsLibrary();
+const {
+  files,
+  loaded,
+  error,
+  load: loadFiles,
+  write: writeAgent,
+  remove: deleteAgent,
+} = useAgentsLibrary();
 
 async function load() {
   await loadFiles(activeSession.value?.id);
@@ -171,6 +177,7 @@ async function submitForm() {
     if (!path) {
       // toast already shown by composable; surface the failure inline too
       formError.value = 'Save failed';
+
       return;
     }
 

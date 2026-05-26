@@ -19,10 +19,7 @@ import { tryGetClient } from '../client/client';
 import { AppError } from '../shared/errors';
 import { toErrorMessage } from '../shared/errorMessage';
 import type { ReasoningEffort } from '../client/copilotSdk';
-import type {
-  SessionHistoryCompactionResult,
-  SessionMode,
-} from '../../rpc';
+import type { SessionHistoryCompactionResult, SessionMode } from '../../rpc';
 import type { PendingRequestQueue } from './pendingRequests';
 import type { SessionServiceContext } from './sessionServiceContext';
 
@@ -170,10 +167,7 @@ export class SessionMetadataService {
   /// Wraps `session.history.truncate`. The given event AND all later
   /// events are removed; callers typically follow this with a fresh
   /// `sendMessage` (Edit / Retry flows).
-  async truncateHistory(
-    sessionId: string,
-    eventId: string,
-  ): Promise<{ eventsRemoved: number }> {
+  async truncateHistory(sessionId: string, eventId: string): Promise<{ eventsRemoved: number }> {
     const entry = this.ctx.getEntry(sessionId);
 
     return this.ctx.wrapSdk(async () => {
@@ -245,7 +239,8 @@ export class SessionMetadataService {
     const entry = this.ctx.getEntry(sessionId);
 
     return this.ctx.wrapSdk(
-      async () => (await entry.session.rpc.usage.getMetrics()) as unknown as Record<string, unknown>,
+      async () =>
+        (await entry.session.rpc.usage.getMetrics()) as unknown as Record<string, unknown>,
     );
   }
 

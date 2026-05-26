@@ -252,7 +252,7 @@ export function summarizePermission(request: PermissionRequest): string {
 
   const pick = (...keys: string[]): string | null => {
     for (const k of keys) {
-      if (typeof raw[k] === 'string') return raw[k] as string;
+      if (typeof raw[k] === 'string') return raw[k];
     }
 
     return null;

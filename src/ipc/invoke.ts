@@ -134,9 +134,7 @@ function createDeferredChannel<L>(
   };
 }
 
-const sessionChannel = createDeferredChannel<SessionEventListener>((b, l) =>
-  b.onSessionEvent(l),
-);
+const sessionChannel = createDeferredChannel<SessionEventListener>((b, l) => b.onSessionEvent(l));
 const pendingRequestChannel = createDeferredChannel<PendingRequestListener>((b, l) =>
   b.onPendingRequest(l),
 );

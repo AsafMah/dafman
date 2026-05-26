@@ -37,7 +37,7 @@ const props = defineProps<{
 
 // Normalised kind — covers aliases so the template only has to care
 // about a small set. Mirrors the alias entries in toolRenderers.ts.
-const kind = computed<
+type ToolKind =
   | 'shell'
   | 'read'
   | 'write'
@@ -49,50 +49,44 @@ const kind = computed<
   | 'fetch'
   | 'todo_write'
   | 'mcp'
-  | 'generic'
->(() => {
+  | 'generic';
+
+/// Tool-name → kind lookup. Hoisted out of the computed so it stays
+/// at CC 1 (the computed is a single `??` fallback after the
+/// `mcpServerName` short-circuit) — see CODE_AUDIT §2.3, Phase F.
+const TOOL_KIND_BY_NAME: Readonly<Record<string, ToolKind>> = {
+  shell: 'shell',
+  bash: 'shell',
+  execute: 'shell',
+  read: 'read',
+  read_file: 'read',
+  readFile: 'read',
+  write: 'write',
+  write_file: 'write',
+  writeFile: 'write',
+  create: 'write',
+  edit: 'edit',
+  str_replace_editor: 'edit',
+  str_replace: 'edit',
+  apply_patch: 'apply_patch',
+  applyPatch: 'apply_patch',
+  patch: 'apply_patch',
+  grep: 'grep',
+  search: 'grep',
+  glob: 'glob',
+  view: 'view',
+  fetch: 'fetch',
+  web_fetch: 'fetch',
+  webFetch: 'fetch',
+  todo_write: 'todo_write',
+  todoWrite: 'todo_write',
+  todos: 'todo_write',
+};
+
+const kind = computed<ToolKind>(() => {
   if (props.mcpServerName) return 'mcp';
 
-  switch (props.toolName) {
-    case 'shell':
-    case 'bash':
-    case 'execute':
-      return 'shell';
-    case 'read':
-    case 'read_file':
-    case 'readFile':
-      return 'read';
-    case 'write':
-    case 'write_file':
-    case 'writeFile':
-    case 'create':
-      return 'write';
-    case 'edit':
-    case 'str_replace_editor':
-    case 'str_replace':
-      return 'edit';
-    case 'apply_patch':
-    case 'applyPatch':
-    case 'patch':
-      return 'apply_patch';
-    case 'grep':
-    case 'search':
-      return 'grep';
-    case 'glob':
-      return 'glob';
-    case 'view':
-      return 'view';
-    case 'fetch':
-    case 'web_fetch':
-    case 'webFetch':
-      return 'fetch';
-    case 'todo_write':
-    case 'todoWrite':
-    case 'todos':
-      return 'todo_write';
-    default:
-      return 'generic';
-  }
+  return TOOL_KIND_BY_NAME[props.toolName] ?? 'generic';
 });
 
 // Args probes — defensive on `unknown` shape.

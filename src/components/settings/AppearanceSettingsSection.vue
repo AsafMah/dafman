@@ -53,9 +53,7 @@ const defaultModel = computed<string>({
   },
 });
 
-const selectedDefaultModel = computed(() =>
-  models.value.find((m) => m.id === defaultModel.value),
-);
+const selectedDefaultModel = computed(() => models.value.find((m) => m.id === defaultModel.value));
 
 const defaultReasoningOptions = computed(() => [
   { label: 'Model default', value: null as string | null },
@@ -197,9 +195,9 @@ const enableMermaid = computed<boolean>({
         <span>Render mermaid diagrams</span>
       </label>
       <p class="field-hint">
-        Off (default): <code>```mermaid</code> fences render as plain code blocks. On:
-        lazy-loads the mermaid library on first use and renders the diagram inline. Adds ~800 KB
-        to the chunk fetched when you first open a chat with a diagram.
+        Off (default): <code>```mermaid</code> fences render as plain code blocks. On: lazy-loads
+        the mermaid library on first use and renders the diagram inline. Adds ~800 KB to the chunk
+        fetched when you first open a chat with a diagram.
       </p>
     </div>
   </SettingsGroup>

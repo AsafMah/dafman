@@ -48,9 +48,7 @@ export function useComposerToolbarLayout(): UseComposerToolbarLayoutReturn {
   const inlineFormatActions = computed(() =>
     editorFormatActions.slice(0, visibleFormatCount.value),
   );
-  const overflowFormatActions = computed(() =>
-    editorFormatActions.slice(visibleFormatCount.value),
-  );
+  const overflowFormatActions = computed(() => editorFormatActions.slice(visibleFormatCount.value));
 
   useResizeObserver(toolbarRef, () => {
     if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;

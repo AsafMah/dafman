@@ -176,15 +176,14 @@ export const useLayoutStore = defineStore('layout', () => {
   /// sessions store WITHOUT layoutStore importing it directly.
   /// Returns `null`/`undefined` when no session record is available;
   /// addPanel falls back to the short GUID prefix in that case.
-  const sessionTitleResolver = ref<((sessionId: string) => string | null | undefined) | null>(
-    null,
-  );
+  const sessionTitleResolver = ref<((sessionId: string) => string | null | undefined) | null>(null);
 
   function setSessionTitleResolver(
     resolver: ((sessionId: string) => string | null | undefined) | null,
   ): void {
     sessionTitleResolver.value = resolver;
   }
+
   /// Reactive id of the currently-focused chat panel, or `null` when no
   /// chat panel is active (focus on Sessions sidebar, Settings, dev
   /// playground, or nothing at all). Subscribers on dockview's
@@ -917,6 +916,40 @@ export const useLayoutStore = defineStore('layout', () => {
   /// (e.g. the user dragged it to a sliver, or a previous close left
   /// it collapsed), we tear it down and recreate at the requested size.
   /// Without this, "close → reopen" produces a tiny strip.
+  /// Reads the id off a dockview panel record. Defensive on shape —
+  /// some dockview versions expose `id` at the top level, others
+  /// only via `api.id`. Returns `''` when neither is present so the
+  /// caller can filter it out.
+  function panelIdOf(panel: unknown): string {
+    const top = (panel as { id?: unknown }).id;
+
+    if (typeof top === 'string') return top;
+
+    const viaApi = (panel as { api?: { id?: unknown } }).api?.id;
+
+    if (typeof viaApi === 'string') return viaApi;
+
+    return '';
+  }
+
+  /// Tear down every panel inside `group` whose id differs from
+  /// `keepId`. Used by the `exclusive` branch of `openEdgePanel`.
+  function removeOtherPanelsInGroup(
+    dock: NonNullable<typeof api.value>,
+    group: object,
+    keepId: string,
+  ): void {
+    const panels = groupPanels(group);
+
+    for (const panel of [...panels]) {
+      const panelId = panelIdOf(panel);
+
+      if (panelId && panelId !== keepId) {
+        dock.removePanel(asRemovePanelArg(panel));
+      }
+    }
+  }
+
   function openEdgePanel(position: EdgeGroupPosition, options: EdgePanelOptions): void {
     const dock = api.value;
 
@@ -944,20 +977,7 @@ export const useLayoutStore = defineStore('layout', () => {
     applyEdgeMinimum(position, options.minimumSize);
 
     if (options.exclusive && existingGroup) {
-      const panels = groupPanels(existingGroup);
-
-      for (const panel of [...panels]) {
-        const panelId =
-          typeof (panel as { id?: unknown }).id === 'string'
-            ? (panel as { id: string }).id
-            : typeof (panel as { api?: { id?: unknown } }).api?.id === 'string'
-              ? (panel as { api: { id: string } }).api.id
-              : '';
-
-        if (panelId && panelId !== options.id) {
-          dock.removePanel(asRemovePanelArg(panel));
-        }
-      }
+      removeOtherPanelsInGroup(dock, existingGroup, options.id);
     }
 
     if (existingGroup && options.initialSize !== undefined) {

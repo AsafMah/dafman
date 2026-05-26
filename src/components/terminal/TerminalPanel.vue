@@ -44,8 +44,6 @@ const progress = ref<IProgressState>({ state: 0, value: 0 });
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
 let search: SearchAddon | null = null;
-let webFonts: WebFontsAddon | null = null;
-let webgl: WebglAddon | null = null;
 const addonDisposables: Array<{ dispose(): void }> = [];
 let pendingSearchFrame: number | null = null;
 let commandCaptureActive = false;
@@ -287,11 +285,13 @@ function initXterm(): void {
   const addons = terminalPrefs.value.addons;
 
   if (addons.search) {
-    search = new SearchAddon();
-    loadAddon(search, () => {
-      term?.loadAddon(search!);
+    const searchAddon = new SearchAddon();
+
+    search = searchAddon;
+    loadAddon(searchAddon, () => {
+      term?.loadAddon(searchAddon);
       addonDisposables.push(
-        search!.onDidChangeResults(({ resultIndex, resultCount }) => {
+        searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
           searchResultLabel.value =
             resultCount > 0 ? `${resultIndex + 1} / ${resultCount}` : 'No matches';
         }),
@@ -336,11 +336,12 @@ function initXterm(): void {
   }
 
   if (addons.webFonts) {
-    webFonts = new WebFontsAddon(true);
-    loadAddon(webFonts, () => {
-      term?.loadAddon(webFonts!);
-      void webFonts
-        ?.loadFonts()
+    const webFontsAddon = new WebFontsAddon(true);
+
+    loadAddon(webFontsAddon, () => {
+      term?.loadAddon(webFontsAddon);
+      void webFontsAddon
+        .loadFonts()
         .then(() => fitAndNotify())
         .catch(() => {});
     });
@@ -366,13 +367,13 @@ function initXterm(): void {
   }
 
   if (addons.webgl) {
-    webgl = new WebglAddon();
-    loadAddon(webgl, () => {
-      term?.loadAddon(webgl!);
+    const webglAddon = new WebglAddon();
+
+    loadAddon(webglAddon, () => {
+      term?.loadAddon(webglAddon);
       addonDisposables.push(
-        webgl!.onContextLoss(() => {
-          webgl?.dispose();
-          webgl = null;
+        webglAddon.onContextLoss(() => {
+          webglAddon.dispose();
         }),
       );
     });
@@ -431,6 +432,7 @@ onMounted(async () => {
   initXterm();
   offFocusTerminal = busOn('focus-terminal', ({ terminalId: id }) => {
     if (id !== terminalId.value) return;
+
     term?.focus();
   });
 });

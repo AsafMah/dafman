@@ -119,18 +119,22 @@ onMounted(() => {
   busSubscriptions.push(
     busOn('focus-composer', ({ sessionId }) => {
       if (sessionId !== props.sessionId) return;
+
       void scrollToBottom().then(() => composerRef.value?.focus());
     }),
     busOn('open-command-terminal', ({ sessionId }) => {
       if (sessionId !== props.sessionId) return;
+
       composerRef.value?.enterCommandMode?.();
     }),
     busOn('close-command-terminal', ({ sessionId }) => {
       if (sessionId !== props.sessionId) return;
+
       composerRef.value?.exitCommandMode?.();
     }),
     busOn('scroll-to-bottom', ({ sessionId }) => {
       if (sessionId !== props.sessionId) return;
+
       void scrollToBottom();
     }),
   );

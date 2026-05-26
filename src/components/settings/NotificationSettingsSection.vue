@@ -79,8 +79,8 @@ async function askPermission() {
         <span>Waiting for input</span>
       </label>
       <p class="field-hint">
-        OS notification when a tool needs permission or a session asks for input, and you're not
-        on its panel.
+        OS notification when a tool needs permission or a session asks for input, and you're not on
+        its panel.
       </p>
     </div>
     <div class="field field-inline">
@@ -89,8 +89,8 @@ async function askPermission() {
         <span>Turn complete</span>
       </label>
       <p class="field-hint">
-        OS notification on every <code>assistant.turn_end</code> for a background session. Off
-        by default — can be noisy.
+        OS notification on every <code>assistant.turn_end</code> for a background session. Off by
+        default — can be noisy.
       </p>
     </div>
     <div class="field">

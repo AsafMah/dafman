@@ -48,9 +48,7 @@ export class SessionAgentsService {
         }>;
       };
 
-      return (result.agents ?? [])
-        .filter((a) => typeof a.name === 'string')
-        .map(normalizeAgent);
+      return (result.agents ?? []).filter((a) => typeof a.name === 'string').map(normalizeAgent);
     });
   }
 
@@ -117,9 +115,7 @@ export class SessionAgentsService {
         }>;
       };
 
-      return (result.agents ?? [])
-        .filter((a) => typeof a.name === 'string')
-        .map(normalizeAgent);
+      return (result.agents ?? []).filter((a) => typeof a.name === 'string').map(normalizeAgent);
     });
   }
 
@@ -173,11 +169,7 @@ export class SessionAgentsService {
     return path;
   }
 
-  async deleteFile(
-    sessionId: string,
-    scope: AgentFileScope,
-    name: string,
-  ): Promise<boolean> {
+  async deleteFile(sessionId: string, scope: AgentFileScope, name: string): Promise<boolean> {
     const entry = this.ctx.getEntry(sessionId);
     const wd = scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
 

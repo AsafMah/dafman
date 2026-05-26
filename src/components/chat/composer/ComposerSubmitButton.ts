@@ -13,10 +13,7 @@ import SplitButton from 'primevue/splitbutton';
 import type { MenuItem } from 'primevue/menuitem';
 import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
 
-import {
-  consumeComposerText,
-  type ComposerSubmitPayload,
-} from '@/lexical/plugins';
+import { consumeComposerText, type ComposerSubmitPayload } from '@/lexical/plugins';
 
 export default defineComponent({
   name: 'ComposerSubmitButton',

@@ -15,10 +15,7 @@
 import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 
-import {
-  resolveLanguageExtension,
-  resolveLanguageForFile,
-} from '@/lib/codeLanguage';
+import { resolveLanguageExtension, resolveLanguageForFile } from '@/lib/codeLanguage';
 
 export interface CodeMirrorThemeOptions {
   /// Max content height before scroll. `0` = fit content.

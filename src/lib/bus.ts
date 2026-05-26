@@ -33,15 +33,12 @@ const inner = mitt<AppEvents>();
 /// Subscribe to an app event. Returns an unsubscribe callback.
 /// Listener exceptions are logged but never propagated — see module
 /// docstring.
-export function on<K extends EventKey>(
-  key: K,
-  handler: Handler<AppEvents[K]>,
-): () => void {
+export function on<K extends EventKey>(key: K, handler: Handler<AppEvents[K]>): () => void {
   const wrapped: Handler<AppEvents[K]> = (payload) => {
     try {
       handler(payload);
     } catch (err) {
-      console.error(`[app-bus:${String(key)} listener threw]`, err);
+      console.error(`[app-bus:${key as string} listener threw]`, err);
     }
   };
 
@@ -56,7 +53,7 @@ export function emit<K extends EventKey>(key: K, payload: AppEvents[K]): void {
 }
 
 /// Remove all handlers for one channel (test cleanup mostly).
-export function clear<K extends EventKey>(key?: K): void {
+export function clear(key?: EventKey): void {
   if (key) inner.off(key);
   else inner.all.clear();
 }

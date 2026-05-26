@@ -68,6 +68,7 @@ export const useTerminalStore = defineStore('terminals', () => {
     {
       validate: (parsed) => {
         const map = validateStringMap(parsed);
+
         return map ? capBuffers(map) : null;
       },
       cap: capBuffers,

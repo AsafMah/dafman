@@ -137,10 +137,7 @@ export function useMcpLibrary() {
   /// After toggling at the config level (which only affects new
   /// sessions), also push the change to every currently-open session
   /// so the toggle takes effect immediately.
-  async function syncToggleToActiveSessions(
-    serverName: string,
-    enabled: boolean,
-  ): Promise<void> {
+  async function syncToggleToActiveSessions(serverName: string, enabled: boolean): Promise<void> {
     const sessionsStore = useSessionsStore();
 
     for (const session of sessionsStore.sessions) {

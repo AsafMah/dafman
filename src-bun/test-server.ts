@@ -588,8 +588,12 @@ const controlHandlers: Record<string, (args: unknown) => Promise<unknown>> = {
   '__test.recordAudit': async (args) => {
     const { entry } = args as {
       entry:
-        | (Omit<import('./app/observability/audit').PermissionAuditEntry, 'ts' | 'kind'> & { kind: 'permission' })
-        | (Omit<import('./app/observability/audit').UrlAuditEntry, 'ts' | 'kind'> & { kind: 'url' });
+        | (Omit<import('./app/observability/audit').PermissionAuditEntry, 'ts' | 'kind'> & {
+            kind: 'permission';
+          })
+        | (Omit<import('./app/observability/audit').UrlAuditEntry, 'ts' | 'kind'> & {
+            kind: 'url';
+          });
     };
     const { recordPermission, recordUrl } = await import('./app/observability/audit');
 

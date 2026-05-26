@@ -21,10 +21,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
-import {
-  buildCodeMirrorTheme,
-  resolveLanguageWithFallback,
-} from '@/lib/codeMirrorShared';
+import { buildCodeMirrorTheme, resolveLanguageWithFallback } from '@/lib/codeMirrorShared';
 
 const props = withDefaults(
   defineProps<{

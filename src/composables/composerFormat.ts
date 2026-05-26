@@ -11,7 +11,6 @@ import {
   FORMAT_TEXT_COMMAND,
   type LexicalEditor,
   type TextFormatType,
-  type RangeSelection,
 } from 'lexical';
 import { $createCodeNode, $isCodeNode } from '@lexical/code';
 import {
@@ -118,10 +117,7 @@ export const INITIAL_FORMAT_STATE: EditorFormatState = {
 /// dispatch FORMAT_TEXT_COMMAND; list actions dispatch their
 /// INSERT_*_LIST_COMMAND; block actions use $setBlocksType inside an
 /// `editor.update`. After applying, returns focus to the editor.
-export function applyEditorFormat(
-  editor: LexicalEditor,
-  action: EditorFormatAction,
-): void {
+export function applyEditorFormat(editor: LexicalEditor, action: EditorFormatAction): void {
   if (TEXT_FORMAT_ACTIONS.has(action)) {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, action as TextFormatType);
   } else if (action === 'bullet') {
@@ -190,9 +186,7 @@ export function computeFormatState(): EditorFormatState {
     }
   }
 
-  const rangeSel = $isRangeSelection(selection)
-    ? (selection as RangeSelection)
-    : null;
+  const rangeSel = $isRangeSelection(selection) ? selection : null;
 
   return {
     bold: rangeSel ? rangeSel.hasFormat('bold') : false,

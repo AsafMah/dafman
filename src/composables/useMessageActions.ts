@@ -21,18 +21,14 @@ export interface MessageActionsToasts {
 /// Subset of `useSessionsStore` we depend on.
 export interface MessageActionsSessionsStore {
   editUserMessage(sessionId: string, eventId: string, newText: string): Promise<void>;
-  forkAndSend(
-    sessionId: string,
-    eventId: string,
-    newText: string,
-  ): Promise<string>;
+  forkAndSend(sessionId: string, eventId: string, newText: string): Promise<string>;
   retryFromEvent(sessionId: string, eventId: string, text: string): Promise<void>;
   forkSession(sessionId: string, toEventId?: string): Promise<string>;
   findSessionByName(name: string): { id: string } | undefined;
   /// Loose return type so the real `sessionsStore.restoreSession`
   /// (which returns `SessionRecord | null`) and tighter fakes both
   /// satisfy this contract. We only read `.id` off the result.
-  restoreSession(sessionId: string): Promise<{ id: string } | null | undefined | void>;
+  restoreSession(sessionId: string): Promise<{ id: string } | null | undefined>;
 }
 
 export interface MessageActionsSessionsListStore {
@@ -85,9 +81,7 @@ export interface UseMessageActionsReturn {
   itemIndexById: (itemId: number) => number;
 }
 
-export function useMessageActions(
-  opts: UseMessageActionsOptions,
-): UseMessageActionsReturn {
+export function useMessageActions(opts: UseMessageActionsOptions): UseMessageActionsReturn {
   const editingItemId = opts.editingItemId ?? ref<number | null>(null);
 
   function onMessageEdit(itemId: number): void {
@@ -119,10 +113,7 @@ export function useMessageActions(
   /// Save & fork: open a brand-new session forked at the user
   /// message's eventId, send the edited text there. Original session
   /// is left intact. The new session opens as a new dockview panel.
-  async function onEditorSaveFork(
-    eventId: string,
-    newText: string,
-  ): Promise<void> {
+  async function onEditorSaveFork(eventId: string, newText: string): Promise<void> {
     editingItemId.value = null;
 
     if (!eventId) {
@@ -132,11 +123,7 @@ export function useMessageActions(
     }
 
     try {
-      const newId = await opts.sessionsStore.forkAndSend(
-        opts.sessionId.value,
-        eventId,
-        newText,
-      );
+      const newId = await opts.sessionsStore.forkAndSend(opts.sessionId.value, eventId, newText);
 
       opts.layoutStore.addPanel(newId);
       opts.layoutStore.activatePanel(newId);
@@ -160,11 +147,7 @@ export function useMessageActions(
 
       if (it && it.kind === 'user' && it.eventId) {
         try {
-          await opts.sessionsStore.retryFromEvent(
-            opts.sessionId.value,
-            it.eventId,
-            it.text,
-          );
+          await opts.sessionsStore.retryFromEvent(opts.sessionId.value, it.eventId, it.text);
         } catch {
           // Toast already shown by the store action.
         }
@@ -219,10 +202,7 @@ export function useMessageActions(
     }
 
     try {
-      const newId = await opts.sessionsStore.forkSession(
-        opts.sessionId.value,
-        anchor,
-      );
+      const newId = await opts.sessionsStore.forkSession(opts.sessionId.value, anchor);
 
       opts.layoutStore.addPanel(newId);
       opts.layoutStore.activatePanel(newId);

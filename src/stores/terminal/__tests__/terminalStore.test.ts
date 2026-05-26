@@ -132,10 +132,7 @@ describe('terminalStore', () => {
     });
 
     test('drops non-string buffer entries on hydration', () => {
-      localStorage.setItem(
-        BUFFERS_KEY,
-        JSON.stringify({ ok: 'string', bad: 123, alsoBad: null }),
-      );
+      localStorage.setItem(BUFFERS_KEY, JSON.stringify({ ok: 'string', bad: 123, alsoBad: null }));
 
       const store = useTerminalStore();
 
@@ -176,10 +173,7 @@ describe('terminalStore', () => {
 
       await nextTick();
 
-      const persisted = JSON.parse(localStorage.getItem(IDS_KEY) ?? '{}') as Record<
-        string,
-        string
-      >;
+      const persisted = JSON.parse(localStorage.getItem(IDS_KEY) ?? '{}') as Record<string, string>;
 
       expect(persisted.sess1).toBe('t1');
     });

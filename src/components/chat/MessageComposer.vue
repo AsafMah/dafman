@@ -111,8 +111,7 @@ const diagEnabled =
 const toasts = useToastStore();
 const commandMode = ref(false);
 
-const { toolbarRef, inlineFormatActions, overflowFormatActions } =
-  useComposerToolbarLayout();
+const { toolbarRef, inlineFormatActions, overflowFormatActions } = useComposerToolbarLayout();
 
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;

@@ -50,7 +50,7 @@ export function asGroupRuntime(group: DockviewGroupPanel | object): DockviewGrou
 
 /// Cast the dockview API root to its runtime shape.
 export function asDockviewApiRuntime(api: object | null | undefined): DockviewApiRuntime {
-  return (api ?? {}) as DockviewApiRuntime;
+  return api ?? {};
 }
 
 /// Read `group.panels` (array of panels in a group). Returns `[]` when

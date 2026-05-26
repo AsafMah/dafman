@@ -168,7 +168,7 @@ export class CommandResultRegistry {
         active.totalBytes += accepted.byteLength;
         const text = decoder.decode(accepted, { stream: true });
 
-        (active.record[stream] as string) += text;
+        active.record[stream] += text;
         this.emit({
           kind: stream,
           sessionId: active.record.sessionId,
@@ -182,7 +182,7 @@ export class CommandResultRegistry {
       const tail = decoder.decode();
 
       if (tail) {
-        (active.record[stream] as string) += tail;
+        active.record[stream] += tail;
         this.emit({
           kind: stream,
           sessionId: active.record.sessionId,

@@ -133,6 +133,7 @@ export function createWebSocketBridge(url: string): RpcBridge {
       throw new Error('WebSocket not open');
     }
 
+    const liveSocket = socket;
     const id = nextId++;
     const wire: WireRequest = { type: 'request', id, name, args };
 
@@ -141,7 +142,7 @@ export function createWebSocketBridge(url: string): RpcBridge {
         resolve: (v) => resolve(v as CommandMap[N]['result']),
         reject,
       });
-      socket!.send(JSON.stringify(wire));
+      liveSocket.send(JSON.stringify(wire));
     });
   }
 

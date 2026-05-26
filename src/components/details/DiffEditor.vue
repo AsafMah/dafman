@@ -19,10 +19,7 @@ import { EditorState, type Extension } from '@codemirror/state';
 import { MergeView, unifiedMergeView } from '@codemirror/merge';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
-import {
-  buildCodeMirrorTheme,
-  resolveLanguageWithFallback,
-} from '@/lib/codeMirrorShared';
+import { buildCodeMirrorTheme, resolveLanguageWithFallback } from '@/lib/codeMirrorShared';
 
 type Mode = 'inline' | 'side-by-side';
 

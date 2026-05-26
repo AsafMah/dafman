@@ -104,16 +104,16 @@ const defaultApproveAll = computed<boolean>({
           <span>Default to approve all for new sessions</span>
         </label>
         <p class="field-hint">
-          When ON, brand-new sessions automatically approve every privileged tool call (file
-          write, shell, network, etc.) without prompting. Off by default — explicit user choice.
-          The per-session toggle in the session rail continues to drive runtime state; this only
-          sets the starting value.
+          When ON, brand-new sessions automatically approve every privileged tool call (file write,
+          shell, network, etc.) without prompting. Off by default — explicit user choice. The
+          per-session toggle in the session rail continues to drive runtime state; this only sets
+          the starting value.
         </p>
       </div>
       <div class="field">
         <p class="field-hint">
-          To reset remembered approvals for an open session, use "Reset approvals" in the
-          session's right-rail Session section.
+          To reset remembered approvals for an open session, use "Reset approvals" in the session's
+          right-rail Session section.
         </p>
       </div>
     </SettingsGroup>

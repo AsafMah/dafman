@@ -51,6 +51,7 @@ export function usePersistedRef<T>(
     if (pending === null) return;
 
     const value = cap ? cap(pending) : pending;
+
     pending = null;
     timer = null;
 
@@ -61,24 +62,27 @@ export function usePersistedRef<T>(
     }
   }
 
-  watch(state, (next) => {
-    if (throttleMs === 0) {
-      try {
-        const value = cap ? cap(next) : next;
-        localStorage.setItem(key, JSON.stringify(value));
-      } catch {
-        /* persistence is best-effort */
+  watch(
+    state,
+    (next) => {
+      if (throttleMs === 0) {
+        try {
+          const value = cap ? cap(next) : next;
+
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch {
+          /* persistence is best-effort */
+        }
+
+        return;
       }
 
-      return;
-    }
+      pending = next;
 
-    pending = next;
-
-    if (timer === null) {
-      timer = setTimeout(flush, throttleMs);
-    }
-  }, { deep: true });
+      timer ??= setTimeout(flush, throttleMs);
+    },
+    { deep: true },
+  );
 
   return state;
 }

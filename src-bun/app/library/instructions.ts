@@ -4,9 +4,8 @@
 // project file write and must go through the normal permissioned file-write
 // UX, not a silent Library save button.
 
-import { existsSync } from 'node:fs';
+import { existsSync, type Dirent } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 
@@ -96,7 +95,7 @@ async function findNestedAgents(root: string): Promise<string[]> {
     let entries: Dirent[];
 
     try {
-      entries = (await readdir(dir, { withFileTypes: true })) as Dirent[];
+      entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
