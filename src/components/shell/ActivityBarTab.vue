@@ -71,21 +71,54 @@ const tooltip = computed(() => resolvedParams.value.title ?? '');
   </div>
 </template>
 
-<style scoped>
+<style>
+/* Custom dockview tab renderer for the activity-bar edge groups.
+ *
+ * Dockview's vertical strip uses `writing-mode: vertical-rl` on the
+ * tabs container, which makes flex layout's main axis vertical. The
+ * .dv-tab cells need explicit physical sizing and a forced horizontal
+ * writing-mode to render PrimeIcons correctly (the glyph pseudo-
+ * element would otherwise inherit the rotated writing-mode).
+ *
+ * Receipts:
+ *   - dockview-core/dist/styles/dockview.css:2866 (vertical-rl on
+ *     `.dv-tabs-container.dv-tabs-container-vertical`)
+ *   - dockview-core/dist/styles/dockview.css:3166 (vertical actions
+ *     container is `flex-direction: column; width: 35px`)
+ *   - The 0x0 size bug we hit during integration came from
+ *     src/style.css hiding `.dv-edge-group .dv-tabs-and-actions-
+ *     container` (a v1 carry-over for the old custom ActivityBar). */
+.dv-tab:has(.activity-bar-tab) {
+  writing-mode: horizontal-tb !important;
+  flex: 0 0 40px !important;
+  width: 100% !important;
+  height: 40px !important;
+  padding: 0 !important;
+}
+
+.dv-tab:has(.activity-bar-tab) .dv-vue-part {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .activity-bar-tab {
-  /* Defeat dockview's vertical-rl writing mode on the parent edge
-   * strip so the icon glyph renders right-side-up. */
-  writing-mode: horizontal-tb;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 100%;
+  height: 100%;
   color: var(--p-text-muted-color);
-  background: transparent;
   cursor: pointer;
   user-select: none;
   transition: color 120ms ease;
+}
+
+.activity-bar-tab .pi {
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 .activity-bar-tab:hover {
@@ -94,9 +127,5 @@ const tooltip = computed(() => resolvedParams.value.title ?? '');
 
 .activity-bar-tab.is-active {
   color: var(--p-primary-color);
-}
-
-.activity-bar-tab .pi {
-  font-size: 1.05rem;
 }
 </style>

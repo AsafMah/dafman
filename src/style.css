@@ -92,18 +92,13 @@ body.app-dark {
   background-color: transparent !important;
 }
 
-/* Edge-group panels (Sessions today; Library, Log viewer, … later)
- * carry their own in-panel header (title + actions). Dockview's tab
- * strip would otherwise add a redundant chrome row — and on left/
- * right groups the strip is rotated 90° which clashes with the rest
- * of the app. Hide the strip on edge groups only; body groups keep
- * their tab bar so multi-session panels stack normally.
- *
- * The drag handle for resizing the edge group lives on the group
- * container's edge separator, OUTSIDE `.dv-tabs-and-actions-
- * container`, so hiding the strip leaves the side resize affordance
- * untouched. The ActivityBar provides the always-on toggle that the
- * tab strip would otherwise have given us. */
+/* Edge-group tab strips. v1 hid these because we had a custom
+ * ActivityBar rail providing the always-on toggle. v2 brings the
+ * native dockview vertical tab strip back: it's now the activity
+ * bar itself, with our ActivityBarTab.vue rendering each tab as
+ * an icon. */
 .dv-edge-group .dv-tabs-and-actions-container {
-  display: none !important;
+  /* Make sure dockview's vertical strip renders. The PrimeIcons
+   * sit inside; sizing rules live in ActivityBarTab.vue. */
+  display: flex;
 }

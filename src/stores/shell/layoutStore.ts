@@ -1238,6 +1238,10 @@ export const useLayoutStore = defineStore('layout', () => {
           id: `edge-${position}`,
           initialSize,
           minimumSize,
+          // Explicit collapsedSize: dockview's default is 35px which
+          // crowds our 28x28 icons. 44px matches most dockview themes
+          // and leaves comfortable padding.
+          collapsedSize: 44,
           collapsed: true,
         });
 
