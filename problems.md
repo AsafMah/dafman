@@ -5,10 +5,20 @@
 
 ## Open
 
-- The word "attachment" triggers an issue with the sql, we need to reword "see attachment"
 - The left tab bar is broken - first, the exclusivity doesn't work sometimes, and secondly, you need to close and re-open tabs multiple times so they would show up
 
 ## Solved (2026-05-26 sweep)
+
+- [x] `"see attachment"` triggered an SQL safety filter — `AttachmentNode.getTextContent()`
+  was emitting `(see attachment "<name>")` as the prompt-side reference
+  for inline pills. The upstream Copilot CLI uses a different shape
+  for pasted-file slugs: `[<emoji> <name>]` (literals in
+  `node_modules/@github/copilot/app.js` at `function sWa` + the
+  `rWa` emoji table + `m2r="📷"` constant). Switched our slug to
+  match the CLI verbatim — `[📷 screenshot.png]`, `[📄 notes.txt]`,
+  `[💻 sample.ts]`, etc. — so the model resolves attachment refs
+  via the same payload it already understands and the literal
+  "see attachment" phrase no longer trips the SQL filter.
 
 - [x] Sessions don't get their title sometimes when they are resumed —
   `resume()` was making TWO calls to `getSessionMetadata`: one for the

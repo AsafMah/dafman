@@ -161,7 +161,52 @@ export function labelForAttachment(a: SendMessageAttachment): string {
 }
 
 function promptTextForAttachment(a: SendMessageAttachment): string {
-  return `(see attachment "${labelForAttachment(a)}")`;
+  return slugFor(a);
+}
+
+/// Per-type emoji that the upstream Copilot CLI uses for inline
+/// attachment slugs (see `node_modules/@github/copilot/app.js` —
+/// `m2r` for image fallback + `rWa` for the 10 file emojis +
+/// `dIn()` for mime-type dispatch). Matching the CLI's format
+/// lets the model resolve attachment slugs the same way regardless
+/// of which surface produced the message; "(see attachment …)"
+/// was bespoke wording that made the model re-open the file
+/// instead of using the provided attachment payload, and tripped
+/// hosted SQL safety filters on the literal phrase. The model
+/// already understands the CLI's `[<emoji> <name>]` form because
+/// it appears in every CLI-rendered prompt.
+function emojiFor(a: SendMessageAttachment): string {
+  if (a.type === 'directory') return '\u{1F4C2}'; // 📂 — folder
+
+  if (a.type === 'selection') return '\u{1F516}'; // 🔖 — selection bookmark
+
+  if (a.type === 'commandResult') return '\u{1F4DD}'; // 📝 — command output as a notes file
+
+  if (a.type === 'blob' && (a.mimeType ?? '').startsWith('image/')) {
+    return '\u{1F4F7}'; // 📷
+  }
+
+  // Files + non-image blobs: pick by extension (CLI does the same
+  // via `dIn()`). Default to 📄.
+  const label = labelForAttachment(a).toLowerCase();
+  const ext = label.split('.').pop() ?? '';
+
+  if (['md', 'txt', 'rst'].includes(ext)) return '\u{1F4DD}'; // 📝
+  if (['csv', 'tsv'].includes(ext)) return '\u{1F4CA}'; // 📊
+  if (['json', 'yaml', 'yml', 'toml', 'xml'].includes(ext)) return '\u{1F4CB}'; // 📋
+  if (['log', 'logs'].includes(ext)) return '\u{1F4C3}'; // 📃
+  if (['js', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'py', 'rs', 'go', 'c', 'cpp', 'h', 'hpp', 'java', 'rb', 'sh', 'ps1', 'bat', 'lua', 'php', 'swift', 'kt', 'scala', 'clj', 'css', 'scss', 'sass', 'less', 'html', 'vue'].includes(ext)) {
+    return '\u{1F4BB}'; // 💻
+  }
+
+  return '\u{1F4C4}'; // 📄
+}
+
+/// Build a CLI-style attachment slug: `[<emoji> <displayName>]`.
+/// See `promptTextForAttachment` doc for why we mirror the CLI's
+/// shape verbatim.
+function slugFor(a: SendMessageAttachment): string {
+  return `[${emojiFor(a)} ${labelForAttachment(a)}]`;
 }
 
 function iconClassForAttachment(a: SendMessageAttachment, isImage: boolean): string {

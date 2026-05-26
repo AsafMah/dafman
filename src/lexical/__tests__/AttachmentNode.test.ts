@@ -62,14 +62,16 @@ describe('AttachmentNode', () => {
     );
   });
 
-  test('getTextContent returns prompt-friendly reference', () => {
+  test('getTextContent returns CLI-style attachment slug', () => {
     const editor = makeEditor();
     editor.update(
       () => {
         const node = new AttachmentNode(sampleFile);
-        expect(node.getTextContent()).toBe('(see attachment "src/sample.ts")');
+        // .ts file → 💻 source-code emoji per the CLI's dIn() table.
+        expect(node.getTextContent()).toBe('[\u{1F4BB} src/sample.ts]');
         const imageNode = new AttachmentNode(sampleImage);
-        expect(imageNode.getTextContent()).toBe('(see attachment "screenshot.png")');
+        // image/png blob → 📷 per the CLI's m2r constant.
+        expect(imageNode.getTextContent()).toBe('[\u{1F4F7} screenshot.png]');
       },
       { discrete: true },
     );
