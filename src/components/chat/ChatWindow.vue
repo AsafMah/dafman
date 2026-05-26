@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, toRef } from 'vue';
 import { storeToRefs } from 'pinia';
 import MessageComposer from '@/components/chat/MessageComposer.vue';
 import MessageContent from '@/components/chat/MessageContent.vue';
@@ -11,15 +11,7 @@ import ToolCallBlock from '@/components/chat/ToolCallBlock.vue';
 import SubagentBlock from '@/components/chat/SubagentBlock.vue';
 import PendingRequestCard from '@/components/permissions/PendingRequestCard.vue';
 import CommandResultCard from '@/components/chat/CommandResultCard.vue';
-import {
-  appendSystemMessage,
-  appendUserMessage,
-  defaultAmbient,
-  processEvents,
-  type ChatAmbient,
-  type ChatItem,
-  type IdCounter,
-} from '@/lib/chatEvents';
+import type { ChatItem } from '@/lib/chatEvents';
 import type {
   CommandResultRecord,
   ReasoningVisibility,
@@ -33,6 +25,7 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useCommandTerminal } from '@/composables/useCommandTerminal';
 import { useChatScroll } from '@/composables/useChatScroll';
+import { useChatTimelineState } from '@/composables/useChatTimelineState';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import type { ComposerSubmitPayload } from '@/lexical/plugins';
 import { styleFor } from '@/lib/notificationStyles';
@@ -76,8 +69,6 @@ const settingsStore = useSettingsStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
 
-const items = ref<ChatItem[]>([]);
-const ambient = ref<ChatAmbient>(defaultAmbient());
 const messagesEl = ref<HTMLElement | null>(null);
 const tileEl = ref<HTMLElement | null>(null);
 const composerRef = ref<{
@@ -89,7 +80,24 @@ const composerRef = ref<{
 } | null>(null);
 
 const sessionIdRef = computed(() => props.sessionId);
-const idCounter: IdCounter = { next: 1 };
+
+const { scrollToBottom } = useChatScroll(messagesEl, tileEl);
+
+const {
+  items,
+  ambient,
+  idCounter,
+  isSending,
+  appendOptimisticUser,
+  appendSystemError,
+  resetForReplay,
+} = useChatTimelineState({
+  events: toRef(props, 'events'),
+  droppedEventCount: toRef(props, 'droppedEventCount'),
+  sessionId: sessionIdRef,
+  toasts,
+  scrollToBottom,
+});
 
 const {
   commandTerminalId,
@@ -101,8 +109,6 @@ const {
   cancelCommandResult,
   initCommandResults,
 } = useCommandTerminal(sessionIdRef, idCounter, { composerRef });
-
-const { scrollToBottom } = useChatScroll(messagesEl, tileEl);
 
 /// External "focus my composer" requests arrive from the Sessions
 /// sidebar (clicking an already-open session row). Filter by sessionId
@@ -134,21 +140,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   for (const off of busSubscriptions.splice(0)) off();
 });
-
-/// Fallback "thinking" flag used until we observe a turn boundary; after
-/// the first `assistant.turn_start` we trust `ambient.turnActive` exclusively.
-const isSendingFallback = ref(false);
-/// Absolute position in the session's event stream that we've already
-/// reduced into `items`. Computed as `droppedEventCount + events.length`
-/// AFTER the reducer pass, so the next flush picks up only events
-/// that arrived since. Survives the store's ring-buffer trim (which
-/// bumps droppedEventCount and shifts `events`) without re-processing
-/// or skipping anything.
-let processedAbsolute = 0;
-
-const isSending = computed(() =>
-  ambient.value.sawTurnBoundary ? ambient.value.turnActive : isSendingFallback.value,
-);
 
 /// "Agent is working right now" indicator for the in-chat card. Reads
 /// the session record's authoritative `isThinking` flag (driven by
@@ -189,115 +180,6 @@ const timelineItems = computed(() => {
   return out.sort((a, b) => a.id - b.id);
 });
 
-let isFirstBatch = true;
-
-/// rAF-coalesced flush. Each event arrives as its own IPC frame —
-/// during session hydration that's 30-80+ frames in quick succession.
-/// Without coalescing we'd run processEvents O(N²) times (N=length on
-/// each push) and remount the whole CM6/Lexical tree per chunk. By
-/// gating the work behind requestAnimationFrame we collapse all
-/// events that landed in the same frame into a single reducer pass.
-let pendingFlush: number | null = null;
-
-function scheduleFlush(): void {
-  if (pendingFlush !== null) return;
-
-  if (typeof requestAnimationFrame === 'undefined') {
-    // Test environments (jsdom etc.) — flush synchronously so the
-    // existing chatEvents tests don't have to wait for a frame.
-    flush();
-
-    return;
-  }
-
-  pendingFlush = requestAnimationFrame(() => {
-    pendingFlush = null;
-    flush();
-  });
-}
-
-function flush(): void {
-  const dropped = props.droppedEventCount ?? 0;
-  const target = dropped + props.events.length;
-
-  if (processedAbsolute >= target) return;
-
-  // Slice index inside the (possibly trimmed) events array. clamped
-  // to 0 in case the ring buffer trimmed events we hadn't processed
-  // yet — those are lost, but the cap is high enough that this only
-  // happens for surfaces that mount very late in a long session.
-  const startIdx = Math.max(0, processedAbsolute - dropped);
-  const fresh = props.events.slice(startIdx);
-
-  processedAbsolute = target;
-  const live = !isFirstBatch;
-
-  isFirstBatch = false;
-  const result = processEvents(items.value, ambient.value, fresh, idCounter, {
-    live,
-  });
-
-  items.value = result.items;
-  ambient.value = result.ambient;
-
-  if (result.idle || result.error) isSendingFallback.value = false;
-
-  for (const t of result.toasts) {
-    switch (t.severity) {
-      case 'success':
-        toasts.success(t.summary, t.detail);
-        break;
-      case 'warn':
-        toasts.warn(t.summary, t.detail);
-        break;
-      case 'error':
-        toasts.error(t.summary, t.detail);
-        break;
-      default:
-        toasts.info(t.summary, t.detail);
-    }
-  }
-
-  if (result.error && live) {
-    const lastSystem = [...result.items]
-      .reverse()
-      .find((i) => i.kind === 'system' && i.severity === 'error');
-
-    if (lastSystem && lastSystem.kind === 'system') {
-      toasts.error('Session error', lastSystem.text);
-    }
-  }
-
-  void scrollToBottom();
-}
-
-watch(
-  // Watch the absolute target (dropped + length). Trimming the ring
-  // buffer leaves `events.length` unchanged but bumps
-  // droppedEventCount — without including it here we'd miss the
-  // flush for events that arrive once the buffer is at its cap.
-  () => (props.droppedEventCount ?? 0) + props.events.length,
-  () => scheduleFlush(),
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (pendingFlush !== null && typeof cancelAnimationFrame !== 'undefined') {
-    cancelAnimationFrame(pendingFlush);
-    pendingFlush = null;
-  }
-});
-
-watch(
-  () => props.sessionId,
-  () => {
-    items.value = [];
-    ambient.value = defaultAmbient();
-    isSendingFallback.value = false;
-    processedAbsolute = (props.droppedEventCount ?? 0) + props.events.length;
-  },
-);
-
 /// Submission handler. The composer always submits a payload —
 /// `mode: "default"` (Ctrl+Enter, primary button), `mode: "queue"`
 /// (Alt+Enter — force queue regardless of default), or
@@ -318,8 +200,7 @@ async function sendMessage(
 
   const concreteMode = payload.mode === 'default' ? props.defaultSendMode : payload.mode;
 
-  items.value = appendUserMessage(items.value, payload.text, idCounter, payload.attachments);
-  isSendingFallback.value = true;
+  appendOptimisticUser(payload.text, payload.attachments);
   await scrollToBottom();
 
   try {
@@ -336,9 +217,8 @@ async function sendMessage(
   } catch (error) {
     const message = toErrorMessage(error);
 
-    items.value = appendSystemMessage(items.value, `Error: ${message}`, idCounter);
+    appendSystemError(`Error: ${message}`);
     toasts.error('Failed to send message', message);
-    isSendingFallback.value = false;
     await scrollToBottom();
   }
 }
@@ -375,11 +255,7 @@ async function onEditorSave(eventId: string, newText: string): Promise<void> {
 
   try {
     await sessionsStore.editUserMessage(props.sessionId, eventId, newText);
-    items.value = [];
-    ambient.value = defaultAmbient();
-    processedAbsolute = 0;
-    isFirstBatch = true;
-    isSendingFallback.value = true;
+    resetForReplay({ markSending: true });
     await scrollToBottom();
   } catch {
     // Toast surfaced by the store action.
