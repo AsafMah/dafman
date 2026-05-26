@@ -37,21 +37,25 @@ import { PendingRequestQueue } from './pendingRequests';
 import { buildBuiltInTools } from '../library/tools';
 import { searchWorkspaceFiles } from '../filesystem/fileSearch';
 import {
-  listAgentFiles,
-  writeAgent,
-  deleteAgent,
   type AgentFileSpec,
   type AgentScope as AgentFileScope,
 } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
 import {
   commandResultBlobAttachment,
-  jobFromTask,
-  normalizeAgent,
-  normalizeTask,
   summarizePermission,
   toPlainObject,
 } from './sessionHelpers';
+import {
+  wrapSdkError,
+  type SessionEntryView,
+  type SessionServiceContext,
+} from './sessionServiceContext';
+import { SessionPlanService } from './sessionPlanService';
+import { SessionSkillsService } from './sessionSkillsService';
+import { SessionTasksService } from './sessionTasksService';
+import { SessionAgentsService } from './sessionAgentsService';
+import { SessionMcpService } from './sessionMcpService';
 import type {
   AutoModeSwitchRequestData,
   ElicitationRequestData,
@@ -130,6 +134,17 @@ export class SessionRegistry {
   private readonly approveAllBySession = new Map<string, boolean>();
   private readonly modeBySession = new Map<string, SessionMode>();
 
+  /// Context port shared with sibling services (Phase D.3). Holds
+  /// `getEntry` and `wrapSdk` so services don't import the entries
+  /// Map directly. Set in the constructor body because both
+  /// closures reference `this`.
+  private readonly serviceCtx: SessionServiceContext;
+  private readonly plans: SessionPlanService;
+  private readonly skills: SessionSkillsService;
+  private readonly tasks: SessionTasksService;
+  private readonly agents: SessionAgentsService;
+  private readonly mcp: SessionMcpService;
+
   /// `streamingResolver` is called at session create/resume time to
   /// pick the current SDK streaming mode. Decoupled from on-disk
   /// settings so this module stays framework-agnostic (per AGENTS.md
@@ -146,7 +161,29 @@ export class SessionRegistry {
     /// entirely in that case (passing an empty array would tell
     /// the SDK to allow no tools at all, per the SDK docs).
     private readonly allowedToolsResolver: () => string[] = () => [],
-  ) {}
+  ) {
+    this.serviceCtx = {
+      getEntry: (sessionId) => this.getEntryOrThrow(sessionId),
+      wrapSdk: wrapSdkError,
+    };
+    this.plans = new SessionPlanService(this.serviceCtx);
+    this.skills = new SessionSkillsService(this.serviceCtx);
+    this.tasks = new SessionTasksService(this.serviceCtx, () => this.entries.keys());
+    this.agents = new SessionAgentsService(this.serviceCtx);
+    this.mcp = new SessionMcpService(this.serviceCtx);
+  }
+
+  /// Lookup helper shared with sibling services through `serviceCtx`.
+  /// Throws `AppError.sessionNotFound` so the previous behavior of
+  /// every per-session method (`if (!entry) throw …`) is preserved
+  /// without re-inlining the check at every call site.
+  private getEntryOrThrow(sessionId: string): SessionEntryView {
+    const entry = this.entries.get(sessionId);
+
+    if (!entry) throw AppError.sessionNotFound(sessionId);
+
+    return entry;
+  }
 
   /// Returns the live `CopilotSession` for an id, or undefined if the
   /// session is unknown. Used by built-in tools (see `app/tools.ts`)
@@ -1166,109 +1203,23 @@ export class SessionRegistry {
   // "User" source by checking if path contains `.github/agents/`).
 
   async listAgents(sessionId: string): Promise<AgentInfo[]> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.agent.list()) as {
-        agents?: Array<{
-          name?: unknown;
-          displayName?: unknown;
-          description?: unknown;
-          path?: unknown;
-        }>;
-      };
-
-      return (result.agents ?? []).filter((a) => typeof a.name === 'string').map(normalizeAgent);
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.agents.list(sessionId);
   }
 
   async getCurrentAgent(sessionId: string): Promise<AgentInfo | null> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.agent.getCurrent()) as {
-        agent?: {
-          name?: unknown;
-          displayName?: unknown;
-          description?: unknown;
-          path?: unknown;
-        } | null;
-      };
-
-      if (!result.agent || typeof result.agent.name !== 'string') return null;
-
-      return normalizeAgent(result.agent);
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.agents.getCurrent(sessionId);
   }
 
   async selectAgent(sessionId: string, name: string): Promise<AgentInfo> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.agent.select({ name })) as {
-        agent?: {
-          name?: unknown;
-          displayName?: unknown;
-          description?: unknown;
-          path?: unknown;
-        };
-      };
-
-      if (!result.agent || typeof result.agent.name !== 'string') {
-        throw AppError.sdk('selectAgent: SDK returned no agent');
-      }
-
-      return normalizeAgent(result.agent);
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.agents.select(sessionId, name);
   }
 
   async deselectAgent(sessionId: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      await entry.session.rpc.agent.deselect();
-
-      return true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.agents.deselect(sessionId);
   }
 
   async reloadAgents(sessionId: string): Promise<AgentInfo[]> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.agent.reload()) as {
-        agents?: Array<{
-          name?: unknown;
-          displayName?: unknown;
-          description?: unknown;
-          path?: unknown;
-        }>;
-      };
-
-      return (result.agents ?? []).filter((a) => typeof a.name === 'string').map(normalizeAgent);
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.agents.reload(sessionId);
   }
 
   // ---------- Tasks (Phase 19b.1) ----------
@@ -1278,118 +1229,29 @@ export class SessionRegistry {
   // global Jobs panel both consume this normalized union.
 
   async listTasks(sessionId: string): Promise<TaskInfo[]> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.tasks.list()) as unknown as {
-        tasks?: Array<Record<string, unknown>>;
-      };
-
-      return (result.tasks ?? [])
-        .filter((t) => (t.type === 'agent' || t.type === 'shell') && typeof t.id === 'string')
-        .map(normalizeTask);
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.tasks.list(sessionId);
   }
 
   async listJobs(): Promise<JobRecord[]> {
-    const jobs: JobRecord[] = [];
-
-    for (const [sessionId] of this.entries) {
-      try {
-        const tasks = await this.listTasks(sessionId);
-
-        for (const task of tasks) jobs.push(jobFromTask(sessionId, task));
-      } catch (err) {
-        log.warn('listJobs failed for session', {
-          sessionId,
-          error: toErrorMessage(err),
-        });
-      }
-    }
-
-    return jobs.sort((a, b) => {
-      const at = a.startedAt ? Date.parse(a.startedAt) : 0;
-      const bt = b.startedAt ? Date.parse(b.startedAt) : 0;
-
-      return bt - at;
-    });
+    return this.tasks.listJobs();
   }
 
   async cancelTask(sessionId: string, id: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.tasks.cancel({ id })) as {
-        cancelled?: boolean;
-      };
-
-      return result.cancelled === true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.tasks.cancel(sessionId, id);
   }
 
   async removeTask(sessionId: string, id: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.tasks.remove({ id })) as {
-        removed?: boolean;
-      };
-
-      return result.removed === true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.tasks.remove(sessionId, id);
   }
 
   async promoteTask(sessionId: string, id: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.tasks.promoteToBackground({ id })) as {
-        promoted?: boolean;
-      };
-
-      return result.promoted === true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.tasks.promote(sessionId, id);
   }
 
   // ---------- Fleet (Phase 19c) ----------
-  //
-  // Wraps the @experimental `session.rpc.fleet.start` surface. Fleet
-  // kicks off parallel sub-agent work. The RPC takes an optional
-  // prompt; the count is determined by SDK internals (no caller
-  // parameter). Sub-agent activity streams via the regular session
-  // events (each tagged with the sub-agent's envelope `agentId`),
-  // rendered by the chat reducer's nested SubagentChatItem branch.
 
   async startFleet(sessionId: string, prompt?: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.fleet.start(prompt ? { prompt } : {})) as {
-        started?: boolean;
-      };
-
-      return result.started === true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.tasks.startFleet(sessionId, prompt);
   }
 
   // ---------- Agent files CRUD (Phase 19b.2) ----------
@@ -1411,18 +1273,7 @@ export class SessionRegistry {
       canonical: boolean;
     }>
   > {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    const opts: Parameters<typeof listAgentFiles>[0] = {
-      includeUser: true,
-      includeProject: true,
-    };
-
-    if (entry.workingDirectory) opts.workingDirectory = entry.workingDirectory;
-
-    return listAgentFiles(opts);
+    return this.agents.listFiles(sessionId);
   }
 
   /// User-scope only — for the Library tab when no session is
@@ -1435,67 +1286,15 @@ export class SessionRegistry {
       canonical: boolean;
     }>
   > {
-    return listAgentFiles({ includeUser: true, includeProject: false });
+    return this.agents.listFilesGlobal();
   }
 
   async writeAgentFile(sessionId: string, spec: AgentFileSpec): Promise<string> {
-    // User-scope writes don't need a workingDirectory; project
-    // scope does. SessionRegistry resolves it from the session
-    // entry (no caller-supplied workingDirectory string allowed
-    // — defense in depth: a malicious renderer could otherwise
-    // pass an arbitrary path).
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    const wd = spec.scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
-
-    if (spec.scope === 'project' && !wd) {
-      throw AppError.sdk('project scope requires a session with a working directory');
-    }
-
-    const path = await writeAgent(spec, wd);
-
-    // Tell the SDK to re-scan so the new agent shows up in
-    // `session.rpc.agent.list` immediately. Best-effort: a
-    // failed reload doesn't block the user's write.
-    try {
-      await entry.session.rpc.agent.reload();
-    } catch (err) {
-      log.warn('agent.reload after writeAgentFile failed', {
-        sessionId,
-        error: toErrorMessage(err),
-      });
-    }
-
-    return path;
+    return this.agents.writeFile(sessionId, spec);
   }
 
   async deleteAgentFile(sessionId: string, scope: AgentFileScope, name: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    const wd = scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
-
-    if (scope === 'project' && !wd) {
-      throw AppError.sdk('project scope requires a session with a working directory');
-    }
-
-    const removed = await deleteAgent(scope, name, wd);
-
-    if (removed) {
-      try {
-        await entry.session.rpc.agent.reload();
-      } catch (err) {
-        log.warn('agent.reload after deleteAgentFile failed', {
-          sessionId,
-          error: toErrorMessage(err),
-        });
-      }
-    }
-
-    return removed;
+    return this.agents.deleteFile(sessionId, scope, name);
   }
 
   /// Lists session skills (name, description, enabled, source).
@@ -1513,54 +1312,11 @@ export class SessionRegistry {
       path?: string;
     }>
   > {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.skills.list()) as {
-        skills?: Array<{
-          name?: unknown;
-          description?: unknown;
-          source?: unknown;
-          enabled?: unknown;
-          userInvocable?: unknown;
-          path?: unknown;
-        }>;
-      };
-      const skills = result.skills ?? [];
-
-      return skills
-        .filter((s) => typeof s.name === 'string')
-        .map((s) => ({
-          name: String(s.name),
-          description: typeof s.description === 'string' ? s.description : '',
-          source: typeof s.source === 'string' ? s.source : '',
-          enabled: s.enabled === true,
-          userInvocable: s.userInvocable === true,
-          ...(typeof s.path === 'string' ? { path: s.path } : {}),
-        }));
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.skills.list(sessionId);
   }
 
   async setSkillEnabled(sessionId: string, name: string, enabled: boolean): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      if (enabled) {
-        await entry.session.rpc.skills.enable({ name });
-      } else {
-        await entry.session.rpc.skills.disable({ name });
-      }
-
-      return true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.skills.setEnabled(sessionId, name, enabled);
   }
 
   /// Per-session usage metrics. Returns the raw SDK response shape
@@ -1611,62 +1367,20 @@ export class SessionRegistry {
   }
 
   /// Session-scoped: MCP server list. Per-server tool lists are
-  /// not yet surfaced by the SDK — only name/status/source/error.
+  /// Session-scoped per-MCP server state. Captures less detail than
+  /// the server-scoped catalog — only name/status/source/error.
   async listSessionMcpServers(
     sessionId: string,
   ): Promise<Array<{ name: string; status: string; source?: string; error?: string }>> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.mcp.list()) as {
-        servers?: Array<{
-          name?: unknown;
-          status?: unknown;
-          source?: unknown;
-          error?: unknown;
-        }>;
-      };
-      const servers = result.servers ?? [];
-
-      return servers
-        .filter((s) => typeof s.name === 'string')
-        .map((s) => ({
-          name: String(s.name),
-          status: typeof s.status === 'string' ? s.status : 'unknown',
-          ...(typeof s.source === 'string' ? { source: s.source } : {}),
-          ...(typeof s.error === 'string' ? { error: s.error } : {}),
-        }));
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.mcp.listServers(sessionId);
   }
 
-  /// Session-scoped per-MCP toggle. Lives on the live session
-  /// (`session.rpc.mcp.enable/disable`) rather than the server-
-  /// scoped allowlist — lets the user gate an MCP for one session
-  /// without persistently disabling it everywhere.
   async setSessionMcpEnabled(
     sessionId: string,
     serverName: string,
     enabled: boolean,
   ): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      if (enabled) {
-        await entry.session.rpc.mcp.enable({ serverName });
-      } else {
-        await entry.session.rpc.mcp.disable({ serverName });
-      }
-
-      return true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.mcp.setEnabled(sessionId, serverName, enabled);
   }
 
   async getAccountQuota(): Promise<
@@ -1725,53 +1439,15 @@ export class SessionRegistry {
   async readPlan(
     sessionId: string,
   ): Promise<{ exists: boolean; content: string | null; path: string | null }> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.plan.read()) as {
-        exists?: unknown;
-        content?: unknown;
-        path?: unknown;
-      };
-
-      return {
-        exists: result.exists === true,
-        content: typeof result.content === 'string' ? result.content : null,
-        path: typeof result.path === 'string' ? result.path : null,
-      };
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.plans.read(sessionId);
   }
 
   async writePlan(sessionId: string, content: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      await entry.session.rpc.plan.update({ content });
-
-      return true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.plans.write(sessionId, content);
   }
 
   async deletePlan(sessionId: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      await entry.session.rpc.plan.delete();
-
-      return true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.plans.delete(sessionId);
   }
 
   // ---------- MCP config registry (server-scoped, Phase 19a) ----------
@@ -1788,24 +1464,7 @@ export class SessionRegistry {
     serverName: string,
     opts: { forceReauth?: boolean; clientName?: string } = {},
   ): Promise<{ authorizationUrl: string | null }> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.mcp.oauth.login({
-        serverName,
-        ...(opts.forceReauth ? { forceReauth: opts.forceReauth } : {}),
-        ...(opts.clientName ? { clientName: opts.clientName } : {}),
-      })) as { authorizationUrl?: unknown };
-
-      return {
-        authorizationUrl:
-          typeof result.authorizationUrl === 'string' ? result.authorizationUrl : null,
-      };
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.mcp.loginToServer(sessionId, serverName, opts);
   }
 
   // ---------- Skills registry (server-scoped, Phase 19b) ----------
