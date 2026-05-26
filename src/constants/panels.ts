@@ -53,3 +53,21 @@ export const PANEL_IDS = {
 } as const;
 
 export type PanelId = (typeof PANEL_IDS)[keyof typeof PANEL_IDS];
+
+/// Panels that share the left activity-bar's "single visible at a time"
+/// slot. Runtime exclusion lives in `ActivityBar.activate()`, which
+/// closes any other open member before opening the new one. The
+/// startup `dockview.fromJSON()` path bypasses that pre-close, so
+/// `layoutStore.restore()` calls `enforceActivityBarExclusivity()` to
+/// keep the invariant after restore as well.
+///
+/// Note: `sessionDetails` lives on the RIGHT edge, not the activity
+/// bar — kept out of this set.
+export const ACTIVITY_BAR_PANEL_IDS: ReadonlySet<PanelId> = new Set([
+  PANEL_IDS.sessionsManager,
+  PANEL_IDS.terminals,
+  PANEL_IDS.library,
+  PANEL_IDS.jobs,
+  PANEL_IDS.logs,
+  PANEL_IDS.settings,
+]);

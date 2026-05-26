@@ -170,11 +170,7 @@ function enumOptions(schema: JsonSchema): Array<{ value: unknown; label: string 
 }
 
 /// Validate an object node — required + recurse into properties.
-function validateObjectNode(
-  schema: JsonSchema,
-  v: unknown,
-  path: string[],
-): string | null {
+function validateObjectNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
   const obj = (v ?? {}) as Record<string, unknown>;
   const req = schema.required ?? [];
 
@@ -249,8 +245,11 @@ function validateNumberNode(schema: JsonSchema, v: unknown, path: string[]): str
 /// `required` lists — nested schemas carry their own.
 function validateNode(schema: JsonSchema, v: unknown, path: string[]): string | null {
   if (schema.type === 'object') return validateObjectNode(schema, v, path);
+
   if (schema.type === 'array') return validateArrayNode(schema, v, path);
+
   if (schema.type === 'string') return validateStringNode(schema, v, path);
+
   if (schema.type === 'number' || schema.type === 'integer') {
     return validateNumberNode(schema, v, path);
   }

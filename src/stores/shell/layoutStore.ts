@@ -26,7 +26,7 @@ import {
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
-import { PANEL_IDS } from '@/constants/panels';
+import { ACTIVITY_BAR_PANEL_IDS, PANEL_IDS } from '@/constants/panels';
 
 const SESSION_DETAILS_PANEL_ID = PANEL_IDS.sessionDetails;
 const SESSIONS_PANEL_ID = PANEL_IDS.sessionsManager;
@@ -389,6 +389,62 @@ export const useLayoutStore = defineStore('layout', () => {
     }
 
     return true;
+  }
+
+  /// Sweep the dockview tree post-restore to make sure at most one
+  /// activity-bar panel is visible. Runtime exclusion (closing any
+  /// other open ActivityBar item before opening a new one) lives in
+  /// `ActivityBar.activate()`, but `dockview.fromJSON()` restores the
+  /// raw layout JSON without re-checking that invariant. If a prior
+  /// session managed to persist (or a layout migration introduced)
+  /// 2+ activity-bar panels stacked on the left edge, all of them
+  /// would come back — that's the "multiple sidebars at startup"
+  /// regression.
+  ///
+  /// Strategy: across the entire dockview tree (both edge groups
+  /// and body groups), find every panel whose id is in
+  /// `ACTIVITY_BAR_PANEL_IDS`. Keep the active one (or, if none is
+  /// marked active, the first by group enumeration order). Close
+  /// the rest. Idempotent — running this on a layout that already
+  /// satisfies the invariant is a no-op.
+  function enforceActivityBarExclusivity(): void {
+    const dock = api.value;
+
+    if (!dock) return;
+
+    const found: Array<{ id: string; isActive: boolean }> = [];
+
+    for (const id of ACTIVITY_BAR_PANEL_IDS) {
+      const panel = dock.getPanel(id);
+
+      if (!panel) continue;
+
+      found.push({
+        id,
+        isActive: panel.api.isActive === true,
+      });
+    }
+
+    if (found.length <= 1) return;
+
+    // Prefer the currently-active one as the survivor; fall back to
+    // the first match by `ACTIVITY_BAR_PANEL_IDS` iteration order.
+    const survivor = found.find((p) => p.isActive)?.id ?? found[0]?.id;
+
+    if (!survivor) return;
+
+    for (const { id } of found) {
+      if (id === survivor) continue;
+
+      const panel = dock.getPanel(id);
+
+      if (panel) dock.removePanel(panel);
+    }
+
+    console.info('[layoutStore] enforced activity-bar exclusivity at restore', {
+      survivor,
+      closed: found.filter((p) => p.id !== survivor).map((p) => p.id),
+    });
   }
 
   function enforceKnownEdgeMinimums(): void {
@@ -1139,6 +1195,7 @@ export const useLayoutStore = defineStore('layout', () => {
     try {
       dock.fromJSON(layout as Parameters<DockviewApi['fromJSON']>[0]);
       enforceKnownEdgeMinimums();
+      enforceActivityBarExclusivity();
 
       return true;
     } catch (err) {

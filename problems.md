@@ -5,9 +5,22 @@
 
 ## Open
 
-- The left tab bar is broken - first, the exclusivity doesn't work sometimes, and secondly, you need to close and re-open tabs multiple times so they would show up
+- The left tab bar still sometimes refuses to show a panel until you
+  click it twice (runtime exclusivity quirk separate from the startup
+  bug fixed below; need a concrete repro before chasing).
 
 ## Solved (2026-05-26 sweep)
+
+- [x] Multiple left sidebars open at startup — `ActivityBar.activate()`
+  enforces "at most one of {Sessions, Terminals, Library, Jobs, Logs,
+  Settings} open" at runtime, but `dock.fromJSON(layout)` in
+  `layoutStore.restore()` bypassed that path entirely; any persisted
+  snapshot with 2+ activity-bar panels stacked on the left edge would
+  restore all of them. Added `enforceActivityBarExclusivity()` that
+  sweeps the dock after every restore: keeps the currently-active one
+  (or the first by canonical order if none are active) and removes
+  the rest. Regression test in
+  `src/stores/shell/__tests__/layoutStore.activityBarExclusivity.test.ts`.
 
 - [x] `"see attachment"` triggered an SQL safety filter — `AttachmentNode.getTextContent()`
   was emitting `(see attachment "<name>")` as the prompt-side reference
