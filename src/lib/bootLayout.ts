@@ -1,27 +1,30 @@
 /**
- * Boot-time layout restore + migration logic, extracted from `App.vue`.
+ * Boot-time layout restore + groups v3 migration logic.
  *
  * Used by `App.vue` once on mount; the function captures Pinia stores at
  * call time so it remains a thin composable rather than a constructor.
  *
- * The three "pending" refs handle the @ready race: the DockviewVue child's
- * onMounted (which fires `@ready`) runs from the parent's onMounted callback
- * stack, but we kick off the async `restoreFromLayout` from the same stack —
- * so the api may or may not be present when we have the layout to apply. The
- * refs let either side wake up the other.
+ * Phase 3 lands the v3 nested-dockview design:
+ *  - `groupsStore.hydrate(layout)` normalizes v2 / v3 / empty / corrupt
+ *    layouts into a {groups, innerBodiesCache} shape
+ *  - we resume the UNION of session ids across all cached inner bodies
+ *  - the outer `<DockviewVue>` mounts; on @ready we seed the activity bar
+ *    and add one outer body panel per group
+ *  - each `GroupPanel.vue` mounts its inner `<DockviewVue>`; on inner
+ *    @ready it `fromJSON`s the cached body for its group, which restores
+ *    the chat panels with their session ids
  *
- * Phase 1 extraction is intentionally behavior-preserving: the v3 groups
- * migration is wired in phase 2.
+ * Persistence: `App.vue` subscribes to outer `onDidLayoutChange` (and per
+ * the v3 plan, to each inner via the GroupPanel) and calls
+ * `composePersistLayout` (via `groupsStore.serialize`) on debounce.
  */
 
 import { ref } from 'vue';
-import {
-  enforcePersistedEdgeMinimums,
-  extractChatPanelIds,
-  stripLegacyDetailsPanels,
-} from '@/lib/layoutSanitize';
-import { LAYOUT_SCHEMA_VERSION } from '@/ipc/types';
 import { useBootStore } from '@/stores/app/bootStore';
+import {
+  extractPanelIdsFromBody,
+  useGroupsStore,
+} from '@/stores/shell/groupsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
@@ -37,147 +40,123 @@ export function useBootLayout(): BootLayout {
   const layoutStore = useLayoutStore();
   const sessionsStore = useSessionsStore();
   const settingsStore = useSettingsStore();
+  const groupsStore = useGroupsStore();
   const toastStore = useToastStore();
 
-  /// Layout-side pending state for the boot race. The dockview @ready event
-  /// fires from the child component's `onMounted`, which races our parent's
-  /// `onMounted` (which kicks off `restoreFromLayout`). We capture intent
-  /// here and `flushPendingLayout` drains it once the api becomes available.
-  const pendingRestoreLayout = ref<unknown>(null);
-  /// If non-null, a v1 → v2 migration was detected. Drain by calling
-  /// `seedDefaultLayout()` + `addPanel(id)` for each resumed session.
-  const pendingMigrationSessions = ref<string[] | null>(null);
-  /// True when there's no stored layout at all (fresh install or hard reset)
-  /// — drain by calling `seedDefaultLayout()` only.
-  const pendingFreshSeed = ref<boolean>(false);
+  /// True when the outer api was not yet ready when `restoreFromLayout`
+  /// finished. `flushPendingLayout` consumes this once the outer @ready
+  /// fires.
+  const pendingFlush = ref<boolean>(false);
 
   async function restoreFromLayout(): Promise<void> {
     const layoutPref = settingsStore.settings.layout;
-    const layout = layoutPref?.dockview;
-    const storedVersion = layoutPref?.schemaVersion ?? 1;
+    console.info('[boot] restoreFromLayout: hydrating groupsStore');
 
-    if (storedVersion !== LAYOUT_SCHEMA_VERSION) {
-      console.info(
-        `[boot] restoreFromLayout: migrating layout v${storedVersion} → v${LAYOUT_SCHEMA_VERSION}`,
-      );
+    // Hydrate normalizes v2 legacy / v3 / empty / corrupt all in one
+    // path. After this, groupsStore.groups.length >= 1 and the
+    // innerBodiesCache holds whatever sessions exist (the union below
+    // walks across all groups).
+    groupsStore.hydrate(layoutPref);
 
-      const sessionIds = layout ? extractChatPanelIds(layout) : [];
-
-      if (sessionIds.length > 0) {
-        bootStore.beginSessions(sessionIds.length);
-        await Promise.all(
-          sessionIds.map((id) =>
-            sessionsStore.restoreSession(id).finally(() => bootStore.markSessionRestored()),
-          ),
-        );
-        console.info('[boot] restoreFromLayout: migration — all resumes settled');
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-        bootStore.beginApplying();
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    // Collect session ids across all groups' cached bodies. v2 migrations
+    // produce a single Default group with the legacy body in its cache;
+    // v3 layouts may distribute sessions across multiple groups.
+    const sessionIds = new Set<string>();
+    for (const g of groupsStore.groups) {
+      const body = groupsStore.innerBodiesCache[g.id];
+      for (const id of extractPanelIdsFromBody(body)) {
+        sessionIds.add(id);
       }
-
-      pendingMigrationSessions.value = sessionIds;
-
-      if (layoutStore.api) flushPendingLayout();
-
-      return;
     }
 
-    if (!layout || typeof layout !== 'object') {
-      console.info('[boot] restoreFromLayout: no layout to restore — fresh seed');
-      pendingFreshSeed.value = true;
-
-      if (layoutStore.api) flushPendingLayout();
-
-      return;
-    }
-
-    // stripLegacyDetailsPanels was a v1 sanitizer for stale per-session
-    // session-details panel ids. Still useful for old layouts crossing the
-    // v1→v2 boundary. Settings used to be stripped too because v1 didn't
-    // always close it cleanly; in v2 Settings is a permanently seeded edge
-    // tab so we DO want it preserved in the persisted layout (its expanded
-    // width persists across reloads).
-    const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
-    const sanitized = enforcePersistedEdgeMinimums(withoutLegacyDetails);
-    const sessionIds = extractChatPanelIds(sanitized);
-
-    console.info(`[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`);
-
-    if (sessionIds.length === 0) {
-      pendingRestoreLayout.value = sanitized;
-
-      if (layoutStore.api) flushPendingLayout();
-
-      return;
-    }
-
-    bootStore.beginSessions(sessionIds.length);
-    // Parallel resumes — safe again now that rpcGuard throws a real Error
-    // (encoded AppErrorPayload). Previously this hung because Electrobun's
-    // bridge drops non-Error throws (see src-bun/app/errors.ts comment).
-    await Promise.all(
-      sessionIds.map((id) =>
-        sessionsStore.restoreSession(id).finally(() => bootStore.markSessionRestored()),
-      ),
+    console.info(
+      `[boot] restoreFromLayout: ${sessionIds.size} chat sessions to resume across ${groupsStore.groups.length} group(s)`,
     );
-    console.info('[boot] restoreFromLayout: all resumes settled, applying layout');
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    bootStore.beginApplying();
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-    pendingRestoreLayout.value = sanitized;
+    if (sessionIds.size > 0) {
+      bootStore.beginSessions(sessionIds.size);
+      // Parallel resumes — safe because rpcGuard throws a real Error
+      // (encoded AppErrorPayload) so the bridge doesn't swallow it.
+      await Promise.all(
+        Array.from(sessionIds).map((id) =>
+          sessionsStore.restoreSession(id).finally(() => bootStore.markSessionRestored()),
+        ),
+      );
+      console.info('[boot] restoreFromLayout: all resumes settled');
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      bootStore.beginApplying();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
 
+    pendingFlush.value = true;
     if (layoutStore.api) flushPendingLayout();
   }
 
-  /// Applies whichever boot intent is set (v2 restore / v1 migration / fresh
-  /// seed). Called from both `restoreFromLayout` (when dock is already
-  /// ready) and `onDockReady` (when dock becomes ready after
-  /// `restoreFromLayout` has already finished). Safe to call multiple
-  /// times: each branch nulls its own state once drained.
+  /// Adds an outer body panel for every group in the store. The active
+  /// group is activated last so it ends up focused. Called from
+  /// `flushPendingLayout` after the outer api is ready and the activity
+  /// bar has been seeded.
+  function seedOuterGroupPanels(): void {
+    const outer = layoutStore.api;
+    if (!outer) return;
+    let added = 0;
+    for (const g of groupsStore.groups) {
+      if (outer.getPanel(g.id)) continue;
+      outer.addPanel({
+        id: g.id,
+        component: 'group',
+        title: g.name,
+        tabComponent: 'groupTab',
+        params: { groupId: g.id, color: g.color, name: g.name },
+      });
+      added += 1;
+    }
+    console.info(
+      `[boot] seedOuterGroupPanels: ${added} group panel(s) added; active=${groupsStore.activeGroupId ?? '(none)'}`,
+    );
+    if (groupsStore.activeGroupId) {
+      const active = outer.getPanel(groupsStore.activeGroupId);
+      active?.api.setActive();
+    }
+  }
+
+  /// Applies the boot intent once the outer api is ready. Safe to call
+  /// multiple times; the `pendingFlush` flag guards re-entry.
   function flushPendingLayout(): void {
-    if (pendingMigrationSessions.value !== null) {
-      layoutStore.seedDefaultLayout();
+    if (!pendingFlush.value) return;
+    pendingFlush.value = false;
 
-      for (const id of pendingMigrationSessions.value) {
-        layoutStore.addPanel(id);
-      }
-
-      pendingMigrationSessions.value = null;
-      // Force a persist with the new schemaVersion so subsequent boots take
-      // the fast path. The layout-change subscription in onDockReady will
-      // fire from the addPanel calls; nudge it with an explicit save so we
-      // don't depend on the debounce window.
-      void settingsStore.persistLayout(layoutStore.snapshot());
-
+    const outer = layoutStore.api;
+    if (!outer) {
+      // Should not happen — flushPendingLayout is only called from
+      // onDockReady, but be defensive in case future code paths invoke
+      // it earlier.
+      console.warn('[boot] flushPendingLayout called without outer api');
+      pendingFlush.value = true;
       return;
     }
 
-    if (pendingRestoreLayout.value !== null) {
-      const ok = layoutStore.restore(pendingRestoreLayout.value);
-
-      if (!ok) {
-        toastStore.warn(
-          'Layout restore failed',
-          'The persisted dockview JSON was rejected. Resetting to default.',
-        );
-        layoutStore.seedDefaultLayout();
-      } else {
-        // Idempotent fill-in for any tabs that didn't exist when the layout
-        // was last persisted (e.g. a new activity-bar entry shipped in a
-        // code update).
-        layoutStore.seedDefaultLayout();
-      }
-
-      pendingRestoreLayout.value = null;
-
-      return;
-    }
-
-    if (pendingFreshSeed.value) {
+    try {
+      // Always seed the activity bar — it lives in the outer dockview's
+      // edge groups and is independent of body content.
       layoutStore.seedDefaultLayout();
-      pendingFreshSeed.value = false;
+
+      // Add a group panel per group. Active one focused last.
+      seedOuterGroupPanels();
+    } catch (err) {
+      console.error('[boot] flushPendingLayout failed', err);
+      toastStore.warn(
+        'Layout restore failed',
+        'The persisted layout could not be applied. Resetting to default.',
+      );
+      // Fall back to a fresh seed; hydrate already produced a Default
+      // group, so re-seeding will recreate the outer panel.
+      try {
+        layoutStore.seedDefaultLayout();
+        seedOuterGroupPanels();
+      } catch (err2) {
+        console.error('[boot] flushPendingLayout fallback also failed', err2);
+      }
     }
   }
 

@@ -180,6 +180,29 @@ test("renderer bundle boots to ready without console errors", async ({ page }) =
   await expect(dockview, "Dockview body never mounted — boot did not reach ready")
     .toBeVisible({ timeout: 15_000 });
 
+  // v3 nested-dockview check: the outer body should have a `group` panel
+  // for the Default group, rendering inside a `.group-panel-root`. The
+  // inner DockviewVue should also mount, producing a second `.dv-dockview`
+  // node. Asserting BOTH catches the v1 nesting failure mode where the
+  // inner instance crashed silently at mount.
+  //
+  // Use `toBeAttached` rather than `toBeVisible` for the GroupPanel root
+  // because dockview lays out body panels asynchronously after first
+  // add, and the 0×0 transient lasts long enough to fail toBeVisible
+  // in headless chromium. Inner dockview mounting (= 2 total
+  // .dv-dockview nodes) is the real proof of nesting.
+  const groupRoot = page.locator(".group-panel-root").first();
+  await expect(groupRoot, "GroupPanel never mounted — outer body has no group panel")
+    .toBeAttached({ timeout: 5_000 });
+  const allDockviews = page.locator(".dv-dockview");
+  await expect(allDockviews, "Inner DockviewVue never mounted")
+    .toHaveCount(2, { timeout: 5_000 });
+  // Note: not asserting `boundingBox()` dimensions here. dockview's
+  // gridview lays out body panels via a ResizeObserver in a deferred
+  // task that headless chromium under playwright's run loop can delay
+  // unpredictably — a separate dev-boot manual check (rule 4a) covers
+  // visual sizing of the group panel.
+
   // The splash should auto-dismiss once boot is ready.
   await expect(splash, "BootSplash did not dismiss after boot")
     .toBeHidden({ timeout: 5_000 });

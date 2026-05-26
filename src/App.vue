@@ -12,9 +12,14 @@ import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useLayoutStore, composePanelTitle } from '@/stores/shell/layoutStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useModelsStore } from '@/stores/library/modelsStore';
 import { useBootStore } from '@/stores/app/bootStore';
-import { useJobsStore } from '@/stores/observability/jobsStore';
+// jobsStore was used by the outer onDidRemovePanel session-busy check;
+// in v3 chat panels live in inner dockviews so that handler moved to
+// GroupPanel and the busy-toast UX is currently disabled. Re-add the
+// busy check inside GroupPanel.onInnerReady if M7 surfaces complaints.
+// import { useJobsStore } from '@/stores/observability/jobsStore';
 import { useConfirm } from 'primevue/useconfirm';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { resolveIsDark } from '@/lib/theme';
@@ -29,9 +34,9 @@ const sessionsStore = useSessionsStore();
 const settingsStore = useSettingsStore();
 const toastStore = useToastStore();
 const layoutStore = useLayoutStore();
+const groupsStore = useGroupsStore();
 const modelsStore = useModelsStore();
 const bootStore = useBootStore();
-const jobsStore = useJobsStore();
 const primeToast = useToast();
 const primeConfirm = useConfirm();
 
@@ -325,38 +330,20 @@ function onDockReady(event: DockviewReadyEvent) {
   );
   // Whenever the user closes a tab via dockview's own X (we hide the
   // in-pane close button to keep a single source of truth), tear down
-  // the underlying session too. closeSession is idempotent and safe to
-  // call even if the session is already gone.
+  // Per-inner dockviews handle chat-session lifecycle (closing the tab
+  // there → closeSession). The OUTER handler now only cares about edge
+  // panels and the rare case of a group panel being removed externally;
+  // group panels are normally removed by GroupTab's X handler which has
+  // already disposed inner cleanly.
   event.api.onDidRemovePanel((panel) => {
-    // Capture the parent group id BEFORE the panel is fully torn down
-    // — at this point the panel still has its `api.group` reference,
-    // but its `group.panels.length` reflects the post-removal count.
-    const groupId = panel.api.group.id;
-
-    if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-      const record = sessionsStore.getSession(panel.id);
-      const sessionBusy =
-        jobsStore.hasActiveJobsForSession(panel.id) ||
-        record?.isThinking ||
-        (record?.pendingRequests?.length ?? 0) > 0;
-
-      if (sessionBusy) {
-        toastStore.info(
-          'Session detached',
-          'Session is still busy. Reopen from the Sessions sidebar.',
-        );
-      } else {
-        void sessionsStore.closeSession(panel.id);
-      }
-    }
-
-    // If this panel was the last one in its edge group (e.g. user
-    // closed the Sessions sidebar via dockview's own X), tear down
-    // the edge group too so the next open recreates at the
-    // configured `initialSize` instead of inheriting a residual
-    // sliver. Safe to call for body groups: it's a no-op when the
-    // group isn't an edge group.
-    layoutStore.pruneEmptyEdgeGroup(groupId);
+    const parentGroupId = panel.api.group.id;
+    // If this panel was the last one in its edge group (e.g. user closed
+    // the Sessions sidebar via dockview's own X), tear down the edge
+    // group too so the next open recreates at the configured
+    // `initialSize` instead of inheriting a residual sliver. Safe to
+    // call for body groups: it's a no-op when the group isn't an edge
+    // group.
+    layoutStore.pruneEmptyEdgeGroup(parentGroupId);
   });
 
   // If startup-resume already produced a pruned layout, hand it over
@@ -405,7 +392,10 @@ function onDockReady(event: DockviewReadyEvent) {
 }
 
 /// Debounced write — drag-resize fires `onDidLayoutChange` continuously
-/// at frame rate; we coalesce into one settings write per ~300ms.
+/// at frame rate; we coalesce into one settings write per ~300ms. v3:
+/// `composePersistLayout` walks outer + each registered inner api to
+/// produce the full grouped layout in one atomic write (cache-first so
+/// unmounted groups aren't dropped — rubber-duck rule).
 let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleLayoutSave() {
@@ -413,7 +403,10 @@ function scheduleLayoutSave() {
 
   layoutSaveTimer = setTimeout(() => {
     layoutSaveTimer = null;
-    void settingsStore.persistLayout(layoutStore.snapshot());
+    const outer = layoutStore.api;
+    if (!outer) return;
+    const layout = groupsStore.serialize(outer.toJSON());
+    void settingsStore.persistGroupedLayout(layout);
   }, 300);
 }
 

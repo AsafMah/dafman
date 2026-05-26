@@ -11,7 +11,7 @@
 // serialized into the layout JSON for free.
 
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { DockviewApi, EdgeGroupPosition } from 'dockview-core';
 import {
   asRemovePanelArg,
@@ -20,6 +20,7 @@ import {
   groupId,
   groupPanels,
 } from '@/stores/shell/dockviewTypes';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
 
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
@@ -101,6 +102,22 @@ export interface EdgePanelOptions {
 
 export const useLayoutStore = defineStore('layout', () => {
   const api = ref<DockviewApi | null>(null);
+
+  /// The "body" api — where chat / terminal / playground panels live. In
+  /// v3 this is the active group's INNER dockview (`groupsStore.innerApis[
+  /// groupsStore.activeGroupId]`); during the v2→v3 transition (before any
+  /// group inner has mounted) it falls back to the outer api so existing
+  /// add/close paths keep working. Read-only computed; write the inner-api
+  /// registry via `groupsStore.registerInnerApi`.
+  const groupsStore = useGroupsStore();
+  const bodyApi = computed<DockviewApi | null>((): DockviewApi | null => {
+    const activeId = groupsStore.activeGroupId;
+    if (activeId) {
+      const inner = groupsStore.innerApis[activeId];
+      if (inner) return inner as unknown as DockviewApi;
+    }
+    return api.value as DockviewApi | null;
+  });
 
   /// Caller-injected title resolver. Set once at boot by App.vue so
   /// `addPanel(sessionId)` (and any other layout call that needs a
@@ -403,9 +420,14 @@ export const useLayoutStore = defineStore('layout', () => {
     sessionId: string,
     opts: { title?: string; targetGroupId?: string } = {},
   ): void {
-    const dock = api.value;
+    const dock = bodyApi.value;
 
     if (!dock) return;
+
+    // One-only invariant: if this session lives in a different group
+    // (mounted or cached), strip it from there first. No-op when it's
+    // already in the active group.
+    groupsStore.pruneSessionFromAllGroups(sessionId, groupsStore.activeGroupId ?? undefined);
 
     if (dock.getPanel(sessionId)) return;
 
@@ -474,7 +496,7 @@ export const useLayoutStore = defineStore('layout', () => {
   }
 
   function addTerminalPanel(terminalId: string, title = 'Terminal'): void {
-    const dock = api.value;
+    const dock = bodyApi.value;
 
     if (!dock) return;
 
@@ -878,6 +900,11 @@ export const useLayoutStore = defineStore('layout', () => {
   /// empty group means the *next* `openEdgePanel` call recreates at
   /// the configured `initialSize` instead of inheriting a residual
   /// collapsed size. Idempotent for unknown ids.
+  ///
+  /// v3: chat / terminal panels live in inner dockviews. We try the
+  /// outer api first (covers edge tabs, settings, playground, group
+  /// panels themselves). If the panel isn't there, walk the registered
+  /// inner apis and remove from whichever inner owns it.
   function closePanel(id: string): void {
     const dock = api.value;
 
@@ -885,25 +912,39 @@ export const useLayoutStore = defineStore('layout', () => {
 
     const panel = dock.getPanel(id);
 
-    if (!panel) return;
+    if (panel) {
+      const group = panel.api.group;
+      const wasLastInGroup = group.panels.length <= 1;
 
-    const group = panel.api.group;
-    const wasLastInGroup = group.panels.length <= 1;
+      dock.removePanel(panel);
 
-    dock.removePanel(panel);
+      // If the group it lived in is now empty *and* it's an edge group,
+      // remove it so size persistence resets. Body groups are left for
+      // dockview to clean up on its own — body layout is the user's
+      // grid and we don't want to collapse adjacent panels.
+      if (wasLastInGroup) {
+        for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
+          const edge = dock.getEdgeGroup(pos);
 
-    // If the group it lived in is now empty *and* it's an edge group,
-    // remove it so size persistence resets. Body groups are left for
-    // dockview to clean up on its own — body layout is the user's
-    // grid and we don't want to collapse adjacent panels.
-    if (wasLastInGroup) {
-      for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
-        const edge = dock.getEdgeGroup(pos);
-
-        if (edge && groupId(edge) === group.id) {
-          dock.removeEdgeGroup(pos);
-          break;
+          if (edge && groupId(edge) === group.id) {
+            dock.removeEdgeGroup(pos);
+            break;
+          }
         }
+      }
+      return;
+    }
+
+    // Not on outer — walk inner apis (chat / terminal panels live there
+    // in v3).
+    for (const [gid, innerApi] of Object.entries(groupsStore.innerApis)) {
+      const innerPanel = (innerApi as DockviewApi).getPanel(id);
+      if (innerPanel) {
+        (innerApi as DockviewApi).removePanel(innerPanel);
+        // No edge-group cleanup inside inner dockviews (they don't have edges).
+        // The group-meta cache will pick up the new toJSON on next layout-change.
+        void gid; // mark used
+        return;
       }
     }
   }
@@ -1034,6 +1075,7 @@ export const useLayoutStore = defineStore('layout', () => {
 
   return {
     api,
+    bodyApi,
     activeSessionId,
     detailsOpen,
     enforceKnownEdgeMinimums,

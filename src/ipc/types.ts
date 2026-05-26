@@ -176,7 +176,7 @@ export type CommandResultEvent =
 ///        edge: ad-hoc session-details panel
 ///   v2 — left + right edges: native dockview vertical tab strips
 ///        seeded by `seedDefaultLayout`; library moved to right edge
-export const LAYOUT_SCHEMA_VERSION = 2;
+export const LAYOUT_SCHEMA_VERSION = 3;
 
 /// User-facing identity for a group (the "tabs at top of body" model).
 /// Mirrors `GroupMeta` in `src-bun/rpc.ts`.

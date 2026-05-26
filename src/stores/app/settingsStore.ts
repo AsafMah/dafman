@@ -13,7 +13,7 @@ import type {
   TerminalPrefs,
   ThemeChoice,
 } from '@/ipc/types';
-import { LAYOUT_SCHEMA_VERSION } from '@/ipc/types';
+import { LAYOUT_SCHEMA_VERSION, type Layout } from '@/ipc/types';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 
@@ -193,6 +193,22 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /// Persists a v3 grouped layout (with `outer`, `groups`, `innerBodies`,
+  /// `activeGroupId`) — used by the groups v3 boot path. The full `Layout`
+  /// object is provided by `composePersistLayout` at the call site. We
+  /// don't validate the shape here; the source of truth is whichever
+  /// composition function produced it.
+  async function persistGroupedLayout(layout: Layout): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        layout,
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
+  }
+
   /// Promotes a workspace path to the head of the MRU list and
   /// persists. Empty / whitespace inputs are ignored. The list is
   /// deduped (case-sensitive — keeping the freshly-cased version) and
@@ -297,6 +313,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setEnableMermaid,
     setNotifications,
     persistLayout,
+    persistGroupedLayout,
     recordWorkspaceUse,
     setDefaultWorkspace,
     setDefaultApproveAll,
