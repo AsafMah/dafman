@@ -344,11 +344,24 @@ caught bugs that would have taken much longer without:
 
 ### Known follow-ups (intentional out-of-scope for this sprint)
 
-- **dockview upstream issue** — file a feature request for
-  `setEdgeGroupConstraints(position, {minimumSize, maximumSize})`
-  to allow post-creation mutation. The current immutability forces
-  callers into either max-of-all-mins (static) or destructive
-  recreate-the-group hacks.
+- **dockview upstream issues** — filed
+  [mathuo/dockview#1305](https://github.com/mathuo/dockview/issues/1305)
+  ("dynamic edge-group constraints — mutable minimumSize / maximumSize /
+  initialSize after addEdgeGroup") with receipts pointing at
+  `dockviewShell.js` v6.4.0 (`_expandedMinimumSize` set only in the
+  constructor; `updateCollapsedSize` is reserved for ShellManager
+  theme/gap recomputation; public `DockviewApi` exposes only
+  `addEdgeGroup / getEdgeGroup / setEdgeGroupVisible /
+  isEdgeGroupVisible / removeEdgeGroup`). Includes our `max(min-over-
+  all-tabs)` workaround and the proposed `setEdgeGroupConstraints` /
+  `getEdgeGroup(pos).setConstraints` shapes. Also filed
+  [#1306](https://github.com/mathuo/dockview/issues/1306) ("vertical
+  split of edge groups — multiple edge groups per side, stacked with
+  sash") so we have an upstream tracking issue if the user pushes for
+  the VS-style stacked Sessions + Logs request. That one requires
+  `Map<Position, group>` → `Map<Position, group[]>` plus a per-side
+  splitview and a JSON-shape break (`edgeGroups.left: EdgeGroupJSON`
+  → `EdgeGroupJSON[]`).
 - **Boot-cost gate breach** — `seedDefaultLayout` cost went from
   ~50 ms to ~100 ms once Settings was added as a permanent tab.
   Crossed the 50-ms gate from the original plan. Fix path is

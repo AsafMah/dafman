@@ -33,7 +33,12 @@ from a private `_expandedMinimumSize` field set ONLY at `addEdgeGroup` time
 Settled for static `max(all-tab-mins)` per side: left=420 (Logs floor),
 right=380 (SessionDetails floor). Trade-off: Sessions can't drag narrower
 than Logs's 420, but the strip never breaks. Verified via Playwright
-probe.
+probe. Filed upstream as
+[mathuo/dockview#1305](https://github.com/mathuo/dockview/issues/1305)
+("dynamic edge-group constraints"). Also filed
+[mathuo/dockview#1306](https://github.com/mathuo/dockview/issues/1306)
+for vertical-split-of-edge-groups (stacked Sessions + Logs on one side)
+— blocks any future "two pinned panels per side, both visible" feature.
 
 **Drag restriction:** activity-bar tabs can only be dropped into another
 edge group's tab strip — wired via `dock.api.onWillShowOverlay`
@@ -471,6 +476,11 @@ without grepping `DEVLOG.md`. One-liner per item.
   New tool: `bun run inspect <selector> [--rules|--eval]`
   (`tools/inspect.ts`) — Playwright + CDP live-app introspection.
   **626 tests**, prod + hmr smoke green. Verified via probe scripts.
+  Upstream feature requests filed:
+  [mathuo/dockview#1305](https://github.com/mathuo/dockview/issues/1305)
+  (dynamic edge-group constraints) and
+  [#1306](https://github.com/mathuo/dockview/issues/1306)
+  (vertical split of edge groups for stacked Sessions + Logs).
 
 - **2026-05-25** — Code-quality + restructure pass shipped: gts/Prettier,
   spacious control-flow padding, `shellUtils` extraction, ESLint to **0 errors**,
