@@ -68,19 +68,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: 'pi pi-list',
       keywords: ['sidebar', 'panel'],
       run: () => {
-        if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) {
-          layoutStore.closePanel(SESSIONS_PANEL_ID);
-        } else {
-          layoutStore.openEdgePanel('left', {
-            id: SESSIONS_PANEL_ID,
-            component: 'sessionsManager',
-            tabComponent: 'sidebarTab',
-            title: 'Sessions',
-            initialSize: 260,
-            minimumSize: 180,
-            exclusive: true,
-          });
-        }
+        layoutStore.activateEdgePanel(SESSIONS_PANEL_ID, 'left');
       },
     },
     {
@@ -90,19 +78,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: 'pi pi-clock',
       keywords: ['background', 'tasks', 'autopilot'],
       run: () => {
-        const id = 'jobs-panel';
-
-        if (layoutStore.isPanelOpen(id)) return;
-
-        layoutStore.openEdgePanel('left', {
-          id,
-          component: 'jobsPanel',
-          tabComponent: 'sidebarTab',
-          title: 'Jobs',
-          initialSize: 380,
-          minimumSize: 380,
-          exclusive: true,
-        });
+        layoutStore.activateEdgePanel('jobs-panel', 'left');
       },
     },
     {
@@ -112,19 +88,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: 'pi pi-window-maximize',
       keywords: ['shell', 'terminal', 'pty', 'settings'],
       run: () => {
-        const id = 'terminals-panel';
-
-        if (layoutStore.isPanelOpen(id)) return;
-
-        layoutStore.openEdgePanel('left', {
-          id,
-          component: 'terminalsPanel',
-          tabComponent: 'sidebarTab',
-          title: 'Terminals — running shells',
-          initialSize: 360,
-          minimumSize: 320,
-          exclusive: true,
-        });
+        layoutStore.activateEdgePanel('terminals-panel', 'left');
       },
     },
     {
@@ -173,22 +137,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: 'pi pi-cog',
       keywords: ['preferences', 'config'],
       run: () => {
-        const id = 'settings-panel';
-
-        if (layoutStore.isPanelOpen(id)) return;
-
-        layoutStore.openEdgePanel('left', {
-          id,
-          component: 'settingsPanel',
-          tabComponent: 'sidebarTab',
-          title: 'Settings',
-          // Keep in sync with App.vue's ActivityBar settings item —
-          // both paths must use the same size or the panel jumps
-          // width when opened via different surfaces.
-          initialSize: 400,
-          minimumSize: 380,
-          exclusive: true,
-        });
+        // Settings stopped being an activity-bar edge tab in v2. It
+        // opens as a body grid tab via the layoutStore helper that
+        // the status-bar cog also calls — so both surfaces converge
+        // on a single rendered Settings panel.
+        layoutStore.openSettingsInBody();
       },
     },
     {

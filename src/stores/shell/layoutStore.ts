@@ -17,16 +17,15 @@ import {
   asRemovePanelArg,
   dockApiHeight,
   dockApiWidth,
-  groupHeight,
   groupId,
   groupPanels,
-  groupWidth,
 } from '@/stores/shell/dockviewTypes';
 
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
 import {
+  findActivityTabSeed,
   LEFT_ACTIVITY_TABS,
   PANEL_IDS,
   RIGHT_ACTIVITY_TABS,
@@ -34,79 +33,7 @@ import {
 } from '@/constants/panels';
 
 const SESSION_DETAILS_PANEL_ID = PANEL_IDS.sessionDetails;
-const SESSIONS_PANEL_ID = PANEL_IDS.sessionsManager;
 const SETTINGS_PANEL_ID = PANEL_IDS.settings;
-const LIBRARY_PANEL_ID = PANEL_IDS.library;
-const JOBS_PANEL_ID = PANEL_IDS.jobs;
-const TERMINALS_PANEL_ID = PANEL_IDS.terminals;
-const LOG_VIEWER_PANEL_ID = PANEL_IDS.logs;
-const SESSION_DETAILS_MIN_WIDTH = 380;
-const LEFT_EDGE_MIN_BY_PANEL_ID: Record<string, number> = {
-  [SESSIONS_PANEL_ID]: 180,
-  [SETTINGS_PANEL_ID]: 380,
-  [LIBRARY_PANEL_ID]: 320,
-  [JOBS_PANEL_ID]: 380,
-  [TERMINALS_PANEL_ID]: 320,
-  [LOG_VIEWER_PANEL_ID]: 420,
-};
-const EDGE_PANEL_DEFINITIONS: Record<string, Omit<EdgePanelOptions, 'exclusive'>> = {
-  [SESSIONS_PANEL_ID]: {
-    id: SESSIONS_PANEL_ID,
-    component: 'sessionsManager',
-    tabComponent: 'sidebarTab',
-    title: 'Sessions',
-    initialSize: 260,
-    minimumSize: 180,
-  },
-  [SETTINGS_PANEL_ID]: {
-    id: SETTINGS_PANEL_ID,
-    component: 'settingsPanel',
-    tabComponent: 'sidebarTab',
-    title: 'Settings',
-    initialSize: 400,
-    minimumSize: 380,
-  },
-  [LIBRARY_PANEL_ID]: {
-    id: LIBRARY_PANEL_ID,
-    component: 'library',
-    tabComponent: 'sidebarTab',
-    title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
-    initialSize: 360,
-    minimumSize: 320,
-  },
-  [JOBS_PANEL_ID]: {
-    id: JOBS_PANEL_ID,
-    component: 'jobsPanel',
-    tabComponent: 'sidebarTab',
-    title: 'Jobs',
-    initialSize: 380,
-    minimumSize: 380,
-  },
-  [TERMINALS_PANEL_ID]: {
-    id: TERMINALS_PANEL_ID,
-    component: 'terminalsPanel',
-    tabComponent: 'sidebarTab',
-    title: 'Terminals — running shells',
-    initialSize: 360,
-    minimumSize: 320,
-  },
-  [LOG_VIEWER_PANEL_ID]: {
-    id: LOG_VIEWER_PANEL_ID,
-    component: 'logViewer',
-    tabComponent: 'sidebarTab',
-    title: 'Diagnostics — live log + bundle export',
-    initialSize: 480,
-    minimumSize: 420,
-  },
-  [SESSION_DETAILS_PANEL_ID]: {
-    id: SESSION_DETAILS_PANEL_ID,
-    component: 'sessionDetails',
-    tabComponent: 'sidebarTab',
-    title: 'Session',
-    initialSize: SESSION_DETAILS_MIN_WIDTH,
-    minimumSize: SESSION_DETAILS_MIN_WIDTH,
-  },
-};
 
 /// Short panel title from a session id. The CLI emits `session.title_changed`
 /// when the model summarizes the conversation; until then the tab shows
@@ -202,24 +129,7 @@ export const useLayoutStore = defineStore('layout', () => {
   /// — it reads its current session from `activeSessionId` and
   /// re-binds when the user switches chat tabs.
   const detailsOpen = ref<boolean>(false);
-  const lastSessionDetailsWidth = ref<number>(SESSION_DETAILS_MIN_WIDTH);
   let activeUnsubs: Array<() => void> = [];
-
-  function panelId(panel: unknown): string | null {
-    const api = (panel as { api?: { id?: unknown } }).api;
-
-    if (typeof api?.id === 'string') return api.id;
-
-    const flat = (panel as { id?: unknown }).id;
-
-    return typeof flat === 'string' ? flat : null;
-  }
-
-  function edgePanels(edge: unknown): unknown[] {
-    const panels = (edge as { panels?: unknown[] }).panels;
-
-    return Array.isArray(panels) ? panels : [];
-  }
 
   function edgeId(edge: unknown): string | null {
     const id = (edge as { id?: unknown }).id;
@@ -227,47 +137,58 @@ export const useLayoutStore = defineStore('layout', () => {
     return typeof id === 'string' ? id : null;
   }
 
-  function edgePanelsFromDock(edge: unknown): unknown[] {
-    const direct = edgePanels(edge);
-
-    if (direct.length > 0) return direct;
-
-    const id = edgeId(edge);
+  /// Returns the active panel's id within an edge group, or null if
+  /// the group is empty or its active panel can't be identified.
+  function activePanelIdInEdge(position: EdgeGroupPosition): string | null {
     const dock = api.value;
 
-    if (!id || !dock) return [];
+    if (!dock) return null;
+
+    const edge = dock.getEdgeGroup(position);
+
+    if (!edge) return null;
+
+    const id = edgeId(edge);
+
+    if (!id) return null;
 
     const group = dock.groups.find((g) => g.id === id);
 
-    if (!group) return [];
+    if (!group) return null;
 
-    return groupPanels(group);
+    const activePanel = (group as { activePanel?: unknown }).activePanel;
+    const apiId = (activePanel as { api?: { id?: unknown } } | undefined)?.api?.id;
+
+    if (typeof apiId === 'string') return apiId;
+
+    const flatId = (activePanel as { id?: unknown } | undefined)?.id;
+
+    return typeof flatId === 'string' ? flatId : null;
   }
 
-  function minimumForEdgeGroup(position: EdgeGroupPosition, edge: unknown): number | undefined {
-    if (position === 'right') {
-      return edgePanelsFromDock(edge).some((panel) => panelId(panel) === SESSION_DETAILS_PANEL_ID)
-        ? SESSION_DETAILS_MIN_WIDTH
-        : undefined;
-    }
+  /// Apply the active-tab's `minimumSize` (from the seed metadata)
+  /// to the edge group's splitview constraints. Idempotent. No-op
+  /// when the edge group is collapsed (the 44px strip floor is
+  /// handled by dockview's `collapsedSize`).
+  function applyActiveTabConstraints(position: EdgeGroupPosition): void {
+    const dock = api.value;
 
-    if (position !== 'left') return undefined;
+    if (!dock) return;
 
-    let min: number | undefined;
+    const edge = dock.getEdgeGroup(position);
 
-    for (const panel of edgePanelsFromDock(edge)) {
-      const id = panelId(panel);
+    if (!edge) return;
+    if (edge.isCollapsed()) return;
 
-      if (!id) continue;
+    const activeId = activePanelIdInEdge(position);
 
-      const candidate = LEFT_EDGE_MIN_BY_PANEL_ID[id];
+    if (!activeId) return;
 
-      if (candidate === undefined) continue;
+    const seed = findActivityTabSeed(activeId);
 
-      min = Math.max(min ?? 0, candidate);
-    }
+    if (!seed) return;
 
-    return min;
+    applyEdgeMinimum(position, seed.minimumSize);
   }
 
   function applyEdgeMinimum(position: EdgeGroupPosition, minimumSize: number | undefined): void {
@@ -325,108 +246,14 @@ export const useLayoutStore = defineStore('layout', () => {
     return Math.min(desired, maxEdge);
   }
 
-  function edgeSize(position: EdgeGroupPosition, edge: unknown): number | undefined {
-    const edgeApi = edge as { width?: number; height?: number };
-
-    return position === 'left' || position === 'right' ? edgeApi.width : edgeApi.height;
-  }
-
-  function isEdgeBelowMinimum(
-    position: EdgeGroupPosition,
-    edge: unknown,
-    minimumSize: number | undefined,
-  ): boolean {
-    if (minimumSize === undefined) return false;
-
-    const current = edgeSize(position, edge);
-
-    return typeof current === 'number' && current < effectiveEdgeMinimum(position, minimumSize);
-  }
-
-  function recreateKnownEdgeGroup(
-    position: EdgeGroupPosition,
-    edge: unknown,
-    minimumSize: number,
-  ): boolean {
-    const dock = api.value;
-
-    if (!dock) return false;
-
-    const panels = edgePanelsFromDock(edge);
-    const knownPanels = panels
-      .map((panel) => {
-        const id = panelId(panel);
-
-        return id ? EDGE_PANEL_DEFINITIONS[id] : undefined;
-      })
-      .filter((panel): panel is Omit<EdgePanelOptions, 'exclusive'> => !!panel);
-
-    if (knownPanels.length === 0) return false;
-
-    const effectiveMinimum = effectiveEdgeMinimum(position, minimumSize);
-
-    dock.removeEdgeGroup(position);
-    const initialSize = Math.max(
-      effectiveMinimum,
-      ...knownPanels.map((panel) =>
-        Math.min(panel.initialSize ?? effectiveMinimum, effectiveMinimum),
-      ),
-    );
-    const recreatedEdge = dock.addEdgeGroup(position, {
-      id: `edge-${position}`,
-      initialSize,
-      minimumSize: effectiveMinimum,
-    });
-
-    for (const panel of knownPanels) {
-      dock.addPanel({
-        id: panel.id,
-        component: panel.component,
-        title: panel.title ?? panel.id,
-        params: panel.params ?? {},
-        ...(panel.tabComponent ? { tabComponent: panel.tabComponent } : {}),
-        position: { referenceGroup: recreatedEdge.id },
-      });
-    }
-
-    if (knownPanels.some((panel) => panel.id === SESSION_DETAILS_PANEL_ID)) {
-      detailsOpen.value = true;
-    }
-
-    return true;
-  }
-
+  /// Re-apply per-edge active-tab constraints. Called on every layout
+  /// change (via App.vue's onDidLayoutChange) so that drag-resize
+  /// down to the constraint floor is enforced and so that any
+  /// runtime-added panels with their own ergonomic minimum get
+  /// picked up.
   function enforceKnownEdgeMinimums(): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    for (const position of ['left', 'right'] as const) {
-      const edge = dock.getEdgeGroup(position);
-
-      if (!edge) continue;
-
-      const minimumSize = minimumForEdgeGroup(position, edge);
-
-      // v2 multi-tab edge groups: we never tear down + recreate, the
-      // tabs would all be lost. The recreate path was a v1 patch for
-      // single-panel exclusive edge groups whose persisted width
-      // could go below the rebuilt minimum. With multi-tab groups,
-      // dockview's own minimumSize on the edge group keeps the width
-      // honest — we just nudge applyEdgeMinimum if anything got below.
-      const isMultiTab = edgePanelsFromDock(edge).length > 1;
-
-      if (
-        !isMultiTab &&
-        minimumSize !== undefined &&
-        isEdgeBelowMinimum(position, edge, minimumSize) &&
-        recreateKnownEdgeGroup(position, edge, minimumSize)
-      ) {
-        continue;
-      }
-
-      applyEdgeMinimum(position, minimumSize);
-    }
+    applyActiveTabConstraints('left');
+    applyActiveTabConstraints('right');
   }
 
   function recomputeActiveSession(dock: DockviewApi): void {
@@ -530,34 +357,53 @@ export const useLayoutStore = defineStore('layout', () => {
 
     recomputeActiveSession(next);
     rescanOpenDetails(next);
-    enforceKnownEdgeMinimums();
 
-    // v2 semantics: details state = right edge expanded AND active
-    // panel === session-details. We need to react to BOTH active-panel
-    // changes (already subscribed) AND the right edge group's
-    // collapsed-state changes. The right edge group may not exist
-    // when setApi is called (seedDefaultLayout creates it later), so
-    // we re-attach the collapse listener every time a group is added
-    // until we find the right edge.
+    // Per-tab edge-group constraint tracking. Each edge group's
+    // active tab supplies its own `minimumSize` (from the seed
+    // metadata); the constraint applied to the edge group as a
+    // whole must follow the active tab. We re-attach the collapse
+    // listener for each edge group once it actually exists (the
+    // group may not be present at setApi time — seedDefaultLayout
+    // creates it later via fromJSON or fresh-seed).
+    let leftCollapseUnsub: (() => void) | null = null;
     let rightCollapseUnsub: (() => void) | null = null;
-    const tryAttachRightCollapse = () => {
-      if (rightCollapseUnsub) return;
 
-      const right = next.getEdgeGroup('right');
+    const tryAttachEdgeListeners = (position: 'left' | 'right') => {
+      const cur = position === 'left' ? leftCollapseUnsub : rightCollapseUnsub;
 
-      if (!right) return;
+      if (cur) return;
 
-      const sub = right.onDidCollapsedChange(() => rescanOpenDetails(next));
+      const edge = next.getEdgeGroup(position);
 
-      rightCollapseUnsub = () => sub.dispose();
+      if (!edge) return;
+
+      const sub = edge.onDidCollapsedChange(() => {
+        applyActiveTabConstraints(position);
+        if (position === 'right') rescanOpenDetails(next);
+      });
+
+      if (position === 'left') {
+        leftCollapseUnsub = () => sub.dispose();
+      } else {
+        rightCollapseUnsub = () => sub.dispose();
+      }
     };
 
-    tryAttachRightCollapse();
+    tryAttachEdgeListeners('left');
+    tryAttachEdgeListeners('right');
+
+    // Initial constraint pass — covers the fresh-seed / restore-from-
+    // JSON case where the edge groups already exist with an active
+    // tab when setApi is called.
+    applyActiveTabConstraints('left');
+    applyActiveTabConstraints('right');
 
     const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
     const panelSub = next.onDidActivePanelChange(() => {
       recomputeActiveSession(next);
       rescanOpenDetails(next);
+      applyActiveTabConstraints('left');
+      applyActiveTabConstraints('right');
     });
     const removeSub = next.onDidRemovePanel(() => {
       recomputeActiveSession(next);
@@ -565,8 +411,11 @@ export const useLayoutStore = defineStore('layout', () => {
     });
     const addSub = next.onDidAddPanel(() => rescanOpenDetails(next));
     const addGroupSub = next.onDidAddGroup(() => {
-      tryAttachRightCollapse();
+      tryAttachEdgeListeners('left');
+      tryAttachEdgeListeners('right');
       rescanOpenDetails(next);
+      applyActiveTabConstraints('left');
+      applyActiveTabConstraints('right');
     });
 
     activeUnsubs = [
@@ -575,6 +424,7 @@ export const useLayoutStore = defineStore('layout', () => {
       () => removeSub.dispose(),
       () => addSub.dispose(),
       () => addGroupSub.dispose(),
+      () => leftCollapseUnsub?.(),
       () => rightCollapseUnsub?.(),
     ];
   }
@@ -698,38 +548,12 @@ export const useLayoutStore = defineStore('layout', () => {
   // re-renders the rail for the new session rather than spawning
   // a per-session panel.
 
-  /// Opens (or focuses) the singleton details rail. Idempotent —
-  /// reopening when the panel already exists just brings it forward.
-  /// Activates the session-details panel in the right edge group and
-  /// expands the strip if collapsed. v2 semantics: the panel is
-  /// permanently seeded at boot via `seedDefaultLayout`, so this is
-  /// purely an activate + expand, never an add-panel call.
-  function openSessionDetailsPanel(): void {
-    activateEdgePanel(SESSION_DETAILS_PANEL_ID, 'right');
-    restoreSessionDetailsWidth();
-  }
-
   /// Toggles the details rail. Goes through `activateEdgePanel` which
   /// already implements the toggle (click active → collapse; otherwise
-  /// activate + expand).
+  /// activate + expand). Per-tab `minimumSize` is enforced by
+  /// `applyActiveTabConstraints` reacting to the active-panel change.
   function toggleSessionDetailsPanel(): void {
     activateEdgePanel(SESSION_DETAILS_PANEL_ID, 'right');
-  }
-
-  function rememberSessionDetailsWidth(): void {
-    const edge = api.value?.getEdgeGroup('right');
-
-    if (!edge) return;
-
-    const width = edge.width;
-
-    if (Number.isFinite(width) && width >= SESSION_DETAILS_MIN_WIDTH) {
-      lastSessionDetailsWidth.value = width;
-    }
-  }
-
-  function restoreSessionDetailsWidth(): void {
-    applyEdgeMinimum('right', Math.max(lastSessionDetailsWidth.value, SESSION_DETAILS_MIN_WIDTH));
   }
 
   /// Returns true if the rail singleton is currently open. Reactive
@@ -854,16 +678,7 @@ export const useLayoutStore = defineStore('layout', () => {
 
     if (!dock) return;
 
-    // Copy the list — dockview mutates it during removePanel. The
-    // typed `panels: readonly IDockviewPanel[]` is structurally
-    // compatible with `removePanel(panel: DockviewGroupPanel)` at
-    // runtime; the cast matches the same pattern used elsewhere in
-    // this store for moveTo / removePanel calls.
-    //
-    // Each removePanel is wrapped in try/catch because this is also
-    // called as a fallback when fromJSON failed and the dock is in a
-    // partial / unknown state — one panel's removal throwing must
-    // not strand the user with a half-cleared layout.
+    // Copy the list — dockview mutates it during removePanel.
     const panels = dock.panels.slice();
 
     for (const panel of panels) {
@@ -874,23 +689,53 @@ export const useLayoutStore = defineStore('layout', () => {
       }
     }
 
-    // Re-open the Sessions sidebar at default size. Wrapped because
-    // a broken dock may also throw on openEdgePanel; we'd rather log
-    // and let the user create a session from the (empty) topbar than
-    // crash the boot.
-    try {
-      openEdgePanel('left', {
-        id: 'sessions-manager',
-        component: 'sessionsManager',
-        tabComponent: 'sidebarTab',
-        title: 'Sessions',
-        initialSize: 260,
-        minimumSize: 180,
-        exclusive: true,
-      });
-    } catch (err) {
-      console.error('[layoutStore.resetToDefault] openEdgePanel threw', err);
+    // Tear down edge groups too so seedDefaultLayout rebuilds them fresh.
+    for (const pos of ['left', 'right'] as const) {
+      if (dock.getEdgeGroup(pos)) {
+        try {
+          dock.removeEdgeGroup(pos);
+        } catch (err) {
+          console.error(`[layoutStore.resetToDefault] removeEdgeGroup ${pos} threw`, err);
+        }
+      }
     }
+
+    // Re-seed the activity-bar tabs.
+    try {
+      seedDefaultLayout();
+    } catch (err) {
+      console.error('[layoutStore.resetToDefault] seedDefaultLayout threw', err);
+    }
+  }
+
+  /// Opens the Settings panel in the main body grid (it stopped being
+  /// an activity-bar tab in v2; the status-bar cog and the command
+  /// palette both go through here so the panel lands in the same
+  /// place from every surface).
+  function openSettingsInBody(): void {
+    const dock = api.value;
+
+    if (!dock) return;
+
+    const existing = dock.getPanel(SETTINGS_PANEL_ID);
+
+    if (existing) {
+      existing.api.setActive();
+
+      return;
+    }
+
+    const bodyGroups = dock.groups.filter(
+      (g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid',
+    );
+    const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
+
+    dock.addPanel({
+      id: SETTINGS_PANEL_ID,
+      component: 'settingsPanel',
+      title: 'Settings',
+      position: { referenceGroup, direction: 'within' },
+    });
   }
 
   function removePanel(sessionId: string): void {
@@ -942,40 +787,6 @@ export const useLayoutStore = defineStore('layout', () => {
   /// (e.g. the user dragged it to a sliver, or a previous close left
   /// it collapsed), we tear it down and recreate at the requested size.
   /// Without this, "close → reopen" produces a tiny strip.
-  /// Reads the id off a dockview panel record. Defensive on shape —
-  /// some dockview versions expose `id` at the top level, others
-  /// only via `api.id`. Returns `''` when neither is present so the
-  /// caller can filter it out.
-  function panelIdOf(panel: unknown): string {
-    const top = (panel as { id?: unknown }).id;
-
-    if (typeof top === 'string') return top;
-
-    const viaApi = (panel as { api?: { id?: unknown } }).api?.id;
-
-    if (typeof viaApi === 'string') return viaApi;
-
-    return '';
-  }
-
-  /// Tear down every panel inside `group` whose id differs from
-  /// `keepId`. Used by the `exclusive` branch of `openEdgePanel`.
-  function removeOtherPanelsInGroup(
-    dock: NonNullable<typeof api.value>,
-    group: object,
-    keepId: string,
-  ): void {
-    const panels = groupPanels(group);
-
-    for (const panel of [...panels]) {
-      const panelId = panelIdOf(panel);
-
-      if (panelId && panelId !== keepId) {
-        dock.removePanel(asRemovePanelArg(panel));
-      }
-    }
-  }
-
   /// Toggle/activate a panel that lives in an edge group. Intended
   /// for command palette, keyboard shortcuts, and programmatic
   /// callers — UI clicks on dockview tabs already go through
@@ -1012,58 +823,36 @@ export const useLayoutStore = defineStore('layout', () => {
     if (isCollapsed) group.expand();
   }
 
+  /// v1 entry point retained for back-compat with callers that still
+  /// pass `EdgePanelOptions`. In v2 every activity-bar panel is
+  /// seeded at boot via `seedDefaultLayout`, so this just delegates
+  /// to `activateEdgePanel` for the known activity-tab ids. The
+  /// `initialSize` / `minimumSize` fields in the options are IGNORED
+  /// here — per-tab constraints come from the seed metadata via
+  /// `applyActiveTabConstraints` instead. Kept as a function so we
+  /// don't have to migrate every caller in one commit.
+  ///
+  /// New callers should use `activateEdgePanel(id, position)` directly.
   function openEdgePanel(position: EdgeGroupPosition, options: EdgePanelOptions): void {
     const dock = api.value;
 
     if (!dock) return;
 
-    let existingGroup = dock.getEdgeGroup(position);
-    let existing = dock.getPanel(options.id);
-
-    if (existingGroup && isEdgeBelowMinimum(position, existingGroup, options.minimumSize)) {
-      dock.removeEdgeGroup(position);
-      existingGroup = undefined;
-      existing = undefined;
-    }
-
-    if (existing) {
-      existing.api.setActive();
-      applyEdgeMinimum(
-        position,
-        options.minimumSize ?? minimumForEdgeGroup(position, existingGroup),
-      );
+    // If the panel is one of our seeded activity-bar tabs, the seed
+    // already created it. Just activate + expand.
+    if (findActivityTabSeed(options.id)) {
+      if (position === 'left' || position === 'right') {
+        activateEdgePanel(options.id, position);
+      }
 
       return;
     }
 
-    applyEdgeMinimum(position, options.minimumSize);
-
-    if (options.exclusive && existingGroup) {
-      removeOtherPanelsInGroup(dock, existingGroup, options.id);
-    }
-
-    if (existingGroup && options.initialSize !== undefined) {
-      // dockview-vue's EdgeGroupApi exposes `width` / `height` via the
-      // underlying group element. Read defensively — if the property
-      // shape changes we just skip the resize check and use the
-      // existing group as-is.
-      const w =
-        position === 'left' || position === 'right'
-          ? groupWidth(existingGroup)
-          : groupHeight(existingGroup);
-      // Threshold: if the caller declared a `minimumSize`, that's the
-      // floor — anything below it (e.g. a stale persisted layout from
-      // before a min-size bump) gets torn down + recreated at
-      // `initialSize`. Without a `minimumSize`, fall back to the older
-      // half-of-initialSize heuristic that just rescues "sliver"
-      // panels.
-      const recreateBelow = options.minimumSize ?? Math.max(40, options.initialSize / 2);
-
-      if (typeof w === 'number' && w < recreateBelow) {
-        dock.removeEdgeGroup(position);
-      }
-    }
-
+    // Unknown panel id — fall back to the v1 path (add the panel
+    // into the existing edge group, or create the group if absent).
+    // No callers exercise this today; if a new caller appears,
+    // consider whether the panel should be added to the seed table
+    // instead.
     const edge =
       dock.getEdgeGroup(position) ??
       dock.addEdgeGroup(position, {
@@ -1072,15 +861,22 @@ export const useLayoutStore = defineStore('layout', () => {
         ...(options.minimumSize !== undefined ? { minimumSize: options.minimumSize } : {}),
       });
 
-    dock.addPanel({
-      id: options.id,
-      component: options.component,
-      title: options.title ?? options.id,
-      params: options.params ?? {},
-      ...(options.tabComponent ? { tabComponent: options.tabComponent } : {}),
-      position: { referenceGroup: edge.id },
-    });
-    applyEdgeMinimum(position, options.minimumSize ?? minimumForEdgeGroup(position, edge));
+    if (!dock.getPanel(options.id)) {
+      dock.addPanel({
+        id: options.id,
+        component: options.component,
+        title: options.title ?? options.id,
+        params: options.params ?? {},
+        ...(options.tabComponent ? { tabComponent: options.tabComponent } : {}),
+        position: { referenceGroup: edge.id },
+      });
+    } else {
+      dock.getPanel(options.id)?.api.setActive();
+    }
+
+    if (edge.isCollapsed()) edge.expand();
+
+    applyEdgeMinimum(position, options.minimumSize);
   }
 
   /// Removes the edge group at `position` if the given group id matches
@@ -1228,10 +1024,17 @@ export const useLayoutStore = defineStore('layout', () => {
 
     const startedAt = performance.now();
 
-    for (const [position, seeds, initialSize, minimumSize] of [
-      ['left', LEFT_ACTIVITY_TABS, 280, 200],
-      ['right', RIGHT_ACTIVITY_TABS, 400, 320],
+    for (const [position, seeds] of [
+      ['left', LEFT_ACTIVITY_TABS],
+      ['right', RIGHT_ACTIVITY_TABS],
     ] as const) {
+      // Initial constraint = the FIRST seeded tab's preferred size.
+      // Active-tab tracking via `applyActiveTabConstraints` adjusts
+      // this whenever the user switches tabs.
+      const firstSeed = seeds[0];
+      const initialSize = firstSeed?.initialSize ?? 280;
+      const minimumSize = firstSeed?.minimumSize ?? 180;
+
       const edge =
         dock.getEdgeGroup(position) ??
         dock.addEdgeGroup(position, {
@@ -1271,8 +1074,6 @@ export const useLayoutStore = defineStore('layout', () => {
     activeSessionId,
     detailsOpen,
     enforceKnownEdgeMinimums,
-    rememberSessionDetailsWidth,
-    restoreSessionDetailsWidth,
     setApi,
     setSessionTitleResolver,
     addPanel,
@@ -1283,7 +1084,7 @@ export const useLayoutStore = defineStore('layout', () => {
     replaceMissingPanel,
     openEdgePanel,
     activateEdgePanel,
-    openSessionDetailsPanel,
+    openSettingsInBody,
     toggleSessionDetailsPanel,
     isSessionDetailsOpen,
     isPanelOpen,

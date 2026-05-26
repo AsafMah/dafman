@@ -62,11 +62,28 @@ export type PanelId = (typeof PANEL_IDS)[keyof typeof PANEL_IDS];
 /// Each entry must reference a panel id from `PANEL_IDS` and a
 /// component name from `PANEL_COMPONENTS`. Tabs render via the global
 /// `activityTab` component with `params: { icon, title }`.
+///
+/// `minimumSize` / `initialSize` are PER-TAB constraints. The edge
+/// group as a whole has one constraint at a time; layoutStore tracks
+/// the active tab and applies that tab's `minimumSize` to the edge
+/// group. So when the user clicks "Logs" (min 420), the edge auto-
+/// grows; when they switch back to "Sessions" (min 180), they can
+/// drag the strip narrower again.
+///
+/// Width catalog inherited from v1 `EDGE_PANEL_DEFINITIONS` —
+/// preserve ergonomic widths the user had pre-refactor.
 export interface ActivityTabSeed {
   id: PanelId;
   component: PanelComponentName;
   icon: string;
   title: string;
+  /// Width the edge group expands to on the FIRST activation of this
+  /// tab (before the user has dragged). Subsequent activations
+  /// preserve the user's drag width.
+  initialSize: number;
+  /// Floor width when this tab is active. Edge group is constrained
+  /// to >= this. Drag handle bottoms out here.
+  minimumSize: number;
 }
 
 export const LEFT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
@@ -75,24 +92,32 @@ export const LEFT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
     component: PANEL_COMPONENTS.sessionsManager,
     icon: 'pi-list',
     title: 'Sessions',
+    initialSize: 260,
+    minimumSize: 180,
   },
   {
     id: PANEL_IDS.terminals,
     component: PANEL_COMPONENTS.terminalsPanel,
     icon: 'pi-chevron-right',
     title: 'Terminals',
+    initialSize: 360,
+    minimumSize: 320,
   },
   {
     id: PANEL_IDS.jobs,
     component: PANEL_COMPONENTS.jobsPanel,
     icon: 'pi-clock',
     title: 'Jobs',
+    initialSize: 380,
+    minimumSize: 380,
   },
   {
     id: PANEL_IDS.logs,
     component: PANEL_COMPONENTS.logViewer,
     icon: 'pi-bars',
     title: 'Logs',
+    initialSize: 480,
+    minimumSize: 420,
   },
 ];
 
@@ -102,11 +127,25 @@ export const RIGHT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
     component: PANEL_COMPONENTS.sessionDetails,
     icon: 'pi-info-circle',
     title: 'Session details',
+    initialSize: 380,
+    minimumSize: 380,
   },
   {
     id: PANEL_IDS.library,
     component: PANEL_COMPONENTS.library,
     icon: 'pi-book',
     title: 'Library',
+    initialSize: 360,
+    minimumSize: 320,
   },
 ];
+
+/// Returns the seed metadata for any activity-bar tab id, regardless
+/// of edge. Used by layoutStore to look up per-tab constraints when
+/// the active panel in an edge group changes.
+export function findActivityTabSeed(id: string): ActivityTabSeed | undefined {
+  for (const t of LEFT_ACTIVITY_TABS) if (t.id === id) return t;
+  for (const t of RIGHT_ACTIVITY_TABS) if (t.id === id) return t;
+
+  return undefined;
+}

@@ -236,7 +236,7 @@ describe('layoutStore.resetToDefault', () => {
     setActivePinia(createPinia());
   });
 
-  test('closes every panel and re-opens the Sessions sidebar at default size', () => {
+  test('closes every panel and re-seeds the activity-bar tabs on both edges', () => {
     const dock = makeFake({
       groups: [
         {
@@ -259,17 +259,28 @@ describe('layoutStore.resetToDefault', () => {
 
     store.resetToDefault();
 
+    // All pre-existing panels closed.
     expect(dock.removePanelCalls).toEqual(
       expect.arrayContaining(['session-a', 'session-b', 'playground']),
     );
-    expect(dock.removePanelCalls).toHaveLength(3);
 
-    expect(dock.addEdgeGroupCalls).toHaveLength(1);
-    expect(dock.addEdgeGroupCalls[0]?.position).toBe('left');
-    expect(dock.addEdgeGroupCalls[0]?.initialSize).toBe(260);
+    // Both edge groups created.
+    const leftCreate = dock.addEdgeGroupCalls.find((c) => c.position === 'left');
+    const rightCreate = dock.addEdgeGroupCalls.find((c) => c.position === 'right');
+    expect(leftCreate).toBeDefined();
+    expect(rightCreate).toBeDefined();
+
+    // Left edge group seeded with Sessions's preferred initial size
+    // (the first seed in LEFT_ACTIVITY_TABS).
+    expect(leftCreate?.initialSize).toBe(260);
+    expect(leftCreate?.minimumSize).toBe(180);
+
+    // Right edge group seeded with Session-details's preferred initial size.
+    expect(rightCreate?.initialSize).toBe(380);
+    expect(rightCreate?.minimumSize).toBe(380);
   });
 
-  test('no panels open → still opens the Sessions sidebar (idempotent first-launch reset)', () => {
+  test('no panels open → still seeds activity-bar tabs (idempotent first-launch reset)', () => {
     const dock = makeFake({});
     const store = useLayoutStore();
     store.setApi(dock.api);
@@ -277,10 +288,11 @@ describe('layoutStore.resetToDefault', () => {
     store.resetToDefault();
 
     expect(dock.removePanelCalls).toHaveLength(0);
-    expect(dock.addEdgeGroupCalls).toHaveLength(1);
+    // Both edges created.
+    expect(dock.addEdgeGroupCalls.map((c) => c.position).sort()).toEqual(['left', 'right']);
   });
 
-  test('Sessions sidebar already open → still resets cleanly', () => {
+  test('Sessions sidebar already open → tears it down and re-seeds cleanly', () => {
     const dock = makeFake({
       edges: {
         left: {
@@ -294,86 +306,8 @@ describe('layoutStore.resetToDefault', () => {
 
     store.resetToDefault();
 
-    // The sidebar panel is closed along with everything else; reset
-    // then re-creates it in the existing (now-empty) edge group.
-    // What matters is the panel is BACK after the reset — not
-    // whether a new edge group was created (it isn't, because the
-    // existing one is reused).
     expect(dock.removePanelCalls).toContain('sessions-manager');
+    // After re-seed the sessions panel is back.
     expect(dock.api.getPanel('sessions-manager')).toBeDefined();
-  });
-
-  test('enforceKnownEdgeMinimums recreates stale narrow library and details rails with real edge minimums', () => {
-    const dock = makeFake({
-      edges: {
-        left: {
-          id: 'edge-left',
-          width: 120,
-          panelIds: [{ id: 'library', component: 'library' }],
-        },
-        right: {
-          id: 'edge-right',
-          width: 140,
-          panelIds: [{ id: 'session-details', component: 'sessionDetails' }],
-        },
-      },
-    });
-    const store = useLayoutStore();
-    store.setApi(dock.api);
-
-    store.enforceKnownEdgeMinimums();
-
-    const left = dock.groups.find((g) => g.id === 'edge-left');
-    const right = dock.groups.find((g) => g.id === 'edge-right');
-    expect(dock.removeEdgeGroupCalls).toEqual(expect.arrayContaining(['left', 'right']));
-    expect(left?.width).toBe(320);
-    expect(
-      dock.addEdgeGroupCalls.some(
-        (call) => call.position === 'left' && call.initialSize === 320 && call.minimumSize === 320,
-      ),
-    ).toBe(true);
-    expect(right?.width).toBe(380);
-    expect(
-      dock.addEdgeGroupCalls.some(
-        (call) => call.position === 'right' && call.initialSize === 380 && call.minimumSize === 380,
-      ),
-    ).toBe(true);
-  });
-
-  test('openEdgePanel recreates an already-open stale narrow edge group', () => {
-    const dock = makeFake({
-      edges: {
-        left: {
-          id: 'edge-left',
-          width: 160,
-          panelIds: [{ id: 'library', component: 'library' }],
-        },
-      },
-    });
-    const store = useLayoutStore();
-    store.setApi(dock.api);
-    const staleEdge = dock.groups.find((g) => g.id === 'edge-left');
-    if (staleEdge) staleEdge.width = 160;
-
-    store.openEdgePanel('left', {
-      id: 'library',
-      component: 'library',
-      tabComponent: 'sidebarTab',
-      title: 'Library',
-      initialSize: 360,
-      minimumSize: 320,
-      exclusive: true,
-    });
-
-    expect(dock.removeEdgeGroupCalls).toContain('left');
-    expect(dock.addEdgeGroupCalls[dock.addEdgeGroupCalls.length - 1]).toMatchObject({
-      position: 'left',
-      id: 'edge-left',
-      initialSize: 360,
-      minimumSize: 320,
-    });
-    const edge = dock.groups.find((g) => g.id === 'edge-left');
-    expect(edge?.width).toBe(360);
-    expect(edge?.panels.map((p) => p.id)).toContain('library');
   });
 });

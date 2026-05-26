@@ -53,29 +53,7 @@ const SETTINGS_PANEL_ID = 'settings-panel';
 /// (v1) but in v2 it's no longer an activity-bar member — the cog in
 /// the status bar opens it on demand.
 function openSettings() {
-  const dock = layoutStore.api;
-
-  if (!dock) return;
-
-  const existing = dock.getPanel(SETTINGS_PANEL_ID);
-
-  if (existing) {
-    existing.api.setActive();
-
-    return;
-  }
-
-  const bodyGroups = dock.groups.filter(
-    (g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid',
-  );
-  const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
-
-  dock.addPanel({
-    id: SETTINGS_PANEL_ID,
-    component: 'settingsPanel',
-    title: 'Settings',
-    position: { referenceGroup, direction: 'within' },
-  });
+  layoutStore.openSettingsInBody();
 }
 
 /// Opens the Dev Playground as a regular dockview body tab (not a
@@ -539,7 +517,6 @@ function onDockReady(event: DockviewReadyEvent) {
   // mutation collapses into this single event.
   event.api.onDidLayoutChange(() => {
     layoutStore.enforceKnownEdgeMinimums();
-    layoutStore.rememberSessionDetailsWidth();
     scheduleLayoutSave();
   });
 }

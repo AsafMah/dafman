@@ -5,7 +5,7 @@ import { invokeCommand } from '@/ipc/invoke';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { emit as busEmit } from '@/lib/bus';
-import { PANEL_COMPONENTS, PANEL_IDS, TAB_COMPONENTS } from '@/constants/panels';
+import { PANEL_IDS } from '@/constants/panels';
 
 export type SessionSkill = {
   name: string;
@@ -63,15 +63,8 @@ export function useSessionSkills(sessionId: ComputedRef<string>) {
     }
 
     busEmit('library-activate-tab', { tab: 'skills' });
-    layoutStore.openEdgePanel('left', {
-      id: PANEL_IDS.library,
-      component: PANEL_COMPONENTS.library,
-      tabComponent: TAB_COMPONENTS.sidebarTab,
-      title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
-      initialSize: 360,
-      minimumSize: 320,
-      exclusive: true,
-    });
+    // Library lives on the right edge in v2.
+    layoutStore.activateEdgePanel(PANEL_IDS.library, 'right');
   }
 
   function reset() {

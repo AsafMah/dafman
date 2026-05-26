@@ -4,7 +4,7 @@
 /// Logic for each section is extracted into composables under
 /// `./details/`. This file orchestrates them and owns the template.
 
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -201,15 +201,7 @@ function onToggleApproveAll(next: boolean) {
 
 // ---------- Jobs panel ----------
 function openJobsPanel() {
-  layoutStore.openEdgePanel('left', {
-    id: 'jobs-panel',
-    component: 'jobsPanel',
-    tabComponent: 'sidebarTab',
-    title: 'Jobs',
-    initialSize: 380,
-    minimumSize: 380,
-    exclusive: true,
-  });
+  layoutStore.activateEdgePanel('jobs-panel', 'left');
 }
 
 // ---------- Lifecycle ----------
@@ -227,7 +219,6 @@ onMounted(() => {
 watch(
   () => sessionId.value,
   () => {
-    void nextTick(() => layoutStore.restoreSessionDetailsWidth());
     resetAgents();
     resetTasks();
     resetSkills();

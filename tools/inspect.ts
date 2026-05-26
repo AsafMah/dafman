@@ -62,6 +62,7 @@ type Args = {
   rpcStub: boolean;
   wait: string;
   headed: boolean;
+  click: string | null;
 };
 
 function parseArgs(argv: string[]): Args {
@@ -74,6 +75,7 @@ function parseArgs(argv: string[]): Args {
     rpcStub: false,
     wait: ".dv-dockview",
     headed: false,
+    click: null,
   };
 
   const rest: string[] = [];
@@ -86,6 +88,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--screenshot") args.screenshot = argv[++i] ?? null;
     else if (a === "--url") args.url = argv[++i] ?? args.url;
     else if (a === "--wait") args.wait = argv[++i] ?? args.wait;
+    else if (a === "--click") args.click = argv[++i] ?? null;
     else if (a === "--help" || a === "-h") {
       // eslint-disable-next-line no-console
       console.log(
@@ -340,6 +343,23 @@ async function main(): Promise<void> {
     }
   }
   await page.waitForTimeout(1000);
+
+  if (args.click) {
+    // eslint-disable-next-line no-console
+    console.log(`Clicking "${args.click}" before probing…`);
+    try {
+      // Try the locator click first; if the strip doesn't expand,
+      // also try a synthetic click event with `bubbles: true`. As
+      // a final fallback, dispatch a pointerdown+pointerup pair
+      // (dockview's edge-strip tab click is bound via click but
+      // some test environments only trigger pointer events).
+      await page.locator(args.click).first().dispatchEvent('click');
+      await page.waitForTimeout(800);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`Click failed: ${(err as Error).message}`);
+    }
+  }
 
   // eslint-disable-next-line no-console
   console.log(`Probing "${args.selector}"…\n`);

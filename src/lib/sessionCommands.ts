@@ -17,7 +17,7 @@ import { useToastStore } from '@/stores/app/toastStore';
 import { invokeCommand } from '@/ipc/invoke';
 import { emit as busEmit } from '@/lib/bus';
 import { toErrorMessage } from '@/lib/errorMessage';
-import { PANEL_COMPONENTS, PANEL_IDS, TAB_COMPONENTS } from '@/constants/panels';
+import { PANEL_IDS } from '@/constants/panels';
 
 export interface SessionCommand {
   /// Slash form (with leading "/"). What the user types in the
@@ -82,15 +82,8 @@ function openLibraryTab(tab = 'mcp'): void {
     busEmit('library-activate-tab', { tab: normalized });
   }
 
-  useLayoutStore().openEdgePanel('left', {
-    id: PANEL_IDS.library,
-    component: PANEL_COMPONENTS.library,
-    tabComponent: TAB_COMPONENTS.sidebarTab,
-    title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
-    initialSize: 360,
-    minimumSize: 320,
-    exclusive: true,
-  });
+  // Library lives on the right edge in v2.
+  useLayoutStore().activateEdgePanel(PANEL_IDS.library, 'right');
 }
 
 /// Runs Dafman's local slash command when the typed text is one of
@@ -156,7 +149,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     group: 'Session',
     keywords: ['llm', 'reasoning'],
     run: (sessionId) => {
-      useLayoutStore().openSessionDetailsPanel();
+      useLayoutStore().activateEdgePanel(PANEL_IDS.sessionDetails, 'right');
       busEmit('open-model-selector', { sessionId });
     },
   },
