@@ -24,7 +24,6 @@ import {
   extractChatPanelIds,
   enforcePersistedEdgeMinimums,
   stripLegacyDetailsPanels,
-  stripPanelFromLayout,
 } from '@/lib/layoutSanitize';
 import { isActivityBarPanel } from '@/constants/panels';
 import { LAYOUT_SCHEMA_VERSION } from '@/ipc/types';
@@ -47,14 +46,13 @@ const { settings } = storeToRefs(settingsStore);
 const prefersDark = ref(false);
 
 const PLAYGROUND_PANEL_ID = 'playground';
-const SETTINGS_PANEL_ID = 'settings-panel';
 
-/// Opens the Settings panel as a body grid tab. Subsequent calls
-/// focus the existing tab. Settings used to live on the left rail
-/// (v1) but in v2 it's no longer an activity-bar member — the cog in
-/// the status bar opens it on demand.
+/// Opens the Settings panel. v2 keeps Settings as a left-edge
+/// activity-bar tab — clicking the status-bar cog toggles it via
+/// the same `activateEdgePanel` path used by the rail click and
+/// the command palette.
 function openSettings() {
-  layoutStore.openSettingsInBody();
+  layoutStore.toggleSettings();
 }
 
 /// Opens the Dev Playground as a regular dockview body tab (not a
@@ -334,9 +332,14 @@ async function restoreFromLayout() {
     return;
   }
 
+  // stripLegacyDetailsPanels was a v1 sanitizer for stale per-session
+  // session-details panel ids. Still useful for old layouts crossing
+  // the v1→v2 boundary. Settings used to be stripped too because v1
+  // didn't always close it cleanly; in v2 Settings is a permanently
+  // seeded edge tab so we DO want it preserved in the persisted
+  // layout (its expanded width persists across reloads).
   const withoutLegacyDetails = stripLegacyDetailsPanels(layout);
-  const withoutSettings = stripPanelFromLayout(withoutLegacyDetails, SETTINGS_PANEL_ID);
-  const sanitized = enforcePersistedEdgeMinimums(withoutSettings);
+  const sanitized = enforcePersistedEdgeMinimums(withoutLegacyDetails);
   const sessionIds = extractChatPanelIds(sanitized);
 
   console.info(`[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`);

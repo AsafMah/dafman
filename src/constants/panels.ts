@@ -119,6 +119,14 @@ export const LEFT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
     initialSize: 480,
     minimumSize: 420,
   },
+  {
+    id: PANEL_IDS.settings,
+    component: PANEL_COMPONENTS.settingsPanel,
+    icon: 'pi-cog',
+    title: 'Settings',
+    initialSize: 400,
+    minimumSize: 380,
+  },
 ];
 
 export const RIGHT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [

@@ -680,30 +680,13 @@ export const useLayoutStore = defineStore('layout', () => {
   /// an activity-bar tab in v2; the status-bar cog and the command
   /// palette both go through here so the panel lands in the same
   /// place from every surface).
-  function openSettingsInBody(): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const existing = dock.getPanel(SETTINGS_PANEL_ID);
-
-    if (existing) {
-      existing.api.setActive();
-
-      return;
-    }
-
-    const bodyGroups = dock.groups.filter(
-      (g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid',
-    );
-    const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
-
-    dock.addPanel({
-      id: SETTINGS_PANEL_ID,
-      component: 'settingsPanel',
-      title: 'Settings',
-      position: { referenceGroup, direction: 'within' },
-    });
+  /// Opens or toggles the Settings panel. In v2 Settings lives as a
+  /// left-edge activity-bar tab (per `LEFT_ACTIVITY_TABS`). This is
+  /// just a typed shortcut to `activateEdgePanel(SETTINGS_PANEL_ID,
+  /// 'left')` — clicking when closed expands the strip + activates
+  /// Settings; clicking when already active+expanded collapses.
+  function toggleSettings(): void {
+    activateEdgePanel(SETTINGS_PANEL_ID, 'left');
   }
 
   function removePanel(sessionId: string): void {
@@ -1064,7 +1047,7 @@ export const useLayoutStore = defineStore('layout', () => {
     replaceMissingPanel,
     openEdgePanel,
     activateEdgePanel,
-    openSettingsInBody,
+    toggleSettings,
     toggleSessionDetailsPanel,
     isSessionDetailsOpen,
     isPanelOpen,

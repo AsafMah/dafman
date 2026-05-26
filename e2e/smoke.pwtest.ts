@@ -44,12 +44,46 @@ async function installRpcStub(page: Page): Promise<void> {
     // Match the shape `electroview.rpc.request` would return: the
     // boot stores expect a resolved Promise with the typed shape.
     const stub = {
+      // Full settings shape — Settings is now eagerly mounted at boot
+      // as a left-edge tab, so any subsection (terminal, workspaces,
+      // tools, permissions, …) will dereference its part of the
+      // settings tree on mount. Keep this fixture in sync with
+      // `defaultSettings()` in src/stores/app/settingsStore.ts.
       getSettings: () => ({
-        version: 7,
-        appearance: { theme: "system", reasoningVisibility: "compact", streaming: false },
-        layout: { dockview: null },
+        version: 14,
+        appearance: {
+          theme: "system",
+          reasoningVisibility: "compact",
+          defaultModelId: "auto",
+          defaultReasoningEffort: null,
+          streaming: false,
+          enableMermaid: false,
+        },
+        layout: { dockview: null, schemaVersion: 2 },
         workspaces: { recent: [], defaultWorkspace: "" },
         notifications: { turnEnd: false, waitingForInput: true },
+        tools: { defaultExcluded: [], defaultAllowed: [] },
+        permissions: { defaultApproveAll: false },
+        terminal: {
+          defaultProfileId: "platform-default",
+          fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
+          fontSize: 13,
+          scrollback: 10_000,
+          theme: { background: "#111827", foreground: "#d1d5db" },
+          addons: {
+            search: true,
+            webLinks: true,
+            clipboard: true,
+            unicode11: true,
+            webFonts: true,
+            progress: true,
+            ligatures: true,
+            image: true,
+            unicodeGraphemes: true,
+            webgl: true,
+            serialize: true,
+          },
+        },
       }),
       updateSettings: ({ next }: { next: unknown }) => next,
       createClient: () => ({ status: "ready" }),

@@ -137,11 +137,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: 'pi pi-cog',
       keywords: ['preferences', 'config'],
       run: () => {
-        // Settings stopped being an activity-bar edge tab in v2. It
-        // opens as a body grid tab via the layoutStore helper that
-        // the status-bar cog also calls — so both surfaces converge
-        // on a single rendered Settings panel.
-        layoutStore.openSettingsInBody();
+        // Settings is a left-edge activity-bar tab in v2. Toggle
+        // semantics: open if closed, collapse if active+expanded.
+        layoutStore.toggleSettings();
       },
     },
     {
