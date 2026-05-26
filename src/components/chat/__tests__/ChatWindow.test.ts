@@ -494,4 +494,138 @@ describe('ChatWindow', () => {
     const kindChip = banner!.querySelector('.pending-banner-kind');
     expect(kindChip?.textContent).toContain('2 pending');
   });
+
+  /// Rubber-duck pre-split critique flagged three additional paths
+  /// the original five tests didn't pin: fork anchor resolution
+  /// (separate from retry), editor-save replay, and the dev
+  /// `sendHandler` bypass. Adding them keeps the safety net
+  /// behavior-complete before any composable extraction begins.
+
+  test('fork from assistant resolves to preceding user event id', async () => {
+    const events: SessionEventPayload[] = [
+      userEvent('a', 'user-A'),
+      assistantEvent('a-reply', 'asst-A'),
+      userEvent('b', 'user-B'),
+      assistantEvent('b-reply', 'asst-B'),
+    ];
+    const utils = await mountChat({ events });
+
+    const actionBlocks = Array.from(
+      utils.container.querySelectorAll<HTMLElement>('.stub-actions'),
+    );
+    const assistantActions = actionBlocks.filter(
+      (el) => el.getAttribute('data-kind') === 'assistant',
+    );
+    expect(assistantActions.length).toBe(2);
+    // Forking from the LAST assistant should anchor at user-B (the
+    // user message that triggered that assistant turn — not asst-A
+    // or asst-B which would be mid-turn).
+    const forkBtn = assistantActions[1]!.querySelector('.stub-fork');
+    expect(forkBtn).not.toBeNull();
+    await fireEvent.click(forkBtn as Element);
+    await flushFrames();
+
+    const forkCalls = handle.calls.filter((c) => c.name === 'forkSession');
+    expect(forkCalls.length).toBe(1);
+    const forkArgs = forkCalls[0]!.args as {
+      sessionId: string;
+      toEventId?: string;
+    };
+    expect(forkArgs.sessionId).toBe('s1');
+    expect(forkArgs.toEventId).toBe('user-B');
+  });
+
+  test('sendHandler prop bypasses sessionsStore.sendMessage', async () => {
+    const sendHandlerCalls: string[] = [];
+    ensureResizeObserver();
+    const utils = render(ChatWindow, {
+      props: {
+        sessionId: 's1',
+        accent: '#abc',
+        events: [],
+        droppedEventCount: 0,
+        reasoningVisibilityOverride: 'default',
+        defaultSendMode: 'steer',
+        sendHandler: (text: string) => {
+          sendHandlerCalls.push(text);
+          return Promise.resolve();
+        },
+      },
+      global: { plugins: [PrimeVue], stubs },
+    });
+    await nextTick();
+    await flushFrames();
+
+    const composerEl = utils.container.querySelector(
+      '.stub-composer',
+    ) as HTMLElement & {
+      __vueParentComponent?: { emit: (e: string, p: unknown) => void };
+    };
+    composerEl.__vueParentComponent!.emit('submit', {
+      text: 'dev playground msg',
+      mode: 'default',
+    });
+    await flushFrames();
+
+    // The optimistic user bubble still landed (sendHandler is just a
+    // transport swap, not a transcript swap).
+    const bubbles = utils.container.querySelectorAll('.stub-user');
+    expect(bubbles.length).toBe(1);
+    expect(bubbles[0]?.textContent?.trim()).toBe('dev playground msg');
+
+    // sendHandler received the text; sessionsStore.sendMessage was NOT
+    // invoked (no `sendMessage` IPC call landed on the bridge).
+    expect(sendHandlerCalls).toEqual(['dev playground msg']);
+    expect(handle.calls.filter((c) => c.name === 'sendMessage').length).toBe(0);
+  });
+
+  test('editor save resets transcript and replays via truncate + send', async () => {
+    const events: SessionEventPayload[] = [
+      userEvent('original prompt', 'user-orig'),
+      assistantEvent('answer', 'asst-1'),
+    ];
+    const utils = await mountChat({ events });
+
+    expect(utils.container.querySelectorAll('.stub-user').length).toBe(1);
+    expect(utils.container.querySelectorAll('.stub-assistant').length).toBe(1);
+
+    // Reach the MessageActions stub on the user bubble and request
+    // edit mode. The component opens an inline MessageEditor stub;
+    // we then emit the editor's `save` event with the new text.
+    const userActions = Array.from(
+      utils.container.querySelectorAll<HTMLElement>('.stub-actions'),
+    ).filter((el) => el.getAttribute('data-kind') === 'user');
+    expect(userActions.length).toBe(1);
+    const userActionsHost = userActions[0] as HTMLElement & {
+      __vueParentComponent?: { emit: (e: string, p?: unknown) => void };
+    };
+    userActionsHost.__vueParentComponent!.emit('edit');
+    await flushFrames();
+
+    const editorHost = utils.container.querySelector(
+      '.stub-editor',
+    ) as HTMLElement & {
+      __vueParentComponent?: { emit: (e: string, p?: unknown) => void };
+    };
+    expect(editorHost).not.toBeNull();
+    editorHost.__vueParentComponent!.emit('save', 'edited prompt');
+    await flushFrames();
+
+    const truncateCalls = handle.calls.filter(
+      (c) => c.name === 'truncateSessionHistory',
+    );
+    expect(truncateCalls.length).toBe(1);
+    expect((truncateCalls[0]!.args as { eventId: string }).eventId).toBe(
+      'user-orig',
+    );
+    const sendCalls = handle.calls.filter((c) => c.name === 'sendMessage');
+    expect(sendCalls.length).toBe(1);
+    expect((sendCalls[0]!.args as { text: string }).text).toBe('edited prompt');
+
+    // After save, the transcript is cleared until the SDK echoes new
+    // events back. (The component drops `items` to []; the next
+    // event flush will repopulate from the live stream.)
+    await flushFrames();
+    expect(utils.container.querySelectorAll('.stub-assistant').length).toBe(0);
+  });
 });

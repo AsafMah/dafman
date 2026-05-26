@@ -23,7 +23,8 @@ see [`DEVLOG.md`](DEVLOG.md) top entry for the full receipts. Headline:
 - **`.vue` direct invokeCommand calls 36 → 3** (Phase B composables)
 - **`as unknown as` in layoutStore 12 → 2** (Phase C dockview-types)
 - **SettingsPanel 968 → 339 lines** (Phase D.1 section components)
-- **600 tests** (was 551 at sprint start; +49 regression-net additions)
+- **600 tests** (was 551 at sprint start; +49 regression-net additions; 608 after
+  the 2026-05-26 ChatWindow safety-net add)
 - **AGENTS.md rules 16–22 added** with concrete sprint precedents
 
 Renderer imports now resolve through `tsconfig.json` (`@/*` → `src/*`) across 129 files.
@@ -36,11 +37,18 @@ honor tsconfig path aliases for the bun entry graph.
 
 **Code-quality sprint follow-through (current):**
 
-1. **Phase D.2 — ChatWindow.vue (1,185 lines).**
-   Per rubber-duck, add 5 specific regression tests FIRST (event flush, timeline merge,
-   send, retry/fork, pending banner — ChatWindow has 0 unit tests today and smoke is too
-   coarse for rAF/dropped-event regressions). Then extract `useChatEventFlush`,
-   `useChatScroll`, `useMessageActions`, optionally `<ChatTranscript>`.
+1. **Phase D.2 — ChatWindow.vue (1,185 lines).** 🟡 IN PROGRESS
+   Regression safety net landed (commit `4b972fe` + extended in `<new>`): 8 tests
+   pin event-flush/dropped-count, timeline merge, optimistic send + attachments,
+   retry anchor, fork anchor, pending banner, `sendHandler` bypass, editor-save
+   replay. Pre-split rubber-duck (2026-05-26) said: extract one timeline-state
+   controller (items + ambient + idCounter + processedAbsolute + isFirstBatch +
+   isSendingFallback) with semantic APIs (`resetForReplay({markSending})`,
+   `appendOptimisticUser`, `appendSystemError`, `flush/scheduleFlush`) — NOT a
+   narrow `useChatEventFlush` that leaves the other mutations to escape hatches.
+   Then `useChatScroll` (lowest-risk, do first), then `useChatSubmit`, then
+   `useMessageActions`, then maybe `<ChatTranscript>`. Pass stores as
+   dependencies (testable) rather than calling `use*()` inside composables.
 2. **Phase D.3 — sessions.ts (1,929 lines).**
    Extract sibling SDK-wrapper services (`SessionAgentsService`, `SessionTasksService`,
    `SessionSkillsService`, `SessionMcpService`, `SessionPlanService`, optionally

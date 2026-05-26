@@ -10,7 +10,128 @@
 
 ---
 
-## 2026-05-25 → 2026-05-26 — Phase A through D.1 sprint
+## 2026-05-26 — Phase D.2 prep: ChatWindow regression safety net + pre-split rubber-duck
+
+**Takeaway:** Landed the 8-test pre-extraction safety net for `ChatWindow.vue`
+(1,185 lines, 0 unit tests pre-this-session). Rubber-duck critiqued the
+proposed split shape from the 2026-05-25 handoff and recommended a *single
+timeline-state controller* with semantic APIs instead of the narrow
+`useChatEventFlush` + escape-hatch mutations originally planned. Captured the
+revised plan in `STATUS.md` so the next session opens the right surface. No
+extraction yet — the gate (lint + 608 tests + build + Playwright smoke) is
+green and the regression net is in place.
+
+### Commits
+
+- `4b972fe` test(chat): add 5-test regression safety net for ChatWindow before D.2 split
+- `<follow-up>` test(chat): extend ChatWindow safety net with fork / sendHandler / editor-save pins
+
+### What's pinned
+
+`src/components/chat/__tests__/ChatWindow.test.ts` — 8 tests across happy-dom
++ @testing-library/vue + Pinia + a fake `RpcBridge`:
+
+1. **flush respects droppedEventCount across a ring-buffer trim** — pushes 3
+   user events at `dropped=0`, then rerenders with `dropped=1` + a fresh
+   trailing event; asserts only the new event is processed (not the
+   reshuffled prefix).
+2. **timelineItems renders commandResults inline alongside chat items** —
+   seeds `useCommandResultsStore.recordsBySession['s1']` and asserts the
+   stub `<CommandResultCard>` lands in the transcript.
+3. **send forwards text + attachments through sessionsStore** — emits
+   `submit` on the stubbed MessageComposer, asserts the optimistic user
+   bubble lands AND `invokeCommand('sendMessage', { sessionId, text,
+   attachments })` is called with the right shape.
+4. **retry walks back to the nearest user-with-eventId anchor** — feeds
+   user→assistant→user→assistant, clicks the last assistant's stub-retry,
+   asserts `truncateSessionHistory({eventId:'user-evt-2'})` + a `sendMessage`
+   with `text:'second user msg'`.
+5. **pending-request banner reflects the queue head** — pushes two
+   `dafman.pending_request` events, asserts the banner shows the first
+   request's summary and the "2 pending" chip.
+6. **fork from assistant resolves to preceding user event id** —
+   added per rubber-duck. Asserts `forkSession({toEventId:'user-B'})`
+   for a click on the SECOND assistant's stub-fork.
+7. **sendHandler prop bypasses sessionsStore.sendMessage** — added per
+   rubber-duck. Passes a custom `sendHandler` (dev-playground path),
+   emits `submit`, asserts the handler received the text AND no
+   `sendMessage` IPC was issued.
+8. **editor save resets transcript and replays via truncate + send** —
+   added per rubber-duck. Triggers `MessageActions @edit`, then the
+   editor's `@save` event; asserts truncate + send IPC pair fired
+   with the original user event's id and the new text, and the
+   transcript was cleared.
+
+### Why mock.module on only MessageComposer + MessageEditor
+
+Pulling the real components in trips a top-level-await circular init
+under bun+happy-dom:
+
+- `node_modules/@lexical/utils/LexicalUtils.node.mjs:14` —
+  `Cannot access '$findMatchingParent' before initialization`
+- `node_modules/@lexical/list/LexicalList.dev.mjs:589` —
+  `Cannot access 'ElementNode' before initialization`
+
+`MessageComposer` and `MessageEditor` are the two transitive entries that
+pull `@lexical/react/*` and `@/lexical/nodes` (which imports
+`@lexical/list`). `UserMessageBody` / `MessageContent` only reach for the
+top-level `lexical` package (works fine — see `AttachmentNode.test.ts`).
+
+Critically: bun's `mock.module()` registry persists for the lifetime of
+the test process, and `mock.restore()` does NOT clear module mocks
+(verified by inspecting the cache — see
+`src/components/chat/__tests__/ChatWindow.test.ts` afterAll comment).
+Mocking only `MessageComposer` + `MessageEditor` keeps the leak
+harmless because neither has its own unit test today. Mocking
+`UserMessageBody` / `MessageContent` also worked, but those *do* have
+tests, and the leak silently swapped them out — all 3 attachment-pill
+assertions in `UserMessageBody.test.ts` started failing depending on
+file-execution order.
+
+### Rubber-duck findings (revised D.2 plan)
+
+The original handoff proposed `useChatEventFlush` + `useChatScroll` +
+`useMessageActions` + optional `<ChatTranscript>`. Rubber-duck flagged
+that this leaves `items` + `ambient` + `idCounter` + `processedAbsolute`
++ `isFirstBatch` + `isSendingFallback` as shared mutable refs across
+composables, with edit-save and submit both reaching across the seam.
+The revised target:
+
+1. **`useChatScroll(messagesEl, tileEl)`** — extract first, lowest risk.
+   Owns `scrollToBottom()` (double-rAF + scrollHeight) and the resize
+   observer for `--tile-height`.
+2. **`useChatTimelineState({events, droppedEventCount, sessionId, toasts})`**
+   — owns ALL transcript state (items + ambient + idCounter +
+   processedAbsolute + isFirstBatch + isSendingFallback) with semantic
+   APIs: `appendOptimisticUser(text, attachments)`,
+   `appendSystemError(text)`, `resetForReplay({ markSending })`,
+   `scheduleFlush()`, and the session-id watcher.
+3. **`useChatSubmit({timeline, scrollToBottom, sessionsStore, toasts,
+   sessionId, defaultSendMode, sendHandler})`** — the optimistic-send
+   orchestrator. Calls `timeline.appendOptimisticUser` then the
+   transport (`sendHandler` if provided, else
+   `sessionsStore.sendMessage`).
+4. **`useMessageActions({sessionId, items, composerRef, sessionsStore,
+   sessionsListStore, layoutStore, toasts, editingItemId, timeline})`**
+   — edit / quote / retry / fork / fork-notice + their helpers.
+   Calls `timeline.resetForReplay({markSending:true})` from the
+   editor-save path instead of mutating cursor state directly.
+5. **`<ChatTranscript>`** — skip. The template branch is long but the
+   prop-drilling cost (10+ callbacks) isn't obviously better. Revisit
+   only if 1–4 don't drop the line count enough.
+
+Pass stores as parameters (testable) rather than calling `use*()`
+inside composables. Use `toRef(props, 'events')` patterns so reactivity
+survives the props→composable boundary.
+
+### Gate
+
+`bun run check` — lint (renderer vue-tsc) + 608 tests across 67 files +
+Vite + Electrobun build + Playwright smoke (prod + hmr). Green.
+
+---
+
+
 
 **Takeaway:** Big code-quality push. 7 phases planned, 4.5 phases delivered. ~600 lines of hand-rolled infrastructure deleted, 4 real bugs fixed, 63 backend TS errors cleared and gated, all behind a rubber-duck pass per phase. Next session picks up at Phase D.2 (ChatWindow).
 
