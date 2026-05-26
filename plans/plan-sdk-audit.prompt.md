@@ -1,10 +1,18 @@
-# Plan — SDK + CLI feature audit (2026-05-22)
+# Plan — SDK + CLI feature audit (2026-05-22, refreshed 2026-05-26)
 
-> Authoritative cross-reference of every surface exposed by
-> `@github/copilot` SDK (v1.0.52+, formerly `copilot-sdk-supercharged`)
-> and the bundled Copilot CLI against what Dafman currently implements.
-> `copilot-sdk-supercharged` has been removed; all features exist in
-> the official SDK.
+> Authoritative cross-reference of every surface exposed by the
+> `@github/copilot-sdk` package (v1.0.0-beta.7 as of 2026-05-25,
+> wrapped via `src-bun/app/client/copilotSdk.ts`) and the bundled
+> Copilot CLI against what Dafman currently implements.
+>
+> Migration history:
+> - `copilot-sdk-supercharged` (3rd-party wrapper) — removed in May 2026
+>   because it lagged the bundled SDK and lacked mode-lifecycle callbacks.
+> - Deep imports under `@github/copilot/copilot-sdk/*.js` — used briefly,
+>   replaced 2026-05-25 by the standalone `@github/copilot-sdk@1.0.0-beta.7`
+>   package (commit `95461c2`). beta.4 lagged the bundled SDK at three
+>   load-bearing surfaces; beta.7 matches it. Pinned explicitly because
+>   it's tagged `prerelease`, not `latest`.
 >
 > Use this doc when planning the next Phase. STATUS.md tracks "what
 > shipped"; this doc tracks "what the platform offers and we haven't
@@ -355,13 +363,15 @@ surface — it's deny-by-default permission prompts, full stop.
 ## I. Reading order for the next agent
 
 1. **This file** (you are here).
-2. `node_modules/copilot-sdk-supercharged/README.md` — full reference;
-   we read every line for this audit.
-3. `node_modules/copilot-sdk-supercharged/dist/generated/rpc.d.ts` —
+2. `node_modules/@github/copilot-sdk/dist/index.d.ts` — entrypoint export list.
+3. `node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts` —
    complete typed RPC surface; cross-reference §A items.
-4. `node_modules/copilot-sdk-supercharged/dist/types.d.ts` — event
-   union, permission union, hook signatures.
+4. `node_modules/@github/copilot-sdk/dist/types.d.ts` — event
+   union, permission union, hook signatures, `SessionConfig`.
 5. `node_modules/@github/copilot/changelog.json` — sanity-check
    against any feature you're considering ("did this already ship
    upstream?").
-6. `STATUS.md` — current state; this audit is layered on top.
+6. `src-bun/app/client/copilotSdk.ts` — our adapter; all SDK imports
+   funnel through here so any future package or export-path change is
+   localized to one file.
+7. `STATUS.md` — current state; this audit is layered on top.

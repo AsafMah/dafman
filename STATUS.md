@@ -14,11 +14,17 @@
 > definition-of-done per milestone.
 
 **Active milestone:** **Code-quality + architecture cleanup follow-through**.
-The 2026-05-25 quality pass is now landed: **gts + Prettier adoption, spacing cleanup,
-`shellUtils` extraction, dependency cleanup, and ESLint reduced to 0 errors**.
-The structural follow-up also landed: stores/components/backend modules were regrouped by
-domain, shared utilities were extracted (`createListenerRegistry`, `revealPath`,
-`MODE_OPTIONS`), and renderer imports now use the `@/` alias consistently.
+The 2026-05-25 → 26 quality sprint landed Phases A / A.5 / B / C / D.1 (28 commits) —
+see [`DEVLOG.md`](DEVLOG.md) top entry for the full receipts. Headline:
+- **~600 lines of hand-rolled infrastructure deleted** (Phase A library swaps)
+- **63 backend TS errors cleared + gated** (`bun run lint:tsc-bun` now in `bun run check`)
+- **Switched SDK** from deep `node_modules/@github/copilot/copilot-sdk/*` paths to the
+  standalone `@github/copilot-sdk@1.0.0-beta.7` package
+- **`.vue` direct invokeCommand calls 36 → 3** (Phase B composables)
+- **`as unknown as` in layoutStore 12 → 2** (Phase C dockview-types)
+- **SettingsPanel 968 → 339 lines** (Phase D.1 section components)
+- **600 tests** (was 551 at sprint start; +49 regression-net additions)
+- **AGENTS.md rules 16–22 added** with concrete sprint precedents
 
 Renderer imports now resolve through `tsconfig.json` (`@/*` → `src/*`) across 129 files.
 Backend imports intentionally stay relative because `Bun.build` still does not reliably
@@ -28,20 +34,52 @@ honor tsconfig path aliases for the bun entry graph.
 
 ## Next concrete steps
 
-**Quality-pass follow-up (current):**
+**Code-quality sprint follow-through (current):**
 
-1. **Cleanup Phase 4 — `src/lib/` reorg.**
-   Split the remaining flat helper layer into domain folders so the renderer-side
-   architecture matches the now-grouped stores/components/backend layout.
-2. **Cleanup Phase 5 — remaining god-object splits.**
-   Continue carving down oversized modules after the folder move so the restructure is
-   reflected in actual ownership boundaries, not just import paths.
-3. **Playwright smoke investigation on Windows.**
-   The Windows smoke hangs are still open, are considered pre-existing, and are **not**
-   attributed to the restructure / alias series.
-4. **Roadmap backlog resumes after the cleanup thread closes.**
-   The audit/roadmap phases below remain valid, but the immediate engineering focus is
-   finishing the quality/restructure follow-through first.
+1. **Phase D.2 — ChatWindow.vue (1,185 lines).**
+   Per rubber-duck, add 5 specific regression tests FIRST (event flush, timeline merge,
+   send, retry/fork, pending banner — ChatWindow has 0 unit tests today and smoke is too
+   coarse for rAF/dropped-event regressions). Then extract `useChatEventFlush`,
+   `useChatScroll`, `useMessageActions`, optionally `<ChatTranscript>`.
+2. **Phase D.3 — sessions.ts (1,929 lines).**
+   Extract sibling SDK-wrapper services (`SessionAgentsService`, `SessionTasksService`,
+   `SessionSkillsService`, `SessionMcpService`, `SessionPlanService`, optionally
+   `SessionModelService`) with a tiny context port — services receive
+   `{ getEntry(sessionId), getClient(), wrapSdkError() }` and DO NOT mutate `entries`.
+   Lifecycle (`create`/`resume`/`forward`/`disconnect`) stays in `SessionRegistry`.
+3. **Phase D.4 — MessageComposer.vue (1,389 lines).**
+   Add regression tests for paste/drop, focus, command-mode entry/exit, toolbar format
+   state, submit payload (attachment retention). Then prefer subcomponents
+   (`<ComposerToolbar>`, `<ComposerFilePickerButton>`, `<ComposerCommandMode>`) over
+   giant composables. Avoid prop-drilling the Lexical editor.
+4. **Phase E — jscpd-driven deduplication.**
+   Per the §3 jscpd refresh (70 clones / 2.56%): `JsonSchemaField` 4 type branches,
+   Library tabs user/project pattern, task aggregation composable, Lexical trigger
+   plugin factory, `useCodeMirror()`, shared `<ArgRow>`. ~250 lines deletable, all
+   independent of Phase D.
+5. **Phase F — timing hacks + remaining ESLint** (17 complexity, 6 non-null assertions,
+   5 max-lines-per-function, 1 max-depth).
+
+**Deferred per rubber-duck:**
+- D.5 `SessionsManager.vue` (1,062 lines) — split when sidebar work resumes.
+- D.6 `layoutStore.ts` (1,145 lines) — Phase C.1 dockview-types extraction was the
+  recent touch; another structural split now is high blast radius. Touch only if a
+  Dockview feature/bug forces it.
+
+**Pending feature todo:**
+- `sdk-canvas-support` (queued in session SQL) — wire the new Canvas API from
+  `@github/copilot-sdk@1.0.0-beta.7` (`createCanvas`, `CanvasAction`,
+  `CanvasDeclaration`, `CanvasOpenContext`) once Phase D decoupling provides a
+  natural home for a `canvasRegistry` analogous to `commandResultRegistry`.
+  Tracked in `plans/plan-sdk-audit.prompt.md` §D.13.
+
+**Playwright smoke investigation on Windows.**
+The Windows smoke hangs are still open, are considered pre-existing, and are **not**
+attributed to the restructure / alias series.
+
+**Roadmap backlog resumes after the cleanup thread closes.**
+The audit/roadmap phases below remain valid, but the immediate engineering focus is
+finishing the Phase D-F cleanup first.
 
 Explicitly **out of scope**:
 - Image generation (deferred per user; un-defer requires explicit ask).
@@ -59,7 +97,7 @@ TODO reflects current state against the M0–M7 ambitions in
 | Area | Status | Notes |
 |---|---|---|
 | Tauri → Electrobun port | DONE | `src-tauri/` deleted; one TS+Bun stack. |
-| SDK pinned to bundled Copilot JSON-RPC SDK | DONE | `src-bun/app/copilotSdk.ts` centralises the bundled SDK import; prebuilt platform binary resolved in `src-bun/app/client.ts` to dodge the Node 24 floor. |
+| SDK pinned to standalone `@github/copilot-sdk@1.0.0-beta.7` | DONE | `src-bun/app/client/copilotSdk.ts` centralises the SDK import; prebuilt platform binary resolved in `src-bun/app/client/client.ts` to dodge the Node 24 floor. Switched off deep `node_modules/@github/copilot/copilot-sdk/*` paths 2026-05-25. |
 | Single Client lifecycle | DONE | `clientStore` + bun `client.ts`. |
 | Multi-session create / resume / disconnect / delete | DONE | `SessionRegistry`; layout-driven resume on startup. |
 | Streaming chat | DONE | rAF-coalesced; reducer in `src/lib/chatEvents.ts`. |
@@ -280,13 +318,15 @@ estimates (1 d = ~1 working day of focused engineering).
 | Surface | Runner | Count |
 |---|---|---|
 | Bun-side domain modules | `bun test` | ~50 |
-| IPC wire-shape snapshots | `bun test` (`toMatchSnapshot`) | 23 snapshots |
-| Pure renderer reducers / helpers | `bun test` | ~120 |
-| Vue SFCs + Lexical custom nodes | `bun test` + `tools/bun-vue-loader.ts` | ~110 |
+| IPC wire-shape snapshots | `bun test` (`toMatchSnapshot`) | 49 snapshots |
+| Pure renderer reducers / helpers | `bun test` | ~135 |
+| Vue SFCs + Lexical custom nodes | `bun test` + `tools/bun-vue-loader.ts` | ~115 |
 | Renderer boot smoke (Playwright + chromium) | `bun run smoke` | 2 (prod + HMR) |
 | Real binary E2E | not yet wired | 0 |
 
-Total: **544 `bun test`** passing as of 2026-05-23.
+Total: **600 `bun test`** passing as of 2026-05-26 (+49 since 2026-05-23: regression-net
+adds for ansi / codeLanguage / listenerRegistry / terminalStore / bus / usePersistedRef
+landed during the Phase A library swaps).
 
 Phase A–B shipped (manual test bug-bash):
 - Reasoning: entire shell hidden when visibility=hidden

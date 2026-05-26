@@ -10,6 +10,12 @@ the 20c commit. Items marked **fixed in 21a / 21b** were addressed
 in the Phase 21 burn-down. Everything else lives here as a tracked
 backlog.
 
+> **Update 2026-05-26:** the 2026-05-25 → 26 code-quality sprint
+> (28 commits, Phases A / A.5 / SDK / B / C / D.1) addressed several
+> items below. New live source of truth for ongoing cleanup is
+> [`CODE_AUDIT.md`](../CODE_AUDIT.md) §8 (Phases D.2 / D.3 / D.4 / E / F
+> remain open). This doc keeps history; new items go into CODE_AUDIT.
+
 ---
 
 ## Architectural — sessions.ts is 1451 lines
