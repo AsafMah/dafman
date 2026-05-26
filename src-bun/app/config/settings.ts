@@ -253,37 +253,31 @@ function coercePermissions(raw: unknown): PermissionsPrefs {
   return { defaultApproveAll };
 }
 
+/// Coerce a value to a trimmed non-empty string, falling back when
+/// the input isn't a string or trims to empty.
+function coerceTrimmedString(raw: unknown, fallback: string): string {
+  if (typeof raw !== 'string') return fallback;
+
+  const trimmed = raw.trim();
+
+  return trimmed ? trimmed : fallback;
+}
+
+/// Coerce a value to an integer in `[min, max]`, falling back when
+/// the input isn't a finite number.
+function coerceBoundedInt(raw: unknown, min: number, max: number, fallback: number): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallback;
+
+  return Math.min(max, Math.max(min, Math.floor(raw)));
+}
+
 function coerceTerminal(raw: unknown): TerminalPrefs {
   const base = defaultSettings().terminal;
 
   if (!raw || typeof raw !== 'object') return base;
 
   const obj = raw as Record<string, unknown>;
-  const defaultProfileId =
-    typeof obj.defaultProfileId === 'string' && obj.defaultProfileId.trim()
-      ? obj.defaultProfileId.trim()
-      : base.defaultProfileId;
-  const fontFamily =
-    typeof obj.fontFamily === 'string' && obj.fontFamily.trim()
-      ? obj.fontFamily.trim()
-      : base.fontFamily;
-  const fontSize =
-    typeof obj.fontSize === 'number' && Number.isFinite(obj.fontSize)
-      ? Math.min(32, Math.max(8, Math.floor(obj.fontSize)))
-      : base.fontSize;
-  const scrollback =
-    typeof obj.scrollback === 'number' && Number.isFinite(obj.scrollback)
-      ? Math.min(100_000, Math.max(1_000, Math.floor(obj.scrollback)))
-      : base.scrollback;
   const rawTheme = obj.theme as Record<string, unknown> | undefined;
-  const background =
-    typeof rawTheme?.background === 'string' && rawTheme.background.trim()
-      ? rawTheme.background.trim()
-      : base.theme.background;
-  const foreground =
-    typeof rawTheme?.foreground === 'string' && rawTheme.foreground.trim()
-      ? rawTheme.foreground.trim()
-      : base.theme.foreground;
   const rawAddons = obj.addons as Record<string, unknown> | undefined;
   const addons = { ...base.addons };
 
@@ -292,11 +286,14 @@ function coerceTerminal(raw: unknown): TerminalPrefs {
   }
 
   return {
-    defaultProfileId,
-    fontFamily,
-    fontSize,
-    scrollback,
-    theme: { background, foreground },
+    defaultProfileId: coerceTrimmedString(obj.defaultProfileId, base.defaultProfileId),
+    fontFamily: coerceTrimmedString(obj.fontFamily, base.fontFamily),
+    fontSize: coerceBoundedInt(obj.fontSize, 8, 32, base.fontSize),
+    scrollback: coerceBoundedInt(obj.scrollback, 1_000, 100_000, base.scrollback),
+    theme: {
+      background: coerceTrimmedString(rawTheme?.background, base.theme.background),
+      foreground: coerceTrimmedString(rawTheme?.foreground, base.theme.foreground),
+    },
     addons,
   };
 }

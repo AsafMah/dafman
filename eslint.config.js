@@ -139,4 +139,18 @@ export default tseslint.config(
       ],
     },
   },
+
+  // ── max-lines-per-function overrides ──────────────────────────
+  //
+  // Pinia `defineStore` callbacks ARE the whole store body — splitting
+  // them into helpers just hides the structure behind named imports.
+  // Same for `registerBuiltinCommands` which is a flat per-command
+  // declaration list. Per CODE_AUDIT §8 / 2026-05-26: rule disabled
+  // for these specific surfaces, kept at 200 everywhere else.
+  {
+    files: ['src/stores/**/*.ts', 'src/lib/registerBuiltinCommands.ts'],
+    rules: {
+      'max-lines-per-function': 'off',
+    },
+  },
 );

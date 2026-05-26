@@ -158,112 +158,14 @@ export class PendingRequestQueue {
   /// instead of throwing. Type-narrows the renderer's compact
   /// response shape into the SDK's wider one.
   async respond(params: RespondToRequestParams): Promise<boolean> {
-    const entry = this.entries.get(params.requestId);
+    const entry = this.validateRespond(params);
 
-    if (!entry || entry.settled) {
-      log.debug('respondToRequest on already-resolved request', {
-        requestId: params.requestId,
-      });
-
-      return false;
-    }
-
-    if (entry.sessionId !== params.sessionId) {
-      log.warn('respondToRequest sessionId mismatch', {
-        requestId: params.requestId,
-        expected: entry.sessionId,
-        got: params.sessionId,
-      });
-
-      return false;
-    }
-
-    if (entry.kind !== params.response.kind) {
-      log.warn('respondToRequest kind mismatch', {
-        requestId: params.requestId,
-        expected: entry.kind,
-        got: params.response.kind,
-      });
-
-      return false;
-    }
+    if (!entry) return false;
 
     entry.settled = true;
     this.entries.delete(params.requestId);
-    let sdkResult: unknown;
-    let approvalKind: string | undefined;
-    let approvalDomain: string | undefined;
 
-    switch (params.response.kind) {
-      case 'permission':
-        if (params.response.decision === 'approveOnce') {
-          sdkResult = { kind: 'approve-once' };
-        } else if (params.response.decision === 'reject') {
-          sdkResult = { kind: 'reject' };
-        } else {
-          // approveForSession — assemble the full SDK shape.
-          // The `approval` field is per-kind:
-          //   - commands : { commandIdentifiers: string[] }
-          //   - read / write / memory : kind only
-          //   - mcp : { serverName, toolName | null }
-          //   - mcp-sampling : { serverName }
-          //   - custom-tool : { toolName }
-          // `domain` is exclusive to `url` permission requests and
-          // goes at the top level (not inside `approval`).
-          const out: Record<string, unknown> = { kind: 'approve-for-session' };
-
-          if (params.response.approval) {
-            out.approval = params.response.approval;
-            approvalKind = params.response.approval.kind;
-          }
-
-          if (params.response.domain) {
-            out.domain = params.response.domain;
-            approvalDomain = params.response.domain;
-          }
-
-          sdkResult = out;
-        }
-
-        // Audit log: every permission decision recorded as one
-        // line in <userData>/audit/permissions.jsonl. Captures
-        // what + when + who + scope without leaking command
-        // bodies or paths beyond the bun-derived summary.
-        this.auditPermission({
-          sessionId: params.sessionId,
-          requestId: params.requestId,
-          permissionKind: entry.permissionKind ?? 'unknown',
-          decision: params.response.decision,
-          ...(entry.summary ? { summary: entry.summary } : {}),
-          ...(approvalKind ? { approvalKind } : {}),
-          ...(approvalDomain ? { approvalDomain } : {}),
-        });
-        break;
-      case 'userInput':
-        sdkResult = {
-          answer: params.response.answer,
-          wasFreeform: params.response.wasFreeform,
-        };
-        break;
-      case 'elicitation':
-        sdkResult = {
-          action: params.response.action,
-          ...(params.response.content ? { content: params.response.content } : {}),
-        };
-        break;
-      case 'exitPlanMode':
-        sdkResult = {
-          approved: params.response.approved,
-          ...(params.response.selectedAction
-            ? { selectedAction: params.response.selectedAction }
-            : {}),
-          ...(params.response.feedback ? { feedback: params.response.feedback } : {}),
-        };
-        break;
-      case 'autoModeSwitch':
-        sdkResult = params.response.response;
-        break;
-    }
+    const sdkResult = this.buildSdkResult(entry, params);
 
     try {
       entry.resolve(sdkResult);
@@ -277,5 +179,127 @@ export class PendingRequestQueue {
     }
 
     return true;
+  }
+
+  /// Verify the response targets a still-pending request and the
+  /// sessionId / kind line up. Returns the entry on success, `null`
+  /// on a mismatch (with a log line).
+  private validateRespond(params: RespondToRequestParams): PendingEntry | null {
+    const entry = this.entries.get(params.requestId);
+
+    if (!entry || entry.settled) {
+      log.debug('respondToRequest on already-resolved request', {
+        requestId: params.requestId,
+      });
+
+      return null;
+    }
+
+    if (entry.sessionId !== params.sessionId) {
+      log.warn('respondToRequest sessionId mismatch', {
+        requestId: params.requestId,
+        expected: entry.sessionId,
+        got: params.sessionId,
+      });
+
+      return null;
+    }
+
+    if (entry.kind !== params.response.kind) {
+      log.warn('respondToRequest kind mismatch', {
+        requestId: params.requestId,
+        expected: entry.kind,
+        got: params.response.kind,
+      });
+
+      return null;
+    }
+
+    return entry;
+  }
+
+  /// Translate the renderer's compact response shape into the SDK's
+  /// wider one. Permission responses also fire an audit-log entry as
+  /// a side effect — the only kind that does.
+  private buildSdkResult(entry: PendingEntry, params: RespondToRequestParams): unknown {
+    switch (params.response.kind) {
+      case 'permission':
+        return this.buildPermissionResult(entry, params, params.response);
+      case 'userInput':
+        return {
+          answer: params.response.answer,
+          wasFreeform: params.response.wasFreeform,
+        };
+      case 'elicitation':
+        return {
+          action: params.response.action,
+          ...(params.response.content ? { content: params.response.content } : {}),
+        };
+      case 'exitPlanMode':
+        return {
+          approved: params.response.approved,
+          ...(params.response.selectedAction
+            ? { selectedAction: params.response.selectedAction }
+            : {}),
+          ...(params.response.feedback ? { feedback: params.response.feedback } : {}),
+        };
+      case 'autoModeSwitch':
+        return params.response.response;
+    }
+  }
+
+  /// Permission response builder + audit log. The `approval` field
+  /// is per-kind:
+  ///   - commands : { commandIdentifiers: string[] }
+  ///   - read / write / memory : kind only
+  ///   - mcp : { serverName, toolName | null }
+  ///   - mcp-sampling : { serverName }
+  ///   - custom-tool : { toolName }
+  /// `domain` is exclusive to `url` permission requests and goes
+  /// at the top level (not inside `approval`).
+  private buildPermissionResult(
+    entry: PendingEntry,
+    params: RespondToRequestParams,
+    response: Extract<RespondToRequestParams['response'], { kind: 'permission' }>,
+  ): unknown {
+    let sdkResult: unknown;
+    let approvalKind: string | undefined;
+    let approvalDomain: string | undefined;
+
+    if (response.decision === 'approveOnce') {
+      sdkResult = { kind: 'approve-once' };
+    } else if (response.decision === 'reject') {
+      sdkResult = { kind: 'reject' };
+    } else {
+      const out: Record<string, unknown> = { kind: 'approve-for-session' };
+
+      if (response.approval) {
+        out.approval = response.approval;
+        approvalKind = response.approval.kind;
+      }
+
+      if (response.domain) {
+        out.domain = response.domain;
+        approvalDomain = response.domain;
+      }
+
+      sdkResult = out;
+    }
+
+    // Audit log: every permission decision recorded as one line in
+    // <userData>/audit/permissions.jsonl. Captures what + when +
+    // who + scope without leaking command bodies or paths beyond
+    // the bun-derived summary.
+    this.auditPermission({
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      permissionKind: entry.permissionKind ?? 'unknown',
+      decision: response.decision,
+      ...(entry.summary ? { summary: entry.summary } : {}),
+      ...(approvalKind ? { approvalKind } : {}),
+      ...(approvalDomain ? { approvalDomain } : {}),
+    });
+
+    return sdkResult;
   }
 }

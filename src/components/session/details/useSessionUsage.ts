@@ -105,6 +105,39 @@ export function formatDurationMs(ms: number): string {
   return `${min}m ${sec}s`;
 }
 
+/// Number coercion that maps non-numeric/undefined values to a
+/// caller-provided default.
+function asNumber(v: unknown, fallback = 0): number {
+  return typeof v === 'number' ? v : fallback;
+}
+
+/// Build a `UsageMetrics` shape from the raw RPC payload. Field
+/// fallbacks: `currentTokens ?? inputTokens`,
+/// `tokenLimit ?? maxTokens`, both run through `normalizeContextLimit`
+/// to round to a sane bucket (e.g. 1_048_576 → 1_000_000).
+function normalizeRpcUsage(raw: Record<string, unknown>): UsageMetrics {
+  const currentTokens = asNumber(raw.currentTokens, asNumber(raw.inputTokens));
+  const tokenLimitSource = typeof raw.tokenLimit === 'number' ? raw.tokenLimit : raw.maxTokens;
+  const tokenLimit =
+    typeof tokenLimitSource === 'number' ? (normalizeContextLimit(tokenLimitSource) ?? 0) : 0;
+
+  return {
+    totalUserRequests: asNumber(raw.totalUserRequests),
+    totalPremiumRequestCost: asNumber(raw.totalPremiumRequestCost),
+    totalApiDurationMs: asNumber(raw.totalApiDurationMs),
+    lastCallInputTokens: asNumber(raw.lastCallInputTokens),
+    lastCallOutputTokens: asNumber(raw.lastCallOutputTokens),
+    currentTokens,
+    tokenLimit,
+  };
+}
+
+/// True when the RPC returned at least one signal we should prefer
+/// over the event-derived fallback.
+function isUsageRpcPopulated(u: UsageMetrics): boolean {
+  return u.totalUserRequests > 0 || u.lastCallInputTokens > 0 || u.tokenLimit > 0;
+}
+
 export function useSessionUsage(
   sessionId: ComputedRef<string>,
   record: ComputedRef<SessionRecord | undefined>,
@@ -122,34 +155,10 @@ export function useSessionUsage(
       const raw = await invokeCommand('getSessionUsageMetrics', {
         sessionId: sessionId.value,
       });
-      const fromRpc = {
-        totalUserRequests: typeof raw.totalUserRequests === 'number' ? raw.totalUserRequests : 0,
-        totalPremiumRequestCost:
-          typeof raw.totalPremiumRequestCost === 'number' ? raw.totalPremiumRequestCost : 0,
-        totalApiDurationMs: typeof raw.totalApiDurationMs === 'number' ? raw.totalApiDurationMs : 0,
-        lastCallInputTokens:
-          typeof raw.lastCallInputTokens === 'number' ? raw.lastCallInputTokens : 0,
-        lastCallOutputTokens:
-          typeof raw.lastCallOutputTokens === 'number' ? raw.lastCallOutputTokens : 0,
-        currentTokens:
-          typeof raw.currentTokens === 'number'
-            ? raw.currentTokens
-            : typeof raw.inputTokens === 'number'
-              ? raw.inputTokens
-              : 0,
-        tokenLimit:
-          typeof raw.tokenLimit === 'number'
-            ? (normalizeContextLimit(raw.tokenLimit) ?? 0)
-            : typeof raw.maxTokens === 'number'
-              ? (normalizeContextLimit(raw.maxTokens) ?? 0)
-              : 0,
-      };
+      const fromRpc = normalizeRpcUsage(raw);
       const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
 
-      usage.value =
-        fromRpc.totalUserRequests > 0 || fromRpc.lastCallInputTokens > 0 || fromRpc.tokenLimit > 0
-          ? fromRpc
-          : fromEvents;
+      usage.value = isUsageRpcPopulated(fromRpc) ? fromRpc : fromEvents;
     } catch (err) {
       const fromEvents = deriveUsageFromEvents(record.value?.events ?? []);
 

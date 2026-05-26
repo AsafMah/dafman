@@ -37,6 +37,67 @@ export interface SessionEventForwarderDeps {
   pending: PendingRequestQueue;
 }
 
+/// Diagnostic event types log at `debug` (with the full payload);
+/// everything else logs at `trace` (without the payload, to keep
+/// the JSONL log lean).
+const DIAGNOSTIC_EVENT_TYPES = new Set<string>([
+  'assistant.reasoning',
+  'assistant.reasoning_delta',
+  'session.error',
+  'session.warning',
+  'model.call_failure',
+]);
+
+function logSessionEvent(sessionId: string, eventType: string, event: SessionEvent): void {
+  if (DIAGNOSTIC_EVENT_TYPES.has(eventType)) {
+    log.debug('session event', { sessionId, eventType, event });
+  } else {
+    log.trace('session event', { sessionId, eventType });
+  }
+}
+
+/// SDK envelope unwrap + plain-object validation. Returns the lifted
+/// envelope fields (`agentId` / `id` / `timestamp`) and the safe
+/// `data` record (which always exists; malformed `null` / array /
+/// primitive payloads coerce to `{}` plus a warn-log so the issue
+/// surfaces in diagnostics).
+function unwrapEvent(
+  sessionId: string,
+  event: SessionEvent,
+): {
+  envelope: { agentId?: string; id?: string; timestamp?: string };
+  data: Record<string, unknown>;
+} {
+  // The SDK wraps each event as { type, data, id, parentId, ts, ... }.
+  // The Rust port forwarded only `event.data`, and our `chatEvents.ts`
+  // reads fields like `payload.data.messageId` directly off the
+  // payload. Unwrap the SDK's nested `data` so the frontend sees the
+  // same shape it always did, but also lift envelope-level fields
+  // (`agentId`, `id`, `timestamp`) so the frontend can correlate
+  // sub-agent activity without us mirroring every variant.
+  const envelope = event as unknown as {
+    data?: unknown;
+    agentId?: string;
+    id?: string;
+    timestamp?: string;
+  };
+  const rawData = envelope.data;
+  const isPlainObject = rawData !== null && typeof rawData === 'object' && !Array.isArray(rawData);
+
+  if (!isPlainObject && rawData !== undefined) {
+    log.warn('dropping malformed event.data on forward', {
+      sessionId,
+      eventType: event.type,
+      dataType: rawData === null ? 'null' : Array.isArray(rawData) ? 'array' : typeof rawData,
+    });
+  }
+
+  return {
+    envelope,
+    data: (isPlainObject ? rawData : {}) as Record<string, unknown>,
+  };
+}
+
 export class SessionEventForwarder {
   constructor(private readonly deps: SessionEventForwarderDeps) {}
 
@@ -45,80 +106,12 @@ export class SessionEventForwarder {
   /// flattens that to the renderer's `SessionEventPayload` shape.
   forward(sessionId: string, event: SessionEvent): void {
     const eventType = event.type;
-    const isDiagnostic =
-      eventType === 'assistant.reasoning' ||
-      eventType === 'assistant.reasoning_delta' ||
-      eventType === 'session.error' ||
-      eventType === 'session.warning' ||
-      eventType === 'model.call_failure';
 
-    if (isDiagnostic) {
-      log.debug('session event', {
-        sessionId,
-        eventType,
-        event,
-      });
-    } else {
-      log.trace('session event', { sessionId, eventType });
-    }
+    logSessionEvent(sessionId, eventType, event);
 
-    // The SDK wraps each event as { type, data, id, parentId, ts, ... }.
-    // The Rust port forwarded only `event.data`, and our `chatEvents.ts`
-    // reads fields like `payload.data.messageId` directly off the
-    // payload. Unwrap the SDK's nested `data` so the frontend sees the
-    // same shape it always did, but also lift envelope-level fields
-    // (`agentId`, `id`, `timestamp`) so the frontend can correlate
-    // sub-agent activity without us mirroring every variant.
-    const envelope = event as unknown as {
-      data?: unknown;
-      agentId?: string;
-      id?: string;
-      timestamp?: string;
-    };
-    // SDK is typed as `data: Record<string, unknown>` but we can't
-    // trust the wire — a malformed `null` / array / primitive would
-    // silently coerce to `{}` and downstream reducers (which read
-    // `data.messageId`, `data.toolCallId`, …) would see an empty
-    // payload instead of the real one. Reject anything that isn't a
-    // plain object and warn so the issue surfaces in diagnostics.
-    const rawData = envelope.data;
-    const isPlainObject =
-      rawData !== null && typeof rawData === 'object' && !Array.isArray(rawData);
+    const { envelope, data } = unwrapEvent(sessionId, event);
 
-    if (!isPlainObject && rawData !== undefined) {
-      log.warn('dropping malformed event.data on forward', {
-        sessionId,
-        eventType,
-        dataType: rawData === null ? 'null' : Array.isArray(rawData) ? 'array' : typeof rawData,
-      });
-    }
-
-    const data = (isPlainObject ? rawData : {}) as Record<string, unknown>;
-
-    if (eventType === 'session.mode_changed') {
-      const newMode = data.newMode;
-
-      if (newMode === 'interactive' || newMode === 'plan' || newMode === 'autopilot') {
-        this.deps.modeBySession.set(sessionId, newMode);
-
-        if (newMode === 'autopilot') {
-          this.deps.pending.settleForSession(sessionId, 'autopilot-mode');
-        }
-      }
-    }
-
-    // When the CLI signals idle (turn finished), proactively fetch
-    // the session title from metadata. The CLI auto-summarises the
-    // conversation but may only emit `session.title_changed` inside
-    // workspace-enabled sessions. Polling `getMetadata` on idle
-    // catches the title regardless.
-    if (eventType === 'session.idle') {
-      this.pollTitleFromMetadata(sessionId);
-    }
-
-    if (eventType === 'session.title_changed') {
-      log.info('session.title_changed received', { sessionId, title: data.title });
-    }
+    this.handleSideEffects(sessionId, eventType, data);
 
     try {
       this.deps.emit({
@@ -135,6 +128,45 @@ export class SessionEventForwarder {
         eventType,
         error: toErrorMessage(err),
       });
+    }
+  }
+
+  /// Per-eventType side effects: mode mirror + autopilot pending
+  /// settle on `session.mode_changed`, title poll on `session.idle`,
+  /// info-log on `session.title_changed`. Kept inside the class
+  /// because all three reach for `this.deps` / `this.pollTitleFromMetadata`.
+  private handleSideEffects(
+    sessionId: string,
+    eventType: string,
+    data: Record<string, unknown>,
+  ): void {
+    if (eventType === 'session.mode_changed') {
+      const newMode = data.newMode;
+
+      if (newMode === 'interactive' || newMode === 'plan' || newMode === 'autopilot') {
+        this.deps.modeBySession.set(sessionId, newMode);
+
+        if (newMode === 'autopilot') {
+          this.deps.pending.settleForSession(sessionId, 'autopilot-mode');
+        }
+      }
+
+      return;
+    }
+
+    // When the CLI signals idle (turn finished), proactively fetch
+    // the session title from metadata. The CLI auto-summarises the
+    // conversation but may only emit `session.title_changed` inside
+    // workspace-enabled sessions. Polling `getMetadata` on idle
+    // catches the title regardless.
+    if (eventType === 'session.idle') {
+      this.pollTitleFromMetadata(sessionId);
+
+      return;
+    }
+
+    if (eventType === 'session.title_changed') {
+      log.info('session.title_changed received', { sessionId, title: data.title });
     }
   }
 

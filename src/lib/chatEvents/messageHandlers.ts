@@ -85,53 +85,21 @@ export const messageHandlers: Record<string, Handler> = {
     const eventId = payload.eventId ?? pickString(data, ['messageId']) ?? undefined;
     const attachments = normalizeAttachments(data as Record<string, unknown>);
 
-    if (eventId) {
-      const byId = ctx.items.find((i) => i.kind === 'user' && i.messageId === eventId);
-
-      if (byId) {
-        if (byId.kind === 'user') {
-          if (!byId.eventId && payload.eventId) {
-            byId.eventId = payload.eventId;
-          }
-
-          // Restore attachments seen on the SDK echo if the optimistic
-          // path didn't already carry them (history replay after restart).
-          if (!byId.attachments && attachments) {
-            byId.attachments = attachments;
-          }
-        }
-
-        return;
-      }
-    }
-
-    // U8: backwards loop avoids the [...items].reverse() array copy
-    // (which runs on every user.message including the full history
-    // replay on resume). Early-break on the most-recent optimistic
-    // user message with matching text.
-    let optimistic: (typeof ctx.items)[number] | undefined;
-
-    for (let i = ctx.items.length - 1; i >= 0; i--) {
-      const item = ctx.items[i];
-
-      if (item && item.kind === 'user' && !item.messageId && item.text === content) {
-        optimistic = item;
-        break;
-      }
-    }
-
-    if (optimistic && optimistic.kind === 'user') {
-      optimistic.messageId = eventId;
-
-      if (payload.eventId) optimistic.eventId = payload.eventId;
-
-      if (!optimistic.attachments && attachments) {
-        optimistic.attachments = attachments;
-      }
-
+    // 1. Already-known by messageId? Backfill eventId/attachments
+    //    and bail — this is the SDK re-echoing an event we've already
+    //    materialized (history replay after restart).
+    if (eventId && mergeKnownUserMessage(ctx, eventId, payload.eventId, attachments)) {
       return;
     }
 
+    // 2. Optimistic match? An `appendUserMessage` from the composer
+    //    inserts a user item with no messageId; the SDK's echo lets
+    //    us reconcile that bubble with the real ids.
+    if (mergeOptimisticUserMessage(ctx, content, eventId, payload.eventId, attachments)) {
+      return;
+    }
+
+    // 3. Fresh insert.
     ctx.items.push({
       id: ctx.counter.next++,
       kind: 'user',
@@ -143,74 +111,161 @@ export const messageHandlers: Record<string, Handler> = {
   },
 };
 
+/// Merge in-place when we find an existing user item that matches the
+/// SDK's `messageId`. Returns `true` when the merge happened so the
+/// caller can short-circuit the rest of the flow.
+function mergeKnownUserMessage(
+  ctx: Parameters<(typeof messageHandlers)['user.message']>[0],
+  messageId: string,
+  payloadEventId: string | undefined,
+  attachments: import('@/ipc/types').SendMessageAttachment[] | undefined,
+): boolean {
+  const byId = ctx.items.find((i) => i.kind === 'user' && i.messageId === messageId);
+
+  if (!byId || byId.kind !== 'user') return Boolean(byId);
+
+  if (!byId.eventId && payloadEventId) {
+    byId.eventId = payloadEventId;
+  }
+
+  // Restore attachments seen on the SDK echo if the optimistic
+  // path didn't already carry them (history replay after restart).
+  if (!byId.attachments && attachments) {
+    byId.attachments = attachments;
+  }
+
+  return true;
+}
+
+/// Reconcile against an optimistic user bubble (one we appended
+/// locally before the SDK echoed it). Identifies via the most-recent
+/// user item that has no messageId AND matches text. Returns `true`
+/// when a merge happened.
+///
+/// U8: backwards loop avoids the `[...items].reverse()` array copy
+/// (which would otherwise run on every user.message including the
+/// full history replay on resume).
+function mergeOptimisticUserMessage(
+  ctx: Parameters<(typeof messageHandlers)['user.message']>[0],
+  content: string,
+  eventId: string | undefined,
+  payloadEventId: string | undefined,
+  attachments: import('@/ipc/types').SendMessageAttachment[] | undefined,
+): boolean {
+  for (let i = ctx.items.length - 1; i >= 0; i--) {
+    const item = ctx.items[i];
+
+    if (!item || item.kind !== 'user' || item.messageId || item.text !== content) continue;
+
+    item.messageId = eventId;
+
+    if (payloadEventId) item.eventId = payloadEventId;
+
+    if (!item.attachments && attachments) {
+      item.attachments = attachments;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+type RawAttachment = Record<string, unknown>;
+type NormalizedAttachment = import('@/ipc/types').SendMessageAttachment;
+
+function normalizeFileAttachment(item: RawAttachment): NormalizedAttachment | null {
+  const path = item.path;
+  const displayName = item.displayName;
+
+  if (typeof path !== 'string') return null;
+
+  return {
+    type: 'file',
+    path,
+    ...(typeof displayName === 'string' ? { displayName } : {}),
+  };
+}
+
+function normalizeDirectoryAttachment(item: RawAttachment): NormalizedAttachment | null {
+  const path = item.path;
+  const displayName = item.displayName;
+
+  if (typeof path !== 'string') return null;
+
+  return {
+    type: 'directory',
+    path,
+    ...(typeof displayName === 'string' ? { displayName } : {}),
+  };
+}
+
+function normalizeBlobAttachment(item: RawAttachment): NormalizedAttachment | null {
+  const blobData = item.data;
+  const mimeType = item.mimeType;
+  const displayName = item.displayName;
+
+  if (typeof blobData !== 'string' || typeof mimeType !== 'string') return null;
+
+  return {
+    type: 'blob',
+    data: blobData,
+    mimeType,
+    ...(typeof displayName === 'string' ? { displayName } : {}),
+  };
+}
+
+function normalizeSelectionAttachment(item: RawAttachment): NormalizedAttachment | null {
+  const filePath = item.filePath;
+  const displayName = item.displayName;
+
+  if (typeof filePath !== 'string' || typeof displayName !== 'string') return null;
+
+  return {
+    type: 'selection',
+    filePath,
+    displayName,
+  };
+}
+
+/// Per-type normalizer dispatch. Unknown kinds (e.g.
+/// `github_reference`) are intentionally absent — the loop in
+/// `normalizeAttachments` drops anything that returns `null` here.
+const ATTACHMENT_NORMALIZERS: Record<string, (item: RawAttachment) => NormalizedAttachment | null> =
+  {
+    file: normalizeFileAttachment,
+    directory: normalizeDirectoryAttachment,
+    blob: normalizeBlobAttachment,
+    selection: normalizeSelectionAttachment,
+  };
+
 /// Map the SDK's UserMessageAttachment array (see
 /// `@github/copilot` session-events generated types) to our internal
 /// `SendMessageAttachment` shape so a sent message rehydrates with
 /// its pills after a restart. Unknown attachment kinds (github
 /// references etc.) are skipped — the user can still read the prompt
 /// text, just without an interactive chip.
-function normalizeAttachments(
-  data: Record<string, unknown>,
-): import('@/ipc/types').SendMessageAttachment[] | undefined {
+function normalizeAttachments(data: Record<string, unknown>): NormalizedAttachment[] | undefined {
   const raw = (data as { attachments?: unknown }).attachments;
 
   if (!Array.isArray(raw)) return undefined;
 
-  const out: import('@/ipc/types').SendMessageAttachment[] = [];
+  const out: NormalizedAttachment[] = [];
 
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
 
-    const t = (item as { type?: unknown }).type;
+    const kind = (item as { type?: unknown }).type;
 
-    if (t === 'file') {
-      const path = (item as { path?: unknown }).path;
-      const displayName = (item as { displayName?: unknown }).displayName;
+    if (typeof kind !== 'string') continue;
 
-      if (typeof path === 'string') {
-        out.push({
-          type: 'file',
-          path,
-          ...(typeof displayName === 'string' ? { displayName } : {}),
-        });
-      }
-    } else if (t === 'directory') {
-      const path = (item as { path?: unknown }).path;
-      const displayName = (item as { displayName?: unknown }).displayName;
+    const normalizer = ATTACHMENT_NORMALIZERS[kind];
 
-      if (typeof path === 'string') {
-        out.push({
-          type: 'directory',
-          path,
-          ...(typeof displayName === 'string' ? { displayName } : {}),
-        });
-      }
-    } else if (t === 'blob') {
-      const blobData = (item as { data?: unknown }).data;
-      const mimeType = (item as { mimeType?: unknown }).mimeType;
-      const displayName = (item as { displayName?: unknown }).displayName;
+    if (!normalizer) continue;
 
-      if (typeof blobData === 'string' && typeof mimeType === 'string') {
-        out.push({
-          type: 'blob',
-          data: blobData,
-          mimeType,
-          ...(typeof displayName === 'string' ? { displayName } : {}),
-        });
-      }
-    } else if (t === 'selection') {
-      const filePath = (item as { filePath?: unknown }).filePath;
-      const displayName = (item as { displayName?: unknown }).displayName;
+    const normalized = normalizer(item as RawAttachment);
 
-      if (typeof filePath === 'string' && typeof displayName === 'string') {
-        out.push({
-          type: 'selection',
-          filePath,
-          displayName,
-        });
-      }
-    }
-    // unknown kinds (e.g. github_reference) are intentionally dropped
+    if (normalized) out.push(normalized);
   }
 
   return out.length > 0 ? out : undefined;
