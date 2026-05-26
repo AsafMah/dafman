@@ -15,6 +15,95 @@
 
 ---
 
+## Phase 25 — v2 activity-rail → native dockview edge tabs (2026-05-26)
+
+1. ⏳ **Fresh boot — edge groups render correctly.**
+   - **Steps:** delete `userData/dafman/settings.json`'s `layout.dockview`
+     field (or zero out the file) and start the app.
+   - **Expected:** left strip shows 5 vertical tabs (Sessions, Terminals,
+     Jobs, Logs, Settings). Right strip shows 2 (Session details, Library).
+     Both strips collapsed to ~44 px wide. Tab icons render in brand-orange
+     when their panel is active.
+   - **Why not automated:** visual rendering of dockview chrome + writing-
+     mode CSS (`vertical-rl`) interaction with our `horizontal-tb` override.
+
+2. ⏳ **Click-to-expand + click-to-collapse via dockview native handler.**
+   - **Steps:** click each left tab in turn (Sessions → Terminals → Jobs →
+     Logs → Settings). Then click the currently-active tab again.
+   - **Expected:** first click expands the strip to the active tab's
+     preferred width (>= 420 px on left, 380 px on right). Second click
+     on the SAME tab collapses the strip back to 44 px. Pressed-state
+     indicator (orange-tinted icon) leaves the tab when collapsed.
+   - **Why not automated:** native dockview tab click handler + Playwright's
+     synthetic `dispatchEvent` doesn't reliably trigger it; real-user click
+     does.
+
+3. ⏳ **Edge group min-width enforced.**
+   - **Steps:** with the strip expanded, drag the strip's resize handle
+     leftward as far as it'll go (left edge) / rightward (right edge).
+   - **Expected:** left bottoms out at 420 px (Logs's floor). Right bottoms
+     out at 380 px (SessionDetails's floor). Sessions / Library content
+     adapts but doesn't break.
+   - **Why not automated:** drag-resize is a multi-event gesture that
+     Playwright can simulate but doesn't reach the splitview behavior
+     exactly the same way as a mouse-driven drag.
+
+4. ⏳ **Drag activity-bar tab — allowed destinations.**
+   - **Steps:** drag the Library tab from the right strip → drop into
+     the LEFT strip's tab area. Then drag it back.
+   - **Expected:** the drop indicator highlights only when hovering over
+     another edge group's tab strip / header area. Drop succeeds; the tab
+     re-renders on the new edge. Body grid / floating positions / popout
+     overlay never light up for activity-bar tab drags.
+   - **Why not automated:** drag-and-drop with overlay visualization is a
+     compound interaction; the public `onWillShowOverlay` event is wired
+     correctly but visual feedback is the user-visible signal.
+
+5. ⏳ **Settings collapse buttons toggle each section.**
+   - **Steps:** open Settings (click rail's cog or Cmd-K → "Open Settings").
+     Click each section header (Appearance, Workspaces, Terminal,
+     Notifications, Permissions, Diagnostics, About) once. Click again.
+   - **Expected:** each header toggles its body's visibility on each click.
+     The chevron flips between `pi-chevron-right` (collapsed) and
+     `pi-chevron-down` (expanded). State persists across collapses (each
+     section remembers independently) but resets on app restart (in-memory
+     only by design).
+   - **Why not automated:** the unit test (`SettingsGroup.collapse.test.ts`)
+     covers a single section; this one verifies all 7 + that they don't
+     interact.
+
+6. ⏳ **Status bar — dev wrench in HMR mode.**
+   - **Steps:** start the app with `bun run dev:hmr`. Look at the bottom
+     of the window.
+   - **Expected:** thin 22 px bar at the bottom. Left: "dafman" brand
+     label. Right: orange-tinted Playground wrench icon. Click it → dev
+     Playground opens as a body grid tab. Click again → closes / focuses
+     correctly.
+   - **Why not automated:** the wrench is `v-if="isDev"` and gated on
+     `import.meta.env.DEV`; only visible in vite-dev builds. Smoke tests
+     boot the prod bundle.
+
+7. ⏳ **Settings cog removed from status bar.**
+   - **Steps:** look at the right side of the status bar.
+   - **Expected:** NO settings cog. (The cog moved back to the left rail
+     after the user feedback round.)
+   - **Why not automated:** sanity check the v2-detour wasn't half-rolled-back.
+
+8. ⏳ **Schema migration from v1 layout.**
+   - **Steps:** if you have a `settings.json` from before 2026-05-26 with
+     `layout.dockview` populated (or no `schemaVersion` field), back it up
+     and use it for this test. Boot the app.
+   - **Expected:** boot log shows `[boot] restoreFromLayout: migrating
+     layout v1 → v2`. Chat sessions from the old layout are resumed (you
+     should see their tabs in the body grid). Edge groups are seeded
+     fresh from `LEFT_ACTIVITY_TABS` / `RIGHT_ACTIVITY_TABS`. Old layout
+     JSON is overwritten with v2 shape after the first auto-save.
+   - **Why not automated:** the smoke test always uses a fresh
+     `dockview: null` stub; the migration path needs a real v1 JSON
+     blob to verify end-to-end.
+
+---
+
 ## Phase 24 — Terminal integration
 
 1. ⏳ **Standalone terminal pane.**

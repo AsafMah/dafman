@@ -10,18 +10,6 @@
 
 ---
 
-# Development log
-
-> Append-only chronicle of substantive sessions and findings. **Every agent
-> session that touches the codebase ends with a new entry here** — investigation
-> notes that don't fit a commit message, design decisions taken, dead ends,
-> things future-me needs to know but couldn't have learned from the diff alone.
->
-> Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
-> Inside each entry, lead with the takeaway, then the receipts.
-
----
-
 ## 2026-05-26 (later) — Activity-rail → native dockview edge tabs
 
 **Takeaway:** Deleted the custom `ActivityBar.vue` rail and replaced
@@ -239,6 +227,135 @@ gotchas.
   ["sessions-manager","terminals-panel","jobs-panel","log-viewer"]`,
   `right.group.views = ["session-details","library"]`. Both
   `collapsed: true` on first boot.
+
+---
+
+## 2026-05-26 (sprint close) — v2 activity-rail follow-ups + Settings collapse fix
+
+**Takeaway:** Six follow-up commits after the initial v2 activity-rail
+landed, each catching a regression that automated tests missed:
+the user reported, I probed via `bun run inspect` (Playwright + CDP)
+or `tools/probe-*.ts` scripts, identified the structural cause, and
+landed the fix. Two of the bugs were dormant before v2 — surfaced
+only when v2 changed the visibility / mount lifecycle of the affected
+panels.
+
+### Six commits, each driven by a user-reported symptom
+
+| Commit | Symptom | Real cause | Fix |
+|---|---|---|---|
+| `b9fa7fd` | (proactive) need to inspect live DOM/CSS without writing pwtest scaffolding every time | rung-3 of diagnostic ladder was missing | `tools/inspect.ts` — Playwright + CDP harness with `--rules` (CSS cascade) + `--eval` (arbitrary JS) + `--click` + `--screenshot` |
+| `f0268df` | "Session settings styles broken, minimums of others wrong" | v2 collapsed each panel's per-panel min/initial widths into one edge-group constraint. Sessions's 180 floor lost; SessionDetails got the 320 default. v1 `EDGE_PANEL_DEFINITIONS` table orphaned but still referenced. | Promote per-tab `minimumSize` + `initialSize` into the seed (`LEFT_ACTIVITY_TABS` / `RIGHT_ACTIVITY_TABS`). Original plan: dynamic tracking via active-panel events. Probe revealed dockview's splitview reads `EdgeGroupView._expandedMinimumSize` from a private field with NO public setter — `setSize` on the api fires an event the shell ignores. Settled for static `max(all-mins)` per side at seed time. Cleanup: ~570 lines of v1 helpers deleted (`EDGE_PANEL_DEFINITIONS`, `LEFT_EDGE_MIN_BY_PANEL_ID`, `SESSION_DETAILS_MIN_WIDTH`, `lastSessionDetailsWidth` + width helpers, `recreateKnownEdgeGroup`, `isEdgeBelowMinimum`, etc.). |
+| `dcc8da9` | "5 regressions in v2: icon stays pressed after collapse, no minimums (still), Sessions icon too similar to Logs, can drag activity-bar tabs anywhere, playground gone" | Each cause different — see below | (1) Subscribe to `panel.api.group.onDidCollapsedChange`, gate `is-active` on `!groupCollapsed`. (2) `max(all-mins)` static seed (per the previous commit's discovery). (3) `pi-list` → `pi-comments` (better chat metaphor, distinct from Logs's `pi-bars`). (4) `dock.api.onWillShowOverlay` — `evt.preventDefault()` when dragging an activity-bar tab AND target isn't an edge group's tab strip. (5) Verified via inspect probe that the wrench IS rendered in dev mode; bumped to 20px + brand-orange tint for discoverability. |
+| `9624017` | "Settings now acts different" (after I'd moved it to a body grid tab in v2) | I made a unilateral design call to drop Settings from the activity bar. User wanted v1 behavior back. | Ran `ask_user` with structured options (placement: `left_edge_tab`, behavior: `toggle`). Added Settings back as 5th left tab. Renamed `openSettingsInBody` → `toggleSettings`. Removed `stripPanelFromLayout(SETTINGS_PANEL_ID)` from boot — Settings is now a persistent tab. Padded smoke RPC stub to full Settings shape (Settings is now eagerly mounted, would crash on missing `terminal` config). Seed time jumped from ~50 ms → ~100 ms because Settings is a heavy multi-section panel. Flagged but not addressed. |
+| `936bbd3` | "Group collapse buttons in settings don't work" | Phase D.1's SettingsPanel split (commit `9125e50`, ~24 hours earlier) introduced `@update:collapsed="setCollapsed('appearance')"`. Vue's compiler treats `@event="call()"` as an INLINE handler: compiles to `($event) => setCollapsed('appearance')`, then discards the returned closure. The new collapsed value never reached the reactive map. Bug stayed dormant in v1 because Settings was rarely opened; v2's permanent-tab promotion surfaced it. | Switched all 7 sections (Appearance / Workspaces / Terminal / Notifications / Permissions / Diagnostics / About) to `v-model:collapsed="collapsed.appearance"`. Vue's sugar generates the right setter. Deleted the curried `setCollapsed` helper. Initialized all section ids to `false` in the reactive map so `v-model` has a defined starting value. Added `src/components/settings/__tests__/SettingsGroup.collapse.test.ts` — 2 cases: one functional (mount + click + assert), one **documentary** that reconstructs the bad inline-handler pattern in isolation and asserts the inner closure never runs, so a future agent fails the test with an explanation. |
+
+### Drag restriction (commit `dcc8da9` detail)
+
+Used `dock.api.onWillShowOverlay` (public API, no private state):
+
+```ts
+event.api.onWillShowOverlay((evt) => {
+  const draggedPanel = evt.getData()?.panelId;
+  if (!draggedPanel) return;
+  if (!isActivityBarPanel(draggedPanel)) return;
+
+  const targetLocation = evt.group?.api.location.type;
+  const okKind = evt.kind === 'tab' || evt.kind === 'header_space';
+  const okTarget = targetLocation === 'edge';
+  if (!(okKind && okTarget)) evt.preventDefault();
+});
+```
+
+`DockviewGroupDropLocation` = `'tab' | 'header_space' | 'content' | 'edge'`.
+For activity-bar tabs we allow `'tab'` (drop into another strip's tab list)
+and `'header_space'` (drop next to existing tabs). Reject `'content'`
+(would split the panel) and `'edge'` (would split the edge into two
+columns — dockview doesn't actually support that for edge groups, but
+the overlay still shows). Reject any drop where the target group isn't
+an edge group.
+
+### Per-tab dynamic constraints — the dead-end (commit `f0268df`)
+
+The original plan had per-tab `applyActiveTabConstraints(edge)` that
+re-applied the active tab's `minimumSize` on every `onDidActivePanelChange`.
+Built it, wired it, traced via `console.info` + Playwright probe with
+real Playwright clicks (not synthetic `dispatchEvent`, which doesn't
+trigger dockview's tab handler reliably). Logs showed correct active-
+tab detection and correct minimum lookup. BUT the strip width stayed
+at the initial size regardless.
+
+Drilled into `node_modules/dockview-core/dist/esm/dockview/dockviewShell.js`:
+
+- `EdgeGroupView.minimumSize` is a getter returning `_isCollapsed ?
+  _collapsedSize : _expandedMinimumSize`.
+- `_expandedMinimumSize` is set ONLY in the constructor from
+  `options.minimumSize`.
+- The public `DockviewGroupPanelApi.setConstraints({minimumWidth})`
+  fires `_onDidConstraintsChange` — but `EdgeGroupView` doesn't
+  subscribe to it. `setSize({width})` fires `_onDidSizeChange` — also
+  unobserved at the shell level.
+- The shell-level splitview that actually controls the edge group's
+  width reads min/max from `view.minimumSize` / `view.maximumSize`
+  (the view's own properties, not the api). There's no public way
+  to mutate those after `addEdgeGroup`.
+
+So dockview's API surface for edge groups treats min/max as
+**immutable post-creation**. Filing an upstream issue is the right
+follow-up; for now, `max(all-mins)` is the only public-API solution.
+
+### Inspect tool usage — diagnostic ladder paid off
+
+Three places where `bun run inspect` (or its disposable probe siblings)
+caught bugs that would have taken much longer without:
+
+1. **CSS cascade rule** (post-rail, commit `22d92db`): probe revealed
+   `tabsActions.computed.display === "none"` while `inlineStyle === null`.
+   That meant the hide came from a CSS rule. `ide_search_text
+   "dv-tabs-and-actions-container"` found the v1 carry-over instantly
+   (`src/style.css:107`). Total time: minutes. Without the probe I
+   was eyeballing the rendered DOM and would have hit it eventually,
+   but slowly.
+
+2. **Dynamic-constraint dead-end** (commit `f0268df`): added
+   `console.info` logs to `applyActiveTabConstraints`, ran probe that
+   clicked each tab in turn and read the strip width. Width stayed
+   constant despite the active-panel events firing correctly. THAT
+   was the signal that `setSize` was a no-op at the shell level —
+   forcing me to read the dockview source instead of guessing.
+
+3. **SettingsGroup collapse bug** (commit `936bbd3`): probe clicked
+   the first group header, read `aria-expanded` before/after. Stayed
+   `true`. That + the line `@update:collapsed="setCollapsed('id')"`
+   pointed straight at the inline-handler-form bug, no guessing.
+
+### Receipts
+
+- Commits this session: `e39bdc9` → `22d92db` → `b9fa7fd` → `a7b0af2` →
+  `f0268df` → `dcc8da9` → `9624017` → `936bbd3` (8 commits).
+- Final test count: **626** (1 new in
+  `src/components/settings/__tests__/SettingsGroup.collapse.test.ts`,
+  3 obsolete v1 reset/recreate tests refactored, 2 deleted).
+- Full gate green: lint + lint:bun + lint:tsc-bun + Vite + Electrobun +
+  prod/hmr smoke. ~5s test, ~30s prod build, ~4s smoke.
+- Probe scripts authored during the session, all deleted before commit:
+  `tools/probe-edge-tabs.pwtest.ts`, `tools/probe-edge-sizes.ts`,
+  `tools/probe-settings-collapse.ts`.
+
+### Known follow-ups (intentional out-of-scope for this sprint)
+
+- **dockview upstream issue** — file a feature request for
+  `setEdgeGroupConstraints(position, {minimumSize, maximumSize})`
+  to allow post-creation mutation. The current immutability forces
+  callers into either max-of-all-mins (static) or destructive
+  recreate-the-group hacks.
+- **Boot-cost gate breach** — `seedDefaultLayout` cost went from
+  ~50 ms to ~100 ms once Settings was added as a permanent tab.
+  Crossed the 50-ms gate from the original plan. Fix path is
+  lazy-mounting via a stub-then-swap pattern. Not user-visible yet
+  but worth tracking.
+- **Manual test list** — see `MANUAL_TESTS.md` Phase 25 (added this
+  session) for the v2-layout 8-item checklist.
 
 ---
 

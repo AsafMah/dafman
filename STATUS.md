@@ -13,26 +13,58 @@
 > and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
 > definition-of-done per milestone.
 
-**Active milestone:** **Activity-rail → native dockview edge tabs landed** (2026-05-26).
-Custom `ActivityBar.vue` deleted; left + right edge groups now render native
-vertical tab strips with `ActivityBarTab.vue` as the icon renderer. Status bar
-added at the bottom for Settings + Dev wrench. Schema-bumped layout to v2 with
-narrow migration (preserves chat sessions; rebuilds body grid at default).
-Commits `e39bdc9` (initial), `22d92db` (un-hide strip + writing-mode fix).
-626 tests + prod/hmr smoke green.
+**Active milestone:** **Activity-rail → native dockview edge tabs landed (v2)** (2026-05-26).
+Custom 48px `ActivityBar.vue` + `ActivityButton.vue` deleted. Left + right
+edges now render dockview's native vertical tab strips:
 
-New tool: **`bun run inspect <selector>`** (see `tools/inspect.ts`). Live-app
-DOM/CSS introspection harness that surfaces computed styles + the full CSS
-cascade (`--rules`) against a running `bun run hmr` (or `vite preview`). Built
-after the 2026-05-26 debugging session where a stale `display: none` in our
-own `style.css` cost ~45 minutes of Playwright-probe round-trips that this
-tool resolves in one command. Diagnostic ladder added to personal Copilot
-instructions (rung 1 = `ide_search_text`; rung 3 = `bun run inspect`; rung 4 =
-`pwtest` probe).
+- **Left:** Sessions, Terminals, Jobs, Logs, **Settings** (5 tabs)
+- **Right:** Session Details, Library (Library moved from left in v2)
+- **Bottom:** new 22px custom `StatusBar.vue` for the brand + a dev-only
+  Playground wrench (no settings cog — toggle Settings via the rail).
+
+Schema-bumped persisted layout to `LAYOUT_SCHEMA_VERSION = 2` with a narrow
+migration: chat session IDs are extracted from old layout JSON, sessions
+re-resume, then `seedDefaultLayout()` rebuilds the edge groups. Body grid
+arrangement is best-effort (chats re-tile at default).
+
+**Per-tab min widths:** dockview's splitview reads edge-group `minimumSize`
+from a private `_expandedMinimumSize` field set ONLY at `addEdgeGroup` time
+— no public setter. Per-tab dynamic constraints aren't reachable cleanly.
+Settled for static `max(all-tab-mins)` per side: left=420 (Logs floor),
+right=380 (SessionDetails floor). Trade-off: Sessions can't drag narrower
+than Logs's 420, but the strip never breaks. Verified via Playwright
+probe.
+
+**Drag restriction:** activity-bar tabs can only be dropped into another
+edge group's tab strip — wired via `dock.api.onWillShowOverlay`
+(`evt.preventDefault()` blocks main-grid / floating / popout / split-an-
+edge-into-two-columns drops). Public API only, no CSS or DOM hacks.
+
+**New tooling:** `bun run inspect <selector> [--rules] [--eval ...]`
+(`tools/inspect.ts`). Live-app DOM/CSS introspection via Playwright +
+CDP. Caught the v2 stale `display: none` rule on the dockview tab strip
+that v1 left behind. Diagnostic ladder added to AGENTS.md.
+
+8 commits this session:
+- `e39bdc9` — replace custom ActivityBar with native dockview edge tabs
+- `22d92db` — fix `display: none` on edge-tab strip + horizontal-tb on tab cells
+- `b9fa7fd` — `bun run inspect` live-app harness (CDP attach)
+- `a7b0af2` — chore: remove accidental `-w` file
+- `f0268df` — per-tab edge-group min/initial constraints in v2
+- `dcc8da9` — 5 user-reported regressions: collapsed icon stays pressed, no
+  minimums, similar Sessions/Logs icons, drag restriction, dev wrench
+- `9624017` — restore Settings as left-edge activity-bar tab (per user)
+- `936bbd3` — SettingsGroup collapse handler used inline-handler form that
+  dropped event payload (dormant since Phase D.1, surfaced in v2)
+
+Tests: 626 → 626 (1 new regression test in
+`src/components/settings/__tests__/SettingsGroup.collapse.test.ts`,
+2 obsolete tests deleted). Full gate green: lint + lint:bun + lint:tsc-bun
++ Vite + Electrobun + prod/hmr smoke.
 
 Previous sprint context (still relevant):
 The 2026-05-25 → 26 quality sprint landed Phases A / A.5 / B / C / D.1 (28 commits) —
-see [`DEVLOG.md`](DEVLOG.md) top entry for the full receipts. Headline:
+see [`DEVLOG.md`](DEVLOG.md) for receipts. Headline:
 - **~600 lines of hand-rolled infrastructure deleted** (Phase A library swaps)
 - **63 backend TS errors cleared + gated** (`bun run lint:tsc-bun` now in `bun run check`)
 - **Switched SDK** from deep `node_modules/@github/copilot/copilot-sdk/*` paths to the
@@ -422,17 +454,23 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
-- **2026-05-26 (later)** — **Activity-rail → native dockview edge tabs.**
-  Deleted `ActivityBar.vue` / `ActivityButton.vue` (~410 LOC). Left edge
-  hosts Sessions/Terminals/Jobs/Logs as native vertical tabs; right edge
-  hosts Session Details + Library (moved from left). Added 22 px `StatusBar.vue`
-  for Settings + Dev wrench. Schema bump v1 → v2 with narrow chat-resume
-  migration. Two-bug fix: stale `display: none !important` in `src/style.css`
-  was killing the tab strip; dockview's `writing-mode: vertical-rl` was
-  collapsing `.dv-vue-part` to 0×0 — fixed with horizontal-tb override on
-  the activity-tab cells. New `bun run inspect <selector>` tool
-  (`tools/inspect.ts`) for live-app DOM/CSS introspection. **626 tests**,
-  prod + hmr smoke green. Commits `0c6fc1b`, `e39bdc9`, `22d92db`.
+- **2026-05-26 (sprint close)** — **v2 activity-rail refactor finalized**
+  (8 commits, `e39bdc9` → `936bbd3`). v1's custom `ActivityBar.vue` +
+  `ActivityButton.vue` (~410 LOC) deleted in favor of dockview's native
+  vertical-tab strips on both edges. Left edge: Sessions / Terminals /
+  Jobs / Logs / Settings (Settings restored to rail per user feedback
+  after a brief detour to body-grid). Right edge: Session Details /
+  Library. New `StatusBar.vue` (22 px) at the bottom for brand + dev
+  Playground wrench. Schema-bumped layout JSON to v2 with narrow
+  migration. Per-tab min widths use `max(all-mins)` per side (dockview
+  has no public setter for `EdgeGroupView._expandedMinimumSize` post-
+  creation). Drag restriction via `dock.api.onWillShowOverlay` —
+  activity-bar tabs only land in another edge group. SettingsGroup
+  collapse handler regression from Phase D.1 fixed (inline-handler form
+  dropped event payload; switched all 7 sections to `v-model:collapsed`).
+  New tool: `bun run inspect <selector> [--rules|--eval]`
+  (`tools/inspect.ts`) — Playwright + CDP live-app introspection.
+  **626 tests**, prod + hmr smoke green. Verified via probe scripts.
 
 - **2026-05-25** — Code-quality + restructure pass shipped: gts/Prettier,
   spacious control-flow padding, `shellUtils` extraction, ESLint to **0 errors**,

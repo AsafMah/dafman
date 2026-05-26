@@ -4,7 +4,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ## [Unreleased]
 
 ### Changed
-- **Replaced the custom 48 px ActivityBar rail with dockview's native vertical tab strips on both edges.** Left edge shows Sessions / Terminals / Jobs / Logs as vertical tabs; right edge shows Session Details + Library (Library moved from left → right). Tabs are drag-reorderable, drag-out-to-main-grid, and the strip auto-collapses to 44 px when no tab is active — all native dockview behavior. Added a thin 22 px status bar at the bottom for Settings + Dev wrench. Schema-bumped persisted layout to v2 with a narrow migration that preserves chat sessions but rebuilds the body grid at default. See DEVLOG 2026-05-26 (later) for the full design.
+- **Replaced the custom 48 px ActivityBar rail with dockview's native vertical tab strips on both edges.** Left edge shows Sessions / Terminals / Jobs / Logs / Settings as vertical tabs; right edge shows Session Details + Library (Library moved from left → right; Settings stayed on the left rail after a one-commit detour to body grid). Tabs are drag-reorderable within / across edge groups and auto-collapse to 44 px when no tab is active — all native dockview behavior. Activity-bar tabs can no longer be dropped into the main grid / floating windows / popout — enforced via `dock.api.onWillShowOverlay`. Sessions icon changed from `pi-list` to `pi-comments` (was visually identical to Logs's `pi-bars`).
+- **Added a thin 22 px status bar** at the bottom of the app shell. Hosts the brand logo (left), a future indicators slot (center), and a dev-only Playground wrench (right). Settings is no longer in the status bar — toggle via the left rail like any other activity tab.
+- **Schema-bumped persisted layout to v2** with a narrow migration: extracts chat session IDs from the old layout, re-resumes them, then `seedDefaultLayout()` rebuilds the edge groups. Body grid arrangement is best-effort (chats re-tile at default). Chat session data is preserved.
 - **Reorganized the renderer and bun codebase by domain.** Stores now live under 6 `src/stores/` folders, components under 9 `src/components/` feature folders plus `details/`, and bun-side modules under 8 `src-bun/app/` domain folders.
 - **Standardized renderer imports on the `@/` path alias.** `tsconfig.json` now maps `@/*` → `src/*`, and 129 renderer files were updated to use alias imports. Backend imports intentionally remain relative because `Bun.build` does not reliably honor tsconfig path aliases for the bun entry graph.
 - **Extracted shared utilities before the restructure.** `createListenerRegistry()`, `revealPath()`, and `MODE_OPTIONS` now live in shared helpers instead of duplicated call sites.
@@ -13,7 +15,14 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
   The adapter at `copilotSdk.ts` already imported from `@github/copilot/copilot-sdk/index.js`;
   supercharged was only a transitive dependency installer.
 
+### Fixed (v2 activity-rail follow-ups)
+- **Edge-tab icon stayed visually pressed after the strip collapsed.** Dockview's `panel.api.isActive` is a tab-level "selected tab" state, not "visible." Activity-bar tabs now also subscribe to the group's `onDidCollapsedChange` and gate the pressed state on `isActive && !groupCollapsed`.
+- **Left strip had no enforced minimum width** — could be dragged narrower than the most-demanding tab's content (Logs needs 420 px), breaking layout. Dockview's splitview reads `EdgeGroupView._expandedMinimumSize` from a private field set only at `addEdgeGroup` time; no public setter. Worked around by seeding each edge group with `max(all-tab-mins)` at creation: left=420, right=380.
+- **Settings panel collapse buttons didn't toggle** (dormant since the Phase D.1 SettingsPanel split, surfaced when v2 promoted Settings to a permanent edge tab). The template bound `@update:collapsed="setCollapsed('id')"` — Vue treats this as an inline handler `($event) => setCollapsed('id')` and discards the curried closure. Switched all 7 sections to `v-model:collapsed`.
+
 ### Developer Experience
+- **Added `bun run inspect <selector>`** (`tools/inspect.ts`). Live-app DOM/CSS introspection via Playwright + CDP. Supports `--rules` (full matching-CSS-rule cascade, same as Chrome DevTools' Computed panel), `--eval` (arbitrary expressions), `--click`, and `--screenshot`. Built after a debugging session where a stale `display: none` rule in our own `style.css` cost ~45 minutes of probe-test round-trips that this tool resolves in one command.
+- Added a diagnostic ladder to `AGENTS.md` (rung 1 `ide_search_text` → rung 2 `ide_diagnostics` → rung 3 `bun run inspect` → rung 4 `pwtest` probe → rung 5 JetBrains debugger). Personal Copilot instructions carry the same ladder + receipts.
 - Adopted **gts + Prettier** as the formatting baseline.
 - Added a follow-up spacing pass for more readable control-flow / return blocks.
 - Extracted `shellUtils`, fixed floating promises, and cleaned unused dependencies.
