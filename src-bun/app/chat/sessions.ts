@@ -14,19 +14,8 @@
 // "user-not-available" / "cancel" so the SDK never hangs.
 
 import {
-  type AutoModeSwitchRequest,
-  type AutoModeSwitchResponse,
   type CopilotSession,
-  type CommandDefinition,
-  type ElicitationContext,
-  type ElicitationResult,
-  type ExitPlanModeRequest,
-  type ExitPlanModeResult,
-  type PermissionRequest,
-  type PermissionRequestResult,
   type SessionEvent,
-  type UserInputRequest,
-  type UserInputResponse,
 } from '../client/copilotSdk';
 import { stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
@@ -41,11 +30,7 @@ import {
   type AgentScope as AgentFileScope,
 } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
-import {
-  commandResultBlobAttachment,
-  summarizePermission,
-  toPlainObject,
-} from './sessionHelpers';
+import { commandResultBlobAttachment } from './sessionHelpers';
 import {
   wrapSdkError,
   type SessionEntryView,
@@ -56,19 +41,17 @@ import { SessionSkillsService } from './sessionSkillsService';
 import { SessionTasksService } from './sessionTasksService';
 import { SessionAgentsService } from './sessionAgentsService';
 import { SessionMcpService } from './sessionMcpService';
+import { SessionEventForwarder } from './sessionEventForwarder';
+import { buildBaseSessionConfig } from './sessionConfigBuilder';
+import { SessionMetadataService } from './sessionMetadataService';
 import type {
-  AutoModeSwitchRequestData,
-  ElicitationRequestData,
-  ExitPlanModeRequestData,
   PendingRequestPayload,
-  PermissionRequestData,
   RespondToRequestParams,
   SendMessageAttachment,
   SessionEventPayload,
   SessionMetadataSummary,
   SessionHistoryCompactionResult,
   SessionMode,
-  UserInputRequestData,
   WorkspaceFileMatch,
   AgentInfo,
   JobRecord,
@@ -144,6 +127,8 @@ export class SessionRegistry {
   private readonly tasks: SessionTasksService;
   private readonly agents: SessionAgentsService;
   private readonly mcp: SessionMcpService;
+  private readonly forwarder: SessionEventForwarder;
+  private readonly metadata: SessionMetadataService;
 
   /// `streamingResolver` is called at session create/resume time to
   /// pick the current SDK streaming mode. Decoupled from on-disk
@@ -171,6 +156,17 @@ export class SessionRegistry {
     this.tasks = new SessionTasksService(this.serviceCtx, () => this.entries.keys());
     this.agents = new SessionAgentsService(this.serviceCtx);
     this.mcp = new SessionMcpService(this.serviceCtx);
+    this.forwarder = new SessionEventForwarder({
+      emit: this.emit,
+      modeBySession: this.modeBySession,
+      pending: this.pending,
+    });
+    this.metadata = new SessionMetadataService({
+      ctx: this.serviceCtx,
+      approveAllBySession: this.approveAllBySession,
+      modeBySession: this.modeBySession,
+      pending: this.pending,
+    });
   }
 
   /// Lookup helper shared with sibling services through `serviceCtx`.
@@ -194,197 +190,24 @@ export class SessionRegistry {
 
   /// Config shared between `create()` and `resume()` so a resumed
   /// session behaves identically to a freshly created one
-  /// (permission handler, streaming mode, etc.). Has to be a method
-  /// because handlers close over `this` (registry state).
+  /// (permission handler, streaming mode, etc.). Delegates to
+  /// `sessionConfigBuilder` — the registry just wires in its
+  /// closures + per-session maps.
   private baseSessionConfig(sessionId: () => string) {
-    return {
-      // Auto-discover workspace-level MCP server configs (.mcp.json,
-      // .vscode/mcp.json) and skill directories. Defaults to false
-      // in the SDK, which meant a user dropping an .mcp.json in
-      // their repo saw nothing. Custom instruction files
-      // (.github/copilot-instructions.md, AGENTS.md, etc.) are
-      // loaded regardless. Explicit `mcpServers` / `skillDirectories`
-      // would take precedence on collision — we don't supply any
-      // yet, so discovery is the only source.
-      enableConfigDiscovery: true,
-      tools: buildBuiltInTools(this),
-      commands: this.buildRegisteredCommands(sessionId),
-      onPermissionRequest: (request: PermissionRequest): Promise<PermissionRequestResult> => {
-        const sid = sessionId();
-
-        // Per-session approveAll short-circuit. Returns the SDK's
-        // minimal `approve-once` shape — no rule editor here.
-        if (this.approveAllBySession.get(sid) === true) {
-          return Promise.resolve({ kind: 'approve-once' });
-        }
-
-        if (this.modeBySession.get(sid) === 'autopilot') {
-          log.info('permission unavailable in autopilot', {
-            sessionId: sid,
-            permissionKind: request.kind,
-          });
-
-          return Promise.resolve({ kind: 'user-not-available' });
-        }
-
-        return this.pending.enqueue(
-          sid,
-          'permission',
-          (requestId) => {
-            const data: PermissionRequestData = {
-              kind: request.kind,
-              ...(request.toolCallId ? { toolCallId: request.toolCallId } : {}),
-              summary: summarizePermission(request),
-              raw: toPlainObject(request),
-            };
-
-            this.emitPending({
-              sessionId: sid,
-              requestId,
-              kind: 'permission',
-              request: data,
-            });
-          },
-          {
-            permissionKind: request.kind,
-            summary: summarizePermission(request),
-          },
-        ) as Promise<PermissionRequestResult>;
-      },
-      onUserInputRequest: (request: UserInputRequest): Promise<UserInputResponse> => {
-        const sid = sessionId();
-
-        if (this.modeBySession.get(sid) === 'autopilot') {
-          log.info('user input unavailable in autopilot', { sessionId: sid });
-
-          return Promise.resolve({
-            answer: 'User is unavailable in autopilot mode.',
-            wasFreeform: true,
-          });
-        }
-
-        return this.pending.enqueue(sid, 'userInput', (requestId) => {
-          const data: UserInputRequestData = {
-            question: request.question,
-            ...(request.choices ? { choices: request.choices } : {}),
-            allowFreeform: request.allowFreeform ?? true,
-          };
-
-          this.emitPending({
-            sessionId: sid,
-            requestId,
-            kind: 'userInput',
-            request: data,
-          });
-        }) as Promise<UserInputResponse>;
-      },
-      onElicitationRequest: (context: ElicitationContext): Promise<ElicitationResult> => {
-        const sid = sessionId();
-
-        if (this.modeBySession.get(sid) === 'autopilot') {
-          log.info('elicitation declined in autopilot', {
-            sessionId: sid,
-            mode: context.mode ?? 'form',
-          });
-
-          return Promise.resolve({ action: 'decline' });
-        }
-
-        return this.pending.enqueue(sid, 'elicitation', (requestId) => {
-          const data: ElicitationRequestData = {
-            message: context.message,
-            mode: context.mode ?? 'form',
-            ...(context.elicitationSource ? { elicitationSource: context.elicitationSource } : {}),
-            ...(context.url ? { url: context.url } : {}),
-            ...(context.requestedSchema
-              ? { requestedSchema: toPlainObject(context.requestedSchema) }
-              : {}),
-          };
-
-          this.emitPending({
-            sessionId: sid,
-            requestId,
-            kind: 'elicitation',
-            request: data,
-          });
-        }) as Promise<ElicitationResult>;
-      },
-      onExitPlanMode: (request: ExitPlanModeRequest): Promise<ExitPlanModeResult> => {
-        const sid = sessionId();
-
-        return this.pending.enqueue(sid, 'exitPlanMode', (requestId) => {
-          const data: ExitPlanModeRequestData = {
-            summary: request.summary,
-            planContent: request.planContent ?? '',
-            actions: request.actions,
-            recommendedAction: request.recommendedAction,
-          };
-
-          this.emitPending({
-            sessionId: sid,
-            requestId,
-            kind: 'exitPlanMode',
-            request: data,
-          });
-        }) as Promise<ExitPlanModeResult>;
-      },
-      onAutoModeSwitch: (request: AutoModeSwitchRequest): Promise<AutoModeSwitchResponse> => {
-        const sid = sessionId();
-
-        return this.pending.enqueue(sid, 'autoModeSwitch', (requestId) => {
-          const data: AutoModeSwitchRequestData = {
-            ...(request.errorCode ? { errorCode: request.errorCode } : {}),
-            ...(typeof request.retryAfterSeconds === 'number'
-              ? { retryAfterSeconds: request.retryAfterSeconds }
-              : {}),
-          };
-
-          this.emitPending({
-            sessionId: sid,
-            requestId,
-            kind: 'autoModeSwitch',
-            request: data,
-          });
-        }) as Promise<AutoModeSwitchResponse>;
-      },
-      streaming: this.streamingResolver(),
-      ...(() => {
-        // 22b: SDK semantics — `availableTools` (allowlist)
-        // takes precedence over `excludedTools`. When the
-        // allowlist is non-empty, the exclude list is
-        // ignored by the SDK so we omit it entirely to keep
-        // the wire shape honest. When the allowlist is
-        // empty, NEVER pass `availableTools: []` (the SDK
-        // would interpret that as "allow no tools").
-        const allowed = this.allowedToolsResolver();
-        const excluded = this.excludedToolsResolver();
-
-        if (allowed.length > 0) return { availableTools: allowed };
-
-        return excluded.length > 0 ? { excludedTools: excluded } : {};
-      })(),
-    };
-  }
-
-  private buildRegisteredCommands(sessionId: () => string): CommandDefinition[] {
-    return [
+    return buildBaseSessionConfig(
       {
-        name: 'library',
-        description:
-          "Open Dafman's Library panel. In Dafman UI, use /library [mcp|skills|agents|instructions].",
-        handler: (context) => {
-          const tab = context.args.trim().split(/\s+/)[0] || 'mcp';
-
-          this.emit({
-            sessionId: sessionId(),
-            eventType: 'system.notification',
-            data: {
-              content: `Library command received (${tab}). In Dafman, /library opens the Library sidebar; from the CLI TUI use the app's Library activity-bar item.`,
-            },
-          });
-        },
+        tools: buildBuiltInTools(this),
+        emit: this.emit,
+        emitPending: this.emitPending,
+        approveAllBySession: this.approveAllBySession,
+        modeBySession: this.modeBySession,
+        pending: this.pending,
+        streamingResolver: this.streamingResolver,
+        excludedToolsResolver: this.excludedToolsResolver,
+        allowedToolsResolver: this.allowedToolsResolver,
       },
-    ];
+      sessionId,
+    );
   }
 
   /// Renderer → bun: respond to a pending callback. Idempotent: a
@@ -551,25 +374,13 @@ export class SessionRegistry {
 
     // Poll the title immediately after resume so restored sessions show
     // their persisted title without needing a new turn (session.idle).
-    this.pollTitleFromMetadata(actualId);
+    this.forwarder.pollTitleFromMetadata(actualId);
 
     return actualId;
   }
 
   async getCurrentModel(sessionId: string): Promise<string | null> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const current = (await entry.session.rpc.model.getCurrent()) as {
-        modelId?: unknown;
-      };
-
-      return typeof current.modelId === 'string' && current.modelId.trim() ? current.modelId : null;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.getCurrentModel(sessionId);
   }
 
   /// S5 helper: replays history events to `forward` in
@@ -733,126 +544,11 @@ export class SessionRegistry {
   /// workspace rename but may not always emit `session.title_changed`
   /// to the SDK (e.g. when workspaces are disabled or ephemeral events
   /// are lost). Polling metadata is a reliable fallback.
-  private pollTitleFromMetadata(sessionId: string): void {
-    try {
-      const client = tryGetClient();
-
-      client
-        .getSessionMetadata(sessionId)
-        .then((meta) => {
-          if (meta?.summary) {
-            log.info('polled title from metadata', {
-              sessionId,
-              title: meta.summary,
-            });
-            this.emit({
-              sessionId,
-              eventType: 'session.title_changed',
-              data: { title: meta.summary },
-            });
-          }
-        })
-        .catch(() => {
-          // Session may have been deleted between idle and poll.
-        });
-    } catch {
-      // Client not started or getSessionMetadata unavailable.
-    }
-  }
-
+  /// Transform + emit one SDK event. Delegates to
+  /// `SessionEventForwarder` — the registry only owns the
+  /// `session.on(...)` subscription that calls this.
   private forward(sessionId: string, event: SessionEvent): void {
-    const eventType = event.type;
-    const isDiagnostic =
-      eventType === 'assistant.reasoning' ||
-      eventType === 'assistant.reasoning_delta' ||
-      eventType === 'session.error' ||
-      eventType === 'session.warning' ||
-      eventType === 'model.call_failure';
-
-    if (isDiagnostic) {
-      log.debug('session event', {
-        sessionId,
-        eventType,
-        event,
-      });
-    } else {
-      log.trace('session event', { sessionId, eventType });
-    }
-
-    // The SDK wraps each event as { type, data, id, parentId, ts, ... }.
-    // The Rust port forwarded only `event.data`, and our `chatEvents.ts`
-    // reads fields like `payload.data.messageId` directly off the
-    // payload. Unwrap the SDK's nested `data` so the frontend sees the
-    // same shape it always did, but also lift envelope-level fields
-    // (`agentId`, `id`, `timestamp`) so the frontend can correlate
-    // sub-agent activity without us mirroring every variant.
-    const envelope = event as unknown as {
-      data?: unknown;
-      agentId?: string;
-      id?: string;
-      timestamp?: string;
-    };
-    // SDK is typed as `data: Record<string, unknown>` but we can't
-    // trust the wire — a malformed `null` / array / primitive would
-    // silently coerce to `{}` and downstream reducers (which read
-    // `data.messageId`, `data.toolCallId`, …) would see an empty
-    // payload instead of the real one. Reject anything that isn't a
-    // plain object and warn so the issue surfaces in diagnostics.
-    const rawData = envelope.data;
-    const isPlainObject =
-      rawData !== null && typeof rawData === 'object' && !Array.isArray(rawData);
-
-    if (!isPlainObject && rawData !== undefined) {
-      log.warn('dropping malformed event.data on forward', {
-        sessionId,
-        eventType,
-        dataType: rawData === null ? 'null' : Array.isArray(rawData) ? 'array' : typeof rawData,
-      });
-    }
-
-    const data = (isPlainObject ? rawData : {}) as Record<string, unknown>;
-
-    if (eventType === 'session.mode_changed') {
-      const newMode = data.newMode;
-
-      if (newMode === 'interactive' || newMode === 'plan' || newMode === 'autopilot') {
-        this.modeBySession.set(sessionId, newMode);
-
-        if (newMode === 'autopilot') {
-          this.pending.settleForSession(sessionId, 'autopilot-mode');
-        }
-      }
-    }
-
-    // When the CLI signals idle (turn finished), proactively fetch
-    // the session title from metadata. The CLI auto-summarises the
-    // conversation but may only emit `session.title_changed` inside
-    // workspace-enabled sessions. Polling `getMetadata` on idle
-    // catches the title regardless.
-    if (eventType === 'session.idle') {
-      this.pollTitleFromMetadata(sessionId);
-    }
-
-    if (eventType === 'session.title_changed') {
-      log.info('session.title_changed received', { sessionId, title: data.title });
-    }
-
-    try {
-      this.emit({
-        sessionId,
-        eventType,
-        data,
-        ...(envelope.agentId ? { agentId: envelope.agentId } : {}),
-        ...(envelope.id ? { eventId: envelope.id } : {}),
-        ...(envelope.timestamp ? { timestamp: envelope.timestamp } : {}),
-      });
-    } catch (err) {
-      log.warn('failed to forward session event', {
-        sessionId,
-        eventType,
-        error: toErrorMessage(err),
-      });
-    }
+    this.forwarder.forward(sessionId, event);
   }
 
   async send(
@@ -986,17 +682,7 @@ export class SessionRegistry {
   }
 
   async abort(sessionId: string): Promise<string> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      await entry.session.abort();
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
-
-    return 'Aborted';
+    return this.metadata.abort(sessionId);
   }
 
   async setModel(
@@ -1004,189 +690,45 @@ export class SessionRegistry {
     model: string,
     reasoningEffort: string | null,
   ): Promise<string> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    const opts = reasoningEffort
-      ? { reasoningEffort: reasoningEffort as ReasoningEffort }
-      : undefined;
-
-    try {
-      await entry.session.setModel(model, opts);
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
-
-    return model;
+    return this.metadata.setModel(sessionId, model, reasoningEffort);
   }
 
   async getMode(sessionId: string): Promise<SessionMode> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = await entry.session.rpc.mode.get();
-
-      if (result !== 'interactive' && result !== 'plan' && result !== 'autopilot') {
-        throw AppError.sdk(`unexpected session mode from SDK: ${JSON.stringify(result)}`);
-      }
-
-      this.modeBySession.set(sessionId, result);
-
-      return result;
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.getMode(sessionId);
   }
 
   async setMode(sessionId: string, mode: SessionMode): Promise<SessionMode> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      await entry.session.rpc.mode.set({ mode });
-      this.modeBySession.set(sessionId, mode);
-
-      if (mode === 'autopilot') {
-        this.pending.settleForSession(sessionId, 'autopilot-mode');
-      }
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
-
-    return mode;
+    return this.metadata.setMode(sessionId, mode);
   }
 
   async getName(sessionId: string): Promise<string | null> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = await entry.session.rpc.name.get();
-      const name = (result as { name?: unknown }).name;
-
-      if (typeof name === 'string') return name;
-
-      if (name === null || name === undefined) return null;
-
-      throw AppError.sdk(`unexpected session name from SDK: ${JSON.stringify(name)}`);
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.getName(sessionId);
   }
 
   async setName(sessionId: string, name: string): Promise<string> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      await entry.session.rpc.name.set({ name });
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
-
-    return name;
+    return this.metadata.setName(sessionId, name);
   }
 
   async compactHistory(sessionId: string): Promise<SessionHistoryCompactionResult> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.history.compact()) as {
-        success?: boolean;
-        tokensFreed?: number;
-        messagesRemoved?: number;
-      };
-
-      return {
-        success: result.success ?? true,
-        tokensFreed: typeof result.tokensFreed === 'number' ? result.tokensFreed : null,
-        messagesRemoved: typeof result.messagesRemoved === 'number' ? result.messagesRemoved : null,
-      };
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.compactHistory(sessionId);
   }
 
   /// Wraps `session.history.truncate`. The given event AND all later
   /// events are removed; callers typically follow this with a fresh
   /// `sendMessage` (Edit / Retry flows).
   async truncateHistory(sessionId: string, eventId: string): Promise<{ eventsRemoved: number }> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.history.truncate({
-        eventId,
-      })) as { eventsRemoved?: number };
-
-      return { eventsRemoved: result.eventsRemoved ?? 0 };
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.truncateHistory(sessionId, eventId);
   }
 
   /// Wraps `sessions.fork`. Returns the new session id; we do NOT
   /// auto-register it — the renderer opens it via the regular
   /// resume flow once it has the id (keeps lifecycle uniform).
   async fork(sessionId: string, toEventId?: string): Promise<{ sessionId: string }> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    const client = tryGetClient();
-
-    if (!client) throw AppError.clientNotStarted();
-
-    try {
-      const result = (await client.rpc.sessions.fork({
-        sessionId,
-        ...(toEventId ? { toEventId } : {}),
-      })) as { sessionId?: string };
-
-      if (!result.sessionId) {
-        throw AppError.sdk('fork: SDK returned no sessionId');
-      }
-
-      return { sessionId: result.sessionId };
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.fork(sessionId, toEventId);
   }
 
   async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    // Source of truth for OUR onPermissionRequest handler. Mirror to
-    // the SDK so any SDK-internal short-circuits that respect this
-    // flag stay consistent.
-    this.approveAllBySession.set(sessionId, enabled);
-
-    try {
-      const result = (await entry.session.rpc.permissions.setApproveAll({
-        enabled,
-      })) as { success?: boolean };
-
-      return result.success ?? true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.setApproveAll(sessionId, enabled);
   }
 
   // ---------- Custom agents (Phase 19a) ----------
@@ -1323,47 +865,16 @@ export class SessionRegistry {
   /// (totals + per-model + token details) without filtering — the
   /// renderer cherry-picks what to display.
   async getUsageMetrics(sessionId: string): Promise<Record<string, unknown>> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      return (await entry.session.rpc.usage.getMetrics()) as unknown as Record<string, unknown>;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.getUsageMetrics(sessionId);
   }
 
-  /// Server-scoped: built-in tool catalog. Returns a trimmed
-  /// view (name + namespacedName + description) — the renderer
-  /// doesn't need the full JSON schema.
+  /// Server-scoped: built-in tool catalog. Returns a trimmed view
+  /// (name + namespacedName + description) — the renderer doesn't
+  /// need the full JSON schema.
   async listBuiltinTools(): Promise<
     Array<{ name: string; namespacedName?: string; description: string }>
   > {
-    const client = tryGetClient();
-
-    if (!client) throw AppError.clientNotStarted();
-
-    try {
-      const result = (await client.rpc.tools.list({})) as {
-        tools?: Array<{
-          name?: unknown;
-          namespacedName?: unknown;
-          description?: unknown;
-        }>;
-      };
-      const tools = result.tools ?? [];
-
-      return tools
-        .filter((t) => typeof t.name === 'string')
-        .map((t) => ({
-          name: String(t.name),
-          ...(typeof t.namespacedName === 'string' ? { namespacedName: t.namespacedName } : {}),
-          description: typeof t.description === 'string' ? t.description : '',
-        }));
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.listBuiltinTools();
   }
 
   /// Session-scoped: MCP server list. Per-server tool lists are
@@ -1396,44 +907,7 @@ export class SessionRegistry {
       }
     >
   > {
-    const client = tryGetClient();
-
-    if (!client) throw AppError.clientNotStarted();
-
-    try {
-      const result = (await client.rpc.account.getQuota({})) as unknown as {
-        quotaSnapshots?: Record<string, Record<string, unknown>>;
-      };
-      const snaps = result.quotaSnapshots ?? {};
-      const out: Record<
-        string,
-        {
-          isUnlimitedEntitlement: boolean;
-          entitlementRequests: number;
-          usedRequests: number;
-          remainingPercentage: number;
-          overage: number;
-          resetDate?: string;
-        }
-      > = {};
-
-      for (const [key, snap] of Object.entries(snaps)) {
-        out[key] = {
-          isUnlimitedEntitlement: snap.isUnlimitedEntitlement === true,
-          entitlementRequests:
-            typeof snap.entitlementRequests === 'number' ? snap.entitlementRequests : 0,
-          usedRequests: typeof snap.usedRequests === 'number' ? snap.usedRequests : 0,
-          remainingPercentage:
-            typeof snap.remainingPercentage === 'number' ? snap.remainingPercentage : 0,
-          overage: typeof snap.overage === 'number' ? snap.overage : 0,
-          ...(typeof snap.resetDate === 'string' ? { resetDate: snap.resetDate } : {}),
-        };
-      }
-
-      return out;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.getAccountQuota();
   }
 
   async readPlan(
@@ -1474,19 +948,7 @@ export class SessionRegistry {
   // file because they need entries Map lookup.
 
   async resetApprovals(sessionId: string): Promise<boolean> {
-    const entry = this.entries.get(sessionId);
-
-    if (!entry) throw AppError.sessionNotFound(sessionId);
-
-    try {
-      const result = (await entry.session.rpc.permissions.resetSessionApprovals()) as {
-        success?: boolean;
-      };
-
-      return result.success ?? true;
-    } catch (err) {
-      throw AppError.sdk(toErrorMessage(err));
-    }
+    return this.metadata.resetApprovals(sessionId);
   }
 
   async disconnect(sessionId: string): Promise<string> {
