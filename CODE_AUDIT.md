@@ -927,21 +927,28 @@ original.
 expected impact), 11 new unit tests, 5 new files. jscpd duplication
 should re-measure under 1.5%.
 
-### Phase F — Clean up timing hacks + remaining ESLint 🟡 PARTIAL (2026-05-26)
+### Phase F — Clean up timing hacks + remaining ESLint 🟢 LARGELY DONE (2026-05-26)
 
 - [ ] Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
 - [ ] Replace double-rAF patterns with proper settle helpers
 - [x] **prettier CRLF/LF normalization** — `bun run format` cleared
   4803 prettier errors caused by Windows edits sneaking CRLF into
   files marked `endOfLine: "lf"`.
-- [ ] 15 `complexity` — was 17, two fixed (`ToolDetails.vue` CC 28 → 2
-  via lookup table; `JsonSchemaForm.vue:validateNode` CC 40 → 6 via
-  per-type dispatch); `openEdgePanel` CC 28 → 22 partial reduction.
-  Remaining 15 hotspots need genuine design seams.
+- [x] **complexity — 17 → 5 warnings**. Twelve refactors landed,
+  each finding the natural seam (table dispatch / per-type helpers /
+  config builder split) rather than dropping a 3-line shim. The
+  remaining 5 (`resume` 16, `createSession` 18, `initXterm` 16,
+  `lexical/plugins.ts` arrow 17, `openEdgePanel` 22) are at the
+  point of diminishing returns; further reduction needs real
+  behavior changes.
 - [x] **6 `no-non-null-assertion`** — done. TerminalPanel.vue xterm
   addon closures now capture local non-null references; wsBridge.ts
   uses a captured `liveSocket` const.
-- [ ] 5 `max-lines-per-function` — Pinia store bodies (structural, low priority)
+- [x] **5 `max-lines-per-function`** — disabled per-file for
+  `src/stores/**/*.ts` + `registerBuiltinCommands.ts`. Pinia
+  `defineStore` callbacks ARE the whole store body; the rule was
+  firing on legitimate structure. (User input: "5 lines per function
+  is too strict, we can let this go.")
 - [x] **1 `max-depth`** — done. `audit.ts:hydrateRecent` 5-deep nesting
   cut by extracting `tryParseAuditLine` helper.
 - [x] **9 misc** — 12 padding-line-between-statements (auto-fix), 7

@@ -86,16 +86,19 @@ honor tsconfig path aliases for the bun entry graph.
    false positives. The remaining intra-file dedup items (`CommandPalette`,
    `McpServerForm`, `JsonValueView`) are deferred — the dup pattern is
    pure template and a sub-component adds similar boilerplate.
-5. **Phase F — timing hacks + remaining ESLint** 🟡 PARTIAL.
-   First pass landed: prettier LF normalization (4803 → 0 errors via
-   `bun run format`), 9 cheap ESLint cleanups (duplicate imports,
-   max-depth via helper extract, 6 non-null assertions via captured
-   locals, unused imports, etc.), 2 complexity fixes (`ToolDetails`
-   12-case switch → lookup table CC 28→2; `JsonSchemaForm.validateNode`
-   CC 40→6 via per-type dispatch), 1 partial (`openEdgePanel` 28→22).
-   Remaining: 15 complexity hotspots that need design seams, 5
-   max-lines (Pinia store bodies, audit marked low priority), and the
-   setTimeout/double-rAF timing hacks.
+5. **Phase F — timing hacks + remaining ESLint** 🟢 LARGELY DONE.
+   ESLint surface went from 4839 → 5 warnings across two sessions.
+   Highlights: prettier LF normalization (4803 errors → 0 via
+   `bun run format`); 12 honest complexity refactors (each finding
+   the natural seam — table dispatch / per-type helpers / config
+   builder split); 6 non-null assertions resolved via captured locals;
+   per-file disable of max-lines-per-function for Pinia stores +
+   `registerBuiltinCommands` (user said "5 [max-]lines per function
+   is too strict, let it go"); 1 max-depth + 9 cheap misc fixes.
+   Remaining 5 complexity warnings are all at CC 16-22 with no
+   obvious natural seam without changing behavior (mostly lifecycle
+   methods + the Lexical state-machine plugin). Timing hacks
+   (setTimeout focus, double-rAF settle) remain untouched.
 
 **Deferred per rubber-duck:**
 - D.5 `SessionsManager.vue` (1,062 lines) — split when sidebar work resumes.

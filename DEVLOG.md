@@ -10,6 +10,83 @@
 
 ---
 
+## 2026-05-26 (cont.) — Phase F second pass: 17 → 5 complexity warnings
+
+**Takeaway:** Picked up Phase F where the first pass left off (15
+remaining complexity warnings + 5 max-lines on Pinia stores) and
+landed two more commits worth of refactors. ESLint surface is now
+**5 warnings total**, all at CC 16-22 with no obvious natural seam
+without changing behavior.
+
+### Commits
+
+- `e8651a0` refactor(f.2): disable max-lines on Pinia stores; 6
+  complexity hotspots refactored
+- `55ec75c` refactor(f.3): four more complexity hotspots (CC 17 → 5)
+
+### Config change
+
+- `eslint.config.js` — per-file override turns off
+  `max-lines-per-function` for `src/stores/**/*.ts` +
+  `src/lib/registerBuiltinCommands.ts`. Pinia `defineStore` callbacks
+  ARE the whole store body; the rule was firing on legitimate
+  structure. User input: "5 [max-]lines per function is too strict,
+  we can let this go." Clears 5 warnings instantly.
+
+### Complexity refactors (10 in total this session)
+
+| Target | Before | After | Approach |
+|---|---:|---:|---|
+| `messageHandlers.ts:user.message` | 24 | ~6 | `mergeKnownUserMessage` + `mergeOptimisticUserMessage` extracts — main handler becomes 3-step flat sequence (known? optimistic? fresh) |
+| `messageHandlers.ts:normalizeAttachments` | 19 | ~4 | Per-type normalizers (file/directory/blob/selection) + `ATTACHMENT_NORMALIZERS` dispatch table |
+| `sessionEventForwarder.ts:forward` | 24 | ~3 | `logSessionEvent` (DIAGNOSTIC_EVENT_TYPES set) + `unwrapEvent` (SDK envelope + plain-object validation) + `handleSideEffects` (mode_changed / idle / title_changed) |
+| `pendingRequests.ts:respond` | 22 | ~3 | `validateRespond` + `buildSdkResult` switch + `buildPermissionResult` audit-log fire |
+| `useSessionUsage.ts:loadUsage` | 23 | ~5 | `normalizeRpcUsage` (7-ternary literal extract) + `asNumber` + `isUsageRpcPopulated` |
+| `settings.ts:coerceTerminal` | 20 | ~3 | Generic `coerceTrimmedString` + `coerceBoundedInt` helpers used at 6 inline sites |
+| `sessionReducer.ts:trackSessionArtifact` | 19 | ~7 | Module-level `SHELL_TOOL_NAMES` Set + `WRITE_TOOL_NEEDLES` / `WRITE_PATH_KEYS` arrays + `extractTouchedPath` helper |
+| `sessions.ts:cwdFor` | 18 | ~5 | `adoptCwd` helper encapsulates the U6 re-check-after-await + entry backfill pattern; both fallback blocks reduce to 3 lines |
+| `stderrFilter.ts` arrow | 18 | ~4 | `chunkToText` (Buffer → string) + `filterStderrLines` (per-line keep/log/drop) |
+| `McpServerForm.vue:structuredFromConfig` | 17 | ~3 | `applyLocalConfig` / `applyHttpConfig` per-transport branches + `entriesFromRecord` env/headers helper |
+
+### Remaining 5
+
+All at CC 16-22 with no obvious natural seam:
+- `sessions.ts:resume` CC 16 — lifecycle method, barely over
+- `sessions.ts:createSession` (sessionsStore.ts) CC 18 — lifecycle
+- `TerminalPanel.vue:initXterm` CC 16 — addon load orchestration
+- `lexical/plugins.ts` arrow CC 17 — Lexical state-machine plugin
+- `layoutStore.ts:openEdgePanel` CC 22 — partial done in f.1; rest is dockview-lifecycle
+
+### Pattern that emerged
+
+Every honest refactor this session was either:
+1. **Per-type dispatch via a lookup table** (`TOOL_KIND_BY_NAME`,
+   `ATTACHMENT_NORMALIZERS`, `DIAGNOSTIC_EVENT_TYPES`,
+   `SHELL_TOOL_NAMES`), OR
+2. **Helper extraction at a natural boundary** (`validateXNode`,
+   `buildPermissionResult`, `mergeKnownUserMessage`,
+   `normalizeRpcUsage`, `chunkToText`, `applyLocalConfig`).
+
+No magic; just AGENTS rule 20 ("find the natural seam") applied
+mechanically across 12 sites.
+
+### Gate
+
+`bun run check` green every step. 619 tests. Lint clean. Build +
+smoke (prod + hmr) clean.
+
+### Next session
+
+Phase F's complexity work is effectively done. Remaining audit items:
+- `setTimeout(fn, 0)` focus hacks + double-rAF settle patterns
+  (untouched; would need a `useFocusOnNextTick` / VueUse-driven
+  composable)
+- D.5 (`SessionsManager.vue` 1,062 lines) and D.6 (`layoutStore.ts`
+  1,145 lines) deferred per audit; revisit if a feature forces
+  the touch
+
+---
+
 ## 2026-05-26 (cont.) — Phase F first pass
 
 **Takeaway:** First Phase-F sweep landed. The biggest single win was
