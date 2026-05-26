@@ -851,14 +851,19 @@ logic, SessionRegistry public API, etc.).
   bypass), `useMessageActions` (edit/quote/retry/fork/fork-notice +
   editor save/cancel + anchor walks). `<ChatTranscript>` skipped —
   not needed once 838 lines reached.
-- [x] **D.3 `sessions.ts`** ✅ done (commit pending push): 1,904 → 1,563
-  lines (-18%). Extracted 5 sibling services (Plan / Skills / Tasks /
-  Agents / Mcp) behind a shared `SessionServiceContext { getEntry,
-  wrapSdk }` port. Services never touch `entries` directly. Lifecycle
-  (`create`/`resume`/`forward`/`disconnect`/`shutdownAll`) + entries +
-  pending-request queue stay on `SessionRegistry`. Registry keeps thin
-  delegating methods so existing callers (`src-bun/index.ts`,
-  `src-bun/test-server.ts`, 44 sessions.test.ts tests) are unchanged.
+- [x] **D.3 `sessions.ts`** ✅ done (commits `f1402df`, `<r2>`): 1,904 →
+  1,025 lines (-46%). Round 1: 5 sibling services (Plan / Skills /
+  Tasks / Agents / Mcp) behind `SessionServiceContext { getEntry,
+  wrapSdk }`. Round 2 (after user pushback that 10% wasn't enough):
+  extracted `SessionEventForwarder` (SDK envelope unwrap + mode/idle
+  side-effects), `sessionConfigBuilder` (170-line callbacks factory
+  shared by create/resume), and `SessionMetadataService` (13 thin
+  SDK-passthrough methods + 2 client-level ones). Registry now owns
+  only lifecycle (constructor, create, resume, replayHistory,
+  setWorkingDirectory, list, deleteCliSession, send,
+  searchWorkspaceFiles, getCwd/cwdFor, disconnect, shutdownAll) plus
+  thin delegating methods for every service. 44 sessions.test.ts
+  tests + RPC wiring untouched.
 - [ ] **D.4 `MessageComposer.vue`** (1,389 lines): add rubber-duck
   regression tests FIRST (submit payload, focus, paste/drop, command
   mode, toolbar state). Prefer subcomponents (`<ComposerToolbar>`,

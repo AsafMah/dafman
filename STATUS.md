@@ -53,16 +53,21 @@ honor tsconfig path aliases for the bun entry graph.
      save/save-fork/cancel + anchor walks. Stores passed as explicit
      dependencies (testable) rather than reached for inside.
    `<ChatTranscript>` deferred — not needed once 838 lines reached.
-2. **Phase D.3 — sessions.ts (1,904 → 1,563 lines).** ✅ DONE (2026-05-26)
-   Five sibling services extracted (`SessionPlanService`,
-   `SessionSkillsService`, `SessionTasksService`, `SessionAgentsService`,
-   `SessionMcpService`) behind a shared `SessionServiceContext` port
-   (`getEntry`, `wrapSdk`). Services never touch `entries` directly.
-   Lifecycle (`create`/`resume`/`forward`/`disconnect`/`shutdownAll`) +
-   the entries Map + the pending-request queue stay on `SessionRegistry`.
-   Thin delegating methods kept so 44 sessions.test.ts tests + the RPC
-   wiring in `src-bun/index.ts` / `src-bun/test-server.ts` stay
-   unchanged.
+2. **Phase D.3 — sessions.ts (1,904 → 1,025 lines, -46%).** ✅ DONE (2026-05-26)
+   Eight extractions across two rounds:
+   - Round 1 — `SessionPlanService`, `SessionSkillsService`,
+     `SessionTasksService`, `SessionAgentsService`, `SessionMcpService`
+     behind a `SessionServiceContext { getEntry, wrapSdk }` port.
+   - Round 2 — `SessionEventForwarder` (SDK envelope unwrap +
+     mode/idle side-effects), `sessionConfigBuilder` (170-line
+     callbacks factory shared by create/resume), `SessionMetadataService`
+     (13 thin SDK-passthrough methods + 2 client-level ones).
+   `SessionRegistry` now owns only lifecycle (entries Map +
+   pending-request queue + constructor + create + resume +
+   replayHistory + setWorkingDirectory + list + deleteCliSession +
+   send + searchWorkspaceFiles + getCwd/cwdFor + disconnect +
+   shutdownAll) plus thin delegating methods. RPC wiring + 44
+   sessions.test.ts tests untouched.
 3. **Phase D.4 — MessageComposer.vue (1,389 lines).**
    Add regression tests for paste/drop, focus, command-mode entry/exit, toolbar format
    state, submit payload (attachment retention). Then prefer subcomponents

@@ -119,9 +119,82 @@ retention). Prefer subcomponents (`<ComposerToolbar>`,
 `<ComposerFilePickerButton>`, `<ComposerCommandMode>`) over
 giant composables; don't prop-drill the Lexical editor.
 
+### Round 2 — pushback round (cumulative: 1,904 → 1,025 lines, -46%)
+
+User reaction to round 1: "10% is all you could do? 1600 lines is
+still huge." Fair — `baseSessionConfig` was a 170-line callback
+soup, `forward` was 95 lines of envelope-unwrap + mode/title
+side-effects, and 13 metadata methods all followed the same
+`entry → try → sdk → catch → AppError.sdk` shape that begged to be
+collapsed.
+
+**Three more files added:**
+
+- `src-bun/app/chat/sessionEventForwarder.ts` (~170 lines) — the
+  `forward()` body + `pollTitleFromMetadata()`. Takes
+  `{emit, modeBySession, pending}` so the registry hands over the
+  Maps it owns by reference. `pollTitleFromMetadata` had to stay
+  public on the forwarder because `resume()` calls it directly
+  (not through the event stream).
+- `src-bun/app/chat/sessionConfigBuilder.ts` (~250 lines) — pure
+  factory `buildBaseSessionConfig(deps, sessionId)` returning the
+  SDK SessionConfig. All five callback shapes
+  (onPermissionRequest, onUserInputRequest, onElicitationRequest,
+  onExitPlanMode, onAutoModeSwitch) plus `buildRegisteredCommands`
+  (the `/library` stub) live here. Accepts pre-built `Tool[]` from
+  the registry — keeping the `buildBuiltInTools(this)` call site
+  there avoids a circular type dependency with `library/tools.ts`.
+- `src-bun/app/chat/sessionMetadataService.ts` (~280 lines) — 13
+  thin SDK-passthrough methods (getCurrentModel / abort / setModel
+  / getMode / setMode / getName / setName / compactHistory /
+  truncateHistory / fork / setApproveAll / resetApprovals /
+  getUsageMetrics) + 2 client-level methods (listBuiltinTools,
+  getAccountQuota). Each was previously ~15-20 lines of `entry →
+  try → catch → throw AppError.sdk`; now most are 1-line
+  `wrapSdk` closures. Takes `{ctx, approveAllBySession,
+  modeBySession, pending}` because `setMode` writes
+  `modeBySession` + settles the pending queue on autopilot, and
+  `setApproveAll` writes `approveAllBySession`.
+
+**What SessionRegistry now owns** (1,025 lines):
+
+- entries Map + Entry interface + PendingRequestQueue +
+  approveAllBySession + modeBySession + serviceCtx + (5 services +
+  forwarder + metadata) handles
+- constructor / getEntryOrThrow / sessionFor / baseSessionConfig
+  (delegates) / respondToRequest / create / resume / replayHistory
+  / setWorkingDirectory / list / deleteCliSession / forward
+  (delegates) / send / searchWorkspaceFiles / getCwd / cwdFor /
+  disconnect / shutdownAll
+- thin delegating methods for the 30+ methods now living in
+  services
+
+### Cumulative receipts
+
+- `f1402df` refactor(d3): extract 5 sibling services
+- `<r2-sha>` refactor(d3.6-8): extract event forwarder + config builder + metadata service
+- `67f0e2e` docs: mark Phase D.3 complete (round 1)
+- `<r2-docs-sha>` docs: round 2 receipts
+
+### Why the lifecycle stays heavy
+
+`create` / `resume` / `setWorkingDirectory` / `cwdFor` /
+`deleteCliSession` / `disconnect` / `shutdownAll` all mutate the
+entries Map and the per-session state Maps, AND many wire the
+emitter / subscription tear-down dance. They're irreducibly
+about lifecycle — the audit's plan to keep them on the registry
+was correct.
+
+`send` (45 lines) is a candidate for further extraction (it does
+attachment validation + temp-file materialization + SDK
+forwarding), but it touches the registry's entry directly and
+would be lifecycle-adjacent. Defer until a real feature forces
+the touch.
+
+`searchWorkspaceFiles` (~20 lines) is genuinely thin and could
+move to the metadata service, but it isn't worth its own commit.
+
 ---
-
-
 
 ## 2026-05-26 (cont.) — Phase D.2 ChatWindow split delivered
 
