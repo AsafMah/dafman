@@ -62,6 +62,12 @@ async function installRpcStub(page: Page): Promise<void> {
       browseDirectory: () => [],
       revealPath: () => null,
       respondToRequest: () => true,
+      // v2 layout seeds the LogViewer panel at boot, which calls
+      // auditStore.ensureInitialised → getAuditState and
+      // logStore.ensureInitialised → getLogState. Return empty so
+      // the panel mounts cleanly.
+      getAuditState: () => ({ recent: [], pendingCount: 0 }),
+      getLogState: () => ({ recent: [], droppedCount: 0 }),
     } as Record<string, (args: unknown) => unknown>;
 
     (window as unknown as { __DAFMAN_TEST_RPC__: unknown }).__DAFMAN_TEST_RPC__ = {

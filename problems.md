@@ -5,9 +5,11 @@
 
 ## Open
 
-- The left tab bar still sometimes refuses to show a panel until you
-  click it twice (runtime exclusivity quirk separate from the startup
-  bug fixed below; need a concrete repro before chasing).
+(No open items.)
+
+## Solved (2026-05-26 sweep — round 2)
+
+- [x] Left tab bar runtime exclusivity sometimes needed two clicks — made obsolete by removing the exclusivity model entirely. v2 layout uses dockview's native vertical tab strip on both edges; tabs are independent first-class panels with native drag/click/collapse behavior. See DEVLOG 2026-05-26 (later).
 
 ## Solved (2026-05-26 sweep)
 

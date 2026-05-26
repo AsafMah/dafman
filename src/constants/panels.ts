@@ -28,11 +28,11 @@ export const PANEL_COMPONENTS = {
 export type PanelComponentName = (typeof PANEL_COMPONENTS)[keyof typeof PANEL_COMPONENTS];
 
 /// Tab header components passed to dockview's `tabComponent:` panel
-/// option. Today there's only one shared `sidebarTab`, but a typed
-/// constant keeps future additions discoverable.
+/// option.
 export const TAB_COMPONENTS = {
   sidebarTab: 'sidebarTab',
   chatTab: 'chatTab',
+  activityTab: 'activityTab',
 } as const;
 
 export type TabComponentName = (typeof TAB_COMPONENTS)[keyof typeof TAB_COMPONENTS];
@@ -54,20 +54,59 @@ export const PANEL_IDS = {
 
 export type PanelId = (typeof PANEL_IDS)[keyof typeof PANEL_IDS];
 
-/// Panels that share the left activity-bar's "single visible at a time"
-/// slot. Runtime exclusion lives in `ActivityBar.activate()`, which
-/// closes any other open member before opening the new one. The
-/// startup `dockview.fromJSON()` path bypasses that pre-close, so
-/// `layoutStore.restore()` calls `enforceActivityBarExclusivity()` to
-/// keep the invariant after restore as well.
+/// Activity-bar tab inventory. The left + right edge groups are seeded
+/// from these at boot. The order here determines tab order in the
+/// strip on first launch; the user can drag-reorder thereafter
+/// (persisted by dockview's layout JSON).
 ///
-/// Note: `sessionDetails` lives on the RIGHT edge, not the activity
-/// bar — kept out of this set.
-export const ACTIVITY_BAR_PANEL_IDS: ReadonlySet<PanelId> = new Set([
-  PANEL_IDS.sessionsManager,
-  PANEL_IDS.terminals,
-  PANEL_IDS.library,
-  PANEL_IDS.jobs,
-  PANEL_IDS.logs,
-  PANEL_IDS.settings,
-]);
+/// Each entry must reference a panel id from `PANEL_IDS` and a
+/// component name from `PANEL_COMPONENTS`. Tabs render via the global
+/// `activityTab` component with `params: { icon, title }`.
+export interface ActivityTabSeed {
+  id: PanelId;
+  component: PanelComponentName;
+  icon: string;
+  title: string;
+}
+
+export const LEFT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
+  {
+    id: PANEL_IDS.sessionsManager,
+    component: PANEL_COMPONENTS.sessionsManager,
+    icon: 'pi-list',
+    title: 'Sessions',
+  },
+  {
+    id: PANEL_IDS.terminals,
+    component: PANEL_COMPONENTS.terminalsPanel,
+    icon: 'pi-chevron-right',
+    title: 'Terminals',
+  },
+  {
+    id: PANEL_IDS.jobs,
+    component: PANEL_COMPONENTS.jobsPanel,
+    icon: 'pi-clock',
+    title: 'Jobs',
+  },
+  {
+    id: PANEL_IDS.logs,
+    component: PANEL_COMPONENTS.logViewer,
+    icon: 'pi-bars',
+    title: 'Logs',
+  },
+];
+
+export const RIGHT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
+  {
+    id: PANEL_IDS.sessionDetails,
+    component: PANEL_COMPONENTS.sessionDetails,
+    icon: 'pi-info-circle',
+    title: 'Session details',
+  },
+  {
+    id: PANEL_IDS.library,
+    component: PANEL_COMPONENTS.library,
+    icon: 'pi-book',
+    title: 'Library',
+  },
+];

@@ -101,6 +101,10 @@ function makeFakeDock(initial: {
       listeners.push(cb);
       return { dispose: () => {} };
     },
+    onDidAddGroup(cb: () => void) {
+      listeners.push(cb);
+      return { dispose: () => {} };
+    },
   } as unknown as DockviewApi;
 
   function activate(groupId: string): void {

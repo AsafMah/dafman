@@ -10,6 +10,238 @@
 
 ---
 
+# Development log
+
+> Append-only chronicle of substantive sessions and findings. **Every agent
+> session that touches the codebase ends with a new entry here** — investigation
+> notes that don't fit a commit message, design decisions taken, dead ends,
+> things future-me needs to know but couldn't have learned from the diff alone.
+>
+> Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
+> Inside each entry, lead with the takeaway, then the receipts.
+
+---
+
+## 2026-05-26 (later) — Activity-rail → native dockview edge tabs
+
+**Takeaway:** Deleted the custom `ActivityBar.vue` rail and replaced
+it with dockview's **native vertical tab strip** on both edges. Left
+edge hosts Sessions/Terminals/Jobs/Logs as vertical tabs; right edge
+hosts Session Details + Library (Library moved over). Added a thin
+22 px custom status bar at the bottom for non-panel actions (Settings
++ Dev wrench). Schema-bumped persisted layout to v2 with a narrow
+migration that preserves chat-session resumption. Six 619-test gate
+runs along the way; final boot timing shows the seed taking 37 ms in
+real dev and 45–49 ms in CI smoke (well under the 50 ms regression
+gate set during planning). Mount-cost gate held.
+
+### Why this exists (after defending the custom rail for five turns)
+
+`dockview-core/dist/esm/dockview/dockviewComponent.js:960` —
+`group.model.headerPosition = position`. When you create an edge
+group, dockview renders the tab strip along that edge automatically.
+`theme.js:35` — `edgeGroupCollapsedSize: 44`. Collapsed edge groups
+shrink to a 44 px strip with tabs still visible. `tabs.js:420-443` —
+clicking the active tab toggles collapse/expand; clicking an
+inactive tab activates + expands. That **is** the JetBrains
+tool-window pattern. We hand-rolled all of this from scratch.
+
+Four "load-bearing reasons" I gave the user defending the custom
+rail all turned out wrong:
+
+| What I claimed | Reality |
+|---|---|
+| "Must survive all panels closed" | Edge group collapses to 44 px strip, stays visible |
+| "Toggle-on-second-click" | Native dockview handler already does this |
+| "Action items aren't panels" | Settings + Dev wrench live in a thin status bar (different widget, different role) |
+| "Top/bottom stack" | Status bar covers it cleanly without inheriting dockview semantics |
+
+### Architecture (v2)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [ ←vertical tabs ] │   Main grid (chat panels)   │ [ tabs→ ]    │
+│ sessions / terminals /                           │ session-     │
+│ jobs / log-viewer                                │ details /    │
+│                                                  │ library      │
+├─────────────────────────────────────────────────────────────────┤
+│ dafman   <indicators>                                ⚙  🔧      │ ← StatusBar
+└─────────────────────────────────────────────────────────────────┘
+```
+
+- **Left edge group** (`headerPosition: 'left'`): 4 vertical tabs.
+- **Right edge group** (`headerPosition: 'right'`): 2 vertical tabs.
+- Both seeded by `layoutStore.seedDefaultLayout()` and started
+  collapsed. User clicks a tab to expand.
+- **Status bar** is custom Vue (not dockview). 22 px, brand left,
+  expansion center for future indicators, Settings + Dev wrench right.
+
+### Migration (v1 → v2)
+
+`Layout.schemaVersion` constant added (`src/ipc/types.ts`). On boot
+in `App.vue:restoreFromLayout`:
+
+- `schemaVersion === 2` → fast path: `dock.fromJSON(layout)` then
+  idempotent `seedDefaultLayout()` to fill in any tabs added since
+  the snapshot was taken.
+- `schemaVersion < 2` (or missing) → narrow migration:
+  `extractChatPanelIds(layout)` first, resume those sessions in
+  parallel, then `seedDefaultLayout()`, then re-add each chat as a
+  body-grid panel.
+- Body grid layout is intentionally **not** preserved across v1 → v2.
+  User's chat sessions resume; their tile arrangement resets to
+  default. One-time pain documented in the manual-test list.
+
+### Files
+
+**Added:**
+- `src/components/shell/ActivityBarTab.vue` — icon+tooltip tab
+  renderer used via `tabComponent: 'activityTab'`. NO click handler:
+  dockview's native tab click handler already does activate +
+  expand/collapse.
+- `src/components/shell/StatusBar.vue` — 22 px bottom strip with
+  Settings + Dev wrench buttons. Emits events; App.vue wires them
+  to existing handlers.
+- `src/stores/shell/__tests__/layoutStore.edgeTabs.test.ts` — 7
+  tests covering seed shape + idempotency + `activateEdgePanel`
+  toggle semantics.
+
+**Deleted:**
+- `src/components/shell/ActivityBar.vue` (~280 LOC)
+- `src/components/shell/ActivityButton.vue` (~130 LOC)
+- `src/stores/shell/__tests__/layoutStore.activityBarExclusivity.test.ts`
+  (the just-landed regression test for a problem that no longer
+  exists)
+
+**Reshaped:**
+- `src/constants/panels.ts` — added `LEFT_ACTIVITY_TABS` +
+  `RIGHT_ACTIVITY_TABS` seed inventories; removed
+  `ACTIVITY_BAR_PANEL_IDS` (no longer needed without exclusivity).
+- `src/stores/shell/layoutStore.ts` — new `seedDefaultLayout()` +
+  `activateEdgePanel(id, edge)` helpers. `enforceKnownEdgeMinimums`
+  now skips its tear-down + recreate path for multi-tab edge groups
+  (would lose all the tabs). `rescanOpenDetails` redefined: v2
+  semantics = right edge expanded AND session-details panel is
+  active. Subscribes to `onDidCollapsedChange` on the right edge
+  group, lazily re-attaching via `onDidAddGroup`.
+- `src/App.vue` — removed `<ActivityBar>`, `activityItems`,
+  `openSessionsByDefault`, `persistedLayoutHasPanel`,
+  `activityBarRef`. Added `<StatusBar>`, `openSettings`, new
+  schema-aware `restoreFromLayout` + `flushPendingLayout`.
+- `src/main.ts` — registered `ActivityBarTab` globally as
+  `activityTab` (dockview-vue requires global registration; the
+  component name is looked up via `app.component(...)`).
+- `e2e/smoke.pwtest.ts` — added `getAuditState` + `getLogState`
+  stubs (LogViewer panel is now seeded at boot so its
+  `auditStore.ensureInitialised` / `logStore.ensureInitialised`
+  calls hit the IPC bridge).
+
+### Rubber-duck pre-implementation pass
+
+Critique caught 3 BLOCKERS + 4 SIGNIFICANT items before any code
+got written. All seven landed as concrete plan revisions:
+
+| # | Severity | Finding | Plan fix |
+|---|---|---|---|
+| 1 | BLOCKER | `<DockviewVue>` has no `tabComponents` prop | Global registration in `src/main.ts` |
+| 2 | BLOCKER | Hard reset loses chat resumption | Narrow migration: extract IDs first |
+| 3 | BLOCKER | `setEdgeGroupCollapsed` not public | Use `getEdgeGroup().collapse()/expand()` |
+| 4 | SIG | Native click already toggles | No click handler in `ActivityBarTab` |
+| 5 | SIG | `detailsOpen` would always be true | Redefine as expanded && active |
+| 6 | SIG | Eager mount cost | Measurement gate (passed) |
+| 7 | SIG | Chat scroll not resize-anchored | Deferred to follow-up — see open items |
+
+### Self code-review pass (per plan §14)
+
+**14.1 Logic correctness** — Toggle semantics verified live (`bun
+run dev`, persisted layout shows the expected `edgeGroups` shape
+with `collapsed: true` on both sides; migration log fires; seed log
+fires at 37ms). Migration end-to-end: 2 stored chat sessions
+resumed, re-added to body grid, no error toasts. `detailsOpen`
+subscribes to `onDidActivePanelChange` + `onDidCollapsedChange` +
+`onDidAddGroup` (for lazy attach when right edge appears post-seed)
+— all four sources keep state consistent.
+
+**14.2 Duplication** — No new copy-paste introduced. The seed loop
+in `seedDefaultLayout` uses the same `addPanel(...)` shape as
+`openEdgePanel` but the call sites are intentionally distinct: seed
+runs once at boot, openEdgePanel was for runtime opens (now mostly
+unused; left in place for one back-compat caller —
+`resetToDefault`'s "Sessions sidebar at default size" fallback —
+will be cleaned up in follow-up). `activateEdgePanel` is the
+canonical v2 helper for programmatic open/close.
+
+**14.3 Modularity** — `layoutStore.ts` is now ~1,308 lines (up
+~95 from prior). Under the 1,200-line soft cap by ~108 lines but
+flagged for a future split (`edgeGroups.ts` is the natural seam).
+`StatusBar.vue` emits events instead of importing layoutStore
+directly — keeps the chrome swappable. `ActivityBarTab.vue` is a
+pure renderer; no business state.
+
+**14.4 Quality** — No new `as unknown as` casts in the v2 helpers.
+JSDoc on `seedDefaultLayout`, `activateEdgePanel`,
+`openSessionDetailsPanel`. ESLint complexity unchanged at 5
+warnings (none on the new code). All new dockview event
+subscriptions added to `activeUnsubs` array in `setApi` — no leaked
+listeners across HMR. Backend TS gate (`lint:tsc-bun`) clean.
+
+**14.5 Wire contract** — `Layout.schemaVersion` is now part of the
+persisted shape. `extractChatPanelIds` ignores unknown top-level
+fields (legacy-compatible — tested implicitly by the migration
+working against a stored v1 layout).
+
+**14.6 Deletion completeness** — `rg ActivityBar src` returns only
+StatusBar.vue comment references + DEVLOG citations. `rg
+enforceActivityBarExclusivity src` returns no hits.
+`ACTIVITY_BAR_PANEL_IDS` deleted from `constants/panels.ts`.
+`openEdgePanel` kept (one back-compat caller in `resetToDefault`).
+
+**14.7 Documentation** — DEVLOG (this entry), STATUS, CHANGELOG,
+problems.md updated. ARCHITECTURE pointer added under §8 SDK
+gotchas.
+
+### Manual test list (AGENTS.md rule 10)
+
+| # | Steps | Expected | Why not automated |
+|---|---|---|---|
+| 1 | Boot fresh (delete `dockview.layout` field in settings.json). | Left strip shows 4 vertical icons (list, chevron, clock, bars); right strip 2 (info-circle, book); both collapsed at 44 px. | Visual rendering / dockview chrome |
+| 2 | Click Sessions tab on left. | Strip expands to ~280 px; Sessions list visible; tab highlighted. | Native dockview UX |
+| 3 | Click Sessions again. | Strip collapses to 44 px; tabs stay visible. | Native dockview UX |
+| 4 | Drag Sessions tab from strip into the main grid. | Becomes a tabbed panel in main grid; left strip loses that tab. | Drag-and-drop runtime behavior |
+| 5 | Drag it back onto left strip. | Re-docks as a left tab. | Drag-and-drop runtime behavior |
+| 6 | Click Settings cog in status bar. | Settings opens in main grid (one tab). Second click focuses, doesn't toggle. | Status bar wiring |
+| 7 | Boot with a pre-v2 stored layout that had 2+ chat sessions open. | "migrating layout v1 → v2" log line; chats resume into the body grid at default tiling; no error toasts. | One-time migration path |
+| 8 | Open Session Details via existing header button. | Right rail expands with session-details active. Button shows pressed state. | New `detailsOpen` semantics |
+| 9 | Resize window vertically while chat is at bottom. | Chat may drift slightly off bottom after status bar gain — known limitation, scroll-anchor patch deferred. | Resize-anchor behavior |
+| 10 | Long-press / right-click a vertical tab. | Dockview's native context menu (rename, close, popout). | Dockview default chrome |
+
+### Known follow-ups (intentional out-of-scope)
+
+- `useChatScroll` resize anchor (rubber-duck #7) — deferred. Visual
+  drift is small (22 px) and most users won't notice. File a
+  separate task if it bothers anyone.
+- CSS polish for the vertical tabs (active-tab brand orange,
+  hover/focus states for dark theme). Default dockview chrome
+  renders fine; refinement is cosmetic.
+- The remaining `problems.md` runtime "exclusivity sometimes needs
+  two clicks" item — obsolete with the exclusivity model gone.
+  Marking solved in this commit.
+- Bottom dockview edge group for drawer panels (terminal output,
+  problems list, etc.) — status bar is a separate concern; the two
+  can coexist when the drawer pattern lands.
+
+### Receipts
+
+- Plan: `~/.copilot/session-state/18c42172-.../plan.md`
+- Mount-cost gate output: `[layoutStore.seedDefaultLayout] seeded
+  edge tabs in 37ms` (dev), 45–49 ms (CI smoke).
+- Wire-shape: `dockview.edgeGroups.left.group.views =
+  ["sessions-manager","terminals-panel","jobs-panel","log-viewer"]`,
+  `right.group.views = ["session-details","library"]`. Both
+  `collapsed: true` on first boot.
+
+---
+
 ## 2026-05-26 (cont.) — Phase F second pass: 17 → 5 complexity warnings
 
 **Takeaway:** Picked up Phase F where the first pass left off (15

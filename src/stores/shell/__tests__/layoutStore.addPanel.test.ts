@@ -160,6 +160,7 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
     onDidActivePanelChange: () => ({ dispose: () => {} }),
     onDidAddPanel: () => ({ dispose: () => {} }),
     onDidRemovePanel: () => ({ dispose: () => {} }),
+    onDidAddGroup: () => ({ dispose: () => {} }),
   } as unknown as DockviewApi;
 
   return { api, addPanelCalls, addGroupCalls, groups };

@@ -26,7 +26,12 @@ import {
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
-import { ACTIVITY_BAR_PANEL_IDS, PANEL_IDS } from '@/constants/panels';
+import {
+  LEFT_ACTIVITY_TABS,
+  PANEL_IDS,
+  RIGHT_ACTIVITY_TABS,
+  TAB_COMPONENTS,
+} from '@/constants/panels';
 
 const SESSION_DETAILS_PANEL_ID = PANEL_IDS.sessionDetails;
 const SESSIONS_PANEL_ID = PANEL_IDS.sessionsManager;
@@ -391,62 +396,6 @@ export const useLayoutStore = defineStore('layout', () => {
     return true;
   }
 
-  /// Sweep the dockview tree post-restore to make sure at most one
-  /// activity-bar panel is visible. Runtime exclusion (closing any
-  /// other open ActivityBar item before opening a new one) lives in
-  /// `ActivityBar.activate()`, but `dockview.fromJSON()` restores the
-  /// raw layout JSON without re-checking that invariant. If a prior
-  /// session managed to persist (or a layout migration introduced)
-  /// 2+ activity-bar panels stacked on the left edge, all of them
-  /// would come back — that's the "multiple sidebars at startup"
-  /// regression.
-  ///
-  /// Strategy: across the entire dockview tree (both edge groups
-  /// and body groups), find every panel whose id is in
-  /// `ACTIVITY_BAR_PANEL_IDS`. Keep the active one (or, if none is
-  /// marked active, the first by group enumeration order). Close
-  /// the rest. Idempotent — running this on a layout that already
-  /// satisfies the invariant is a no-op.
-  function enforceActivityBarExclusivity(): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const found: Array<{ id: string; isActive: boolean }> = [];
-
-    for (const id of ACTIVITY_BAR_PANEL_IDS) {
-      const panel = dock.getPanel(id);
-
-      if (!panel) continue;
-
-      found.push({
-        id,
-        isActive: panel.api.isActive === true,
-      });
-    }
-
-    if (found.length <= 1) return;
-
-    // Prefer the currently-active one as the survivor; fall back to
-    // the first match by `ACTIVITY_BAR_PANEL_IDS` iteration order.
-    const survivor = found.find((p) => p.isActive)?.id ?? found[0]?.id;
-
-    if (!survivor) return;
-
-    for (const { id } of found) {
-      if (id === survivor) continue;
-
-      const panel = dock.getPanel(id);
-
-      if (panel) dock.removePanel(panel);
-    }
-
-    console.info('[layoutStore] enforced activity-bar exclusivity at restore', {
-      survivor,
-      closed: found.filter((p) => p.id !== survivor).map((p) => p.id),
-    });
-  }
-
   function enforceKnownEdgeMinimums(): void {
     const dock = api.value;
 
@@ -459,7 +408,16 @@ export const useLayoutStore = defineStore('layout', () => {
 
       const minimumSize = minimumForEdgeGroup(position, edge);
 
+      // v2 multi-tab edge groups: we never tear down + recreate, the
+      // tabs would all be lost. The recreate path was a v1 patch for
+      // single-panel exclusive edge groups whose persisted width
+      // could go below the rebuilt minimum. With multi-tab groups,
+      // dockview's own minimumSize on the edge group keeps the width
+      // honest — we just nudge applyEdgeMinimum if anything got below.
+      const isMultiTab = edgePanelsFromDock(edge).length > 1;
+
       if (
+        !isMultiTab &&
         minimumSize !== undefined &&
         isEdgeBelowMinimum(position, edge, minimumSize) &&
         recreateKnownEdgeGroup(position, edge, minimumSize)
@@ -540,27 +498,19 @@ export const useLayoutStore = defineStore('layout', () => {
     activeSessionId.value = null;
   }
 
+  /// Recomputes `detailsOpen` from the live dockview state. The
+  /// definition (v2): right edge group exists AND is expanded AND its
+  /// session-details panel is the active tab.
+  ///
+  /// (v1 used existence-based semantics — `detailsOpen = panel exists
+  /// anywhere in the layout`. That stopped working once we seed
+  /// `session-details` as a persistent tab in the right edge: the
+  /// panel always exists, the strip just collapses to hide it.)
   function rescanOpenDetails(dock: DockviewApi): void {
-    let found = false;
-
-    for (const group of dock.groups) {
-      for (const panel of group.panels) {
-        const rawApi = (panel as { api?: { id?: unknown } }).api;
-        const id =
-          typeof rawApi?.id === 'string'
-            ? rawApi.id
-            : typeof (panel as { id?: unknown }).id === 'string'
-              ? (panel as { id: string }).id
-              : null;
-
-        if (id === SESSION_DETAILS_PANEL_ID) {
-          found = true;
-          break;
-        }
-      }
-
-      if (found) break;
-    }
+    const right = dock.getEdgeGroup('right');
+    const panel = dock.getPanel(SESSION_DETAILS_PANEL_ID);
+    const found =
+      right !== undefined && !right.isCollapsed() && panel?.api.isActive === true;
 
     if (detailsOpen.value !== found) detailsOpen.value = found;
   }
@@ -581,19 +531,51 @@ export const useLayoutStore = defineStore('layout', () => {
     recomputeActiveSession(next);
     rescanOpenDetails(next);
     enforceKnownEdgeMinimums();
+
+    // v2 semantics: details state = right edge expanded AND active
+    // panel === session-details. We need to react to BOTH active-panel
+    // changes (already subscribed) AND the right edge group's
+    // collapsed-state changes. The right edge group may not exist
+    // when setApi is called (seedDefaultLayout creates it later), so
+    // we re-attach the collapse listener every time a group is added
+    // until we find the right edge.
+    let rightCollapseUnsub: (() => void) | null = null;
+    const tryAttachRightCollapse = () => {
+      if (rightCollapseUnsub) return;
+
+      const right = next.getEdgeGroup('right');
+
+      if (!right) return;
+
+      const sub = right.onDidCollapsedChange(() => rescanOpenDetails(next));
+
+      rightCollapseUnsub = () => sub.dispose();
+    };
+
+    tryAttachRightCollapse();
+
     const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
-    const panelSub = next.onDidActivePanelChange(() => recomputeActiveSession(next));
+    const panelSub = next.onDidActivePanelChange(() => {
+      recomputeActiveSession(next);
+      rescanOpenDetails(next);
+    });
     const removeSub = next.onDidRemovePanel(() => {
       recomputeActiveSession(next);
       rescanOpenDetails(next);
     });
     const addSub = next.onDidAddPanel(() => rescanOpenDetails(next));
+    const addGroupSub = next.onDidAddGroup(() => {
+      tryAttachRightCollapse();
+      rescanOpenDetails(next);
+    });
 
     activeUnsubs = [
       () => groupSub.dispose(),
       () => panelSub.dispose(),
       () => removeSub.dispose(),
       () => addSub.dispose(),
+      () => addGroupSub.dispose(),
+      () => rightCollapseUnsub?.(),
     ];
   }
 
@@ -718,31 +700,20 @@ export const useLayoutStore = defineStore('layout', () => {
 
   /// Opens (or focuses) the singleton details rail. Idempotent —
   /// reopening when the panel already exists just brings it forward.
+  /// Activates the session-details panel in the right edge group and
+  /// expands the strip if collapsed. v2 semantics: the panel is
+  /// permanently seeded at boot via `seedDefaultLayout`, so this is
+  /// purely an activate + expand, never an add-panel call.
   function openSessionDetailsPanel(): void {
-    openEdgePanel('right', {
-      id: SESSION_DETAILS_PANEL_ID,
-      component: 'sessionDetails',
-      tabComponent: 'sidebarTab',
-      title: 'Session',
-      initialSize: Math.max(lastSessionDetailsWidth.value, SESSION_DETAILS_MIN_WIDTH),
-      minimumSize: SESSION_DETAILS_MIN_WIDTH,
-    });
+    activateEdgePanel(SESSION_DETAILS_PANEL_ID, 'right');
     restoreSessionDetailsWidth();
   }
 
-  /// Toggles the details rail. If open, closes; if closed, opens.
+  /// Toggles the details rail. Goes through `activateEdgePanel` which
+  /// already implements the toggle (click active → collapse; otherwise
+  /// activate + expand).
   function toggleSessionDetailsPanel(): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const panel = dock.getPanel(SESSION_DETAILS_PANEL_ID);
-
-    if (panel) {
-      dock.removePanel(panel);
-    } else {
-      openSessionDetailsPanel();
-    }
+    activateEdgePanel(SESSION_DETAILS_PANEL_ID, 'right');
   }
 
   function rememberSessionDetailsWidth(): void {
@@ -1005,6 +976,42 @@ export const useLayoutStore = defineStore('layout', () => {
     }
   }
 
+  /// Toggle/activate a panel that lives in an edge group. Intended
+  /// for command palette, keyboard shortcuts, and programmatic
+  /// callers — UI clicks on dockview tabs already go through
+  /// dockview's native handler which does the same thing.
+  ///
+  /// Semantics:
+  ///   - panel inactive  → activate it + expand the strip if collapsed
+  ///   - panel active + expanded → collapse the strip
+  ///   - panel active + collapsed → expand the strip (rare; happens
+  ///     if external code activated the panel programmatically while
+  ///     the strip is collapsed)
+  ///
+  /// No-ops if the panel or its edge group is not seeded yet.
+  function activateEdgePanel(id: string, edge: 'left' | 'right'): void {
+    const dock = api.value;
+
+    if (!dock) return;
+
+    const group = dock.getEdgeGroup(edge);
+    const panel = dock.getPanel(id);
+
+    if (!group || !panel) return;
+
+    const isActive = panel.api.isActive;
+    const isCollapsed = group.isCollapsed();
+
+    if (isActive && !isCollapsed) {
+      group.collapse();
+
+      return;
+    }
+
+    if (!isActive) panel.api.setActive();
+    if (isCollapsed) group.expand();
+  }
+
   function openEdgePanel(position: EdgeGroupPosition, options: EdgePanelOptions): void {
     const dock = api.value;
 
@@ -1195,7 +1202,6 @@ export const useLayoutStore = defineStore('layout', () => {
     try {
       dock.fromJSON(layout as Parameters<DockviewApi['fromJSON']>[0]);
       enforceKnownEdgeMinimums();
-      enforceActivityBarExclusivity();
 
       return true;
     } catch (err) {
@@ -1203,6 +1209,57 @@ export const useLayoutStore = defineStore('layout', () => {
 
       return false;
     }
+  }
+
+  /// Seeds the canonical v2 edge-group layout: a left edge group with
+  /// the activity-bar tabs and a right edge group with the right-side
+  /// tabs (session details + library). Both groups start collapsed —
+  /// the user opens one by clicking its tab in the strip.
+  ///
+  /// Idempotent: skips work that's already in place. Safe to call
+  /// during boot before any chat panel resumes happen.
+  ///
+  /// Logs total wall time so we can keep the boot-cost gate honest
+  /// per plan §4 (>50 ms regression triggers a lazy-mount detour).
+  function seedDefaultLayout(): void {
+    const dock = api.value;
+
+    if (!dock) return;
+
+    const startedAt = performance.now();
+
+    for (const [position, seeds, initialSize, minimumSize] of [
+      ['left', LEFT_ACTIVITY_TABS, 280, 200],
+      ['right', RIGHT_ACTIVITY_TABS, 400, 320],
+    ] as const) {
+      const edge =
+        dock.getEdgeGroup(position) ??
+        dock.addEdgeGroup(position, {
+          id: `edge-${position}`,
+          initialSize,
+          minimumSize,
+          collapsed: true,
+        });
+
+      for (const seed of seeds) {
+        if (dock.getPanel(seed.id)) continue;
+
+        dock.addPanel({
+          id: seed.id,
+          component: seed.component,
+          tabComponent: TAB_COMPONENTS.activityTab,
+          title: seed.title,
+          params: { icon: seed.icon, title: seed.title },
+          position: { referenceGroup: edge.id },
+        });
+      }
+
+      if (!edge.isCollapsed()) edge.collapse();
+    }
+
+    const elapsedMs = Math.round(performance.now() - startedAt);
+
+    console.info(`[layoutStore.seedDefaultLayout] seeded edge tabs in ${elapsedMs}ms`);
   }
 
   return {
@@ -1221,6 +1278,7 @@ export const useLayoutStore = defineStore('layout', () => {
     renamePanel,
     replaceMissingPanel,
     openEdgePanel,
+    activateEdgePanel,
     openSessionDetailsPanel,
     toggleSessionDetailsPanel,
     isSessionDetailsOpen,
@@ -1230,6 +1288,7 @@ export const useLayoutStore = defineStore('layout', () => {
     rescueChatPanelsFromEdgeGroups,
     toggleEdgeGroup,
     resetToDefault,
+    seedDefaultLayout,
     firstBodyGroupId,
     snapshot,
     restore,

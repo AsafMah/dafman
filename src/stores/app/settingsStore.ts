@@ -13,6 +13,7 @@ import type {
   TerminalPrefs,
   ThemeChoice,
 } from '@/ipc/types';
+import { LAYOUT_SCHEMA_VERSION } from '@/ipc/types';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 
@@ -27,7 +28,7 @@ function defaultSettings(): Settings {
       streaming: false,
       enableMermaid: false,
     },
-    layout: { dockview: null },
+    layout: { dockview: null, schemaVersion: LAYOUT_SCHEMA_VERSION },
     workspaces: { recent: [], defaultWorkspace: '' },
     notifications: { turnEnd: false, waitingForInput: true },
     tools: { defaultExcluded: [], defaultAllowed: [] },
@@ -185,7 +186,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       await update({
         ...settings.value,
-        layout: { dockview },
+        layout: { dockview, schemaVersion: LAYOUT_SCHEMA_VERSION },
       });
     } catch {
       /* toast already shown by `update()` */

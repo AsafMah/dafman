@@ -17,6 +17,7 @@ type FakePanel = {
     id: string;
     component: string;
     group: { id: string };
+    isActive: boolean;
     setActive: () => void;
   };
 };
@@ -110,6 +111,7 @@ function makeFake(
         id,
         component,
         group: { id: group.id },
+        isActive: false,
         setActive() {},
       },
     };
@@ -126,6 +128,10 @@ function makeFake(
       },
       setSize: group.setSize,
       setConstraints: group.setConstraints,
+      isCollapsed: () => false,
+      collapse: () => {},
+      expand: () => {},
+      onDidCollapsedChange: () => ({ dispose: () => {} }),
     };
   }
 
@@ -162,7 +168,7 @@ function makeFake(
         : undefined;
     },
     getPanel(id: string) {
-      for (const g of groups) for (const p of g.panels) if (p.id === id) return p.api;
+      for (const g of groups) for (const p of g.panels) if (p.id === id) return p;
       return undefined;
     },
     addGroup() {
@@ -219,6 +225,7 @@ function makeFake(
     onDidActivePanelChange: () => ({ dispose: () => {} }),
     onDidAddPanel: () => ({ dispose: () => {} }),
     onDidRemovePanel: () => ({ dispose: () => {} }),
+    onDidAddGroup: () => ({ dispose: () => {} }),
   } as unknown as DockviewApi;
 
   return { api, removePanelCalls, addEdgeGroupCalls, removeEdgeGroupCalls, groups };

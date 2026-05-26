@@ -4,6 +4,7 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ## [Unreleased]
 
 ### Changed
+- **Replaced the custom 48 px ActivityBar rail with dockview's native vertical tab strips on both edges.** Left edge shows Sessions / Terminals / Jobs / Logs as vertical tabs; right edge shows Session Details + Library (Library moved from left → right). Tabs are drag-reorderable, drag-out-to-main-grid, and the strip auto-collapses to 44 px when no tab is active — all native dockview behavior. Added a thin 22 px status bar at the bottom for Settings + Dev wrench. Schema-bumped persisted layout to v2 with a narrow migration that preserves chat sessions but rebuilds the body grid at default. See DEVLOG 2026-05-26 (later) for the full design.
 - **Reorganized the renderer and bun codebase by domain.** Stores now live under 6 `src/stores/` folders, components under 9 `src/components/` feature folders plus `details/`, and bun-side modules under 8 `src-bun/app/` domain folders.
 - **Standardized renderer imports on the `@/` path alias.** `tsconfig.json` now maps `@/*` → `src/*`, and 129 renderer files were updated to use alias imports. Backend imports intentionally remain relative because `Bun.build` does not reliably honor tsconfig path aliases for the bun entry graph.
 - **Extracted shared utilities before the restructure.** `createListenerRegistry()`, `revealPath()`, and `MODE_OPTIONS` now live in shared helpers instead of duplicated call sites.

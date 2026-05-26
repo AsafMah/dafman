@@ -165,8 +165,23 @@ export type CommandResultEvent =
       record: CommandResultRecord;
     };
 
+/// Bump when the dockview layout shape stored in `Layout.dockview`
+/// changes in an incompatible way. The boot path compares the
+/// persisted `schemaVersion` against this and triggers a one-time
+/// narrow migration (preserve chat session IDs, re-seed edge groups)
+/// on a downgrade detection.
+///
+/// History:
+///   v1 — left edge: custom ActivityBar with `exclusive: true`; right
+///        edge: ad-hoc session-details panel
+///   v2 — left + right edges: native dockview vertical tab strips
+///        seeded by `seedDefaultLayout`; library moved to right edge
+export const LAYOUT_SCHEMA_VERSION = 2;
+
 export interface Layout {
   dockview: unknown;
+  /// Missing or older than `LAYOUT_SCHEMA_VERSION` triggers migration.
+  schemaVersion?: number;
 }
 
 export interface Workspaces {

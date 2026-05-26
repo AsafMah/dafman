@@ -37,6 +37,7 @@ import SessionDetailsPanel from '@/components/session/SessionDetailsPanel.vue';
 import SessionsManager from '@/components/session/SessionsManager.vue';
 import SettingsPanel from '@/components/settings/SettingsPanel.vue';
 import SidebarTab from '@/components/shell/SidebarTab.vue';
+import ActivityBarTab from '@/components/shell/ActivityBarTab.vue';
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
 import TerminalsPanel from '@/components/terminal/TerminalsPanel.vue';
 import Watermark from '@/components/shell/Watermark.vue';
@@ -150,6 +151,7 @@ async function mountWith(Root: typeof App) {
   app.component('chatTabActions', ChatTabActions);
   app.component('chatTab', ChatTab);
   app.component('sidebarTab', SidebarTab);
+  app.component('activityTab', ActivityBarTab);
   /* eslint-enable vue/component-definition-name-casing */
 
   if (import.meta.env.DEV) {

@@ -4,9 +4,9 @@ import { storeToRefs } from 'pinia';
 import Toast, { type ToastMessageOptions } from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
 import { DockviewVue, type DockviewReadyEvent } from 'dockview-vue';
-import ActivityBar, { type ActivityItem } from '@/components/shell/ActivityBar.vue';
 import BootSplash from '@/components/shell/BootSplash.vue';
 import CommandPalette from '@/components/shell/CommandPalette.vue';
+import StatusBar from '@/components/shell/StatusBar.vue';
 import { useClientStore } from '@/stores/app/clientStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
@@ -23,10 +23,10 @@ import { on as busOn } from '@/lib/bus';
 import {
   extractChatPanelIds,
   enforcePersistedEdgeMinimums,
-  persistedLayoutHasPanel as persistedLayoutHasPanelImpl,
   stripLegacyDetailsPanels,
   stripPanelFromLayout,
 } from '@/lib/layoutSanitize';
+import { LAYOUT_SCHEMA_VERSION } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 const clientStore = useClientStore();
@@ -45,10 +45,38 @@ const { settings } = storeToRefs(settingsStore);
 
 const prefersDark = ref(false);
 
-// Dev playground is only built in dev mode; the action item is
-// stripped from the ActivityBar in prod.
-const isDev = import.meta.env.DEV;
 const PLAYGROUND_PANEL_ID = 'playground';
+const SETTINGS_PANEL_ID = 'settings-panel';
+
+/// Opens the Settings panel as a body grid tab. Subsequent calls
+/// focus the existing tab. Settings used to live on the left rail
+/// (v1) but in v2 it's no longer an activity-bar member — the cog in
+/// the status bar opens it on demand.
+function openSettings() {
+  const dock = layoutStore.api;
+
+  if (!dock) return;
+
+  const existing = dock.getPanel(SETTINGS_PANEL_ID);
+
+  if (existing) {
+    existing.api.setActive();
+
+    return;
+  }
+
+  const bodyGroups = dock.groups.filter(
+    (g) => (g as unknown as { location?: { type?: string } }).location?.type === 'grid',
+  );
+  const referenceGroup = bodyGroups[0]?.id ?? dock.addGroup().id;
+
+  dock.addPanel({
+    id: SETTINGS_PANEL_ID,
+    component: 'settingsPanel',
+    title: 'Settings',
+    position: { referenceGroup, direction: 'within' },
+  });
+}
 
 /// Opens the Dev Playground as a regular dockview body tab (not a
 /// sidebar edge panel). Subsequent calls just focus the existing tab.
@@ -225,9 +253,9 @@ onMounted(async () => {
   // Open the Sessions Manager by default. We do this only when the
   // persisted dockview JSON didn't contain it — i.e. first launch, or
   // the user explicitly closed it last time we don't want to reopen it.
-  if (!persistedLayoutHasPanel(SESSIONS_PANEL_ID)) {
-    setTimeout(openSessionsByDefault, 0);
-  }
+  //
+  // Removed in v2: the activity-bar tabs are now seeded permanently,
+  // so the user clicks Sessions in the rail to open. No auto-open.
 
   // Final yield: lets the just-mounted dockview panels paint at
   // least one frame before the splash fades out. Without this the
@@ -269,18 +297,60 @@ onMounted(async () => {
   }
 });
 
-/// Resumes each session id referenced by the persisted dockview JSON,
-/// then applies the JSON via `layoutStore.restore()` if at least one
-/// resume succeeded. The dockview side won't be `@ready` yet on
-/// startup, so we defer the actual `fromJSON` until the api shows up
-/// (`onDockReady` will check this).
+/// Layout-side pending state for the boot race. The dockview @ready
+/// event fires from the child component's `onMounted`, which races
+/// our parent's `onMounted` (which kicks off `restoreFromLayout`).
+/// We capture intent here and `onDockReady` drains it once the api
+/// becomes available.
 const pendingRestoreLayout = ref<unknown>(null);
+/// If non-null, a v1 → v2 migration was detected. Drain by calling
+/// `seedDefaultLayout()` + `addPanel(id)` for each resumed session.
+const pendingMigrationSessions = ref<string[] | null>(null);
+/// True when there's no stored layout at all (fresh install or hard
+/// reset) — drain by calling `seedDefaultLayout()` only.
+const pendingFreshSeed = ref<boolean>(false);
 
 async function restoreFromLayout() {
-  const layout = settingsStore.settings.layout?.dockview;
+  const layoutPref = settingsStore.settings.layout;
+  const layout = layoutPref?.dockview;
+  const storedVersion = layoutPref?.schemaVersion ?? 1;
+
+  // v1 (or missing) → narrow migration: harvest chat session IDs,
+  // resume them, then seed the fresh v2 shape with those chats added
+  // as body-grid panels. The previously-stored grid arrangement is
+  // best-effort — by design, body layout is rebuilt at default.
+  if (storedVersion !== LAYOUT_SCHEMA_VERSION) {
+    console.info(
+      `[boot] restoreFromLayout: migrating layout v${storedVersion} → v${LAYOUT_SCHEMA_VERSION}`,
+    );
+
+    const sessionIds = layout ? extractChatPanelIds(layout) : [];
+
+    if (sessionIds.length > 0) {
+      bootStore.beginSessions(sessionIds.length);
+      await Promise.all(
+        sessionIds.map((id) =>
+          sessionsStore.restoreSession(id).finally(() => bootStore.markSessionRestored()),
+        ),
+      );
+      console.info('[boot] restoreFromLayout: migration — all resumes settled');
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      bootStore.beginApplying();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+
+    pendingMigrationSessions.value = sessionIds;
+
+    if (layoutStore.api) flushPendingLayout();
+
+    return;
+  }
 
   if (!layout || typeof layout !== 'object') {
-    console.info('[boot] restoreFromLayout: no layout to restore');
+    console.info('[boot] restoreFromLayout: no layout to restore — fresh seed');
+    pendingFreshSeed.value = true;
+
+    if (layoutStore.api) flushPendingLayout();
 
     return;
   }
@@ -293,13 +363,9 @@ async function restoreFromLayout() {
   console.info(`[boot] restoreFromLayout: ${sessionIds.length} chat sessions to resume`);
 
   if (sessionIds.length === 0) {
-    if (layoutStore.api) {
-      const ok = layoutStore.restore(sanitized);
+    pendingRestoreLayout.value = sanitized;
 
-      if (!ok) layoutStore.resetToDefault();
-    } else {
-      pendingRestoreLayout.value = sanitized;
-    }
+    if (layoutStore.api) flushPendingLayout();
 
     return;
   }
@@ -319,23 +385,58 @@ async function restoreFromLayout() {
   bootStore.beginApplying();
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-  if (layoutStore.api) {
-    const ok = layoutStore.restore(sanitized);
+  pendingRestoreLayout.value = sanitized;
 
-    console.info(`[boot] restoreFromLayout: fromJSON ok=${ok}`);
+  if (layoutStore.api) flushPendingLayout();
+}
+
+/// Applies whichever boot intent is set (v2 restore / v1 migration /
+/// fresh seed). Called from both `restoreFromLayout` (when dock is
+/// already ready) and `onDockReady` (when dock becomes ready after
+/// `restoreFromLayout` has already finished). Safe to call multiple
+/// times: each branch nulls its own state once drained.
+function flushPendingLayout() {
+  if (pendingMigrationSessions.value !== null) {
+    layoutStore.seedDefaultLayout();
+
+    for (const id of pendingMigrationSessions.value) {
+      layoutStore.addPanel(id);
+    }
+
+    pendingMigrationSessions.value = null;
+    // Force a persist with the new schemaVersion so subsequent boots
+    // take the fast path. The layout-change subscription in
+    // onDockReady will fire from the addPanel calls; nudge it with
+    // an explicit save so we don't depend on the debounce window.
+    void settingsStore.persistLayout(layoutStore.snapshot());
+
+    return;
+  }
+
+  if (pendingRestoreLayout.value !== null) {
+    const ok = layoutStore.restore(pendingRestoreLayout.value);
 
     if (!ok) {
-      // fromJSON threw — toast and fall back to a default layout
-      // so the user has something to work with instead of a blank
-      // window.
       useToastStore().warn(
         'Layout restore failed',
         'The persisted dockview JSON was rejected. Resetting to default.',
       );
-      layoutStore.resetToDefault();
+      layoutStore.seedDefaultLayout();
+    } else {
+      // Idempotent fill-in for any tabs that didn't exist when the
+      // layout was last persisted (e.g. a new activity-bar entry
+      // shipped in a code update).
+      layoutStore.seedDefaultLayout();
     }
-  } else {
-    pendingRestoreLayout.value = sanitized;
+
+    pendingRestoreLayout.value = null;
+
+    return;
+  }
+
+  if (pendingFreshSeed.value) {
+    layoutStore.seedDefaultLayout();
+    pendingFreshSeed.value = false;
   }
 }
 
@@ -426,13 +527,7 @@ function onDockReady(event: DockviewReadyEvent) {
   // If startup-resume already produced a pruned layout, hand it over
   // now that the api is alive. Done before subscribing to layout
   // changes so the restore itself doesn't trigger a write.
-  if (pendingRestoreLayout.value) {
-    const ok = layoutStore.restore(pendingRestoreLayout.value);
-
-    if (!ok) layoutStore.resetToDefault();
-
-    pendingRestoreLayout.value = null;
-  }
+  flushPendingLayout();
 
   // One-shot rescue: older builds (or a stale persisted layout) could
   // leave chat panels stuck inside the Sessions sidebar's edge group,
@@ -446,10 +541,6 @@ function onDockReady(event: DockviewReadyEvent) {
     layoutStore.enforceKnownEdgeMinimums();
     layoutStore.rememberSessionDetailsWidth();
     scheduleLayoutSave();
-    // Keep the ActivityBar's pressed-state in sync with reality
-    // (panels closed via their in-panel X, restored from layout,
-    // dragged into popouts, …).
-    activityBarRef.value?.sync();
   });
 }
 
@@ -466,148 +557,10 @@ function scheduleLayoutSave() {
   }, 300);
 }
 
-// Sessions Manager — left edge-group panel toggle. Owned by the
-// ActivityBar; the SESSIONS_PANEL_ID constant is shared with the
-// activity-item config below and with the open-by-default path.
-const SESSIONS_PANEL_ID = 'sessions-manager';
-const SETTINGS_PANEL_ID = 'settings-panel';
-const LOG_VIEWER_PANEL_ID = 'log-viewer';
-const LIBRARY_PANEL_ID = 'library';
-const JOBS_PANEL_ID = 'jobs-panel';
-const TERMINALS_PANEL_ID = 'terminals-panel';
-
-/// ActivityBar items.
-/// - Top stack (default `group: "top"`): panel toggles. Sessions today;
-///   Library / Log viewer / MCP status / ... append here.
-/// - Bottom stack (`group: "bottom"`): settings panel + (dev-only) the
-///   playground escape hatch. Settings is a panel like Sessions, not
-///   a modal dialog — collapsible groups inside, future search across.
-const activityItems = computed<ActivityItem[]>(() => {
-  const items: ActivityItem[] = [
-    {
-      kind: 'panel',
-      id: SESSIONS_PANEL_ID,
-      component: 'sessionsManager',
-      icon: 'pi-list',
-      title: 'Sessions',
-      initialSize: 260,
-      minimumSize: 180,
-    },
-    {
-      kind: 'panel',
-      id: TERMINALS_PANEL_ID,
-      component: 'terminalsPanel',
-      icon: 'pi-chevron-right',
-      title: 'Terminals — running shells',
-      initialSize: 360,
-      minimumSize: 320,
-    },
-    {
-      kind: 'panel',
-      id: LIBRARY_PANEL_ID,
-      component: 'library',
-      icon: 'pi-book',
-      title: 'Library — MCP servers + Tools + Skills + Agents + Instructions',
-      initialSize: 360,
-      minimumSize: 320,
-    },
-    {
-      kind: 'panel',
-      id: JOBS_PANEL_ID,
-      component: 'jobsPanel',
-      icon: 'pi-clock',
-      title: 'Jobs',
-      initialSize: 380,
-      minimumSize: 380,
-      badge: jobsStore.activeCount > 0 ? jobsStore.activeCount : undefined,
-    },
-  ];
-
-  if (isDev) {
-    items.push({
-      kind: 'action',
-      id: 'playground',
-      icon: 'pi-wrench',
-      title: 'Open dev playground',
-      group: 'bottom',
-      onClick: openPlayground,
-    });
-  }
-
-  items.push({
-    kind: 'panel',
-    id: LOG_VIEWER_PANEL_ID,
-    component: 'logViewer',
-    icon: 'pi-bars',
-    title: 'Diagnostics — live log + bundle export',
-    group: 'bottom',
-    initialSize: 480,
-    minimumSize: 420,
-  });
-  items.push({
-    kind: 'panel',
-    id: SETTINGS_PANEL_ID,
-    component: 'settingsPanel',
-    icon: 'pi-cog',
-    title: 'Settings',
-    group: 'bottom',
-    // Settings rows pack an input + 2 icon buttons + a "Request
-    // permission" button — 280 px clipped the right edge in
-    // practice. 400 / 380 fits comfortably and still leaves the
-    // body group ~60 % of a 1280 px viewport.
-    initialSize: 400,
-    minimumSize: 380,
-  });
-
-  return items;
-});
-
-/// Ref to the ActivityBar so onDockReady can ask it to resync after
-/// any layout change (covers panels closed via their own X, restored
-/// from layout, etc.).
-const activityBarRef = ref<InstanceType<typeof ActivityBar> | null>(null);
-
-/// Returns true when the persisted dockview JSON references the
-/// given panel id. Used by the "open by default" path to avoid
-/// re-opening a panel the user explicitly closed last time.
-function persistedLayoutHasPanel(id: string): boolean {
-  return persistedLayoutHasPanelImpl(settingsStore.settings.layout?.dockview, id);
-}
-
-/// Opens the Sessions panel as the default sidebar on first launch.
-/// Retries briefly if the dockview api isn't up yet — the @ready
-/// event fires from the child component's onMounted, which races
-/// with our parent onMounted.
-function openSessionsByDefault(attempt = 0) {
-  if (!layoutStore.api) {
-    if (attempt < 20) {
-      setTimeout(() => openSessionsByDefault(attempt + 1), 50);
-    } else {
-      // U3: don't silently bail. If dockview's @ready never fires
-      // after 20 * 50ms = 1s, the user gets a chrome-free renderer
-      // with no Sessions panel. Surface the issue in the log so we
-      // can diagnose from the in-app log viewer.
-      console.warn(
-        '[boot] openSessionsByDefault: dockview api never became ready after 20 retries; Sessions panel will not auto-open',
-      );
-    }
-
-    return;
-  }
-
-  if (layoutStore.isPanelOpen(SESSIONS_PANEL_ID)) return;
-
-  layoutStore.openEdgePanel('left', {
-    id: SESSIONS_PANEL_ID,
-    component: 'sessionsManager',
-    tabComponent: 'sidebarTab',
-    title: 'Sessions',
-    initialSize: 240,
-    minimumSize: 160,
-    exclusive: true,
-  });
-  activityBarRef.value?.sync();
-}
+// Activity-bar panel IDs — kept for the layout-sanitize call below
+// (stripping legacy settings panel from old persisted JSON). The
+// activity bar itself is gone in v2; tabs are seeded directly into
+// dockview's edge groups by `layoutStore.seedDefaultLayout`.
 </script>
 
 <template>
@@ -627,16 +580,13 @@ function openSessionsByDefault(attempt = 0) {
          button on bootStore.markFailed(). -->
     <BootSplash />
 
-    <!-- App body: persistent ActivityBar on the far left + dockview
-         body taking the rest. The ActivityBar hosts everything that
-         used to live in the topbar (settings + dev wrench) plus the
-         panel toggles. No topbar — the rail is the only chrome.
-         Settings is a panel like Sessions, not a modal. -->
+    <!-- App body: dockview workspace with native edge-group tab
+         strips on the left (Sessions / Terminals / Jobs / Logs) and
+         right (Session Details / Library). The strips are dockview's
+         own vertical-tab rails — collapsed to 44 px until the user
+         clicks a tab. Status bar pinned to the bottom for non-panel
+         actions (Settings, dev wrench). -->
     <div class="app-body">
-      <ActivityBar
-        ref="activityBarRef"
-        :items="activityItems"
-      />
       <div
         class="dock-wrapper"
         :class="isDarkMode ? 'dockview-theme-dark' : 'dockview-theme-light'"
@@ -649,6 +599,10 @@ function openSessionsByDefault(attempt = 0) {
         />
       </div>
     </div>
+    <StatusBar
+      @open-settings="openSettings"
+      @open-playground="openPlayground"
+    />
   </main>
 </template>
 
