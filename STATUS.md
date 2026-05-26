@@ -37,18 +37,22 @@ honor tsconfig path aliases for the bun entry graph.
 
 **Code-quality sprint follow-through (current):**
 
-1. **Phase D.2 — ChatWindow.vue (1,185 lines).** 🟡 IN PROGRESS
-   Regression safety net landed (commit `4b972fe` + extended in `<new>`): 8 tests
-   pin event-flush/dropped-count, timeline merge, optimistic send + attachments,
-   retry anchor, fork anchor, pending banner, `sendHandler` bypass, editor-save
-   replay. Pre-split rubber-duck (2026-05-26) said: extract one timeline-state
-   controller (items + ambient + idCounter + processedAbsolute + isFirstBatch +
-   isSendingFallback) with semantic APIs (`resetForReplay({markSending})`,
-   `appendOptimisticUser`, `appendSystemError`, `flush/scheduleFlush`) — NOT a
-   narrow `useChatEventFlush` that leaves the other mutations to escape hatches.
-   Then `useChatScroll` (lowest-risk, do first), then `useChatSubmit`, then
-   `useMessageActions`, then maybe `<ChatTranscript>`. Pass stores as
-   dependencies (testable) rather than calling `use*()` inside composables.
+1. **Phase D.2 — ChatWindow.vue (1,185 → 838 lines).** ✅ DONE (2026-05-26)
+   Four composables extracted against the 8-test regression net:
+   - `useChatScroll` — `scrollToBottom` (double-rAF + nextTick) + the
+     resize observer that drives `--tile-height`.
+   - `useChatTimelineState` — single transcript-state controller per
+     rubber-duck (items + ambient + idCounter + processedAbsolute +
+     isFirstBatch + isSendingFallback) with semantic APIs
+     (`appendOptimisticUser`, `appendSystemError`,
+     `resetForReplay({markSending})`).
+   - `useChatSubmit` — optimistic-send orchestrator. Takes timeline
+     mutations + scrollToBottom + a transport port + the optional
+     `sendHandler` dev-playground bypass.
+   - `useMessageActions` — edit/quote/retry/fork/fork-notice + editor
+     save/save-fork/cancel + anchor walks. Stores passed as explicit
+     dependencies (testable) rather than reached for inside.
+   `<ChatTranscript>` deferred — not needed once 838 lines reached.
 2. **Phase D.3 — sessions.ts (1,929 lines).**
    Extract sibling SDK-wrapper services (`SessionAgentsService`, `SessionTasksService`,
    `SessionSkillsService`, `SessionMcpService`, `SessionPlanService`, optionally

@@ -10,7 +10,98 @@
 
 ---
 
-## 2026-05-26 — Phase D.2 prep: ChatWindow regression safety net + pre-split rubber-duck
+## 2026-05-26 (cont.) — Phase D.2 ChatWindow split delivered
+
+**Takeaway:** All four composables extracted against the 8-test
+safety net from the earlier entry today. ChatWindow.vue went from
+1,185 → 838 lines (-29%). `<ChatTranscript>` was on the menu but
+skipped — the file is now small enough that the template branch
+isn't a god-object signal anymore.
+
+### Commits
+
+- `640e108` refactor(d2.1): extract useChatScroll composable
+- `4689010` refactor(d2.2): extract useChatTimelineState (single transcript-state controller)
+- `a638860` refactor(d2.3+d2.4): extract useChatSubmit + useMessageActions
+
+### Composables added
+
+- `src/composables/useChatScroll.ts` (~80 lines) — `scrollToBottom`
+  (nextTick + double-rAF + scrollHeight write) + the resize observer
+  for `--tile-height`. No state ownership; pure DOM side-effects.
+- `src/composables/useChatTimelineState.ts` (~240 lines) — single
+  transcript-state controller per rubber-duck. Owns items + ambient +
+  idCounter + processedAbsolute + isFirstBatch + isSendingFallback +
+  the rAF-coalesced flush + the dropped+length watcher + the
+  session-id reset. Cursor and firstBatch never leak out; all
+  mutation goes through semantic APIs (`appendOptimisticUser`,
+  `appendSystemError`, `resetForReplay({markSending})`).
+- `src/composables/useChatSubmit.ts` (~100 lines) — optimistic-send
+  orchestrator. `default` mode resolution against
+  `props.defaultSendMode` lives here. Accepts a `transport` port so
+  the dev playground's `sendHandler` bypass is a clean swap, not a
+  branch inside ChatWindow.
+- `src/composables/useMessageActions.ts` (~260 lines) — edit / quote
+  / retry / fork / fork-notice + editor save/save-fork/cancel +
+  anchor walks. Stores passed as explicit dependencies (testable).
+  Calls `resetForReplay({markSending: true})` from the editor-save
+  path instead of mutating cursor state directly.
+
+### What ChatWindow still owns
+
+- the four-store wiring (`useSessionsStore`, `useSessionsListStore`,
+  `useLayoutStore`, `useSettingsStore`, `useToastStore`)
+- the four bus listeners (focus-composer, open/close-command-terminal,
+  scroll-to-bottom) and their cleanup
+- `recordIsThinking` (reads `sessionsStore.getSession(sessionId)` —
+  not appropriate for a Pinia-free composable)
+- `reasoningVisibility` / `accentColor` / `pendingHead` /
+  `pendingStyle` / `commandsRun` / `timelineItems` derived computeds
+- the template itself (~520 lines including style)
+
+### Implementation notes / things future-me needs to know
+
+- `idCounter` is intentionally returned from `useChatTimelineState`
+  and threaded into `useCommandTerminal` because `timelineItems`
+  merges chat items and command-result cards by their numeric id —
+  they MUST come from one monotonic counter. Two separate counters
+  would collide.
+- `useChatTimelineState` takes a `TimelineToasts` port rather than
+  the full `ToastStore` interface. The real store satisfies it
+  structurally; tests can pass a `{ success, warn, error, info }`
+  fake without spinning up Pinia.
+- `useMessageActions.restoreSession` typing is intentionally loose
+  (`Promise<{ id: string } | null | undefined | void>`) — the real
+  `sessionsStore.restoreSession` returns `SessionRecord | null` and
+  the composable only reads `.id`. Tightening the interface to
+  exclude `null` would force the real store to change.
+- `useChatScroll` is the only composable that registers
+  `onMounted` / `onBeforeUnmount` for itself — the timeline state's
+  `pendingFlush` cancellation lives inside its own
+  `onBeforeUnmount`. Each composable owns its own lifecycle hooks
+  so ChatWindow doesn't have to remember which composable to clean
+  up where.
+
+### Gate
+
+`bun run check` — lint + 608 tests + build + Playwright smoke (prod +
+hmr). Green across every step. The 8-test safety net stayed green
+across all four extractions — proof that the regression-first
+ordering paid off.
+
+### Next session
+
+`Phase D.3 — sessions.ts (1,929 lines)`. Keep `SessionRegistry` as
+the public boundary (50 tests depend on it). Extract sibling
+SDK-wrapper services (`SessionAgentsService`, `SessionTasksService`,
+etc.) with a tiny context port — services receive `{ getEntry,
+getClient, wrapSdkError }` and DO NOT mutate `this.entries`.
+Lifecycle (`create`/`resume`/`forward`/`disconnect`) stays in the
+registry.
+
+---
+
+
 
 **Takeaway:** Landed the 8-test pre-extraction safety net for `ChatWindow.vue`
 (1,185 lines, 0 unit tests pre-this-session). Rubber-duck critiqued the

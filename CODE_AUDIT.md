@@ -836,11 +836,21 @@ logic, SessionRegistry public API, etc.).
 - [x] **D.1 `SettingsPanel.vue`** ✅ done (commit `9125e50`): 968 → 339
   lines via 4 section components + shared `SettingsGroup` chrome. Small
   categories (Permissions / Diagnostics / About) stay inline.
-- [ ] **D.2 `ChatWindow.vue`** (1,185 lines): per critique, add direct
-  unit tests FIRST (event-stream flush, timeline merge, send optimistic
-  message, retry/fork anchor, pending banner) — currently has 0 unit
-  tests. Then extract `useChatEventFlush`, `useChatScroll`,
-  `useMessageActions`, optionally `<ChatTranscript>`.
+- [x] **D.2 `ChatWindow.vue`** ✅ done (commits `4b972fe`, `38ebbca`,
+  `640e108`, `4689010`, `a638860`): 1,185 → 838 lines (-29%). 8-test
+  regression net landed FIRST (flush w/ droppedEventCount, timeline
+  merge, optimistic send + attachments, retry anchor, fork anchor,
+  pending banner, sendHandler bypass, editor-save replay). Pre-split
+  rubber-duck reshaped the extraction: single transcript-state
+  controller (`useChatTimelineState`) with semantic APIs
+  (`appendOptimisticUser`, `appendSystemError`,
+  `resetForReplay({markSending})`) instead of a thin
+  `useChatEventFlush` + escape hatches. Extracted:
+  `useChatScroll` (DOM/rAF), `useChatTimelineState` (state machine),
+  `useChatSubmit` (optimistic-send orchestrator + sendHandler
+  bypass), `useMessageActions` (edit/quote/retry/fork/fork-notice +
+  editor save/cancel + anchor walks). `<ChatTranscript>` skipped —
+  not needed once 838 lines reached.
 - [ ] **D.3 `sessions.ts`** (1,929 lines): keep `SessionRegistry` as the
   public boundary; extract sibling SDK-wrapper services (Agents, Mcp,
   Tasks, Plan, Skills, Model). Each receives a tiny context
