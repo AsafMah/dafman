@@ -776,3 +776,116 @@ exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
   },
 }
 `;
+
+exports[`IPC wire contracts Settings with v3 groups layout 1`] = `
+{
+  "appearance": {
+    "defaultModelId": "auto",
+    "defaultReasoningEffort": null,
+    "enableMermaid": false,
+    "reasoningVisibility": "compact",
+    "streaming": true,
+    "theme": "dark",
+  },
+  "layout": {
+    "groups": [
+      {
+        "color": "#3b82f6",
+        "id": "grp-default",
+        "name": "Default",
+      },
+      {
+        "color": "#f59e0b",
+        "id": "grp-other",
+        "name": "Work",
+      },
+    ],
+    "innerBodies": {
+      "grp-default": {
+        "activeGroup": "g1",
+        "grid": {
+          "height": 600,
+          "orientation": "HORIZONTAL",
+          "root": {},
+          "width": 1000,
+        },
+        "panels": {
+          "sess-1": {
+            "contentComponent": "chatPanel",
+            "id": "sess-1",
+          },
+        },
+      },
+      "grp-other": {
+        "activeGroup": "g2",
+        "grid": {
+          "height": 600,
+          "orientation": "HORIZONTAL",
+          "root": {},
+          "width": 1000,
+        },
+        "panels": {},
+      },
+    },
+    "outer": {
+      "activeGroup": "g-outer-1",
+      "grid": {
+        "height": 800,
+        "orientation": "HORIZONTAL",
+        "root": {},
+        "width": 1200,
+      },
+      "panels": {
+        "grp-default": {
+          "contentComponent": "group",
+          "id": "grp-default",
+        },
+        "grp-other": {
+          "contentComponent": "group",
+          "id": "grp-other",
+        },
+      },
+    },
+    "schemaVersion": 3,
+  },
+  "notifications": {
+    "turnEnd": true,
+    "waitingForInput": true,
+  },
+  "permissions": {
+    "defaultApproveAll": false,
+  },
+  "terminal": {
+    "addons": {
+      "clipboard": true,
+      "image": true,
+      "ligatures": true,
+      "progress": true,
+      "search": true,
+      "serialize": true,
+      "unicode11": true,
+      "unicodeGraphemes": true,
+      "webFonts": true,
+      "webLinks": true,
+      "webgl": true,
+    },
+    "defaultProfileId": "platform-default",
+    "fontFamily": "Cascadia Mono, Consolas, ui-monospace, monospace",
+    "fontSize": 13,
+    "scrollback": 10000,
+    "theme": {
+      "background": "#111827",
+      "foreground": "#d1d5db",
+    },
+  },
+  "tools": {
+    "defaultAllowed": [],
+    "defaultExcluded": [],
+  },
+  "version": 13,
+  "workspaces": {
+    "defaultWorkspace": "",
+    "recent": [],
+  },
+}
+`;

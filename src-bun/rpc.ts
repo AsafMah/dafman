@@ -150,10 +150,22 @@ export interface NotificationPrefs {
   waitingForInput: boolean;
 }
 
+export interface GroupMeta {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Layout {
-  /// Serialized dockview state (`api.toJSON()`). `null` means
-  /// "no panes were open last time" — start with an empty dockview.
-  dockview: unknown;
+  /// Serialized outer dockview state (`outer.api.toJSON()`). Renamed from
+  /// v2's `dockview`. The v2->v3 migration wraps the old body into a
+  /// single Default group on first save.
+  outer?: unknown;
+  groups?: GroupMeta[];
+  innerBodies?: Record<string, unknown>;
+  schemaVersion?: number;
+  /// Legacy v2 field retained ONLY for hydration of pre-v3 layouts.
+  dockview?: unknown;
 }
 
 export interface TerminalCreateParams {

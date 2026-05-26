@@ -178,10 +178,34 @@ export type CommandResultEvent =
 ///        seeded by `seedDefaultLayout`; library moved to right edge
 export const LAYOUT_SCHEMA_VERSION = 2;
 
+/// User-facing identity for a group (the "tabs at top of body" model).
+/// Mirrors `GroupMeta` in `src-bun/rpc.ts`.
+export interface GroupMeta {
+  /// Stable id, also used as the outer dockview panel id for this group.
+  id: string;
+  name: string;
+  /// Hex color for the tab's color dot. Defaulted from a cycling palette on
+  /// create.
+  color: string;
+}
+
 export interface Layout {
-  dockview: unknown;
+  /// Serialized outer dockview state (`outer.api.toJSON()`). Contains edge
+  /// groups (activity bar) + body grid where each body panel id == a
+  /// `groups[].id`. Renamed from v2's `dockview` field; the v2->v3 migration
+  /// in `bootLayout.ts` wraps the old body into a single Default group.
+  outer?: unknown;
+  /// Ordered group list. Length >= 1 after hydrate (corrupt or empty input
+  /// hydrates to a single Default group).
+  groups?: GroupMeta[];
+  /// Per-group inner dockview JSON. Keys are subset of `groups[].id`; a
+  /// missing key means an empty inner dockview at first activation.
+  innerBodies?: Record<string, unknown>;
   /// Missing or older than `LAYOUT_SCHEMA_VERSION` triggers migration.
   schemaVersion?: number;
+  /// Legacy v2 field retained ONLY for hydration of pre-v3 layouts.
+  /// Migrated to `outer` + `innerBodies['<default>']` on first save.
+  dockview?: unknown;
 }
 
 export interface Workspaces {

@@ -107,6 +107,53 @@ describe('IPC wire contracts', () => {
     expect(sample).toMatchSnapshot();
   });
 
+  test('Settings with v3 groups layout', () => {
+    const sample: Settings = {
+      version: 13,
+      appearance: {
+        theme: 'dark',
+        reasoningVisibility: 'compact',
+        defaultModelId: 'auto',
+        defaultReasoningEffort: null,
+        streaming: true,
+        enableMermaid: false,
+      },
+      layout: {
+        schemaVersion: 3,
+        outer: {
+          grid: { root: {}, height: 800, width: 1200, orientation: 'HORIZONTAL' },
+          panels: {
+            'grp-default': { id: 'grp-default', contentComponent: 'group' },
+            'grp-other': { id: 'grp-other', contentComponent: 'group' },
+          },
+          activeGroup: 'g-outer-1',
+        },
+        groups: [
+          { id: 'grp-default', name: 'Default', color: '#3b82f6' },
+          { id: 'grp-other', name: 'Work', color: '#f59e0b' },
+        ],
+        innerBodies: {
+          'grp-default': {
+            grid: { root: {}, height: 600, width: 1000, orientation: 'HORIZONTAL' },
+            panels: { 'sess-1': { id: 'sess-1', contentComponent: 'chatPanel' } },
+            activeGroup: 'g1',
+          },
+          'grp-other': {
+            grid: { root: {}, height: 600, width: 1000, orientation: 'HORIZONTAL' },
+            panels: {},
+            activeGroup: 'g2',
+          },
+        },
+      },
+      workspaces: { recent: [], defaultWorkspace: '' },
+      notifications: { turnEnd: true, waitingForInput: true },
+      tools: { defaultExcluded: [], defaultAllowed: [] },
+      permissions: { defaultApproveAll: false },
+      terminal: makeTerminalPrefs('platform-default'),
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
   test('ModelSummary shape', () => {
     const sample: ModelSummary = {
       id: 'claude-sonnet-4.5',
