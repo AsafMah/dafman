@@ -198,6 +198,10 @@ export interface Layout {
   /// Ordered group list. Length >= 1 after hydrate (corrupt or empty input
   /// hydrates to a single Default group).
   groups?: GroupMeta[];
+  /// Id of the group whose inner panel was active when the layout was
+  /// persisted. Restored at boot by activating the matching outer body
+  /// panel. Falls back to `groups[0].id` if missing/invalid.
+  activeGroupId?: string;
   /// Per-group inner dockview JSON. Keys are subset of `groups[].id`; a
   /// missing key means an empty inner dockview at first activation.
   innerBodies?: Record<string, unknown>;

@@ -162,6 +162,7 @@ export interface Layout {
   /// single Default group on first save.
   outer?: unknown;
   groups?: GroupMeta[];
+  activeGroupId?: string;
   innerBodies?: Record<string, unknown>;
   schemaVersion?: number;
   /// Legacy v2 field retained ONLY for hydration of pre-v3 layouts.

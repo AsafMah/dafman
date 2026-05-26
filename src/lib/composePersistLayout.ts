@@ -36,6 +36,10 @@ export interface ComposeSource {
   /// Ordered group meta. Caller (groupsStore) is responsible for the
   /// `length >= 1` invariant; this function passes it through.
   groups: GroupMeta[];
+  /// Id of the active group (persisted so next boot can re-activate the
+  /// same outer body panel). MAY be null if there are no groups yet —
+  /// composePersistLayout still emits the field as undefined in that case.
+  activeGroupId?: string | null;
   /// Inner dockview JSON cached at the most recent layout-change for every
   /// group (mounted or not). Keys MAY be missing for never-yet-mounted
   /// groups; `composePersistLayout` does not synthesize empty bodies for
@@ -57,10 +61,12 @@ export function composePersistLayout(src: ComposeSource): Layout {
     const live = src.liveInnerBodies[g.id];
     if (live !== undefined) innerBodies[g.id] = live;
   }
-  return {
+  const out: Layout = {
     schemaVersion: COMPOSED_SCHEMA_VERSION,
     outer: src.outer,
     groups: src.groups.map((g) => ({ ...g })),
     innerBodies,
   };
+  if (src.activeGroupId) out.activeGroupId = src.activeGroupId;
+  return out;
 }
