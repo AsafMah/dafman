@@ -19,11 +19,10 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, ref } from 'vue';
-import SplitButton from 'primevue/splitbutton';
+import { computed, ref } from 'vue';
 import Popover from 'primevue/popover';
 import type { MenuItem } from 'primevue/menuitem';
-import { LexicalComposer, useLexicalComposer } from 'lexical-vue/LexicalComposer';
+import { LexicalComposer } from 'lexical-vue/LexicalComposer';
 import { ContentEditable } from 'lexical-vue/LexicalContentEditable';
 import { PlainTextPlugin } from 'lexical-vue/LexicalPlainTextPlugin';
 import { RichTextPlugin } from 'lexical-vue/LexicalRichTextPlugin';
@@ -38,8 +37,6 @@ import {
   $isRangeSelection,
   $createParagraphNode,
   $createTextNode,
-  COMMAND_PRIORITY_LOW,
-  SELECTION_CHANGE_COMMAND,
   type ElementNode,
   type LexicalEditor,
 } from 'lexical';
@@ -64,6 +61,8 @@ import MentionPlugin from '@/components/chat/MentionPlugin.vue';
 import FilePicker from '@/components/shared/FilePicker.vue';
 import ModeButtonGroup from '@/components/chat/ModeButtonGroup.vue';
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
+import ComposerSubmitButton from '@/components/chat/composer/ComposerSubmitButton';
+import ComposerEditorBridge from '@/components/chat/composer/ComposerEditorBridge';
 import {
   applyEditorFormat,
   computeFormatState,
@@ -73,6 +72,7 @@ import {
 } from '@/composables/composerFormat';
 import { useComposerToolbarLayout } from '@/composables/useComposerToolbarLayout';
 import { useComposerAttachments } from '@/composables/useComposerAttachments';
+import { useComposerCommandMode } from '@/composables/useComposerCommandMode';
 
 const props = withDefaults(
   defineProps<{
@@ -110,7 +110,6 @@ const diagEnabled =
 /// ref array drifting from the editor state.
 const toasts = useToastStore();
 const commandMode = ref(false);
-let bangArmed = false;
 
 const { toolbarRef, inlineFormatActions, overflowFormatActions } =
   useComposerToolbarLayout();
@@ -277,6 +276,22 @@ function readEditorFormatState(): void {
   editorFormatState.value = computeFormatState();
 }
 
+const { enterCommandMode, exitCommandMode, onCommandModeKeydown, onComposerKeydown } =
+  useComposerCommandMode({
+    commandMode,
+    getEditorText: () => {
+      const editor = editorRef.value as LexicalEditor | null;
+
+      if (!editor) return '';
+
+      return editor.getEditorState().read(() => $getRoot().getTextContent());
+    },
+    clearEditor,
+    focusComposer,
+    emitRequestCommandTerminal: () => emit('requestCommandTerminal'),
+    isDisabled: () => props.disabled,
+  });
+
 defineExpose({
   focus: focusComposer,
   setText,
@@ -285,102 +300,6 @@ defineExpose({
   enterCommandMode,
   exitCommandMode,
 });
-
-async function enterCommandMode(): Promise<void> {
-  clearEditor();
-  commandMode.value = true;
-  emit('requestCommandTerminal');
-  await nextTick();
-}
-
-let escArmed = false;
-let escTimer: ReturnType<typeof setTimeout> | null = null;
-
-function onCommandModeKeydown(event: KeyboardEvent): void {
-  // Double-Esc exits command mode
-  if (event.key === 'Escape') {
-    if (escArmed) {
-      event.preventDefault();
-      event.stopPropagation();
-      escArmed = false;
-
-      if (escTimer) {
-        clearTimeout(escTimer);
-        escTimer = null;
-      }
-
-      exitCommandMode();
-
-      return;
-    }
-
-    escArmed = true;
-
-    if (escTimer) clearTimeout(escTimer);
-
-    escTimer = setTimeout(() => {
-      escArmed = false;
-      escTimer = null;
-    }, 400);
-
-    return;
-  }
-
-  // Ctrl+Backspace exits command mode
-  if (event.key === 'Backspace' && event.ctrlKey) {
-    event.preventDefault();
-    event.stopPropagation();
-    exitCommandMode();
-
-    return;
-  }
-
-  escArmed = false;
-}
-
-function exitCommandMode(): void {
-  commandMode.value = false;
-  bangArmed = false;
-  escArmed = false;
-
-  if (escTimer) {
-    clearTimeout(escTimer);
-    escTimer = null;
-  }
-
-  setTimeout(() => focusComposer(), 0);
-}
-
-function onComposerKeydown(event: KeyboardEvent): void {
-  if (props.disabled || commandMode.value) return;
-
-  if (event.key !== '!' || event.ctrlKey || event.altKey || event.metaKey) {
-    bangArmed = false;
-
-    return;
-  }
-
-  const editor = editorRef.value as LexicalEditor | null;
-
-  if (!editor) return;
-
-  const text = editor.getEditorState().read(() => $getRoot().getTextContent());
-
-  if (!bangArmed && text.length === 0) {
-    bangArmed = true;
-
-    return;
-  }
-
-  if (bangArmed && text === '!') {
-    event.preventDefault();
-    void enterCommandMode();
-
-    return;
-  }
-
-  bangArmed = false;
-}
 
 const editable = computed(() => !props.disabled);
 const richText = computed(() => props.enableMarkdownShortcuts);
@@ -433,7 +352,7 @@ const defaultModeItems = computed<MenuItem[]>(() => [
 
 /// Imperative send trigger used by the SplitButton's "interrupt" menu
 /// entry. Reaches into the editor via the editor-ref established by
-/// `EditorRefCapture` below.
+/// `ComposerEditorBridge` below captures the active editor.
 const editorRef = ref<unknown>(null);
 
 function triggerSubmit(mode: ComposerSubmitMode) {
@@ -458,33 +377,9 @@ function triggerSubmit(mode: ComposerSubmitMode) {
 /// `lexical-vue`'s `useLexicalComposer()` is typed against a slightly
 /// older `LexicalEditor` shape than the one exported by `lexical`;
 /// we cast at the call site where we actually use it.
-const EditorRefCapture = defineComponent({
-  name: 'EditorRefCapture',
-  setup() {
-    const editor = useLexicalComposer();
-
-    editorRef.value = editor;
-    const unregisterUpdate = editor.registerUpdateListener(({ editorState }) => {
-      editorState.read(readEditorFormatState);
-    });
-    const unregisterSelection = editor.registerCommand(
-      SELECTION_CHANGE_COMMAND,
-      () => {
-        editor.getEditorState().read(readEditorFormatState);
-
-        return false;
-      },
-      COMMAND_PRIORITY_LOW,
-    );
-
-    onBeforeUnmount(() => {
-      unregisterUpdate();
-      unregisterSelection();
-    });
-
-    return () => null;
-  },
-});
+function onEditorReady(editor: LexicalEditor): void {
+  editorRef.value = editor;
+}
 
 const primaryLabel = computed(() => '');
 const primaryIcon = computed(() => (props.defaultMode === 'queue' ? 'pi pi-clock' : 'pi pi-send'));
@@ -498,53 +393,8 @@ const primaryTooltip = computed(() =>
 /// `defaultSendMode` (Steer by default). The dropdown lets the user
 /// pick a different default or trigger an explicit interrupt. The
 /// shortcut hints in the dropdown labels match the bindings registered
-/// by `SubmitOnEnter`.
-const SubmitButton = defineComponent({
-  name: 'SubmitButton',
-  props: {
-    disabled: { type: Boolean, default: false },
-    label: { type: String, required: true },
-    icon: { type: String, required: true },
-    tooltip: { type: String, required: true },
-    model: { type: Array as () => MenuItem[], required: true },
-  },
-  emits: ['submit'],
-  setup(p, { emit: emitInner }) {
-    const editor = useLexicalComposer();
-
-    function fire() {
-      if (p.disabled) return;
-
-      const result = consumeComposerText(editor);
-
-      if (result !== null) {
-        const payload: ComposerSubmitPayload = {
-          text: result.text,
-          mode: 'default',
-          ...(result.attachments.length > 0 ? { attachments: result.attachments } : {}),
-        };
-
-        emitInner('submit', payload);
-      }
-    }
-
-    return () =>
-      h(SplitButton, {
-        label: p.label,
-        icon: p.icon,
-        title: p.tooltip,
-        'aria-label': p.tooltip,
-        disabled: p.disabled,
-        model: p.model,
-        size: 'small',
-        class: 'lex-submit-button',
-        onClick: fire,
-        // Keep focus in the editor after primary-button click so the
-        // next keystroke after a send still routes to it.
-        onMousedown: (event: MouseEvent) => event.preventDefault(),
-      });
-  },
-});
+/// by `SubmitOnEnter`. Implementation moved to
+/// `./composer/ComposerSubmitButton.ts`.
 </script>
 
 <template>
@@ -631,7 +481,7 @@ const SubmitButton = defineComponent({
             <AutoFocusPlugin />
           </div>
           <div class="lex-composer-send">
-            <SubmitButton
+            <ComposerSubmitButton
               :disabled="props.disabled || commandMode"
               :label="primaryLabel"
               :icon="primaryIcon"
@@ -788,7 +638,10 @@ const SubmitButton = defineComponent({
           </div>
           <slot name="session-controls" />
         </footer>
-        <EditorRefCapture />
+        <ComposerEditorBridge
+          :on-editor="onEditorReady"
+          :on-format-state-read="readEditorFormatState"
+        />
       </LexicalComposer>
     </div>
   </div>
