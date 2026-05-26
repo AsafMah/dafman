@@ -10,6 +10,93 @@
 
 ---
 
+## 2026-05-26 (cont.) — Phase F first pass
+
+**Takeaway:** First Phase-F sweep landed. The biggest single win was
+running `bun run format` to fix 4803 CRLF/LF prettier errors that
+had crept in across every Windows edit during Phases A-E (the
+.prettierrc enforces LF; my edit tool wrote CRLF). After that
+auto-fix, 9 small ESLint cleanups, 2 honest complexity refactors
+(`ToolDetails` 12-case switch → lookup table; `JsonSchemaForm`
+validateNode per-type dispatch), and 1 partial (`openEdgePanel`
+exclusive-removal extract).
+
+### Cheap fixes (1-3 lines each)
+
+- `sessions.ts` + `instructions.ts` — merge duplicate imports
+- `composerFormat.ts` — drop unused `RangeSelection` import
+- `useMessageActions.ts` — drop `| void` from union
+- `usePersistedRef.ts` — `??=` for the timer
+- `bus.ts` — drop redundant `String(key)` cast + un-generic-ify `clear`
+- `wsBridge.ts` — capture `liveSocket` const instead of `socket!.send`
+- `TerminalPanel.vue` — capture addon locals (`searchAddon`,
+  `webFontsAddon`, `webglAddon`) so closures don't need non-null
+  assertions. Dead `webFonts` + `webgl` module-level lets removed.
+- `audit.ts:hydrateRecent` — extract `tryParseAuditLine` helper to
+  drop max-depth from 5 to 4.
+
+### Honest complexity refactors
+
+- **`ToolDetails.vue:53` CC 28 → 2** — the 12-case
+  switch-on-`toolName` mapping tool-name aliases to a normalized
+  `kind` became a module-level `TOOL_KIND_BY_NAME: Record<string,
+  ToolKind>` lookup table. Computed shrinks to:
+  ```ts
+  if (props.mcpServerName) return 'mcp';
+  return TOOL_KIND_BY_NAME[props.toolName] ?? 'generic';
+  ```
+- **`JsonSchemaForm.vue:validateNode` CC 40 → 6** — split into
+  four per-type helpers (validateObjectNode / validateArrayNode /
+  validateStringNode / validateNumberNode). Top-level dispatcher
+  is a flat sequence of `if (schema.type === ...)` returns. The 7
+  existing JsonSchemaForm tests still pass — pure refactor, same
+  truth table.
+- **`layoutStore.ts:openEdgePanel` CC 28 → 22** (partial) —
+  extracted `removeOtherPanelsInGroup` (the exclusive-removal
+  loop) + `panelIdOf` (the nested-ternary panel-id resolver).
+  Still over the 15 threshold; the remaining branches are
+  legitimate dockview-lifecycle paths and don't have an obvious
+  further seam.
+
+### What's left
+
+- **15 complexity warnings** — each needs a real design seam.
+  Candidates by file (descending CC):
+  - `pendingRequests.ts:respond` CC 22
+  - `sessionEventForwarder.ts:forward` CC 24
+  - `sessions.ts:resume` CC 16, `cwdFor` CC 18
+  - `settings.ts:coerceTerminal` CC 20
+  - `stderrFilter.ts` arrow CC 18
+  - `useSessionUsage.ts:loadUsage` CC 23
+  - `TerminalPanel.vue:initXterm` CC 16
+  - `messageHandlers.ts:user.message` CC 24, `normalizeAttachments` CC 19
+  - `sessionReducer.ts:trackSessionArtifact` CC 19
+  - `sessionsStore.ts:createSession` CC 18
+  - `layoutStore.ts:openEdgePanel` CC 22 (partial)
+- **5 max-lines-per-function** — all Pinia `defineStore` bodies +
+  `registerBuiltinCommands`. Audit explicitly marks these as
+  structural and low priority.
+- **`setTimeout(fn, 0)` focus hacks + double-rAF settle patterns**
+  — not yet touched. Many sites; would need a `useFocusOnNextTick`
+  / VueUse-driven replacement.
+
+### Gate
+
+`bun run check` green throughout. 619 tests pass. Prettier-fix
+touched ~45 files (line-ending only) plus the 12 files I edited
+for the actual ESLint fixes.
+
+### Next session
+
+If continuing F: hit one or two of the remaining 15 complexity
+hotspots (the `user.message` handler in messageHandlers.ts is
+probably the highest-value next target — it has ~24 branches
+covering eventId vs messageId dedup, optimistic-bubble matching,
+and the attachment normalization tail). Otherwise the audit's
+priority work is effectively done.
+
+---
+
 ## 2026-05-26 (cont.) — Phase E deduplication delivered (rubber-duck-revised)
 
 **Takeaway:** 5 extractions, ~250 production lines net removed, 11

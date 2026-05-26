@@ -927,12 +927,26 @@ original.
 expected impact), 11 new unit tests, 5 new files. jscpd duplication
 should re-measure under 1.5%.
 
-### Phase F — Clean up timing hacks + remaining ESLint
+### Phase F — Clean up timing hacks + remaining ESLint 🟡 PARTIAL (2026-05-26)
 
 - [ ] Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
 - [ ] Replace double-rAF patterns with proper settle helpers
-- [ ] 17 `complexity` — CC > 15 functions
-- [ ] 6 `no-non-null-assertion` — xterm addon closures
+- [x] **prettier CRLF/LF normalization** — `bun run format` cleared
+  4803 prettier errors caused by Windows edits sneaking CRLF into
+  files marked `endOfLine: "lf"`.
+- [ ] 15 `complexity` — was 17, two fixed (`ToolDetails.vue` CC 28 → 2
+  via lookup table; `JsonSchemaForm.vue:validateNode` CC 40 → 6 via
+  per-type dispatch); `openEdgePanel` CC 28 → 22 partial reduction.
+  Remaining 15 hotspots need genuine design seams.
+- [x] **6 `no-non-null-assertion`** — done. TerminalPanel.vue xterm
+  addon closures now capture local non-null references; wsBridge.ts
+  uses a captured `liveSocket` const.
 - [ ] 5 `max-lines-per-function` — Pinia store bodies (structural, low priority)
-- [ ] 1 `max-depth` — nested conditional
-- [ ] 5 misc
+- [x] **1 `max-depth`** — done. `audit.ts:hydrateRecent` 5-deep nesting
+  cut by extracting `tryParseAuditLine` helper.
+- [x] **9 misc** — 12 padding-line-between-statements (auto-fix), 7
+  unnecessary-type-assertion (auto-fix), 2 duplicate-imports
+  (sessions.ts, instructions.ts), unused `RangeSelection` import,
+  `void`-in-union, `??=` for usePersistedRef timer, redundant
+  `String(key)` in bus.ts, single-use type parameter `K` removed
+  from `clear<K>`.
