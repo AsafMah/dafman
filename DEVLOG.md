@@ -10,6 +10,119 @@
 
 ---
 
+## 2026-05-26 (cont.) — Phase D.3 sessions.ts split delivered
+
+**Takeaway:** `src-bun/app/chat/sessions.ts` (the `SessionRegistry`)
+went from 1,904 → 1,563 lines (-18%) by hoisting 5 sibling
+SDK-wrapper services out into separate files. The registry keeps
+ownership of the entries Map + lifecycle + pending-request queue +
+session metadata; everything that just needed a single `entry =
+entries.get(id); try { await entry.session.rpc.X.Y(...) } catch {
+throw AppError.sdk(...) }` shape moved into a sibling service.
+
+### Commit
+
+- `<follow-up>` refactor(d3): extract 5 sibling services from SessionRegistry
+
+### Files added
+
+- `src-bun/app/chat/sessionServiceContext.ts` — shared port.
+  Exports `SessionServiceContext { getEntry, wrapSdk }` plus the
+  default `wrapSdkError<T>` helper and a narrow `SessionEntryView`
+  shape (`{ session, workingDirectory? }`) that hides
+  `Entry.unsubscribe` from services so they can't accidentally
+  reach for lifecycle internals.
+- `src-bun/app/chat/sessionPlanService.ts` — `read` / `write` /
+  `delete` (3 methods).
+- `src-bun/app/chat/sessionSkillsService.ts` — `list` / `setEnabled`
+  (2 methods).
+- `src-bun/app/chat/sessionTasksService.ts` — `list` / `listJobs` /
+  `cancel` / `remove` / `promote` / `startFleet` (6 methods).
+  Takes a `getSessionIds: () => Iterable<string>` getter so the
+  cross-session `listJobs` aggregation can enumerate sessions
+  without holding a reference to the entries Map.
+- `src-bun/app/chat/sessionAgentsService.ts` — SDK `agent.*` (5
+  methods: list / getCurrent / select / deselect / reload) +
+  filesystem agent file CRUD (4 methods: listFiles /
+  listFilesGlobal / writeFile / deleteFile). 9 methods total.
+- `src-bun/app/chat/sessionMcpService.ts` — `listServers` /
+  `setEnabled` / `loginToServer` (3 methods). Only the
+  session-scoped MCP calls live here — the server-scoped catalog
+  lives in `mcpRegistry.ts` (21a.2) and was already extracted.
+
+### What's still on SessionRegistry
+
+The lifecycle + everything that touches the entries Map directly:
+
+- Constructor / `sessionFor` / `baseSessionConfig` /
+  `buildRegisteredCommands` / `create` / `resume` /
+  `getCurrentModel` / `setWorkingDirectory` / `list` /
+  `deleteCliSession` / `pollTitleFromMetadata` / `forward` /
+  `send` / `searchWorkspaceFiles` / `getCwd` / `abort` /
+  `setModel` / `getMode` / `setMode` / `getName` / `setName` /
+  `compactHistory` / `truncateHistory` / `fork` / `setApproveAll`
+  / `resetApprovals` / `getUsageMetrics` / `listBuiltinTools` /
+  `getAccountQuota` / `respondToRequest` / `disconnect` /
+  `shutdownAll`.
+- The entries Map, the `PendingRequestQueue`, the per-session
+  `approveAll` + `mode` Maps.
+- Thin delegating methods for everything moved to services
+  (`readPlan` → `this.plans.read(sessionId)` etc.) so 44 tests in
+  `sessions.test.ts` + the RPC wiring in `src-bun/index.ts` +
+  `src-bun/test-server.ts` keep working without changes.
+
+### Design notes
+
+- `SessionServiceContext.getEntry` returns the entry synchronously
+  and throws `AppError.sessionNotFound` so service call sites are
+  trivial:
+  ```ts
+  const entry = ctx.getEntry(sessionId);
+  return ctx.wrapSdk(async () => entry.session.rpc.X.Y(...));
+  ```
+  vs the old shape:
+  ```ts
+  const entry = this.entries.get(sessionId);
+  if (!entry) throw AppError.sessionNotFound(sessionId);
+  try { ... } catch (err) { throw AppError.sdk(toErrorMessage(err)); }
+  ```
+- `wrapSdkError` pre-checks `instanceof AppError` so a typed error
+  (e.g. the `selectAgent`-no-result case) passes through without
+  being double-wrapped.
+- `SessionTasksService.listJobs` is the only cross-session
+  aggregator. It takes the registry's `() => this.entries.keys()`
+  as a constructor parameter rather than reaching for the entries
+  Map — preserves the contract that services don't see the
+  collection itself.
+- `SessionAgentsService.writeFile` / `deleteFile` still re-call
+  `entry.session.rpc.agent.reload()` after a successful fs write
+  (best-effort, logs warn on failure) — preserves the SDK
+  re-scan behavior.
+- The registry's `Entry` interface stays internal; services
+  consume the narrower `SessionEntryView` so they can't reach
+  for `Entry.unsubscribe` (lifecycle-only).
+
+### Gate
+
+`bun run check` — lint + lint:tsc-bun + 608 tests + Vite +
+Electrobun build + Playwright smoke (prod + hmr). Green. The 44
+`SessionRegistry` tests in `src-bun/__tests__/sessions.test.ts`
+all pass through the delegating methods, proving the back-compat
+guarantee.
+
+### Next session
+
+Phase D.4 — `MessageComposer.vue` (1,389 lines). Per audit: add
+regression tests FIRST (submit payload, focus, paste/drop,
+command-mode entry/exit, toolbar format state, attachment
+retention). Prefer subcomponents (`<ComposerToolbar>`,
+`<ComposerFilePickerButton>`, `<ComposerCommandMode>`) over
+giant composables; don't prop-drill the Lexical editor.
+
+---
+
+
+
 ## 2026-05-26 (cont.) — Phase D.2 ChatWindow split delivered
 
 **Takeaway:** All four composables extracted against the 8-test

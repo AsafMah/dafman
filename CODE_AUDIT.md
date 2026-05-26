@@ -851,12 +851,14 @@ logic, SessionRegistry public API, etc.).
   bypass), `useMessageActions` (edit/quote/retry/fork/fork-notice +
   editor save/cancel + anchor walks). `<ChatTranscript>` skipped —
   not needed once 838 lines reached.
-- [ ] **D.3 `sessions.ts`** (1,929 lines): keep `SessionRegistry` as the
-  public boundary; extract sibling SDK-wrapper services (Agents, Mcp,
-  Tasks, Plan, Skills, Model). Each receives a tiny context
-  (`getEntry(sessionId)`, `getClient()`, `wrapSdkError()`) — do NOT let
-  services mutate `this.entries`. Lifecycle (`create`/`resume`/`forward`)
-  stays in `SessionRegistry`.
+- [x] **D.3 `sessions.ts`** ✅ done (commit pending push): 1,904 → 1,563
+  lines (-18%). Extracted 5 sibling services (Plan / Skills / Tasks /
+  Agents / Mcp) behind a shared `SessionServiceContext { getEntry,
+  wrapSdk }` port. Services never touch `entries` directly. Lifecycle
+  (`create`/`resume`/`forward`/`disconnect`/`shutdownAll`) + entries +
+  pending-request queue stay on `SessionRegistry`. Registry keeps thin
+  delegating methods so existing callers (`src-bun/index.ts`,
+  `src-bun/test-server.ts`, 44 sessions.test.ts tests) are unchanged.
 - [ ] **D.4 `MessageComposer.vue`** (1,389 lines): add rubber-duck
   regression tests FIRST (submit payload, focus, paste/drop, command
   mode, toolbar state). Prefer subcomponents (`<ComposerToolbar>`,
