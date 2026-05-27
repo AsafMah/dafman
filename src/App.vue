@@ -27,6 +27,7 @@ import { registerBuiltinCommands } from '@/lib/registerBuiltinCommands';
 import { on as busOn } from '@/lib/bus';
 import { isActivityBarPanel } from '@/constants/panels';
 import { useBootLayout } from '@/lib/bootLayout';
+import { schedulePersist } from '@/lib/persistScheduler';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 const clientStore = useClientStore();
@@ -401,32 +402,14 @@ function onDockReady(event: DockviewReadyEvent) {
   // where they have no tab/header chrome and look broken. Move any
   // such strays out to the body. Safe no-op when the layout is clean.
   layoutStore.rescueChatPanelsFromEdgeGroups();
-  // Persist on every layout change (debounced). Covers add/remove/
-  // resize/move/popout/dock — everything dockview considers a layout
-  // mutation collapses into this single event.
+  // Persist on every OUTER layout change (debounced). Inner dockviews
+  // (each GroupPanel) subscribe to their own onDidLayoutChange and
+  // also call schedulePersist — that path is what catches chat / terminal
+  // panel add/remove inside groups.
   event.api.onDidLayoutChange(() => {
     layoutStore.enforceKnownEdgeMinimums();
-    scheduleLayoutSave();
+    schedulePersist();
   });
-}
-
-/// Debounced write — drag-resize fires `onDidLayoutChange` continuously
-/// at frame rate; we coalesce into one settings write per ~300ms. v3:
-/// `composePersistLayout` walks outer + each registered inner api to
-/// produce the full grouped layout in one atomic write (cache-first so
-/// unmounted groups aren't dropped — rubber-duck rule).
-let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleLayoutSave() {
-  if (layoutSaveTimer !== null) clearTimeout(layoutSaveTimer);
-
-  layoutSaveTimer = setTimeout(() => {
-    layoutSaveTimer = null;
-    const outer = layoutStore.api;
-    if (!outer) return;
-    const layout = groupsStore.serialize(outer.toJSON());
-    void settingsStore.persistGroupedLayout(layout);
-  }, 300);
 }
 
 // Activity-bar panel IDs — kept for the layout-sanitize call below

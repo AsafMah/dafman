@@ -51,7 +51,13 @@ await page.addInitScript(() => {
         },
       },
     }),
-    updateSettings: (a: unknown) => (a as { next: unknown }).next,
+    updateSettings: (a: unknown) => {
+      const next = (a as { next: unknown }).next;
+      const persisted = next as { layout?: unknown };
+      (window as unknown as { __PERSIST_CALLS__: unknown[] }).__PERSIST_CALLS__ ??= [];
+      (window as unknown as { __PERSIST_CALLS__: unknown[] }).__PERSIST_CALLS__.push(persisted.layout);
+      return next;
+    },
     createClient: () => ({ status: "ready" }),
     listModels: () => [],
     listSessions: () => [],
@@ -169,6 +175,18 @@ const innerTabsByGroup = await page.evaluate(() => {
 console.log("[smoke:inner-tabs]", JSON.stringify(innerTabsByGroup, null, 2));
 
 await page.screenshot({ path: "test-results/probe-after-newGroup-addSess2.png", fullPage: true });
+
+console.log("\n=== Persist check: settings updates received ===");
+// Wait beyond schedulePersist debounce (300ms) so the queued save flushes.
+await page.waitForTimeout(500);
+const persistCalls = await page.evaluate(() => {
+  const calls = (window as unknown as { __PERSIST_CALLS__?: unknown[] }).__PERSIST_CALLS__ ?? [];
+  return {
+    count: calls.length,
+    last: calls.at(-1) as unknown,
+  };
+});
+console.log("[smoke:persist]", JSON.stringify(persistCalls, null, 2));
 
 console.log("\n=== Looking for + button on outer body tab strip (bug 2) ===");
 const s4 = await page.evaluate(() => {

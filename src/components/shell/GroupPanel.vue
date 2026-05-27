@@ -35,6 +35,7 @@ import {
 import type { IDockviewPanel } from 'dockview-core';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { schedulePersist } from '@/lib/persistScheduler';
 
 type UserParams = { groupId?: string; color?: string; name?: string };
 type WrappedParams = {
@@ -61,6 +62,7 @@ const groupsStore = useGroupsStore();
 const sessionsStore = useSessionsStore();
 
 let removeSub: { dispose(): void } | null = null;
+let layoutSub: { dispose(): void } | null = null;
 
 function onInnerReady(event: DockviewReadyEvent): void {
   const id = groupId.value;
@@ -94,12 +96,24 @@ function onInnerReady(event: DockviewReadyEvent): void {
       void sessionsStore.closeSession(panel.id);
     }
   });
+
+  // Per-inner persistence trigger. Inner add/remove/resize/split all
+  // fire onDidLayoutChange on the INNER api; without this subscription
+  // chat-session add/close never reaches settings.layout (caught
+  // 2026-05-27 as 'Restart didn't load the data'). Snapshots and
+  // schedulePersist coalesces the cascade into one debounced write.
+  layoutSub = inner.onDidLayoutChange(() => {
+    groupsStore.recordInnerBodySnapshot(id, inner.toJSON());
+    schedulePersist();
+  });
 }
 
 onBeforeUnmount(() => {
   const id = groupId.value;
   removeSub?.dispose();
   removeSub = null;
+  layoutSub?.dispose();
+  layoutSub = null;
   if (id) {
     // `unregisterInnerApi` snapshots the final body into the cache so the
     // next mount (e.g. after an outer reorder repaint) can restore it.
