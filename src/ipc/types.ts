@@ -718,8 +718,22 @@ export type CommandMap = {
     result: AgentFileEntry[];
   };
   writeAgentFile: {
-    args: { sessionId: string; spec: AgentFileSpec };
+    args: {
+      sessionId: string;
+      spec: AgentFileSpec;
+      allowOverwrite?: boolean;
+      preservedTail?: string;
+    };
     result: string;
+  };
+  readAgentFile: {
+    args: { sessionId: string; scope: AgentFileScope; name: string };
+    result: {
+      spec: Partial<AgentFileSpec>;
+      prompt: string;
+      preservedTail: string;
+      path: string;
+    };
   };
   deleteAgentFile: {
     args: { sessionId: string; scope: AgentFileScope; name: string };

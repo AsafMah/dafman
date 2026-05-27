@@ -36,11 +36,46 @@ export function useAgentsLibrary() {
 
   /// Create (or overwrite) an agent file. Returns the written path
   /// on success, or null on failure (already toasted).
-  async function write(sessionId: string, spec: AgentFileSpec): Promise<string | null> {
+  ///
+  /// `options.allowOverwrite=true` is required to edit an existing
+  /// file. `options.preservedTail` is the verbatim front-matter tail
+  /// of unknown keys returned by `read()` — pass it through so the
+  /// Edit path doesn't strip e.g. `mcp-servers` keys.
+  async function write(
+    sessionId: string,
+    spec: AgentFileSpec,
+    options: { allowOverwrite?: boolean; preservedTail?: string } = {},
+  ): Promise<string | null> {
     try {
-      return await invokeCommand('writeAgentFile', { sessionId, spec });
+      return await invokeCommand('writeAgentFile', {
+        sessionId,
+        spec,
+        ...(options.allowOverwrite !== undefined ? { allowOverwrite: options.allowOverwrite } : {}),
+        ...(options.preservedTail !== undefined ? { preservedTail: options.preservedTail } : {}),
+      });
     } catch (err) {
       useToastStore().error('Save failed', toErrorMessage(err));
+
+      return null;
+    }
+  }
+
+  /// Reads an agent file's spec + prompt + preserved unknown-keys
+  /// tail for the Edit form. Returns null on failure (toasted).
+  async function read(
+    sessionId: string,
+    scope: AgentFileScope,
+    name: string,
+  ): Promise<{
+    spec: Partial<AgentFileSpec>;
+    prompt: string;
+    preservedTail: string;
+    path: string;
+  } | null> {
+    try {
+      return await invokeCommand('readAgentFile', { sessionId, scope, name });
+    } catch (err) {
+      useToastStore().error('Read failed', toErrorMessage(err));
 
       return null;
     }
@@ -62,5 +97,5 @@ export function useAgentsLibrary() {
     }
   }
 
-  return { files, loaded, error, load, write, remove };
+  return { files, loaded, error, load, write, read, remove };
 }

@@ -215,4 +215,65 @@ describe('sessionCommands', () => {
     expect(await runLocalSlashCommand('s1', '/mcp')).toBe(true);
     expect(await runLocalSlashCommand('s1', '/skills')).toBe(true);
   });
+
+  test('/agent <name> calls selectAgent and toasts unknown names', async () => {
+    // Spec lock 2026-05-27: /agent <name> selects the named agent;
+    // unknown names produce a warn toast with available list.
+    const sessions = useSessionsStore();
+    sessions.sessions.push({
+      id: 's1',
+      accent: '#000',
+      events: [],
+      droppedEventCount: 0,
+      model: null,
+      reasoningEffort: null,
+      mode: null,
+      approveAll: true,
+      title: null,
+      reasoningVisibilityOverride: 'default',
+      workingDirectory: 'C:\\repo\\dafman',
+      defaultSendMode: 'steer',
+      pendingRequests: [],
+      unseenTurns: 0,
+      isThinking: false,
+      sawTurnBoundary: false,
+      currentAgent: null,
+      tasksRefreshCounter: 0,
+      planRefreshCounter: 0,
+      touchedFiles: [],
+      commandsRun: 0,
+      _toastedOauthRequests: new Set<string>(),
+      _artifactToolCallIds: new Set<string>(),
+    } as never);
+
+    const calls: Array<{ name: string; args: unknown }> = [];
+    setRpcBridge({
+      async request(name, args) {
+        calls.push({ name, args });
+        if (name === 'listAgents') {
+          return [
+            { name: 'reviewer', displayName: 'Code Reviewer', description: '', source: 'user' },
+            { name: 'planner', displayName: null, description: '', source: 'user' },
+          ];
+        }
+        return 'ok';
+      },
+      onSessionEvent: () => () => {},
+      onPendingRequest: () => () => {},
+      onLogEvent: () => () => {},
+      onAuditEvent: () => () => {},
+    } as RpcBridge);
+
+    // Known name → selectAgent IPC fires.
+    expect(await runLocalSlashCommand('s1', '/agent reviewer')).toBe(true);
+    const selects = calls.filter((c) => c.name === 'selectAgent');
+    expect(selects.length).toBe(1);
+    expect((selects[0].args as { name: string }).name).toBe('reviewer');
+
+    // Unknown name → no selectAgent fires (only listAgents).
+    calls.length = 0;
+    expect(await runLocalSlashCommand('s1', '/agent unknown')).toBe(true);
+    expect(calls.some((c) => c.name === 'selectAgent')).toBe(false);
+    expect(calls.some((c) => c.name === 'listAgents')).toBe(true);
+  });
 });

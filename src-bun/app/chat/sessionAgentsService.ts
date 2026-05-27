@@ -18,6 +18,7 @@ import {
   listAgentFiles,
   writeAgent,
   deleteAgent,
+  readAgentForEdit,
   type AgentFileSpec,
   type AgentScope as AgentFileScope,
 } from '../library/agentFiles';
@@ -139,7 +140,11 @@ export class SessionAgentsService {
     return listAgentFiles({ includeUser: true, includeProject: false });
   }
 
-  async writeFile(sessionId: string, spec: AgentFileSpec): Promise<string> {
+  async writeFile(
+    sessionId: string,
+    spec: AgentFileSpec,
+    options: { allowOverwrite?: boolean; preservedTail?: string } = {},
+  ): Promise<string> {
     // User-scope writes don't need a workingDirectory; project
     // scope does. The registry resolves it from the session entry
     // (no caller-supplied workingDirectory string allowed — defense
@@ -152,7 +157,7 @@ export class SessionAgentsService {
       throw AppError.sdk('project scope requires a session with a working directory');
     }
 
-    const path = await writeAgent(spec, wd);
+    const path = await writeAgent(spec, wd, options);
 
     // Tell the SDK to re-scan so the new agent shows up in
     // `session.rpc.agent.list` immediately. Best-effort: a failed
@@ -167,6 +172,27 @@ export class SessionAgentsService {
     }
 
     return path;
+  }
+
+  /// Reads an agent for the Edit form. Returns the known-keys spec
+  /// subset + body + any unknown frontmatter keys preserved verbatim
+  /// (caller passes the tail back to `writeFile` to keep them).
+  async readFile(
+    sessionId: string,
+    scope: AgentFileScope,
+    name: string,
+  ): Promise<{
+    spec: Partial<AgentFileSpec>;
+    prompt: string;
+    preservedTail: string;
+    path: string;
+  }> {
+    const entry = this.ctx.getEntry(sessionId);
+    const wd = scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
+    if (scope === 'project' && !wd) {
+      throw AppError.sdk('project scope requires a session with a working directory');
+    }
+    return readAgentForEdit(scope, name, wd);
   }
 
   async deleteFile(sessionId: string, scope: AgentFileScope, name: string): Promise<boolean> {

@@ -115,19 +115,7 @@ _Source: archive line 808 (Phase 19a)_
 
 ### Slash `/agent <name>` actually selects
 
-_Source: archive line 1107 (Phase 19a)_
-
-- **Steps:** with no chip showing, run `/agent reviewer` in the
-  composer (the SDK's slash command). Watch the header.
-- **Expected:** chip flips to `reviewer` reactively — no full page
-  reload, no refetch needed.
-- **Why not automated:** SDK slash + event stream + Vue reactivity.
-- **Note:** "Doesn't seem to do anything — no indication of what's my
-  agent, no way to choose from the agent library, and `/agent <name>`
-  doesn't seem to do anything except opening the tab."
-  Partially addressed by commit `bca5704` (Select / Deselect button
-  in Library Agents tab). Slash command argument parsing still
-  pending (Sprint A3).
+_Source: archive line 1107 (Phase 19a). **Fixed Sprint A3 (2026-05-27).** Promoted into Pending verification below; remove from Failing after the user dogfoods._
 
 ### Slash `/skill <name>` actually runs the skill
 
@@ -225,6 +213,53 @@ when the whole section is verified) or ❌ (into Failing above).
   - **Expected:** button shows a spinner during the IPC roundtrip;
     other rows' buttons are disabled (one-at-a-time semantics from
     `useSessionAgents`).
+
+### Sprint A2 — Library Agents Edit button (2026-05-27)
+
+- **A2.1** ⏳ **Edit opens form prefilled.**
+  - **Steps:** click the pencil icon on any existing agent row.
+  - **Expected:** form opens with title `Edit <name>`. Name and Scope
+    are disabled. Other fields show the parsed values from the file.
+  - **Why not automated:** form prefill + scope/name lock across all
+    fields needs a full Vue mount + DOM read.
+
+- **A2.2** ⏳ **Edit save persists known fields + preserves unknown frontmatter.**
+  - **Steps:** create an agent file by hand at
+    `~/.copilot/agents/foo.agent.md` with a `mcp-servers:` block in
+    the frontmatter that we don't model. Click Edit on the row.
+    Change the description. Click Save.
+  - **Expected:** toast "Agent saved". File on disk: description
+    updated, `mcp-servers:` block still present byte-for-byte.
+  - **Why not automated:** filesystem round-trip + SDK reload chain.
+
+- **A2.3** ⏳ **Preserved-keys hint shows when there are unknown frontmatter keys.**
+  - **Steps:** open Edit on the file above (which has `mcp-servers:`).
+  - **Expected:** blue info banner at the top of the form: "Unknown
+    frontmatter keys preserved: edits won't strip `mcp-servers`,
+    `github`, plugin keys, etc."
+
+- **A2.4** ⏳ **Preserved-keys hint hidden when there's nothing to preserve.**
+  - **Steps:** create an agent via `New agent`, save it. Then Edit.
+  - **Expected:** no preserved-keys banner.
+
+### Sprint A3 — `/agent <name>` selects (2026-05-27)
+
+- **A3.1** ⏳ **`/agent reviewer` selects the agent.**
+  - **Steps:** type `/agent reviewer` (with a real agent name) in
+    composer → Enter.
+  - **Expected:** header chip flips to `reviewer`; toast "Agent
+    selected: Reviewer"; an in-stream system note appears under the
+    last message.
+  - **Why not automated:** SDK roundtrip + reactive header chip.
+
+- **A3.2** ⏳ **`/agent unknown` warns + lists available.**
+  - **Steps:** type `/agent unknown-name` → Enter.
+  - **Expected:** warn toast "No agent named 'unknown-name'.
+    Available: foo, bar, baz". Chip does NOT change.
+
+- **A3.3** ⏳ **`/agent` with no argument opens Library.**
+  - **Steps:** type `/agent` → Enter (or pick from slash menu).
+  - **Expected:** right-edge Library panel opens to the Agents tab.
 
 ---
 

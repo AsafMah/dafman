@@ -13,12 +13,15 @@
 // agents unambiguously, and so we don't conflict with arbitrary
 // markdown the user might have in the same directory.
 //
-// **No Edit operation in v1** — the SDK accepts unknown frontmatter
-// keys we don't model (e.g. `github.toolsets`, `github.permissions`,
-// `mcp-servers`, custom plugins). Editing an existing file with our
-// simplified writer would silently strip those keys. We expose
-// create + delete only and tell the user to edit the file directly
-// for advanced fields.
+// **Edit safety (added 2026-05-27).** The SDK accepts unknown
+// frontmatter keys we don't model (`github.toolsets`, `mcp-servers`,
+// plugin keys). Editing them via our minimal serializer would silently
+// strip them. We solve this WITHOUT a YAML round-trip library:
+// `readAgentForEdit` parses known keys into the spec subset AND
+// captures unknown keys as a verbatim byte-for-byte tail; `writeAgent`
+// appends that tail back after our own frontmatter emit. So Edit
+// preserves unknown keys exactly even though we can't reason about
+// their shape.
 
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
@@ -257,6 +260,185 @@ async function atomicWrite(path: string, content: string): Promise<void> {
   }
 }
 
+/// Splits a raw agent file into front-matter (between `---` fences)
+/// and body. Empty front-matter is `""`. If the file has no opening
+/// `---`, the whole file is body and front-matter is `""`.
+export function splitFrontmatter(raw: string): { frontmatter: string; body: string } {
+  // Accept both `\n` and `\r\n` line endings.
+  const normalized = raw.replace(/\r\n/g, '\n');
+  if (!normalized.startsWith('---\n')) {
+    return { frontmatter: '', body: normalized };
+  }
+  const rest = normalized.slice(4);
+  const closeIdx = rest.indexOf('\n---');
+  if (closeIdx === -1) {
+    // Unterminated front-matter — treat whole file as body.
+    return { frontmatter: '', body: normalized };
+  }
+  const frontmatter = rest.slice(0, closeIdx);
+  // The closing `---` is followed by `\n` or EOF; skip the marker
+  // and one optional trailing newline (the canonical `---\n\n<body>`
+  // emit form leaves a leading blank line in the body which we
+  // preserve by not stripping it here).
+  const afterClose = rest.slice(closeIdx + '\n---'.length);
+  const body = afterClose.startsWith('\n') ? afterClose.slice(1) : afterClose;
+  return { frontmatter, body };
+}
+
+/// Keys we model in `AgentFileSpec`. Anything else in the front-matter
+/// is preserved verbatim by the Edit path. Keep in sync with
+/// `serializeFrontmatter` above.
+const KNOWN_FRONTMATTER_KEYS = new Set<string>([
+  'name',
+  'displayName',
+  'description',
+  'tools',
+  'skills',
+  'model',
+  'user-invocable',
+]);
+
+/// Parses raw agent front-matter into a known-keys subset (returned
+/// as a partial `AgentFileSpec`) and a raw-preserved tail of any
+/// keys we don't model. The tail is the original source lines, not
+/// re-serialized — guarantees byte-perfect preservation of unknown
+/// keys including comments and unusual quoting we don't emit ourselves.
+///
+/// This is the v2 Edit path's safety net: we never have to round-trip
+/// `mcp-servers` / `github.toolsets` / etc. through a YAML library
+/// to preserve them — we just leave the original bytes alone.
+export function parseAgentFrontmatter(frontmatter: string): {
+  spec: Partial<AgentFileSpec>;
+  preservedTail: string;
+} {
+  const spec: Partial<AgentFileSpec> = {};
+  const preservedLines: string[] = [];
+
+  // Walk lines top-down; for each, decide if it starts a known key
+  // (drop until next top-level key or block end) or is part of an
+  // unknown key block (push to preservedLines).
+  const lines = frontmatter.split('\n');
+  let i = 0;
+  function readTopLevelKey(line: string): string | null {
+    // Top-level YAML key: `^[a-zA-Z_-]+:`. Indented lines belong to
+    // the previous key's block.
+    const m = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*:/.exec(line);
+    return m ? m[1] : null;
+  }
+  function unquote(raw: string): string {
+    const trimmed = raw.trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      // Both JSON.parse and a manual single-quote strip would work;
+      // double-quoted strings are what `serializeFrontmatter` emits
+      // so JSON.parse round-trips them exactly. Single-quoted is
+      // handled as a literal strip — sufficient for hand-written files.
+      if (trimmed.startsWith('"')) {
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          return trimmed.slice(1, -1);
+        }
+      }
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  }
+  while (i < lines.length) {
+    const line = lines[i];
+    const key = readTopLevelKey(line);
+    if (key === null) {
+      // Stray indented line or blank line at top level; preserve.
+      preservedLines.push(line);
+      i++;
+      continue;
+    }
+    // Collect the key's block: this line + any indented continuation.
+    const blockStart = i;
+    i++;
+    while (i < lines.length) {
+      const peek = lines[i];
+      if (peek === '' || /^\s/.test(peek)) {
+        i++;
+        continue;
+      }
+      // Next top-level key (or end-of-front-matter sentinel) → stop.
+      break;
+    }
+    const blockLines = lines.slice(blockStart, i);
+    if (!KNOWN_FRONTMATTER_KEYS.has(key)) {
+      preservedLines.push(...blockLines);
+      continue;
+    }
+    // Known key: extract value(s).
+    const head = blockLines[0];
+    const valueRaw = head.slice(head.indexOf(':') + 1);
+    if (key === 'tools' || key === 'skills') {
+      // Array — either `tools: []` or block form:
+      //   tools:
+      //     - "read"
+      //     - "shell"
+      const items: string[] = [];
+      const inline = valueRaw.trim();
+      if (inline === '[]') {
+        // empty
+      } else if (inline.startsWith('[') && inline.endsWith(']')) {
+        // Flow-style array. Best-effort split on commas, then unquote.
+        const inner = inline.slice(1, -1).trim();
+        if (inner.length > 0) {
+          for (const part of inner.split(',')) items.push(unquote(part));
+        }
+      } else {
+        for (const cont of blockLines.slice(1)) {
+          const m = /^\s*-\s*(.*)$/.exec(cont);
+          if (m) items.push(unquote(m[1]));
+        }
+      }
+      spec[key] = items;
+    } else if (key === 'user-invocable') {
+      spec.userInvocable = unquote(valueRaw).toLowerCase() === 'true';
+    } else if (key === 'displayName') {
+      spec.displayName = unquote(valueRaw);
+    } else if (key === 'name' || key === 'description' || key === 'model') {
+      spec[key] = unquote(valueRaw);
+    }
+  }
+
+  // Trim leading/trailing blank lines from preserved tail so the
+  // joined output doesn't accumulate them across edits.
+  while (preservedLines.length > 0 && preservedLines[0].trim() === '') {
+    preservedLines.shift();
+  }
+  while (preservedLines.length > 0 && preservedLines[preservedLines.length - 1].trim() === '') {
+    preservedLines.pop();
+  }
+  return { spec, preservedTail: preservedLines.join('\n') };
+}
+
+/// Reads an agent file from disk and returns the parsed spec + body
+/// + preserved unknown-keys tail. Used by the Edit form to prefill;
+/// the writePath uses `preservedTail` to keep unknown keys intact.
+export async function readAgentForEdit(
+  scope: AgentScope,
+  name: string,
+  workingDirectory?: string,
+): Promise<{ spec: Partial<AgentFileSpec>; prompt: string; preservedTail: string; path: string }> {
+  const { path } = resolveTargetPath(scope, name, workingDirectory);
+  if (!existsSync(path)) {
+    throw AppError.sdk(`agent not found at ${path}`);
+  }
+  const { readFile } = await import('node:fs/promises');
+  const raw = await readFile(path, 'utf-8');
+  const { frontmatter, body } = splitFrontmatter(raw);
+  const { spec, preservedTail } = parseAgentFrontmatter(frontmatter);
+  // Set scope/name on the partial spec for round-trip convenience.
+  spec.scope = scope;
+  if (spec.name === undefined) spec.name = name;
+  return { spec, prompt: body.trim(), preservedTail, path };
+}
+
 function randomSuffix(): string {
   // 6 hex chars from random. crypto.randomBytes is overkill for
   // a temp-file suffix.
@@ -321,23 +503,34 @@ async function scanDir(dir: string, scope: AgentScope, out: DiscoveredAgentFile[
   }
 }
 
-/// Creates a new agent file. Refuses to overwrite an existing file
-/// — Edit is deferred to a future phase; the caller should delete +
-/// recreate if they actually want to overwrite (this keeps the
-/// "no silent data loss" invariant from the rubber-duck duck).
-export async function writeAgent(spec: AgentFileSpec, workingDirectory?: string): Promise<string> {
+/// Creates or overwrites an agent file. To preserve unknown
+/// frontmatter keys on Edit, pass `preservedTail` from
+/// `readAgentForEdit`. When `allowOverwrite` is true, an existing
+/// file will be replaced; otherwise we refuse (matching the original
+/// create-only semantics).
+export async function writeAgent(
+  spec: AgentFileSpec,
+  workingDirectory?: string,
+  options: { allowOverwrite?: boolean; preservedTail?: string } = {},
+): Promise<string> {
   if (!spec.description || spec.description.trim().length === 0) {
     throw AppError.sdk('description is required');
   }
 
   const { path, root } = resolveTargetPath(spec.scope, spec.name, workingDirectory);
 
-  if (existsSync(path)) {
+  if (existsSync(path) && !options.allowOverwrite) {
     throw AppError.sdk(`agent already exists at ${path}; delete it first to overwrite`);
   }
 
   await mkdir(root, { recursive: true });
-  const frontmatter = serializeFrontmatter(spec);
+  let frontmatter = serializeFrontmatter(spec);
+  if (options.preservedTail && options.preservedTail.length > 0) {
+    // Append unknown keys verbatim so things like `mcp-servers` or
+    // `github.toolsets` survive an Edit. The byte-perfect preserved
+    // tail comes from `parseAgentFrontmatter`.
+    frontmatter = `${frontmatter}\n${options.preservedTail}`;
+  }
   const body = spec.prompt.trim().length > 0 ? `${spec.prompt.trim()}\n` : '';
   const content = `---\n${frontmatter}\n---\n\n${body}`;
 

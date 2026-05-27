@@ -248,3 +248,105 @@ describe('writeAgent + deleteAgent + listAgentFiles (project scope)', () => {
     await expect(deleteAgent('project', '../x', workspaceDir)).rejects.toBeInstanceOf(AppError);
   });
 });
+
+describe('Edit path — readAgentForEdit + writeAgent (overwrite + preserved tail)', () => {
+  test('readAgentForEdit parses known keys and preserves unknown keys verbatim', async () => {
+    const dir = join(workspaceDir, '.github', 'agents');
+    await mkdir(dir, { recursive: true });
+    // Hand-write a file with a mix of known + unknown keys.
+    const fileContent = [
+      '---',
+      'name: "reviewer"',
+      'description: "Reviews PRs"',
+      'tools:',
+      '  - "read"',
+      '  - "grep"',
+      'mcp-servers:',
+      '  - name: "fancy"',
+      '    transport: "stdio"',
+      'github:',
+      '  toolsets:',
+      '    - "default"',
+      '---',
+      '',
+      'You are a strict code reviewer.',
+      '',
+    ].join('\n');
+    await writeFile(join(dir, 'reviewer.agent.md'), fileContent);
+
+    const { readAgentForEdit } = await import('../app/library/agentFiles');
+    const result = await readAgentForEdit('project', 'reviewer', workspaceDir);
+    expect(result.spec.name).toBe('reviewer');
+    expect(result.spec.description).toBe('Reviews PRs');
+    expect(result.spec.tools).toEqual(['read', 'grep']);
+    expect(result.prompt).toBe('You are a strict code reviewer.');
+    // Unknown keys preserved verbatim (byte-for-byte).
+    expect(result.preservedTail).toContain('mcp-servers:');
+    expect(result.preservedTail).toContain('  - name: "fancy"');
+    expect(result.preservedTail).toContain('github:');
+    expect(result.preservedTail).toContain('  toolsets:');
+  });
+
+  test('writeAgent with preservedTail + allowOverwrite keeps unknown keys after edit', async () => {
+    const dir = join(workspaceDir, '.github', 'agents');
+    await mkdir(dir, { recursive: true });
+    const original = [
+      '---',
+      'name: "reviewer"',
+      'description: "Reviews PRs"',
+      'mcp-servers:',
+      '  - name: "fancy"',
+      '---',
+      '',
+      'Original prompt.',
+      '',
+    ].join('\n');
+    const path = join(dir, 'reviewer.agent.md');
+    await writeFile(path, original);
+
+    const { readAgentForEdit } = await import('../app/library/agentFiles');
+    const read = await readAgentForEdit('project', 'reviewer', workspaceDir);
+
+    // Edit: change the description + prompt, keep the unknown mcp-servers block.
+    await writeAgent(
+      {
+        scope: 'project',
+        name: 'reviewer',
+        description: 'EDITED description',
+        prompt: 'Edited prompt.',
+      },
+      workspaceDir,
+      { allowOverwrite: true, preservedTail: read.preservedTail },
+    );
+
+    const written = readFileSync(path, 'utf-8');
+    expect(written).toContain('description: "EDITED description"');
+    expect(written).toContain('Edited prompt.');
+    // Unknown keys survive verbatim.
+    expect(written).toContain('mcp-servers:');
+    expect(written).toContain('  - name: "fancy"');
+  });
+
+  test('writeAgent without allowOverwrite still refuses to clobber', async () => {
+    await writeAgent(
+      {
+        scope: 'project',
+        name: 'existing',
+        description: 'd',
+        prompt: 'p',
+      },
+      workspaceDir,
+    );
+    await expect(
+      writeAgent(
+        {
+          scope: 'project',
+          name: 'existing',
+          description: 'd2',
+          prompt: 'p2',
+        },
+        workspaceDir,
+      ),
+    ).rejects.toBeInstanceOf(AppError);
+  });
+});

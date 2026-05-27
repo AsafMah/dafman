@@ -888,8 +888,22 @@ export type DafmanRPC = {
         response: AgentFileEntry[];
       };
       writeAgentFile: {
-        params: { sessionId: string; spec: AgentFileSpec };
+        params: {
+          sessionId: string;
+          spec: AgentFileSpec;
+          allowOverwrite?: boolean;
+          preservedTail?: string;
+        };
         response: string;
+      };
+      readAgentFile: {
+        params: { sessionId: string; scope: AgentFileScope; name: string };
+        response: {
+          spec: Partial<AgentFileSpec>;
+          prompt: string;
+          preservedTail: string;
+          path: string;
+        };
       };
       deleteAgentFile: {
         params: { sessionId: string; scope: AgentFileScope; name: string };

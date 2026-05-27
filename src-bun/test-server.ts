@@ -431,12 +431,23 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   }),
   listAgentFilesGlobal: rpcGuard(async () => sessions.listAgentFilesGlobal()),
   writeAgentFile: rpcGuard(async (args) => {
-    const { sessionId, spec } = args as {
+    const { sessionId, spec, allowOverwrite, preservedTail } = args as {
       sessionId: string;
       spec: Parameters<typeof sessions.writeAgentFile>[1];
+      allowOverwrite?: boolean;
+      preservedTail?: string;
     };
 
-    return sessions.writeAgentFile(sessionId, spec);
+    return sessions.writeAgentFile(sessionId, spec, { allowOverwrite, preservedTail });
+  }),
+  readAgentFile: rpcGuard(async (args) => {
+    const { sessionId, scope, name } = args as {
+      sessionId: string;
+      scope: 'user' | 'project';
+      name: string;
+    };
+
+    return sessions.readAgentFile(sessionId, scope, name);
   }),
   deleteAgentFile: rpcGuard(async (args) => {
     const { sessionId, scope, name } = args as {

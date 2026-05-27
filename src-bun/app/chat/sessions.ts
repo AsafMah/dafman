@@ -847,8 +847,25 @@ export class SessionRegistry {
     return this.agents.listFilesGlobal();
   }
 
-  async writeAgentFile(sessionId: string, spec: AgentFileSpec): Promise<string> {
-    return this.agents.writeFile(sessionId, spec);
+  async writeAgentFile(
+    sessionId: string,
+    spec: AgentFileSpec,
+    options: { allowOverwrite?: boolean; preservedTail?: string } = {},
+  ): Promise<string> {
+    return this.agents.writeFile(sessionId, spec, options);
+  }
+
+  async readAgentFile(
+    sessionId: string,
+    scope: AgentFileScope,
+    name: string,
+  ): Promise<{
+    spec: Partial<AgentFileSpec>;
+    prompt: string;
+    preservedTail: string;
+    path: string;
+  }> {
+    return this.agents.readFile(sessionId, scope, name);
   }
 
   async deleteAgentFile(sessionId: string, scope: AgentFileScope, name: string): Promise<boolean> {

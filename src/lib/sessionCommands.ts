@@ -134,12 +134,36 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   },
   {
     slash: '/agent',
-    label: 'Open Agents Library',
-    description: 'Open Library to the Agents tab.',
+    label: 'Select or open agent',
+    description:
+      'With no argument: open Library Agents tab. With a name: select that agent for the current session.',
     icon: 'pi-user',
     group: 'Library',
-    keywords: ['subagent', 'custom agent'],
-    run: () => openLibraryTab('agents'),
+    keywords: ['subagent', 'custom agent', 'select'],
+    async run(sessionId, args) {
+      const name = (args ?? '').trim();
+      if (!name) {
+        openLibraryTab('agents');
+        return;
+      }
+      try {
+        const agents = await invokeCommand('listAgents', { sessionId });
+        const match = agents.find((a) => a.name.toLowerCase() === name.toLowerCase());
+        if (!match) {
+          const available = agents.map((a) => a.name).slice(0, 5).join(', ') || '(none)';
+          useToastStore().warn(
+            `No agent named "${name}"`,
+            agents.length > 0 ? `Available: ${available}` : 'Drop an agent file under ~/.copilot/agents/ or .github/agents/',
+          );
+          return;
+        }
+        await invokeCommand('selectAgent', { sessionId, name: match.name });
+        useToastStore().success('Agent selected', match.displayName ?? match.name);
+        pushLocalSystem(sessionId, `Agent selected: ${match.displayName ?? match.name}`);
+      } catch (err) {
+        useToastStore().error('Failed to select agent', toErrorMessage(err));
+      }
+    },
   },
   {
     slash: '/model',

@@ -49,6 +49,7 @@ const {
   error,
   load: loadFiles,
   write: writeAgent,
+  read: readAgent,
   remove: deleteAgent,
 } = useAgentsLibrary();
 
@@ -90,8 +91,12 @@ const grouped = computed(() => {
   return { user, project };
 });
 
-// ---------- Create form ----------
+// ---------- Create / edit form ----------
 const showForm = ref(false);
+/// Form mode. 'create' refuses to clobber; 'edit' allows overwrite +
+/// passes the preserved unknown-frontmatter tail through so the SDK's
+/// custom keys (mcp-servers, github.toolsets, etc.) survive a save.
+const formMode = ref<'create' | 'edit'>('create');
 const formScope = ref<AgentFileScope>('user');
 const formName = ref('');
 const formDisplayName = ref('');
@@ -103,6 +108,11 @@ const formUserInvocable = ref(true);
 const formPrompt = ref('');
 const formBusy = ref(false);
 const formError = ref<string | null>(null);
+/// Preserved verbatim front-matter tail captured at read-time. Round-
+/// tripped back into writeAgent options so unknown keys survive Edit.
+const formPreservedTail = ref<string>('');
+/// Original entry for an Edit (for the dialog header + scope lock).
+const formOriginalEntry = ref<AgentFileEntry | null>(null);
 
 const scopeOptions = computed(() => {
   const out: Array<{ label: string; value: AgentFileScope; disabled?: boolean }> = [
@@ -120,6 +130,7 @@ const scopeOptions = computed(() => {
 
 function openForm() {
   showForm.value = true;
+  formMode.value = 'create';
   formScope.value = activeSession.value ? 'project' : 'user';
   formName.value = '';
   formDisplayName.value = '';
@@ -130,6 +141,34 @@ function openForm() {
   formUserInvocable.value = true;
   formPrompt.value = '';
   formError.value = null;
+  formPreservedTail.value = '';
+  formOriginalEntry.value = null;
+}
+
+async function openEditForm(entry: AgentFileEntry) {
+  if (!activeSession.value) {
+    toasts.error(
+      'Need an active session',
+      'Open a session to edit agents (the SDK reload path is session-scoped).',
+    );
+    return;
+  }
+  const read = await readAgent(activeSession.value.id, entry.scope, entry.name);
+  if (!read) return; // toasted
+  showForm.value = true;
+  formMode.value = 'edit';
+  formScope.value = entry.scope;
+  formName.value = read.spec.name ?? entry.name;
+  formDisplayName.value = read.spec.displayName ?? '';
+  formDescription.value = read.spec.description ?? '';
+  formTools.value = (read.spec.tools ?? []).join(', ');
+  formSkills.value = (read.spec.skills ?? []).join(', ');
+  formModel.value = read.spec.model ?? '';
+  formUserInvocable.value = read.spec.userInvocable !== false;
+  formPrompt.value = read.prompt;
+  formError.value = null;
+  formPreservedTail.value = read.preservedTail;
+  formOriginalEntry.value = entry;
 }
 
 function closeForm() {
@@ -198,7 +237,11 @@ async function submitForm() {
 
     if (formModel.value.trim()) spec.model = formModel.value.trim();
 
-    const path = await writeAgent(activeSession.value.id, spec);
+    const path = await writeAgent(activeSession.value.id, spec, {
+      ...(formMode.value === 'edit'
+        ? { allowOverwrite: true, preservedTail: formPreservedTail.value }
+        : {}),
+    });
 
     if (!path) {
       // toast already shown by composable; surface the failure inline too
@@ -207,7 +250,7 @@ async function submitForm() {
       return;
     }
 
-    toasts.success('Agent created', path);
+    toasts.success(formMode.value === 'edit' ? 'Agent saved' : 'Agent created', path);
     closeForm();
     await load();
   } catch (err) {
@@ -340,6 +383,14 @@ async function reveal(path: string) {
             <Button
               size="small"
               text
+              icon="pi pi-pencil"
+              :disabled="!activeSession"
+              :aria-label="`Edit ${entry.name}`"
+              @click="openEditForm(entry)"
+            />
+            <Button
+              size="small"
+              text
               icon="pi pi-external-link"
               :aria-label="`Reveal ${entry.name} in file manager`"
               @click="reveal(entry.path)"
@@ -416,6 +467,14 @@ async function reveal(path: string) {
             <Button
               size="small"
               text
+              icon="pi pi-pencil"
+              :disabled="!activeSession"
+              :aria-label="`Edit ${entry.name}`"
+              @click="openEditForm(entry)"
+            />
+            <Button
+              size="small"
+              text
               icon="pi pi-external-link"
               :aria-label="`Reveal ${entry.name} in file manager`"
               @click="reveal(entry.path)"
@@ -452,7 +511,7 @@ async function reveal(path: string) {
     >
       <div class="agent-form">
         <header class="form-header">
-          <h3>New custom agent</h3>
+          <h3>{{ formMode === 'edit' ? `Edit ${formName}` : 'New custom agent' }}</h3>
           <Button
             size="small"
             text
@@ -462,6 +521,22 @@ async function reveal(path: string) {
           />
         </header>
         <div class="form-body">
+          <div
+            v-if="formMode === 'edit' && formPreservedTail"
+            class="form-preserved-hint"
+            title="These frontmatter keys are not editable in this form, but they are preserved verbatim across saves."
+          >
+            <i
+              class="pi pi-info-circle"
+              aria-hidden="true"
+            />
+            <span>
+              <strong>Unknown frontmatter keys preserved:</strong>
+              edits won't strip
+              <code>mcp-servers</code>, <code>github</code>, plugin keys, etc.
+              Reveal the file to inspect them.
+            </span>
+          </div>
           <label class="form-field">
             <span class="form-label">Scope</span>
             <SelectButton
@@ -471,6 +546,7 @@ async function reveal(path: string) {
               option-value="value"
               option-disabled="disabled"
               size="small"
+              :disabled="formMode === 'edit' || formBusy"
               aria-label="Agent scope"
             />
           </label>
@@ -481,7 +557,7 @@ async function reveal(path: string) {
             <InputText
               v-model="formName"
               placeholder="e.g. reviewer"
-              :disabled="formBusy"
+              :disabled="formBusy || formMode === 'edit'"
               size="small"
             />
           </label>
@@ -565,7 +641,7 @@ async function reveal(path: string) {
           />
           <Button
             size="small"
-            label="Create"
+            :label="formMode === 'edit' ? 'Save' : 'Create'"
             :loading="formBusy"
             :disabled="formBusy"
             @click="submitForm"
@@ -675,6 +751,29 @@ async function reveal(path: string) {
   color: var(--p-primary-color);
   border-radius: 0.25rem;
   font-weight: 600;
+}
+
+.form-preserved-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--p-blue-500, #3b82f6) 10%, transparent);
+  border-left: 3px solid var(--p-blue-500, #3b82f6);
+  border-radius: 0.25rem;
+  color: var(--p-text-color);
+  font-size: 0.82rem;
+}
+.form-preserved-hint i {
+  flex: 0 0 auto;
+  color: var(--p-blue-500, #3b82f6);
+  margin-top: 0.1rem;
+}
+.form-preserved-hint code {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.2rem;
+  font-size: 0.78rem;
 }
 
 .agent-line {
