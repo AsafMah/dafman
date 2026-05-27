@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { cleanup, render, fireEvent } from '@testing-library/vue';
 import { nextTick } from 'vue';
 import CommandPalette from '@/components/shell/CommandPalette.vue';
-import { searchValueFor, childMatchTokens } from '@/lib/palette';
+import { searchValueFor, childMatchTokens, parentSelfTokens } from '@/lib/palette';
 import { useCommandRegistry } from '@/stores/shell/commandRegistry';
 
 /// Mounts the palette and pops it open via the test-only `__testOpen`
@@ -62,7 +62,14 @@ describe('searchValueFor', () => {
     expect(a).not.toBe(b);
   });
 
-  test('parent with children folds child labels + keywords into the search corpus', () => {
+  test('parent with children does NOT fold child tokens into its own corpus', () => {
+    // The user expectation (2026-05-27 feedback): typing "claude"
+    // should reveal "Switch Model: Claude Opus 4.7" — the CHILD row,
+    // not the parent row. If the parent corpus folded in child labels,
+    // the library's fuse would also match the parent and show it as
+    // peer clutter alongside the child. Today the parent matches its
+    // own fields only; the child surfaces via `shouldExpand`-driven
+    // render + the library's per-item fuse filter.
     const value = searchValueFor({
       id: 'session.mode',
       label: 'Run Mode',
@@ -80,15 +87,13 @@ describe('searchValueFor', () => {
     });
     // Parent's own corpus
     expect(value).toContain('Run Mode');
-    // Child labels — typing 'Plan' or 'Interactive' should match the
-    // parent row even when collapsed.
-    expect(value).toContain('Interactive');
-    expect(value).toContain('Plan');
-    expect(value).toContain('Autopilot');
-    // Child keywords flow up too.
-    expect(value).toContain('chat');
-    expect(value).toContain('manual');
-    expect(value).toContain('auto');
+    // Child labels and keywords MUST NOT leak into the parent corpus.
+    expect(value).not.toContain('Interactive');
+    expect(value).not.toContain('Plan');
+    expect(value).not.toContain('Autopilot');
+    expect(value).not.toContain('chat');
+    expect(value).not.toContain('manual');
+    expect(value).not.toContain('auto');
   });
 
   test('parent with empty children array does not crash and behaves like a leaf', () => {
@@ -101,33 +106,26 @@ describe('searchValueFor', () => {
     expect(value).toBe('empty.parent Empty Parent');
   });
 
-  test('childMatchTokens is the single source of truth — every token folded into the parent corpus must come back', () => {
-    // Contract: any token `searchValueFor` adds for a child MUST also
-    // be returned by `childMatchTokens(child)`. The palette's
-    // shouldExpand auto-expand uses childMatchTokens — if the two
-    // diverge, a parent corpus can match a query without expanding
-    // its children. Lock the contract by inversion: build a parent
-    // with one child carrying a unique sentinel in each known field,
-    // assert each sentinel is in BOTH outputs.
-    const child = {
-      id: 'c.sentinel',
-      label: 'LBL_SENTINEL_q1',
-      keywords: ['KW_SENTINEL_q2', 'KW_SENTINEL_q3'],
-      run: () => {},
-    };
-    const tokens = childMatchTokens(child);
-    const parent = searchValueFor({
-      id: 'parent.x',
-      label: 'Parent',
-      children: [child],
+  test('parentSelfTokens covers id + label + group + hint + keywords', () => {
+    const tokens = parentSelfTokens({
+      id: 'p.id',
+      label: 'P Label',
+      group: 'P Group',
+      hint: 'P Hint',
+      keywords: ['kw1', 'kw2'],
       run: () => {},
     });
-    for (const tok of tokens) {
-      expect(parent).toContain(tok);
-    }
-    // Also: if a NEW child field starts being folded into the parent
-    // corpus, this test will need to be updated to assert the inverse
-    // — that the field also appears in tokens. Best caught at PR time.
+    expect(tokens).toEqual(['p.id', 'P Label', 'P Group', 'P Hint', 'kw1', 'kw2']);
+  });
+
+  test('childMatchTokens covers label + keywords', () => {
+    const tokens = childMatchTokens({
+      id: 'c.id',
+      label: 'C Label',
+      keywords: ['k1', 'k2'],
+      run: () => {},
+    });
+    expect(tokens).toEqual(['C Label', 'k1', 'k2']);
   });
 });
 

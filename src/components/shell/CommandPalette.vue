@@ -39,7 +39,7 @@ import { Command } from 'vue-command-palette';
 import CommandPaletteRow from '@/components/shell/CommandPaletteRow.vue';
 import { useCommandRegistry, type Command as CommandDef } from '@/stores/shell/commandRegistry';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
-import { searchValueFor, childMatchTokens } from '@/lib/palette';
+import { searchValueFor, childMatchTokens, parentSelfTokens } from '@/lib/palette';
 import { emit as busEmit } from '@/lib/bus';
 import { useEventListener } from '@vueuse/core';
 
@@ -101,13 +101,17 @@ function shouldExpand(cmd: CommandDef): boolean {
   if (expanded.value.has(cmd.id)) return true;
   const q = query.value.trim().toLowerCase();
   if (!q || !isParent(cmd)) return false;
+  // Auto-expand when the parent's OWN fields match the query (e.g.
+  // typing "model" expands "Switch Model"), OR when any child's
+  // tokens match (e.g. typing "claude" expands the same parent so
+  // the matching child surfaces). Parent corpus no longer folds in
+  // child tokens, so the fuse hides the parent row when only
+  // children match — but the children still render here for the
+  // library to filter and show.
+  for (const token of parentSelfTokens(cmd)) {
+    if (token.toLowerCase().includes(q)) return true;
+  }
   for (const child of cmd.children!) {
-    // childMatchTokens is the SINGLE source of truth shared with
-    // `searchValueFor` (palette.ts). If a token is added to the parent
-    // corpus, it MUST also trigger auto-expand here — otherwise a
-    // query can match the parent row without expanding the children,
-    // leaving the user staring at a highlighted parent with no
-    // visible matches.
     for (const token of childMatchTokens(child)) {
       if (token.toLowerCase().includes(q)) return true;
     }
