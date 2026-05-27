@@ -35,16 +35,23 @@
 //   cases (see `__tests__/CommandPalette.test.ts` afterEach).
 
 import { computed, nextTick, ref, watch } from 'vue';
-import { Command } from 'vue-command-palette';
+import { Command, useCommandState } from 'vue-command-palette';
 import CommandPaletteRow from '@/components/shell/CommandPaletteRow.vue';
 import { useCommandRegistry, type Command as CommandDef } from '@/stores/shell/commandRegistry';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
-import { searchValueFor, childMatchTokens, parentSelfTokens } from '@/lib/palette';
+import { searchValueFor } from '@/lib/palette';
 import { emit as busEmit } from '@/lib/bus';
 import { useEventListener } from '@vueuse/core';
 
 const registry = useCommandRegistry();
 const layoutStore = useLayoutStore();
+/// Authoritative search state from the library. Drives `shouldExpand`
+/// without us having to mirror the input via a window-level listener
+/// (which raced with the library's own internal filter and left
+/// children invisible because they weren't yet in the DOM when the
+/// library filtered — caught 2026-05-27 by user feedback "It doesn't
+/// find either, even before").
+const commandState = useCommandState();
 
 const open = ref(false);
 let prevFocus: HTMLElement | null = null;
@@ -52,22 +59,12 @@ let prevFocus: HTMLElement | null = null;
 const visibleCommands = computed(() => registry.visibleCommands);
 
 /// Parent ids the user has manually expanded. Cleared on every close
-/// so each palette session starts collapsed (a parent's children stay
-/// behind their arrow until you Enter or auto-expand-on-search lifts
-/// them). Use Set semantics so the render loop reads expanded? in O(1).
+/// so each palette session starts collapsed.
 const expanded = ref(new Set<string>());
-
-/// Live query, mirrored from the Command.Input. We can't get this
-/// directly from vue-command-palette's controlled input — the library
-/// owns its state — so we attach a delegated `input` listener on the
-/// dialog wrapper after mount. It's just a string used to decide
-/// "is the user actively searching?" for auto-expand.
-const query = ref('');
 
 watch(open, (next) => {
   if (!next) {
     expanded.value = new Set();
-    query.value = '';
   }
 });
 
@@ -97,26 +94,24 @@ const valueToCommand = computed(() => {
 ///   1. The user manually expanded it (in `expanded`), OR
 ///   2. The query is non-empty AND at least one child label matches.
 /// This is the "auto-expand on search" UX.
+/// A parent renders its children when either:
+///   1. The user manually expanded it (`expanded` set), OR
+///   2. The user has a non-empty search query active.
+///
+/// Rule 2 is intentionally maximal: we always render ALL parents'
+/// children during search and let the library's fuse filter decide
+/// which children are visible. Earlier we tried to be clever and only
+/// auto-expand when a child's tokens matched the query — but that
+/// raced with the library's index (children appeared AFTER the filter
+/// ran, so they showed up as registered-but-hidden). Always-render +
+/// library filter is simpler and correct: typing "claude" puts every
+/// model child in the DOM, the library's ResizeObserver-driven
+/// re-index picks them up, and only `Claude Opus 4.7` survives the
+/// fuse pass.
 function shouldExpand(cmd: CommandDef): boolean {
   if (expanded.value.has(cmd.id)) return true;
-  const q = query.value.trim().toLowerCase();
-  if (!q || !isParent(cmd)) return false;
-  // Auto-expand when the parent's OWN fields match the query (e.g.
-  // typing "model" expands "Switch Model"), OR when any child's
-  // tokens match (e.g. typing "claude" expands the same parent so
-  // the matching child surfaces). Parent corpus no longer folds in
-  // child tokens, so the fuse hides the parent row when only
-  // children match — but the children still render here for the
-  // library to filter and show.
-  for (const token of parentSelfTokens(cmd)) {
-    if (token.toLowerCase().includes(q)) return true;
-  }
-  for (const child of cmd.children!) {
-    for (const token of childMatchTokens(child)) {
-      if (token.toLowerCase().includes(q)) return true;
-    }
-  }
-  return false;
+  if (!isParent(cmd)) return false;
+  return commandState.search.value.trim().length > 0;
 }
 
 function toggleExpanded(id: string): void {
@@ -232,17 +227,6 @@ function onSelectItem(item: { key: string; value: string }): void {
   });
 }
 
-/// Delegated input listener so we can mirror the library's input into
-/// `query` for the auto-expand check. The library doesn't expose
-/// v-model on Command.Input; we read the event.target.value instead.
-function onPaletteInput(e: Event): void {
-  const target = e.target as HTMLElement | null;
-  if (!target) return;
-  if (target.tagName !== 'INPUT') return;
-  if (!target.hasAttribute('command-input')) return;
-  query.value = (target as HTMLInputElement).value;
-}
-
 function onWindowClick(e: MouseEvent): void {
   if (!open.value) return;
 
@@ -258,7 +242,6 @@ function onWindowClick(e: MouseEvent): void {
 useEventListener(window, 'keydown', onHotkey, true);
 useEventListener(window, 'keydown', onEscape, true);
 useEventListener(window, 'click', onWindowClick, true);
-useEventListener(window, 'input', onPaletteInput, true);
 </script>
 
 <template>
