@@ -45,10 +45,22 @@ export function schedulePersist(): void {
   }, DEBOUNCE_MS);
 }
 
-/// Cancels any pending save. Used by App.vue's cleanup path.
+/// Cancels any pending save. Used by App.vue's cleanup path AND by
+/// HMR's dispose hook below.
 export function cancelPendingPersist(): void {
   if (timer !== null) {
     clearTimeout(timer);
     timer = null;
   }
+}
+
+// HMR cleanup. Without this, a 300 ms-pending persist queued by the
+// previous module instance would fire AFTER the new module has loaded,
+// reading from a stale Pinia singleton and either silently overwriting
+// the live layout with junk or crashing when the old store handles
+// have been disposed. Caught in the code-review pass 2026-05-27.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    cancelPendingPersist();
+  });
 }

@@ -82,6 +82,18 @@ export function useGroupsActions(): GroupsActions {
     if (outer) {
       const panel = outer.getPanel(id);
       if (panel) outer.removePanel(panel);
+      // Explicitly activate the new active group's outer panel so
+      // dockview's onDidActivePanelChange fires and bodyApi resolves to
+      // the correct inner. Without this, dockview may activate an
+      // arbitrary remaining panel (potentially an edge-group panel) and
+      // groupsStore.activeGroupId — already updated by deleteGroup
+      // above — would diverge from outer.activePanel (code-review
+      // finding 2026-05-27, issue 3).
+      const newActiveId = groupsStore.activeGroupId;
+      if (newActiveId) {
+        const next = outer.getPanel(newActiveId);
+        next?.api.setActive();
+      }
     }
   }
 
@@ -100,18 +112,17 @@ export function useGroupsActions(): GroupsActions {
     const target = groupsStore.groups.find((g) => g.id === targetGroupId);
     if (!target) return;
 
-    // Activate target first so its inner DockviewVue mounts and registers
-    // an api. If lazy-mount lands later this will need to await a
-    // "registered" signal; for v3 eager-mount the api is available
-    // immediately after activate.
+    // Activate target first so its inner DockviewVue mounts and registers.
+    // Then await the registration via groupsStore.awaitInnerApi — replaces
+    // the old requestAnimationFrame guess that could leave the session
+    // pruned-but-not-added if the inner api wasn't yet bound (code-review
+    // finding 2026-05-27).
     activateGroup(targetGroupId);
-    // Yield one tick so the activate event propagates to the inner
-    // GroupPanel and Vue settles.
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-
-    const targetApi = groupsStore.innerApis[targetGroupId];
-    if (!targetApi) {
-      console.warn('[useGroupsActions] target inner api not registered after activate', targetGroupId);
+    let targetApi;
+    try {
+      targetApi = await groupsStore.awaitInnerApi(targetGroupId);
+    } catch (err) {
+      console.warn('[useGroupsActions] timed out waiting for target inner api', targetGroupId, err);
       return;
     }
 

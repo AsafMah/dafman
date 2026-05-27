@@ -27,7 +27,7 @@ import { registerBuiltinCommands } from '@/lib/registerBuiltinCommands';
 import { on as busOn } from '@/lib/bus';
 import { isActivityBarPanel } from '@/constants/panels';
 import { useBootLayout } from '@/lib/bootLayout';
-import { schedulePersist } from '@/lib/persistScheduler';
+import { schedulePersist, cancelPendingPersist } from '@/lib/persistScheduler';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 const clientStore = useClientStore();
@@ -113,6 +113,10 @@ function handleFocusSession({ sessionId }: { sessionId: string }): void {
 onBeforeUnmount(() => {
   offFocusSession?.();
   offFocusSession = null;
+  // Cancel any pending layout-persist debounce so it doesn't fire
+  // against a stale store after the component teardown (matters in
+  // HMR + test scenarios — code-review finding 2026-05-27).
+  cancelPendingPersist();
 });
 
 onMounted(async () => {

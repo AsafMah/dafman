@@ -182,10 +182,45 @@ export const useGroupsStore = defineStore('groups', () => {
 
   // ─── inner-api registry ─────────────────────────────────────────────
 
+  /// Pending awaiters for `awaitInnerApi`. Resolved by `registerInnerApi`
+  /// the moment the inner DockviewVue's @ready fires. Used by
+  /// `useGroupsActions.moveSessionToGroup` to avoid the
+  /// `requestAnimationFrame` timing assumption that broke when
+  /// activation didn't synchronously land the api.
+  const pendingApiAwaiters = new Map<string, Array<(api: DockviewApi) => void>>();
+
   function registerInnerApi(groupId: string, api: DockviewApi): void {
     innerApis.value = { ...innerApis.value, [groupId]: api };
-    // Restore any cached body now that the api exists. The caller
-    // (GroupPanel) will `api.fromJSON(...)` based on this cache.
+    // Resolve any awaiters that were waiting for this id.
+    const awaiters = pendingApiAwaiters.get(groupId);
+    if (awaiters) {
+      pendingApiAwaiters.delete(groupId);
+      for (const resolve of awaiters) resolve(api);
+    }
+  }
+
+  /// Returns a Promise that resolves with the inner api for `groupId`
+  /// once it's registered. If already registered, resolves on the next
+  /// microtask. Times out after `timeoutMs` (default 2 s) — exceeding
+  /// this means the GroupPanel either failed to mount or the group id
+  /// doesn't exist. Used by orchestration code (move-to-group) that
+  /// needs to add a panel into a freshly-activated group's inner.
+  function awaitInnerApi(groupId: string, timeoutMs = 2000): Promise<DockviewApi> {
+    const existing = innerApis.value[groupId];
+    if (existing) return Promise.resolve(existing);
+    return new Promise<DockviewApi>((resolve, reject) => {
+      const arr = pendingApiAwaiters.get(groupId) ?? [];
+      arr.push(resolve);
+      pendingApiAwaiters.set(groupId, arr);
+      setTimeout(() => {
+        const list = pendingApiAwaiters.get(groupId);
+        if (!list) return;
+        const idx = list.indexOf(resolve);
+        if (idx >= 0) list.splice(idx, 1);
+        if (list.length === 0) pendingApiAwaiters.delete(groupId);
+        reject(new Error(`awaitInnerApi(${groupId}): timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
   }
 
   function unregisterInnerApi(groupId: string): void {
@@ -359,6 +394,7 @@ export const useGroupsStore = defineStore('groups', () => {
     // inner-api registry
     registerInnerApi,
     unregisterInnerApi,
+    awaitInnerApi,
     recordInnerBodySnapshot,
     // CRUD
     createGroup,
