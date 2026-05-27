@@ -64,9 +64,13 @@ function onClick(event: MouseEvent): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  margin: 0 0.4rem;
+  /* Match GroupTab vertical placement so the + lines up with the
+   * other tabs' text/X centers. GroupTab uses height: calc(var(...)
+   * - 4px) and margin: 2px 4px 0 0; mirror that. */
+  height: calc(var(--dv-tabs-and-actions-container-height, 35px) - 4px);
+  width: calc(var(--dv-tabs-and-actions-container-height, 35px) - 4px);
+  margin: 2px 0 0 4px;
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;

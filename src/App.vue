@@ -467,7 +467,7 @@ function scheduleLayoutSave() {
           class="dock"
           watermark-component="watermark"
           default-tab-component="chatTab"
-          right-header-actions-component="groupsHeaderActions"
+          left-header-actions-component="groupsHeaderActions"
           @ready="onDockReady"
         />
       </div>
