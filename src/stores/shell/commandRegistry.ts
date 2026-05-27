@@ -63,6 +63,19 @@ export interface Command {
   /// Action. May return a promise; the palette closes optimistically
   /// before resolution, so async work runs in the background.
   run: () => void | Promise<void>;
+  /// Optional inline-children for sub-menu drill-down. When present:
+  ///   - The palette renders this row with a `›` (collapsed) / `⌄`
+  ///     (expanded) arrow and Enter toggles expansion instead of
+  ///     calling `run` (you can still provide `run` for keyboard-
+  ///     shortcut firing, but the palette UI ignores it for parents).
+  ///   - Children render INDENTED under the parent only when expanded.
+  ///   - Fuse search corpus on the parent includes every child's
+  ///     label + keywords, so typing a child name matches the parent
+  ///     row when collapsed; the parent then auto-expands on match.
+  ///   - Each child renders as its own `Command.Item` with its own
+  ///     `data-value` when the parent is expanded, so children
+  ///     participate independently in fuse filtering and selection.
+  children?: Command[];
 }
 
 export const useCommandRegistry = defineStore('commandRegistry', () => {

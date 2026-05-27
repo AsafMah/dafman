@@ -22,15 +22,16 @@ Legend:
 
 Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
-1. ⬜ **GitHub `#` mentions + Issues/PRs/Gists Library tabs** (G1) — small, leverages existing `MentionPlugin`
-2. ⬜ **Diff viewer: accept/reject hunks** — `ApplyPatchView.vue` is view-only today
-3. ⬜ **Multi-account + BYOK** (OS-keyring) — internal demand
-4. ⬜ **Projects model** — per-cwd settings overlay; unblocks per-session MCP overlay + per-project autopilot policy
-5. ⬜ **Command palette polish** — searchable sub-menus, every toggleable setting, prefix groups
+1. ⬜ **Configurable shortcut system** — user-flagged as the next priority after palette polish
+2. ⬜ **GitHub `#` mentions + Issues/PRs/Gists Library tabs** (G1) — small, leverages existing `MentionPlugin`
+3. ⬜ **Diff viewer: accept/reject hunks** — `ApplyPatchView.vue` is view-only today
+4. ⬜ **Multi-account + BYOK** (OS-keyring) — internal demand
+5. ⬜ **Projects model** — per-cwd settings overlay; unblocks per-session MCP overlay + per-project autopilot policy
 6. ⬜ **Plans API rendering panel** — SDK `rpc.plan.*` exists; no panel
 7. ⬜ **Memory backend** (SQLite-vec or LanceDB)
 8. ⬜ **Automations + scheduler** + HTTP hooks
-9. ⬜ **Real-Electrobun (CDP) harness, Tier-4** — drive the actual WebView2/WKWebView binary. Hard (no CDP debug ports exposed by default) and Tier-3 extension shipped 2026-05-27 already catches the v3 bug class; downranked.
+9. ⬜ **Cmd palette prefix syntax** (deferred from polish sprint — sub-menus + settings coverage shipped 2026-05-27)
+10. ⬜ **Real-Electrobun (CDP) harness, Tier-4** — drive the actual WebView2/WKWebView binary. Hard (no CDP debug ports exposed by default) and Tier-3 extension shipped 2026-05-27 already catches the v3 bug class; downranked.
 
 ---
 
@@ -161,18 +162,16 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
 | # | Item | Status | Effort | Notes |
 |---|---|---|---|---|
-| 1 | Cmd palette sub-menus searchable | ⬜ | 1 d | User-requested |
-| 2 | Every toggleable setting reachable from palette | 🟦 | 1 d | Many today; not all |
-| 3 | Prefix groups for cmd categories (display) | 🟦 | 0.5 d | `group` field present; no prefix display |
-| 4 | Configurable shortcut system | ⬜ | 2 d | User-requested |
-| 5 | Full search of sessions and content | ⬜ | 3 d | User-requested |
-| 6 | `/changelog` viewer | ⬜ | 0.5 d | |
-| 7 | `/instructions` toggle picker | ⬜ | 1 d | Library Instructions tab is read-only |
-| 8 | `/statusline` config | ⬜ | 1 d | StatusBar exists; no per-statusline config |
-| 9 | System prompt customize mode (10 named sections) | ⬜ | 2 d | |
-| 10 | Custom request headers per turn | ⬜ | 1 d | |
-| 11 | Model capabilities override | ⬜ | 1 d | |
-| 12 | Sub-agent streaming events toggle | ⬜ | 0.5 d | |
+| 1 | Cmd palette prefix syntax (`>` / `@` / `:` / `category:query`) | ⬜ | 0.5 d | Deferred from 2026-05-27 palette polish sprint; user chose to ship sub-menus + settings coverage first |
+| 2 | Configurable shortcut system | ⬜ | 2 d | User-requested; up next after palette polish |
+| 3 | Full search of sessions and content | ⬜ | 3 d | User-requested |
+| 4 | `/changelog` viewer | ⬜ | 0.5 d | |
+| 5 | `/instructions` toggle picker | ⬜ | 1 d | Library Instructions tab is read-only |
+| 6 | `/statusline` config | ⬜ | 1 d | StatusBar exists; no per-statusline config |
+| 7 | System prompt customize mode (10 named sections) | ⬜ | 2 d | |
+| 8 | Custom request headers per turn | ⬜ | 1 d | |
+| 9 | Model capabilities override | ⬜ | 1 d | |
+| 10 | Sub-agent streaming events toggle | ⬜ | 0.5 d | |
 
 ## Editor & power workspace
 

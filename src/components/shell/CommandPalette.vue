@@ -34,7 +34,7 @@
 //   be unscoped, and tests must clean teleported nodes between
 //   cases (see `__tests__/CommandPalette.test.ts` afterEach).
 
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Command } from 'vue-command-palette';
 import { useCommandRegistry, type Command as CommandDef } from '@/stores/shell/commandRegistry';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
@@ -50,15 +50,69 @@ let prevFocus: HTMLElement | null = null;
 
 const visibleCommands = computed(() => registry.visibleCommands);
 
+/// Parent ids the user has manually expanded. Cleared on every close
+/// so each palette session starts collapsed (a parent's children stay
+/// behind their arrow until you Enter or auto-expand-on-search lifts
+/// them). Use Set semantics so the render loop reads expanded? in O(1).
+const expanded = ref(new Set<string>());
+
+/// Live query, mirrored from the Command.Input. We can't get this
+/// directly from vue-command-palette's controlled input — the library
+/// owns its state — so we attach a delegated `input` listener on the
+/// dialog wrapper after mount. It's just a string used to decide
+/// "is the user actively searching?" for auto-expand.
+const query = ref('');
+
+watch(open, (next) => {
+  if (!next) {
+    expanded.value = new Set();
+    query.value = '';
+  }
+});
+
+function isParent(cmd: CommandDef): boolean {
+  return Array.isArray(cmd.children) && cmd.children.length > 0;
+}
+
+/// All commands flattened so a single value-to-command map covers both
+/// parents and their children. Used by `@select-item` to find the
+/// CommandDef from the row's data-value attribute. Parents AND children
+/// are searchable; the difference is whether `run` fires (children) or
+/// expansion toggles (parents).
 const valueToCommand = computed(() => {
   const map = new Map<string, CommandDef>();
-
   for (const cmd of visibleCommands.value) {
     map.set(searchValueFor(cmd), cmd);
+    if (isParent(cmd)) {
+      for (const child of cmd.children!) {
+        map.set(searchValueFor(child), child);
+      }
+    }
   }
-
   return map;
 });
+
+/// A parent should render expanded when EITHER:
+///   1. The user manually expanded it (in `expanded`), OR
+///   2. The query is non-empty AND at least one child label matches.
+/// This is the "auto-expand on search" UX.
+function shouldExpand(cmd: CommandDef): boolean {
+  if (expanded.value.has(cmd.id)) return true;
+  const q = query.value.trim().toLowerCase();
+  if (!q || !isParent(cmd)) return false;
+  for (const child of cmd.children!) {
+    if (child.label.toLowerCase().includes(q)) return true;
+    if (child.keywords?.some((k) => k.toLowerCase().includes(q))) return true;
+  }
+  return false;
+}
+
+function toggleExpanded(id: string): void {
+  const next = new Set(expanded.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expanded.value = next;
+}
 
 const grouped = computed(() => {
   const sections = new Map<string, CommandDef[]>();
@@ -134,9 +188,22 @@ function closePalette(): void {
 function onSelectItem(item: { key: string; value: string }): void {
   const cmd = valueToCommand.value.get(item.value);
 
-  closePalette();
+  if (!cmd) {
+    closePalette();
+    return;
+  }
 
-  if (!cmd) return;
+  // Parent rows: Enter / click toggles expansion in-place without
+  // closing the palette and without firing `run`. Selecting a child
+  // still goes through this same handler (children get their own
+  // data-value in `valueToCommand`) and falls through to the run
+  // branch below.
+  if (isParent(cmd)) {
+    toggleExpanded(cmd.id);
+    return;
+  }
+
+  closePalette();
 
   void nextTick(() => {
     try {
@@ -151,6 +218,17 @@ function onSelectItem(item: { key: string; value: string }): void {
       console.error(`[command palette] ${cmd.id} threw`, err);
     }
   });
+}
+
+/// Delegated input listener so we can mirror the library's input into
+/// `query` for the auto-expand check. The library doesn't expose
+/// v-model on Command.Input; we read the event.target.value instead.
+function onPaletteInput(e: Event): void {
+  const target = e.target as HTMLElement | null;
+  if (!target) return;
+  if (target.tagName !== 'INPUT') return;
+  if (!target.hasAttribute('command-input')) return;
+  query.value = (target as HTMLInputElement).value;
 }
 
 function onWindowClick(e: MouseEvent): void {
@@ -168,6 +246,7 @@ function onWindowClick(e: MouseEvent): void {
 useEventListener(window, 'keydown', onHotkey, true);
 useEventListener(window, 'keydown', onEscape, true);
 useEventListener(window, 'click', onWindowClick, true);
+useEventListener(window, 'input', onPaletteInput, true);
 </script>
 
 <template>
@@ -189,43 +268,94 @@ useEventListener(window, 'click', onWindowClick, true);
           :heading="heading"
           :data-group="heading"
         >
-          <Command.Item
+          <template
             v-for="cmd in items"
             :key="cmd.id"
-            :data-value="searchValueFor(cmd)"
-            :data-group="cmd.group ?? ''"
-            :shortcut="cmd.shortcut"
-            :style="cmd.accent ? { '--cmd-accent': cmd.accent } : {}"
-            :data-has-accent="cmd.accent ? 'true' : 'false'"
           >
-            <i
-              v-if="cmd.icon"
-              class="cmd-icon"
-              :class="cmd.icon"
-              aria-hidden="true"
-            />
-            <span
-              v-else
-              class="cmd-icon cmd-icon-empty"
-            />
-            <span class="cmd-label">{{ cmd.label }}</span>
-            <span
-              v-if="cmd.hint"
-              class="cmd-hint"
-              >{{ cmd.hint }}</span
+            <Command.Item
+              :data-value="searchValueFor(cmd)"
+              :data-group="cmd.group ?? ''"
+              :data-parent="isParent(cmd) ? 'true' : 'false'"
+              :data-expanded="isParent(cmd) && shouldExpand(cmd) ? 'true' : 'false'"
+              :shortcut="cmd.shortcut"
+              :style="cmd.accent ? { '--cmd-accent': cmd.accent } : {}"
+              :data-has-accent="cmd.accent ? 'true' : 'false'"
             >
-            <span
-              v-if="cmd.shortcut && cmd.shortcut.length > 0"
-              class="cmd-shortcut"
-              aria-label="Keyboard shortcut"
-            >
-              <kbd
-                v-for="(k, idx) in cmd.shortcut"
-                :key="idx"
-                >{{ k }}</kbd
+              <i
+                v-if="cmd.icon"
+                class="cmd-icon"
+                :class="cmd.icon"
+                aria-hidden="true"
+              />
+              <span
+                v-else
+                class="cmd-icon cmd-icon-empty"
+              />
+              <span class="cmd-label">{{ cmd.label }}</span>
+              <span
+                v-if="cmd.hint"
+                class="cmd-hint"
+                >{{ cmd.hint }}</span
               >
-            </span>
-          </Command.Item>
+              <span
+                v-if="cmd.shortcut && cmd.shortcut.length > 0"
+                class="cmd-shortcut"
+                aria-label="Keyboard shortcut"
+              >
+                <kbd
+                  v-for="(k, idx) in cmd.shortcut"
+                  :key="idx"
+                  >{{ k }}</kbd
+                >
+              </span>
+              <span
+                v-if="isParent(cmd)"
+                class="cmd-submenu-arrow"
+                :data-expanded="shouldExpand(cmd) ? 'true' : 'false'"
+                aria-hidden="true"
+              />
+            </Command.Item>
+            <template v-if="isParent(cmd) && shouldExpand(cmd)">
+              <Command.Item
+                v-for="child in cmd.children"
+                :key="child.id"
+                :data-value="searchValueFor(child)"
+                :data-group="cmd.group ?? ''"
+                :data-child="'true'"
+                :shortcut="child.shortcut"
+                :style="child.accent ? { '--cmd-accent': child.accent } : {}"
+                :data-has-accent="child.accent ? 'true' : 'false'"
+              >
+                <i
+                  v-if="child.icon"
+                  class="cmd-icon"
+                  :class="child.icon"
+                  aria-hidden="true"
+                />
+                <span
+                  v-else
+                  class="cmd-icon cmd-icon-empty"
+                />
+                <span class="cmd-label">{{ child.label }}</span>
+                <span
+                  v-if="child.hint"
+                  class="cmd-hint"
+                  >{{ child.hint }}</span
+                >
+                <span
+                  v-if="child.shortcut && child.shortcut.length > 0"
+                  class="cmd-shortcut"
+                  aria-label="Keyboard shortcut"
+                >
+                  <kbd
+                    v-for="(k, idx) in child.shortcut"
+                    :key="idx"
+                    >{{ k }}</kbd
+                  >
+                </span>
+              </Command.Item>
+            </template>
+          </template>
         </Command.Group>
 
         <template v-if="grouped.ungrouped.length > 0">
@@ -526,5 +656,52 @@ hr[command-separator=''] {
   border: none;
   border-top: 1px solid var(--p-content-border-color);
   margin: 0.4rem 0;
+}
+
+/* ----- Inline sub-menu support ----- */
+
+/* Parent indicator (›). Rotates to ⌄ when the parent is expanded. */
+.cmd-submenu-arrow {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-left: 0.35rem;
+  position: relative;
+  color: var(--p-text-muted-color);
+  transition: transform 120ms ease;
+}
+
+.cmd-submenu-arrow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translate(-25%, -50%) rotate(-45deg);
+  width: 0.45rem;
+  height: 0.45rem;
+  top: 50%;
+  left: 35%;
+}
+
+.cmd-submenu-arrow[data-expanded='true'] {
+  transform: rotate(90deg);
+}
+
+/* Children render indented under their parent. Smaller left-rail tint
+ * so they read as a nested group, not a peer row. */
+div[command-item=''][data-child='true'] {
+  padding-left: calc(2.6rem + 3px);
+  font-size: 0.88rem;
+}
+
+div[command-item=''][data-child='true'] .cmd-icon {
+  font-size: 0.85rem;
+}
+
+/* Parent row stays slightly bolder so the eye locks to it. */
+div[command-item=''][data-parent='true'] .cmd-label {
+  font-weight: 600;
 }
 </style>

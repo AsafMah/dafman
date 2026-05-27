@@ -61,6 +61,45 @@ describe('searchValueFor', () => {
     const b = searchValueFor({ id: 'b', label: 'Open Settings', run: () => {} });
     expect(a).not.toBe(b);
   });
+
+  test('parent with children folds child labels + keywords into the search corpus', () => {
+    const value = searchValueFor({
+      id: 'session.mode',
+      label: 'Run Mode',
+      run: () => {},
+      children: [
+        {
+          id: 'session.mode.interactive',
+          label: 'Interactive',
+          keywords: ['chat', 'manual'],
+          run: () => {},
+        },
+        { id: 'session.mode.plan', label: 'Plan', run: () => {} },
+        { id: 'session.mode.autopilot', label: 'Autopilot', keywords: ['auto'], run: () => {} },
+      ],
+    });
+    // Parent's own corpus
+    expect(value).toContain('Run Mode');
+    // Child labels — typing 'Plan' or 'Interactive' should match the
+    // parent row even when collapsed.
+    expect(value).toContain('Interactive');
+    expect(value).toContain('Plan');
+    expect(value).toContain('Autopilot');
+    // Child keywords flow up too.
+    expect(value).toContain('chat');
+    expect(value).toContain('manual');
+    expect(value).toContain('auto');
+  });
+
+  test('parent with empty children array does not crash and behaves like a leaf', () => {
+    const value = searchValueFor({
+      id: 'empty.parent',
+      label: 'Empty Parent',
+      children: [],
+      run: () => {},
+    });
+    expect(value).toBe('empty.parent Empty Parent');
+  });
 });
 
 describe('CommandPalette', () => {
@@ -195,5 +234,126 @@ describe('CommandPalette', () => {
     );
     expect(values.some((v) => v.includes('y.always'))).toBe(true);
     expect(values.some((v) => v.includes('y.never'))).toBe(false);
+  });
+
+  test('a parent renders the › arrow and starts collapsed (no children visible)', async () => {
+    const registry = useCommandRegistry();
+    registry.register({
+      id: 'p.parent',
+      label: 'Parent',
+      group: 'Demo',
+      run: () => {},
+      children: [
+        { id: 'p.parent.a', label: 'Alpha', run: () => {} },
+        { id: 'p.parent.b', label: 'Beta', run: () => {} },
+      ],
+    });
+
+    await mountOpenPalette();
+
+    // Parent row carries data-parent="true"; child rows carry data-child.
+    // Collapsed: parent row exists, children absent.
+    const parent = document.querySelector('[command-item][data-parent="true"]');
+    expect(parent).not.toBeNull();
+    expect(parent!.getAttribute('data-expanded')).toBe('false');
+
+    const childrenCollapsed = document.querySelectorAll('[command-item][data-child="true"]');
+    expect(childrenCollapsed.length).toBe(0);
+  });
+
+  test('Enter / click on a parent toggles expansion in-place without firing run()', async () => {
+    const registry = useCommandRegistry();
+    let parentRanCount = 0;
+    registry.register({
+      id: 'p2.parent',
+      label: 'Parent 2',
+      group: 'Demo',
+      run: () => {
+        parentRanCount++;
+      },
+      children: [{ id: 'p2.parent.x', label: 'X', run: () => {} }],
+    });
+
+    await mountOpenPalette();
+
+    const parent = document.querySelector(
+      '[command-item][data-parent="true"]',
+    ) as HTMLElement | null;
+    expect(parent).not.toBeNull();
+
+    await fireEvent.click(parent!);
+    await nextTick();
+    await nextTick();
+
+    // Parent's run() must NOT have fired — Enter on a parent toggles expansion.
+    expect(parentRanCount).toBe(0);
+    // Children visible now.
+    const childrenAfter = document.querySelectorAll('[command-item][data-child="true"]');
+    expect(childrenAfter.length).toBe(1);
+    expect(parent!.getAttribute('data-expanded')).toBe('true');
+
+    // Clicking the parent again collapses.
+    await fireEvent.click(parent!);
+    await nextTick();
+    await nextTick();
+    expect(document.querySelectorAll('[command-item][data-child="true"]').length).toBe(0);
+    expect(parent!.getAttribute('data-expanded')).toBe('false');
+  });
+
+  test('selecting a child fires its run() (not the parent\'s)', async () => {
+    const registry = useCommandRegistry();
+    let parentRan = false;
+    let childRan: string | null = null as string | null;
+    function setChildRan(name: string): void {
+      childRan = name;
+    }
+    registry.register({
+      id: 'p3.parent',
+      label: 'Parent 3',
+      group: 'Demo',
+      run: () => {
+        parentRan = true;
+      },
+      children: [
+        {
+          id: 'p3.parent.alpha',
+          label: 'Alpha',
+          run: () => {
+            setChildRan('alpha');
+          },
+        },
+        {
+          id: 'p3.parent.beta',
+          label: 'Beta',
+          run: () => {
+            setChildRan('beta');
+          },
+        },
+      ],
+    });
+
+    await mountOpenPalette();
+
+    // Expand the parent first.
+    const parent = document.querySelector(
+      '[command-item][data-parent="true"]',
+    ) as HTMLElement | null;
+    expect(parent).not.toBeNull();
+    await fireEvent.click(parent!);
+    await nextTick();
+
+    // Click the Beta child.
+    const beta = Array.from(
+      document.querySelectorAll('[command-item][data-child="true"]'),
+    ).find((el) => (el.getAttribute('data-value') ?? '').includes('p3.parent.beta')) as
+      | HTMLElement
+      | undefined;
+    expect(beta).toBeTruthy();
+    await fireEvent.click(beta!);
+    await nextTick();
+    await nextTick();
+
+    expect(childRan).toBe('beta');
+    expect(parentRan).toBe(false);
   });
 });

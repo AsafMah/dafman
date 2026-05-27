@@ -24,5 +24,20 @@ export function searchValueFor(cmd: Command): string {
 
   if (cmd.keywords && cmd.keywords.length > 0) parts.push(...cmd.keywords);
 
+  // Sub-menu support: when a parent has children, fold their labels +
+  // keywords into the parent's fuse corpus so a query that matches a
+  // child name highlights the parent row even when it's collapsed.
+  // The palette then auto-expands the parent so the user sees the
+  // child hit directly (CommandPalette.vue handles the auto-expand
+  // based on a separate child-match check).
+  if (cmd.children && cmd.children.length > 0) {
+    for (const child of cmd.children) {
+      parts.push(child.label);
+      if (child.keywords && child.keywords.length > 0) {
+        parts.push(...child.keywords);
+      }
+    }
+  }
+
   return parts.join(' ');
 }
