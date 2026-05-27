@@ -141,14 +141,18 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
 | # | Item | Status | Effort | Notes |
 |---|---|---|---|---|
-| 1 | Skills as `/skill-name` slash typeahead | ⬜ | 1 d | Local-commands path exists; SDK skills not routed |
-| 2 | Agents / fleets full panel | 🟦 | 2 d | Picker + sub-agent block exist; no fleet panel |
-| 3 | Scheduled prompts (cron) | ⬜ | 2 d | None today |
-| 4 | File / time / manual / webhook triggers | ⬜ | 3 d | |
-| 5 | Activity feed (Settings → Activity) | ⬜ | 1 d | |
-| 6 | Quiet hours / batching / digest | ⬜ | 1 d | Notifications polish |
-| 7 | Background task notifications | ⬜ | 0.5 d | |
-| 8 | `/research`, `/init`, `/review`, `/delegate` | ⬜ | — | |
+| 1 | **`/agent <name>` actually selects the agent** | ⬜ | 1 d | User-flagged 2026-05-27. Today `/agent` just opens the Library Agents tab (`sessionCommands.ts:136-143`). No autocomplete on agent names, no parameter handling, no actual selection. MANUAL_TESTS.md:1110 already documents this. Needs: typeahead listing agents from `rpc.agent.list`; on Enter, call `rpc.agent.select(sessionId, name)`. |
+| 2 | **`/skill <name>` actually runs the skill** | ⬜ | 1 d | Same shape as above. Today `/skill` / `/skills` just open the Library Skills tab. Needs: typeahead from `rpc.skills.list`; on Enter, invoke the skill in the active session. Pairs with item 4 below ("Skills as `/skill-name` slash typeahead"). |
+| 3 | **`/mcp <server>` operations** | ⬜ | 1 d | Today `/mcp` just opens the Library MCP tab. Need to scope: maybe `/mcp enable <server>` / `/mcp disable <server>` / `/mcp restart <server>` per server. Or just kill the slash if Library tab is the right UX. Decide in spec interview. |
+| 4 | **"Select" button in LibraryAgentsTab to actually choose an agent** | ⬜ | 0.5 d | User-flagged 2026-05-27. `LibraryAgentsTab.vue` has reveal / edit / delete buttons but NO Select button. Even on the agents screen the user can't choose one. Needs: per-row Select button that calls `rpc.agent.select(sessionId, name)`; visual indicator of currently-selected agent (highlighted row or chip). |
+| 5 | Skills as `/skill-name` slash typeahead | ⬜ | 1 d | Local-commands path exists; SDK skills not routed |
+| 6 | Agents / fleets full panel | 🟦 | 2 d | Picker + sub-agent block exist; no fleet panel |
+| 7 | Scheduled prompts (cron) | ⬜ | 2 d | None today |
+| 8 | File / time / manual / webhook triggers | ⬜ | 3 d | |
+| 9 | Activity feed (Settings → Activity) | ⬜ | 1 d | |
+| 10 | Quiet hours / batching / digest | ⬜ | 1 d | Notifications polish |
+| 11 | Background task notifications | ⬜ | 0.5 d | |
+| 12 | `/research`, `/init`, `/review`, `/delegate` | ⬜ | — | |
 
 ## Autopilot
 
@@ -231,6 +235,24 @@ History in `_archive/plan-tech-debt.prompt.md`.
 | 3 | `enqueuePending` silent cancel on emit failure (U5) | ⏸️ deferred | Rubber-duck confirmed current shape is correct |
 | 4 | Dev-only suspicious deps (D3) | flag-only | |
 | 5 | Native Go type-checker (typescript-go) (D4) | ⏳ upstream | |
+
+## User-reported manual-test bugs (2026-05-27 sweep of MANUAL_TESTS.md notes)
+
+These are issues the user has manually verified during dogfooding and embedded as
+`Note:` lines in `MANUAL_TESTS.md`. They are real, reproducible bugs — not hypotheticals.
+
+| # | Item | Status | Effort | Receipt in MANUAL_TESTS.md |
+|---|---|---|---|---|
+| 1 | Jobs panel spinner orbits a center point (visual jank); Go-to-session scrolls to top instead of the relevant message | ⬜ | 1 d | line 293-295 |
+| 2 | Plan-mode toggle doesn't actually switch to plan mode | ⬜ | 1 d | line 375 |
+| 3 | Skills tab doesn't recognize skills from `.github/skills` | ⬜ | 1 d | line 706 |
+| 4 | MCP **HTTP transport / OAuth** UI: "No such option" — the Sign-in / HTTP transport form doesn't render | ⬜ | 1 d | line 781 |
+| 5 | Toggling **discovered MCPs** doesn't persist / do anything; discovered servers should be editable / deletable / show location | ⬜ | 1 d | line 797-798 |
+| 6 | Removing a configured MCP "jumps to discovered" — confusing UX | ⬜ | 0.5 d | line 805 |
+| 7 | **No Sign-in button at all** on configured HTTP MCP servers | ⬜ | 0.5 d | line 812 |
+| 8 | Agent card missing an **Edit button** (only reveal / delete) | ⬜ | 0.5 d | line 1100 |
+| 9 | Pressing Tab on the `/fleet` slash menu should insert into composer (so you can add the description), not commit immediately | ⬜ | 0.5 d | line 1196 |
+| 10 | Sub-agent block emits raw `<system_notification>` text instead of parsed events into the nested card | ⬜ | 1 d | line 1205-1210 |
 
 ## Open product questions
 
