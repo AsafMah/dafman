@@ -1097,7 +1097,7 @@ The picker only lets you pick a folder, no files visible.
    - **Steps:** drop a markdown file at `~/.copilot/agents/reviewer.agent.md` with frontmatter `--- description: Reviews PRs ---` and body `You are a strict code reviewer.`. Click Reload from disk in the rail's Agents section. Click Select on the reviewer row.
    - **Expected:** header gets a new pill next to the workspace chip showing `reviewer` (or `displayName` if set). Clicking Deselect hides the chip.
    - **Why not automated:** filesystem + SDK discovery + reactive header chip across the full Electrobun → bun → renderer chain.
-Note: should have an edit button
+Note: should have an edit button (Select button added 2026-05-27; row shows "Selected" chip + Deselect button when the agent is current. Edit still pending — coupled to a YAML-safe round-trip task.)
 2. V **Project vs User source badge derives from path correctly.**
    - **Steps:** put one agent under `~/.copilot/agents/` and another under `<workspace>/.github/agents/`. Open the rail.
    - **Expected:** the user one shows `USER` tag, the project one shows `PROJECT`. Tooltip on the tag shows the absolute path.

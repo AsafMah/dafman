@@ -18,6 +18,20 @@ Legend:
 
 ---
 
+## By User (unsorted)
+
+- The instructions markdown doesn't support darkmode
+- The instructions should support creating and editing
+- No refresh button on agents
+- Many tools (especially sub-agent related one such as task, read agent, report_intent, powershell, ask_user (After the ask - in history)) don't have nice ui
+- I think we should use the library to set mcp/tools/skills/agents/instructions things for the session, instead of duplicating it with the session settings (need to think about design)
+- Sessions may resume with the agent "thinking..." and never get resolved
+- Bottom bar resizing is ruined again, probably because you brought the modes icon back, but not the small select version on small sizes
+- Background tasks in sessions looks worse and is less useful than library
+- Collpased menus, in general, should use the space to display something useful
+- Probably need chip + selector for agent in the bottom bar
+- 
+
 ## Top of stack (recommended next sprints)
 
 Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
@@ -144,7 +158,7 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 | 1 | **`/agent <name>` actually selects the agent** | ⬜ | 1 d | User-flagged 2026-05-27. Today `/agent` just opens the Library Agents tab (`sessionCommands.ts:136-143`). No autocomplete on agent names, no parameter handling, no actual selection. MANUAL_TESTS.md:1110 already documents this. Needs: typeahead listing agents from `rpc.agent.list`; on Enter, call `rpc.agent.select(sessionId, name)`. |
 | 2 | **`/skill <name>` actually runs the skill** | ⬜ | 1 d | Same shape as above. Today `/skill` / `/skills` just open the Library Skills tab. Needs: typeahead from `rpc.skills.list`; on Enter, invoke the skill in the active session. Pairs with item 4 below ("Skills as `/skill-name` slash typeahead"). |
 | 3 | **`/mcp <server>` operations** | ⬜ | 1 d | Today `/mcp` just opens the Library MCP tab. Need to scope: maybe `/mcp enable <server>` / `/mcp disable <server>` / `/mcp restart <server>` per server. Or just kill the slash if Library tab is the right UX. Decide in spec interview. |
-| 4 | **"Select" button in LibraryAgentsTab to actually choose an agent** | ⬜ | 0.5 d | User-flagged 2026-05-27. `LibraryAgentsTab.vue` has reveal / edit / delete buttons but NO Select button. Even on the agents screen the user can't choose one. Needs: per-row Select button that calls `rpc.agent.select(sessionId, name)`; visual indicator of currently-selected agent (highlighted row or chip). |
+| 4 | ~~"Select" button in LibraryAgentsTab~~ | ✅ | — | Shipped (commit pending). Per-row Select/Deselect button + "Selected" chip + left-rail accent on the current agent. Reuses `useSessionAgents` so state stays in sync with `SessionDetailsPanel`. |
 | 5 | Skills as `/skill-name` slash typeahead | ⬜ | 1 d | Local-commands path exists; SDK skills not routed |
 | 6 | Agents / fleets full panel | 🟦 | 2 d | Picker + sub-agent block exist; no fleet panel |
 | 7 | Scheduled prompts (cron) | ⬜ | 2 d | None today |

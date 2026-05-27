@@ -25,6 +25,7 @@ import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
 import { useAgentsLibrary } from '@/composables/library/useAgentsLibrary';
+import { useSessionAgents } from '@/components/session/details/useSessionAgents';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -50,6 +51,31 @@ const {
   write: writeAgent,
   remove: deleteAgent,
 } = useAgentsLibrary();
+
+/// Agent select/deselect surface. Reuses the same composable that
+/// drives `SessionDetailsPanel`'s agent list, so the current-agent
+/// chip + busy state stay in sync between the two views — selecting
+/// from Library reflects in the rail and vice versa.
+const sessionIdRef = computed(() => activeSession.value?.id ?? '');
+const recordRef = computed(() => activeSession.value ?? undefined);
+const { selectAgent: selectSessionAgent, deselectAgent, agentBusyName } = useSessionAgents(
+  sessionIdRef,
+  recordRef,
+);
+/// Name of the currently-selected agent for the active session, or
+/// null if no session / no agent. Drives the row chip + the
+/// Select/Deselect button toggle.
+const currentAgentName = computed<string | null>(() => {
+  const session = activeSession.value;
+  if (!session) return null;
+  return (session as { currentAgent?: { name?: string } | null }).currentAgent?.name ?? null;
+});
+async function onSelect(name: string) {
+  await selectSessionAgent(name);
+}
+async function onDeselect() {
+  await deselectAgent();
+}
 
 async function load() {
   await loadFiles(activeSession.value?.id);
@@ -266,6 +292,7 @@ async function reveal(path: string) {
           v-for="entry in grouped.project"
           :key="`p:${entry.name}`"
           class="agent-row"
+          :class="{ 'agent-row-selected': currentAgentName === entry.name }"
         >
           <div class="agent-line">
             <span class="agent-name">{{ entry.name }}</span>
@@ -276,6 +303,13 @@ async function reveal(path: string) {
             >
               .md
             </small>
+            <span
+              v-if="currentAgentName === entry.name"
+              class="agent-current-chip"
+              :title="`This agent is selected for the active session`"
+            >
+              Selected
+            </span>
           </div>
           <div
             class="agent-path"
@@ -284,6 +318,25 @@ async function reveal(path: string) {
             {{ entry.path }}
           </div>
           <div class="agent-actions">
+            <Button
+              v-if="currentAgentName === entry.name"
+              size="small"
+              severity="secondary"
+              :loading="agentBusyName === '__deselect__'"
+              :disabled="!activeSession || !!agentBusyName"
+              label="Deselect"
+              :aria-label="`Deselect agent ${entry.name}`"
+              @click="onDeselect"
+            />
+            <Button
+              v-else
+              size="small"
+              :loading="agentBusyName === entry.name"
+              :disabled="!activeSession || !!agentBusyName"
+              label="Select"
+              :aria-label="`Select agent ${entry.name}`"
+              @click="onSelect(entry.name)"
+            />
             <Button
               size="small"
               text
@@ -315,6 +368,7 @@ async function reveal(path: string) {
           v-for="entry in grouped.user"
           :key="`u:${entry.name}`"
           class="agent-row"
+          :class="{ 'agent-row-selected': currentAgentName === entry.name }"
         >
           <div class="agent-line">
             <span class="agent-name">{{ entry.name }}</span>
@@ -325,6 +379,13 @@ async function reveal(path: string) {
             >
               .md
             </small>
+            <span
+              v-if="currentAgentName === entry.name"
+              class="agent-current-chip"
+              :title="`This agent is selected for the active session`"
+            >
+              Selected
+            </span>
           </div>
           <div
             class="agent-path"
@@ -333,6 +394,25 @@ async function reveal(path: string) {
             {{ entry.path }}
           </div>
           <div class="agent-actions">
+            <Button
+              v-if="currentAgentName === entry.name"
+              size="small"
+              severity="secondary"
+              :loading="agentBusyName === '__deselect__'"
+              :disabled="!activeSession || !!agentBusyName"
+              label="Deselect"
+              :aria-label="`Deselect agent ${entry.name}`"
+              @click="onDeselect"
+            />
+            <Button
+              v-else
+              size="small"
+              :loading="agentBusyName === entry.name"
+              :disabled="!activeSession || !!agentBusyName"
+              label="Select"
+              :aria-label="`Select agent ${entry.name}`"
+              @click="onSelect(entry.name)"
+            />
             <Button
               size="small"
               text
@@ -575,6 +655,26 @@ async function reveal(path: string) {
   background: color-mix(in srgb, var(--p-content-hover-background) 25%, transparent);
   min-width: 0;
   align-items: center;
+  border-left: 3px solid transparent;
+}
+
+/* Selected agent gets a tinted left rail in the primary color so the
+ * row reads as "this is the active one" at a glance, matching the
+ * palette's selected-item visual language. */
+.agent-row-selected {
+  border-left-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
+}
+
+.agent-current-chip {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.4rem;
+  background: color-mix(in srgb, var(--p-primary-color) 22%, transparent);
+  color: var(--p-primary-color);
+  border-radius: 0.25rem;
+  font-weight: 600;
 }
 
 .agent-line {
