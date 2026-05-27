@@ -504,6 +504,23 @@ See [`AGENTS.md`](AGENTS.md). Highlights:
 Kept here so the next agent can quickly orient on what shipped recently
 without grepping `DEVLOG.md`. One-liner per item.
 
+- **2026-05-27** — **Groups v3 (nested DockviewVue per workspace group) shipped**
+  (`9b9cf11` → `4e27d43`, 11 commits). Outer dockview owns activity bar +
+  one group-panel per group; each `GroupPanel.vue` renders its own inner
+  `<DockviewVue>` for that group's chat/terminal/playground panels.
+  ChatPanel state (Lexical / scroll / composer) preserved across group
+  switches because dockview toggles visibility:hidden — no remount.
+  v2→v3 migration in `groupsStore.hydrate`. Cache-first
+  `composePersistLayout`. One-only invariant via `pruneSessionFromAllGroups`.
+  Per-inner `onDidLayoutChange` → `schedulePersist` (the bug that made
+  "restart didn't load the data" on the first try). Code-review pass
+  closed 5 issues including a `requestAnimationFrame` race replaced with
+  `awaitInnerApi`. New TUI helpers shipped: `bun run inspect`,
+  `tools/probe-groups-bugs.ts`, `window.__DAFMAN_TEST__`. 667 tests
+  (+5 from `useGroupsActions.test.ts`). Owed: Phase 26 manual checks
+  (10 items in `MANUAL_TESTS.md`). v3.1 polish queued in
+  `plan-backlog-audit.prompt.md` §G4.
+
 - **2026-05-26 (sprint close)** — **v2 activity-rail refactor finalized**
   (8 commits, `e39bdc9` → `936bbd3`). v1's custom `ActivityBar.vue` +
   `ActivityButton.vue` (~410 LOC) deleted in favor of dockview's native

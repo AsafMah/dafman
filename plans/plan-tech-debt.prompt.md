@@ -244,3 +244,22 @@ Below is the ordering that was followed for the Phase 21 burn-down
 3. **A3** — extract `SkillsRegistry`. ✅ (21a.3 / `075bb09`)
 4. **S1-S5** — SessionRegistry correctness. ✅ (21b / `687d05b`)
 5. **T3 + U1/U2/U3/U6/U7/U8** — type / UX / perf nits. ✅ (21c / `b7014dc`)
+
+
+---
+
+## 2026-05-27 additions (Groups v3 sprint + code-review pass)
+
+### Pending small cleanups
+- **Drop legacy settingsStore.persistLayout(dockview: unknown).** Kept for back-compat during the v2->v3 transition; no callers in v3 (everything routes through persistGroupedLayout(layout) via composePersistLayout). ~10 LOC removal + 1 settings test update.
+- **irstBodyGroupId() / irstBodyGroupIdOf(dock) duplication.** Already a thin wrapper, not duplicated logic, but the dual API is a smell — future risk that a new caller picks the wrong variant. Could be collapsed by removing the no-arg form and making callers pass the api explicitly.
+- **Outer `fromJSON` vs Vue unmount race in `GroupPanel.vue`.** Code-review pass (commit `4e27d43`) deferred this. Current `onBeforeUnmount` disposes subscriptions then unregisters the inner api; if dockview tears down panels synchronously *before* Vue's lifecycle runs (programmatic `outer.fromJSON`), the subscriptions could fire on partially-torn-down state. Acceptable for the common path; revisit if it surfaces.
+
+### New DX tools to document elsewhere
+The following are shipped but should be cross-referenced from `ARCHITECTURE.md` so they don't get re-invented:
+- `bun run inspect` — Playwright + CDP live-app introspection. Diagnostic ladder rung 3.
+- `tools/probe-*.ts` pattern — between smoke and full-E2E for "reproduce a user bug deterministically".
+- `window.__DAFMAN_TEST__` — production gated test hook (smoke-only).
+
+### Perf budgets to codify
+Plan documented a 130 ms boot budget for groups v3; no enforcement. `plan-observability` mentions "perf budgets in Playwright" generically. Action: add a smoke assertion that records `performance.timing.domContentLoadedEventEnd - navigationStart` and fails the run when over budget. Acts as both a regression gate AND a metric history (Playwright trace archive).

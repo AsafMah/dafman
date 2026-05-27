@@ -534,3 +534,76 @@ Pick from here when planning future work.
 ### External integrations
 - **GitHub**: issues list, pull request list
 - **Azure DevOps**: work items, pull requests
+
+---
+
+## G. Items surfaced 2026-05-27 audit (Groups v3 sprint + GitHub-CLI deep dive)
+
+Items discussed during the v3 groups sprint and the GitHub-integration investigation that weren't yet captured anywhere.
+
+### G1. GitHub references in composer + Issues/PRs/Gists tabs
+- **`#1234` autocomplete** in the composer, parallel to the existing `@file`/`@folder` mention. Walks back from cursor on `#` trigger, calls GitHub `searchIssuesAndPullRequests` (graphql), inserts inline AND adds a `SendAttachmentGithubReference` (the SDK schema type already supports `issue` / `pr` / `discussion` — verified in `api.schema.json`). Outgoing payload wraps refs in `<github_references>` XML envelope so the model sees structured context (matches what the Copilot CLI does at `app.js:4820`).
+- **Tabs in the Sessions sidebar (or a new sidebar): Issues, Pull requests, Gists.** Mirrors the CLI's tab structure (`app.js:6453`). Issues/PRs use `octokit.graphql` `listIssuesPage(owner, name, { perPage, includeInvolved })`. Gists work outside-repo too. Discussions: schema-supported as an attachment shape but the CLI doesn't surface a discussion picker either; defer.
+- **`/share gist`** slash command — `POST /gists` with `description`, `public: false`, `files: { session.md: content }`. CLI does this at `app.js:1312`; we have `/export Markdown` and `/export JSON` already; gist is the third surface. Falls back to local file on GHE Cloud (data residency).
+
+**Effort:** `#` autocomplete + 1 tab (Issues) ~2 d. Full 3 tabs + gists ~4 d.
+**Routes via:** the auto-managed `github` MCP server already authed in every session, OR direct octokit (need to add `@octokit/rest`).
+**Status:** user said "keep for later". Not started.
+
+### G2. Auth surface
+- **`session.auth.getStatus` chip in StatusBar / SessionDetails.** Shows `@login on host (gh-cli)` + plan tier. Read-only — RPC already exists.
+- **Per-session BYOK via `session.auth.setCredentials`.** Settings form to install a `TokenAuthInfo` / `ApiKeyAuthInfo` / `EnvAuthInfo` on a specific session. Slots into Phase 27 (Multi-account + provider) but doesn't depend on the full multi-account UI to be useful in isolation.
+
+**Effort:** 0.5 d for the chip; 1 d for the form. **Status:** not started.
+
+### G3. Remote sessions (attach to Copilot Coding Agent runs)
+- **`sessions.connect({ sessionId })`** attaches the local SDK to an existing remote session running in GitHub Actions (Copilot Coding Agent), exposes it as a normal SDK session. Each remote has `repository: { owner, name, branch }`, `pullRequestNumber`, `taskType: 'cca' | 'cli'`, `staleAt` for expiration.
+- **`session.remote.enable({ mode: 'off' | 'export' | 'on' })`** — `export` streams events to GitHub for visibility; `on` enables remote steering (you can pause/abort the cloud agent from dafman).
+- **UI:** PR-linked sessions could appear in the Sessions Manager with a cloud icon; clicking attaches.
+
+**Effort:** ~3 d for read-only attach; +2 d for steering + abort. **Status:** not started. Distinct from B8's `/delegate to Copilot coding agent` which is the spawn direction.
+
+### G4. Groups v3.1 polish
+- **Right-click "Move to group…" menu** on chat tabs (`useGroupsActions.moveSessionToGroup` already wired + tested; menu UI ~80 LOC).
+- **Tab rename inline (dblclick) + color picker (right-click ContextMenu).** Plan called for them; Phase 4 of v3 plan deferred. ~150 LOC.
+- **Native cross-group drag** via `onUnhandledDragOverEvent` + `onDidDrop` (dockview doesn't move panels across separate DockviewComponent instances natively; needs custom drop handling). ~80 LOC.
+- **Lazy-mount placeholder** for inactive group panels (eager today; revisit only if boot regresses past 130 ms gate).
+
+**Effort:** ~1 d for the first three. **Status:** v3 ship-complete; these are polish.
+
+### G5. Owed verification + small cleanups
+- **Phase 26 manual tests** — 10 items in `MANUAL_TESTS.md`, most importantly item #2 (v2→v3 migration on real user data). Not yet verified.
+- **Drop legacy `settingsStore.persistLayout(dockview)`** — no callers in v3; kept for back-compat during transition. ~10 LOC.
+- **Boot-cost regression check** — v3 may have crossed the 130 ms gate from the original plan. One log-line measurement.
+
+### G6. DX tooling shipped this sprint
+Worth tracking so the next agent uses them:
+- **`bun run inspect <selector> [--rules] [--eval] [--rpc-stub] [--url]`** — Playwright + CDP attach to live app. Rung 3 of the diagnostic ladder (after `ide_search_text`, `ide_diagnostics`).
+- **`tools/probe-groups-bugs.ts`** — one-off bug-hunt probe pattern. Mid-tier between smoke (~1 s) and the real-Electrobun E2E (not yet built). Useful template for any future "reproduce a user bug deterministically" task.
+- **`window.__DAFMAN_TEST__`** — production gated test hook. Exposes `runCommand(id)`, `addPanel(sessionId)`, `getState()` only when `window.__DAFMAN_TEST_RPC__` is also installed (smoke-only gate). Production renderers never see this surface.
+- **Smoke screenshot pattern** — `page.screenshot({ path: 'test-results/...', fullPage: true })` after each assertion checkpoint. Visual evidence of every smoke run preserved alongside the trace.
+
+### G7. Real-DockviewComponent test harness
+Rubber-duck recommended this as mandatory for any test that exercises dockview state. Partially used in `layoutSanitize` tests (real-fromJSON round-trip via jsdom). NOT yet used in groupsStore / useGroupsActions tests (those still use minimal fakes). **Risk:** the same class of bug the user found ("session goes nowhere", "sessions don't persist") could pass a fake-based test and break at runtime — exactly the v1/v2 failure mode.
+
+**Action:** establish "tier 2" tests for v3 surfaces that mount a real `DockviewComponent` in a jsdom container. The `composePersistLayout` test pattern is the template.
+
+### G8. Upstream dockview issues
+Filed `mathuo/dockview#1305` (dynamic edge-group constraints) + `#1306` (vertical split of edge groups). No work needed on our side until upstream responds; track here so we remember to revisit if they merge.
+
+### G9. Outer-fromJSON vs Vue unmount teardown race
+Code-review pass (commit `4e27d43`) deferred this. The current `GroupPanel.onBeforeUnmount` disposes subscriptions then unregisters the inner api. If `outer.fromJSON` tears down panels synchronously before Vue's lifecycle runs, the subscriptions could fire on partially-torn-down state. Acceptable for the common path (user-driven group delete via the X button). Revisit if it surfaces.
+
+### G10. Test gaps
+- `boundingBox()` dimension assertions in smoke (deferred — ResizeObserver timing in headless chromium too flaky).
+- Settings round-trip E2E (B10 + STATUS audit M3 row).
+- Layout-restore E2E (B10).
+- Log-viewer tail E2E (B10).
+- A11y axe-core integration (B10 + Phase 36 + STATUS audit cross-cutting).
+
+---
+
+## H. Things that ARE in the code today but were never properly documented
+
+- **`?autosession=1` URL param** (`src/App.vue:265`) — auto-creates a session at boot if none exist. Used by the E2E harness; production users can also trigger it. Worth documenting as a debugging affordance.
+- **Diagnostic ladder** (rungs 1–5: `ide_search_text` → `ide_diagnostics` → `bun run inspect` → `pwtest probe` → JetBrains debugger). Lives in personal Copilot instructions; should be in `AGENTS.md` proper so it survives across agents.

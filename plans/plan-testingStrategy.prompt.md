@@ -141,3 +141,25 @@ Tracked via:
 - Snapshots reviewed in PRs; updated via explicit script, never auto.
 
 
+
+---
+
+## 2026-05-27 additions
+
+### Real-DockviewComponent harness (cross-reference plan-e2e.prompt.md)
+
+For tests that exercise dockview state (group switching, panel add/remove, fromJSON round-trip), prefer a real `DockviewComponent` mounted in jsdom over `as unknown as DockviewApi` fakes. The current `layoutSanitize` and `composePersistLayout` tests use this pattern. The groups v3 store tests do not yet, which is why several user-found bugs (sessions going nowhere, persist never firing) shipped through smoke + unit tests clean.
+
+### Smoke screenshot pattern
+
+Smoke now saves `test-results/groups-v3-{variant}.png` and `test-results/groups-v3-{variant}-2groups.png` after key assertion checkpoints. Visual evidence is preserved with every smoke run alongside the trace zip. Pattern: after the structural assertions complete + 500 ms settle, call `page.screenshot({ path: ..., fullPage: true })`. Inspect via `view test-results/...png` from Copilot CLI.
+
+### The `__DAFMAN_TEST__` window hook
+
+Production-gated test surface in `src/main.ts`. Exposed ONLY when `window.__DAFMAN_TEST_RPC__` is also installed (same smoke gate). Provides:
+
+- `runCommand(id: string)` — invokes a command palette entry by id without simulating keyboard input.
+- `addPanel(sessionId: string)` — calls `layoutStore.addPanel` directly.
+- `getState()` — dumps `{ activeGroupId, groups, innerApiCount, outerPanelIds, bodyApiPanelIds }` for diagnostics.
+
+Production renderers (no test RPC stub installed) never see this surface. Used by `e2e/smoke.pwtest.ts` and `tools/probe-groups-bugs.ts`.

@@ -217,3 +217,35 @@ I'm adding these to AGENTS.md rule #4.
   pass. Real CLI as opt-in tier later.
 - **Local-only initially.** No `GH_TOKEN` secret in CI until real-
   CLI tier lands.
+
+---
+
+## 2026-05-27 additions (Groups v3 sprint)
+
+### Probe tier — between smoke and full E2E
+
+A new pattern emerged during the groups v3 sprint: targeted Playwright probes written as one-off Node scripts (`tools/probe-*.ts`) that drive a running `vite preview` instance via the same `window.__DAFMAN_TEST_RPC__` stub the smoke uses. Differs from smoke in three ways:
+
+1. **Per-bug, not per-feature.** Smoke proves the bundle boots; a probe proves a *specific user-reported bug* is fixed.
+2. **Drives the app via `window.__DAFMAN_TEST__`** (commands + addPanel + store-state dump). Lets the probe exercise state transitions without simulating keyboard / mouse.
+3. **Throwaway by convention.** Each probe is committed alongside the fix and kept as a regression artifact; the next bug gets a new probe rather than extending the old one.
+
+Reference: `tools/probe-groups-bugs.ts` (commit `17b2123` → `e0de0b8`). Caught 4 user-reported bugs in v3 that smoke + unit tests had passed clean.
+
+**When to write a probe:**
+
+- User reports a concrete behavior bug (e.g. "sessions go nowhere", "restart didn't load the data").
+- The bug shape is hard to express as a fake-DockviewApi unit test.
+- Smoke is too coarse — passes structurally but misses semantic issues.
+
+**When NOT to write a probe:**
+
+- The bug is a unit-testable invariant (use a unit test against `groupsStore` / `composePersistLayout` etc.).
+- The bug is purely visual / responsive (use `bun run inspect` ad hoc instead).
+- The full real-Electrobun E2E tier finally lands and covers the same path.
+
+### Real-DockviewComponent test harness (mandatory for v3 surface)
+
+Rubber-duck pre-implementation pass (2026-05-27) flagged: any test that exercises dockview state SHOULD mount a real `DockviewComponent` in a jsdom container instead of using `as unknown as DockviewApi` fakes. Pattern already established in `src/lib/__tests__/composePersistLayout.test.ts` — feeds helper outputs through `new DockviewComponent({...}).fromJSON(out)` and asserts no throw.
+
+Currently the v3 stores (`groupsStore`, `useGroupsActions`) still use minimal fakes. They pass, but they pass the same way v1/v2's tests passed while the feature broke at runtime. **Action:** when the next v3-area regression surfaces, upgrade those tests to real-DockviewComponent fixtures.
