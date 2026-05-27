@@ -1,8 +1,9 @@
 # Code Quality Audit
 
-> **Date:** 2026-05-25 (refreshed: all tables verified against codebase)
-> **Codebase:** ~47,200 lines of production TypeScript + Vue across `src/` and `src-bun/` (58,500 including tests)
-> **Tools used:** ESLint (strictTypeChecked), deep manual code review, IDE diagnostics, build-vs-buy analysis
+> **Date:** 2026-05-27 (refreshed — all tables re-verified against codebase)
+> **Codebase:** ~52,000 lines of production TypeScript + Vue across `src/` and `src-bun/` (66,090 including tests)
+> **Tools used this refresh:** PowerShell `Get-Content` line scans, jscpd v4 (renderer + backend split), grep pattern scans for architectural patterns. **ESLint config is currently broken** (config-array `@typescript-eslint` plugin redefinition) — `bun run lint:eslint` exits non-zero; backend `tsc -p tsconfig.bun.json --noEmit` and frontend `vue-tsc --noEmit` both clean.
+> **Prior refresh:** 2026-05-25.
 
 ---
 
@@ -10,41 +11,52 @@
 ## 1  File Size Distribution
 
 Files above **800 lines** are strong candidates for splitting.
+Re-derived 2026-05-27 from `Get-Content` on every `*.ts/*.vue` under `src/` + `src-bun/`.
 
-| Lines | File                                              | Notes                            |
-| ----: | ------------------------------------------------- | -------------------------------- |
-| 2,181 | `src/components/session/SessionDetailsPanel.vue`  | ↓774 — composables extracted     |
-| 1,929 | `src-bun/app/chat/sessions.ts`                    | ↓304 — helpers to sessionHelpers |
-| 1,635 | `src/dev/Playground.vue`                          | Dev-only, not shipped            |
-| 1,396 | `src/components/chat/MessageComposer.vue`         | Lexical editor + toolbar         |
-| 1,239 | `src-bun/rpc.ts`                                  | IPC handler registry             |
-| 1,185 | `src/components/chat/ChatWindow.vue`              | ↓24 — VueUse + bus       |
-| 1,149 | `src/stores/chat/sessionsStore.ts`                | ↓317 — reducer extracted |
-| 1,145 | `src/stores/shell/layoutStore.ts`                 | Dockview orchestration  |
-| 1,062 | `src/components/session/SessionsManager.vue`      | Sidebar session list    |
-|   991 | `src/components/settings/SettingsPanel.vue`       | Settings UI             |
-|   920 | `src/components/session/SessionHeaderControls.vue`| Header bar controls     |
-|   904 | `src/ipc/types.ts`                                | Shared type defs (expected big)|
-|   757 | `src/components/terminal/TerminalPanel.vue`       | ↓5 — VueUse + bus       |
-|   721 | `src/components/library/LibraryAgentsTab.vue`     | Agent library UI                 |
-|   712 | `src/components/permissions/PendingRequestCard.vue`| Permission card                 |
-|   692 | `src-bun/test-server.ts`                          | Dev test server                  |
-|   685 | `src/lib/chatEvents.ts`                           | Chat event barrel + legacy       |
-|   681 | `src/App.vue`                                     | Root component                   |
-|   657 | `src-bun/index.ts`                                | Main process entry               |
-|   614 | `src/components/library/McpServerForm.vue`        | MCP server form                  |
-|   605 | `src-bun/app/client/fakeClient.ts`                | Fake SDK client                  |
-|   575 | `src/components/permissions/ToolDetails.vue`      | Tool detail view                 |
-|   545 | `src/components/shared/FilePicker.vue`            | File picker component            |
-|   540 | `src/components/shell/CommandPalette.vue`         | Command palette                  |
-|   528 | `src/components/library/LibraryMcpTab.vue`        | MCP library tab                  |
-|   521 | `src/components/observability/LogViewer.vue`      | Log viewer                       |
-|   473 | `src/components/permissions/PermissionRuleEditor.vue` | Permission rule editor       |
-|   461 | `src/components/observability/JobsPanel.vue`      | Jobs panel                       |
-|   460 | `src/lib/registerBuiltinCommands.ts`              | ↓62 — dynamicCommands extracted  |
-|   454 | `src/components/shared/JsonSchemaField.vue`       | JSON schema form field           |
-|   432 | `src/components/terminal/TerminalsPanel.vue`      | Terminals list panel             |
-|   424 | `src/components/library/LibraryInstructionsTab.vue`| Instructions library tab        |
+| Lines | File                                              | Delta vs 2026-05-25 | Notes |
+| ----: | ------------------------------------------------- | -------- | -- |
+| 2,168 | `src/components/session/SessionDetailsPanel.vue`  | ↓13 | Small drift; still the #1 god component |
+| 1,635 | `src/dev/Playground.vue`                          | = | Dev-only, not shipped |
+| 1,276 | `src-bun/rpc.ts`                                  | ↑37 | New `readAgentFile` + `agentFiles` options added 2026-05-27 |
+| 1,184 | `src/stores/shell/layoutStore.ts`                 | ↑39 | New `layoutRev` + `setActiveSessionId` (rubber-duck Sprint A) |
+| 1,149 | `src/stores/chat/sessionsStore.ts`                | = | |
+| 1,058 | `src-bun/app/chat/sessions.ts`                    | ↓871 (!!) | **Phase D.3 landed** — verify the 1,929 prior number was pre-extraction |
+| 1,038 | `src/components/session/SessionsManager.vue`      | ↓24 | |
+|   996 | `src/components/chat/MessageComposer.vue`         | ↓400 | **D.4 landed** — was 1,396 |
+|   971 | `src/ipc/types.ts`                                | ↑67 | Added new agent edit/select types |
+|   912 | `src/components/session/SessionHeaderControls.vue`| ↓8 | |
+|   903 | `src/components/library/LibraryAgentsTab.vue`     | ↑182 | **Sprint A1/A2** — Select/Edit added; **see §3 — 77-line intra-file dup** |
+|   842 | `src/components/chat/ChatWindow.vue`              | ↓343 | **D.2 landed** — was 1,185 |
+|   757 | `src/components/terminal/TerminalPanel.vue`       | = | |
+|   735 | `src/lib/registerBuiltinCommands.ts`              | ↑275 | Palette polish (2026-05-27) — settings catch-all + active-session controls |
+|   715 | `src-bun/test-server.ts`                          | ↑23 | New test-server handlers for E2E flows 21-24 |
+|   705 | `src/components/permissions/PendingRequestCard.vue`| ↓7 | |
+|   685 | `src/lib/chatEvents.ts`                           | = | |
+|   662 | `src-bun/index.ts`                                | ↑5 | |
+|   625 | `src/components/shell/CommandPalette.vue`         | ↑85 | Palette polish — child rendering, ContextMenu, useCommandState wiring |
+|   617 | `src/components/library/McpServerForm.vue`        | ↑3 | |
+|   611 | `src-bun/app/client/fakeClient.ts`                | ↑6 | |
+|   565 | `src-bun/app/library/agentFiles.ts`               | NEW 565 | Was ~350; A2 added `splitFrontmatter`/`parseAgentFrontmatter`/`readAgentForEdit` |
+|   560 | `src/components/permissions/ToolDetails.vue`      | ↓15 | |
+|   545 | `src/components/shared/FilePicker.vue`            | = | |
+|   517 | `src/components/observability/LogViewer.vue`      | ↓4 | |
+|   504 | `src/App.vue`                                     | ↓177 | **D.x landed** — verified ↓ |
+|   473 | `src/components/permissions/PermissionRuleEditor.vue` | = | |
+|   471 | `src/components/shell/GroupTab.vue`               | NEW | Groups v3.1 polish (right-click menu, color popover) |
+|   464 | `src/stores/shell/groupsStore.ts`                 | = | |
+
+**Total prod lines this refresh:** 51,969 across 207 files (excludes `__tests__/`, `*.test.ts`).
+**Total all lines:** 66,090 across 278 files.
+**Prior refresh claimed:** 47,200 prod / 58,500 total. Delta ~+4,800 prod is reasonable given the Groups v3, palette polish, E2E harness, and Sprint A work shipped since.
+
+**Notable:**
+
+- **D.3 (`sessions.ts`) verified:** 1,929 → 1,058 (-871, -45%). Matches §7 claim.
+- **D.4 (`MessageComposer.vue`) verified:** 1,396 → 996 (-400, -29%). Matches §7 claim.
+- **D.2 (`ChatWindow.vue`) verified:** 1,185 → 842 (-343, -29%). Matches §7 claim.
+- **D.1 (`SettingsPanel.vue`) verified:** dropped out of top-29 entirely (was 991). The orchestrator is now `<340 lines per §7`.
+- **NEW debt 2026-05-27:** `LibraryAgentsTab.vue` grew 182 lines (Sprint A1/A2). One of those rows is a 77-line intra-file dup — see §3.
+- **D.5 / D.6 still deferred.** `SessionsManager.vue` (1,038) and `layoutStore.ts` (1,184) both still > 1000 lines.
 
 
 ---
@@ -54,9 +66,22 @@ Files above **800 lines** are strong candidates for splitting.
 
 **Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity + `@stylistic/eslint-plugin`
 
-**Current: 0 errors, 31 warnings** (down from 92 → dispatch tables, pick helpers, composable extraction, no-dynamic-delete fixes)
+### 2026-05-27 status
 
-### 2.1  Issues by Rule
+🔴 **ESLint config is currently broken** — running `bun run lint:eslint` errors with:
+
+```
+ConfigError: Config "typescript-eslint/base": Key "plugins":
+Cannot redefine plugin "@typescript-eslint".
+```
+
+Root cause: an upstream package update (likely `typescript-eslint` flat config redesign) is incompatible with the current `eslint.config.js`. Both `vue-tsc --noEmit` (renderer) and `tsc -p tsconfig.bun.json --noEmit` (backend) are clean and gate `bun run check`, so type safety isn't degraded — but the **lint rules in this refresh CANNOT be re-derived** until the config is fixed.
+
+**All §2 numbers below are stale (last verified 2026-05-25). Treat as historical reference only.**
+
+Fixing the eslint config is filed as Phase F.4 below.
+
+### 2.1  Issues by Rule (STALE — 2026-05-25)
 
 | Count | Rule                                           | What It Means                                  |
 | ----: | ---------------------------------------------- | ---------------------------------------------- |
@@ -76,7 +101,7 @@ Files above **800 lines** are strong candidates for splitting.
 | `vue/one-component-per-file`                   | Test helpers / barrel exports (6 hits)               |
 | `vue/require-default-prop`                     | TypeScript handles prop defaults (5 hits)            |
 
-### 2.2  Remaining Complexity Hotspots
+### 2.2  Remaining Complexity Hotspots (STALE — 2026-05-25)
 
 | CC | File                                                     | Function                    |
 | -: | -------------------------------------------------------- | --------------------------- |
@@ -92,6 +117,8 @@ Files above **800 lines** are strong candidates for splitting.
 | 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      |
 | 18 | `src-bun/app/terminal/stderrFilter.ts`                   | (arrow fn CC=18)            |
 | 17 | `src/components/library/McpServerForm.vue`               | `structuredFromConfig`      |
+
+Re-verify when eslint config is fixed (Phase F.4).
 
 ### 2.3  Complexity Violations (Cyclomatic > 15)
 
@@ -170,54 +197,86 @@ What was fixed:
 
 ## 3  Copy-Paste Detection (jscpd)
 
-**70 clones detected** in `src/` (up from 16 — earlier number was scoped narrowly)
+**2026-05-27 refresh:** ran `bunx jscpd src` and `bunx jscpd src-bun` separately.
 
-Duplication rate: **2.86%** tokens, **2.56%** lines (895 / 34,992 lines)
+| Scope | Clones | Duplicated lines | Pct |
+| ----- | -----: | ---------------: | --: |
+| `src/` (renderer) | 90 | 1,070 of 44,070 | **2.43%** |
+| `src-bun/` (backend) | 25 | 251 of 11,264 | **2.23%** |
+| **Both combined** | 115 | 1,321 of 55,334 | **~2.4%** |
 
-Of the 70, ~32 are in production code (excluding `__tests__/`); the rest are
-boilerplate in test setup (acceptable). 14 cross-file + 18 intra-file are
-addressable.
+Partition of the 90 renderer clones:
+- **Cross-file production:** 18 (down from 14 last refresh — small uptick due to Sprint A1/A2 work)
+- **Intra-file production:** 14 (down from 18, but ONE BIG ONE: see §3.2)
+- **Test boilerplate:** 58 (acceptable)
 
-### 3.1  Cross-File Clones (Production)
+### 3.1  Cross-File Clones (Production, top 15)
 
 | Lines | Source A | Source B | What's Duplicated |
 | ----: | -------- | -------- | ----------------- |
-| 17 | `SubagentBlock.vue:64` | `useSessionTasks.ts:110` | Sub-agent task aggregation |
-| 16 | `JsonSchemaField.vue:23` | `JsonSchemaForm.vue:35` | Schema field type narrowing |
-| 16 | `JobsPanel.vue:78` | `useSessionTasks.ts:105` | Task list rendering |
-| 16 | `LibraryInstructionsTab.vue:337` | `LibrarySkillsTab.vue:279` | Library tab boilerplate |
-| 15 | `PermissionDetails.vue:22` | `PermissionRuleEditor.vue:39` | Permission shape mapping |
-| 15 | `LibraryMcpTab.vue:315` | `LibraryToolsTab.vue:153` | Library tab boilerplate |
-| 13 | `sessionMetaHandlers.ts:12` | `useSessionUsage.ts:7` | Usage parsing |
-| 12 | `MentionPlugin.vue:133` | `SlashCommandPlugin.vue:184` | Lexical trigger plugin scaffolding |
-| 11 | `JsonSchemaField.vue:85` | `JsonSchemaForm.vue:246` | Field validation |
-| 11 | `PermissionDetails.vue:54` | `ToolDetails.vue:182` | Permission/tool detail render |
-| 11 | `DiffEditor.vue:52` | `CodeEditor.vue:99` | CodeMirror setup |
-| 11 | `ModeButtonGroup.vue:116` | `SessionHeaderControls.vue:625` | Mode button rendering |
-| 7  | `sessionMetaHandlers.ts:101` | `sessionReducer.ts:179` | Session meta merge logic |
+| 22 | `ChatWindow.vue` | `SubagentBlock.vue` | Sub-agent task aggregation (was 17 — grew) |
+| 21 | `ChatTab.vue:235` | `GroupTab.vue:362` | **Tab-close button CSS** (`.chat-tab-close` / `.group-tab-close` identical) |
+| 16 | `JsonSchemaField.vue` | `JsonSchemaForm.vue` | Schema field type narrowing |
+| 16 | `LibraryInstructionsTab.vue` | `LibrarySkillsTab.vue` | Library tab boilerplate |
+| 15 | `PermissionDetails.vue` | `PermissionRuleEditor.vue` | Permission shape mapping |
+| 15 | `LibraryMcpTab.vue` | `LibraryToolsTab.vue` | Library tab boilerplate |
+| 14 | `JsonSchemaField.vue` | `JsonSchemaFieldFrame.vue` | Frame helpers (partial extraction; rest deferred per Phase E) |
+| 13 | `sessionMetaHandlers.ts` | `useSessionUsage.ts` | Usage parsing |
+| 13 | `ChatTab.vue:15` | `GroupTab.vue:24` | **Tab script setup boilerplate** (closely-coupled to the 21-line CSS dup above) |
+| 12 | `MentionPlugin.vue` | `SlashCommandPlugin.vue` | Lexical trigger plugin scaffolding (still deferred — only 2 plugins) |
+| 12 | `MessageComposer.vue` | `MessageEditorBody.vue` | Editor surface chrome (D.4 left this seam) |
+| 11 | `PermissionDetails.vue` | `ToolDetails.vue` | Permission/tool detail render |
+| 11 | `JsonSchemaField.vue` | `JsonSchemaForm.vue` | Field validation |
+| 11 | `ModeButtonGroup.vue` | `SessionHeaderControls.vue` | Mode button rendering |
+| 10 | `TerminalSettingsSection.vue` | `WorkspaceSettingsSection.vue` | Settings-section list-row chrome |
 
-### 3.2  Intra-File Clones (Production, top 12)
+**Backend (`src-bun/`) cross-file:**
 
-| Lines | File | What's Duplicated |
-| ----: | ---- | ----------------- |
-| 42 | `LibraryAgentsTab.vue:284,333` | User vs project agent sections |
-| 33 | `CommandPalette.vue:206,246` | Keyboard nav blocks |
-| 26 | `LibraryInstructionsTab.vue:149,204` | User vs project instructions |
-| 25 | `LibraryInstructionsTab.vue:174,229` | (same — 2 paste sites) |
-| 23 | `ActivityBar.vue:146,170` | Button group render |
-| 23 | `JsonSchemaField.vue:164,222` | Field type rendering (string/number/bool) |
-| 22 | `JsonSchemaField.vue:164,275` | (same field, repeated 3× total) |
-| 22 | `JsonSchemaField.vue:164,339` | (same — 4 type-branches identical) |
-| 16 | `McpServerForm.vue:360,422` | Env var entry blocks |
-| 16 | `ToolDetails.vue:273,288,434,458` | Tool category headers (2 pairs) |
-| 16 | `JsonValueView.vue:128,164` | Value render branches |
+| Lines | Source A | Source B | What's Duplicated |
+| ----: | -------- | -------- | ----------------- |
+| 13 | `mcpRegistry.ts` | `skillsRegistry.ts` | RPC wrap helper (caught in §4.4 last refresh) |
+| 11 | `sessionSkillsService.ts` | `skillsRegistry.ts` | Skills surface bridging |
+| 10 | `sessionMcpService.ts` | `mcpRegistry.ts` | MCP surface bridging |
+| 8 | `index.ts` | `test-server.ts` | RPC handler-table boilerplate |
 
-**High-ROI extraction candidates:**
-1. `JsonSchemaField.vue` — 4 near-identical type branches (~70 lines) → polymorphic per-type sub-component
-2. `LibraryAgentsTab` / `LibraryInstructionsTab` / `LibrarySkillsTab` / `LibraryMcpTab` / `LibraryToolsTab` — all share user/project tab pattern → `<LibraryTabPanel :user :project>` wrapper
-3. `SubagentBlock` ↔ `useSessionTasks` ↔ `JobsPanel` — task aggregation in 3 places → single `useTaskAggregation` composable
-4. `MentionPlugin` ↔ `SlashCommandPlugin` — Lexical trigger plugin scaffolding → shared `createTriggerPlugin()`
-5. `DiffEditor` ↔ `CodeEditor` — CodeMirror setup → shared `useCodeMirror()` composable
+### 3.2  Intra-File Clones (Production)
+
+**🔴 NEW REGRESSION:** the biggest intra-file clone in the renderer is now my own work from Sprint A1/A2.
+
+| Lines | File | What's Duplicated | Status |
+| ----: | ---- | ----------------- | ------ |
+| **77** | **`LibraryAgentsTab.vue:336,420`** | **Project section ↔ User section** (Select / chip / Edit / Reveal / Delete rendered identically). Grew from 42 → 77 because A1 added Select + chip and A2 added Edit pencil, doubling the markup. | 🔴 **Open — added 2026-05-27 by Sprint A** |
+| 26 | `LibraryInstructionsTab.vue` | User/project chrome | Open |
+| 25 | `LibraryInstructionsTab.vue` | (same — 2nd paste) | Open |
+| 16 | `ToolDetails.vue` | Tool category headers | Open |
+| 16 | `PendingRequestCard.vue` | Permission-card branches | Open |
+| 16 | `JsonValueView.vue` | Value render branches | Open |
+| 16 | `McpServerForm.vue` | Env var entry blocks | Open |
+| 12 | `MessageComposer.vue` | Internal | Open |
+| 11 | `sessionCommands.ts` | Slash-command boilerplate | Open |
+| 11 | `layoutSanitize.ts` | Sanitization branches | Open |
+| 10 | `GroupTab.vue` | Group-tab variants | Open |
+
+### 3.3  Resolution status of prior audit's top 5 candidates
+
+| Prior candidate | This refresh |
+| --------------- | ------------ |
+| 1. JsonSchemaField polymorphic split | 🟡 partial — `JsonSchemaFieldFrame.vue` extracted (E.4) but type-branch dups remain (14 + 16) |
+| 2. `<LibraryTabPanel>` 5-way wrapper | ❌ rejected per Phase E — only 2 tabs share the shape |
+| 3. `useTaskAggregation` composable | ✅ shipped as `formatElapsed` (E.2) — was a jscpd false positive per rubber-duck |
+| 4. `createTriggerPlugin()` Lexical factory | ⏸️ deferred — only 2 plugins |
+| 5. `useCodeMirror()` composable | ✅ shipped as `codeMirrorShared.ts` helpers (E.3) |
+
+### 3.4  New high-ROI extraction candidates (2026-05-27)
+
+| # | Candidate | ROI |
+| - | --------- | --- |
+| 1 | **`LibraryAgentsTab` user/project sections → `<AgentSection :scope :entries>`** | 🔴 HIGH — 77 lines, freshly added in Sprint A. The Edit button worsened the dup; same fix has to land in both branches. **Do this before B.** |
+| 2 | **`<TabCloseButton>` extracted from ChatTab + GroupTab** | 🟡 LOW — 21 lines CSS + 13 lines script. Real but visual, both files are < 500 lines. Defer until either grows. |
+| 3 | **`<EnvKeyValueRow>` for env-var blocks (McpServerForm intra)** | 🟡 LOW — would also help Settings env sections. Defer. |
+| 4 | **`<LibraryInstructionsScopeSection>`** for user/project chrome (instructions tab dup, 26+25 lines) | 🟡 MEDIUM — similar shape to #1; could share the same wrapper. |
+
+---
 
 
 ---
@@ -257,10 +316,24 @@ Found by manual review and IDE diagnostics.
 
 | Severity | File                                       | Line(s)    | Issue                                              |
 | -------- | ------------------------------------------ | ---------- | -------------------------------------------------- |
-| HIGH     | `src-bun/app/chat/sessions.ts`             | (entire)   | 1,929-line god object — CRUD+events+agents+MCP     |
-| MEDIUM   | `src-bun/app/library/mcpRegistry.ts`       | 59-73      | Duplicated RPC wrapper (addConfig/updateConfig)    |
-| MEDIUM   | `src-bun/app/client/fakeClient.ts`         | 287-290    | Raw `Error` throws (inconsistent with AppError)    |
-| LOW      | `src-bun/app/client/client.ts`             | 21-24, 116 | Duplicate test seams (`setClientForTest` × 2)      |
+| ~~HIGH~~ | ~~`src-bun/app/chat/sessions.ts`~~         | ~~(entire)~~ | ~~1,929-line god object~~ ✅ Phase D.3 — now 1,058 lines (-45%); 5 sibling services + SessionEventForwarder + config builder + MetadataService extracted |
+| MEDIUM   | `src-bun/app/library/mcpRegistry.ts`       | 59-73      | Duplicated RPC wrapper (addConfig/updateConfig) — still present (jscpd confirms 13-line cross-file dup with skillsRegistry.ts in §3) |
+| MEDIUM   | `src-bun/app/client/fakeClient.ts`         | 293, 296   | Raw `Error` throws — verified 2026-05-27 (still present; only 2 sites left). Acceptable in test infra path, not gated by AppError |
+| ~~LOW~~  | ~~`src-bun/app/client/client.ts`~~         | ~~21-24, 116~~ | ~~Duplicate `setClientForTest` × 2~~ ✅ Done (SDK simplification 2026-05-25; per §7) |
+
+### 4.5  Architectural pattern counts (verified 2026-05-27 by grep)
+
+| Pattern | Prior count | This refresh | Delta |
+| ------- | ----------: | -----------: | ----- |
+| `window.dispatchEvent('dafman:…')` callsites | 0 (Phase A killed) | **0** | = ✅ |
+| `addEventListener('dafman:…')` callsites | 0 (Phase A killed) | **0** | = ✅ |
+| `as unknown as` (prod files only) | ~25 | **25** | = (renderer 14, backend 11). Tests have many more but they're acceptable scaffolding. |
+| `invokeCommand(` directly in `*.vue` | 3 | **3** | = (`SessionDetailsPanel.vue` x1, `FilePicker.vue` x2). Pre-existing per Phase B. |
+| `setTimeout(fn, 0)` callsites | unknown | **7** prod (TerminalPanel 2, MessageComposer 2, MessageEditorBody 1, FilePicker 1, useComposerCommandMode 1) | NEW count — these are the Phase F.1 backlog. |
+| `requestAnimationFrame` callsites | unknown | **15** prod (composables/useChatScroll 5, useChatTimelineState 3, others 7) | Mostly intentional (D.2 transcript controllers). Phase F.2 backlog. |
+| `localStorage.setItem` raw callsites | unknown | **7** prod (4 via `usePersistedRef`, 3 directly in components — `useDetailsSections.ts`, `useSessionSkills.ts`, `LibraryPanel.vue`, `FilePicker.vue`, `sessionCommands.ts`) | The 3 direct sites should migrate to `usePersistedRef` for consistency. |
+| `new ResizeObserver` | unknown | **0** prod (all via `useResizeObserver` from VueUse) | ✅ Clean. |
+| `throw new Error(` in `src-bun/app/` RPC paths | unknown | **0** in production RPC handlers (the 3 hits are 1 in `terminalRegistry` runtime-unsupported guard, 2 in `fakeClient` test infra, 1 in `shared/errors.ts` AppError factory itself) | ✅ Clean. rpcGuard discipline holds. |
 
 
 ---
@@ -728,6 +801,49 @@ to both sides).
     (`setTheme`, `setReasoningVisibility`, `setTerminalPrefs`, etc.) —
     no more inline `update(...)` calls
 
+### Since the last audit (2026-05-26 → 2026-05-27)
+
+- [x] **Groups v3 + v3.1 polish** — nested DockviewVue per workspace
+  group; G4a–G4c right-click move-to-group / inline rename / cross-
+  group drag. Multiple `fix(groups)` commits.
+- [x] **Settings restore fix (`c97b0a5`)** — bun-side `coerceLayout`
+  was stripping all v3 fields, making restore impossible. Added
+  passthrough + regression test.
+- [x] **Tier-3 E2E harness extension (`f999bfd`)** — `bunHarness.restart()`,
+  `urlFor()` helper, flows 21-24 (layout restore, settings round-trip,
+  groups create, groups move-session). Catches the v3 bug class.
+- [x] **Plans restructure (`4bff70c`)** — 17 `plan-*.prompt.md` →
+  `DONE.md` + `TODO.md` + `_archive/`. Docs only but eliminates
+  drift sources.
+- [x] **Palette polish (`46540cd` + follow-ups)** — inline sub-menus
+  + child label as breadcrumb (so context survives when fuse hides
+  the parent) + settings coverage + `useCommandState` integration
+  (kills the hand-rolled query mirror that was racing the library).
+- [x] **`childMatchTokens` / `parentSelfTokens` extracted** — single
+  source of truth for which child fields participate in the parent's
+  fuse corpus vs auto-expand.
+- [x] **`activeSessionId` fix (`0d20fb5`)** — `recomputeActiveSession`
+  + GroupPanel `onDidActivePanelChange` now correctly track chat-tab
+  changes inside the v3 active group. Was breaking every
+  `session.*` palette command + the right-rail.
+- [x] **Sprint A1 — Library Agents Select/Deselect (`bca5704`)**
+  — per-row Select/Deselect button, "Selected" chip, left-rail accent.
+  Reuses `useSessionAgents`.
+- [x] **Sprint A2 — Library Agents Edit (`a529ef5`)** — safe-subset
+  edit via `splitFrontmatter` + `parseAgentFrontmatter` + verbatim
+  preserved-tail. Unknown frontmatter keys (mcp-servers / github /
+  plugins) survive byte-for-byte. +3 unit tests.
+- [x] **Sprint A3 — `/agent <name>` actually selects (`a529ef5`)**
+  — slash parses argument, looks up via `listAgents`, calls
+  `selectAgent`. Unknown name → warn toast with available list.
+- [x] **MANUAL_TESTS split (`1308a58`)** — 1338-line file split
+  into active `MANUAL_TESTS.md` + `MANUAL_TESTS_archive.md`. Active
+  file gathers all failing items into a single ❌ work list.
+
+**Tests:** 600 → **679 pass**. **Type gates:** all clean
+(`vue-tsc --noEmit` + `tsc -p tsconfig.bun.json --noEmit`).
+**ESLint:** ⚠️ config currently broken — see Phase F.4.
+
 
 ---
 
@@ -927,33 +1043,79 @@ original.
 expected impact), 11 new unit tests, 5 new files. jscpd duplication
 should re-measure under 1.5%.
 
-### Phase F — Clean up timing hacks + remaining ESLint 🟢 LARGELY DONE (2026-05-26)
+**2026-05-27 refresh:** actual remeasure showed `src/` at **2.43%**
+(not 1.5%). Sprint A1/A2 added the new 77-line intra-file dup
+in `LibraryAgentsTab.vue` (see §3.2 + new candidate §3.4 #1). Defer
+the original Phase E completion and add Phase E.8 below to clean
+up the new debt before it grows.
 
-- [ ] Replace `setTimeout(fn, 0)` focus hacks with `nextTick` or VueUse lifecycle
-- [ ] Replace double-rAF patterns with proper settle helpers
-- [x] **prettier CRLF/LF normalization** — `bun run format` cleared
-  4803 prettier errors caused by Windows edits sneaking CRLF into
-  files marked `endOfLine: "lf"`.
-- [x] **complexity — 17 → 5 warnings**. Twelve refactors landed,
-  each finding the natural seam (table dispatch / per-type helpers /
-  config builder split) rather than dropping a 3-line shim. The
-  remaining 5 (`resume` 16, `createSession` 18, `initXterm` 16,
-  `lexical/plugins.ts` arrow 17, `openEdgePanel` 22) are at the
-  point of diminishing returns; further reduction needs real
-  behavior changes.
-- [x] **6 `no-non-null-assertion`** — done. TerminalPanel.vue xterm
-  addon closures now capture local non-null references; wsBridge.ts
-  uses a captured `liveSocket` const.
-- [x] **5 `max-lines-per-function`** — disabled per-file for
-  `src/stores/**/*.ts` + `registerBuiltinCommands.ts`. Pinia
-  `defineStore` callbacks ARE the whole store body; the rule was
-  firing on legitimate structure. (User input: "5 lines per function
-  is too strict, we can let this go.")
-- [x] **1 `max-depth`** — done. `audit.ts:hydrateRecent` 5-deep nesting
-  cut by extracting `tryParseAuditLine` helper.
-- [x] **9 misc** — 12 padding-line-between-statements (auto-fix), 7
-  unnecessary-type-assertion (auto-fix), 2 duplicate-imports
-  (sessions.ts, instructions.ts), unused `RangeSelection` import,
-  `void`-in-union, `??=` for usePersistedRef timer, redundant
-  `String(key)` in bus.ts, single-use type parameter `K` removed
-  from `clear<K>`.
+### Phase E.8 — `<AgentSection>` extraction (NEW 2026-05-27)
+
+🔴 **Triggered by:** Sprint A1 + A2 doubled the per-row markup
+(Select + chip + Edit + Reveal + Delete), turning the prior 42-line
+project-vs-user dup in `LibraryAgentsTab.vue` into a **77-line**
+intra-file clone — biggest single dup in the renderer.
+
+**Scope:**
+- Extract `<AgentSection :scope="user|project" :entries />` component
+  for the agent row + actions block.
+- Same component can absorb `LibraryInstructionsTab.vue`'s 26+25
+  line user/project dups (cross-file reuse opportunity).
+- Keep `LibraryAgentsTab.vue` as orchestrator (form + grouping +
+  Select wiring) — should shrink from 903 → ~750 lines.
+
+**Anti-goal:** don't try to also wrap Skills / MCP / Tools per the
+2026-05-26 rubber-duck rejection (different shapes; would be a
+god-component).
+
+### Phase F — Clean up timing hacks + remaining ESLint 🟡 PARTIAL
+
+**Done (2026-05-26):**
+- [x] prettier CRLF/LF normalization (4803 → 0)
+- [x] complexity 17 → 5 warnings
+- [x] 6 `no-non-null-assertion` cleaned
+- [x] 5 `max-lines-per-function` disabled per-file for stores
+- [x] 1 `max-depth` cleaned
+- [x] 9 misc fixes
+
+**Open:**
+- [ ] **F.1** Replace `setTimeout(fn, 0)` focus hacks with `nextTick`
+  or VueUse lifecycle (**7 sites** verified 2026-05-27: TerminalPanel x2,
+  MessageComposer x2, MessageEditorBody, FilePicker, useComposerCommandMode)
+- [ ] **F.2** Replace double-rAF patterns with proper settle helpers
+  (15 rAF sites — most intentional in scroll/timeline controllers; the
+  auditable ones are App.vue + useGroupsActions + bootLayout)
+- [ ] **F.3** Migrate 3 direct `localStorage.setItem` callsites to
+  `usePersistedRef` (`useDetailsSections.ts`, `useSessionSkills.ts`,
+  `LibraryPanel.vue`, `FilePicker.vue`, `sessionCommands.ts`)
+- [ ] **F.4** 🔴 **Fix ESLint config** — currently broken
+  (`Cannot redefine plugin "@typescript-eslint"`). Without this, §2
+  numbers in this audit can't be refreshed, complexity hotspots
+  can't be tracked, and we lose the safety net for new regressions.
+  **Highest-priority item in §8 right now.**
+
+---
+
+### Phase G — God objects (NEW 2026-05-27)
+
+The 2026-05-27 refresh showed 7 files still > 800 lines. Phase D
+closed three of them; the rest break into:
+
+- **Still-deferred from Phase D:**
+  - **D.5** `SessionsManager.vue` (1,038) — split when sidebar work
+    resumes
+  - **D.6** `layoutStore.ts` (1,184) — split only if Dockview feature
+    or bug forces it
+  - **`SessionDetailsPanel.vue`** (2,168) — D-class candidate; was
+    already extracted into 7 composables but the SFC stayed huge
+
+- **NEW (post-Phase D):**
+  - **`registerBuiltinCommands.ts`** (735, ↑275 since 2026-05-25 due
+    to palette polish) — would benefit from splitting per-section
+    (Static / Settings catch-all / Active-session / Dynamic parents)
+    but each section is a coherent unit. Defer unless it crosses 800.
+
+**Triage:** none of these are urgent. The biggest *new* signal is
+`SessionDetailsPanel.vue` at 2,168 still being #1 god component
+despite its composables — a template-side split (per-section SFCs
+mirroring the composables) could meaningfully cut it.
