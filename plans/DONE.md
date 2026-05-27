@@ -82,7 +82,7 @@ Legend:
 | Command palette (Ctrl+K) | ✅ | `vue-command-palette` integration |
 | Inline sub-menus in command palette (parent → expandable children) | ✅ | `src/components/shell/CommandPalette.vue` + `Command.children` in `commandRegistry.ts` |
 | Auto-expand parent on search-match | ✅ | `CommandPalette.vue:shouldExpand` |
-| All toggleable settings reachable from palette | ✅ | `registerBuiltinCommands.ts` (streaming, mermaid, notifications, reasoningVisibility, defaultModel, defaultReasoningEffort, defaultWorkspace, defaultApproveAll + future-proof catch-all) |
+| All toggleable settings reachable from palette | ✅ | `registerBuiltinCommands.ts` (streaming, mermaid, notifications.turnEnd / .waitingForInput, defaultApproveAll, reasoningVisibility, defaultModel, defaultReasoningEffort, defaultWorkspace — every boolean today is wired by name; future schema additions get a same-PR `Toggle X` command, not a fragile auto-discovery hook) |
 | Active session controls in palette | ✅ | `registerBuiltinCommands.ts` (session.model parent, session.mode parent, session.approveAll toggle, session.reasoningOverride parent, session.pinAsDefaults) |
 
 ## Tools & permissions
