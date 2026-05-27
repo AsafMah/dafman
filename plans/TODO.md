@@ -22,7 +22,10 @@ Legend:
 
 - The instructions markdown doesn't support darkmode
 - The instructions should support creating and editing
-- No refresh button on agents
+- No refresh button on library agents
+- Library agents doesn't show project agents
+- MCP creator doesn't let you choose between user or project
+- MCP creator is a modal, but agent creator is inline
 - Many tools (especially sub-agent related one such as task, read agent, report_intent, powershell, ask_user (After the ask - in history)) don't have nice ui
 - I think we should use the library to set mcp/tools/skills/agents/instructions things for the session, instead of duplicating it with the session settings (need to think about design)
 - Sessions may resume with the agent "thinking..." and never get resolved
