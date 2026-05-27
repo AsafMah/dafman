@@ -102,6 +102,25 @@ async function installRpcStub(page: Page): Promise<void> {
       // the panel mounts cleanly.
       getAuditState: () => ({ recent: [], pendingCount: 0 }),
       getLogState: () => ({ recent: [], droppedCount: 0 }),
+      listJobs: () => [],
+      // Minimal createSession stub returning a session id; the renderer
+      // then asks for metadata + history below.
+      createSession: () => ({
+        id: 'sess-smoke-1',
+        title: 'Smoke session',
+        cwd: 'C:\\smoke',
+        workingDirectory: 'C:\\smoke',
+        accent: '#3b82f6',
+      }),
+      getSessionMetadata: () => ({ summary: 'Smoke session', context: { workingDirectory: 'C:\\smoke' } }),
+      listSessionEvents: () => [],
+      listSessionHistory: () => [],
+      getSession: () => ({
+        id: 'sess-smoke-1',
+        title: 'Smoke session',
+        cwd: 'C:\\smoke',
+        workingDirectory: 'C:\\smoke',
+      }),
     } as Record<string, (args: unknown) => unknown>;
 
     (window as unknown as { __DAFMAN_TEST_RPC__: unknown }).__DAFMAN_TEST_RPC__ = {
@@ -197,6 +216,74 @@ test("renderer bundle boots to ready without console errors", async ({ page }) =
   const allDockviews = page.locator(".dv-dockview");
   await expect(allDockviews, "Inner DockviewVue never mounted")
     .toHaveCount(2, { timeout: 5_000 });
+
+  // Wait for boot to fully settle then capture a screenshot for
+  // human-eye verification (rule 4a). The structural assertions only
+  // prove DOM presence; visual bugs (0x0 group panel, watermark
+  // showing instead of group tab strip, etc.) hide from them.
+  await page.waitForTimeout(500);
+
+  // Regression guard for the "group panel landed in an edge group"
+  // bug: dockview's default placement (no `position`) drops new panels
+  // into the active group, which after edge-seeding is an EDGE group.
+  // The visible symptom is a vertical 35-px-wide tab strip and a 0×0
+  // group-panel-root. Assert the inner dockview has the body's full
+  // width so this can't regress silently.
+  const sizes = await page.evaluate(() => {
+    const dockviews = Array.from(document.querySelectorAll('.dv-dockview'));
+    return dockviews.map((d) => {
+      const r = (d as HTMLElement).getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+  });
+  // The inner dockview must be wider than ~200 px (i.e. not stuffed
+  // into a 35 px edge strip). 200 is a deliberate floor — the actual
+  // value is ~1192 in the smoke viewport.
+  const innerWidth = sizes[1]?.w ?? 0;
+  expect(
+    innerWidth,
+    `Inner dockview width is ${innerWidth}px — group panel likely landed in an edge group (regression of bootLayout.seedOuterGroupPanels). Sizes: ${JSON.stringify(sizes)}`,
+  ).toBeGreaterThan(200);
+
+  await page.screenshot({
+    path: `test-results/groups-v3-${process.env.SMOKE_VARIANT ?? 'prod'}.png`,
+    fullPage: true,
+  });
+
+  // Exercise: create a new group via the command palette entry. This
+  // is the highest-leverage path through the v3 surface and the one
+  // the user explicitly asked to verify on 2026-05-27.
+  await page.evaluate(async () => {
+    type DafmanTest = { runCommand: (id: string) => Promise<unknown> };
+    const w = window as unknown as { __DAFMAN_TEST__?: DafmanTest };
+    if (!w.__DAFMAN_TEST__) throw new Error('__DAFMAN_TEST__ not available');
+    await w.__DAFMAN_TEST__.runCommand('view.newGroup');
+  });
+  await page.waitForTimeout(500);
+
+  const sizes2 = await page.evaluate(() => {
+    const dockviews = Array.from(document.querySelectorAll('.dv-dockview'));
+    return {
+      dockviewCount: dockviews.length,
+      groupTabCount: document.querySelectorAll('.group-tab').length,
+      activeTabName: document.querySelector('.group-tab.group-tab-active .group-tab-title')?.textContent ?? null,
+      innerWidth: Math.round(
+        (dockviews[1] as HTMLElement | undefined)?.getBoundingClientRect().width ?? 0,
+      ),
+    };
+  });
+  // eslint-disable-next-line no-console
+  console.log('[smoke:after-newGroup]', JSON.stringify(sizes2));
+
+  // Two outer tabs, the new one is active, inner width still full.
+  expect(sizes2.groupTabCount, 'newGroup did not add a 2nd group tab').toBe(2);
+  expect(sizes2.activeTabName, 'newGroup did not activate the new group').toBe('Group 2');
+  expect(sizes2.innerWidth, 'inner dockview width collapsed after newGroup').toBeGreaterThan(200);
+
+  await page.screenshot({
+    path: `test-results/groups-v3-${process.env.SMOKE_VARIANT ?? 'prod'}-2groups.png`,
+    fullPage: true,
+  });
   // Note: not asserting `boundingBox()` dimensions here. dockview's
   // gridview lays out body panels via a ResizeObserver in a deferred
   // task that headless chromium under playwright's run loop can delay

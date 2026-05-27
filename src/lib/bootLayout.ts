@@ -96,9 +96,27 @@ export function useBootLayout(): BootLayout {
   /// group is activated last so it ends up focused. Called from
   /// `flushPendingLayout` after the outer api is ready and the activity
   /// bar has been seeded.
+  ///
+  /// IMPORTANT: dockview's default placement, when no body group exists
+  /// yet, drops new panels into the currently-active group — which after
+  /// `seedDefaultLayout` is an EDGE group (the activity-bar sidebar).
+  /// The result is the group panel rendering as a tiny vertical-strip
+  /// tab on the left/right edge instead of a horizontal body tab. Same
+  /// gotcha that `layoutStore.addPanel` documents at length. Fix: create
+  /// a body group explicitly before adding the first group panel, then
+  /// place subsequent group panels `within` that group as tabs.
   function seedOuterGroupPanels(): void {
     const outer = layoutStore.api;
     if (!outer) return;
+
+    let referenceGroup = layoutStore.firstBodyGroupId();
+    let createdBodyGroup = false;
+    if (!referenceGroup) {
+      const body = outer.addGroup();
+      referenceGroup = body.id;
+      createdBodyGroup = true;
+    }
+
     let added = 0;
     for (const g of groupsStore.groups) {
       if (outer.getPanel(g.id)) continue;
@@ -108,11 +126,14 @@ export function useBootLayout(): BootLayout {
         title: g.name,
         tabComponent: 'groupTab',
         params: { groupId: g.id, color: g.color, name: g.name },
+        // Always place within the body group (never use 'right' for
+        // groups — they're tabs in the same strip, not split panes).
+        position: { referenceGroup, direction: 'within' },
       });
       added += 1;
     }
     console.info(
-      `[boot] seedOuterGroupPanels: ${added} group panel(s) added; active=${groupsStore.activeGroupId ?? '(none)'}`,
+      `[boot] seedOuterGroupPanels: ${added} group panel(s) added; active=${groupsStore.activeGroupId ?? '(none)'}; createdBodyGroup=${createdBodyGroup}`,
     );
     if (groupsStore.activeGroupId) {
       const active = outer.getPanel(groupsStore.activeGroupId);

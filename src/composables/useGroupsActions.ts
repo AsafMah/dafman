@@ -44,12 +44,23 @@ export function useGroupsActions(): GroupsActions {
     const outer = layoutStore.api;
     if (!outer) return null;
     const meta = groupsStore.createGroup(name);
+    // Use an existing body group as the reference so the new tab lands
+    // in the same horizontal tab strip as the other groups. If somehow
+    // no body group exists (e.g. all groups were closed via dockview's
+    // own X — currently impossible since we block last-group-close in
+    // GroupTab), create one. Direction is always 'within' so groups
+    // stay as tabs, never split panes.
+    let referenceGroup = layoutStore.firstBodyGroupId();
+    if (!referenceGroup) {
+      referenceGroup = outer.addGroup().id;
+    }
     outer.addPanel({
       id: meta.id,
       component: 'group',
       title: meta.name,
       tabComponent: 'groupTab',
       params: { groupId: meta.id, color: meta.color, name: meta.name },
+      position: { referenceGroup, direction: 'within' },
     });
     const panel = outer.getPanel(meta.id);
     panel?.api.setActive();

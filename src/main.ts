@@ -166,6 +166,23 @@ async function mountWith(Root: typeof App) {
   }
 
   app.mount('#app');
+
+  // Optional test hook — exposed only when the smoke RPC stub is also
+  // installed (same gate). Gives playwright a way to invoke command
+  // palette entries by id without simulating keyboard input.
+  if (testBridge) {
+    const { useCommandRegistry } = await import('@/stores/shell/commandRegistry');
+    const registry = useCommandRegistry();
+    (window as unknown as {
+      __DAFMAN_TEST__: { runCommand: (id: string) => Promise<unknown> };
+    }).__DAFMAN_TEST__ = {
+      async runCommand(id: string) {
+        const cmd = registry.commands.get(id);
+        if (!cmd) throw new Error(`Unknown command: ${id}`);
+        return await cmd.run();
+      },
+    };
+  }
 }
 
 void mountWith(App);
