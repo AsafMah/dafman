@@ -22,15 +22,15 @@ Legend:
 
 Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
-1. ⬜ **Real-Electrobun E2E harness** — would catch the v3 bug class in 5 min
-2. ⬜ **GitHub `#` mentions + Issues/PRs/Gists Library tabs** (G1) — small, leverages existing `MentionPlugin`
-3. ⬜ **Diff viewer: accept/reject hunks** — `ApplyPatchView.vue` is view-only today
-4. ⬜ **Multi-account + BYOK** (OS-keyring) — internal demand
-5. ⬜ **Projects model** — per-cwd settings overlay; unblocks per-session MCP overlay + per-project autopilot policy
-6. ⬜ **Command palette polish** — searchable sub-menus, every toggleable setting, prefix groups
-7. ⬜ **Plans API rendering panel** — SDK `rpc.plan.*` exists; no panel
-8. ⬜ **Memory backend** (SQLite-vec or LanceDB)
-9. ⬜ **Automations + scheduler** + HTTP hooks
+1. ⬜ **GitHub `#` mentions + Issues/PRs/Gists Library tabs** (G1) — small, leverages existing `MentionPlugin`
+2. ⬜ **Diff viewer: accept/reject hunks** — `ApplyPatchView.vue` is view-only today
+3. ⬜ **Multi-account + BYOK** (OS-keyring) — internal demand
+4. ⬜ **Projects model** — per-cwd settings overlay; unblocks per-session MCP overlay + per-project autopilot policy
+5. ⬜ **Command palette polish** — searchable sub-menus, every toggleable setting, prefix groups
+6. ⬜ **Plans API rendering panel** — SDK `rpc.plan.*` exists; no panel
+7. ⬜ **Memory backend** (SQLite-vec or LanceDB)
+8. ⬜ **Automations + scheduler** + HTTP hooks
+9. ⬜ **Real-Electrobun (CDP) harness, Tier-4** — drive the actual WebView2/WKWebView binary. Hard (no CDP debug ports exposed by default) and Tier-3 extension shipped 2026-05-27 already catches the v3 bug class; downranked.
 
 ---
 
@@ -38,13 +38,12 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
 | # | Item | Status | Effort | Notes |
 |---|---|---|---|---|
-| 1 | Real-Electrobun E2E harness (drive renderer + bun + fake SDK end-to-end) | ⬜ | ~3 d | See [`_archive/plan-e2e.prompt.md`](_archive/plan-e2e.prompt.md). Would have caught 4 v3 bugs this sprint. |
+| 1 | Real-Electrobun (Tier-4) CDP harness | ⬜ | ~3 d | Drive the actual built binary via CDP. Hard — webviews don't expose debug ports by default. Tier-3 extensions (flows 21–24) already cover the v3 restart-restore bug class. |
 | 2 | Outer-fromJSON vs Vue unmount race | ⬜ | 0.5 d | Deferred from Groups v3 code review |
 | 3 | Lazy-mount placeholder for unfocused groups | ⬜ | 1 d | Groups v3.1 (G4d) |
 | 4 | Manual test pass on real data | ⬜ | user | Restore fix `c97b0a5` unblocks |
-| 5 | Phase 26 boundingBox / layout-restore / settings-round-trip E2E | ⬜ | 1 d | |
-| 6 | Tiling / layout commands (split / stack / focus-by-direction) | 🟦 | 1 d | `view.newGroup` etc. landed v3; more keyboard tiling missing |
-| 7 | Dockview upstream `#1305` + `#1306` | ⏳ | — | Awaiting upstream |
+| 5 | Tiling / layout commands (split / stack / focus-by-direction) | 🟦 | 1 d | `view.newGroup` etc. landed v3; more keyboard tiling missing |
+| 6 | Dockview upstream `#1305` + `#1306` | ⏳ | — | Awaiting upstream |
 
 ## Messaging & UX
 
@@ -207,16 +206,18 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
 | # | Item | Status | Effort | Notes |
 |---|---|---|---|---|
-| 1 | Real-Electrobun E2E harness (Tier-4) | ⬜ | 3 d | The high-leverage item |
+| 1 | Real-Electrobun Tier-4 (CDP) harness | ⬜ | 3 d | Drive the actual built binary. Hard. Tier-3 extensions shipped 2026-05-27 cover the v3 bug class. |
 | 2 | Real-DockviewComponent harness across all v3 tests | 🟦 | 1 d | Used in `composePersistLayout` tests only |
 | 3 | Real-DockviewComponent in `bootLayout` tests | ⬜ | 1 d | |
-| 4 | Layout-restore E2E | ⬜ | 1 d | |
-| 5 | Settings round-trip E2E | ⬜ | 0.5 d | |
-| 6 | Log-viewer tail E2E | ⬜ | 0.5 d | |
-| 7 | Diagnostics-bundle export E2E | ⬜ | 0.5 d | |
-| 8 | 14 RPC handlers in production missing from test-server | ⬜ | 2 d | Deferred from 20c |
-| 9 | Test gap: SessionDetailsPanel compact-row item-expansion | ⬜ | 0.5 d | |
-| 10 | Test gap: shutdown watchdog | ⬜ | 0.5 d | |
+| 4 | Layout-restore E2E | ✅ | — | Shipped (flow 21) |
+| 5 | Settings round-trip E2E | ✅ | — | Shipped (flow 22) |
+| 6 | Groups v3 create + move-session E2E | ✅ | — | Shipped (flows 23 + 24) |
+| 7 | Log-viewer tail E2E | ⬜ | 0.5 d | |
+| 8 | Diagnostics-bundle export E2E | ⬜ | 0.5 d | |
+| 9 | Pre-existing flake: `14-details-rail`, `15-tools-toggle`, `16-plan-panel`, `17-quota-warning`, `18-library-mcp`, `19-library-skills`, `20-details-singleton` | ⬜ | 1-2 d | Fail on `bun run e2e` against clean main; not included in `bun run check`. Investigate timing/race causes. |
+| 10 | 13 RPC handlers in production still missing from test-server | ⬜ | 2 d | 1 fixed during 2026-05-27 sprint (`updateSettings` param parity); 13 remain. |
+| 11 | Test gap: SessionDetailsPanel compact-row item-expansion | ⬜ | 0.5 d | |
+| 12 | Test gap: shutdown watchdog | ⬜ | 0.5 d | |
 
 ## Tech-debt remaining
 

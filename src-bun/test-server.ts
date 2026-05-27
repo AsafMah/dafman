@@ -254,7 +254,12 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   }),
   getSettings: rpcGuard(async () => settings.get()),
   updateSettings: rpcGuard(async (args) => {
-    const { settings: next } = args as { settings: ReturnType<typeof settings.get> };
+    // Production wire shape is `{ next: Settings }` (see src-bun/rpc.ts).
+    // Earlier this handler destructured `{ settings: next }` which never
+    // matched the renderer's payload — every layout-persist silently
+    // dropped on the floor in the WS-bridge harness. Caught while wiring
+    // flow 21 (layout-restore E2E).
+    const { next } = args as { next: ReturnType<typeof settings.get> };
 
     await settings.update(next);
 

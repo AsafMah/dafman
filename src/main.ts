@@ -169,22 +169,37 @@ async function mountWith(Root: typeof App) {
 
   app.mount('#app');
 
-  // Optional test hook — exposed only when the smoke RPC stub is also
-  // installed (same gate). Gives playwright a way to invoke command
-  // palette entries by id without simulating keyboard input, and to
-  // reach into the layout/groups stores for debugging.
-  if (testBridge) {
+  // Optional test hook — exposed both when the smoke RPC stub is
+  // installed via `window.__DAFMAN_TEST_RPC__` (smoke harness in `e2e/`)
+  // and when the full-tier WebSocket bridge URL param is present
+  // (real-E2E harness in `e2e/full/`). Gives playwright a way to
+  // invoke command palette entries by id without simulating keyboard
+  // input, and to reach into the layout/groups stores for debugging.
+  const wsBridgeActive =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('testBridge');
+  if (testBridge || wsBridgeActive) {
+    // Eager-load the test surface. Earlier we tried lazy-loading on
+    // first method call to avoid extra boot work, but that made
+    // `getState()` return a Promise and broke the sync predicate
+    // contract Playwright callers rely on. Eager-load keeps the
+    // surface sync from the caller's perspective.
     const { useCommandRegistry } = await import('@/stores/shell/commandRegistry');
     const { useLayoutStore } = await import('@/stores/shell/layoutStore');
     const { useGroupsStore } = await import('@/stores/shell/groupsStore');
+    const { useGroupsActions } = await import('@/composables/useGroupsActions');
     const registry = useCommandRegistry();
     const layout = useLayoutStore();
     const groups = useGroupsStore();
+    const groupsActions = useGroupsActions();
     (window as unknown as {
       __DAFMAN_TEST__: {
         runCommand: (id: string) => Promise<unknown>;
         addPanel: (sessionId: string) => void;
         getState: () => unknown;
+        moveSessionToGroup: (sessionId: string, targetGroupId: string) => Promise<void>;
+        renameGroup: (id: string, name: string) => void;
+        setGroupColor: (id: string, color: string) => void;
       };
     }).__DAFMAN_TEST__ = {
       async runCommand(id: string) {
@@ -196,13 +211,27 @@ async function mountWith(Root: typeof App) {
         layout.addPanel(sessionId);
       },
       getState(): unknown {
+        const innerPanelIds: Record<string, string[]> = {};
+        for (const [gid, api] of Object.entries(groups.innerApis)) {
+          innerPanelIds[gid] = api.panels.map((p) => p.id);
+        }
         return {
           activeGroupId: groups.activeGroupId,
           groups: groups.groups.map((g) => ({ id: g.id, name: g.name, color: g.color })),
           innerApiCount: Object.keys(groups.innerApis).length,
+          innerPanelIds,
           outerPanelIds: layout.api?.panels.map((p) => p.id) ?? [],
           bodyApiPanelIds: layout.bodyApi?.panels.map((p) => p.id) ?? [],
         };
+      },
+      async moveSessionToGroup(sessionId: string, targetGroupId: string): Promise<void> {
+        await groupsActions.moveSessionToGroup(sessionId, targetGroupId);
+      },
+      renameGroup(id: string, name: string): void {
+        groups.renameGroup(id, name);
+      },
+      setGroupColor(id: string, color: string): void {
+        groups.setGroupColor(id, color);
       },
     };
   }

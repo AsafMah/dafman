@@ -17,8 +17,8 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface BunHarness {
-  port: number;
-  wsUrl: string;
+  readonly port: number;
+  readonly wsUrl: string;
   workspace: string;
   userData: string;
   /// Invoke a control-namespace RPC on the test-server (e.g.
@@ -27,6 +27,11 @@ export interface BunHarness {
   invokeControl: <T = unknown>(name: string, args: Record<string, unknown>) => Promise<T>;
   /// Stop the bun subprocess + remove the temp workspace.
   teardown: () => Promise<void>;
+  /// Kill the current bun subprocess, respawn on a fresh port against
+  /// the SAME workspace + userData, and rewire `port` / `wsUrl` /
+  /// `invokeControl` in-place. Used to assert restart-restore flows
+  /// (layout, settings, groups) without juggling two harness objects.
+  restart: (overrides?: { stubPickerPath?: string }) => Promise<void>;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,42 +71,21 @@ export async function spawnBunHarness(options: {
 } = {}): Promise<BunHarness> {
   const workspace = options.workspace ?? seedWorkspace();
   const userData = options.userData ?? join(workspace, ".dafman-userdata");
-  const port = pickPort();
-  const args = [
-    "src-bun/test-server.ts",
-    `--port=${port}`,
-    `--workspace=${workspace}`,
-    `--user-data=${userData}`,
-  ];
-  if (options.stubPickerPath) {
-    args.push(`--stub-picker=${options.stubPickerPath}`);
-  }
-  const child = spawn("bun", args, {
-    cwd: REPO_ROOT,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
-  });
-  child.stderr?.on("data", (b) => {
-    process.stderr.write(`[bun] ${String(b)}`);
-  });
 
-  await waitForReadyMarker(child, port);
+  // Mutable child + control-client refs so `restart()` can swap them
+  // in-place while the returned harness object keeps the same identity.
+  let active = await spawnChild({ workspace, userData, stubPickerPath: options.stubPickerPath });
 
-  const invokeControl = makeControlClient(`ws://127.0.0.1:${port}`);
-
-  return {
-    port,
-    wsUrl: `ws://127.0.0.1:${port}`,
+  const harness: BunHarness = {
+    get port() { return active.port; },
+    get wsUrl() { return active.wsUrl; },
     workspace,
     userData,
-    invokeControl,
+    invokeControl: async <T = unknown>(name: string, args: Record<string, unknown>): Promise<T> => {
+      return active.invokeControl<T>(name, args);
+    },
     async teardown() {
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        /* ignore */
-      }
-      await new Promise((r) => setTimeout(r, 50));
+      await killChild(active.child);
       // Only nuke the workspace when WE created it. The caller
       // owns external workspaces (cwd-persistence test passes its
       // own A + B tempdirs in and cleans them up itself).
@@ -113,7 +97,73 @@ export async function spawnBunHarness(options: {
         }
       }
     },
+    async restart(overrides) {
+      await killChild(active.child);
+      active = await spawnChild({
+        workspace,
+        userData,
+        stubPickerPath: overrides?.stubPickerPath ?? options.stubPickerPath,
+      });
+    },
   };
+
+  // BunHarness's interface declares `port` / `wsUrl` as plain strings/numbers
+  // for callers, but we want them to read through to `active`. The TS shape
+  // is preserved at the public boundary; the getter trick keeps `harness.wsUrl`
+  // current after `restart()`.
+  return harness;
+}
+
+interface ActiveChild {
+  child: ChildProcess;
+  port: number;
+  wsUrl: string;
+  invokeControl: <T>(name: string, args: Record<string, unknown>) => Promise<T>;
+}
+
+async function spawnChild(opts: {
+  workspace: string;
+  userData: string;
+  stubPickerPath?: string;
+}): Promise<ActiveChild> {
+  const port = pickPort();
+  const args = [
+    "src-bun/test-server.ts",
+    `--port=${port}`,
+    `--workspace=${opts.workspace}`,
+    `--user-data=${opts.userData}`,
+  ];
+  if (opts.stubPickerPath) {
+    args.push(`--stub-picker=${opts.stubPickerPath}`);
+  }
+  const child = spawn("bun", args, {
+    cwd: REPO_ROOT,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env },
+  });
+  child.stderr?.on("data", (b) => {
+    process.stderr.write(`[bun] ${String(b)}`);
+  });
+  await waitForReadyMarker(child, port);
+  return {
+    child,
+    port,
+    wsUrl: `ws://127.0.0.1:${port}`,
+    invokeControl: makeControlClient(`ws://127.0.0.1:${port}`),
+  };
+}
+
+async function killChild(child: ChildProcess): Promise<void> {
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    /* ignore */
+  }
+  // 200ms grace on Windows for the socket to drop before the next
+  // spawnChild picks a (potentially same) port. The port-picker is
+  // randomized so collisions are unlikely, but the wait also lets the
+  // control-client `close` listeners fire and clear pending callbacks.
+  await new Promise((r) => setTimeout(r, 200));
 }
 
 function waitForReadyMarker(child: ChildProcess, port: number): Promise<void> {

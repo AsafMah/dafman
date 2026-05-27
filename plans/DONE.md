@@ -127,7 +127,14 @@ Legend:
 | Backend TS gate (`lint:tsc-bun` in `check`) | ✅ | `package.json` (2026-05-25) |
 | Bun-side entry reachability check (`lint:bun`) | ✅ | `tools/check-bun-entry.ts` |
 | Tier-2 electrobun build matrix (Linux/macOS/Windows) | ✅ | `.github/workflows/ci.yml` |
-| Tier-3 real E2E (Playwright + bun + fake SDK) | ✅ | `bun run e2e` — 6 baseline flows |
+| Tier-3 real E2E (Playwright + bun + fake SDK) | ✅ | `bun run e2e` — 24 flows (20 baseline + 4 v3 restart-restore) |
+| Tier-3 `harness.restart()` for restart-restore flows | ✅ | `e2e/full/harness/bunHarness.ts` (kills + respawns on new port, same userData) |
+| `urlFor()` cross-restart bridge helper | ✅ | `e2e/full/harness/pageHarness.ts` |
+| Layout restore E2E (2 groups + session, restart, reload) | ✅ | `e2e/full/flows/21-layout-restore.pwtest.ts` |
+| Settings round-trip E2E (theme persists across restart) | ✅ | `e2e/full/flows/22-settings-roundtrip.pwtest.ts` |
+| Groups v3 create + session-lands-in-active-group E2E | ✅ | `e2e/full/flows/23-groups-create.pwtest.ts` |
+| Move session between groups + survive restart E2E | ✅ | `e2e/full/flows/24-groups-move-session.pwtest.ts` |
+| `__DAFMAN_TEST__` hook auto-wires for ws-bridge URL too | ✅ | `src/main.ts` (was smoke-only; now also fires for `?testBridge=ws://...`) |
 | Renderer smoke (prod + HMR) | ✅ | `e2e/smoke.pwtest.ts` |
 | Smoke screenshot pattern | ✅ | `bun run smoke` |
 | `tools/probe-*.ts` user-bug-repro pattern | 🟦 | `tools/probe-groups-bugs.ts` (canonical) |

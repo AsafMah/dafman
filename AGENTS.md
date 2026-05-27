@@ -264,29 +264,45 @@ Every substantive session ends with:
 
 #### 4a. Dogfood-before-`task_complete` (UI / IPC changes)
 
-Until the real-E2E Tier-4 harness lands (tracked in
-[`plans/TODO.md`](plans/TODO.md) → Testing & CI), unit tests + smoke are
-**not sufficient** for changes that touch:
+The Tier-3 E2E harness (`bun run e2e`) covers:
+- session create/send + reply
+- @-picker happy path + path-nav
+- permission flow + audit log
+- layout restore across bun restart (`flow 21`)
+- settings round-trip across bun restart (`flow 22`)
+- groups v3: create + session lands in active group (`flow 23`)
+- groups v3: move session between groups + survive restart (`flow 24`)
+- file picker toggle persist, cwd persist, export, audit rehydrate,
+  reveal, attachment abspath, perm matcher, perm-each-kind, details
+  rail, tools toggle, plan panel, quota warning, library MCP,
+  library skills, details singleton
+
+For changes that touch:
 
 - the composer / Lexical plugins
 - any `searchWorkspaceFiles` / `pickAttachment` / `sendMessage` /
   `pendingRequest` IPC path
-- dockview layout / panel mount
+- dockview layout / panel mount (outer or inner)
+- groups v3 (`groupsStore`, `useGroupsActions`, `GroupPanel`)
+- settings / `coerceLayout` / persist
 - z-index / stacking-context decisions
 
 Required additional gate before `task_complete`:
 
-1. `bun run dev` once (or `dev:hmr`) — actually exercise the changed
-   flow manually. (This single step catches the bug class that
-   shipped in commit 7c728e3 — `cwdFor()` returned undefined for
-   every session and "No matches" was the result, undetected by
-   347 unit tests + smoke + lint.)
-2. If touching Lexical / trigger / DOM-selection logic, also pop
+1. **Run the relevant existing E2E flow** before claiming the change
+   is safe (`bun run e2e:run -- e2e/full/flows/<flow>.pwtest.ts`).
+   Layout / groups / settings changes MUST also pass flows 21–24.
+2. If the change exercises a path no flow covers, **add a flow** in
+   the same PR (use flow 21 / 23 as templates; the `bunHarness` with
+   `restart()` plus `__DAFMAN_TEST__` are the available primitives).
+3. `bun run dev` once (or `dev:hmr`) — actually exercise the changed
+   flow manually. Still required for visual / responsive changes
+   that don't have automation yet.
+4. If touching Lexical / trigger / DOM-selection logic, also pop
    chromium DevTools to check stacking + visual.
-3. If a manual step *can't* be turned into an automated test in the
-   current suite, add it to `MANUAL_TESTS.md` per rule #10 AND note
-   in DEVLOG which automated test would have caught it under the
-   planned E2E tier.
+5. If a manual step *can't* be turned into an automated test (native
+   OS dialog / keyring / OS-modal), add it to `MANUAL_TESTS.md` per
+   rule #10.
 
 The "I ran lint + tests + smoke and they were green" output is
 **not** a substitute for actually running the app. Don't dodge.
