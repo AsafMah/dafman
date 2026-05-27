@@ -18,26 +18,28 @@ Legend:
 
 ---
 
-## By User (unsorted)
+## By User (unsorted intake)
 
-- The instructions markdown doesn't support darkmode
-- The instructions should support creating and editing
-- No refresh button on library agents
-- Library agents doesn't show project agents
-- MCP creator doesn't let you choose between user or project
-- MCP creator is a modal, but agent creator is inline
-- Many tools (especially sub-agent related one such as task, read agent, report_intent, powershell, ask_user (After the ask - in history)) don't have nice ui
-- I think we should use the library to set mcp/tools/skills/agents/instructions things for the session, instead of duplicating it with the session settings (need to think about design)
-- Sessions may resume with the agent "thinking..." and never get resolved
-- Bottom bar resizing is ruined again, probably because you brought the modes icon back, but not the small select version on small sizes
-- Background tasks in sessions looks worse and is less useful than library
-- Collpased menus, in general, should use the space to display something useful
-- Probably need chip + selector for agent in the bottom bar
-- 
+> Inbox for raw user feedback. Anything actionable here should be
+> sorted into the relevant section below in the next cleanup pass.
+> Lines that have been sorted are deleted from this list.
+
+_(Empty — 2026-05-27 pass sorted all 14 prior items into the canonical
+sections. See §"User-reported bugs — sorted" below + §Messaging & UX +
+§Skills/agents/automations for where each landed.)_
 
 ## Top of stack (recommended next sprints)
 
 Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
+
+**Immediate bug-sprint queue (continuation of the 2026-05-27 plan):**
+
+0a. ⬜ **Sprint B — MCP UX repair** (~2.5 d) — OAuth popup login flow, Sign-in button, discovered toggle persistence, Remove UX. Highest-impact bug cluster left.
+0b. ⬜ **Sprint C — `/skill <name>` runs the skill** (~1 d) — Mirror of Sprint A3's pattern.
+0c. ⬜ **Sprint D — Jobs panel + bottom bar polish** (~1 d) — Spinner centering, Go-to-session scroll, bottom-bar resize regression.
+0d. ⬜ **Sprint E — Light mode visual audit** (~1 d) — Plus instructions-markdown theme fix as a sibling.
+
+**Feature backlog (top-of-stack after bug sprints clear):**
 
 1. ⬜ **Configurable shortcut system** — user-flagged as the next priority after palette polish
 2. ⬜ **GitHub `#` mentions + Issues/PRs/Gists Library tabs** (G1) — small, leverages existing `MentionPlugin`
@@ -47,8 +49,8 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 6. ⬜ **Plans API rendering panel** — SDK `rpc.plan.*` exists; no panel
 7. ⬜ **Memory backend** (SQLite-vec or LanceDB)
 8. ⬜ **Automations + scheduler** + HTTP hooks
-9. ⬜ **Cmd palette prefix syntax** (deferred from polish sprint — sub-menus + settings coverage shipped 2026-05-27)
-10. ⬜ **Real-Electrobun (CDP) harness, Tier-4** — drive the actual WebView2/WKWebView binary. Hard (no CDP debug ports exposed by default) and Tier-3 extension shipped 2026-05-27 already catches the v3 bug class; downranked.
+9. ⬜ **Cmd palette prefix syntax** (deferred from palette polish sprint)
+10. ⬜ **Real-Electrobun (CDP) harness, Tier-4** — Hard (no CDP debug ports exposed by default); Tier-3 catches the v3 bug class so downranked.
 
 ---
 
@@ -62,6 +64,7 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 | 4 | Manual test pass on real data | ⬜ | user | Restore fix `c97b0a5` unblocks |
 | 5 | Tiling / layout commands (split / stack / focus-by-direction) | 🟦 | 1 d | `view.newGroup` etc. landed v3; more keyboard tiling missing |
 | 6 | Dockview upstream `#1305` + `#1306` | ⏳ | — | Awaiting upstream |
+| 7 | Bottom bar resize regression + responsive mode selector on small sizes | ⬜ | 0.5 d | User-flagged 2026-05-27: "Bottom bar resizing is ruined again, probably because you brought the modes icon back, but not the small select version on small sizes". The composer-footer mode selector lost its narrow-mode form. Pairs with §"User-reported bugs — sorted" §12 (Sprint D). |
 
 ## Messaging & UX
 
@@ -79,7 +82,14 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 | 10 | `/diff` session changes panel | ⬜ | 1 d | |
 | 11 | Pin to Notes sidebar / Notes sidebar | ⬜ | — | Deferred |
 | 12 | Theme picker (colorblind variants) | 🟦 | 1 d | Light/dark only today |
-| 13 | Fix light mode (visual bugs / contrast / unstyled areas) | ⬜ | 1 d | User-flagged 2026-05-27. Dark is the default-tested path; light mode has not been audited recently — likely missing tokens / PrimeVue overrides / per-component themes. |
+| 13 | Fix light mode (visual bugs / contrast / unstyled areas) | ⬜ | 1 d | User-flagged 2026-05-27. Dark is the default-tested path; light mode has not been audited recently. Also: instructions markdown doesn't render in dark mode either (so the markdown renderer respects neither). |
+| 14 | Instructions markdown renderer respects theme tokens | ⬜ | 0.5 d | User-flagged 2026-05-27: "The instructions markdown doesn't support darkmode". Could be a `prose` / `prose-invert` Tailwind / PrimeVue token miss. Pairs with row 13 light-mode sweep. |
+| 15 | Library Instructions: create + edit instruction files | ⬜ | 1 d | User-flagged 2026-05-27: "The instructions should support creating and editing". Today Library Instructions tab is read-only. Mirror the Agents tab's New + Edit + Delete shape. |
+| 16 | Rich UI for sub-agent related tool calls (`task`, `read_agent`, `report_intent`, `powershell`, `ask_user` in-history view) | ⬜ | 2 d | User-flagged 2026-05-27: "Many tools don't have nice ui". Current `ToolCallBlock` falls back to generic args+output. Each named tool should get a per-renderer (like `apply_patch` / `fs.edit` already have). |
+| 17 | Background tasks UI parity between in-session strip and Library | ⬜ | 1 d | User-flagged 2026-05-27: "Background tasks in sessions looks worse and is less useful than library". Reuse the same component or share rendering. |
+| 18 | Collapsed menus use space to display something useful (preview / mini view / count badge) | ⬜ | 0.5 d | User-flagged 2026-05-27: "Collapsed menus, in general, should use the space to display something useful". |
+| 19 | Sessions sometimes resume with `thinking…` stuck and never resolve | ⬜ | 1.5 d | User-flagged 2026-05-27: "Sessions may resume with the agent 'thinking…' and never get resolved". Probably an SDK event not replayed during resume → `isThinking` ref never clears. |
+| 20 | Agent chip + selector in the bottom bar | ⬜ | 1 d | User-flagged 2026-05-27: "Probably need chip + selector for agent in the bottom bar". Companion to the A1 Library Select button. |
 
 ## Tools & permissions
 
@@ -158,19 +168,25 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 
 | # | Item | Status | Effort | Notes |
 |---|---|---|---|---|
-| 1 | ~~`/agent <name>` actually selects the agent~~ | ✅ | — | Shipped 2026-05-27. `/agent <name>` calls `selectAgent` IPC; unknown names warn-toast with available list; bare `/agent` opens Library. Inline typeahead deferred (Lexical-side work). See item 1b below. |
-| 1b | **Inline typeahead for `/agent <name>`** | ⬜ | 1 d | Deferred from row 1. The composer slash menu should list agents directly when the user types `/agent ` (with a trailing space) so they don't have to remember names. Needs custom Lexical typeahead extension beyond the current single-token slash matcher. |
-| 2 | **`/skill <name>` actually runs the skill** | ⬜ | 1 d | Same shape as the (now-shipped) /agent fix. Today `/skill` / `/skills` just open the Library Skills tab. Needs: route `/skill <name>` through `rpc.skills.list` then invoke. Pairs with item 5 below ("Skills as `/skill-name` slash typeahead"). |
-| 3 | **`/mcp <server>` operations** | ⬜ | 1 d | Today `/mcp` just opens the Library MCP tab. Need to scope: maybe `/mcp enable <server>` / `/mcp disable <server>` / `/mcp restart <server>` per server. Or just kill the slash if Library tab is the right UX. Decide in spec interview. |
-| 4 | ~~"Select" button in LibraryAgentsTab~~ | ✅ | — | Shipped (commit pending). Per-row Select/Deselect button + "Selected" chip + left-rail accent on the current agent. Reuses `useSessionAgents` so state stays in sync with `SessionDetailsPanel`. |
-| 5 | Skills as `/skill-name` slash typeahead | ⬜ | 1 d | Local-commands path exists; SDK skills not routed |
-| 6 | Agents / fleets full panel | 🟦 | 2 d | Picker + sub-agent block exist; no fleet panel |
-| 7 | Scheduled prompts (cron) | ⬜ | 2 d | None today |
-| 8 | File / time / manual / webhook triggers | ⬜ | 3 d | |
-| 9 | Activity feed (Settings → Activity) | ⬜ | 1 d | |
-| 10 | Quiet hours / batching / digest | ⬜ | 1 d | Notifications polish |
-| 11 | Background task notifications | ⬜ | 0.5 d | |
-| 12 | `/research`, `/init`, `/review`, `/delegate` | ⬜ | — | |
+| 1 | ~~`/agent <name>` actually selects the agent~~ | ✅ | — | Shipped 2026-05-27 (`a529ef5`). |
+| 2 | Inline typeahead for `/agent <name>` | ⬜ | 1 d | Deferred from row 1. Composer slash menu lists agents when user types `/agent ` (trailing space). Needs custom Lexical typeahead beyond the single-token slash matcher. |
+| 3 | `/skill <name>` actually runs the skill | ⬜ | 1 d | Today `/skill` / `/skills` just open Library. Route through `rpc.skills.list` then invoke. Pairs with row 7. |
+| 4 | `/mcp <server>` subcommands | ⬜ | 1 d | Today `/mcp` just opens Library. Scope (`/mcp enable/disable/restart <server>` vs. drop the slash entirely) — decide in Sprint B spec interview. |
+| 5 | ~~Library Agents `Select` / `Deselect` button~~ | ✅ | — | Shipped 2026-05-27 (`bca5704`). |
+| 6 | ~~Library Agents `Edit` button~~ | ✅ | — | Shipped 2026-05-27 (`a529ef5`). Safe-subset edit + preserves unknown frontmatter (mcp-servers / github / plugin keys). |
+| 7 | Skills as `/skill-name` slash typeahead | ⬜ | 1 d | Local-commands path exists; SDK skills not routed. |
+| 8 | Agents / fleets full panel | 🟦 | 2 d | Picker + sub-agent block exist; no fleet panel. |
+| 9 | Library Agents refresh button | ⬜ | 0.25 d | User-flagged 2026-05-27: "No refresh button on library agents". Today the tab loads on mount; if the user drops a file at the path, they have to switch tabs to re-trigger. |
+| 10 | Library Agents shows project agents (`.github/agents/`) | ⬜ | 0.5 d | User-flagged 2026-05-27: "Library agents doesn't show project agents". The composable already filters by `activeSession?.id`; verify project files in `<workspace>/.github/agents/` are actually listed when a session has a `workingDirectory`. |
+| 11 | MCP creator: pick user vs project scope | ⬜ | 0.5 d | User-flagged 2026-05-27: "MCP creator doesn't let you choose between user or project". `McpServerForm` has no scope picker; today everything writes to user config. Mirror the Agents form's Scope toggle. |
+| 12 | Unify MCP creator UX with Agent creator (modal vs inline) | ⬜ | 0.5 d | User-flagged 2026-05-27: "MCP creator is a modal, but agent creator is inline". Pick one shape (inline preferred for consistency since Agents already has it). |
+| 13 | Library replaces SessionDetailsPanel as the source of truth for per-session mcp/tools/skills/agents/instructions | ⬜ | 3 d | User-flagged 2026-05-27 as a design question, not a clear bug. "I think we should use the library to set mcp/tools/skills/agents/instructions things for the session, instead of duplicating it with the session settings (need to think about design)." Needs spec interview before implementation. Tagged as design-decision. |
+| 14 | Scheduled prompts (cron) | ⬜ | 2 d | None today. |
+| 15 | File / time / manual / webhook triggers | ⬜ | 3 d | |
+| 16 | Activity feed (Settings → Activity) | ⬜ | 1 d | |
+| 17 | Quiet hours / batching / digest | ⬜ | 1 d | Notifications polish. |
+| 18 | Background task notifications | ⬜ | 0.5 d | |
+| 19 | `/research`, `/init`, `/review`, `/delegate` | ⬜ | — | |
 
 ## Autopilot
 
@@ -254,23 +270,63 @@ History in `_archive/plan-tech-debt.prompt.md`.
 | 4 | Dev-only suspicious deps (D3) | flag-only | |
 | 5 | Native Go type-checker (typescript-go) (D4) | ⏳ upstream | |
 
-## User-reported manual-test bugs (2026-05-27 sweep of MANUAL_TESTS.md notes)
+## User-reported bugs — sorted (2026-05-27)
 
-These are issues the user has manually verified during dogfooding and embedded as
-`Note:` lines in `MANUAL_TESTS.md`. They are real, reproducible bugs — not hypotheticals.
+Canonical list of bugs the user has manually verified during dogfooding.
+Auto-merged from prior `Note:` lines in `MANUAL_TESTS.md` + new
+2026-05-27 reports. Sorted by sprint assignment from `plans/_archive/`
+post-triage planning so the work order is explicit.
 
-| # | Item | Status | Effort | Receipt in MANUAL_TESTS.md |
+Status legend: ⬜ open · ✅ shipped (move to DONE.md on next sweep) ·
+🟦 partial · ⏸️ deferred (with a real reason)
+
+### Already shipped this sprint (2026-05-27 — pending user dogfood)
+
+| # | Bug | Status | Commit | Verification |
 |---|---|---|---|---|
-| 1 | Jobs panel spinner orbits a center point (visual jank); Go-to-session scrolls to top instead of the relevant message | ⬜ | 1 d | line 293-295 |
-| 2 | Plan-mode toggle doesn't actually switch to plan mode | ⬜ | 1 d | line 375 |
-| 3 | Skills tab doesn't recognize skills from `.github/skills` | ⬜ | 1 d | line 706 |
-| 4 | MCP **HTTP transport / OAuth** UI: "No such option" — the Sign-in / HTTP transport form doesn't render | ⬜ | 1 d | line 781 |
-| 5 | Toggling **discovered MCPs** doesn't persist / do anything; discovered servers should be editable / deletable / show location | ⬜ | 1 d | line 797-798 |
-| 6 | Removing a configured MCP "jumps to discovered" — confusing UX | ⬜ | 0.5 d | line 805 |
-| 7 | **No Sign-in button at all** on configured HTTP MCP servers | ⬜ | 0.5 d | line 812 |
-| 8 | Agent card missing an **Edit button** (only reveal / delete) | ⬜ | 0.5 d | line 1100 |
-| 9 | Pressing Tab on the `/fleet` slash menu should insert into composer (so you can add the description), not commit immediately | ⬜ | 0.5 d | line 1196 |
-| 10 | Sub-agent block emits raw `<system_notification>` text instead of parsed events into the nested card | ⬜ | 1 d | line 1205-1210 |
+| 1 | No way to choose an agent on the Library Agents screen | ✅ | `bca5704` | MANUAL_TESTS.md A1.1–A1.4 |
+| 2 | Agent card missing an Edit button | ✅ | `a529ef5` | MANUAL_TESTS.md A2.1–A2.4 |
+| 3 | `/agent <name>` doesn't actually select | ✅ | `a529ef5` | MANUAL_TESTS.md A3.1–A3.3 |
+
+### Sprint B — MCP UX (4 bugs, ~2.5 d)
+
+| # | Bug | Status | Effort | Source |
+|---|---|---|---|---|
+| 4 | MCP HTTP transport has no OAuth popup login flow — values entered manually only | ⬜ | 1 d | 2026-05-27 user feedback (MANUAL_TESTS.md "MCP — HTTP transport + OAuth login flow") |
+| 5 | `Sign in` button on configured HTTP MCP servers is broken / doesn't appear | ⬜ | 0.5 d | MANUAL_TESTS.md "MCP — `Sign in` button on HTTP servers" |
+| 6 | Toggling discovered MCPs doesn't persist; discovered rows should be editable / deletable and show file path | ⬜ | 1 d | MANUAL_TESTS.md "MCP — discovered server toggle + editability" |
+| 7 | MCP `Remove` jumps to `Discovered` view instead of staying in `Configured` | ⬜ | 0.5 d | MANUAL_TESTS.md "MCP — Remove no longer 'jumps to discovered'" |
+
+### Sprint C — Slash command UX (1 bug, ~1 d)
+
+| # | Bug | Status | Effort | Source |
+|---|---|---|---|---|
+| 8 | `/skill <name>` only opens Library; should run the skill (pairs with row 5 in §Skills) | ⬜ | 1 d | MANUAL_TESTS.md "Slash `/skill <name>` actually runs the skill" |
+| 9 | `/mcp <server>` only opens Library; subcommand shape TBD (decide in Sprint B spec interview) | ⬜ | 0.5 d | MANUAL_TESTS.md "Slash `/mcp <server>` operations" |
+
+### Sprint D — Jobs panel + bottom bar (3 bugs, ~1 d)
+
+| # | Bug | Status | Effort | Source |
+|---|---|---|---|---|
+| 10 | Jobs panel spinner orbits an off-center point (visual jank — CSS `transform-origin`) | ⬜ | 0.25 d | MANUAL_TESTS.md "Jobs panel — spinner + scroll bugs" |
+| 11 | `Go to session` in Jobs panel scrolls to top instead of the relevant message | ⬜ | 0.5 d | Same as #10 |
+| 12 | Bottom bar resize regressed (after plan-mode fix) — needs scoping which "bottom bar" + repro | ⬜ | 0.25 d | 2026-05-27 user feedback |
+
+### Sprint E — Light mode (1 bug, ~1 d)
+
+| # | Bug | Status | Effort | Source |
+|---|---|---|---|---|
+| 13 | Light mode has visual issues across the app — needs audit + token / contrast / unstyled-region sweep | ⬜ | 1 d | MANUAL_TESTS.md "Light mode visual audit" |
+
+### Deferred / split out
+
+| # | Item | Status | Why deferred |
+|---|---|---|---|
+| 14 | Inline typeahead for `/agent <name>` (list agents in slash menu) | ⏸️ | Spec'd `inline_typeahead` but requires custom Lexical extension beyond the single-token slash matcher. Named-select path (Sprint A3 ✅) already fixes the user-reported "can't choose an agent" issue. Promote when Lexical typeahead work is in scope. |
+| 15 | `Sub-agent block emits raw <system_notification>` | ✅ | User reports already fixed (2026-05-27). Kept in MANUAL_TESTS.md "Pending verification" until re-run confirms. |
+| 16 | Plan-mode toggle doesn't switch | ✅ | User reports already fixed (2026-05-27). |
+| 17 | Skills tab doesn't recognize `.github/skills` | ✅ | User reports already fixed (2026-05-27). Kept in MANUAL_TESTS.md "Failing" until re-verified on clean install. |
+| 18 | `/fleet` Tab key shouldn't commit immediately | ✅ | User reports already fixed (2026-05-27). |
 
 ## Open product questions
 
