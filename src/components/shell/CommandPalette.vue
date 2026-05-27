@@ -293,7 +293,10 @@ useEventListener(window, 'click', onWindowClick, true);
                 :style="child.accent ? { '--cmd-accent': child.accent } : {}"
                 :data-has-accent="child.accent ? 'true' : 'false'"
               >
-                <CommandPaletteRow :cmd="child" />
+                <CommandPaletteRow
+                  :cmd="child"
+                  :parent-label="cmd.label"
+                />
               </Command.Item>
             </template>
           </template>
