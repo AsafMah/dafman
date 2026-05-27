@@ -188,6 +188,26 @@ const persistCalls = await page.evaluate(() => {
 });
 console.log("[smoke:persist]", JSON.stringify(persistCalls, null, 2));
 
+console.log("\n=== Right-click context menu visual check (v3.1) ===");
+// Right-click the first group tab and screenshot the resulting menu.
+// Playwright can OPEN the menu reliably, but PrimeVue's command callbacks
+// don't fire from synthetic key events or DOM clicks — real mouse clicks
+// from the user are the canonical activation path. So this probe just
+// verifies the menu opens with the expected items + visual chrome; the
+// downstream Popover (color picker) needs manual verification.
+await page.locator('.group-tab').first().click({ button: 'right' });
+await page.waitForTimeout(300);
+
+const menuState = await page.evaluate(() => ({
+  contextMenuOpen: document.querySelectorAll('.p-contextmenu').length,
+  itemLabels: Array.from(document.querySelectorAll('.p-contextmenu .p-menuitem-link, .p-contextmenu .dv-menu-item-row'))
+    .map((el) => el.textContent?.trim() ?? ''),
+  iconsPresent: document.querySelectorAll('.p-contextmenu .pi-pencil, .p-contextmenu .pi-palette, .p-contextmenu .pi-times').length,
+}));
+console.log("[smoke:contextmenu]", JSON.stringify(menuState, null, 2));
+
+await page.screenshot({ path: "test-results/probe-color-popover.png", fullPage: true });
+
 console.log("\n=== Looking for + button on outer body tab strip (bug 2) ===");
 const s4 = await page.evaluate(() => {
   // Find the outer body's tab strip (horizontal one).

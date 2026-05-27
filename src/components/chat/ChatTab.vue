@@ -75,14 +75,11 @@ const menuItems = computed<MenuItem[]>(() => {
       // Disable when only one group exists (nowhere to move to).
       disabled: others.length === 0,
       items: others.map((g) => ({
+        // `label` is the display string; `groupColor` is a custom field
+        // the `item` slot below reads to render the color dot. PrimeVue
+        // MenuItem allows arbitrary fields on the object.
         label: g.name,
-        // Render the color dot via inline style on the label icon. PrimeVue
-        // ContextMenu doesn't have a slot for arbitrary content per item
-        // in 4.x; the `iconClass` + `style` approach keeps it consistent
-        // with the existing menu rendering used elsewhere.
-        icon: 'pi pi-circle-fill',
-        iconClass: 'group-color-dot',
-        style: { '--menu-color-dot': g.color } as Record<string, string>,
+        groupColor: g.color,
         command: () => {
           void groupsActions.moveSessionToGroup(sessionId.value, g.id);
         },
@@ -95,6 +92,13 @@ function onContextMenu(event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
   ctxMenuRef.value?.show(event);
+}
+
+/// Pluck the destination group's color from a custom field we attach to
+/// each `Move to group` submenu item. Wrapped in a helper because Vue
+/// templates don't accept `as` casts.
+function groupColorOf(item: MenuItem): string | undefined {
+  return (item as { groupColor?: string }).groupColor;
 }
 </script>
 
@@ -130,7 +134,32 @@ function onContextMenu(event: MouseEvent): void {
     <ContextMenu
       ref="ctxMenuRef"
       :model="menuItems"
-    />
+    >
+      <template #item="{ item, props }">
+        <!-- Custom item template so the destination group's color dot
+        actually renders with its color. PrimeVue 4's default item
+        rendering applies `iconClass` but doesn't propagate per-item
+        `style` to the icon element. `v-bind="props.action"` keeps
+        PrimeVue's keyboard + ARIA wiring intact. -->
+        <a
+          v-bind="props.action"
+          class="dv-menu-item-row"
+        >
+          <span
+            v-if="groupColorOf(item)"
+            class="dv-menu-color-dot"
+            :style="{ background: groupColorOf(item) }"
+            aria-hidden="true"
+          />
+          <i
+            v-else-if="item.icon"
+            :class="['pi', item.icon]"
+            aria-hidden="true"
+          />
+          <span class="dv-menu-item-label">{{ item.label }}</span>
+        </a>
+      </template>
+    </ContextMenu>
   </div>
 </template>
 
@@ -282,15 +311,36 @@ function onContextMenu(event: MouseEvent): void {
 }
 </style>
 
-<!-- Color-dot styling for the "Move to group" ContextMenu items. PrimeVue
-ContextMenu renders the menu in a Vue teleport portal that's outside the
-scoped CSS boundary, so the rule must be unscoped to apply to the dots
-in the rendered menu. Targeted by a class on the menu item's icon
-(`iconClass: 'group-color-dot'`) + a CSS variable on each item's style
-binding. -->
+<!-- Unscoped so the rule reaches the ContextMenu items rendered in a Vue
+teleport portal outside the scoped boundary. The `dv-menu-*` classes are
+applied by the `#item` slot template above so we have full control over
+the dot rendering — earlier `iconClass + style` attempts didn't work
+because PrimeVue 4 MenuItem doesn't propagate per-item `style` to the
+icon element. Same classes are reused by GroupTab.vue's color popover. -->
 <style>
-.group-color-dot {
-  color: var(--menu-color-dot, var(--p-text-color)) !important;
-  font-size: 0.65rem !important;
+.dv-menu-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.4rem 0.75rem;
+  color: var(--p-text-color);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.dv-menu-color-dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--p-text-color) 12%, transparent);
+}
+
+.dv-menu-item-label {
+  flex: 1 1 auto;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 </style>

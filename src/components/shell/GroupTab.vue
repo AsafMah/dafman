@@ -13,6 +13,8 @@
 
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import ContextMenu from 'primevue/contextmenu';
+import Popover from 'primevue/popover';
+import ColorPicker from 'primevue/colorpicker';
 import type { MenuItem } from 'primevue/menuitem';
 import { useGroupsStore, GROUP_COLORS } from '@/stores/shell/groupsStore';
 import { useGroupsActions } from '@/composables/useGroupsActions';
@@ -94,6 +96,30 @@ function cancelRename(): void {
   isRenaming.value = false;
 }
 
+// ─── Color picker popover ────────────────────────────────────────────
+
+const colorPopRef = useTemplateRef<InstanceType<typeof Popover>>('colorPopRef');
+
+/// Two-way bound to ColorPicker. PrimeVue's ColorPicker emits hex
+/// WITHOUT the leading `#` (e.g. `"3b82f6"`), so we normalize both
+/// directions: read drops the `#` if present, write prepends it.
+const colorModel = computed<string>({
+  get: () => (meta.value?.color ?? '#3b82f6').replace(/^#/, ''),
+  set: (next: string) => {
+    if (!next) return;
+    const withHash = next.startsWith('#') ? next : `#${next}`;
+    groupsStore.setGroupColor(groupId.value, withHash);
+  },
+});
+
+function openColorPicker(event: Event): void {
+  colorPopRef.value?.show(event);
+}
+
+function pickSwatch(swatch: string): void {
+  groupsStore.setGroupColor(groupId.value, swatch);
+}
+
 // ─── Right-click context menu ────────────────────────────────────────
 
 const ctxMenuRef = useTemplateRef<InstanceType<typeof ContextMenu>>('ctxMenuRef');
@@ -107,15 +133,15 @@ const menuItems = computed<MenuItem[]>(() => [
     },
   },
   {
-    label: 'Change color',
+    label: 'Change color…',
     icon: 'pi pi-palette',
-    items: GROUP_COLORS.map((swatch) => ({
-      label: swatch,
-      icon: 'pi pi-circle-fill',
-      iconClass: 'group-color-dot',
-      style: { '--menu-color-dot': swatch } as Record<string, string>,
-      command: () => groupsStore.setGroupColor(groupId.value, swatch),
-    })),
+    command: (e) => {
+      // Open the color popover anchored on the current contextmenu's
+      // trigger element (the tab itself). PrimeVue's MenuItem command
+      // receives `{ originalEvent, item }` — we use originalEvent so the
+      // popover positions near the click.
+      openColorPicker(e.originalEvent);
+    },
   },
   { separator: true },
   {
@@ -231,6 +257,31 @@ function onClose(event: MouseEvent): void {
       ref="ctxMenuRef"
       :model="menuItems"
     />
+    <Popover ref="colorPopRef">
+      <div class="group-color-popover">
+        <div class="group-color-swatches">
+          <button
+            v-for="swatch in GROUP_COLORS"
+            :key="swatch"
+            type="button"
+            class="group-color-swatch"
+            :class="{ active: swatch === meta?.color }"
+            :style="{ '--swatch-color': swatch }"
+            :aria-label="`Select color ${swatch}`"
+            :title="swatch"
+            @click="pickSwatch(swatch)"
+          />
+        </div>
+        <div class="group-color-custom">
+          <span class="group-color-custom-label">Custom</span>
+          <ColorPicker
+            v-model="colorModel"
+            format="hex"
+            inline
+          />
+        </div>
+      </div>
+    </Popover>
   </div>
 </template>
 
@@ -360,11 +411,61 @@ function onClose(event: MouseEvent): void {
 }
 </style>
 
-<!-- Unscoped so the rule reaches the ContextMenu items rendered in a Vue
-teleport portal outside the scoped boundary. Same pattern as ChatTab.vue. -->
+<!-- Unscoped popover styling. PrimeVue Popover teleports outside the
+component's scoped CSS boundary. -->
 <style>
-.group-color-dot {
-  color: var(--menu-color-dot, var(--p-text-color)) !important;
-  font-size: 0.65rem !important;
+.group-color-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.25rem;
+  min-width: 12rem;
+}
+
+.group-color-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+
+.group-color-swatch {
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--swatch-color);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.group-color-swatch:hover {
+  transform: scale(1.08);
+}
+
+.group-color-swatch.active {
+  border-color: var(--p-text-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--swatch-color) 30%, transparent);
+}
+
+.group-color-swatch:focus-visible {
+  outline: none;
+  border-color: var(--p-primary-color);
+}
+
+.group-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+
+.group-color-custom-label {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
 }
 </style>
