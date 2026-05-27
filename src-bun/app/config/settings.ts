@@ -174,19 +174,47 @@ function coerceAppearance(raw: unknown): Appearance {
   };
 }
 
-/// Coerces a raw `layout` blob into the canonical shape. The dockview
-/// JSON is treated as opaque — we only validate that it's an object.
-/// Anything else (string, number, malformed) resets to `null`, which
-/// causes startup-resume to skip layout restoration entirely.
+/// Coerces a raw `layout` blob into the canonical shape. All sub-fields
+/// (`dockview`, `outer`, `groups`, `activeGroupId`, `innerBodies`,
+/// `schemaVersion`) are opaque JSON — we only validate object shape and
+/// pass through, because the renderer owns the schema. An earlier
+/// version stripped everything except `dockview` here, which silently
+/// erased the v3 groups data on every save and made restore impossible
+/// (caught 2026-05-27 as "Restoring the session still doesn't work").
 function coerceLayout(raw: unknown): Layout {
   if (!raw || typeof raw !== 'object') return { dockview: null };
 
   const obj = raw as Record<string, unknown>;
-  const dv = obj.dockview;
+  const out: Layout = {};
 
-  return {
-    dockview: dv && typeof dv === 'object' && !Array.isArray(dv) ? dv : null,
-  };
+  // v2 legacy `dockview` field
+  if (obj.dockview && typeof obj.dockview === 'object' && !Array.isArray(obj.dockview)) {
+    out.dockview = obj.dockview;
+  } else {
+    out.dockview = null;
+  }
+  // v3 `outer` (renamed from `dockview`)
+  if (obj.outer && typeof obj.outer === 'object' && !Array.isArray(obj.outer)) {
+    out.outer = obj.outer;
+  }
+  // v3 `groups` — must be an array of objects
+  if (Array.isArray(obj.groups)) {
+    out.groups = obj.groups as Layout['groups'];
+  }
+  // v3 `activeGroupId` — string
+  if (typeof obj.activeGroupId === 'string') {
+    out.activeGroupId = obj.activeGroupId;
+  }
+  // v3 `innerBodies` — map of opaque blobs
+  if (obj.innerBodies && typeof obj.innerBodies === 'object' && !Array.isArray(obj.innerBodies)) {
+    out.innerBodies = obj.innerBodies as Layout['innerBodies'];
+  }
+  // schemaVersion — number
+  if (typeof obj.schemaVersion === 'number') {
+    out.schemaVersion = obj.schemaVersion;
+  }
+
+  return out;
 }
 
 /// Coerces a raw `workspaces` blob into the canonical shape. Drops

@@ -119,6 +119,48 @@ describe('SettingsService', () => {
     expect(reloaded.get().layout.dockview).toEqual(blob);
   });
 
+  test('v3 grouped layout round-trips through update + reload', async () => {
+    // Regression for the 'Restoring the session still doesn't work' bug
+    // (2026-05-27): coerceLayout was stripping every layout field
+    // except `dockview`, silently erasing groups v3 data on every save.
+    const dir = newTempDir();
+    const path = join(dir, 'settings.json');
+    const svc = SettingsService.loadOrDefault(path);
+    const v3 = {
+      schemaVersion: 3,
+      outer: {
+        grid: { root: { type: 'branch', data: [] }, width: 1, height: 1 },
+        panels: { 'grp-default': { id: 'grp-default', contentComponent: 'group' } },
+      },
+      groups: [
+        { id: 'grp-default', name: 'Default', color: '#3b82f6' },
+        { id: 'grp-work', name: 'Work', color: '#f59e0b' },
+      ],
+      activeGroupId: 'grp-default',
+      innerBodies: {
+        'grp-default': {
+          grid: { root: { type: 'branch', data: [] } },
+          panels: { 'sess-1': { id: 'sess-1', contentComponent: 'chat' } },
+        },
+        'grp-work': {
+          grid: { root: { type: 'branch', data: [] } },
+          panels: { 'sess-2': { id: 'sess-2', contentComponent: 'chat' } },
+        },
+      },
+    };
+    await svc.update({
+      ...svc.get(),
+      layout: v3,
+    });
+    const reloaded = SettingsService.loadOrDefault(path);
+    const layout = reloaded.get().layout;
+    expect(layout.schemaVersion).toBe(3);
+    expect(layout.outer).toEqual(v3.outer);
+    expect(layout.groups).toEqual(v3.groups);
+    expect(layout.activeGroupId).toBe('grp-default');
+    expect(layout.innerBodies).toEqual(v3.innerBodies);
+  });
+
   test('unknown version is stamped to current', () => {
     const dir = newTempDir();
     const path = join(dir, 'settings.json');
