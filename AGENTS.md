@@ -26,8 +26,9 @@ editor, inline file/image attachments, command palette, dark mode.
 4. **`MANUAL_TESTS.md`** — open manual-test checklist the user runs to
    sign off features. Append a new section per feature you ship
    (per rule #10 below).
-5. Whatever **`plans/*.prompt.md`** is relevant to your task (index at
-   `plans/plan-overview.prompt.md`).
+5. **`plans/DONE.md`** and **`plans/TODO.md`** — single live "shipped" /
+   "open" matrices, organized by topic. Read both. (Historical design
+   docs live under `plans/_archive/` and are NOT kept current.)
 
 If your task touches the IPC wire contract, also read `src-bun/rpc.ts` and
 `src/ipc/types.ts` — they MUST stay in sync.
@@ -175,7 +176,8 @@ See `ARCHITECTURE.md` §8 for the full list. Highlights:
 - Update `STATUS.md` when you complete a milestone item or change direction.
 - Update `CHANGELOG.md` under `## [Unreleased]` for user-visible changes.
 - Append to `DEVLOG.md` for every substantive session.
-- If your change affects direction, update the relevant `plans/` doc.
+- Move shipped rows from `plans/TODO.md` to `plans/DONE.md`. Add new
+  open work to `plans/TODO.md`. Do NOT create new `plans/plan-*` files.
 - Include screenshots / GIFs for UI changes.
 - Commits include the `Co-authored-by: Copilot` trailer unless explicitly
   told not to.
@@ -183,11 +185,11 @@ See `ARCHITECTURE.md` §8 for the full list. Highlights:
 ## Security considerations
 
 - **Never commit secrets.** GitHub tokens and BYOK credentials live in the
-  OS keyring (planned in M4). Logs redact by default
-  (see `plans/plan-observability.prompt.md`).
+  OS keyring (planned). Logs redact by default (see
+  `src-bun/app/redact.ts`).
 - Every privileged action (file write, shell, network, browser open, MCP
   install) must go through the permission system
-  (`plans/plan-toolsAndPermissions.prompt.md`).
+  (`src/components/permissions/`).
 - For vulnerabilities, follow [`SECURITY.md`](SECURITY.md) — file privately
   via GitHub Security Advisories. Do not open public issues.
 
@@ -195,22 +197,13 @@ See `ARCHITECTURE.md` §8 for the full list. Highlights:
 
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — current reality (module map,
   invariants, SDK gotchas). Read this first for any non-trivial task.
-- `plans/plan-frontend-shell.prompt.md` — dockview/Vue shell design.
-- `plans/plan-sdkAndExternalSurfaces.prompt.md` — SDK pinning, URL/browser
-  surface, MCP OAuth, `session.ui`, image generation.
-- `plans/plan-toolsAndPermissions.prompt.md` — built-in tools, permission
-  model, URL policy, MCP.
-- `plans/plan-platformFeatures.prompt.md` — projects, accounts, skills,
-  agents, automations.
-- `plans/plan-messagingAndUx.prompt.md` — chat UX, reasoning, tools display,
-  markdown, settings UI.
-- `plans/plan-observability.prompt.md` — logging, tracing, metrics, audit,
-  perf budgets.
-- `plans/plan-testingStrategy.prompt.md` — test pyramid, fakes, snapshot
-  tests, E2E, CI.
-- `plans/plan-roadmap.prompt.md` — milestones M0–M7 with definition-of-done.
-- `plans/plan-architecture.prompt.md` — **legacy Tauri layout**; historical
-  context only.
+- **[`plans/DONE.md`](plans/DONE.md)** — every capability Dafman ships
+  today, by topic, with code receipts.
+- **[`plans/TODO.md`](plans/TODO.md)** — every open feature, gap, and
+  known piece of tech debt, by topic, ranked within each topic.
+- **[`plans/_archive/`](plans/_archive/)** — historical design docs and
+  audits. Kept for context only. Do not update; if a fact in there
+  matters, lift it into `DONE.md` / `TODO.md` / `ARCHITECTURE.md`.
 
 ---
 
@@ -251,8 +244,10 @@ Every substantive session ends with:
 - **`CHANGELOG.md`** under `## [Unreleased]` for any user-visible change.
 - **`ARCHITECTURE.md`** updated if you changed a module structure, an
   invariant, or an IPC surface significantly.
-- **`plans/*.prompt.md`** updated if your change affects direction. Don't
-  let plans drift silently.
+- **`plans/DONE.md`** and **`plans/TODO.md`** kept in sync with reality:
+  move shipped rows from TODO → DONE; add new open work to TODO. Do
+  NOT add new `plans/plan-*` files (the old per-topic plan docs are
+  archived under `plans/_archive/` and not kept current).
 
 ### 4. No unverified claims
 
@@ -269,9 +264,9 @@ Every substantive session ends with:
 
 #### 4a. Dogfood-before-`task_complete` (UI / IPC changes)
 
-Until the real-E2E tier lands (see
-[`plans/plan-e2e.prompt.md`](../plans/plan-e2e.prompt.md)), unit tests
-+ smoke are **not sufficient** for changes that touch:
+Until the real-E2E Tier-4 harness lands (tracked in
+[`plans/TODO.md`](plans/TODO.md) → Testing & CI), unit tests + smoke are
+**not sufficient** for changes that touch:
 
 - the composer / Lexical plugins
 - any `searchWorkspaceFiles` / `pickAttachment` / `sendMessage` /
@@ -348,8 +343,8 @@ surface, file layout, or user-visible behavior — interview the user
   **remind the user to enter plan mode** and iterate the plan with
   them before exiting.
 - Locked specs go in the commit message and (for non-trivial
-  features) into the relevant `plans/*.prompt.md` so the next agent
-  doesn't re-litigate them.
+  features) as a row in [`plans/TODO.md`](plans/TODO.md) until
+  shipped, so the next agent doesn't re-litigate them.
 
 This rule exists because too many features in this repo were built
 on assumed defaults that the user disagreed with, costing rework.
@@ -609,16 +604,17 @@ cleared 63 stale errors).
 These are the smaller never-cross-this-line items, in addition to the
 anti-laziness rules above:
 
-- Never invent direction. If a feature is not in `plans/` or `STATUS.md`,
-  ask before adding it.
+- Never invent direction. If a feature is not in `plans/TODO.md` or
+  `STATUS.md`, ask before adding it.
 - Never commit secrets, tokens, or raw prompt content.
 - Domain modules under `src-bun/app/` don't import `electrobun/bun`.
 - Never throw raw `Error` from an RPC handler — go through `rpcGuard`.
 - Tests stay green: `bun run check` must succeed.
 - Never delete an item from `STATUS.md`. Move it (open → done) but preserve
   history.
-- Never let `plans/` drift silently. Update the relevant doc when reality
-  diverges.
+- Never let `plans/DONE.md` / `plans/TODO.md` drift silently. When you
+  ship something move the row across; when you accept new work add the
+  row to TODO. Do NOT add new `plans/plan-*` files.
 - **Never reach for `window.dispatchEvent`/`addEventListener('app:...')`
   for in-app messaging** — see rule 18.
 - **Never silence ESLint's `complexity` rule globally to skirt rule 20**

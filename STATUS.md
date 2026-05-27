@@ -8,10 +8,8 @@
 > [`ARCHITECTURE.md`](ARCHITECTURE.md) for the live architecture snapshot,
 > [`MANUAL_TESTS.md`](MANUAL_TESTS.md) for the manual-test backlog
 > (per-feature checklists the user runs to sign off),
-> [`plans/plan-backlog-audit.prompt.md`](plans/plan-backlog-audit.prompt.md)
-> for the comprehensive feature gap list across all plans/,
-> and [`plans/plan-roadmap.prompt.md`](plans/plan-roadmap.prompt.md) for the
-> definition-of-done per milestone.
+> [`plans/TODO.md`](plans/TODO.md) for every open feature and gap, and
+> [`plans/DONE.md`](plans/DONE.md) for every capability Dafman ships today.
 
 **Active milestone:** **Groups v3 (nested DockviewVue) shipped** (2026-05-27).
 Three-phase landing of the workspace-groups feature. After two failed prior
@@ -227,8 +225,9 @@ Explicitly **out of scope**:
 ## Audit snapshot (2026-05-21)
 
 Authoritative map of what's in the code, grouped by area. DONE / PARTIAL /
-TODO reflects current state against the M0–M7 ambitions in
-`plans/plan-roadmap.prompt.md`.
+TODO reflects current state against the legacy M0–M7 ambitions in
+`plans/_archive/plan-roadmap.prompt.md` (kept for historical context;
+not maintained). See `plans/TODO.md` for the live priority list.
 
 ### Foundations (M0–M1)
 
@@ -371,10 +370,10 @@ TODO reflects current state against the M0–M7 ambitions in
 
 ## Re-organised phases (replaces M-numbered roadmap going forward)
 
-The old M1–M7 milestones in `plans/plan-roadmap.prompt.md` are kept as
-historical reference. Going forward we organise by **Phase** — coherent
-chunks scoped to a single PR-ish unit of work, each with rough effort
-estimates (1 d = ~1 working day of focused engineering).
+The old M1–M7 milestones in `plans/_archive/plan-roadmap.prompt.md` are
+kept as historical reference. Going forward we organise by **Phase** —
+coherent chunks scoped to a single PR-ish unit of work, each with rough
+effort estimates (1 d = ~1 working day of focused engineering).
 
 ### Phase 1 — Close M1's observability tail (~2 d) — DONE
 - In-app log viewer (tail + filter + search). ✅

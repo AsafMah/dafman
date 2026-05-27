@@ -1,8 +1,8 @@
 /**
  * Color helpers — shared between chat panes and other accent-using UI.
  *
- * See `plans/plan-messagingAndUx.prompt.md` ("session accent color") and
- * `plans/plan-architecture.prompt.md` (lib/color.ts).
+ * See `plans/_archive/plan-messagingAndUx.prompt.md` ("session accent color") and
+ * `plans/_archive/plan-architecture.prompt.md` (lib/color.ts).
  */
 
 /**

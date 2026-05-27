@@ -15,7 +15,7 @@
 // What this still ISN'T: a full WebView2 / Electrobun E2E. WebView2
 // is Edge Chromium ~120; Playwright bundles ~141. They agree 99% of
 // the time but a Tier-2 harness via CDP-attach to real electrobun
-// is the eventual upgrade (see plans/plan-testingStrategy.prompt.md).
+// is the eventual upgrade (see plans/TODO.md "Real-Electrobun E2E harness").
 
 import { defineConfig, devices } from "@playwright/test";
 

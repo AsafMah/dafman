@@ -11,5 +11,5 @@ assignees: []
 <!-- High-level description. Mock-ups or sketches welcome. -->
 ## Alternatives considered
 ## Roadmap alignment
-<!-- Which milestone does this fit into? See plans/plan-roadmap.prompt.md. -->
+<!-- Which area does this fit into? See plans/TODO.md. -->
 ## Additional context

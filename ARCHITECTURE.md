@@ -402,16 +402,6 @@ Total: **308 tests** as of writing. `bun run check` is the gate:
 
 ## 9. What's not here yet (link to plans)
 
-The roadmap milestones (M3+) are tracked in `STATUS.md` (current state) and
-`plans/plan-roadmap.prompt.md` (target state). Highest-value missing pieces:
-
-- **In-app log viewer + diagnostics bundle export** (Observability M1 tail).
-- **Projects model + multi-account auth** (M4).
-- **MCP server registry UI** (M5).
-- **Agents / Fleets UI** (M5).
-- **Automations + scheduled prompts** (M6).
-- **Monaco diff viewer for `fs.edit` results** (M7).
-- **Headless browser tool** (M7).
-
-See `plans/plan-roadmap.prompt.md` for the full taxonomy and definition-of-done
-per milestone.
+Tracked in `STATUS.md` (current sprint) and `plans/TODO.md` (full open
+list, by topic, ranked). `plans/DONE.md` is the matrix of what already
+ships. The legacy M-numbered roadmap is in `plans/_archive/`.
