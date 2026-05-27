@@ -254,13 +254,14 @@
 | G1 | `#` autocomplete + Issues/PRs/Gists tabs + `/share gist` | ⬜ |
 | G2 | `session.auth.getStatus` chip + BYOK form | ⬜ |
 | G3 | Remote-session attach (`sessions.connect`) | ⬜ |
-| G4a | Right-click "Move to group…" menu | ⬜ (action wired; UI missing) |
-| G4b | Tab rename inline (dblclick) + color picker | ⬜ |
-| G4c | Native cross-group drag (`onUnhandledDragOverEvent`) | ⬜ |
+| G4a | Right-click "Move to group…" menu | ✅ (`5dbf2b3`) — ChatTab.vue ContextMenu with #item slot for color dots |
+| G4b | Tab rename inline (dblclick) + color picker | ✅ (`5dbf2b3` + `5a066f3`) — GroupTab.vue inline rename + Popover ColorPicker |
+| G4c | Native cross-group drag (`onUnhandledDragOverEvent`) | ✅ (`5dbf2b3`) — GroupPanel.vue onUnhandledDragOverEvent + onDidDrop |
 | G4d | Lazy-mount placeholder | ⬜ |
-| G5a | Phase 26 manual test verification on real data | ⬜ |
-| G5b | Drop legacy `persistLayout(dockview)` | ⬜ |
-| G5c | Boot-cost regression check | ⬜ |
+| G5a | Phase 26 manual test verification on real data | ⬜ (user owns; restore fix `c97b0a5` unblocks) |
+| G5b | Drop legacy `persistLayout(dockview)` | ✅ (`5dbf2b3`) — only `persistGroupedLayout` remains |
+| G5c | Boot-cost regression check | ✅ (`5dbf2b3`) |
+| G11 | `coerceLayout` strips v3 fields → restore broken | ✅ (`c97b0a5`) — bun-side validator now passes through all v3 fields |
 | G6a | `bun run inspect` | ✅ (shipped 2026-05-26) |
 | G6b | `tools/probe-*.ts` pattern | 🟨 |
 | G6c | `window.__DAFMAN_TEST__` | ✅ |
@@ -298,7 +299,7 @@
 **Highest-value gaps right now (by frequency-of-mention × user-visible-impact):**
 
 1. ⬜ Real-Electrobun E2E harness (would catch the v3 bug class)
-2. ⬜ G4 — Groups v3.1 polish (Move-to-group menu, rename, color picker)
+2. ✅ ~~G4 — Groups v3.1 polish~~ shipped 2026-05-27 (`5dbf2b3` + `5a066f3` + `c97b0a5`)
 3. ⬜ Phase 27 — Multi-account + BYOK (lots of internal demand)
 4. ⬜ Phase 29 — Projects (resolves the "groups vs projects" open question)
 5. ⬜ Phase 31 — Diff viewer with accept/reject hunks
