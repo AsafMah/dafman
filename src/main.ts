@@ -32,6 +32,7 @@ import ChatTab from '@/components/chat/ChatTab.vue';
 import ChatTabActions from '@/components/chat/ChatTabActions.vue';
 import GroupPanel from '@/components/shell/GroupPanel.vue';
 import GroupTab from '@/components/shell/GroupTab.vue';
+import GroupsHeaderActions from '@/components/shell/GroupsHeaderActions.vue';
 import JobsPanel from '@/components/observability/JobsPanel.vue';
 import LibraryPanel from '@/components/library/LibraryPanel.vue';
 import LogViewer from '@/components/observability/LogViewer.vue';
@@ -154,6 +155,7 @@ async function mountWith(Root: typeof App) {
   app.component('chatTab', ChatTab);
   app.component('group', GroupPanel);
   app.component('groupTab', GroupTab);
+  app.component('groupsHeaderActions', GroupsHeaderActions);
   app.component('sidebarTab', SidebarTab);
   app.component('activityTab', ActivityBarTab);
   /* eslint-enable vue/component-definition-name-casing */
@@ -169,17 +171,38 @@ async function mountWith(Root: typeof App) {
 
   // Optional test hook — exposed only when the smoke RPC stub is also
   // installed (same gate). Gives playwright a way to invoke command
-  // palette entries by id without simulating keyboard input.
+  // palette entries by id without simulating keyboard input, and to
+  // reach into the layout/groups stores for debugging.
   if (testBridge) {
     const { useCommandRegistry } = await import('@/stores/shell/commandRegistry');
+    const { useLayoutStore } = await import('@/stores/shell/layoutStore');
+    const { useGroupsStore } = await import('@/stores/shell/groupsStore');
     const registry = useCommandRegistry();
+    const layout = useLayoutStore();
+    const groups = useGroupsStore();
     (window as unknown as {
-      __DAFMAN_TEST__: { runCommand: (id: string) => Promise<unknown> };
+      __DAFMAN_TEST__: {
+        runCommand: (id: string) => Promise<unknown>;
+        addPanel: (sessionId: string) => void;
+        getState: () => unknown;
+      };
     }).__DAFMAN_TEST__ = {
       async runCommand(id: string) {
         const cmd = registry.commands.get(id);
         if (!cmd) throw new Error(`Unknown command: ${id}`);
         return await cmd.run();
+      },
+      addPanel(sessionId: string): void {
+        layout.addPanel(sessionId);
+      },
+      getState(): unknown {
+        return {
+          activeGroupId: groups.activeGroupId,
+          groups: groups.groups.map((g) => ({ id: g.id, name: g.name, color: g.color })),
+          innerApiCount: Object.keys(groups.innerApis).length,
+          outerPanelIds: layout.api?.panels.map((p) => p.id) ?? [],
+          bodyApiPanelIds: layout.bodyApi?.panels.map((p) => p.id) ?? [],
+        };
       },
     };
   }

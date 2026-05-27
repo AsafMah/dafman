@@ -22,7 +22,7 @@
  */
 
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import type { DockviewApi } from 'dockview-core';
 import type { GroupMeta, Layout } from '@/ipc/types';
 import { composePersistLayout } from '@/lib/composePersistLayout';
@@ -77,7 +77,15 @@ export const useGroupsStore = defineStore('groups', () => {
   /// Live inner DockviewApi by group id. Populated by `GroupPanel.vue` in
   /// its `@ready` handler (phase 3) and cleared by `onBeforeUnmount`
   /// (covers the dockview teardown path during outer `fromJSON`).
-  const innerApis = ref<Record<string, DockviewApi>>({});
+  ///
+  /// Uses `shallowRef` (not `ref`) because `DockviewApi` is a class
+  /// instance with private fields — Vue's deep reactive proxy mangles
+  /// its TypeScript identity (`Type 'DockviewApi' is missing the
+  /// following private properties: component, _getGroupModel`),
+  /// forcing every reader to add `as unknown as DockviewApi` casts.
+  /// Shallow ref keeps the map itself reactive (so registry add/remove
+  /// triggers updates) but stores the api values raw.
+  const innerApis = shallowRef<Record<string, DockviewApi>>({});
 
   /// Per-group inner-body cache. Source of truth for unmounted groups'
   /// persisted body. Updated by:
@@ -198,6 +206,15 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function recordInnerBodySnapshot(groupId: string, json: unknown): void {
     innerBodiesCache.value = { ...innerBodiesCache.value, [groupId]: json };
+  }
+
+  /// Caller-injected setter for `activeGroupId`. Used by `layoutStore`'s
+  /// outer `onDidActivePanelChange` subscription to sync this store with
+  /// the user's tab clicks. Filtered by `isGroupPanelId` at the call
+  /// site so edge-panel focus changes don't shift the active group.
+  function setActiveGroupId(id: string | null): void {
+    if (id !== null && !groups.value.some((g) => g.id === id)) return;
+    activeGroupId.value = id;
   }
 
   function getCachedInnerBody(groupId: string): unknown | undefined {
@@ -335,6 +352,7 @@ export const useGroupsStore = defineStore('groups', () => {
     isGroupPanelId,
     isMovingSession,
     getCachedInnerBody,
+    setActiveGroupId,
     // lifecycle
     hydrate,
     serialize,

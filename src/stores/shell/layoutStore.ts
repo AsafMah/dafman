@@ -11,7 +11,7 @@
 // serialized into the layout JSON for free.
 
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import type { DockviewApi, EdgeGroupPosition } from 'dockview-core';
 import {
   asRemovePanelArg,
@@ -101,7 +101,12 @@ export interface EdgePanelOptions {
 }
 
 export const useLayoutStore = defineStore('layout', () => {
-  const api = ref<DockviewApi | null>(null);
+  /// Outer DockviewApi. `shallowRef` (not `ref`) because DockviewApi is
+  /// a class with private fields; Vue's deep reactive proxy strips them
+  /// from the TS surface and forces `as unknown as DockviewApi` casts
+  /// everywhere it flows. Shallow ref keeps the reference reactive (so
+  /// computed bodyApi re-runs on setApi) but stores the api raw.
+  const api = shallowRef<DockviewApi | null>(null);
 
   /// The "body" api — where chat / terminal / playground panels live. In
   /// v3 this is the active group's INNER dockview (`groupsStore.innerApis[
@@ -110,13 +115,13 @@ export const useLayoutStore = defineStore('layout', () => {
   /// add/close paths keep working. Read-only computed; write the inner-api
   /// registry via `groupsStore.registerInnerApi`.
   const groupsStore = useGroupsStore();
-  const bodyApi = computed<DockviewApi | null>((): DockviewApi | null => {
+  const bodyApi = computed<DockviewApi | null>(() => {
     const activeId = groupsStore.activeGroupId;
     if (activeId) {
       const inner = groupsStore.innerApis[activeId];
-      if (inner) return inner as unknown as DockviewApi;
+      if (inner) return inner;
     }
-    return api.value as DockviewApi | null;
+    return api.value;
   });
 
   /// Caller-injected title resolver. Set once at boot by App.vue so
@@ -389,6 +394,18 @@ export const useLayoutStore = defineStore('layout', () => {
       rescanOpenDetails(next);
       applyActiveTabConstraints('left');
       applyActiveTabConstraints('right');
+      // v3 groups: sync groupsStore.activeGroupId from outer.activePanel
+      // so layoutStore.bodyApi (and any composePersistLayout call) sees
+      // the correct active group when the user clicks a different
+      // group's tab or creates a new group (which auto-activates).
+      // Filter: only update when the active panel is a group panel —
+      // clicking an activity-bar tab (Sessions / Settings / etc.)
+      // changes outer.activePanel but should NOT change which group
+      // is "active" for body routing.
+      const activeId = next.activePanel?.id;
+      if (activeId && groupsStore.isGroupPanelId(activeId)) {
+        groupsStore.setActiveGroupId(activeId);
+      }
     });
     const removeSub = next.onDidRemovePanel(() => {
       recomputeActiveSession(next);
@@ -466,7 +483,15 @@ export const useLayoutStore = defineStore('layout', () => {
     // `.dv-edge-group .dv-tabs-and-actions-container` rule in
     // style.css — exactly the "sessions open at tiny percentage / no
     // tab bar / lands in sidebar" cluster. Covered by tests now.
-    let referenceGroup = opts.targetGroupId ?? firstBodyGroupId();
+    // v3 nested-dockview: `dock === bodyApi` is the active group's INNER
+    // dockview which has no edge groups. Use the location-aware helper
+    // so both v3 inner AND the legacy outer code path produce a
+    // grid-located reference (never an edge group). Using the outer's
+    // firstBodyGroupId() here would return an id that doesn't exist on
+    // the inner and dockview throws `referenceGroup '<id>' does not
+    // exist`. (Caught when the user reported "sessions go nowhere
+    // after creating".)
+    let referenceGroup = opts.targetGroupId ?? firstBodyGroupIdOf(dock);
     let createdBodyGroup = false;
 
     if (!referenceGroup) {
@@ -509,7 +534,9 @@ export const useLayoutStore = defineStore('layout', () => {
       return;
     }
 
-    let referenceGroup = firstBodyGroupId();
+    // See addPanel above for why we use firstBodyGroupIdOf(dock)
+    // instead of the outer-only firstBodyGroupId().
+    let referenceGroup = firstBodyGroupIdOf(dock);
     let createdBodyGroup = false;
 
     if (!referenceGroup) {
@@ -563,6 +590,15 @@ export const useLayoutStore = defineStore('layout', () => {
 
     if (!dock) return undefined;
 
+    return firstBodyGroupIdOf(dock);
+  }
+
+  /// Variant of `firstBodyGroupId` that operates on an arbitrary
+  /// DockviewApi (used by addPanel when it's routing through bodyApi
+  /// — the active group's INNER dockview). Inner dockviews have no
+  /// edge groups so all their groups are body groups, but the filter
+  /// is still semantically correct (and protects the legacy path).
+  function firstBodyGroupIdOf(dock: DockviewApi): string | undefined {
     const active = dock.activeGroup;
 
     if (active && active.model.location.type === 'grid') return active.id;
@@ -936,14 +972,14 @@ export const useLayoutStore = defineStore('layout', () => {
     }
 
     // Not on outer — walk inner apis (chat / terminal panels live there
-    // in v3).
-    for (const [gid, innerApi] of Object.entries(groupsStore.innerApis)) {
-      const innerPanel = (innerApi as DockviewApi).getPanel(id);
+    // in v3). innerApis is now a shallowRef so values keep their
+    // DockviewApi identity (no `as unknown as DockviewApi` needed).
+    for (const innerApi of Object.values(groupsStore.innerApis)) {
+      const innerPanel = innerApi.getPanel(id);
       if (innerPanel) {
-        (innerApi as DockviewApi).removePanel(innerPanel);
+        innerApi.removePanel(innerPanel);
         // No edge-group cleanup inside inner dockviews (they don't have edges).
         // The group-meta cache will pick up the new toJSON on next layout-change.
-        void gid; // mark used
         return;
       }
     }

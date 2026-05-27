@@ -385,9 +385,12 @@ function onDockReady(event: DockviewReadyEvent) {
 
     if (isGroup) {
       // Group panel: only reorder within the body tab strip. Reject any
-      // 'edge', 'content' drop (would split the body or move into a
-      // sidebar — neither is desired UX).
-      if (!okKind) {
+      // 'edge' / 'content' drop (would split the body), and reject any
+      // 'tab' / 'header_space' drop into an EDGE group (would stuff the
+      // group panel into an activity-bar sidebar where it has no visible
+      // chrome and the inner DockviewVue collapses to 0x0).
+      const targetIsBody = targetLocation === 'grid';
+      if (!okKind || !targetIsBody) {
         evt.preventDefault();
       }
     }
@@ -464,6 +467,7 @@ function scheduleLayoutSave() {
           class="dock"
           watermark-component="watermark"
           default-tab-component="chatTab"
+          right-header-actions-component="groupsHeaderActions"
           @ready="onDockReady"
         />
       </div>
