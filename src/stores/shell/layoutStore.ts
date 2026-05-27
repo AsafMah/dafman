@@ -157,6 +157,14 @@ export const useLayoutStore = defineStore('layout', () => {
   function bumpLayoutRev(): void {
     layoutRev.value++;
   }
+  /// Programmatic setter for `activeSessionId`. Used by GroupPanel.vue's
+  /// per-inner `onDidActivePanelChange` subscription so chat-tab
+  /// switches inside the active group update the active-session ref
+  /// without us having to roll through `recomputeActiveSession` (which
+  /// only sees outer-level events).
+  function setActiveSessionId(sessionId: string | null): void {
+    activeSessionId.value = sessionId;
+  }
   /// Reactive flag for the singleton session-details right-rail
   /// panel. Kept in sync via `onDidAddPanel` / `onDidRemovePanel`.
   /// Unlike the old per-session set, only one rail exists at a time
@@ -265,6 +273,25 @@ export const useLayoutStore = defineStore('layout', () => {
       activeSessionId.value = panel.api.id;
 
       return;
+    }
+
+    // v3: the outer dock's active panel is a `group` component, not
+    // `chat`. The actual chat panel lives inside the inner dockview
+    // owned by groupsStore.innerApis[activeGroupId]. Resolve through
+    // that path first. Without this, the user just switching the
+    // active outer group (or any boot path that doesn't pass the
+    // chat-active branch above) leaves activeSessionId null even
+    // though a chat panel IS active — surfaces "No active session"
+    // in SessionDetailsPanel and hides every session.* palette
+    // command. Caught 2026-05-27 by user feedback.
+    const activeGid = groupsStore.activeGroupId;
+    if (activeGid) {
+      const inner = groupsStore.innerApis[activeGid];
+      const innerActive = inner?.activeGroup?.activePanel;
+      if (innerActive && innerActive.api.component === 'chat') {
+        activeSessionId.value = innerActive.api.id;
+        return;
+      }
     }
 
     // The active panel may be a non-chat surface (the rail itself,
@@ -1127,6 +1154,7 @@ export const useLayoutStore = defineStore('layout', () => {
     activeSessionId,
     layoutRev,
     bumpLayoutRev,
+    setActiveSessionId,
     detailsOpen,
     enforceKnownEdgeMinimums,
     setApi,

@@ -62,6 +62,7 @@ Ranked by **(frequency-of-mention) × (user-visible impact) × (clear scope)**:
 | 10 | `/diff` session changes panel | ⬜ | 1 d | |
 | 11 | Pin to Notes sidebar / Notes sidebar | ⬜ | — | Deferred |
 | 12 | Theme picker (colorblind variants) | 🟦 | 1 d | Light/dark only today |
+| 13 | Fix light mode (visual bugs / contrast / unstyled areas) | ⬜ | 1 d | User-flagged 2026-05-27. Dark is the default-tested path; light mode has not been audited recently — likely missing tokens / PrimeVue overrides / per-component themes. |
 
 ## Tools & permissions
 

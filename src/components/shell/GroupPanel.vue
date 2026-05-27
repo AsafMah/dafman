@@ -67,6 +67,7 @@ const groupsActions = useGroupsActions();
 
 let removeSub: { dispose(): void } | null = null;
 let layoutSub: { dispose(): void } | null = null;
+let activeSub: { dispose(): void } | null = null;
 let dropSub: { dispose(): void } | null = null;
 let dragOverSub: { dispose(): void } | null = null;
 
@@ -114,6 +115,20 @@ function onInnerReady(event: DockviewReadyEvent): void {
     schedulePersist();
   });
 
+  // Per-inner active-panel tracking. v3: the outer dockview's
+  // activePanel is the GROUP panel, not the chat panel. Without this
+  // subscription `layoutStore.activeSessionId` stays null when the
+  // user just switches chat tabs inside a group, and surfaces that
+  // read it (SessionDetailsPanel "No active session", palette
+  // `when()` for session.* commands, etc.) think no session is open.
+  // Caught 2026-05-27: 'session settings says no active session'.
+  activeSub = inner.onDidActivePanelChange((panel) => {
+    if (groupsStore.activeGroupId !== id) return;
+    if (panel && (panel as { api?: { component?: string } }).api?.component === 'chat') {
+      layoutStore.setActiveSessionId(panel.id);
+    }
+  });
+
   // G4c — native cross-group drag. dockview's drag flow only moves
   // panels within the SAME DockviewComponent (PanelTransfer.viewId
   // check). When a chat tab is dragged from another group's inner to
@@ -148,6 +163,8 @@ onBeforeUnmount(() => {
   removeSub = null;
   layoutSub?.dispose();
   layoutSub = null;
+  activeSub?.dispose();
+  activeSub = null;
   dropSub?.dispose();
   dropSub = null;
   dragOverSub?.dispose();
