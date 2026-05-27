@@ -36,9 +36,10 @@
 
 import { computed, nextTick, ref, watch } from 'vue';
 import { Command } from 'vue-command-palette';
+import CommandPaletteRow from '@/components/shell/CommandPaletteRow.vue';
 import { useCommandRegistry, type Command as CommandDef } from '@/stores/shell/commandRegistry';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
-import { searchValueFor } from '@/lib/palette';
+import { searchValueFor, childMatchTokens } from '@/lib/palette';
 import { emit as busEmit } from '@/lib/bus';
 import { useEventListener } from '@vueuse/core';
 
@@ -101,8 +102,15 @@ function shouldExpand(cmd: CommandDef): boolean {
   const q = query.value.trim().toLowerCase();
   if (!q || !isParent(cmd)) return false;
   for (const child of cmd.children!) {
-    if (child.label.toLowerCase().includes(q)) return true;
-    if (child.keywords?.some((k) => k.toLowerCase().includes(q))) return true;
+    // childMatchTokens is the SINGLE source of truth shared with
+    // `searchValueFor` (palette.ts). If a token is added to the parent
+    // corpus, it MUST also trigger auto-expand here — otherwise a
+    // query can match the parent row without expanding the children,
+    // leaving the user staring at a highlighted parent with no
+    // visible matches.
+    for (const token of childMatchTokens(child)) {
+      if (token.toLowerCase().includes(q)) return true;
+    }
   }
   return false;
 }
@@ -281,38 +289,10 @@ useEventListener(window, 'input', onPaletteInput, true);
               :style="cmd.accent ? { '--cmd-accent': cmd.accent } : {}"
               :data-has-accent="cmd.accent ? 'true' : 'false'"
             >
-              <i
-                v-if="cmd.icon"
-                class="cmd-icon"
-                :class="cmd.icon"
-                aria-hidden="true"
-              />
-              <span
-                v-else
-                class="cmd-icon cmd-icon-empty"
-              />
-              <span class="cmd-label">{{ cmd.label }}</span>
-              <span
-                v-if="cmd.hint"
-                class="cmd-hint"
-                >{{ cmd.hint }}</span
-              >
-              <span
-                v-if="cmd.shortcut && cmd.shortcut.length > 0"
-                class="cmd-shortcut"
-                aria-label="Keyboard shortcut"
-              >
-                <kbd
-                  v-for="(k, idx) in cmd.shortcut"
-                  :key="idx"
-                  >{{ k }}</kbd
-                >
-              </span>
-              <span
-                v-if="isParent(cmd)"
-                class="cmd-submenu-arrow"
-                :data-expanded="shouldExpand(cmd) ? 'true' : 'false'"
-                aria-hidden="true"
+              <CommandPaletteRow
+                :cmd="cmd"
+                :is-parent="isParent(cmd)"
+                :expanded="isParent(cmd) && shouldExpand(cmd)"
               />
             </Command.Item>
             <template v-if="isParent(cmd) && shouldExpand(cmd)">
@@ -326,33 +306,7 @@ useEventListener(window, 'input', onPaletteInput, true);
                 :style="child.accent ? { '--cmd-accent': child.accent } : {}"
                 :data-has-accent="child.accent ? 'true' : 'false'"
               >
-                <i
-                  v-if="child.icon"
-                  class="cmd-icon"
-                  :class="child.icon"
-                  aria-hidden="true"
-                />
-                <span
-                  v-else
-                  class="cmd-icon cmd-icon-empty"
-                />
-                <span class="cmd-label">{{ child.label }}</span>
-                <span
-                  v-if="child.hint"
-                  class="cmd-hint"
-                  >{{ child.hint }}</span
-                >
-                <span
-                  v-if="child.shortcut && child.shortcut.length > 0"
-                  class="cmd-shortcut"
-                  aria-label="Keyboard shortcut"
-                >
-                  <kbd
-                    v-for="(k, idx) in child.shortcut"
-                    :key="idx"
-                    >{{ k }}</kbd
-                  >
-                </span>
+                <CommandPaletteRow :cmd="child" />
               </Command.Item>
             </template>
           </template>
@@ -368,33 +322,7 @@ useEventListener(window, 'input', onPaletteInput, true);
             :style="cmd.accent ? { '--cmd-accent': cmd.accent } : {}"
             :data-has-accent="cmd.accent ? 'true' : 'false'"
           >
-            <i
-              v-if="cmd.icon"
-              class="cmd-icon"
-              :class="cmd.icon"
-              aria-hidden="true"
-            />
-            <span
-              v-else
-              class="cmd-icon cmd-icon-empty"
-            />
-            <span class="cmd-label">{{ cmd.label }}</span>
-            <span
-              v-if="cmd.hint"
-              class="cmd-hint"
-              >{{ cmd.hint }}</span
-            >
-            <span
-              v-if="cmd.shortcut && cmd.shortcut.length > 0"
-              class="cmd-shortcut"
-              aria-label="Keyboard shortcut"
-            >
-              <kbd
-                v-for="(k, idx) in cmd.shortcut"
-                :key="idx"
-                >{{ k }}</kbd
-              >
-            </span>
+            <CommandPaletteRow :cmd="cmd" />
           </Command.Item>
         </template>
       </Command.List>

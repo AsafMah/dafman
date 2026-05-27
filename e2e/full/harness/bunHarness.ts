@@ -154,16 +154,34 @@ async function spawnChild(opts: {
 }
 
 async function killChild(child: ChildProcess): Promise<void> {
+  // Already dead? Nothing to do.
+  if (child.exitCode !== null || child.signalCode !== null) return;
+
+  const exited = new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+    child.once("close", () => resolve());
+  });
   try {
     child.kill("SIGTERM");
   } catch {
-    /* ignore */
+    /* ignore — process may already be gone */
   }
-  // 200ms grace on Windows for the socket to drop before the next
-  // spawnChild picks a (potentially same) port. The port-picker is
-  // randomized so collisions are unlikely, but the wait also lets the
-  // control-client `close` listeners fire and clear pending callbacks.
-  await new Promise((r) => setTimeout(r, 200));
+  // Wait for the actual exit event with a 2s ceiling. Replaces an
+  // earlier fixed 200ms sleep flagged by rubber-duck 2026-05-27: the
+  // sleep was a guess; on a slow Windows box the old process may still
+  // hold its socket when the next spawnChild picks the (random) port.
+  // Race the exit promise against a hard timeout; if SIGTERM gets
+  // stuck we escalate to SIGKILL and accept the next spawn might
+  // collide. Two seconds is well under the test timeout (30s).
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, 2000));
+  await Promise.race([exited, timeout]);
+  if (child.exitCode === null && child.signalCode === null) {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 function waitForReadyMarker(child: ChildProcess, port: number): Promise<void> {

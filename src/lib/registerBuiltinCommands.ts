@@ -606,9 +606,18 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   );
 
   // ---------- Dynamic parent: Switch to Session ----------
+  // Watcher source includes layoutRev so opening/closing a panel
+  // without mutating sessionsStore.sessions still re-fires the
+  // children rebuild. (Caught by rubber-duck 2026-05-27: filter inside
+  // the children map reads layoutStore.api?.getPanel, but the watcher
+  // had only sessionsStore as its source — stale parent on panel
+  // open/close was possible.)
   watch(
-    () => sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
-    (sessions) => {
+    () => ({
+      sessions: sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
+      rev: layoutStore.layoutRev,
+    }),
+    ({ sessions }) => {
       const children: Command[] = sessions
         .filter((r) => Boolean(layoutStore.api?.getPanel(r.id)))
         .map((r) => {

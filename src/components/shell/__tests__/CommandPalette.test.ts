@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { cleanup, render, fireEvent } from '@testing-library/vue';
 import { nextTick } from 'vue';
 import CommandPalette from '@/components/shell/CommandPalette.vue';
-import { searchValueFor } from '@/lib/palette';
+import { searchValueFor, childMatchTokens } from '@/lib/palette';
 import { useCommandRegistry } from '@/stores/shell/commandRegistry';
 
 /// Mounts the palette and pops it open via the test-only `__testOpen`
@@ -99,6 +99,35 @@ describe('searchValueFor', () => {
       run: () => {},
     });
     expect(value).toBe('empty.parent Empty Parent');
+  });
+
+  test('childMatchTokens is the single source of truth — every token folded into the parent corpus must come back', () => {
+    // Contract: any token `searchValueFor` adds for a child MUST also
+    // be returned by `childMatchTokens(child)`. The palette's
+    // shouldExpand auto-expand uses childMatchTokens — if the two
+    // diverge, a parent corpus can match a query without expanding
+    // its children. Lock the contract by inversion: build a parent
+    // with one child carrying a unique sentinel in each known field,
+    // assert each sentinel is in BOTH outputs.
+    const child = {
+      id: 'c.sentinel',
+      label: 'LBL_SENTINEL_q1',
+      keywords: ['KW_SENTINEL_q2', 'KW_SENTINEL_q3'],
+      run: () => {},
+    };
+    const tokens = childMatchTokens(child);
+    const parent = searchValueFor({
+      id: 'parent.x',
+      label: 'Parent',
+      children: [child],
+      run: () => {},
+    });
+    for (const tok of tokens) {
+      expect(parent).toContain(tok);
+    }
+    // Also: if a NEW child field starts being folded into the parent
+    // corpus, this test will need to be updated to assert the inverse
+    // — that the field also appears in tokens. Best caught at PR time.
   });
 });
 

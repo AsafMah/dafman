@@ -412,6 +412,7 @@ function onDockReady(event: DockviewReadyEvent) {
   // panel add/remove inside groups.
   event.api.onDidLayoutChange(() => {
     layoutStore.enforceKnownEdgeMinimums();
+    layoutStore.bumpLayoutRev();
     schedulePersist();
   });
 }

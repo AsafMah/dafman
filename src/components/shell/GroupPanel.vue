@@ -34,6 +34,7 @@ import {
 } from 'dockview-vue';
 import type { IDockviewPanel } from 'dockview-core';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useGroupsActions } from '@/composables/useGroupsActions';
 import { schedulePersist } from '@/lib/persistScheduler';
@@ -60,6 +61,7 @@ const userParams = computed<UserParams>(() => {
 const groupId = computed(() => userParams.value.groupId ?? '');
 
 const groupsStore = useGroupsStore();
+const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
 const groupsActions = useGroupsActions();
 
@@ -108,6 +110,7 @@ function onInnerReady(event: DockviewReadyEvent): void {
   // schedulePersist coalesces the cascade into one debounced write.
   layoutSub = inner.onDidLayoutChange(() => {
     groupsStore.recordInnerBodySnapshot(id, inner.toJSON());
+    layoutStore.bumpLayoutRev();
     schedulePersist();
   });
 

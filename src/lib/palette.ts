@@ -15,6 +15,26 @@
 
 import type { Command } from '@/stores/shell/commandRegistry';
 
+/// Single source of truth for which fields of a child command
+/// participate in the parent's sub-menu fuzzy match. Used by BOTH:
+///
+///   1. `searchValueFor(parent)` — folds these tokens into the parent's
+///      fuse corpus, so typing a child name matches the collapsed parent.
+///   2. `CommandPalette.vue:shouldExpand` — auto-expands the parent if
+///      any of the same tokens matches the current query.
+///
+/// If these two consumers ever read different fields, a query can match
+/// the parent corpus without auto-expanding — the user sees the parent
+/// highlighted but no children to click. Centralizing here prevents
+/// that divergence (locked by `palette.test.ts`).
+export function childMatchTokens(child: Command): string[] {
+  const tokens: string[] = [child.label];
+  if (child.keywords && child.keywords.length > 0) {
+    tokens.push(...child.keywords);
+  }
+  return tokens;
+}
+
 export function searchValueFor(cmd: Command): string {
   const parts: string[] = [cmd.id, cmd.label];
 
@@ -24,18 +44,15 @@ export function searchValueFor(cmd: Command): string {
 
   if (cmd.keywords && cmd.keywords.length > 0) parts.push(...cmd.keywords);
 
-  // Sub-menu support: when a parent has children, fold their labels +
-  // keywords into the parent's fuse corpus so a query that matches a
+  // Sub-menu support: when a parent has children, fold their match
+  // tokens into the parent's fuse corpus so a query that matches a
   // child name highlights the parent row even when it's collapsed.
   // The palette then auto-expands the parent so the user sees the
-  // child hit directly (CommandPalette.vue handles the auto-expand
-  // based on a separate child-match check).
+  // child hit directly — `shouldExpand` MUST read the same tokens
+  // via `childMatchTokens` to stay in sync.
   if (cmd.children && cmd.children.length > 0) {
     for (const child of cmd.children) {
-      parts.push(child.label);
-      if (child.keywords && child.keywords.length > 0) {
-        parts.push(...child.keywords);
-      }
+      parts.push(...childMatchTokens(child));
     }
   }
 

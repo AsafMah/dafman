@@ -145,6 +145,18 @@ export const useLayoutStore = defineStore('layout', () => {
   /// sync; consumers (command palette `when()` predicates, future
   /// status-bar bindings, …) just read the ref.
   const activeSessionId = ref<string | null>(null);
+  /// Reactive counter bumped on every layout change (outer + each
+  /// inner dockview's `onDidLayoutChange`, wired by App.vue and
+  /// GroupPanel.vue). Consumers that depend on the panel-set —
+  /// command-palette `session.switch` parent re-registration is the
+  /// motivating case — `watch` this to re-run when panels open/close
+  /// without sessionsStore.sessions mutating. Avoids walking the
+  /// per-group inner apis directly (their `panels` arrays aren't
+  /// deeply reactive via Vue).
+  const layoutRev = ref<number>(0);
+  function bumpLayoutRev(): void {
+    layoutRev.value++;
+  }
   /// Reactive flag for the singleton session-details right-rail
   /// panel. Kept in sync via `onDidAddPanel` / `onDidRemovePanel`.
   /// Unlike the old per-session set, only one rail exists at a time
@@ -1113,6 +1125,8 @@ export const useLayoutStore = defineStore('layout', () => {
     api,
     bodyApi,
     activeSessionId,
+    layoutRev,
+    bumpLayoutRev,
     detailsOpen,
     enforceKnownEdgeMinimums,
     setApi,
