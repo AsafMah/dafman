@@ -3,8 +3,12 @@
 // dockview's default tab so each tab can carry its session's accent
 // colour and match the chat tile's rounded design language.
 
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
+import ContextMenu from 'primevue/contextmenu';
+import type { MenuItem } from 'primevue/menuitem';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
+import { useGroupsActions } from '@/composables/useGroupsActions';
 import { indicatorStyle } from '@/lib/notificationStyles';
 import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
 
@@ -23,6 +27,8 @@ const props = defineProps<{
 const { panelApi, title, isActive, close: onClose } = usePanelLifecycle(props);
 
 const sessionsStore = useSessionsStore();
+const groupsStore = useGroupsStore();
+const groupsActions = useGroupsActions();
 
 const sessionId = computed(() => {
   const fromUserParams = props.params?.params?.sessionId ?? props.params?.sessionId;
@@ -50,6 +56,46 @@ const indicator = computed(() =>
     record.value?.unseenTurns ?? 0,
   ),
 );
+
+// ─── Right-click context menu ─────────────────────────────────────────
+//
+// G4a (2026-05-27): "Move to group…" submenu. Lists every group EXCEPT
+// the active one; clicking moves the session via
+// `useGroupsActions.moveSessionToGroup` (prune-from-source + activate
+// target + addPanel-into-target).
+
+const ctxMenuRef = useTemplateRef<InstanceType<typeof ContextMenu>>('ctxMenuRef');
+
+const menuItems = computed<MenuItem[]>(() => {
+  const others = groupsStore.groups.filter((g) => g.id !== groupsStore.activeGroupId);
+  return [
+    {
+      label: 'Move to group',
+      icon: 'pi pi-arrow-right',
+      // Disable when only one group exists (nowhere to move to).
+      disabled: others.length === 0,
+      items: others.map((g) => ({
+        label: g.name,
+        // Render the color dot via inline style on the label icon. PrimeVue
+        // ContextMenu doesn't have a slot for arbitrary content per item
+        // in 4.x; the `iconClass` + `style` approach keeps it consistent
+        // with the existing menu rendering used elsewhere.
+        icon: 'pi pi-circle-fill',
+        iconClass: 'group-color-dot',
+        style: { '--menu-color-dot': g.color } as Record<string, string>,
+        command: () => {
+          void groupsActions.moveSessionToGroup(sessionId.value, g.id);
+        },
+      })),
+    },
+  ];
+});
+
+function onContextMenu(event: MouseEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+  ctxMenuRef.value?.show(event);
+}
 </script>
 
 <template>
@@ -58,6 +104,7 @@ const indicator = computed(() =>
     :class="{ 'chat-tab-active': isActive, 'chat-tab-inactive': !isActive }"
     :style="{ '--accent': accent }"
     :title="displayTitle"
+    @contextmenu="onContextMenu"
   >
     <i
       v-if="indicator"
@@ -80,6 +127,10 @@ const indicator = computed(() =>
         aria-hidden="true"
       />
     </button>
+    <ContextMenu
+      ref="ctxMenuRef"
+      :model="menuItems"
+    />
   </div>
 </template>
 
@@ -228,5 +279,18 @@ const indicator = computed(() =>
   50% {
     opacity: 0.55;
   }
+}
+</style>
+
+<!-- Color-dot styling for the "Move to group" ContextMenu items. PrimeVue
+ContextMenu renders the menu in a Vue teleport portal that's outside the
+scoped CSS boundary, so the rule must be unscoped to apply to the dots
+in the rendered menu. Targeted by a class on the menu item's icon
+(`iconClass: 'group-color-dot'`) + a CSS variable on each item's style
+binding. -->
+<style>
+.group-color-dot {
+  color: var(--menu-color-dot, var(--p-text-color)) !important;
+  font-size: 0.65rem !important;
 }
 </style>

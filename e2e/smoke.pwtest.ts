@@ -192,6 +192,22 @@ test("renderer bundle boots to ready without console errors", async ({ page }) =
   await expect(splash, "BootSplash never mounted — bundle likely failed to evaluate")
     .toBeVisible({ timeout: 10_000 });
 
+  // G5c: boot-cost regression gate. The original Groups v3 plan
+  // documented a 130 ms boot budget. Measure from
+  // navigationStart -> first frame after `.dv-dockview` becomes visible.
+  // Headless chromium under playwright is consistently 2-3x slower than
+  // real chromium so this floor is set generously (~500 ms) and is
+  // mostly a "don't regress by 2x overnight" guard rather than a strict
+  // user-facing target. Log the actual value either way so trends are
+  // visible in CI artifacts.
+  const bootCostMs = await page.evaluate(() => {
+    const t = performance.timing;
+    return t.domContentLoadedEventEnd - t.navigationStart;
+  });
+  // eslint-disable-next-line no-console
+  console.log(`[smoke:boot-cost] DOMContentLoaded = ${bootCostMs}ms`);
+  expect(bootCostMs, `boot cost ${bootCostMs}ms exceeded 1000 ms gate`).toBeLessThan(1000);
+
   // The dockview body is mounted exactly once, when bootStore.phase
   // flips to "ready". So waiting for the dockview root is equivalent
   // to waiting for boot completion.

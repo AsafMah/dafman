@@ -178,26 +178,14 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  /// Persists a fresh dockview-layout snapshot. Called (debounced) by
-  /// App.vue on every `onDidLayoutChange` once the api is ready. Errors
-  /// are intentionally swallowed — a layout-save failure should not
-  /// disrupt the user's workflow.
-  async function persistLayout(dockview: unknown): Promise<void> {
-    try {
-      await update({
-        ...settings.value,
-        layout: { dockview, schemaVersion: LAYOUT_SCHEMA_VERSION },
-      });
-    } catch {
-      /* toast already shown by `update()` */
-    }
-  }
-
   /// Persists a v3 grouped layout (with `outer`, `groups`, `innerBodies`,
-  /// `activeGroupId`) — used by the groups v3 boot path. The full `Layout`
-  /// object is provided by `composePersistLayout` at the call site. We
-  /// don't validate the shape here; the source of truth is whichever
-  /// composition function produced it.
+  /// `activeGroupId`). The full `Layout` object is produced by
+  /// `composePersistLayout` at the call site (via
+  /// `groupsStore.serialize(outer.toJSON())`) and written through
+  /// debounced via `lib/persistScheduler.schedulePersist`.
+  ///
+  /// Errors are intentionally swallowed — a layout-save failure should
+  /// not disrupt the user's workflow.
   async function persistGroupedLayout(layout: Layout): Promise<void> {
     try {
       await update({
@@ -312,7 +300,6 @@ export const useSettingsStore = defineStore('settings', () => {
     setStreaming,
     setEnableMermaid,
     setNotifications,
-    persistLayout,
     persistGroupedLayout,
     recordWorkspaceUse,
     setDefaultWorkspace,

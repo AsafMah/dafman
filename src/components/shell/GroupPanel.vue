@@ -35,6 +35,7 @@ import {
 import type { IDockviewPanel } from 'dockview-core';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useGroupsActions } from '@/composables/useGroupsActions';
 import { schedulePersist } from '@/lib/persistScheduler';
 
 type UserParams = { groupId?: string; color?: string; name?: string };
@@ -60,9 +61,12 @@ const groupId = computed(() => userParams.value.groupId ?? '');
 
 const groupsStore = useGroupsStore();
 const sessionsStore = useSessionsStore();
+const groupsActions = useGroupsActions();
 
 let removeSub: { dispose(): void } | null = null;
 let layoutSub: { dispose(): void } | null = null;
+let dropSub: { dispose(): void } | null = null;
+let dragOverSub: { dispose(): void } | null = null;
 
 function onInnerReady(event: DockviewReadyEvent): void {
   const id = groupId.value;
@@ -106,6 +110,33 @@ function onInnerReady(event: DockviewReadyEvent): void {
     groupsStore.recordInnerBodySnapshot(id, inner.toJSON());
     schedulePersist();
   });
+
+  // G4c — native cross-group drag. dockview's drag flow only moves
+  // panels within the SAME DockviewComponent (PanelTransfer.viewId
+  // check). When a chat tab is dragged from another group's inner to
+  // this inner, dockview fires onUnhandledDragOverEvent then onDidDrop
+  // on this api with the panel info — we accept the drop iff the
+  // dragged panel is a known chat session AND came from a different
+  // inner (i.e. another group's dockview), then route through
+  // moveSessionToGroup so the source gets pruned correctly.
+  dragOverSub = inner.onUnhandledDragOverEvent((evt) => {
+    const data = evt.getData();
+    if (!data || !data.panelId) return;
+    if (data.viewId === inner.id) return; // intra-component — dockview handles
+    if (!sessionsStore.sessions.some((s) => s.id === data.panelId)) return;
+    evt.accept();
+  });
+  dropSub = inner.onDidDrop((evt) => {
+    const panelData = evt.getData();
+    if (!panelData || !panelData.panelId) return;
+    if (panelData.viewId === inner.id) return;
+    const sid = panelData.panelId;
+    if (!sessionsStore.sessions.some((s) => s.id === sid)) return;
+    // Programmatic move — `moveSessionToGroup` activates this group,
+    // prunes the session from its previous inner (mounted or cached),
+    // then addPanels into this inner.
+    void groupsActions.moveSessionToGroup(sid, id);
+  });
 }
 
 onBeforeUnmount(() => {
@@ -114,6 +145,10 @@ onBeforeUnmount(() => {
   removeSub = null;
   layoutSub?.dispose();
   layoutSub = null;
+  dropSub?.dispose();
+  dropSub = null;
+  dragOverSub?.dispose();
+  dragOverSub = null;
   if (id) {
     // `unregisterInnerApi` snapshots the final body into the cache so the
     // next mount (e.g. after an outer reorder repaint) can restore it.
