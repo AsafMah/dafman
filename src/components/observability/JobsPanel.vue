@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
+import ProgressSpinner from 'primevue/progressspinner';
 import Textarea from 'primevue/textarea';
 import { storeToRefs } from 'pinia';
 import type { JobRecord } from '@/ipc/types';
@@ -79,19 +80,26 @@ function elapsed(job: JobRecord): string {
   });
 }
 
+function isRunning(job: JobRecord): boolean {
+  return job.status === 'starting' || job.status === 'running';
+}
+
 function statusIcon(job: JobRecord): string {
+  // For active jobs we render PrimeVue's <ProgressSpinner> instead of a
+  // pi-spinner glyph — see issue #15. The pi-spinner glyph variants kept
+  // either orbiting off-center or stopping animation when boxed via CSS;
+  // PrimeVue's spinner is a real SVG with a working built-in animation.
   switch (job.status) {
-    case 'starting':
-    case 'running':
-      return 'pi pi-spin pi-spinner';
     case 'idle':
-      return 'pi pi-pause-circle';
+      return 'pi pi-fw pi-pause-circle';
     case 'completed':
-      return 'pi pi-check-circle';
+      return 'pi pi-fw pi-check-circle';
     case 'failed':
-      return 'pi pi-times-circle';
+      return 'pi pi-fw pi-times-circle';
     case 'cancelled':
-      return 'pi pi-ban';
+      return 'pi pi-fw pi-ban';
+    default:
+      return '';
   }
 }
 </script>
@@ -183,7 +191,14 @@ function statusIcon(job: JobRecord): string {
             :class="`job-${job.status}`"
           >
             <div class="job-main">
+              <ProgressSpinner
+                v-if="isRunning(job)"
+                class="job-spinner"
+                stroke-width="4"
+                aria-label="Running"
+              />
               <i
+                v-else
                 :class="statusIcon(job)"
                 aria-hidden="true"
               />
@@ -368,12 +383,28 @@ function statusIcon(job: JobRecord): string {
 
 .job-main > .pi {
   margin-top: 0.15rem;
+  color: var(--p-primary-color);
+  flex-shrink: 0;
+}
+
+/* Size PrimeVue's <ProgressSpinner> to roughly match the pi-icon
+ * footprint so the column doesn't visually shift between running and
+ * completed states. Default is 100×100; we want it inline with the
+ * row text. */
+.job-spinner {
   width: 1em;
   height: 1em;
-  text-align: center;
-  color: var(--p-primary-color);
-  transform-origin: 50% 50%;
+  margin-top: 0.15rem;
   flex-shrink: 0;
+}
+
+/* PrimeVue normally cycles the stroke through 4 colors; pin to our
+ * primary so the spinner reads as "active job" instead of decoration.
+ * Override only the color-cycle animation, leaving the dash + the SVG
+ * rotate animation untouched. */
+.job-spinner :deep(.p-progressspinner-circle) {
+  stroke: var(--p-primary-color);
+  animation: p-progressspinner-dash 1.5s ease-in-out infinite;
 }
 
 .job-failed .job-main > .pi {
