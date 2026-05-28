@@ -26,6 +26,7 @@ import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
 import { useAgentsLibrary } from '@/composables/library/useAgentsLibrary';
 import { useSessionAgents } from '@/components/session/details/useSessionAgents';
+import LibraryAgentsTabSection from '@/components/library/LibraryAgentsTabSection.vue';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -334,173 +335,35 @@ async function reveal(path: string) {
       <code>.github/agents/</code>.
     </div>
 
-    <section
-      v-if="grouped.project.length > 0 && loaded"
-      class="agents-group"
-    >
-      <h3 class="group-title">Project ({{ grouped.project.length }})</h3>
-      <ul class="agents-list">
-        <li
-          v-for="entry in grouped.project"
-          :key="`p:${entry.name}`"
-          class="agent-row"
-          :class="{ 'agent-row-selected': currentAgentName === entry.name }"
-        >
-          <div class="agent-line">
-            <span class="agent-name">{{ entry.name }}</span>
-            <small
-              v-if="!entry.canonical"
-              class="warn-tag"
-              title="File ends with .md (not .agent.md)"
-            >
-              .md
-            </small>
-            <span
-              v-if="currentAgentName === entry.name"
-              class="agent-current-chip"
-              :title="`This agent is selected for the active session`"
-            >
-              Selected
-            </span>
-          </div>
-          <div
-            class="agent-path"
-            :title="entry.path"
-          >
-            {{ entry.path }}
-          </div>
-          <div class="agent-actions">
-            <Button
-              v-if="currentAgentName === entry.name"
-              size="small"
-              severity="secondary"
-              :loading="agentBusyName === '__deselect__'"
-              :disabled="!activeSession || !!agentBusyName"
-              label="Deselect"
-              :aria-label="`Deselect agent ${entry.name}`"
-              @click="onDeselect"
-            />
-            <Button
-              v-else
-              size="small"
-              :loading="agentBusyName === entry.name"
-              :disabled="!activeSession || !!agentBusyName"
-              label="Select"
-              :aria-label="`Select agent ${entry.name}`"
-              @click="onSelect(entry.name)"
-            />
-            <Button
-              size="small"
-              text
-              icon="pi pi-pencil"
-              :disabled="!activeSession"
-              :aria-label="`Edit ${entry.name}`"
-              @click="openEditForm(entry)"
-            />
-            <Button
-              size="small"
-              text
-              icon="pi pi-external-link"
-              :aria-label="`Reveal ${entry.name} in file manager`"
-              @click="reveal(entry.path)"
-            />
-            <Button
-              size="small"
-              severity="danger"
-              text
-              icon="pi pi-trash"
-              :disabled="!activeSession"
-              :aria-label="`Delete ${entry.name}`"
-              @click="deleteFile(entry)"
-            />
-          </div>
-        </li>
-      </ul>
-    </section>
+    <LibraryAgentsTabSection
+      v-if="loaded"
+      title="Project"
+      key-prefix="p"
+      :entries="grouped.project"
+      :current-agent-name="currentAgentName"
+      :agent-busy-name="agentBusyName"
+      :active-session="!!activeSession"
+      @select="onSelect"
+      @deselect="onDeselect"
+      @edit="openEditForm"
+      @reveal="reveal"
+      @delete="deleteFile"
+    />
 
-    <section
-      v-if="grouped.user.length > 0 && loaded"
-      class="agents-group"
-    >
-      <h3 class="group-title">User ({{ grouped.user.length }})</h3>
-      <ul class="agents-list">
-        <li
-          v-for="entry in grouped.user"
-          :key="`u:${entry.name}`"
-          class="agent-row"
-          :class="{ 'agent-row-selected': currentAgentName === entry.name }"
-        >
-          <div class="agent-line">
-            <span class="agent-name">{{ entry.name }}</span>
-            <small
-              v-if="!entry.canonical"
-              class="warn-tag"
-              title="File ends with .md (not .agent.md)"
-            >
-              .md
-            </small>
-            <span
-              v-if="currentAgentName === entry.name"
-              class="agent-current-chip"
-              :title="`This agent is selected for the active session`"
-            >
-              Selected
-            </span>
-          </div>
-          <div
-            class="agent-path"
-            :title="entry.path"
-          >
-            {{ entry.path }}
-          </div>
-          <div class="agent-actions">
-            <Button
-              v-if="currentAgentName === entry.name"
-              size="small"
-              severity="secondary"
-              :loading="agentBusyName === '__deselect__'"
-              :disabled="!activeSession || !!agentBusyName"
-              label="Deselect"
-              :aria-label="`Deselect agent ${entry.name}`"
-              @click="onDeselect"
-            />
-            <Button
-              v-else
-              size="small"
-              :loading="agentBusyName === entry.name"
-              :disabled="!activeSession || !!agentBusyName"
-              label="Select"
-              :aria-label="`Select agent ${entry.name}`"
-              @click="onSelect(entry.name)"
-            />
-            <Button
-              size="small"
-              text
-              icon="pi pi-pencil"
-              :disabled="!activeSession"
-              :aria-label="`Edit ${entry.name}`"
-              @click="openEditForm(entry)"
-            />
-            <Button
-              size="small"
-              text
-              icon="pi pi-external-link"
-              :aria-label="`Reveal ${entry.name} in file manager`"
-              @click="reveal(entry.path)"
-            />
-            <Button
-              size="small"
-              severity="danger"
-              text
-              icon="pi pi-trash"
-              :disabled="!activeSession"
-              :aria-label="`Delete ${entry.name}`"
-              @click="deleteFile(entry)"
-            />
-          </div>
-        </li>
-      </ul>
-    </section>
+    <LibraryAgentsTabSection
+      v-if="loaded"
+      title="User"
+      key-prefix="u"
+      :entries="grouped.user"
+      :current-agent-name="currentAgentName"
+      :agent-busy-name="agentBusyName"
+      :active-session="!!activeSession"
+      @select="onSelect"
+      @deselect="onDeselect"
+      @edit="openEditForm"
+      @reveal="reveal"
+      @delete="deleteFile"
+    />
 
     <div
       v-if="loaded && files.length === 0"

@@ -279,7 +279,7 @@ Partition of the 90 renderer clones:
 
 | # | Candidate | ROI |
 | - | --------- | --- |
-| 1 | **`LibraryAgentsTab` user/project sections → `<AgentSection :scope :entries>`** | 🔴 HIGH — 77 lines, freshly added in Sprint A. The Edit button worsened the dup; same fix has to land in both branches. **Do this before B.** |
+| ~~1~~ | ~~**`LibraryAgentsTab` user/project sections → `<AgentSection :scope :entries>`**~~ | ✅ **Fixed 2026-05-28 (Phase E.8)** — extracted `LibraryAgentsTabSection.vue`; intra-file dup 77 → 12 lines. |
 | 2 | **`<TabCloseButton>` extracted from ChatTab + GroupTab** | 🟡 LOW — 21 lines CSS + 13 lines script. Real but visual, both files are < 500 lines. Defer until either grows. |
 | 3 | **`<EnvKeyValueRow>` for env-var blocks (McpServerForm intra)** | 🟡 LOW — would also help Settings env sections. Defer. |
 | 4 | **`<LibraryInstructionsScopeSection>`** for user/project chrome (instructions tab dup, 26+25 lines) | 🟡 MEDIUM — similar shape to #1; could share the same wrapper. |
@@ -1057,24 +1057,23 @@ in `LibraryAgentsTab.vue` (see §3.2 + new candidate §3.4 #1). Defer
 the original Phase E completion and add Phase E.8 below to clean
 up the new debt before it grows.
 
-### Phase E.8 — `<AgentSection>` extraction (NEW 2026-05-27)
+### Phase E.8 — `<AgentSection>` extraction ✅ DONE (2026-05-28)
 
 🔴 **Triggered by:** Sprint A1 + A2 doubled the per-row markup
 (Select + chip + Edit + Reveal + Delete), turning the prior 42-line
 project-vs-user dup in `LibraryAgentsTab.vue` into a **77-line**
 intra-file clone — biggest single dup in the renderer.
 
-**Scope:**
-- Extract `<AgentSection :scope="user|project" :entries />` component
-  for the agent row + actions block.
-- Same component can absorb `LibraryInstructionsTab.vue`'s 26+25
-  line user/project dups (cross-file reuse opportunity).
-- Keep `LibraryAgentsTab.vue` as orchestrator (form + grouping +
-  Select wiring) — should shrink from 903 → ~750 lines.
+**Resolution (2026-05-28):** Extracted
+`src/components/library/LibraryAgentsTabSection.vue` (105 lines, pure
+template + props + 3 emit signatures). Parent shrank
+**912 → 775 lines (-137)**. Intra-file dup measured by jscpd in
+`LibraryAgentsTab.vue` dropped **77 → 12 lines (-84%)**. Tests 679 pass.
 
-**Anti-goal:** don't try to also wrap Skills / MCP / Tools per the
+**Anti-goal preserved:** did NOT absorb Skills / MCP / Tools per the
 2026-05-26 rubber-duck rejection (different shapes; would be a
-god-component).
+god-component). Cross-file reuse for `LibraryInstructionsTab` left as
+a future optional pass if its dup gets worse.
 
 ### Phase F — Clean up timing hacks + remaining ESLint 🟡 PARTIAL
 

@@ -10,7 +10,40 @@
 
 ---
 
-## 2026-05-28 — Phase F.4: ESLint config repaired
+## 2026-05-28 (later) — Phase E.8 + .gitattributes
+
+**Takeaway:** Extracted `<LibraryAgentsTabSection>` to kill the 77-line
+intra-file dup Sprint A1+A2 introduced. Also added `.gitattributes` to
+stop the CRLF/LF dance.
+
+**Phase E.8:**
+- New `src/components/library/LibraryAgentsTabSection.vue` (105 lines):
+  pure template + `defineProps` + 3 emit signatures
+  (`select`/`reveal` → string, `deselect` → void, `edit`/`delete` →
+  `AgentFileEntry`). Note: unified emit overloads to dodge eslint's
+  `unified-signatures` warning.
+- `LibraryAgentsTab.vue`: **912 → 775 lines (−137)**.
+- jscpd intra-file dup in `LibraryAgentsTab.vue`: **77 → 12 lines (−84%)**.
+- Tests: **679 pass**.
+
+**.gitattributes:**
+- Repo had `core.autocrlf=true` (local) and NO `.gitattributes`. That
+  means checkouts convert blobs (LF) → working tree (CRLF), and
+  prettier (`endOfLine: "lf"`) then complains on any new file. Hidden
+  trap for every new contributor on Windows.
+- Added `* text=auto eol=lf` + explicit binary list. `git add
+  --renormalize .` was a no-op on existing files (autocrlf=true was
+  already storing LF blobs); the practical effect is **new files will
+  be LF on disk going forward**, no more "delete `␍`" prettier errors.
+- This is closely related to the silent-eslint-break in F.4: a check we
+  don't run is a check we can't trust, AND a setting that produces
+  visible warnings on every other commit ("LF will be replaced by CRLF
+  the next time Git touches it") is one we eventually ignore. Both
+  classes now fixed.
+
+---
+
+
 
 **Takeaway:** ESLint had been silently broken since the typescript-eslint
 8.59 → 8.60 bump (commit `9b9cf11`, 2026-05-26). Root cause was a

@@ -1,0 +1,19 @@
+# Default: treat all files as text and normalize to LF on checkout + commit.
+# Matches the repo's prettier config (`endOfLine: "lf"`) and dodges the
+# `core.autocrlf=true` checkout-converts-to-CRLF trap on Windows.
+* text=auto eol=lf
+
+# Binary types (no normalization).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
