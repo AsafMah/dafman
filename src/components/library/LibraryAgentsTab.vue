@@ -568,63 +568,6 @@ async function reveal(path: string) {
   font-size: 0.95em;
 }
 
-.agents-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.group-title {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  color: var(--p-text-muted-color);
-  margin: 0;
-}
-
-.agents-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.agent-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
-  gap: 0.2rem 0.5rem;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--p-surface-border);
-  border-radius: var(--p-border-radius-sm);
-  background: color-mix(in srgb, var(--p-content-hover-background) 25%, transparent);
-  min-width: 0;
-  align-items: center;
-  border-left: 3px solid transparent;
-}
-
-/* Selected agent gets a tinted left rail in the primary color so the
- * row reads as "this is the active one" at a glance, matching the
- * palette's selected-item visual language. */
-.agent-row-selected {
-  border-left-color: var(--p-primary-color);
-  background: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
-}
-
-.agent-current-chip {
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.1rem 0.4rem;
-  background: color-mix(in srgb, var(--p-primary-color) 22%, transparent);
-  color: var(--p-primary-color);
-  border-radius: 0.25rem;
-  font-weight: 600;
-}
-
 .form-preserved-hint {
   display: flex;
   align-items: flex-start;
@@ -646,47 +589,6 @@ async function reveal(path: string) {
   padding: 0.05rem 0.3rem;
   border-radius: 0.2rem;
   font-size: 0.78rem;
-}
-
-.agent-line {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
-.agent-name {
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.warn-tag {
-  text-transform: uppercase;
-  font-size: 0.55rem;
-  padding: 0.05rem 0.3rem;
-  background: color-mix(in srgb, var(--p-yellow-500, #eab308) 18%, transparent);
-  color: var(--p-yellow-500, #eab308);
-  border-radius: 0.2rem;
-}
-
-.agent-path {
-  grid-row: 2;
-  grid-column: 1 / 2;
-  font-size: 0.65rem;
-  color: var(--p-text-muted-color);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.agent-actions {
-  grid-row: 1 / 3;
-  grid-column: 2;
-  display: flex;
-  gap: 0.2rem;
 }
 
 .empty-hint {

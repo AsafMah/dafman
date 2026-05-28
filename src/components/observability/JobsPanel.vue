@@ -80,18 +80,26 @@ function elapsed(job: JobRecord): string {
 }
 
 function statusIcon(job: JobRecord): string {
+  // `pi-fw` (fixed-width) makes the glyph render in a square 1.286em box
+  // with text-align:center. That gives `pi-spin`'s default
+  // transform-origin (50% 50%) a square box to rotate around, which is
+  // what prevents the "spinner orbits an off-center point" visual.
+  // Don't override width/height/transform-origin in scoped CSS — that
+  // breaks the spin animation (commit 19412d1 attempted that and made
+  // the spinner stop visibly rotating). Use pi-fw and let the font /
+  // spin keyframe do their job.
   switch (job.status) {
     case 'starting':
     case 'running':
-      return 'pi pi-spin pi-spinner';
+      return 'pi pi-spin pi-fw pi-spinner';
     case 'idle':
-      return 'pi pi-pause-circle';
+      return 'pi pi-fw pi-pause-circle';
     case 'completed':
-      return 'pi pi-check-circle';
+      return 'pi pi-fw pi-check-circle';
     case 'failed':
-      return 'pi pi-times-circle';
+      return 'pi pi-fw pi-times-circle';
     case 'cancelled':
-      return 'pi pi-ban';
+      return 'pi pi-fw pi-ban';
   }
 }
 </script>
