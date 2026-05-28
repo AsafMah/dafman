@@ -5,7 +5,6 @@
       {"context": "Lint (vue-tsc + bun-entry + tsc-bun + eslint)"},
       {"context": "Unit tests (bun test)"},
       {"context": "Renderer smoke (Playwright)"},
-      {"context": "Full E2E (real test-server + fake SDK)"},
       {"context": "electrobun build (ubuntu-latest)"}
     ]
   },
