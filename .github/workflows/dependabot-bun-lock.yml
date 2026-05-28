@@ -58,9 +58,11 @@ jobs:
         run: bun install
 
       - name: Commit + push bun.lock if changed
+        id: sync
         run: |
           if [[ -z "$(git status --porcelain bun.lock)" ]]; then
             echo "bun.lock already in sync; nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name 'dependabot[bot]'
@@ -68,3 +70,14 @@ jobs:
           git add bun.lock
           git commit -m "chore: sync bun.lock with package.json [dependabot-bun-sync]"
           git push origin HEAD:"${{ github.event.pull_request.head.ref }}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger CI for the synced commit
+        # GITHUB_TOKEN pushes don't trigger downstream workflows. After
+        # we sync bun.lock and push, dispatch CI explicitly against the
+        # PR head so the dependabot PR actually gets re-tested.
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run ci.yml --ref "${{ github.event.pull_request.head.ref }}"
