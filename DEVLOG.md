@@ -10,7 +10,94 @@
 
 ---
 
-## 2026-05-28 — TS 5.9 → 6.0 (#44 part 2)
+## 2026-05-28 — vite 6 → 8 + @vitejs/plugin-vue 5 → 6 (#44 part 3, closes #44)
+
+**Takeaway:** Third and final fork of #44 dep-majors umbrella. Vite
+6 → 8 (skipping 7) swaps the bundler engine from esbuild/Rollup to
+Rolldown + Oxc. **Build time dropped from ~11s to ~1.6s** (7×
+speedup). Zero source-code changes — our vite config dodges every
+breaking-change surface. All probes green.
+
+### Receipts
+
+- `package.json` — `vite: "^8.0.0"` (was `6.4.2`),
+  `@vitejs/plugin-vue: "^6.0.0"` (was `5.2.4`).
+- `vite.config.ts` — unchanged. Single `vue()` plugin + `@/*` alias
+  + port + outDir. None of the Vite 8 breaking-change surfaces apply.
+
+### Pre-flight research (per rules 0 + 24)
+
+Read the official Vite migration guide (`vite.dev/guide/migration`).
+Vite 8 breaking changes that affect us:
+
+| Change | Our exposure |
+|---|---|
+| Rolldown replaces esbuild + Rollup | We don't use either's API directly |
+| `optimizeDeps.esbuildOptions` deprecated | Not used |
+| `esbuild.*` options deprecated → `oxc.*` | Not used |
+| `build.rollupOptions` → `build.rolldownOptions` | Not used |
+| `build.rollupOptions.output.manualChunks` removed (object form) | Not used |
+| `import.meta.url` no longer polyfilled in UMD/IIFE | We build ESM |
+| CJS interop heuristic change | Could affect deps; tested via smoke + e2e — clean |
+| `browser`/`module` field auto-pick removed | Could affect deps; tested via smoke — clean |
+| Default browser target Chrome 107 → 111 (etc.) | We target evergreen webview, fine |
+| `build.rollupOptions.watch.chokidar` removed | Not used |
+
+Also checked Electrobun's vite compatibility: it has no vite
+peer-dep. `electrobun.config.ts` declares `copy: { "dist/index.html"
+→ views/mainview/index.html, "dist/assets" → views/mainview/assets
+}` — shape-only coupling. Vite 8's `dist/` output shape is
+unchanged.
+
+### Verification
+
+- **`bun run check` green** — vue-tsc + lint:bun + lint:tsc-bun +
+  lint:eslint (18 carried warnings) + 679 tests + electrobun build
+  matrix.
+- **Smoke (prod + HMR)** — 2 passed.
+- **Spinner regression probe (prod + HMR)** — 2 passed (animation
+  state intact).
+- **`bunx electrobun build`** — clean Windows native bundle.
+- **`bun run dev`** — launcher spawned, child Bun process started,
+  no boot errors.
+
+### Build perf
+
+```
+vite 6.4.2 build: ~11s
+vite 8.0.14 build: ~1.6s   (7× faster via Rolldown)
+```
+
+### Warnings (not errors; pre-existing tree-shaking signals)
+
+Rolldown's stricter dead-code analysis surfaced:
+
+1. `@vueuse/core/dist/index.js:5780` — PURE annotation positioned
+   AFTER an opening paren instead of before. Rolldown can't
+   interpret it. Upstream fix needed in @vueuse/core.
+2. Five "ineffective dynamic import" warnings — files imported both
+   statically AND dynamically:
+   - `src/stores/shell/commandRegistry.ts`
+   - `src/stores/shell/groupsStore.ts`
+   - `src/stores/shell/layoutStore.ts`
+   - `src/composables/useGroupsActions.ts`
+   - `src/lib/chatEvents.ts`
+
+   Pre-existing tree-shaking signals from `src/main.ts` dynamically
+   importing files that are also statically imported elsewhere.
+   Would be useful follow-up to clean up but doesn't affect build
+   correctness. Filed as separate issue.
+
+### Closes #44
+
+This is the third and final fork of the dep-majors umbrella.
+- Part 1: vue-tsc 2.2.12 → 3.3.2 + useTemplateRef (#45, `dab45f8`)
+- Part 2: typescript 5.9.3 → 6.0.x (#47, `e516b27`)
+- Part 3: vite 6.4.2 → 8.0.x + plugin-vue 5.2.4 → 6.0.x (this PR)
+
+---
+
+
 
 **Takeaway:** Second fork of #44 dep-majors umbrella. Bumped
 typescript 5.9.3 → 6.0.x. Two tsconfig migrations, zero source
