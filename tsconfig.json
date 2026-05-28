@@ -14,11 +14,17 @@
     "noEmit": true,
     "jsx": "preserve",
 
-    /* Path aliases */
-    "baseUrl": ".",
+    /* Path aliases. TS 6+ no longer requires baseUrl; paths are
+     * resolved relative to the tsconfig directory. */
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
+    /* TS 6 defaults `types` to `[]` (was: enumerate all of @types/*).
+     * Renderer test files import from `bun:test`, so we need bun
+     * types explicitly. This doesn't leak Bun globals into renderer
+     * production code — tsconfig.bun.json is the canonical
+     * typecheck for backend code. */
+    "types": ["bun"],
 
     /* Linting */
     "strict": true,

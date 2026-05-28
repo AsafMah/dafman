@@ -10,7 +10,58 @@
 
 ---
 
-## 2026-05-28 — vue-tsc 2 → 3 + Vue 3.5 useTemplateRef migration (#44)
+## 2026-05-28 — TS 5.9 → 6.0 (#44 part 2)
+
+**Takeaway:** Second fork of #44 dep-majors umbrella. Bumped
+typescript 5.9.3 → 6.0.x. Two tsconfig migrations, zero source
+changes. TS 6 didn't surface any new type errors in our codebase
+— the big-deal defaults (`strict: true`, explicit `module`/`target`,
+explicit `types`) were already set or not relevant to us.
+
+### Receipts
+
+- `package.json` — `typescript: "^6.0.0"` (was `5.9.3`).
+- `tsconfig.json` — dropped `baseUrl: "."` (deprecated in TS 6, paths
+  now resolved relative to tsconfig dir). Added `"types": ["bun"]`
+  (TS 6 changed `types` default from "enumerate all `@types/*`" to
+  `[]`; renderer test files import `bun:test` so we need bun types
+  explicit). Paths updated `"@/*": ["./src/*"]` to be unambiguous.
+
+### TS 6.0 release-note review
+
+Read the official announcement (`devblogs.microsoft.com/typescript/announcing-typescript-6-0/`).
+Relevant breaking changes and our status:
+
+| Change | Default | Our status |
+|---|---|---|
+| `baseUrl` deprecated | removed if not set | dropped explicitly |
+| `strict` defaults to `true` | was `false` | already `true` |
+| `module` defaults to `esnext` | was `commonjs` | explicit `ESNext` |
+| `target` defaults to current-year ES | was `es3` | explicit `ES2020` |
+| `noUncheckedSideEffectImports: true` | was `false` | clean — no side-effect-import typos |
+| `libReplacement: false` | was `true` | perf-only, no behavior change |
+| `rootDir` defaults to tsconfig dir | was inferred | already implicit |
+| `types` defaults to `[]` | was "all @types/*" | added `["bun"]` explicitly |
+| `target: es5` deprecated | — | we use `ES2020`/`ES2022` |
+| Import assertion (`import ... assert {...}`) deprecated | — | no usage |
+
+### Verification
+
+- `bun run check` green — vue-tsc + lint:bun + lint:tsc-bun +
+  lint:eslint (18 warnings carried) + 679 tests + electrobun build
+  matrix.
+- Re-ran Playwright smoke + jobs-spinner probe against the
+  freshly-built bundle: both pass.
+
+### Follow-ups
+
+- Continue #44 umbrella: only fork left is vite 6 → 8 (HIGH RISK —
+  Rolldown engine swap, config key migrations, Electrobun compat
+  verification needed). That's the next session's work, not this PR.
+
+---
+
+
 
 **Takeaway:** First fork of the dep-majors umbrella (#44). Bumped
 vue-tsc 2.2.12 → 3.3.2. vue-tsc 3 stops auto-linking template

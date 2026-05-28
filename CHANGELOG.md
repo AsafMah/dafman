@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (TS bump — 2026-05-28)
+- **Bumped `typescript` from `5.9.3` to `6.0.x`.** Two tsconfig migrations triggered by TS 6 deprecation defaults: (1) dropped `baseUrl` (deprecated; paths now resolved relative to tsconfig dir), (2) added explicit `"types": ["bun"]` to renderer `tsconfig.json` (TS 6 changed `types` default from "enumerate all `@types/*`" to `[]`, breaking auto-discovery of `bun:test` imports in renderer test files). No source-code changes — TS 6 didn't surface any new type errors in our codebase. Second fork of #44 dep-majors umbrella.
+
 ### Changed (vue-tsc bump — 2026-05-28)
 - **Bumped `vue-tsc` from `2.2.12` to `3.3.2`.** Two small Vue 3.5 migrations: (1) refactored `useComposerToolbarLayout` to accept the toolbar ref from the caller via `useTemplateRef('toolbarRef')` instead of destructuring an opaque ref from the composable's return value — vue-tsc 3 can't link a template string-ref to a composable-internal `ref()`. (2) Deleted dead `target` ref in `MermaidBlock.vue` (Mermaid renders via `v-html`, the ref was never read). The other 19 string template refs across `src/` still work in Vue 3.5 (deprecated but functional); broader `useTemplateRef()` migration filed as follow-up.
 
