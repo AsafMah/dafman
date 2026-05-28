@@ -1,0 +1,70 @@
+name: Sync bun.lock on Dependabot PRs
+
+# Dependabot's npm ecosystem only updates `package-lock.json`; it doesn't
+# know how to touch `bun.lock`. When dependabot bumps a dep, package.json
+# changes but bun.lock stays stale, and `bun install --frozen-lockfile`
+# in the lint/test/smoke jobs explodes with:
+#
+#   error: lockfile had changes, but lockfile is frozen
+#
+# This workflow runs on PRs from dependabot, regenerates bun.lock, and
+# commits it back to the PR branch. CI then re-runs against the synced
+# lockfile and passes.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: bun-lock-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # Only run for dependabot PRs that touched package.json.
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          # Check out the PR head — pull_request_target normally checks
+          # out the base, which would defeat the purpose.
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          # GITHUB_TOKEN scoped to `contents: write` is enough to push
+          # back to the dependabot branch (it lives in the same repo).
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # We need full history to push.
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache bun install
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: bun-Linux-${{ hashFiles('package.json') }}
+          restore-keys: |
+            bun-Linux-
+
+      - name: Run bun install (non-frozen) to sync lockfile
+        run: bun install
+
+      - name: Commit + push bun.lock if changed
+        run: |
+          if [[ -z "$(git status --porcelain bun.lock)" ]]; then
+            echo "bun.lock already in sync; nothing to commit."
+            exit 0
+          fi
+          git config user.name 'dependabot[bot]'
+          git config user.email '49699333+dependabot[bot]@users.noreply.github.com'
+          git add bun.lock
+          git commit -m "chore: sync bun.lock with package.json [dependabot-bun-sync]"
+          git push origin HEAD:"${{ github.event.pull_request.head.ref }}"
