@@ -142,21 +142,34 @@ export const SESSION_COMMANDS: SessionCommand[] = [
     keywords: ['subagent', 'custom agent', 'select'],
     async run(sessionId, args) {
       const name = (args ?? '').trim();
+
       if (!name) {
         openLibraryTab('agents');
+
         return;
       }
+
       try {
         const agents = await invokeCommand('listAgents', { sessionId });
         const match = agents.find((a) => a.name.toLowerCase() === name.toLowerCase());
+
         if (!match) {
-          const available = agents.map((a) => a.name).slice(0, 5).join(', ') || '(none)';
+          const available =
+            agents
+              .map((a) => a.name)
+              .slice(0, 5)
+              .join(', ') || '(none)';
+
           useToastStore().warn(
             `No agent named "${name}"`,
-            agents.length > 0 ? `Available: ${available}` : 'Drop an agent file under ~/.copilot/agents/ or .github/agents/',
+            agents.length > 0
+              ? `Available: ${available}`
+              : 'Drop an agent file under ~/.copilot/agents/ or .github/agents/',
           );
+
           return;
         }
+
         await invokeCommand('selectAgent', { sessionId, name: match.name });
         useToastStore().success('Agent selected', match.displayName ?? match.name);
         pushLocalSystem(sessionId, `Agent selected: ${match.displayName ?? match.name}`);

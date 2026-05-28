@@ -117,10 +117,13 @@ export const useLayoutStore = defineStore('layout', () => {
   const groupsStore = useGroupsStore();
   const bodyApi = computed<DockviewApi | null>(() => {
     const activeId = groupsStore.activeGroupId;
+
     if (activeId) {
       const inner = groupsStore.innerApis[activeId];
+
       if (inner) return inner;
     }
+
     return api.value;
   });
 
@@ -154,9 +157,11 @@ export const useLayoutStore = defineStore('layout', () => {
   /// per-group inner apis directly (their `panels` arrays aren't
   /// deeply reactive via Vue).
   const layoutRev = ref<number>(0);
+
   function bumpLayoutRev(): void {
     layoutRev.value++;
   }
+
   /// Programmatic setter for `activeSessionId`. Used by GroupPanel.vue's
   /// per-inner `onDidActivePanelChange` subscription so chat-tab
   /// switches inside the active group update the active-session ref
@@ -165,6 +170,7 @@ export const useLayoutStore = defineStore('layout', () => {
   function setActiveSessionId(sessionId: string | null): void {
     activeSessionId.value = sessionId;
   }
+
   /// Reactive flag for the singleton session-details right-rail
   /// panel. Kept in sync via `onDidAddPanel` / `onDidRemovePanel`.
   /// Unlike the old per-session set, only one rail exists at a time
@@ -190,13 +196,11 @@ export const useLayoutStore = defineStore('layout', () => {
     const edge = dock.getEdgeGroup(position);
 
     if (!edge) return;
+
     if (edge.isCollapsed()) return;
 
     const seeds = position === 'left' ? LEFT_ACTIVITY_TABS : RIGHT_ACTIVITY_TABS;
-    const staticMin = seeds.reduce(
-      (acc, s) => Math.max(acc, s.minimumSize),
-      0,
-    );
+    const staticMin = seeds.reduce((acc, s) => Math.max(acc, s.minimumSize), 0);
 
     if (staticMin > 0) applyEdgeMinimum(position, staticMin);
   }
@@ -285,11 +289,14 @@ export const useLayoutStore = defineStore('layout', () => {
     // in SessionDetailsPanel and hides every session.* palette
     // command. Caught 2026-05-27 by user feedback.
     const activeGid = groupsStore.activeGroupId;
+
     if (activeGid) {
       const inner = groupsStore.innerApis[activeGid];
       const innerActive = inner?.activeGroup?.activePanel;
+
       if (innerActive && innerActive.api.component === 'chat') {
         activeSessionId.value = innerActive.api.id;
+
         return;
       }
     }
@@ -365,8 +372,7 @@ export const useLayoutStore = defineStore('layout', () => {
   function rescanOpenDetails(dock: DockviewApi): void {
     const right = dock.getEdgeGroup('right');
     const panel = dock.getPanel(SESSION_DETAILS_PANEL_ID);
-    const found =
-      right !== undefined && !right.isCollapsed() && panel?.api.isActive === true;
+    const found = right !== undefined && !right.isCollapsed() && panel?.api.isActive === true;
 
     if (detailsOpen.value !== found) detailsOpen.value = found;
   }
@@ -408,6 +414,7 @@ export const useLayoutStore = defineStore('layout', () => {
 
       const sub = edge.onDidCollapsedChange(() => {
         applyActiveTabConstraints(position);
+
         if (position === 'right') rescanOpenDetails(next);
       });
 
@@ -442,6 +449,7 @@ export const useLayoutStore = defineStore('layout', () => {
       // changes outer.activePanel but should NOT change which group
       // is "active" for body routing.
       const activeId = next.activePanel?.id;
+
       if (activeId && groupsStore.isGroupPanelId(activeId)) {
         groupsStore.setActiveGroupId(activeId);
       }
@@ -868,6 +876,7 @@ export const useLayoutStore = defineStore('layout', () => {
     }
 
     if (!isActive) panel.api.setActive();
+
     if (isCollapsed) group.expand();
   }
 
@@ -1007,6 +1016,7 @@ export const useLayoutStore = defineStore('layout', () => {
           }
         }
       }
+
       return;
     }
 
@@ -1015,8 +1025,10 @@ export const useLayoutStore = defineStore('layout', () => {
     // DockviewApi identity (no `as unknown as DockviewApi` needed).
     for (const innerApi of Object.values(groupsStore.innerApis)) {
       const innerPanel = innerApi.getPanel(id);
+
       if (innerPanel) {
         innerApi.removePanel(innerPanel);
+
         // No edge-group cleanup inside inner dockviews (they don't have edges).
         // The group-meta cache will pick up the new toJSON on next layout-change.
         return;

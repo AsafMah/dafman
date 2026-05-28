@@ -91,7 +91,7 @@ const pressed = computed(() => isActive.value && !groupCollapsed.value);
 // Resolve params through both possible wrap depths.
 const resolvedParams = computed<TabParams>(() => {
   const outer = props.params ?? {};
-  const inner = (outer.params as TabParams | undefined) ?? {};
+  const inner = outer.params ?? {};
 
   return {
     icon: inner.icon ?? outer.icon ?? 'pi-circle',

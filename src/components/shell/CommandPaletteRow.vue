@@ -45,12 +45,14 @@ defineProps<{
     v-if="parentLabel"
     class="cmd-breadcrumb"
     aria-hidden="true"
-  >{{ parentLabel }}<span class="cmd-breadcrumb-sep">›</span></span>
+    >{{ parentLabel }}<span class="cmd-breadcrumb-sep">›</span></span
+  >
   <span class="cmd-label">{{ cmd.label }}</span>
   <span
     v-if="cmd.hint"
     class="cmd-hint"
-  >{{ cmd.hint }}</span>
+    >{{ cmd.hint }}</span
+  >
   <span
     v-if="cmd.shortcut && cmd.shortcut.length > 0"
     class="cmd-shortcut"
@@ -59,7 +61,8 @@ defineProps<{
     <kbd
       v-for="(k, idx) in cmd.shortcut"
       :key="idx"
-    >{{ k }}</kbd>
+      >{{ k }}</kbd
+    >
   </span>
   <span
     v-if="isParent"

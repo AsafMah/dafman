@@ -59,21 +59,26 @@ const {
 /// from Library reflects in the rail and vice versa.
 const sessionIdRef = computed(() => activeSession.value?.id ?? '');
 const recordRef = computed(() => activeSession.value ?? undefined);
-const { selectAgent: selectSessionAgent, deselectAgent, agentBusyName } = useSessionAgents(
-  sessionIdRef,
-  recordRef,
-);
+const {
+  selectAgent: selectSessionAgent,
+  deselectAgent,
+  agentBusyName,
+} = useSessionAgents(sessionIdRef, recordRef);
 /// Name of the currently-selected agent for the active session, or
 /// null if no session / no agent. Drives the row chip + the
 /// Select/Deselect button toggle.
 const currentAgentName = computed<string | null>(() => {
   const session = activeSession.value;
+
   if (!session) return null;
+
   return (session as { currentAgent?: { name?: string } | null }).currentAgent?.name ?? null;
 });
+
 async function onSelect(name: string) {
   await selectSessionAgent(name);
 }
+
 async function onDeselect() {
   await deselectAgent();
 }
@@ -151,10 +156,14 @@ async function openEditForm(entry: AgentFileEntry) {
       'Need an active session',
       'Open a session to edit agents (the SDK reload path is session-scoped).',
     );
+
     return;
   }
+
   const read = await readAgent(activeSession.value.id, entry.scope, entry.name);
+
   if (!read) return; // toasted
+
   showForm.value = true;
   formMode.value = 'edit';
   formScope.value = entry.scope;
@@ -533,8 +542,8 @@ async function reveal(path: string) {
             <span>
               <strong>Unknown frontmatter keys preserved:</strong>
               edits won't strip
-              <code>mcp-servers</code>, <code>github</code>, plugin keys, etc.
-              Reveal the file to inspect them.
+              <code>mcp-servers</code>, <code>github</code>, plugin keys, etc. Reveal the file to
+              inspect them.
             </span>
           </div>
           <label class="form-field">

@@ -26,7 +26,7 @@
     "format": "prettier --write 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "inspect": "node --experimental-strip-types --no-warnings tools/inspect.ts",
-    "check": "bun run lint && bun run lint:bun && bun run lint:tsc-bun && bun run test && bun run build && bun run smoke:run"
+    "check": "bun run lint && bun run lint:bun && bun run lint:tsc-bun && bun run lint:eslint && bun run test && bun run build && bun run smoke:run"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -131,6 +131,7 @@
     "@lexical/text": "0.44.0",
     "@lexical/utils": "0.44.0",
     "@lexical/yjs": "0.44.0",
-    "lexical": "0.44.0"
+    "lexical": "0.44.0",
+    "typescript-eslint": "^8.60.0"
   }
 }

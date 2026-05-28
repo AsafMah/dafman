@@ -32,7 +32,9 @@ const groupsStore = useGroupsStore();
 /// cleaner than trying to introspect dockview's panel metadata.
 const isGroupsStrip = computed(() => {
   const panels = props.params?.panels ?? [];
+
   if (panels.length === 0) return false;
+
   return panels.every((p) => groupsStore.isGroupPanelId(p.id));
 });
 

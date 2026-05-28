@@ -342,6 +342,7 @@ function onDockReady(event: DockviewReadyEvent) {
   // already disposed inner cleanly.
   event.api.onDidRemovePanel((panel) => {
     const parentGroupId = panel.api.group.id;
+
     // If this panel was the last one in its edge group (e.g. user closed
     // the Sessions sidebar via dockview's own X), tear down the edge
     // group too so the next open recreates at the configured
@@ -382,9 +383,11 @@ function onDockReady(event: DockviewReadyEvent) {
     if (isActivity) {
       // Activity-bar panel: only land in another edge group's tab strip.
       const okTarget = targetLocation === 'edge';
+
       if (!(okKind && okTarget)) {
         evt.preventDefault();
       }
+
       return;
     }
 
@@ -395,6 +398,7 @@ function onDockReady(event: DockviewReadyEvent) {
       // group panel into an activity-bar sidebar where it has no visible
       // chrome and the inner DockviewVue collapses to 0x0).
       const targetIsBody = targetLocation === 'grid';
+
       if (!okKind || !targetIsBody) {
         evt.preventDefault();
       }

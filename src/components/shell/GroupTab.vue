@@ -54,12 +54,18 @@ const color = computed(() => meta.value?.color ?? 'var(--p-primary-color)');
 const sessionCount = computed(() => {
   const id = groupId.value;
   const api = groupsStore.innerApis[id];
+
   if (api) return api.panels.length;
+
   const cached = groupsStore.innerBodiesCache[id];
+
   if (!cached || typeof cached !== 'object') return 0;
+
   const panels = (cached as Record<string, unknown>).panels;
+
   if (!panels || typeof panels !== 'object') return 0;
-  return Object.keys(panels as Record<string, unknown>).length;
+
+  return Object.keys(panels).length;
 });
 
 // ─── Inline rename ───────────────────────────────────────────────────
@@ -70,11 +76,14 @@ const renameInputRef = useTemplateRef<HTMLInputElement>('renameInputRef');
 
 async function startRename(): Promise<void> {
   const m = meta.value;
+
   if (!m) return;
+
   renameDraft.value = m.name;
   isRenaming.value = true;
   await nextTick();
   const input = renameInputRef.value;
+
   if (input) {
     input.focus();
     input.select();
@@ -83,9 +92,12 @@ async function startRename(): Promise<void> {
 
 function commitRename(): void {
   if (!isRenaming.value) return;
+
   const id = groupId.value;
   const next = renameDraft.value.trim();
+
   isRenaming.value = false;
+
   // renameGroup is no-op on empty input; safe to call regardless.
   if (next && next !== meta.value?.name) {
     groupsStore.renameGroup(id, next);
@@ -107,7 +119,9 @@ const colorModel = computed<string>({
   get: () => (meta.value?.color ?? '#3b82f6').replace(/^#/, ''),
   set: (next: string) => {
     if (!next) return;
+
     const withHash = next.startsWith('#') ? next : `#${next}`;
+
     groupsStore.setGroupColor(groupId.value, withHash);
   },
 });
@@ -151,12 +165,15 @@ const menuItems = computed<MenuItem[]>(() => [
     disabled: groupsStore.groups.length <= 1,
     command: () => {
       const id = groupId.value;
+
       if (!id) return;
+
       const count = sessionCount.value;
       const detail =
         count > 0
           ? `Close ${count} session${count === 1 ? '' : 's'} in "${displayName.value}"?`
           : `Close empty group "${displayName.value}"?`;
+
       confirm.require({
         message: detail,
         icon: 'pi pi-exclamation-triangle',
@@ -177,6 +194,7 @@ function onContextMenu(event: MouseEvent): void {
 function onClose(event: MouseEvent): void {
   event.stopPropagation();
   const id = groupId.value;
+
   if (!id) return;
 
   // Deleting the last group is a no-op at the store level. UX: confirm
@@ -229,17 +247,19 @@ function onClose(event: MouseEvent): void {
       @keydown.enter.prevent="commitRename"
       @keydown.esc.prevent="cancelRename"
       @blur="commitRename"
-    >
+    />
     <span
       v-else
       class="group-tab-title"
       @dblclick.stop="startRename"
-    >{{ displayName }}</span>
+      >{{ displayName }}</span
+    >
     <span
       v-if="sessionCount > 0 && !isRenaming"
       class="group-tab-badge"
       :aria-label="`${sessionCount} session${sessionCount === 1 ? '' : 's'}`"
-    >{{ sessionCount }}</span>
+      >{{ sessionCount }}</span
+    >
     <button
       v-if="groupsStore.groups.length > 1 && !isRenaming"
       type="button"

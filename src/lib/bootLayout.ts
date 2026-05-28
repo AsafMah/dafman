@@ -21,10 +21,7 @@
 
 import { ref } from 'vue';
 import { useBootStore } from '@/stores/app/bootStore';
-import {
-  extractPanelIdsFromBody,
-  useGroupsStore,
-} from '@/stores/shell/groupsStore';
+import { extractPanelIdsFromBody, useGroupsStore } from '@/stores/shell/groupsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
@@ -50,6 +47,7 @@ export function useBootLayout(): BootLayout {
 
   async function restoreFromLayout(): Promise<void> {
     const layoutPref = settingsStore.settings.layout;
+
     console.info('[boot] restoreFromLayout: hydrating groupsStore');
 
     // Hydrate normalizes v2 legacy / v3 / empty / corrupt all in one
@@ -62,8 +60,10 @@ export function useBootLayout(): BootLayout {
     // produce a single Default group with the legacy body in its cache;
     // v3 layouts may distribute sessions across multiple groups.
     const sessionIds = new Set<string>();
+
     for (const g of groupsStore.groups) {
       const body = groupsStore.innerBodiesCache[g.id];
+
       for (const id of extractPanelIdsFromBody(body)) {
         sessionIds.add(id);
       }
@@ -89,6 +89,7 @@ export function useBootLayout(): BootLayout {
     }
 
     pendingFlush.value = true;
+
     if (layoutStore.api) flushPendingLayout();
   }
 
@@ -107,19 +108,24 @@ export function useBootLayout(): BootLayout {
   /// place subsequent group panels `within` that group as tabs.
   function seedOuterGroupPanels(): void {
     const outer = layoutStore.api;
+
     if (!outer) return;
 
     let referenceGroup = layoutStore.firstBodyGroupId();
     let createdBodyGroup = false;
+
     if (!referenceGroup) {
       const body = outer.addGroup();
+
       referenceGroup = body.id;
       createdBodyGroup = true;
     }
 
     let added = 0;
+
     for (const g of groupsStore.groups) {
       if (outer.getPanel(g.id)) continue;
+
       outer.addPanel({
         id: g.id,
         component: 'group',
@@ -132,11 +138,14 @@ export function useBootLayout(): BootLayout {
       });
       added += 1;
     }
+
     console.info(
       `[boot] seedOuterGroupPanels: ${added} group panel(s) added; active=${groupsStore.activeGroupId ?? '(none)'}; createdBodyGroup=${createdBodyGroup}`,
     );
+
     if (groupsStore.activeGroupId) {
       const active = outer.getPanel(groupsStore.activeGroupId);
+
       active?.api.setActive();
     }
   }
@@ -145,15 +154,18 @@ export function useBootLayout(): BootLayout {
   /// multiple times; the `pendingFlush` flag guards re-entry.
   function flushPendingLayout(): void {
     if (!pendingFlush.value) return;
+
     pendingFlush.value = false;
 
     const outer = layoutStore.api;
+
     if (!outer) {
       // Should not happen — flushPendingLayout is only called from
       // onDockReady, but be defensive in case future code paths invoke
       // it earlier.
       console.warn('[boot] flushPendingLayout called without outer api');
       pendingFlush.value = true;
+
       return;
     }
 
@@ -170,6 +182,7 @@ export function useBootLayout(): BootLayout {
         'Layout restore failed',
         'The persisted layout could not be applied. Resetting to default.',
       );
+
       // Fall back to a fresh seed; hydrate already produced a Default
       // group, so re-seeding will recreate the outer panel.
       try {

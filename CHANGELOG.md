@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (Phase F.4 — 2026-05-28)
+- **ESLint repaired.** `bun run lint:eslint` had been silently broken since the `typescript-eslint` 8.59→8.60 bump (commit `9b9cf11`): a duplicate `typescript-eslint` install (nested under `gts`) caused ESLint 10 to reject the second `@typescript-eslint` plugin registration. Fixed via `package.json#overrides` + `eslint --fix` (3,054 prettier auto-fixes across 29 files). `lint:eslint` is now part of `bun run check` so this can't regress silently again. Live warning count: 18 (down from 31 in the 2026-05-25 baseline).
+
 ### Added (Groups v3 — nested DockviewVue per workspace group)
 - **Workspace groups landed (v3, nested-dockview design).** The body of the app now contains one or more named groups, each shown as a tab at the top of the body. Each group owns its own set of chat / terminal / playground panels — switching groups is a single native dockview panel-activation toggle (no remount: scroll, Lexical state, pending composer text all survive). The activity bar (Sessions / Terminals / Jobs / Logs / Settings / Library / Session Details) stays on the outer dockview and is shared across all groups.
 - **`view.newGroup`, `view.nextGroup`, `view.prevGroup`** in the command palette (`Layout` group). Use Ctrl+K, type "new group" / "next group" / "previous group".

@@ -207,10 +207,13 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['workspace', 'switch', 'cycle'],
       run: () => {
         const groups = groupsStore.groups;
+
         if (groups.length <= 1) return;
+
         const activeId = groupsStore.activeGroupId;
         const idx = groups.findIndex((g) => g.id === activeId);
         const next = groups[(idx + 1) % groups.length];
+
         if (next) groupsActions.activateGroup(next.id);
       },
     },
@@ -222,10 +225,13 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['workspace', 'switch', 'cycle'],
       run: () => {
         const groups = groupsStore.groups;
+
         if (groups.length <= 1) return;
+
         const activeId = groupsStore.activeGroupId;
         const idx = groups.findIndex((g) => g.id === activeId);
         const prev = groups[(idx - 1 + groups.length) % groups.length];
+
         if (prev) groupsActions.activateGroup(prev.id);
       },
     },
@@ -326,7 +332,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     icon: 'pi pi-bolt',
     keywords: ['autopilot', 'approve', 'auto'],
     run: async () => {
-      await settingsStore.setDefaultApproveAll(!settingsStore.settings.permissions.defaultApproveAll);
+      await settingsStore.setDefaultApproveAll(
+        !settingsStore.settings.permissions.defaultApproveAll,
+      );
     },
   });
 
@@ -336,6 +344,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     { v: 'compact', label: 'Compact' },
     { v: 'expanded', label: 'Expanded' },
   ];
+
   registry.register({
     id: 'settings.reasoningVisibility',
     label: 'Set Reasoning Visibility',
@@ -361,6 +370,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     { v: 'medium', label: 'Medium' },
     { v: 'high', label: 'High' },
   ];
+
   registry.register({
     id: 'settings.defaultReasoningEffort',
     label: 'Set Default Reasoning Effort',
@@ -397,6 +407,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           );
         },
       }));
+
       registry.register({
         id: 'settings.defaultModel',
         label: 'Set Default Model',
@@ -427,6 +438,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           await settingsStore.setDefaultWorkspace(path);
         },
       }));
+
       registry.register({
         id: 'settings.defaultWorkspace',
         label: 'Set Default Workspace',
@@ -455,8 +467,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     when: () => layoutStore.activeSessionId !== null,
     run: async () => {
       const sid = layoutStore.activeSessionId;
+
       if (!sid) return;
+
       const record = sessionsStore.getSession(sid);
+
       await sessionsStore.setSessionApproveAll(sid, !record?.approveAll);
     },
   });
@@ -478,6 +493,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       icon: 'pi pi-circle',
       run: () => {
         const sid = layoutStore.activeSessionId;
+
         if (sid) sessionsStore.setSessionReasoningOverride(sid, v);
       },
     })),
@@ -494,16 +510,24 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     when: () => layoutStore.activeSessionId !== null,
     run: async () => {
       const sid = layoutStore.activeSessionId;
+
       if (!sid) return;
+
       const record = sessionsStore.getSession(sid);
+
       if (!record) return;
+
       const modelId = record.model ?? settingsStore.settings.appearance.defaultModelId;
-      const effort = record.reasoningEffort ?? settingsStore.settings.appearance.defaultReasoningEffort;
+      const effort =
+        record.reasoningEffort ?? settingsStore.settings.appearance.defaultReasoningEffort;
+
       try {
         await settingsStore.setDefaultModel(modelId, effort);
+
         if (typeof record.approveAll === 'boolean') {
           await settingsStore.setDefaultApproveAll(record.approveAll);
         }
+
         toasts.info('Pinned as defaults', `${modelId}${effort ? ` (${effort})` : ''}`);
       } catch (err) {
         toasts.error("Couldn't pin as defaults", toErrorMessage(err));
@@ -556,6 +580,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           }
         },
       }));
+
       registry.register({
         id: 'session.new.workspace',
         label: 'New Session in Workspace…',
@@ -584,18 +609,23 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         keywords: ['model', m.id, m.name],
         run: async () => {
           const sid = layoutStore.activeSessionId;
+
           if (!sid) return;
+
           const record = sessionsStore.getSession(sid);
+
           await sessionsStore.setSessionModel(sid, m.id, record?.reasoningEffort ?? null);
         },
       }));
+
       registry.register({
         id: 'session.model',
         label: 'Switch Model',
         group: 'Active Session',
         icon: 'pi pi-server',
         keywords: ['model', 'switch'],
-        when: () => clientStore.ready && layoutStore.activeSessionId !== null && children.length > 0,
+        when: () =>
+          clientStore.ready && layoutStore.activeSessionId !== null && children.length > 0,
         children,
         run: () => {
           /* parent */
@@ -622,6 +652,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         .filter((r) => Boolean(layoutStore.api?.getPanel(r.id)))
         .map((r) => {
           const label = r.title ?? `Session ${r.id.slice(0, 8)}…`;
+
           return {
             id: `session.switch.${r.id}`,
             label,
@@ -631,10 +662,12 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             keywords: [r.id, r.id.slice(0, 8), label],
             run: () => {
               const panel = layoutStore.api?.getPanel(r.id);
+
               panel?.api.setActive();
             },
           };
         });
+
       registry.register({
         id: 'session.switch',
         label: 'Switch to Session',
@@ -659,10 +692,13 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     keywords: ['mode', mode],
     run: async () => {
       const sid = layoutStore.activeSessionId;
+
       if (!sid) return;
+
       await sessionsStore.setSessionMode(sid, mode);
     },
   }));
+
   registry.register({
     id: 'session.mode',
     label: 'Run Mode',

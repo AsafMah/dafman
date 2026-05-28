@@ -27,11 +27,7 @@
  */
 
 import { computed, onBeforeUnmount } from 'vue';
-import {
-  DockviewVue,
-  type DockviewReadyEvent,
-  type DockviewPanelApi,
-} from 'dockview-vue';
+import { DockviewVue, type DockviewReadyEvent, type DockviewPanelApi } from 'dockview-vue';
 import type { IDockviewPanel } from 'dockview-core';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
@@ -55,7 +51,8 @@ const props = defineProps<{
 
 const userParams = computed<UserParams>(() => {
   const wrapped = props.params?.params;
-  return wrapped ?? (props.params as UserParams);
+
+  return wrapped ?? props.params;
 });
 
 const groupId = computed(() => userParams.value.groupId ?? '');
@@ -73,18 +70,22 @@ let dragOverSub: { dispose(): void } | null = null;
 
 function onInnerReady(event: DockviewReadyEvent): void {
   const id = groupId.value;
+
   if (!id) {
     console.warn('[GroupPanel] @ready without groupId in params; aborting');
+
     return;
   }
 
   const inner = event.api;
+
   groupsStore.registerInnerApi(id, inner);
 
   // Hydrate from cached body (if any). Phase 3 has no body to restore yet
   // (no sessions in a fresh Default group); the v2 migration in phase 4
   // wiring will populate the cache before this runs for existing users.
   const cached = groupsStore.getCachedInnerBody(id);
+
   if (cached !== undefined) {
     try {
       inner.fromJSON(cached as Parameters<typeof inner.fromJSON>[0]);
@@ -99,6 +100,7 @@ function onInnerReady(event: DockviewReadyEvent): void {
   // `groupsStore.withMovingSession` so this handler skips them.
   removeSub = inner.onDidRemovePanel((panel: IDockviewPanel) => {
     if (groupsStore.isMovingSession(panel.id)) return;
+
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
       void sessionsStore.closeSession(panel.id);
     }
@@ -124,6 +126,7 @@ function onInnerReady(event: DockviewReadyEvent): void {
   // Caught 2026-05-27: 'session settings says no active session'.
   activeSub = inner.onDidActivePanelChange((panel) => {
     if (groupsStore.activeGroupId !== id) return;
+
     if (panel && (panel as { api?: { component?: string } }).api?.component === 'chat') {
       layoutStore.setActiveSessionId(panel.id);
     }
@@ -139,17 +142,26 @@ function onInnerReady(event: DockviewReadyEvent): void {
   // moveSessionToGroup so the source gets pruned correctly.
   dragOverSub = inner.onUnhandledDragOverEvent((evt) => {
     const data = evt.getData();
+
     if (!data || !data.panelId) return;
+
     if (data.viewId === inner.id) return; // intra-component — dockview handles
+
     if (!sessionsStore.sessions.some((s) => s.id === data.panelId)) return;
+
     evt.accept();
   });
   dropSub = inner.onDidDrop((evt) => {
     const panelData = evt.getData();
+
     if (!panelData || !panelData.panelId) return;
+
     if (panelData.viewId === inner.id) return;
+
     const sid = panelData.panelId;
+
     if (!sessionsStore.sessions.some((s) => s.id === sid)) return;
+
     // Programmatic move — `moveSessionToGroup` activates this group,
     // prunes the session from its previous inner (mounted or cached),
     // then addPanels into this inner.
@@ -159,6 +171,7 @@ function onInnerReady(event: DockviewReadyEvent): void {
 
 onBeforeUnmount(() => {
   const id = groupId.value;
+
   removeSub?.dispose();
   removeSub = null;
   layoutSub?.dispose();
@@ -169,6 +182,7 @@ onBeforeUnmount(() => {
   dropSub = null;
   dragOverSub?.dispose();
   dragOverSub = null;
+
   if (id) {
     // `unregisterInnerApi` snapshots the final body into the cache so the
     // next mount (e.g. after an outer reorder repaint) can restore it.

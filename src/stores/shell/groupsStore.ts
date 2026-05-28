@@ -47,8 +47,10 @@ export const GROUP_COLORS = [
 export const DEFAULT_GROUP_NAME = 'Default';
 
 let idCounter = 0;
+
 function newGroupId(): string {
   idCounter += 1;
+
   return `grp-${Date.now().toString(36)}-${idCounter.toString(36)}`;
 }
 
@@ -125,6 +127,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
     if (!incoming || incoming.length === 0) {
       const defaultGroup = createDefaultGroup();
+
       groups.value = [defaultGroup];
       activeGroupId.value = defaultGroup.id;
 
@@ -133,13 +136,16 @@ export const useGroupsStore = defineStore('groups', () => {
       // are outer-only concerns) into the Default group's body cache.
       const legacyDockview = layout?.dockview;
       const legacyBody = legacyDockview ? extractBodyFromLegacy(legacyDockview) : undefined;
+
       innerBodiesCache.value = legacyBody !== undefined ? { [defaultGroup.id]: legacyBody } : {};
+
       return;
     }
 
     groups.value = incoming.map((g) => ({ ...g }));
 
     const persistedActive = layout?.activeGroupId;
+
     activeGroupId.value =
       persistedActive && groups.value.some((g) => g.id === persistedActive)
         ? persistedActive
@@ -147,12 +153,15 @@ export const useGroupsStore = defineStore('groups', () => {
 
     const incomingBodies = layout?.innerBodies;
     const cache: Record<string, unknown> = {};
+
     if (incomingBodies && typeof incomingBodies === 'object') {
       for (const g of groups.value) {
-        const body = (incomingBodies as Record<string, unknown>)[g.id];
+        const body = incomingBodies[g.id];
+
         if (body !== undefined) cache[g.id] = body;
       }
     }
+
     innerBodiesCache.value = cache;
   }
 
@@ -162,6 +171,7 @@ export const useGroupsStore = defineStore('groups', () => {
   /// to `settingsStore.persistLayout` (wired in phase 5).
   function serialize(outerJson: unknown): Layout {
     const live: Record<string, unknown> = {};
+
     for (const [gid, api] of Object.entries(innerApis.value)) {
       try {
         live[gid] = api.toJSON();
@@ -171,6 +181,7 @@ export const useGroupsStore = defineStore('groups', () => {
         console.warn('[groupsStore] inner.toJSON() failed for group', gid, err);
       }
     }
+
     return composePersistLayout({
       outer: outerJson,
       groups: groups.value,
@@ -193,8 +204,10 @@ export const useGroupsStore = defineStore('groups', () => {
     innerApis.value = { ...innerApis.value, [groupId]: api };
     // Resolve any awaiters that were waiting for this id.
     const awaiters = pendingApiAwaiters.get(groupId);
+
     if (awaiters) {
       pendingApiAwaiters.delete(groupId);
+
       for (const resolve of awaiters) resolve(api);
     }
   }
@@ -207,17 +220,25 @@ export const useGroupsStore = defineStore('groups', () => {
   /// needs to add a panel into a freshly-activated group's inner.
   function awaitInnerApi(groupId: string, timeoutMs = 2000): Promise<DockviewApi> {
     const existing = innerApis.value[groupId];
+
     if (existing) return Promise.resolve(existing);
+
     return new Promise<DockviewApi>((resolve, reject) => {
       const arr = pendingApiAwaiters.get(groupId) ?? [];
+
       arr.push(resolve);
       pendingApiAwaiters.set(groupId, arr);
       setTimeout(() => {
         const list = pendingApiAwaiters.get(groupId);
+
         if (!list) return;
+
         const idx = list.indexOf(resolve);
+
         if (idx >= 0) list.splice(idx, 1);
+
         if (list.length === 0) pendingApiAwaiters.delete(groupId);
+
         reject(new Error(`awaitInnerApi(${groupId}): timed out after ${timeoutMs}ms`));
       }, timeoutMs);
     });
@@ -225,6 +246,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function unregisterInnerApi(groupId: string): void {
     const api = innerApis.value[groupId];
+
     if (api) {
       // Last chance to snapshot before the api dies. Mirrors the
       // 'final snapshot' rule called out in the plan's persistence section.
@@ -233,7 +255,9 @@ export const useGroupsStore = defineStore('groups', () => {
       } catch (err) {
         console.warn('[groupsStore] final inner.toJSON() failed for group', groupId, err);
       }
+
       const next = { ...innerApis.value };
+
       delete next[groupId];
       innerApis.value = next;
     }
@@ -249,6 +273,7 @@ export const useGroupsStore = defineStore('groups', () => {
   /// site so edge-panel focus changes don't shift the active group.
   function setActiveGroupId(id: string | null): void {
     if (id !== null && !groups.value.some((g) => g.id === id)) return;
+
     activeGroupId.value = id;
   }
 
@@ -264,24 +289,34 @@ export const useGroupsStore = defineStore('groups', () => {
       name: (name ?? '').trim() || `Group ${groups.value.length + 1}`,
       color: pickNextColor(groups.value),
     };
+
     groups.value = [...groups.value, meta];
+
     return meta;
   }
 
   function renameGroup(id: string, name: string): void {
     const trimmed = name.trim();
+
     if (!trimmed) return;
+
     const idx = groups.value.findIndex((g) => g.id === id);
+
     if (idx < 0) return;
+
     const next = [...groups.value];
+
     next[idx] = { ...next[idx], name: trimmed };
     groups.value = next;
   }
 
   function setGroupColor(id: string, color: string): void {
     const idx = groups.value.findIndex((g) => g.id === id);
+
     if (idx < 0) return;
+
     const next = [...groups.value];
+
     next[idx] = { ...next[idx], color };
     groups.value = next;
   }
@@ -291,7 +326,9 @@ export const useGroupsStore = defineStore('groups', () => {
   /// — caller (App.vue) is responsible for closing them via `sessionsStore`.
   function deleteGroup(id: string): string[] {
     if (groups.value.length <= 1) return [];
+
     const idx = groups.value.findIndex((g) => g.id === id);
+
     if (idx < 0) return [];
 
     // Collect ids to close from whichever source has them. Prefer live
@@ -301,6 +338,7 @@ export const useGroupsStore = defineStore('groups', () => {
     const sessionIds = body ? extractPanelIdsFromBody(body) : [];
 
     const next = [...groups.value];
+
     next.splice(idx, 1);
     groups.value = next;
 
@@ -309,10 +347,12 @@ export const useGroupsStore = defineStore('groups', () => {
     }
 
     const apiNext = { ...innerApis.value };
+
     delete apiNext[id];
     innerApis.value = apiNext;
 
     const cacheNext = { ...innerBodiesCache.value };
+
     delete cacheNext[id];
     innerBodiesCache.value = cacheNext;
 
@@ -333,6 +373,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function withMovingSession<T>(sessionId: string, fn: () => T): T {
     movingSessions.value.add(sessionId);
+
     try {
       return fn();
     } finally {
@@ -344,17 +385,16 @@ export const useGroupsStore = defineStore('groups', () => {
   /// mounted (live api) and unmounted (cached body) groups are pruned.
   /// Returns the set of group ids that actually had to be pruned (for
   /// tests + diagnostics).
-  function pruneSessionFromAllGroups(
-    sessionId: string,
-    exceptGroupId?: string | null,
-  ): string[] {
+  function pruneSessionFromAllGroups(sessionId: string, exceptGroupId?: string | null): string[] {
     const touched: string[] = [];
 
     // 1. Mounted inners: live removal via api. Wrap in withMovingSession
     //    so the per-inner remove handler skips closeSession.
     for (const [gid, api] of Object.entries(innerApis.value)) {
       if (gid === exceptGroupId) continue;
+
       const panel = api.getPanel(sessionId);
+
       if (panel) {
         withMovingSession(sessionId, () => api.removePanel(panel));
         touched.push(gid);
@@ -363,14 +403,18 @@ export const useGroupsStore = defineStore('groups', () => {
 
     // 2. Cached bodies for unmounted groups: walk JSON.
     const nextCache: Record<string, unknown> = { ...innerBodiesCache.value };
+
     for (const [gid, body] of Object.entries(nextCache)) {
       if (gid === exceptGroupId) continue;
+
       const cleaned = removeSessionFromBody(body, sessionId);
+
       if (cleaned !== body) {
         nextCache[gid] = cleaned;
         touched.push(gid);
       }
     }
+
     if (touched.length > 0) innerBodiesCache.value = nextCache;
 
     return touched;
@@ -419,10 +463,14 @@ export const useGroupsStore = defineStore('groups', () => {
 /// the recursive walker.
 export function removeSessionFromBody(body: unknown, sessionId: string): unknown {
   if (!body || typeof body !== 'object') return body;
+
   const obj = body as Record<string, unknown>;
   const panels = obj.panels;
+
   if (!panels || typeof panels !== 'object') return body;
+
   if (!Object.prototype.hasOwnProperty.call(panels, sessionId)) return body;
+
   return stripPanelFromLayout(body, sessionId);
 }
 
@@ -432,9 +480,12 @@ export function removeSessionFromBody(body: unknown, sessionId: string): unknown
 /// panel ids defensively (in practice there shouldn't be any).
 export function extractPanelIdsFromBody(body: unknown): string[] {
   if (!body || typeof body !== 'object') return [];
+
   const panels = (body as Record<string, unknown>).panels;
+
   if (!panels || typeof panels !== 'object') return [];
-  return Object.keys(panels as Record<string, unknown>);
+
+  return Object.keys(panels);
 }
 
 /// v2 → v3 migration helper. Takes a legacy `dockview` blob (which has
@@ -450,15 +501,19 @@ export function extractPanelIdsFromBody(body: unknown): string[] {
 /// Returns `undefined` if the input doesn't look like a dockview blob.
 export function extractBodyFromLegacy(dockview: unknown): unknown | undefined {
   if (!dockview || typeof dockview !== 'object') return undefined;
+
   const obj = dockview as Record<string, unknown>;
+
   if (!obj.grid || typeof obj.grid !== 'object') return undefined;
 
   const body: Record<string, unknown> = {
     grid: obj.grid,
     panels: obj.panels && typeof obj.panels === 'object' ? obj.panels : {},
   };
+
   if (typeof obj.activeGroup === 'string') {
     body.activeGroup = obj.activeGroup;
   }
+
   return body;
 }

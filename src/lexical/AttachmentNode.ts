@@ -192,10 +192,47 @@ function emojiFor(a: SendMessageAttachment): string {
   const ext = label.split('.').pop() ?? '';
 
   if (['md', 'txt', 'rst'].includes(ext)) return '\u{1F4DD}'; // 📝
+
   if (['csv', 'tsv'].includes(ext)) return '\u{1F4CA}'; // 📊
+
   if (['json', 'yaml', 'yml', 'toml', 'xml'].includes(ext)) return '\u{1F4CB}'; // 📋
+
   if (['log', 'logs'].includes(ext)) return '\u{1F4C3}'; // 📃
-  if (['js', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'py', 'rs', 'go', 'c', 'cpp', 'h', 'hpp', 'java', 'rb', 'sh', 'ps1', 'bat', 'lua', 'php', 'swift', 'kt', 'scala', 'clj', 'css', 'scss', 'sass', 'less', 'html', 'vue'].includes(ext)) {
+
+  if (
+    [
+      'js',
+      'ts',
+      'tsx',
+      'jsx',
+      'mjs',
+      'cjs',
+      'py',
+      'rs',
+      'go',
+      'c',
+      'cpp',
+      'h',
+      'hpp',
+      'java',
+      'rb',
+      'sh',
+      'ps1',
+      'bat',
+      'lua',
+      'php',
+      'swift',
+      'kt',
+      'scala',
+      'clj',
+      'css',
+      'scss',
+      'sass',
+      'less',
+      'html',
+      'vue',
+    ].includes(ext)
+  ) {
     return '\u{1F4BB}'; // 💻
   }
 

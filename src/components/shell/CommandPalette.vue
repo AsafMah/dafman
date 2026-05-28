@@ -79,14 +79,17 @@ function isParent(cmd: CommandDef): boolean {
 /// expansion toggles (parents).
 const valueToCommand = computed(() => {
   const map = new Map<string, CommandDef>();
+
   for (const cmd of visibleCommands.value) {
     map.set(searchValueFor(cmd), cmd);
+
     if (isParent(cmd)) {
       for (const child of cmd.children!) {
         map.set(searchValueFor(child), child);
       }
     }
   }
+
   return map;
 });
 
@@ -110,14 +113,18 @@ const valueToCommand = computed(() => {
 /// fuse pass.
 function shouldExpand(cmd: CommandDef): boolean {
   if (expanded.value.has(cmd.id)) return true;
+
   if (!isParent(cmd)) return false;
+
   return commandState.search.value.trim().length > 0;
 }
 
 function toggleExpanded(id: string): void {
   const next = new Set(expanded.value);
+
   if (next.has(id)) next.delete(id);
   else next.add(id);
+
   expanded.value = next;
 }
 
@@ -197,6 +204,7 @@ function onSelectItem(item: { key: string; value: string }): void {
 
   if (!cmd) {
     closePalette();
+
     return;
   }
 
@@ -207,6 +215,7 @@ function onSelectItem(item: { key: string; value: string }): void {
   // branch below.
   if (isParent(cmd)) {
     toggleExpanded(cmd.id);
+
     return;
   }
 

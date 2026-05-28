@@ -55,18 +55,25 @@ export interface ComposeSource {
 
 export function composePersistLayout(src: ComposeSource): Layout {
   const innerBodies: Record<string, unknown> = {};
+
   for (const g of src.groups) {
     const cached = src.innerBodiesCache[g.id];
+
     if (cached !== undefined) innerBodies[g.id] = cached;
+
     const live = src.liveInnerBodies[g.id];
+
     if (live !== undefined) innerBodies[g.id] = live;
   }
+
   const out: Layout = {
     schemaVersion: COMPOSED_SCHEMA_VERSION,
     outer: src.outer,
     groups: src.groups.map((g) => ({ ...g })),
     innerBodies,
   };
+
   if (src.activeGroupId) out.activeGroupId = src.activeGroupId;
+
   return out;
 }

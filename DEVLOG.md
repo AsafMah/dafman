@@ -10,7 +10,55 @@
 
 ---
 
-## 2026-05-27 — Groups v3 (nested DockviewVue) shipped in 4 commits
+## 2026-05-28 — Phase F.4: ESLint config repaired
+
+**Takeaway:** ESLint had been silently broken since the typescript-eslint
+8.59 → 8.60 bump (commit `9b9cf11`, 2026-05-26). Root cause was a
+duplicate `typescript-eslint` install: `gts@7.0.0` pinned `^8.46.1` in
+its own `node_modules/gts/node_modules/typescript-eslint` (8.59.4) and
+the root had `8.60.0`. Each loaded a distinct
+`@typescript-eslint/eslint-plugin` object reference. ESLint 10's flat
+config validator's plugin-identity check rejected the second
+registration as `Cannot redefine plugin "@typescript-eslint"`.
+
+Fix:
+1. Added `"typescript-eslint": "^8.60.0"` to `package.json#overrides`.
+2. `rm -rf node_modules/gts/node_modules/typescript-eslint && bun install --force`.
+3. Ran `eslint --fix` — cleaned **3,054 prettier auto-fixable errors**
+   across 29 files. All were blank-line / formatting drift accumulated
+   while `lint:eslint` was broken.
+4. Wired `lint:eslint` into `bun run check` (was previously orphaned).
+
+**Receipts:**
+- `bun run lint:eslint` exit code 0; 0 errors, 18 warnings.
+- Warning breakdown: 6 `complexity`, 3 `no-dynamic-delete`,
+  3 `no-redundant-type-constituents`, 2 `max-depth`,
+  1 each `no-non-null-assertion`, `prefer-nullish-coalescing`,
+  `no-duplicate-imports`, `vue/no-template-shadow`.
+- `bun test` → 679 pass.
+- `bun run lint` (vue-tsc), `lint:bun`, `lint:tsc-bun` all clean.
+
+**Findings vs the stale 2026-05-25 §2 table:**
+- Complexity hotspots: **17 → 6**. The D-phase store/handler splits
+  resolved 12 of the 17. One new offender appeared:
+  `parseAgentFrontmatter` CC=25 — Sprint A2 code I just landed.
+- Non-null assertions: 6 → 1.
+- `max-depth` doubled (1 → 2) — both in `writeAgent` (also Sprint A2).
+- Net regression from my own week: +1 CC offender, +1 max-depth
+  callsite. Filed as a small cleanup target in §2.3.
+
+**Anti-pattern caught:** `lint:eslint` was never in `bun run check`, so
+the bump that broke it didn't trip CI. CODE_AUDIT §1 line totals were
+the only signal that something was wrong (the 3,054 prettier drift
+should have been impossible). Lesson: any check we don't gate is a
+check we can't trust. `bun run check` now includes `lint:eslint`.
+
+**Refreshed:** CODE_AUDIT.md §2 (live numbers, no longer STALE),
+§8 Phase F.4 marked ✅ Done.
+
+---
+
+
 
 **Takeaway:** Workspace groups landed on the third attempt. **v1 (nested
 dockview, 2026-05-24, reverted at `a1d7a21`)** died on `require()` in browser

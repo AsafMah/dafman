@@ -33,14 +33,18 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 export function schedulePersist(): void {
   if (timer !== null) clearTimeout(timer);
+
   timer = setTimeout(() => {
     timer = null;
     const layoutStore = useLayoutStore();
     const groupsStore = useGroupsStore();
     const settingsStore = useSettingsStore();
     const outer = layoutStore.api;
+
     if (!outer) return;
+
     const layout = groupsStore.serialize(outer.toJSON());
+
     void settingsStore.persistGroupedLayout(layout);
   }, DEBOUNCE_MS);
 }

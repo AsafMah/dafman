@@ -31,9 +31,11 @@ import type { Command } from '@/stores/shell/commandRegistry';
 /// directly and the parent row stays hidden.
 export function childMatchTokens(child: Command): string[] {
   const tokens: string[] = [child.label];
+
   if (child.keywords && child.keywords.length > 0) {
     tokens.push(...child.keywords);
   }
+
   return tokens;
 }
 
@@ -43,9 +45,13 @@ export function childMatchTokens(child: Command): string[] {
 /// can pick a specific model without a second click).
 export function parentSelfTokens(cmd: Command): string[] {
   const tokens: string[] = [cmd.id, cmd.label];
+
   if (cmd.group) tokens.push(cmd.group);
+
   if (cmd.hint) tokens.push(cmd.hint);
+
   if (cmd.keywords && cmd.keywords.length > 0) tokens.push(...cmd.keywords);
+
   return tokens;
 }
 

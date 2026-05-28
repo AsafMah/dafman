@@ -37,8 +37,8 @@ const emit = defineEmits<{
     </div>
     <div class="status-bar-right">
       <Button
-        v-tooltip.top="'Open dev playground'"
         v-if="isDev"
+        v-tooltip.top="'Open dev playground'"
         class="status-bar-button status-bar-button-dev"
         icon="pi pi-wrench"
         text

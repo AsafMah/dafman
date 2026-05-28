@@ -42,7 +42,9 @@ export function useGroupsActions(): GroupsActions {
 
   function newGroup(name?: string): string | null {
     const outer = layoutStore.api;
+
     if (!outer) return null;
+
     const meta = groupsStore.createGroup(name);
     // Use an existing body group as the reference so the new tab lands
     // in the same horizontal tab strip as the other groups. If somehow
@@ -51,9 +53,11 @@ export function useGroupsActions(): GroupsActions {
     // GroupTab), create one. Direction is always 'within' so groups
     // stay as tabs, never split panes.
     let referenceGroup = layoutStore.firstBodyGroupId();
+
     if (!referenceGroup) {
       referenceGroup = outer.addGroup().id;
     }
+
     outer.addPanel({
       id: meta.id,
       component: 'group',
@@ -63,12 +67,15 @@ export function useGroupsActions(): GroupsActions {
       position: { referenceGroup, direction: 'within' },
     });
     const panel = outer.getPanel(meta.id);
+
     panel?.api.setActive();
+
     return meta.id;
   }
 
   function deleteGroup(id: string): void {
     if (groupsStore.groups.length <= 1) return;
+
     const outer = layoutStore.api;
 
     // `groupsStore.deleteGroup` already moves activeGroupId to a sibling,
@@ -76,12 +83,16 @@ export function useGroupsActions(): GroupsActions {
     // the cache + registry entry. Close those sessions, then remove the
     // outer body panel.
     const closedIds = groupsStore.deleteGroup(id);
+
     for (const sid of closedIds) {
       void sessionsStore.closeSession(sid);
     }
+
     if (outer) {
       const panel = outer.getPanel(id);
+
       if (panel) outer.removePanel(panel);
+
       // Explicitly activate the new active group's outer panel so
       // dockview's onDidActivePanelChange fires and bodyApi resolves to
       // the correct inner. Without this, dockview may activate an
@@ -90,8 +101,10 @@ export function useGroupsActions(): GroupsActions {
       // above — would diverge from outer.activePanel (code-review
       // finding 2026-05-27, issue 3).
       const newActiveId = groupsStore.activeGroupId;
+
       if (newActiveId) {
         const next = outer.getPanel(newActiveId);
+
         next?.api.setActive();
       }
     }
@@ -99,17 +112,19 @@ export function useGroupsActions(): GroupsActions {
 
   function activateGroup(id: string): void {
     const outer = layoutStore.api;
+
     if (!outer) return;
+
     const panel = outer.getPanel(id);
+
     panel?.api.setActive();
   }
 
-  async function moveSessionToGroup(
-    sessionId: string,
-    targetGroupId: string,
-  ): Promise<void> {
+  async function moveSessionToGroup(sessionId: string, targetGroupId: string): Promise<void> {
     if (targetGroupId === groupsStore.activeGroupId) return;
+
     const target = groupsStore.groups.find((g) => g.id === targetGroupId);
+
     if (!target) return;
 
     // Activate target first so its inner DockviewVue mounts and registers.
@@ -119,10 +134,12 @@ export function useGroupsActions(): GroupsActions {
     // finding 2026-05-27).
     activateGroup(targetGroupId);
     let targetApi;
+
     try {
       targetApi = await groupsStore.awaitInnerApi(targetGroupId);
     } catch (err) {
       console.warn('[useGroupsActions] timed out waiting for target inner api', targetGroupId, err);
+
       return;
     }
 

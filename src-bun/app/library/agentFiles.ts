@@ -266,15 +266,19 @@ async function atomicWrite(path: string, content: string): Promise<void> {
 export function splitFrontmatter(raw: string): { frontmatter: string; body: string } {
   // Accept both `\n` and `\r\n` line endings.
   const normalized = raw.replace(/\r\n/g, '\n');
+
   if (!normalized.startsWith('---\n')) {
     return { frontmatter: '', body: normalized };
   }
+
   const rest = normalized.slice(4);
   const closeIdx = rest.indexOf('\n---');
+
   if (closeIdx === -1) {
     // Unterminated front-matter — treat whole file as body.
     return { frontmatter: '', body: normalized };
   }
+
   const frontmatter = rest.slice(0, closeIdx);
   // The closing `---` is followed by `\n` or EOF; skip the marker
   // and one optional trailing newline (the canonical `---\n\n<body>`
@@ -282,6 +286,7 @@ export function splitFrontmatter(raw: string): { frontmatter: string; body: stri
   // preserve by not stripping it here).
   const afterClose = rest.slice(closeIdx + '\n---'.length);
   const body = afterClose.startsWith('\n') ? afterClose.slice(1) : afterClose;
+
   return { frontmatter, body };
 }
 
@@ -319,14 +324,18 @@ export function parseAgentFrontmatter(frontmatter: string): {
   // unknown key block (push to preservedLines).
   const lines = frontmatter.split('\n');
   let i = 0;
+
   function readTopLevelKey(line: string): string | null {
     // Top-level YAML key: `^[a-zA-Z_-]+:`. Indented lines belong to
     // the previous key's block.
     const m = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*:/.exec(line);
+
     return m ? m[1] : null;
   }
+
   function unquote(raw: string): string {
     const trimmed = raw.trim();
+
     if (
       (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
       (trimmed.startsWith("'") && trimmed.endsWith("'"))
@@ -342,39 +351,52 @@ export function parseAgentFrontmatter(frontmatter: string): {
           return trimmed.slice(1, -1);
         }
       }
+
       return trimmed.slice(1, -1);
     }
+
     return trimmed;
   }
+
   while (i < lines.length) {
     const line = lines[i];
     const key = readTopLevelKey(line);
+
     if (key === null) {
       // Stray indented line or blank line at top level; preserve.
       preservedLines.push(line);
       i++;
       continue;
     }
+
     // Collect the key's block: this line + any indented continuation.
     const blockStart = i;
+
     i++;
+
     while (i < lines.length) {
       const peek = lines[i];
+
       if (peek === '' || /^\s/.test(peek)) {
         i++;
         continue;
       }
+
       // Next top-level key (or end-of-front-matter sentinel) → stop.
       break;
     }
+
     const blockLines = lines.slice(blockStart, i);
+
     if (!KNOWN_FRONTMATTER_KEYS.has(key)) {
       preservedLines.push(...blockLines);
       continue;
     }
+
     // Known key: extract value(s).
     const head = blockLines[0];
     const valueRaw = head.slice(head.indexOf(':') + 1);
+
     if (key === 'tools' || key === 'skills') {
       // Array — either `tools: []` or block form:
       //   tools:
@@ -382,20 +404,24 @@ export function parseAgentFrontmatter(frontmatter: string): {
       //     - "shell"
       const items: string[] = [];
       const inline = valueRaw.trim();
+
       if (inline === '[]') {
         // empty
       } else if (inline.startsWith('[') && inline.endsWith(']')) {
         // Flow-style array. Best-effort split on commas, then unquote.
         const inner = inline.slice(1, -1).trim();
+
         if (inner.length > 0) {
           for (const part of inner.split(',')) items.push(unquote(part));
         }
       } else {
         for (const cont of blockLines.slice(1)) {
           const m = /^\s*-\s*(.*)$/.exec(cont);
+
           if (m) items.push(unquote(m[1]));
         }
       }
+
       spec[key] = items;
     } else if (key === 'user-invocable') {
       spec.userInvocable = unquote(valueRaw).toLowerCase() === 'true';
@@ -411,9 +437,11 @@ export function parseAgentFrontmatter(frontmatter: string): {
   while (preservedLines.length > 0 && preservedLines[0].trim() === '') {
     preservedLines.shift();
   }
+
   while (preservedLines.length > 0 && preservedLines[preservedLines.length - 1].trim() === '') {
     preservedLines.pop();
   }
+
   return { spec, preservedTail: preservedLines.join('\n') };
 }
 
@@ -426,16 +454,21 @@ export async function readAgentForEdit(
   workingDirectory?: string,
 ): Promise<{ spec: Partial<AgentFileSpec>; prompt: string; preservedTail: string; path: string }> {
   const { path } = resolveTargetPath(scope, name, workingDirectory);
+
   if (!existsSync(path)) {
     throw AppError.sdk(`agent not found at ${path}`);
   }
+
   const { readFile } = await import('node:fs/promises');
   const raw = await readFile(path, 'utf-8');
   const { frontmatter, body } = splitFrontmatter(raw);
   const { spec, preservedTail } = parseAgentFrontmatter(frontmatter);
+
   // Set scope/name on the partial spec for round-trip convenience.
   spec.scope = scope;
+
   if (spec.name === undefined) spec.name = name;
+
   return { spec, prompt: body.trim(), preservedTail, path };
 }
 
@@ -525,12 +558,14 @@ export async function writeAgent(
 
   await mkdir(root, { recursive: true });
   let frontmatter = serializeFrontmatter(spec);
+
   if (options.preservedTail && options.preservedTail.length > 0) {
     // Append unknown keys verbatim so things like `mcp-servers` or
     // `github.toolsets` survive an Edit. The byte-perfect preserved
     // tail comes from `parseAgentFrontmatter`.
     frontmatter = `${frontmatter}\n${options.preservedTail}`;
   }
+
   const body = spec.prompt.trim().length > 0 ? `${spec.prompt.trim()}\n` : '';
   const content = `---\n${frontmatter}\n---\n\n${body}`;
 

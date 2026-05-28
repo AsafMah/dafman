@@ -176,8 +176,8 @@ async function mountWith(Root: typeof App) {
   // invoke command palette entries by id without simulating keyboard
   // input, and to reach into the layout/groups stores for debugging.
   const wsBridgeActive =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).has('testBridge');
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('testBridge');
+
   if (testBridge || wsBridgeActive) {
     // Eager-load the test surface. Earlier we tried lazy-loading on
     // first method call to avoid extra boot work, but that made
@@ -192,19 +192,24 @@ async function mountWith(Root: typeof App) {
     const layout = useLayoutStore();
     const groups = useGroupsStore();
     const groupsActions = useGroupsActions();
-    (window as unknown as {
-      __DAFMAN_TEST__: {
-        runCommand: (id: string) => Promise<unknown>;
-        addPanel: (sessionId: string) => void;
-        getState: () => unknown;
-        moveSessionToGroup: (sessionId: string, targetGroupId: string) => Promise<void>;
-        renameGroup: (id: string, name: string) => void;
-        setGroupColor: (id: string, color: string) => void;
-      };
-    }).__DAFMAN_TEST__ = {
+
+    (
+      window as unknown as {
+        __DAFMAN_TEST__: {
+          runCommand: (id: string) => Promise<unknown>;
+          addPanel: (sessionId: string) => void;
+          getState: () => unknown;
+          moveSessionToGroup: (sessionId: string, targetGroupId: string) => Promise<void>;
+          renameGroup: (id: string, name: string) => void;
+          setGroupColor: (id: string, color: string) => void;
+        };
+      }
+    ).__DAFMAN_TEST__ = {
       async runCommand(id: string) {
         const cmd = registry.commands.get(id);
+
         if (!cmd) throw new Error(`Unknown command: ${id}`);
+
         return await cmd.run();
       },
       addPanel(sessionId: string): void {
@@ -212,9 +217,11 @@ async function mountWith(Root: typeof App) {
       },
       getState(): unknown {
         const innerPanelIds: Record<string, string[]> = {};
+
         for (const [gid, api] of Object.entries(groups.innerApis)) {
           innerPanelIds[gid] = api.panels.map((p) => p.id);
         }
+
         return {
           activeGroupId: groups.activeGroupId,
           groups: groups.groups.map((g) => ({ id: g.id, name: g.name, color: g.color })),

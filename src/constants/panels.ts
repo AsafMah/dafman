@@ -153,6 +153,7 @@ export const RIGHT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
 /// the active panel in an edge group changes.
 export function findActivityTabSeed(id: string): ActivityTabSeed | undefined {
   for (const t of LEFT_ACTIVITY_TABS) if (t.id === id) return t;
+
   for (const t of RIGHT_ACTIVITY_TABS) if (t.id === id) return t;
 
   return undefined;

@@ -66,87 +66,95 @@ Re-derived 2026-05-27 from `Get-Content` on every `*.ts/*.vue` under `src/` + `s
 
 **Config:** `strictTypeChecked` + `eslint-plugin-vue/flat/recommended` + complexity + `@stylistic/eslint-plugin`
 
-### 2026-05-27 status
+### 2026-05-28 status
 
-🔴 **ESLint config is currently broken** — running `bun run lint:eslint` errors with:
+✅ **ESLint config repaired.** Root cause was a duplicate
+`typescript-eslint` install: `gts` had its own nested copy
+(`node_modules/gts/node_modules/typescript-eslint@8.59.4`) and the root
+had `8.60.0`. Each loaded a distinct `@typescript-eslint/eslint-plugin`
+object reference, and ESLint 10's flat-config validator rejected the
+second registration as "redefine plugin".
 
-```
-ConfigError: Config "typescript-eslint/base": Key "plugins":
-Cannot redefine plugin "@typescript-eslint".
-```
+Fix: added `"typescript-eslint": "^8.60.0"` to `package.json#overrides`
+(commit pending after this audit refresh) and re-ran `bun install`.
+Single `typescript-eslint` instance now; `bun run lint:eslint` clean
+(0 errors, 18 warnings — see §2.1 / §2.2 below).
 
-Root cause: an upstream package update (likely `typescript-eslint` flat config redesign) is incompatible with the current `eslint.config.js`. Both `vue-tsc --noEmit` (renderer) and `tsc -p tsconfig.bun.json --noEmit` (backend) are clean and gate `bun run check`, so type safety isn't degraded — but the **lint rules in this refresh CANNOT be re-derived** until the config is fixed.
+Also wired `lint:eslint` into `bun run check` so this stays fixed.
 
-**All §2 numbers below are stale (last verified 2026-05-25). Treat as historical reference only.**
+### 2.1  Issues by Rule (2026-05-28 — eslint config fixed via Phase F.4)
 
-Fixing the eslint config is filed as Phase F.4 below.
+After fixing the `typescript-eslint` plugin redefinition (gts pinned an
+older minor; root pinned ^8.60.0; deduped via `package.json#overrides`)
+and running `eslint --fix` to clean ~3,054 prettier auto-fixable errors,
+the working set is:
 
-### 2.1  Issues by Rule (STALE — 2026-05-25)
+| Count | Rule                                           | Delta vs 2026-05-25 |
+| ----: | ---------------------------------------------- | ------------------- |
+|     6 | `complexity`                                   | **17 → 6 (↓11)** — D-phase splits did most of this |
+|     3 | `@typescript-eslint/no-dynamic-delete`         | new — all in `groupsStore.ts` |
+|     3 | `@typescript-eslint/no-redundant-type-constituents` | unchanged-ish |
+|     2 | `max-depth`                                    | **1 → 2 (↑1)** — both in `agentFiles.ts#writeAgent` (Sprint A2) |
+|     1 | `@typescript-eslint/no-non-null-assertion`     | **6 → 1 (↓5)** |
+|     1 | `@typescript-eslint/prefer-nullish-coalescing` | new |
+|     1 | `no-duplicate-imports`                         | new |
+|     1 | `vue/no-template-shadow`                       | new |
+| **18** | **Total warnings** (0 errors)                 | **31 → 18 (↓13)** |
 
-| Count | Rule                                           | What It Means                                  |
-| ----: | ---------------------------------------------- | ---------------------------------------------- |
-|    17 | `complexity`                                   | Cyclomatic complexity above 15                 |
-|     6 | `no-non-null-assertion`                        | `!` instead of proper null checks              |
-|     5 | `max-lines-per-function`                       | Function body > 200 lines                      |
-|     1 | `max-depth`                                    | Nesting > 4 levels deep                        |
-|     1 | `no-redundant-type-constituents`               | ESLint parser resolves AgentInfo as error type  |
-|     1 | `no-unnecessary-type-assertion`                | Assertion doesn't change the type              |
+`max-lines-per-function` was 5 in the stale table; it's now **0**, but
+that's misleading — the rule is **disabled in `src/stores/**`** (per
+`eslint.config.js` lines 150–155 — Pinia stores are intentionally long).
+The store-body line totals are tracked in §2.4 below.
 
 ### Rules disabled (with rationale)
 
 | Rule                                           | Why disabled                                         |
 | ---------------------------------------------- | ---------------------------------------------------- |
-| `no-unsafe-*` (5 rules)                        | SDK interaction produces unavoidable `any` (418 hits)|
-| `no-unnecessary-condition`                     | Defensive runtime checks are intentional (135 hits)  |
-| `vue/one-component-per-file`                   | Test helpers / barrel exports (6 hits)               |
-| `vue/require-default-prop`                     | TypeScript handles prop defaults (5 hits)            |
+| `no-unsafe-*` (5 rules)                        | SDK interaction produces unavoidable `any`           |
+| `no-unnecessary-condition`                     | Defensive runtime checks are intentional             |
+| `vue/one-component-per-file`                   | Test helpers / barrel exports                        |
+| `vue/require-default-prop`                     | TypeScript handles prop defaults                     |
+| `max-lines-per-function` (in `src/stores/**`)  | Pinia store callbacks are the whole store body       |
 
-### 2.2  Remaining Complexity Hotspots (STALE — 2026-05-25)
+### 2.2  Remaining Complexity Hotspots (2026-05-28 — fresh from eslint --format json)
 
-| CC | File                                                     | Function                    |
-| -: | -------------------------------------------------------- | --------------------------- |
-| 40 | `src/components/shared/JsonSchemaForm.vue`               | `validateNode`              |
-| 29 | `src/stores/shell/layoutStore.ts`                        | `openEdgePanel`             |
-| 28 | `src/components/permissions/ToolDetails.vue`             | (arrow fn)                  |
-| 24 | `src-bun/app/chat/sessions.ts`                           | `forward`                   |
-| 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`              |
-| 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`                 |
-| 22 | `src-bun/app/chat/pendingRequests.ts`                    | `respond`                   |
-| 20 | `src-bun/app/config/settings.ts`                         | `coerceTerminal`            |
-| 19 | `src/lib/chatEvents/messageHandlers.ts`                  | `normalizeAttachments`      |
-| 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      |
-| 18 | `src-bun/app/terminal/stderrFilter.ts`                   | (arrow fn CC=18)            |
-| 17 | `src/components/library/McpServerForm.vue`               | `structuredFromConfig`      |
-
-Re-verify when eslint config is fixed (Phase F.4).
-
-### 2.3  Complexity Violations (Cyclomatic > 15)
-
-| CC | File                                                     | Function                    | Status        |
+| CC | File                                                     | Function                    | Status / Note |
 | -: | -------------------------------------------------------- | --------------------------- | ------------- |
-| 40 | `src/components/shared/JsonSchemaForm.vue`               | `validateNode`              | Open          |
-| 29 | `src/stores/shell/layoutStore.ts`                        | `openEdgePanel`             | Open          |
-| 28 | `src/components/permissions/ToolDetails.vue`             | (arrow fn)                  | Open          |
-| 24 | `src-bun/app/chat/sessions.ts`                           | `forward`                   | Open          |
-| 24 | `src/lib/chatEvents/messageHandlers.ts`                  | `user.message`              | Open          |
-| 23 | `src/components/session/SessionDetailsPanel.vue`         | `loadUsage`                 | Open          |
-| 22 | `src-bun/app/chat/pendingRequests.ts`                    | `respond`                   | Open          |
-| 20 | `src-bun/app/config/settings.ts`                         | `coerceTerminal`            | Open          |
-| 19 | `src/lib/chatEvents/messageHandlers.ts`                  | `normalizeAttachments`      | Open          |
-| 19 | `src/stores/chat/sessionReducer.ts`                      | `trackSessionArtifact`      | Open          |
-| 18 | `src-bun/app/terminal/stderrFilter.ts`                   | (arrow fn)                  | Open          |
-| 18 | `src-bun/app/chat/sessions.ts`                           | `createSession`/`cwdFor`    | Open          |
-| 17 | `src/components/library/McpServerForm.vue`               | `structuredFromConfig`      | Open          |
-| 17 | `src-bun/app/config/settings.ts`                         | `structuredFromConfig`      | Open          |
-| 17 | `src/lexical/plugins.ts`                                 | (plugin)                    | Open          |
-| 16 | `src/components/terminal/TerminalPanel.vue`              | `initXterm`                 | Open          |
-| 16 | `src-bun/app/chat/sessions.ts`                           | `resume`                    | Open          |
-| ~~60~~ | ~~`src/stores/chat/sessionsStore.ts`~~               | ~~`applyToRecord`~~         | ✅ Fixed (→ ~4) |
-| ~~33~~ | ~~`src/lib/chatEvents.ts`~~                          | ~~`processEvents`~~         | ✅ Fixed (→ ~10)|
-| ~~32~~ | ~~`src-bun/app/chat/sessionHelpers.ts`~~             | ~~`normalizeTask`~~         | ✅ Fixed (→ ~6) |
-| ~~25~~ | ~~`src-bun/app/chat/sessionHelpers.ts`~~             | ~~`summarizePermission`~~   | ✅ Fixed (→ ~4) |
+| 25 | `src-bun/app/library/agentFiles.ts`                      | `parseAgentFrontmatter`     | 🔴 **NEW (Sprint A2)** — frontmatter parser branches per known key; candidate for table-driven dispatch |
+| 20 | `src-bun/app/chat/sessions.ts`                           | `resume`                    | Open (was 16 in stale table; grew slightly) |
+| 19 | `src/stores/shell/layoutStore.ts`                        | `recomputeActiveSession`    | Open |
+| 18 | `src/stores/chat/sessionsStore.ts`                       | `createSession`             | Open |
+| 17 | `src/lexical/plugins.ts`                                 | (plugin arrow fn)           | Open |
+| 16 | `src/components/terminal/TerminalPanel.vue`              | `initXterm`                 | Open |
+| ~~40~~ | ~~`src/components/shared/JsonSchemaForm.vue`~~       | ~~`validateNode`~~          | ✅ Fixed (no longer over threshold) |
+| ~~29~~ | ~~`src/stores/shell/layoutStore.ts`~~                | ~~`openEdgePanel`~~         | ✅ Fixed |
+| ~~28~~ | ~~`src/components/permissions/ToolDetails.vue`~~     | ~~(arrow fn)~~              | ✅ Fixed |
+| ~~24~~ | ~~`src-bun/app/chat/sessions.ts`~~                   | ~~`forward`~~               | ✅ Fixed |
+| ~~24~~ | ~~`src/lib/chatEvents/messageHandlers.ts`~~          | ~~`user.message`~~          | ✅ Fixed |
+| ~~23~~ | ~~`src/components/session/SessionDetailsPanel.vue`~~ | ~~`loadUsage`~~             | ✅ Fixed |
+| ~~22~~ | ~~`src-bun/app/chat/pendingRequests.ts`~~            | ~~`respond`~~               | ✅ Fixed |
+| ~~20~~ | ~~`src-bun/app/config/settings.ts`~~                 | ~~`coerceTerminal`~~        | ✅ Fixed |
+| ~~19~~ | ~~`src/lib/chatEvents/messageHandlers.ts`~~          | ~~`normalizeAttachments`~~  | ✅ Fixed |
+| ~~19~~ | ~~`src/stores/chat/sessionReducer.ts`~~              | ~~`trackSessionArtifact`~~  | ✅ Fixed |
+| ~~18~~ | ~~`src-bun/app/terminal/stderrFilter.ts`~~           | ~~(arrow fn)~~              | ✅ Fixed |
+| ~~17~~ | ~~`src/components/library/McpServerForm.vue`~~       | ~~`structuredFromConfig`~~  | ✅ Fixed |
+
+**Net:** 12 hotspots resolved (D-phase work), 1 new (Sprint A2 — file a
+follow-up). Six remaining are pre-existing and tracked.
+
+### 2.3  Other warnings worth addressing
+
+- `agentFiles.ts:415,421` — `max-depth` ≥ 5 in `writeAgent` (Sprint A2);
+  same code that introduced the CC 25 above. Fold into a single cleanup.
+- `groupsStore.ts:261,351,356` — three `no-dynamic-delete` (`delete obj[key]`);
+  prefer `delete (obj as Record<string, unknown>)[key]` cast or a
+  `Map<>`-based store.
+- `CommandPalette.vue:87` — single `!` non-null assertion; refactor away.
 
 ### 2.4  Oversized Functions (> 200 lines)
+
+Backed by hand line counts (eslint `max-lines-per-function` is disabled
+inside `src/stores/**` so these don't appear in §2.1).
 
 | Lines | File                                                | Function                    |
 | ----: | --------------------------------------------------- | --------------------------- |
@@ -842,7 +850,7 @@ to both sides).
 
 **Tests:** 600 → **679 pass**. **Type gates:** all clean
 (`vue-tsc --noEmit` + `tsc -p tsconfig.bun.json --noEmit`).
-**ESLint:** ⚠️ config currently broken — see Phase F.4.
+**ESLint:** ✅ repaired 2026-05-28 (Phase F.4); 0 errors, 18 warnings.
 
 
 ---
@@ -1088,11 +1096,12 @@ god-component).
 - [ ] **F.3** Migrate 3 direct `localStorage.setItem` callsites to
   `usePersistedRef` (`useDetailsSections.ts`, `useSessionSkills.ts`,
   `LibraryPanel.vue`, `FilePicker.vue`, `sessionCommands.ts`)
-- [ ] **F.4** 🔴 **Fix ESLint config** — currently broken
-  (`Cannot redefine plugin "@typescript-eslint"`). Without this, §2
-  numbers in this audit can't be refreshed, complexity hotspots
-  can't be tracked, and we lose the safety net for new regressions.
-  **Highest-priority item in §8 right now.**
+- [x] **F.4** ✅ **Fix ESLint config** — DONE (2026-05-28). Root cause:
+  duplicate `typescript-eslint` install (gts had its own nested copy).
+  Fixed via `package.json#overrides` + reinstall + `eslint --fix` (3,054
+  prettier auto-fixes across 29 files). `lint:eslint` now wired into
+  `bun run check`. Warning count 31 → 18; complexity hotspots 17 → 6.
+  See §2 for the live numbers.
 
 ---
 

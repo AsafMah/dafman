@@ -68,6 +68,7 @@ const ctxMenuRef = useTemplateRef<InstanceType<typeof ContextMenu>>('ctxMenuRef'
 
 const menuItems = computed<MenuItem[]>(() => {
   const others = groupsStore.groups.filter((g) => g.id !== groupsStore.activeGroupId);
+
   return [
     {
       label: 'Move to group',

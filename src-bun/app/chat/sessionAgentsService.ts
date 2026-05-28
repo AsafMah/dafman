@@ -189,9 +189,11 @@ export class SessionAgentsService {
   }> {
     const entry = this.ctx.getEntry(sessionId);
     const wd = scope === 'project' ? (entry.workingDirectory ?? undefined) : undefined;
+
     if (scope === 'project' && !wd) {
       throw AppError.sdk('project scope requires a session with a working directory');
     }
+
     return readAgentForEdit(scope, name, wd);
   }
 

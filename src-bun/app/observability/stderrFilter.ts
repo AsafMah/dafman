@@ -56,10 +56,7 @@ let installed = false;
 /// Convert the heterogeneous `process.stderr.write(...)` chunk into
 /// a UTF-8 string. Returns `null` for chunk types we don't
 /// recognise (the caller falls back to the original write).
-function chunkToText(
-  chunk: unknown,
-  encoding: BufferEncoding | undefined,
-): string | null {
+function chunkToText(chunk: unknown, encoding: BufferEncoding | undefined): string | null {
   if (typeof chunk === 'string') return chunk;
 
   if (Buffer.isBuffer(chunk)) return chunk.toString(encoding ?? 'utf8');
@@ -109,8 +106,7 @@ export function installStderrFilter(): void {
   const patched = (...args: WriteArgs): boolean => {
     const [chunk, encodingOrCb, maybeCb] = args;
     const cb = typeof encodingOrCb === 'function' ? encodingOrCb : maybeCb;
-    const encoding =
-      typeof encodingOrCb === 'string' ? (encodingOrCb as BufferEncoding) : undefined;
+    const encoding = typeof encodingOrCb === 'string' ? encodingOrCb : undefined;
     const text = chunkToText(chunk, encoding);
 
     if (text === null) {

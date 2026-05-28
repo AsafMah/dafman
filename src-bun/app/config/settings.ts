@@ -193,22 +193,27 @@ function coerceLayout(raw: unknown): Layout {
   } else {
     out.dockview = null;
   }
+
   // v3 `outer` (renamed from `dockview`)
   if (obj.outer && typeof obj.outer === 'object' && !Array.isArray(obj.outer)) {
     out.outer = obj.outer;
   }
+
   // v3 `groups` — must be an array of objects
   if (Array.isArray(obj.groups)) {
     out.groups = obj.groups as Layout['groups'];
   }
+
   // v3 `activeGroupId` — string
   if (typeof obj.activeGroupId === 'string') {
     out.activeGroupId = obj.activeGroupId;
   }
+
   // v3 `innerBodies` — map of opaque blobs
   if (obj.innerBodies && typeof obj.innerBodies === 'object' && !Array.isArray(obj.innerBodies)) {
     out.innerBodies = obj.innerBodies as Layout['innerBodies'];
   }
+
   // schemaVersion — number
   if (typeof obj.schemaVersion === 'number') {
     out.schemaVersion = obj.schemaVersion;

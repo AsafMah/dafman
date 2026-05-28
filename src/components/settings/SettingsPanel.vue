@@ -87,9 +87,9 @@ const defaultApproveAll = computed<boolean>({
     <!-- Permissions (Phase 22c) -->
     <SettingsGroup
       id="permissions"
+      v-model:collapsed="collapsed.permissions"
       icon="pi-shield"
       label="Permissions"
-      v-model:collapsed="collapsed.permissions"
     >
       <div class="field field-inline">
         <label class="field-inline-label">
@@ -114,9 +114,9 @@ const defaultApproveAll = computed<boolean>({
     <!-- Diagnostics -->
     <SettingsGroup
       id="diagnostics"
+      v-model:collapsed="collapsed.diagnostics"
       icon="pi-info-circle"
       label="Diagnostics"
-      v-model:collapsed="collapsed.diagnostics"
     >
       <div class="field">
         <Button
@@ -136,9 +136,9 @@ const defaultApproveAll = computed<boolean>({
     <!-- About -->
     <SettingsGroup
       id="about"
+      v-model:collapsed="collapsed.about"
       icon="pi-tag"
       label="About"
-      v-model:collapsed="collapsed.about"
     >
       <p class="field-hint">
         Schema version <strong>{{ settings.version }}</strong> — stored under
