@@ -10,7 +10,59 @@
 
 ---
 
-## 2026-05-28 — Jobs spinner pivot centered (#15)
+## 2026-05-28 — SDK bump beta.7 → beta.9 + 9 new-surface issues filed (#6, #35–#43)
+
+**Takeaway:** Bumped the Copilot SDK two beta versions. Two handlers
+silently renamed upstream (`onExitPlanMode` → `onExitPlanModeRequest`,
+`onAutoModeSwitch` → `onAutoModeSwitchRequest`); without renaming our
+callers both handlers would have **silently stopped firing** because
+`buildBaseSessionConfig` returns an untyped object. Caught by reading
+release notes before merging per AGENTS.md rule 23 — not by the type
+checker.
+
+### Receipts
+
+- `src-bun/app/chat/sessionConfigBuilder.ts:182,201` — renamed handlers.
+- `src-bun/__tests__/sessions.test.ts:790,796,802,823` — renamed test
+  fixture properties to match.
+- `package.json` — `@github/copilot-sdk` 1.0.0-beta.7 → 1.0.0-beta.9.
+- `bun.lock` regenerated.
+
+### SDK new-surface analysis (per rule 23)
+
+Reading release notes for beta.7 → beta.9 surfaced 9 new SDK
+capabilities worth tracking as future work:
+
+- #35 `agentMode` per-message — fix plan/autopilot mode requests
+- #36 `postToolUseFailure` hook — wire into jobs panel
+- #37 `preMcpToolCall` hook — MCP UX (Sprint B)
+- #38 remote sessions — shareable URL (needs-spec)
+- #39 cloud sessions — agent runs in GH backend (needs-spec)
+- #40 `onExitPlanModeRequest` / `onAutoModeSwitchRequest` surface to user
+- #41 composer per-message mode picker UX
+- #42 BYOK provider model + token-limit overrides
+- #43 `runtime_instructions` system message section
+
+### Verification
+
+- `bun test src-bun/__tests__/sessions.test.ts` — 44 pass.
+- `bun run check` green — lint + types + tests + smoke + spinner-probe.
+- The handler rename is type-invisible (untyped return object); the test
+  fixture round-trips through the SAME property names as the production
+  code so the test still proves the wire flow.
+
+### Dogfood gap
+
+The new handler names take effect only when plan-mode is entered (rare
+user action) or auto-mode-switch fires (typically only under rate-limit
+recovery). Both are hard to trigger in dogfood. Pending verification is
+implicit: the SDK now rejects unknown handler keys with a warning, so a
+plain `bun run dev` boot would have surfaced the rename mistake had we
+gotten it wrong. (We did not.)
+
+---
+
+
 
 **Takeaway:** Fixed the Jobs panel active-job spinner so PrimeIcons rotates from a square, centered icon box instead of orbiting around an off-center glyph box.
 

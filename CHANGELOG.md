@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (SDK bump — 2026-05-28)
+- **Bumped `@github/copilot-sdk` from `1.0.0-beta.7` to `1.0.0-beta.9`.** Two handler renames per SDK beta.8 API review: `onExitPlanMode` → `onExitPlanModeRequest` and `onAutoModeSwitch` → `onAutoModeSwitchRequest`. Without the rename, both handlers would have silently fallen through (TS doesn't catch the property-name change because `buildBaseSessionConfig` returns an untyped object — exactly the silent-fallthrough class AGENTS.md rule 23 is designed to prevent). New SDK surfaces (`agentMode` per-message, `postToolUseFailure` / `preMcpToolCall` hooks, remote + cloud sessions, `runtime_instructions`, provider model overrides) are filed as separate issues #35–#43 per rule 23.
+
 ### Fixed
 - **Jobs panel spinner centered.** Running job status icons now use a square icon box with an explicit center transform origin so the spinner rotates around its own center.
 

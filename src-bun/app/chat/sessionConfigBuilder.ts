@@ -179,7 +179,7 @@ export function buildBaseSessionConfig(deps: SessionConfigBuilderDeps, sessionId
         });
       }) as Promise<ElicitationResult>;
     },
-    onExitPlanMode: (request: ExitPlanModeRequest): Promise<ExitPlanModeResult> => {
+    onExitPlanModeRequest: (request: ExitPlanModeRequest): Promise<ExitPlanModeResult> => {
       const sid = sessionId();
 
       return deps.pending.enqueue(sid, 'exitPlanMode', (requestId) => {
@@ -198,7 +198,7 @@ export function buildBaseSessionConfig(deps: SessionConfigBuilderDeps, sessionId
         });
       }) as Promise<ExitPlanModeResult>;
     },
-    onAutoModeSwitch: (request: AutoModeSwitchRequest): Promise<AutoModeSwitchResponse> => {
+    onAutoModeSwitchRequest: (request: AutoModeSwitchRequest): Promise<AutoModeSwitchResponse> => {
       const sid = sessionId();
 
       return deps.pending.enqueue(sid, 'autoModeSwitch', (requestId) => {
