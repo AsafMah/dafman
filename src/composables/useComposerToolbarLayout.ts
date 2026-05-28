@@ -18,13 +18,18 @@ import {
 } from '@/composables/composerFormat';
 
 export interface UseComposerToolbarLayoutReturn {
-  toolbarRef: Ref<HTMLElement | null>;
   inlineFormatActions: ComputedRef<readonly EditorFormatActionDescriptor[]>;
   overflowFormatActions: ComputedRef<readonly EditorFormatActionDescriptor[]>;
 }
 
-export function useComposerToolbarLayout(): UseComposerToolbarLayoutReturn {
-  const toolbarRef = ref<HTMLElement | null>(null);
+/// Composer toolbar responsive layout. The toolbar element is owned by
+/// the caller (template ref) and passed in — that keeps the
+/// template-ref binding visible to vue-tsc 3 instead of hiding it
+/// behind a composable-internal `ref()` that the compiler can't link
+/// to the template string ref.
+export function useComposerToolbarLayout(
+  toolbarRef: Ref<HTMLElement | null>,
+): UseComposerToolbarLayoutReturn {
   /// Default to a wide value so all buttons render inline on the
   /// first paint (before the ResizeObserver fires).
   const toolbarWidth = ref(1000);
@@ -58,5 +63,5 @@ export function useComposerToolbarLayout(): UseComposerToolbarLayoutReturn {
     if (toolbarRef.value) toolbarWidth.value = toolbarRef.value.clientWidth;
   });
 
-  return { toolbarRef, inlineFormatActions, overflowFormatActions };
+  return { inlineFormatActions, overflowFormatActions };
 }

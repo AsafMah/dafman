@@ -15,7 +15,6 @@ const props = defineProps<{
   source: string;
 }>();
 
-const target = ref<HTMLElement | null>(null);
 const svg = ref<string>('');
 const error = ref<string>('');
 const ready = ref(false);
@@ -79,10 +78,7 @@ const showFallback = computed(() => error.value !== '');
 </script>
 
 <template>
-  <div
-    ref="target"
-    class="mermaid-block"
-  >
+  <div class="mermaid-block">
     <div
       v-if="ready && !showFallback"
       class="mermaid-svg"

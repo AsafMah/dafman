@@ -19,7 +19,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import Popover from 'primevue/popover';
 import type { MenuItem } from 'primevue/menuitem';
 import { LexicalComposer } from 'lexical-vue/LexicalComposer';
@@ -111,7 +111,8 @@ const diagEnabled =
 const toasts = useToastStore();
 const commandMode = ref(false);
 
-const { toolbarRef, inlineFormatActions, overflowFormatActions } = useComposerToolbarLayout();
+const toolbarRef = useTemplateRef<HTMLElement>('toolbarRef');
+const { inlineFormatActions, overflowFormatActions } = useComposerToolbarLayout(toolbarRef);
 
 function addAttachment(a: SendMessageAttachment): void {
   const editor = editorRef.value as LexicalEditor | null;
