@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (vue-tsc bump — 2026-05-28)
+- **Bumped `vue-tsc` from `2.2.12` to `3.3.2`.** Two small Vue 3.5 migrations: (1) refactored `useComposerToolbarLayout` to accept the toolbar ref from the caller via `useTemplateRef('toolbarRef')` instead of destructuring an opaque ref from the composable's return value — vue-tsc 3 can't link a template string-ref to a composable-internal `ref()`. (2) Deleted dead `target` ref in `MermaidBlock.vue` (Mermaid renders via `v-html`, the ref was never read). The other 19 string template refs across `src/` still work in Vue 3.5 (deprecated but functional); broader `useTemplateRef()` migration filed as follow-up.
+
 ### Changed (SDK bump — 2026-05-28)
 - **Bumped `@github/copilot-sdk` from `1.0.0-beta.7` to `1.0.0-beta.9`.** Two handler renames per SDK beta.8 API review: `onExitPlanMode` → `onExitPlanModeRequest` and `onAutoModeSwitch` → `onAutoModeSwitchRequest`. Without the rename, both handlers would have silently fallen through (TS doesn't catch the property-name change because `buildBaseSessionConfig` returns an untyped object — exactly the silent-fallthrough class AGENTS.md rule 23 is designed to prevent). New SDK surfaces (`agentMode` per-message, `postToolUseFailure` / `preMcpToolCall` hooks, remote + cloud sessions, `runtime_instructions`, provider model overrides) are filed as separate issues #35–#43 per rule 23.
 

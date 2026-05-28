@@ -10,6 +10,67 @@
 
 ---
 
+## 2026-05-28 — vue-tsc 2 → 3 + Vue 3.5 useTemplateRef migration (#44)
+
+**Takeaway:** First fork of the dep-majors umbrella (#44). Bumped
+vue-tsc 2.2.12 → 3.3.2. vue-tsc 3 stops auto-linking template
+string-refs (`ref="foo"`) to composable-internal `ref()` declarations
+— only 2 sites broke, both fixed via canonical Vue 3.5 patterns.
+Other 19 string-ref sites still type-check (used elsewhere in script)
+but they're deprecated per Vue 3.5; broader migration filed as
+follow-up.
+
+### Receipts
+
+- `package.json` — `vue-tsc: "^3.3.2"` (was `2.2.12`).
+- `src/composables/useComposerToolbarLayout.ts` — signature inverted.
+  Composable now accepts `toolbarRef: Ref<HTMLElement | null>` from
+  the caller. Return shape: `{ inlineFormatActions, overflowFormatActions }`
+  (no more `toolbarRef`).
+- `src/components/chat/MessageComposer.vue` — uses `useTemplateRef('toolbarRef')`
+  and passes it into the composable.
+- `src/components/shared/MermaidBlock.vue` — `target` ref + template
+  `ref="target"` deleted. Mermaid renders via `v-html` of the
+  `svg.value` string; the ref was never read.
+
+### Why this approach
+
+vue-tsc 3's stricter check is **right**. The previous pattern
+hid the template-ref binding inside a composable, which meant:
+- The compiler couldn't link the template's `ref="toolbarRef"` string
+  to the composable's `const toolbarRef = ref(null)`.
+- vue-tsc 3 flagged the destructured local as unused.
+- A `_`-prefix or `// @ts-ignore` "fix" would have been a Rule 0
+  hack — the warning is a real signal about hidden ownership.
+
+The right fix: the component owns the template ref, the composable
+operates on it. Inverting the dependency is mechanical (one
+signature change) and makes the binding visible to the type checker
+AND to anyone reading the component.
+
+### Verification
+
+- `bun run check` green — vue-tsc 3 + lint:bun + lint:tsc-bun +
+  lint:eslint (18 warnings carried) + 679 tests + electrobun build
+  + Playwright smoke + jobs-spinner probe.
+- Tried adding a composer-toolbar Playwright probe but deleted it —
+  default chromium width (1280) doesn't trigger the responsive
+  breakpoint, so it would only verify "page boots" which smoke
+  already covers. Real responsive verification needs a width-matrix
+  probe; filed as future work.
+
+### Follow-ups
+
+- File issue: broader string-ref → `useTemplateRef()` migration for
+  the remaining 19 sites (TerminalPanel, GroupTab, LogViewer,
+  FilePicker, CodeEditor, MentionPlugin, ChatTab, ChatWindow,
+  MessageComposer's other 2 refs, PendingRequestCard, DiffEditor,
+  SessionHeaderControls). Still works in Vue 3.5 but deprecated.
+- Continue #44 umbrella: next fork is TS 5.9 → 6.0 (drop `baseUrl`
+  per TS 6 deprecation).
+
+---
+
 ## 2026-05-28 — SDK bump beta.7 → beta.9 + 9 new-surface issues filed (#6, #35–#43)
 
 **Takeaway:** Bumped the Copilot SDK two beta versions. Two handlers
