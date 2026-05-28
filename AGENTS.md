@@ -289,6 +289,53 @@ bun run pr:review
 These exist because real regressions kept landing under the previous lax
 contract. Treat them as binding, not aspirational.
 
+### 0. The pre-flight check — before EVERY non-trivial change
+
+Before you touch a file or push a commit for non-trivial work
+(anything beyond a typo fix or doc tweak), explicitly ask:
+
+1. **Am I being hacky?** — Suppressing a warning, hardcoding a
+   workaround, `_`-prefixing an unused-var that's actually used in a
+   template, bumping a complexity cap, `// @ts-ignore`, `// eslint-
+   disable`, silently swallowing an error. If yes — STOP. The warning
+   is a real signal; understand it first.
+
+2. **Am I reinventing the wheel?** — Hand-rolling something the
+   framework, ecosystem, or repo already provides:
+   - PrimeVue ships `<ProgressSpinner>`, `<Dialog>`, `<Tooltip>`,
+     `<Badge>`, `<Skeleton>`, `<VirtualScroller>`, etc.
+   - VueUse ships debounce, observers, localStorage glue, focus
+     management, clipboard, etc.
+   - Vue 3.5+ ships `useTemplateRef`, `useId`, `useModel`.
+   - The repo's own composables / helpers cover ANSI, MIME, formatters,
+     event bus.
+   - npm has a popular battle-tested package for nearly every
+     infrastructure primitive.
+
+   If yes — STOP. Use the dep instead (rule 16 / 17).
+
+3. **Am I acting without research?** — Have I actually read:
+   - The library's release notes / migration guide for the version
+     I'm using? (Vite 8's `rollupOptions` → `rolldownOptions`,
+     vue-tsc 3's template-ref handling, TS 6's `baseUrl` deprecation
+     are all in their official changelogs — I just have to look.)
+   - The SDK / API surface, not just my mental model of it?
+   - The source code when documentation is thin? (`node_modules/...`
+     is fair game — see the `reasoning_opaque` precedent.)
+   - The codebase pattern for the thing I'm about to add? (How was
+     this surface done elsewhere? Mirror that.)
+
+   If no — STOP. Read first, then act.
+
+Precedent: 2026-05-28 saw three regressions land because this
+check wasn't applied. The Phase E.8 row-CSS bug was 4 days old and
+trivial to spot. The pi-spinner glyph fix shipped twice broken
+because the agent didn't read PrimeVue's `<ProgressSpinner>` docs.
+The vite 8 / TS 6 / vue-tsc 3 major bumps were being merged without
+reading any of the three migration guides.
+
+This check is 90 seconds. The rework when you skip it is hours.
+
 ### 1. Never declare a task done with half-work
 
 - "It compiles" is not done.
@@ -718,6 +765,9 @@ anti-laziness rules above:
 - **Never add new `src-bun/` TypeScript errors** (rule 22). When you
   touch any `src-bun/` file, run `bun run lint:tsc-bun` first and
   verify the error count doesn't go up.
+- **Never start a non-trivial change without the pre-flight check**
+  (rule 0): am I being hacky, reinventing the wheel, or acting
+  without reading the relevant docs / release notes / source?
 
 ## Monorepo / nested AGENTS.md
 
