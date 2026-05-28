@@ -14,11 +14,13 @@ import { toErrorMessage } from '@/lib/errorMessage';
 export function useAgentsLibrary() {
   const files = ref<AgentFileEntry[]>([]);
   const loaded = ref(false);
+  const loading = ref(false);
   const error = ref<string | null>(null);
 
   async function load(sessionId: string | undefined): Promise<void> {
     error.value = null;
     loaded.value = false;
+    loading.value = true;
 
     try {
       if (sessionId) {
@@ -31,6 +33,7 @@ export function useAgentsLibrary() {
       error.value = toErrorMessage(err);
     } finally {
       loaded.value = true;
+      loading.value = false;
     }
   }
 
@@ -97,5 +100,5 @@ export function useAgentsLibrary() {
     }
   }
 
-  return { files, loaded, error, load, write, read, remove };
+  return { files, loaded, loading, error, load, write, read, remove };
 }

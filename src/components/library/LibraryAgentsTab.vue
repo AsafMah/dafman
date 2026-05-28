@@ -47,6 +47,7 @@ const activeSession = computed(() => {
 const {
   files,
   loaded,
+  loading,
   error,
   load: loadFiles,
   write: writeAgent,
@@ -318,6 +319,14 @@ async function reveal(path: string) {
       </span>
       <Button
         size="small"
+        text
+        icon="pi pi-refresh"
+        aria-label="Refresh agents list"
+        :loading="loading"
+        @click="load"
+      />
+      <Button
+        size="small"
         :disabled="!activeSession"
         :title="activeSession ? '' : 'Open a session first'"
         icon="pi pi-plus"
@@ -543,6 +552,7 @@ async function reveal(path: string) {
 }
 
 .agents-summary {
+  flex: 1;
   font-size: 0.75rem;
   color: var(--p-text-muted-color);
 }
