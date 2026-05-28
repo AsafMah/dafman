@@ -10,6 +10,28 @@
 
 ---
 
+## 2026-05-28 — Jobs spinner pivot centered (#15)
+
+**Takeaway:** Fixed the Jobs panel active-job spinner so PrimeIcons rotates from a square, centered icon box instead of orbiting around an off-center glyph box.
+
+### Receipts
+
+- `src/components/observability/JobsPanel.vue` now gives job status icons an explicit `1em` square box, centered text, and `transform-origin: 50% 50%`.
+- `CHANGELOG.md` records the user-visible fix under `## [Unreleased]`.
+- `MANUAL_TESTS.md` has pending dogfood item `D15.1` because this is a live compositor/glyph-pivot visual bug.
+
+### Testing note
+
+No unit test was added: the regression is a visual CSS animation pivot in the browser compositor, and there is no stable DOM/assertion seam that proves the perceived rotation center. `bun run check` covers lint, tests, build, and smoke.
+
+### Manual dogfood pending
+
+- **Steps:** run `bun run dev`, start a session, ask the agent to spawn a background task, and open the Jobs panel while a job is `starting` or `running`.
+- **Expected:** the active job spinner rotates around its own center without orbiting.
+- **Why not automated:** browser glyph rasterization + transform-origin perception is not reliably assertable from unit tests.
+
+---
+
 ## 2026-05-28 (much later) — GitHub migration shipped
 
 **Takeaway:** Moved work tracking from `plans/TODO.md` to GitHub Issues

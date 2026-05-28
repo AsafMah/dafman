@@ -63,6 +63,13 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Sprint D — Jobs spinner center (issue #15, 2026-05-28)
+
+- **D15.1** ⏳ **Running job spinner rotates in place.**
+  - **Steps:** run `bun run dev`, start a chat session, ask the agent to spawn a background task, then open the Jobs panel while the job is `starting` or `running`.
+  - **Expected:** the spinner beside the active job rotates around its own center without orbiting an off-center point.
+  - **Why not automated:** the bug is a visual glyph/transform-origin artifact in the live browser compositor; unit tests cannot reliably assert the perceived rotation pivot.
+
 ### Sprint A1 — Library Agents Select / Deselect (commit `bca5704`, 2026-05-27)
 
 - **A1.1** ⏳ **Select button per row.**
