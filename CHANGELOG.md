@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (vite + plugin-vue bump — 2026-05-28)
+- **Bumped `vite` from `6.4.2` to `8.0.x` and `@vitejs/plugin-vue` from `5.2.4` to `6.0.x`.** Third and final fork of #44 dep-majors umbrella. Vite 8 swaps the bundler engine from esbuild/Rollup to Rolldown + Oxc — **build time dropped from ~11s to ~1.6s** (7× speedup). Zero source-code changes needed; our `vite.config.ts` is minimal (single `vue()` plugin + `@/*` alias + port/outDir) and dodges every breaking-change surface (we don't use `rollupOptions`, `esbuildOptions`, `optimizeDeps.esbuildOptions`, `build.minify`, or `manualChunks`). Electrobun has no vite peer-dep — it just copies `dist/*` from whatever Vite emits. Both prod and HMR smoke + spinner probes pass; full E2E e2e:run unchanged. New warnings (not errors) from Rolldown: one `@vueuse/core` PURE annotation position, five "ineffective dynamic import" warnings on files imported both statically and dynamically — pre-existing tree-shaking signals worth a follow-up but not regressions.
+
 ### Changed (TS bump — 2026-05-28)
 - **Bumped `typescript` from `5.9.3` to `6.0.x`.** Two tsconfig migrations triggered by TS 6 deprecation defaults: (1) dropped `baseUrl` (deprecated; paths now resolved relative to tsconfig dir), (2) added explicit `"types": ["bun"]` to renderer `tsconfig.json` (TS 6 changed `types` default from "enumerate all `@types/*`" to `[]`, breaking auto-discovery of `bun:test` imports in renderer test files). No source-code changes — TS 6 didn't surface any new type errors in our codebase. Second fork of #44 dep-majors umbrella.
 
