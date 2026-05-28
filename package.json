@@ -26,6 +26,7 @@
     "format": "prettier --write 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "inspect": "node --experimental-strip-types --no-warnings tools/inspect.ts",
+    "pr:review": "bun run tools/pr-review.ts",
     "check": "bun run lint && bun run lint:bun && bun run lint:tsc-bun && bun run lint:eslint && bun run test && bun run build && bun run smoke:run"
   },
   "dependencies": {

@@ -26,9 +26,11 @@ editor, inline file/image attachments, command palette, dark mode.
 4. **`MANUAL_TESTS.md`** — open manual-test checklist the user runs to
    sign off features. Append a new section per feature you ship
    (per rule #10 below).
-5. **`plans/DONE.md`** and **`plans/TODO.md`** — single live "shipped" /
-   "open" matrices, organized by topic. Read both. (Historical design
-   docs live under `plans/_archive/` and are NOT kept current.)
+5. **`plans/DONE.md`** — shipped capabilities matrix. **Open work is in
+   GitHub Issues now** (`gh issue list`); see the "Workflow" section
+   below. Pre-migration backlog frozen at `plans/TODO_archive.md`.
+   (Historical design docs live under `plans/_archive/` and are NOT
+   kept current.)
 
 If your task touches the IPC wire contract, also read `src-bun/rpc.ts` and
 `src/ipc/types.ts` — they MUST stay in sync.
@@ -271,11 +273,14 @@ bun run pr:review
   invariants, SDK gotchas). Read this first for any non-trivial task.
 - **[`plans/DONE.md`](plans/DONE.md)** — every capability Dafman ships
   today, by topic, with code receipts.
-- **[`plans/TODO.md`](plans/TODO.md)** — every open feature, gap, and
-  known piece of tech debt, by topic, ranked within each topic.
+- **[`plans/DONE.md`](plans/DONE.md)** — every capability Dafman ships
+  today, by topic, with code receipts.
+- **GitHub Issues** (`gh issue list` / [issues page](https://github.com/AsafMah/dafman/issues))
+  — every open feature, gap, and known piece of tech debt. Pre-migration
+  backlog frozen at [`plans/TODO_archive.md`](plans/TODO_archive.md).
 - **[`plans/_archive/`](plans/_archive/)** — historical design docs and
   audits. Kept for context only. Do not update; if a fact in there
-  matters, lift it into `DONE.md` / `TODO.md` / `ARCHITECTURE.md`.
+  matters, lift it into `DONE.md` / GitHub Issue / `ARCHITECTURE.md`.
 
 ---
 
@@ -316,10 +321,11 @@ Every substantive session ends with:
 - **`CHANGELOG.md`** under `## [Unreleased]` for any user-visible change.
 - **`ARCHITECTURE.md`** updated if you changed a module structure, an
   invariant, or an IPC surface significantly.
-- **`plans/DONE.md`** and **`plans/TODO.md`** kept in sync with reality:
-  move shipped rows from TODO → DONE; add new open work to TODO. Do
-  NOT add new `plans/plan-*` files (the old per-topic plan docs are
-  archived under `plans/_archive/` and not kept current).
+- **`plans/DONE.md`** kept in sync with reality: when work
+  closes a GH issue, move the capability into `plans/DONE.md` with
+  the issue / commit receipt. Do NOT add new `plans/plan-*` files
+  (the old per-topic plan docs are archived under `plans/_archive/`
+  and not kept current). Open work lives in GitHub Issues.
 
 ### 4. No unverified claims
 
@@ -431,8 +437,9 @@ surface, file layout, or user-visible behavior — interview the user
   **remind the user to enter plan mode** and iterate the plan with
   them before exiting.
 - Locked specs go in the commit message and (for non-trivial
-  features) as a row in [`plans/TODO.md`](plans/TODO.md) until
-  shipped, so the next agent doesn't re-litigate them.
+  features) into the GitHub Issue body (via the Feature template
+  acceptance items) until shipped, so the next agent doesn't
+  re-litigate them.
 
 This rule exists because too many features in this repo were built
 on assumed defaults that the user disagreed with, costing rework.
@@ -692,17 +699,18 @@ cleared 63 stale errors).
 These are the smaller never-cross-this-line items, in addition to the
 anti-laziness rules above:
 
-- Never invent direction. If a feature is not in `plans/TODO.md` or
-  `STATUS.md`, ask before adding it.
+- Never invent direction. If a feature is not in a GitHub Issue
+  (or `STATUS.md`), ask before adding it.
 - Never commit secrets, tokens, or raw prompt content.
 - Domain modules under `src-bun/app/` don't import `electrobun/bun`.
 - Never throw raw `Error` from an RPC handler — go through `rpcGuard`.
 - Tests stay green: `bun run check` must succeed.
 - Never delete an item from `STATUS.md`. Move it (open → done) but preserve
   history.
-- Never let `plans/DONE.md` / `plans/TODO.md` drift silently. When you
-  ship something move the row across; when you accept new work add the
-  row to TODO. Do NOT add new `plans/plan-*` files.
+- Never let `plans/DONE.md` drift silently. When you ship something
+  matching an open GH issue, close the issue AND record the capability
+  in `plans/DONE.md` with the receipt. Do NOT add new
+  `plans/plan-*` files.
 - **Never reach for `window.dispatchEvent`/`addEventListener('app:...')`
   for in-app messaging** — see rule 18.
 - **Never silence ESLint's `complexity` rule globally to skirt rule 20**

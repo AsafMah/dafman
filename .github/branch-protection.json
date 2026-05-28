@@ -1,0 +1,21 @@
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      {"context": "Lint (vue-tsc + bun-entry + tsc-bun + eslint)"},
+      {"context": "Unit tests (bun test)"},
+      {"context": "Renderer smoke (Playwright)"},
+      {"context": "Full E2E (real test-server + fake SDK)"},
+      {"context": "electrobun build (ubuntu-latest)"}
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "required_linear_history": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": false,
+  "lock_branch": false,
+  "allow_fork_syncing": true
+}

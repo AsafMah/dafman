@@ -3,6 +3,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (Process / Workflow — 2026-05-28)
+- **Work-tracking migrated to GitHub Issues** + Projects board + sprint milestones. `plans/TODO.md` frozen as `plans/TODO_archive.md`. `MANUAL_TESTS.md` failing-rows section replaced with pointer to `gh issue list --label manual-test-fail`. Pending-verification section kept.
+- **CI level-up.** `ci.yml` refactored: parallel `lint`/`test`/`smoke`/`e2e` jobs that mirror `bun run check` exactly. Bun install cache + Playwright cache + concurrency cancel-in-progress. CodeQL workflow (javascript-typescript, weekly + PR). Dependabot (npm + GH-actions weekly, grouped, `@lexical/*` pinned). Auto-labeler (path globs → area:* labels). Stale-bot (90d issues / 30d PRs). Automerge workflow. Branch protection on `main` requires `lint`/`test`/`smoke`/`e2e`/`build-matrix(ubuntu-latest)`.
+- **Issue / PR templates rewritten.** YAML form templates for bug / feature / tech-debt aligned to AGENTS.md rules. PR template is now a full anti-laziness checklist. `CONTRIBUTING.md` rewritten from Tauri-era stale to current shape.
+- **New script:** `bun run pr:review` formats `git diff main...HEAD` into a code-review-subagent prompt, writes to temp file, copies to clipboard.
+
 ### Fixed (Phase F.4 — 2026-05-28)
 - **ESLint repaired.** `bun run lint:eslint` had been silently broken since the `typescript-eslint` 8.59→8.60 bump (commit `9b9cf11`): a duplicate `typescript-eslint` install (nested under `gts`) caused ESLint 10 to reject the second `@typescript-eslint` plugin registration. Fixed via `package.json#overrides` + `eslint --fix` (3,054 prettier auto-fixes across 29 files). `lint:eslint` is now part of `bun run check` so this can't regress silently again. Live warning count: 18 (down from 31 in the 2026-05-25 baseline).
 - **Phase E.8 — `<LibraryAgentsTabSection>` extracted (2026-05-28).** The 77-line intra-file dup that Sprint A1+A2 introduced in `LibraryAgentsTab.vue` is gone (jscpd: 77 → 12 lines, −84%). Parent component shrank 912 → 775 lines.

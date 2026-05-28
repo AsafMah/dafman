@@ -6,10 +6,22 @@
 > See [`DEVLOG.md`](DEVLOG.md) for the session-by-session running log,
 > [`CHANGELOG.md`](CHANGELOG.md) for release notes,
 > [`ARCHITECTURE.md`](ARCHITECTURE.md) for the live architecture snapshot,
-> [`MANUAL_TESTS.md`](MANUAL_TESTS.md) for the manual-test backlog
-> (per-feature checklists the user runs to sign off),
-> [`plans/TODO.md`](plans/TODO.md) for every open feature and gap, and
-> [`plans/DONE.md`](plans/DONE.md) for every capability Dafman ships today.
+> [`MANUAL_TESTS.md`](MANUAL_TESTS.md) for `⏳ Pending verification`
+> checklists awaiting user dogfood,
+> **GitHub Issues** (`gh issue list` / [issues page](https://github.com/AsafMah/dafman/issues))
+> for every open feature, bug, and tech-debt item (migrated from
+> `plans/TODO.md` on 2026-05-28),
+> [`plans/TODO_archive.md`](plans/TODO_archive.md) for the frozen
+> pre-migration backlog,
+> and [`plans/DONE.md`](plans/DONE.md) for every capability Dafman
+> ships today.
+
+**Current sprint queue (open issues):**
+- [Sprint B — MCP UX repair](https://github.com/AsafMah/dafman/milestone/1) (6 issues)
+- [Sprint C — slash `/skill` / `/mcp`](https://github.com/AsafMah/dafman/milestone/2) (2 issues)
+- [Sprint D — Jobs panel + bottom bar](https://github.com/AsafMah/dafman/milestone/3) (3 issues)
+- [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
+- [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
 **Active milestone:** **Groups v3 (nested DockviewVue) shipped** (2026-05-27).
 Three-phase landing of the workspace-groups feature. After two failed prior
@@ -227,7 +239,7 @@ Explicitly **out of scope**:
 Authoritative map of what's in the code, grouped by area. DONE / PARTIAL /
 TODO reflects current state against the legacy M0–M7 ambitions in
 `plans/_archive/plan-roadmap.prompt.md` (kept for historical context;
-not maintained). See `plans/TODO.md` for the live priority list.
+not maintained). See **GitHub Issues** for the live priority list (`plans/TODO_archive.md` for the frozen pre-migration record).
 
 ### Foundations (M0–M1)
 

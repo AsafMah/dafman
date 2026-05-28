@@ -10,7 +10,112 @@
 
 ---
 
-## 2026-05-28 (later) — Phase E.8 + .gitattributes
+## 2026-05-28 (much later) — GitHub migration shipped
+
+**Takeaway:** Moved work tracking from `plans/TODO.md` to GitHub Issues
++ Projects board (when scope is available) + automated CI gates +
+labeler + stale + dependabot + automerge + CodeQL. Took most of a
+session; 22 issues filed.
+
+### What landed
+
+- **Phase 1 — Metadata.** 28 labels (type / sprint / status / area /
+  priority), 5 milestones (Sprint B/C/D/E + M1 Features). Project v2
+  board deferred to user (gh CLI token lacks `project` scope; pivoted
+  to labels for queryability).
+- **Phase 2 — Templates.** YAML form templates for bug / feature /
+  tech-debt aligned to AGENTS.md rules 9 / 11 / 15 / 16. PR template
+  rewritten as full anti-laziness checklist. AGENTS.md gained
+  "Workflow — GitHub Issues + PRs" section.
+- **Phase 3 — CI level-up.**
+  - `ci.yml` split into parallel `lint` / `test` / `smoke` / `e2e`
+    jobs that mirror `bun run check` exactly (closes the gap that
+    hid the ESLint break for 2 days).
+  - Bun install cache (~30 s → ~2 s on warm cache).
+  - Playwright browser cache.
+  - Concurrency cancel-in-progress.
+  - CodeQL (javascript-typescript security-extended, weekly + PR).
+  - Dependabot (npm + GH-actions weekly, patch/minor grouped, major
+    separate; `@lexical/*` + `lexical` pinned).
+  - Path-based PR auto-labeler.
+  - Stale-bot (90d issues / 30d PRs; exempts p0 / blocked /
+    needs-spec / pending-dogfood / security / automerge).
+  - Automerge workflow for `automerge`-labelled PRs.
+  - README badges (CI / CodeQL / Bun / License).
+  - `delete_branch_on_merge: true`, `allow_auto_merge: true`,
+    merge-commit disabled (squash-only).
+  - Branch protection on `main`: requires `lint` / `test` / `smoke` /
+    `e2e` / `build-matrix (ubuntu-latest)` green; admins bypass for
+    docs-only direct push.
+- **Phase 4 — 22 issues filed.** Sprint B (6), C (2), D (3), E (2),
+  M1 Features (9). Bodies cite `plans/TODO_archive.md` and
+  `MANUAL_TESTS_archive.md` so history is searchable.
+- **Phase 5 — Doc reshuffle.**
+  - `plans/TODO.md` → `plans/TODO_archive.md` with frozen banner.
+  - `MANUAL_TESTS.md` failing section replaced with `gh issue list
+    --label manual-test-fail` pointer; pending-verification section
+    kept (it's the dogfood-gate replacement for the Pending column).
+  - `STATUS.md` top-of-stack now links the milestones.
+  - `AGENTS.md` cross-references updated everywhere `plans/TODO.md`
+    was named.
+  - `ARCHITECTURE.md` plans/TODO.md reference updated.
+  - `CONTRIBUTING.md` rewritten from Tauri-era stale to current
+    Bun/TS/GitHub-workflow shape.
+- **Phase 6 — Tooling.**
+  - `bun run pr:review` (`tools/pr-review.ts`) — formats
+    `git diff main...HEAD` into a code-review-subagent prompt, writes
+    to a temp file, copies to clipboard. Cross-platform (Windows
+    PowerShell, macOS pbcopy, Linux xclip + wl-copy fallback).
+
+### Gotchas / debt fixed mid-flight
+
+- **Lockfile drift.** Earlier `bun add yaml` for template validation
+  + `bun remove yaml` left `yaml@2.9.0` as a top-level entry in
+  `bun.lock` despite removing the dep. Local install with warm cache
+  accepted it; CI `--frozen-lockfile` rejected it. Fixed with
+  `rm -rf node_modules bun.lock && bun install`.
+- **CI lint job mismatch.** Old `ci.yml#check` only ran `bun run lint`
+  (vue-tsc), missing `lint:bun`, `lint:tsc-bun`, and `lint:eslint`.
+  Refactor aligns CI lint with the local `bun run check` so the
+  silent-break-for-2-days class can't repeat.
+- **E2E webServer race.** First push had `e2e` job missing the
+  `vite build` step (carried over from old monolithic job).
+  `vite preview` had no `dist/` to serve → 60s timeout. Added build
+  step. Smoke job already had it.
+
+### Pivots / deferrals
+
+- **Project v2 board:** `gh CLI` token in this session has `repo` +
+  `workflow` + `gist` + `read:org` but not `project`. Refresh
+  requires interactive device flow. Documented in plan.md / SQL
+  todos as user-action-required. Labels + milestones cover the
+  queryability gap in the meantime.
+- **`p4-rubber-duck`** skipped. The 22 issues are direct
+  transcriptions of user-reported bugs with archive citations; risk
+  of a missed acceptance criterion in a single issue is low and
+  editable post-file.
+
+### Commits
+
+`7ba41e3` (labels/milestones/templates) →
+`dc796d8` (CI level-up + CodeQL + Dependabot + labeler + stale +
+automerge + badges) →
+`4be8412` (bun.lock fix) →
+TBD (P5/P6 doc reshuffle + e2e webServer fix)
+
+### Numbers
+
+- Tests **679 pass** locally.
+- Lint clean (vue-tsc + lint:bun + lint:tsc-bun + lint:eslint —
+  18 warnings, all carried).
+- CI parallel-job wall-clock expected ~3-4 min (was ~8-10 min
+  serial); first CodeQL run pending.
+- GitHub: 22 open issues filed, 28 custom labels, 5 milestones, 6
+  new workflows.
+
+---
+
+
 
 **Takeaway:** Extracted `<LibraryAgentsTabSection>` to kill the 77-line
 intra-file dup Sprint A1+A2 introduced. Also added `.gitattributes` to

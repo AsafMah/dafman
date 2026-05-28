@@ -1,13 +1,21 @@
-# TODO — what Dafman doesn't ship yet
+# TODO_archive — frozen 2026-05-28
 
-> One file. Every open feature, gap, and known piece of tech debt,
-> organized by topic and ranked within each topic.
+> **🧊 Frozen 2026-05-28.** This is the **historical record** of open
+> work as of the GitHub migration. **New work is tracked in GitHub
+> Issues** (`gh issue list`) and the `dafman work` project board. Do
+> NOT add new rows here.
 >
-> When you ship something: move it from here to [`DONE.md`](DONE.md).
-> When the design is unclear, open a short spec interview (per AGENTS.md
-> rule 9) — *don't* spawn another plan file.
+> See `AGENTS.md` `## Workflow — GitHub Issues + PRs` for the new
+> workflow. See `MANUAL_TESTS.md` for the active manual-verification
+> checklist (rows that haven't been migrated to issues yet).
 >
-> Last refreshed 2026-05-27 (post Groups v3.1).
+> Items that became GitHub issues on 2026-05-28 are cited in their
+> issue bodies as `plans/TODO_archive.md ## <section> row N`.
+>
+> Original purpose of this file: one source of truth for every open
+> feature, gap, and known piece of tech debt, organized by topic and
+> ranked within each topic. Last actively refreshed 2026-05-27 (post
+> Groups v3.1).
 
 Legend:
 
@@ -17,6 +25,7 @@ Legend:
 - ⏳ blocked on upstream
 
 ---
+
 
 ## By User (unsorted intake)
 

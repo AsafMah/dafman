@@ -402,6 +402,8 @@ Total: **308 tests** as of writing. `bun run check` is the gate:
 
 ## 9. What's not here yet (link to plans)
 
-Tracked in `STATUS.md` (current sprint) and `plans/TODO.md` (full open
-list, by topic, ranked). `plans/DONE.md` is the matrix of what already
-ships. The legacy M-numbered roadmap is in `plans/_archive/`.
+Tracked in `STATUS.md` (current sprint) and **GitHub Issues**
+(full open list, labelled and milestoned — `gh issue list`).
+`plans/DONE.md` is the matrix of what already ships. The
+pre-migration backlog is frozen at `plans/TODO_archive.md`; the
+legacy M-numbered roadmap is in `plans/_archive/`.
