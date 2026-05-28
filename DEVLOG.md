@@ -10,6 +10,83 @@
 
 ---
 
+## 2026-05-28 — Library tabs auto-refresh on session switch (#51)
+
+**Takeaway:** Added `watch(activeSessionId, () => void load())` to
+the three session-scoped Library tabs (Agents / Skills / MCP); Tools
+is intentionally unwatched (built-in tool list is static). User
+dogfood revealed within-group session switches refreshed but
+between-group switches didn't — uncovered a tightly-coupled
+order-of-ops bug in `layoutStore.setApi` that's been latent since
+groups v3 shipped 2026-05-27. The actual fix is two-part.
+
+### Part 1 — Library watches
+
+Mirror the canonical pattern in `LibraryInstructionsTab.vue:75-78`
+which has been there since Phase 19a. Each tab:
+
+- imports `watch` + `storeToRefs(useLayoutStore())`,
+- reads `activeSessionId` (or `activeSession?.id` for Agents, which
+  already had a computed wrapper),
+- watches it and re-invokes the composable's `load()` / `loadAll()`.
+
+The composables (`useSkillsLibrary`, `useMcpLibrary`) already read
+`useLayoutStore().activeSessionId` internally so the watch trigger
+is enough — no need to plumb the id through.
+
+### Part 2 — layoutStore order-of-ops bug (regression latent since 2026-05-27)
+
+`layoutStore.ts:438` `onDidActivePanelChange` callback was:
+
+```
+recomputeActiveSession(next);  // reads groupsStore.activeGroupId
+…
+const activeId = next.activePanel?.id;
+if (activeId && groupsStore.isGroupPanelId(activeId)) {
+  groupsStore.setActiveGroupId(activeId);  // updates AFTER
+}
+```
+
+When the user clicks a different outer-dock group tab,
+`recomputeActiveSession` resolves through
+`groupsStore.innerApis[activeGroupId]` — but `activeGroupId` is still
+the previous group's id. So it reads the *previous* group's inner
+dockview, finds *that group's* last active chat panel, and either
+reaffirms the stale session id or returns the same one. Net effect:
+`activeSessionId` doesn't change on between-group switches → no
+Library watcher fires.
+
+Fix: swap the order so `setActiveGroupId` runs first, then
+`recomputeActiveSession` sees the fresh id and resolves through the
+correct inner dock.
+
+Why this wasn't caught earlier: within-group chat switches go
+through `GroupPanel.vue:127`'s per-inner `onDidActivePanelChange`
+subscription which calls `layoutStore.setActiveSessionId(panel.id)`
+directly. That path bypasses `recomputeActiveSession` entirely, so
+the order-of-ops bug only surfaces on cross-group switches. Cross-
+group surface was working "well enough" because
+`SessionDetailsPanel` etc. were also seeing stale-but-not-wrong ids
+on the rail's own re-renders.
+
+### Dogfood log proof
+
+`$LOCALAPPDATA\com.dafman.app\dev\dafman-2026-05-28.log` at the
+in-group probe pass shows watches firing on session changes. After
+the layoutStore fix + rebuild + relaunch, user confirmed Library
+tabs refresh on between-group switches too.
+
+### Receipts
+
+- `src/components/library/LibraryAgentsTab.vue:14,33-44` — watch added
+- `src/components/library/LibrarySkillsTab.vue:9,18,61-67` — watch added
+- `src/components/library/LibraryMcpTab.vue:10-11,16,25,120-125` — watch added
+- `src/stores/shell/layoutStore.ts:438-461` — panel-change callback re-ordered
+- `src/components/library/LibraryInstructionsTab.vue:75-78` — canonical pattern
+- `MANUAL_TESTS.md` — rows 51.1-51.4 (Agents / Skills / MCP / no infinite loop)
+
+---
+
 ## 2026-05-28 — vite 6 → 8 + @vitejs/plugin-vue 5 → 6 (#44 part 3, closes #44)
 
 **Takeaway:** Third and final fork of #44 dep-majors umbrella. Vite

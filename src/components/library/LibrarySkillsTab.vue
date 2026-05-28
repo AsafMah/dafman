@@ -6,14 +6,17 @@
 /// via `setGloballyDisabledSkills`. Reveal-in-folder when `path` is
 /// set so users can jump into the skill file.
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
 import MessageContent from '@/components/chat/MessageContent.vue';
 import { revealPath } from '@/lib/pathActions';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSkillsLibrary, type Skill } from '@/composables/library/useSkillsLibrary';
 
 const { skills, loaded, error, load, setEnabled } = useSkillsLibrary();
+const { activeSessionId } = storeToRefs(useLayoutStore());
 const expandedItems = ref<Set<string>>(new Set());
 
 const grouped = computed(() => {
@@ -53,6 +56,13 @@ async function revealSkillFile(path: string | undefined) {
 }
 
 onMounted(() => {
+  void load();
+});
+/// Auto-reload when the user switches to a different session — skills
+/// are session-scoped (per-cwd `.github/skills/` discovery + session
+/// disabled-skill overlay). Watching `activeSessionId` is the canonical
+/// trigger (the composable's `load()` reads it internally). Per #51.
+watch(activeSessionId, () => {
   void load();
 });
 </script>

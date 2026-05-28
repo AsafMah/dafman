@@ -436,14 +436,13 @@ export const useLayoutStore = defineStore('layout', () => {
 
     const groupSub = next.onDidActiveGroupChange(() => recomputeActiveSession(next));
     const panelSub = next.onDidActivePanelChange(() => {
-      recomputeActiveSession(next);
-      rescanOpenDetails(next);
-      applyActiveTabConstraints('left');
-      applyActiveTabConstraints('right');
       // v3 groups: sync groupsStore.activeGroupId from outer.activePanel
-      // so layoutStore.bodyApi (and any composePersistLayout call) sees
-      // the correct active group when the user clicks a different
-      // group's tab or creates a new group (which auto-activates).
+      // FIRST so the recomputeActiveSession call below resolves through
+      // the NEW group's inner dockview, not the previous group's stale
+      // one. Without this ordering, switching between outer group tabs
+      // leaves activeSessionId pointing at the previous group's active
+      // chat panel, and downstream watchers (Library tabs auto-refresh,
+      // session.* command palette `when()`, etc.) miss the switch.
       // Filter: only update when the active panel is a group panel —
       // clicking an activity-bar tab (Sessions / Settings / etc.)
       // changes outer.activePanel but should NOT change which group
@@ -453,6 +452,11 @@ export const useLayoutStore = defineStore('layout', () => {
       if (activeId && groupsStore.isGroupPanelId(activeId)) {
         groupsStore.setActiveGroupId(activeId);
       }
+
+      recomputeActiveSession(next);
+      rescanOpenDetails(next);
+      applyActiveTabConstraints('left');
+      applyActiveTabConstraints('right');
     });
     const removeSub = next.onDidRemovePanel(() => {
       recomputeActiveSession(next);

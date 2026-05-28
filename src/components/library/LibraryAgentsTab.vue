@@ -11,7 +11,7 @@
 /// require an active session with a working directory; the form
 /// disables Project radio when no session is open.
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -89,6 +89,18 @@ async function load() {
 }
 
 onMounted(load);
+/// Mirrors the LibraryInstructionsTab pattern: when the user switches
+/// to a different session the project-scope agent file list changes
+/// (different cwd → different `.github/agents/` contents), and the
+/// session-scoped reload IPC needs the new id. Watching `activeSession?.id`
+/// is enough — `loadFiles(undefined)` already handles the no-session
+/// case. Per #51.
+watch(
+  () => activeSession.value?.id ?? '',
+  () => {
+    void load();
+  },
+);
 
 const grouped = computed(() => {
   const user = files.value.filter((f) => f.scope === 'user');
