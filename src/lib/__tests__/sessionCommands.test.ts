@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createPinia, setActivePinia } from 'pinia';
 import { runLocalSlashCommand, SESSION_COMMANDS } from '@/lib/sessionCommands';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useToastStore } from '@/stores/app/toastStore';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import { on as busOn } from '@/lib/bus';
 
@@ -214,6 +215,106 @@ describe('sessionCommands', () => {
   test('/mcp and /skills are local library commands', async () => {
     expect(await runLocalSlashCommand('s1', '/mcp')).toBe(true);
     expect(await runLocalSlashCommand('s1', '/skills')).toBe(true);
+  });
+
+  test('/skill <name> invokes a user-invocable skill and keeps bare /skill as Library open', async () => {
+    const sessions = useSessionsStore();
+    sessions.sessions.push({
+      id: 's1',
+      accent: '#000',
+      events: [],
+      droppedEventCount: 0,
+      model: null,
+      reasoningEffort: null,
+      mode: null,
+      approveAll: true,
+      title: null,
+      reasoningVisibilityOverride: 'default',
+      workingDirectory: 'C:\\repo\\dafman',
+      defaultSendMode: 'steer',
+      pendingRequests: [],
+      unseenTurns: 0,
+      isThinking: false,
+      sawTurnBoundary: false,
+      currentAgent: null,
+      tasksRefreshCounter: 0,
+      planRefreshCounter: 0,
+      touchedFiles: [],
+      commandsRun: 0,
+      _toastedOauthRequests: new Set<string>(),
+      _artifactToolCallIds: new Set<string>(),
+    } as never);
+
+    const calls: Array<{ name: string; args: unknown }> = [];
+    setRpcBridge({
+      async request(name, args) {
+        calls.push({ name, args });
+        if (name === 'listSessionSkills') {
+          return [
+            { name: 'summarize', description: '', source: 'user', enabled: true, userInvocable: true },
+            { name: 'deploy', description: '', source: 'user', enabled: true, userInvocable: true },
+            { name: 'disabled', description: '', source: 'user', enabled: false, userInvocable: true },
+            { name: 'hidden', description: '', source: 'user', enabled: true, userInvocable: false },
+            { name: 'third', description: '', source: 'user', enabled: true, userInvocable: true },
+            { name: 'fourth', description: '', source: 'user', enabled: true, userInvocable: true },
+            { name: 'fifth', description: '', source: 'user', enabled: true, userInvocable: true },
+            { name: 'sixth', description: '', source: 'user', enabled: true, userInvocable: true },
+          ];
+        }
+        if (name === 'invokeSkill' && (args as { name?: string }).name === 'deploy') {
+          return { kind: 'text', message: 'Deploy help' };
+        }
+        return { kind: 'sent' };
+      },
+      onSessionEvent: () => () => {},
+      onPendingRequest: () => () => {},
+      onLogEvent: () => () => {},
+      onAuditEvent: () => () => {},
+    } as RpcBridge);
+
+    // Known name → invokeSkill IPC fires with remaining slash args as input.
+    expect(await runLocalSlashCommand('s1', '/skill SUMMARIZE this turn')).toBe(true);
+    const invokes = calls.filter((c) => c.name === 'invokeSkill');
+    expect(invokes.length).toBe(1);
+    expect(invokes[0].args).toEqual({ sessionId: 's1', name: 'summarize', input: 'this turn' });
+    expect(sessions.sessions[0]?.events.at(-1)).toEqual({
+      sessionId: 's1',
+      eventType: 'system.notification',
+      data: { content: 'Skill invoked: summarize' },
+    });
+
+    // Text command result → user-visible output instead of a misleading invoked note.
+    calls.length = 0;
+    expect(await runLocalSlashCommand('s1', '/skill deploy')).toBe(true);
+    expect(calls.some((c) => c.name === 'invokeSkill')).toBe(true);
+    expect(useToastStore().pending.at(-1)).toMatchObject({
+      severity: 'info',
+      summary: 'Skill output',
+      detail: 'Deploy help',
+    });
+    expect(sessions.sessions[0]?.events.at(-1)).toEqual({
+      sessionId: 's1',
+      eventType: 'system.notification',
+      data: { content: 'Deploy help' },
+    });
+
+    // Unknown name → no invokeSkill fires and warn toast lists first 5 invocable + enabled skills.
+    calls.length = 0;
+    expect(await runLocalSlashCommand('s1', '/skill unknown')).toBe(true);
+    expect(calls.some((c) => c.name === 'invokeSkill')).toBe(false);
+    expect(calls.some((c) => c.name === 'listSessionSkills')).toBe(true);
+    expect(useToastStore().pending.at(-1)).toMatchObject({
+      severity: 'warn',
+      summary: 'No skill named "unknown"',
+      detail: 'Available: summarize, deploy, third, fourth, fifth',
+    });
+
+    // Bare /skill keeps the existing Library → Skills behavior.
+    const events: Array<{ tab: string }> = [];
+    const off = busOn('library-activate-tab', (payload) => events.push(payload));
+    expect(await runLocalSlashCommand('s1', '/skill')).toBe(true);
+    off();
+    expect(events.at(-1)).toEqual({ tab: 'skills' });
   });
 
   test('/agent <name> calls selectAgent and toasts unknown names', async () => {

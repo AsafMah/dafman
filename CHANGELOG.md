@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (Sprint C — slash skills)
+- **`/skill <name>` now runs enabled user-invocable skills** in the active session. Unknown names warn with the first five available skills; bare `/skill` still opens Library → Skills.
+
 ### Added (Issue #22 — 2026-05-28)
 - **Library → Agents refresh button.** Agents now has a PrimeVue refresh icon button beside `New agent`; it re-runs the existing agents library load path and shows PrimeVue's button loading spinner while the refresh is in flight.
 

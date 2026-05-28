@@ -63,6 +63,23 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Sprint C1 — `/skill <name>` invokes skills (issue #13, 2026-05-28)
+
+- **C1.1** ⏳ **`/skill <known>` runs the skill.**
+  - **Steps:** open a session with an enabled user-invocable skill (for example `summarize`) → type `/skill summarize` → Enter.
+  - **Expected:** toast `Skill invoked: summarize`; an in-stream system note appears; the skill-generated turn runs in the active session.
+  - **Why not automated:** requires a real SDK-loaded skill file and model/CLI turn.
+
+- **C1.2** ⏳ **`/skill bogus` warns + lists available.**
+  - **Steps:** type `/skill bogus` → Enter.
+  - **Expected:** warn toast `No skill named "bogus"` with `Available: ...` listing up to five enabled user-invocable skills. No skill turn starts.
+  - **Why not automated:** unit test covers routing; full available-skill catalog depends on real user/project skill discovery.
+
+- **C1.3** ⏳ **Bare `/skill` opens Library.**
+  - **Steps:** type `/skill` → Enter (or pick it from the slash menu).
+  - **Expected:** right-edge Library panel opens to the Skills tab.
+  - **Why not automated:** unit test covers bus routing; dockview edge-panel visibility needs live-app dogfood.
+
 ### Issue #22 — Library Agents refresh button (2026-05-28)
 
 - **22.1** ⏳ **External agent file appears after refresh.**
@@ -76,7 +93,6 @@ section is verified) or get a GitHub issue filed (with label
   - **Steps:** run `bun run dev`, start a chat session, ask the agent to spawn a background task, then open the Jobs panel while the job is `starting` or `running`.
   - **Expected:** the spinner beside the active job rotates around its own center without orbiting an off-center point.
   - **Why not automated:** the bug is a visual glyph/transform-origin artifact in the live browser compositor; unit tests cannot reliably assert the perceived rotation pivot.
-
 ### Sprint A1 — Library Agents Select / Deselect (commit `bca5704`, 2026-05-27)
 
 - **A1.1** ⏳ **Select button per row.**

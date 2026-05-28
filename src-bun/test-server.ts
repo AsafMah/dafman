@@ -368,6 +368,15 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 
     return sessions.setSkillEnabled(sessionId, name, enabled);
   }),
+  invokeSkill: rpcGuard(async (args) => {
+    const { sessionId, name, input } = args as {
+      sessionId: string;
+      name: string;
+      input?: string;
+    };
+
+    return sessions.invokeSkill(sessionId, name, input);
+  }),
   setSessionMcpEnabled: rpcGuard(async (args) => {
     const { sessionId, serverName, enabled } = args as {
       sessionId: string;

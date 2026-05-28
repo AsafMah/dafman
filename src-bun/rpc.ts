@@ -412,6 +412,12 @@ export interface AgentFileSpec {
   prompt: string;
 }
 
+export type SkillInvocationResult =
+  | { kind: 'sent' }
+  | { kind: 'completed'; message?: string }
+  | { kind: 'text'; message: string }
+  | { kind: 'select-subcommand'; message: string };
+
 /// Subset of `MessageOptions.attachments` from the Copilot JSON-RPC SDK
 /// that the renderer can construct. Mirrors the SDK union so we can
 /// pass straight through `session.send({ attachments })` without
@@ -830,6 +836,10 @@ export type DafmanRPC = {
       setSessionSkillEnabled: {
         params: { sessionId: string; name: string; enabled: boolean };
         response: boolean;
+      };
+      invokeSkill: {
+        params: { sessionId: string; name: string; input?: string };
+        response: SkillInvocationResult;
       };
       /// Phase 19a. Session-scoped @experimental
       /// `session.rpc.agent.*` surface.

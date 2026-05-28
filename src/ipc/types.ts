@@ -367,6 +367,12 @@ export interface AgentFileSpec {
   prompt: string;
 }
 
+export type SkillInvocationResult =
+  | { kind: 'sent' }
+  | { kind: 'completed'; message?: string }
+  | { kind: 'text'; message: string }
+  | { kind: 'select-subcommand'; message: string };
+
 /// Subset of `MessageOptions.attachments` from the Copilot JSON-RPC SDK.
 /// Mirrored here so the renderer can construct without importing the
 /// SDK types directly. Pass-through to bun → SDK at send time.
@@ -668,6 +674,10 @@ export type CommandMap = {
   setSessionSkillEnabled: {
     args: { sessionId: string; name: string; enabled: boolean };
     result: boolean;
+  };
+  invokeSkill: {
+    args: { sessionId: string; name: string; input?: string };
+    result: SkillInvocationResult;
   };
   listAgents: {
     args: { sessionId: string };

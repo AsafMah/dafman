@@ -889,3 +889,31 @@ exports[`IPC wire contracts Settings with v3 groups layout 1`] = `
   },
 }
 `;
+
+exports[`IPC wire contracts invokeSkill request shape 1`] = `
+{
+  "input": "this turn",
+  "name": "summarize",
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts SkillInvocationResult variants 1`] = `
+[
+  {
+    "kind": "sent",
+  },
+  {
+    "kind": "completed",
+    "message": "done",
+  },
+  {
+    "kind": "text",
+    "message": "hello",
+  },
+  {
+    "kind": "select-subcommand",
+    "message": "Choose: available subcommands — a, b",
+  },
+]
+`;

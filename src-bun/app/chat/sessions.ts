@@ -894,6 +894,14 @@ export class SessionRegistry {
     return this.skills.setEnabled(sessionId, name, enabled);
   }
 
+  async invokeSkill(
+    sessionId: string,
+    name: string,
+    input?: string,
+  ): Promise<import('../../rpc').SkillInvocationResult> {
+    return this.skills.invoke(sessionId, name, input);
+  }
+
   /// Per-session usage metrics. Returns the raw SDK response shape
   /// (totals + per-model + token details) without filtering — the
   /// renderer cherry-picks what to display.

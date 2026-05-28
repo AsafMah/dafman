@@ -157,6 +157,17 @@ class FakeCopilotSession {
           this.skillsDisabled.add(name);
         },
       },
+      commands: {
+        invoke: async (args?: unknown) => {
+          const { name, input } = (args ?? {}) as { name: string; input?: string };
+
+          return {
+            kind: 'agent-prompt',
+            prompt: input ? `[skill:${name}] ${input}` : `[skill:${name}]`,
+            displayPrompt: input ? `/${name} ${input}` : `/${name}`,
+          };
+        },
+      },
       usage: {
         getMetrics: async () => ({ requests: 0, totalTokens: 0 }),
       },

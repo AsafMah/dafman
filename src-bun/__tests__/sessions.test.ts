@@ -12,7 +12,7 @@ type Handler = (event: { type: string; [k: string]: unknown }) => void;
 interface FakeSession {
   sessionId: string;
   on(handler: Handler): () => void;
-  send(args: { prompt: string; attachments?: unknown[] }): Promise<string>;
+  send(args: { prompt: string; mode?: string; attachments?: unknown[] }): Promise<string>;
   setModel(model: string, opts?: { reasoningEffort?: string }): Promise<void>;
   getEvents(): Promise<Array<{ type: string; [k: string]: unknown }>>;
   disconnect(): Promise<void>;
@@ -83,6 +83,9 @@ interface FakeSession {
     fleet: {
       start: (params?: { prompt?: string }) => Promise<{ started: boolean }>;
     };
+    commands: {
+      invoke: (params: { name: string; input?: string }) => Promise<Record<string, unknown>>;
+    };
   };
   lastSentPrompt?: string;
   lastSentAttachments?: unknown[];
@@ -108,6 +111,8 @@ interface FakeSession {
   removeCalls: string[];
   promoteCalls: string[];
   fleetStartCalls: Array<string | undefined>;
+  commandInvocations: Array<{ name: string; input?: string }>;
+  commandInvokeResult?: Record<string, unknown>;
 }
 
 function makeFakeSession(
@@ -236,6 +241,19 @@ function makeFakeSession(
           return { started: true };
         },
       },
+      commands: {
+        async invoke(params: { name: string; input?: string }) {
+          session.commandInvocations.push(params);
+
+          return (
+            session.commandInvokeResult ?? {
+              kind: 'agent-prompt',
+              prompt: `skill prompt for ${params.name}${params.input ? `: ${params.input}` : ''}`,
+              displayPrompt: params.input ? `/${params.name} ${params.input}` : `/${params.name}`,
+            }
+          );
+        },
+      },
     },
     agentsList: [],
     currentAgentName: null,
@@ -245,6 +263,7 @@ function makeFakeSession(
     removeCalls: [],
     promoteCalls: [],
     fleetStartCalls: [],
+    commandInvocations: [],
   };
   return session;
 }
@@ -1011,6 +1030,42 @@ describe('SessionRegistry', () => {
     await expect(reg.selectAgent('ghost', 'any')).rejects.toBeInstanceOf(AppError);
     await expect(reg.deselectAgent('ghost')).rejects.toBeInstanceOf(AppError);
     await expect(reg.reloadAgents('ghost')).rejects.toBeInstanceOf(AppError);
+  });
+
+  test('19b: invokeSkill runs the SDK slash-command path and sends agent prompts', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const fake = client.createdSessions[0]!;
+
+    const result = await reg.invokeSkill(id, 'summarize', 'this turn');
+
+    expect(result).toEqual({ kind: 'sent' });
+    expect(fake.commandInvocations).toEqual([{ name: 'summarize', input: 'this turn' }]);
+    expect(fake.lastSentPrompt).toBe('skill prompt for summarize: this turn');
+  });
+
+  test('19b: invokeSkill returns text command results without sending a prompt', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const fake = client.createdSessions[0]!;
+    fake.commandInvokeResult = { kind: 'text', text: 'Skill output' };
+
+    const result = await reg.invokeSkill(id, 'summarize');
+
+    expect(result).toEqual({ kind: 'text', message: 'Skill output' });
+    expect(fake.commandInvocations).toEqual([{ name: 'summarize' }]);
+    expect(fake.lastSentPrompt).toBeUndefined();
+  });
+
+  test('19b: invokeSkill rejects with SessionNotFound on unknown sessionId', async () => {
+    _setClientForTest(new FakeClient() as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+
+    await expect(reg.invokeSkill('ghost', 'summarize')).rejects.toBeInstanceOf(AppError);
   });
 
   test('19b.1: listTasks normalizes agent and shell task shapes', async () => {

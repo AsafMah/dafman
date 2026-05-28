@@ -17,6 +17,7 @@ import type {
   CommandResultEvent,
   CommandResultRecord,
   SendMessageAttachment,
+  SkillInvocationResult,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -377,6 +378,25 @@ describe('IPC wire contracts', () => {
       text: 'steer this',
       mode: 'immediate' as const,
     };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('invokeSkill request shape', () => {
+    const sample = {
+      sessionId: 'sess-1',
+      name: 'summarize',
+      input: 'this turn',
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('SkillInvocationResult variants', () => {
+    const sample: SkillInvocationResult[] = [
+      { kind: 'sent' },
+      { kind: 'completed', message: 'done' },
+      { kind: 'text', message: 'hello' },
+      { kind: 'select-subcommand', message: 'Choose: available subcommands — a, b' },
+    ];
     expect(sample).toMatchSnapshot();
   });
 

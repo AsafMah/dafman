@@ -69,6 +69,12 @@ function pushLocalSystem(sessionId: string, text: string): void {
 
 const LIBRARY_TABS = new Set(['mcp', 'skills', 'agents', 'instructions']);
 
+function splitFirstArg(args: string): { name: string; input: string } {
+  const match = args.trim().match(/^(\S+)(?:\s+([\s\S]*))?$/);
+
+  return { name: match?.[1] ?? '', input: (match?.[2] ?? '').trim() };
+}
+
 function openLibraryTab(tab = 'mcp'): void {
   const normalized = LIBRARY_TABS.has(tab) ? tab : 'mcp';
 
@@ -116,12 +122,67 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   },
   {
     slash: '/skill',
-    label: 'Open Skills Library',
-    description: 'Open Library to the Skills tab. Also available as /skills.',
+    label: 'Invoke or open skill',
+    description:
+      'With no argument: open Library Skills tab. With a name: invoke that skill for the current session.',
     icon: 'pi-sparkles',
     group: 'Library',
-    keywords: ['skills', 'library'],
-    run: () => openLibraryTab('skills'),
+    keywords: ['skills', 'library', 'invoke'],
+    async run(sessionId, args) {
+      const { name, input } = splitFirstArg(args ?? '');
+
+      if (!name) {
+        openLibraryTab('skills');
+
+        return;
+      }
+
+      try {
+        const skills = await invokeCommand('listSessionSkills', { sessionId });
+        const invocableSkills = skills.filter((s) => s.enabled && s.userInvocable);
+        const match = invocableSkills.find((s) => s.name.toLowerCase() === name.toLowerCase());
+
+        if (!match) {
+          const available =
+            invocableSkills
+              .map((s) => s.name)
+              .slice(0, 5)
+              .join(', ') || '(none)';
+
+          useToastStore().warn(
+            `No skill named "${name}"`,
+            invocableSkills.length > 0
+              ? `Available: ${available}`
+              : 'Enable a user-invocable skill in Library → Skills.',
+          );
+
+          return;
+        }
+
+        const result = await invokeCommand('invokeSkill', {
+          sessionId,
+          name: match.name,
+          ...(input ? { input } : {}),
+        });
+
+        if (result.kind === 'sent') {
+          useToastStore().success('Skill invoked', match.name);
+          pushLocalSystem(sessionId, `Skill invoked: ${match.name}`);
+        } else if (result.kind === 'completed') {
+          const message = result.message ?? `Skill completed: ${match.name}`;
+
+          useToastStore().success('Skill completed', message);
+          pushLocalSystem(sessionId, message);
+        } else {
+          const summary = result.kind === 'text' ? 'Skill output' : 'Skill needs input';
+
+          useToastStore().info(summary, result.message);
+          pushLocalSystem(sessionId, result.message);
+        }
+      } catch (err) {
+        useToastStore().error('Failed to invoke skill', toErrorMessage(err));
+      }
+    },
   },
   {
     slash: '/skills',

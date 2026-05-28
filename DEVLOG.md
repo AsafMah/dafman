@@ -10,6 +10,31 @@
 
 ---
 
+## 2026-05-28 — Issue #13 `/skill <name>` invokes skills
+
+**Takeaway:** `/skill <name>` now mirrors Sprint A3 `/agent <name>`: Dafman parses the skill name locally, lists session skills via `listSessionSkills`, invokes enabled `userInvocable` matches through the SDK `session.commands.invoke` path, and preserves bare `/skill` as Library → Skills.
+
+### Receipts
+
+- `src/lib/sessionCommands.ts` — `/skill` now splits the first arg, filters `enabled && userInvocable`, warns with the first five names on misses, and emits success toast + local system note after `invokeSkill`.
+- `src-bun/app/chat/sessionSkillsService.ts` — new `invoke()` wrapper uses `session.rpc.commands.invoke({ name, input })`; `agent-prompt` results are submitted back to the session so the skill actually runs.
+- IPC added in `src-bun/rpc.ts`, `src/ipc/types.ts`, `src-bun/index.ts`, and `src-bun/test-server.ts`; wire snapshots updated in `src-bun/__tests__/wire-contract.test.ts`.
+- Tests: added failing-first renderer routing coverage in `src/lib/__tests__/sessionCommands.test.ts` and backend invocation coverage in `src-bun/__tests__/sessions.test.ts`.
+
+### Verification
+
+- Failing-first: `bun test src\lib\__tests__\sessionCommands.test.ts` failed before the `/skill` implementation (no `invokeSkill` call), then passed.
+- Green: `bun test src\lib\__tests__\sessionCommands.test.ts`; `bun test src-bun\`; `bun test`; `bun run check` (includes smoke: prod + HMR, 2 passed).
+- Dogfood boot: `bun run dev` started the Electrobun app, resumed sessions, and reached renderer `onDockReady`; real skill execution is pending user verification below.
+
+### Manual checks pending
+
+- C1.1 `/skill <known>` runs a real enabled user-invocable skill in a live session.
+- C1.2 `/skill bogus` warns and lists available skills without starting a turn.
+- C1.3 bare `/skill` opens Library → Skills.
+
+---
+
 ## 2026-05-28 — Issue #22 Library Agents refresh button
 
 **Takeaway:** Added the missing Library → Agents refresh affordance so users can reload filesystem-backed agent files without switching tabs.

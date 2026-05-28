@@ -4,7 +4,14 @@
 // registry keeps thin delegating methods so existing callers stay
 // unchanged.
 
+import type { SkillInvocationResult } from '../../rpc';
 import type { SessionServiceContext } from './sessionServiceContext';
+
+type SlashCommandInvocationResult =
+  | { kind: 'agent-prompt'; prompt?: unknown; mode?: unknown }
+  | { kind: 'completed'; message?: unknown }
+  | { kind: 'text'; text?: unknown }
+  | { kind: 'select-subcommand'; title?: unknown; options?: Array<{ name?: unknown }> };
 
 export interface SkillInfo {
   name: string;
@@ -63,6 +70,49 @@ export class SessionSkillsService {
       }
 
       return true;
+    });
+  }
+
+  async invoke(sessionId: string, name: string, input = ''): Promise<SkillInvocationResult> {
+    const entry = this.ctx.getEntry(sessionId);
+
+    return this.ctx.wrapSdk(async () => {
+      const result = (await entry.session.rpc.commands.invoke({
+        name,
+        ...(input ? { input } : {}),
+      })) as SlashCommandInvocationResult;
+
+      if (result.kind === 'agent-prompt') {
+        if (typeof result.prompt !== 'string' || result.prompt.length === 0) {
+          throw new Error('invokeSkill: SDK returned an empty agent prompt');
+        }
+
+        await entry.session.send({ prompt: result.prompt, mode: 'immediate' });
+
+        return { kind: 'sent' };
+      }
+
+      if (result.kind === 'text') {
+        return { kind: 'text', message: typeof result.text === 'string' ? result.text : '' };
+      }
+
+      if (result.kind === 'completed') {
+        return {
+          kind: 'completed',
+          ...(typeof result.message === 'string' ? { message: result.message } : {}),
+        };
+      }
+
+      const options = (result.options ?? [])
+        .map((option) => option.name)
+        .filter((option): option is string => typeof option === 'string')
+        .join(', ');
+      const title = typeof result.title === 'string' ? result.title : 'Available subcommands';
+
+      return {
+        kind: 'select-subcommand',
+        message: options ? `${title}: available subcommands — ${options}` : title,
+      };
     });
   }
 }
