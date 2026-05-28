@@ -63,6 +63,31 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #22 — Library Agents refresh button (2026-05-28, second attempt)
+
+- **22.1** ⏳ **Refresh button appears next to "New agent".**
+  - **Steps:** open Library → Agents.
+  - **Expected:** a `Refresh` button with `pi-refresh` icon sits in the
+    tab header, to the left of `New agent`. Layout matches Library →
+    Skills / MCP / Tools / Instructions which already have this affordance.
+  - **Why not automated:** visual placement / responsive layout in the
+    real dockview right rail isn't reliably assertable from the smoke stub.
+
+- **22.2** ⏳ **External agent file appears after Refresh click.**
+  - **Steps:** with the Agents tab open, drop a valid `.agent.md`
+    file under `~/.copilot/agents/` (or `<cwd>/.github/agents/` with
+    a session whose `workingDirectory` points there). Click `Refresh`.
+  - **Expected:** the new agent appears in the list without switching tabs.
+  - **Why not automated:** external filesystem mutation + real SDK
+    listAgents call.
+
+- **22.3** ⏳ **Rows still styled as cards (no E.8 regression).**
+  - **Steps:** look at any agent row in the list.
+  - **Expected:** bordered card with name + path stacked on the left,
+    action buttons (Select/Edit/Reveal/Delete) on the right.
+    Two-row CSS grid layout. NOT a plain HTML list.
+  - **Why not automated:** vue-tsc + smoke don't catch scoped-CSS-doesn't-match-child-element issues; this is the regression class that ate 2 PRs already this session.
+
 ### Sprint D — Jobs spinner center (issue #15, 2026-05-28)
 
 - **D15.1** ⏳ **Running job spinner rotates in place.**

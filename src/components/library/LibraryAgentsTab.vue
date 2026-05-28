@@ -317,6 +317,15 @@ async function reveal(path: string) {
         <span v-else>{{ files.length }} agent{{ files.length === 1 ? '' : 's' }}</span>
       </span>
       <Button
+        icon="pi pi-refresh"
+        size="small"
+        severity="secondary"
+        text
+        label="Refresh"
+        aria-label="Refresh agents list"
+        @click="load"
+      />
+      <Button
         size="small"
         :disabled="!activeSession"
         :title="activeSession ? '' : 'Open a session first'"
@@ -543,6 +552,7 @@ async function reveal(path: string) {
 }
 
 .agents-summary {
+  flex: 1;
   font-size: 0.75rem;
   color: var(--p-text-muted-color);
 }
