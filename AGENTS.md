@@ -739,6 +739,75 @@ cleared 63 stale errors).
 - If a Bun/Node/SDK upgrade reintroduces errors, treat them like any
   other gate failure: fix immediately, don't push around them.
 
+### 23. SDK bumps are not silent — analyze + update plans
+
+`@github/copilot` and `@github/copilot-sdk` ship rapidly and each
+patch/beta/minor commonly adds new event types, tools, or hooks the
+renderer could surface. Treat every SDK bump as an analysis task,
+not a `bun.lock` change.
+
+Required when an SDK PR opens (Dependabot or manual):
+
+1. **Read the SDK release notes / changelog for the version range**
+   actually being bumped (not just the latest version's notes).
+   Sources: `github.com/github/copilot-sdk/releases`,
+   `github.com/github/copilot/releases`, the SDK `dist/changelog.md`
+   if it exists.
+2. **Identify three buckets:**
+   - **Breaking** — change to a wire shape, event type, RPC contract,
+     or hook signature we use. Must be migrated before merge.
+   - **New surfaces** — new events / tools / hooks / SDK methods the
+     renderer doesn't yet use. File one GH issue per useful surface,
+     labelled `area:agents` / `area:mcp` / etc., with the SDK
+     citation. These become potential `M1 — Features` candidates.
+   - **Internal** — refactors, perf, tests. Note in commit message
+     only; no plan update.
+3. **Cite the SDK source** for every "new surface" issue: file path
+   + symbol name from `node_modules/@github/copilot/` so the next
+   agent can verify the wire shape directly.
+4. **Update `ARCHITECTURE.md` §SDK gotchas** if the bump introduces
+   a new gotcha (e.g. a header field, a permission category, a
+   tool-name collision).
+5. **Don't auto-merge SDK bumps even if CI is green.** The CI
+   coverage of new event types is necessarily zero — there are no
+   tests for code we haven't written yet.
+
+Precedent: SDK beta.7 → beta.9 was sitting in #6 with 0 analysis of
+the 12+ release-note bullet points (multi-tenancy hardening, new
+hooks, new tools). Merging that on green CI would have been silent
+adoption of a half-dozen new surfaces with no plan to use them.
+
+### 24. TypeScript majors are routine — read the changelog, don't panic
+
+TS releases ship breaking changes on every minor *and* major. The
+gap from 5.8 → 5.9 → 6.0 → 6.1 is the same shape; the major-version
+number is marketing. Don't treat 5.x → 6.0 as a categorically
+different risk from 5.8 → 5.9.
+
+What to do on any TS bump (minor or major):
+
+1. **Read the TS release notes** for the version range
+   (`devblogs.microsoft.com/typescript/announcing-typescript-X-Y/`).
+   ~5 minutes; usually a small bulleted list of breaking changes
+   + a few new features.
+2. **Run `bun run lint`** locally. Fix the surfaced errors.
+   They're almost always:
+   - A deprecated option (`baseUrl`, `importsNotUsedAsValues`) →
+     remove it.
+   - A previously-allowed unsafe pattern now caught (`unknown` in
+     catch, `--strict` family additions) → narrow the type.
+   - A new check (`exactOptionalPropertyTypes`,
+     `noUncheckedIndexedAccess`) → opt in or stay opted out.
+3. **Don't hand-wave around the errors** with `// @ts-ignore`,
+   `--skipLibCheck` (already on), `_`-prefixed unused vars that
+   are actually used in templates, or suppressed lint rules. Each
+   error is a real signal even when it's verbose.
+4. **`bun run check` is the gate.** If it's green after the fixes,
+   the bump is safe to merge.
+
+The work is mechanical. The "majors are scary" hesitation is the
+agent thinking it can skip the docs — exactly what rule 0 forbids.
+
 ---
 
 ## Hard rules (do not violate)
@@ -768,6 +837,8 @@ anti-laziness rules above:
 - **Never start a non-trivial change without the pre-flight check**
   (rule 0): am I being hacky, reinventing the wheel, or acting
   without reading the relevant docs / release notes / source?
+- **Never merge an SDK bump without analysis** (rule 23). Read the
+  release notes; file issues for new surfaces; update plans.
 
 ## Monorepo / nested AGENTS.md
 
