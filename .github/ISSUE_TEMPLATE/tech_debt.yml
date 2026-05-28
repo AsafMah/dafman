@@ -1,0 +1,74 @@
+name: Tech debt / refactor
+description: Cleanup, refactor, or build-vs-buy swap with no user-visible change.
+title: "refactor: "
+labels: ["tech-debt"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Per AGENTS.md rule 16 (Build vs Buy), check existing dependencies + npm
+        before writing new infrastructure. Per CODE_AUDIT §5, hand-rolled
+        infrastructure has historically been the biggest source of subtle bugs.
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current state
+      description: |
+        What does the code do today? Cite specific files + line numbers (e.g.
+        `src/lib/eventBus.ts:12-45`). Numbers that motivated this (jscpd dup
+        size, complexity, file size, etc.) belong here.
+    validations:
+      required: true
+
+  - type: textarea
+    id: target
+    attributes:
+      label: Target state
+      description: What should the code look like after this PR lands?
+    validations:
+      required: true
+
+  - type: textarea
+    id: build_vs_buy
+    attributes:
+      label: Build-vs-buy check (per AGENTS.md rule 16)
+      description: |
+        For any refactor that touches infrastructure (event bus, debounce,
+        persistence, ANSI/log parsing, extension/MIME maps, etc.), explicitly
+        check before proposing a hand-rolled version:
+        - Is there already a dep in `package.json` that does this?
+        - Does `@vueuse/core` cover it?
+        - Does PrimeVue cover it?
+        - Does an npm package cover it?
+        - Only after all four miss, hand-roll.
+      value: |
+        - [ ] Checked `package.json` for existing dep
+        - [ ] Checked `@vueuse/core`
+        - [ ] Checked PrimeVue / Vue ecosystem
+        - [ ] Searched npm for popular alternative
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification command
+      description: |
+        How will we know this is done? (e.g. `grep -l 'new CustomEvent' src/`
+        returns 0, `LibraryAgentsTab.vue` is below 800 lines, jscpd report shows
+        no intra-file dup over 30 lines.)
+    validations:
+      required: true
+
+  - type: textarea
+    id: code_audit_ref
+    attributes:
+      label: CODE_AUDIT.md cross-reference
+      description: Which phase / section of CODE_AUDIT.md does this fit?
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      description: Hidden callers? Perf? API surface changes?

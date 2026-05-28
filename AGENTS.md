@@ -176,11 +176,83 @@ See `ARCHITECTURE.md` §8 for the full list. Highlights:
 - Update `STATUS.md` when you complete a milestone item or change direction.
 - Update `CHANGELOG.md` under `## [Unreleased]` for user-visible changes.
 - Append to `DEVLOG.md` for every substantive session.
-- Move shipped rows from `plans/TODO.md` to `plans/DONE.md`. Add new
-  open work to `plans/TODO.md`. Do NOT create new `plans/plan-*` files.
+- Open work is tracked in **GitHub Issues** (see "Workflow" section below).
+  Historical record lives in `plans/TODO_archive.md`.
 - Include screenshots / GIFs for UI changes.
 - Commits include the `Co-authored-by: Copilot` trailer unless explicitly
   told not to.
+
+## Workflow — GitHub Issues + PRs
+
+Open work tracking moved from `plans/TODO.md` to **GitHub Issues** on
+2026-05-28. This section is the canonical workflow.
+
+### Where work lives
+
+- **GitHub Issues** — every open bug, feature, or tech-debt item
+  (`gh issue list`). Templates live in `.github/ISSUE_TEMPLATE/`.
+- **Milestones** — `Sprint B/C/D/E` for the current bug-sprint queue;
+  `M1 — Features` for the post-sprint backlog.
+- **Labels** — `bug`/`enhancement`/`tech-debt`/`manual-test-fail`/`regression`/`docs`/`security`,
+  sprint (`sprint-b`...), status (`needs-spec`/`pending-dogfood`/`blocked`/`automerge`),
+  area (`area:chat`/`area:terminal`/`area:library`/...), priority (`prio:p0`/`p1`/`p2`).
+- **Project board** (when available) — `dafman work`: columns
+  `Backlog → Sprint → In progress → Pending dogfood → Done`.
+- **`plans/TODO_archive.md`** — frozen historical record. Do NOT add new rows.
+- **`MANUAL_TESTS.md`** — `❌ Failing` rows are now individual issues
+  labelled `manual-test-fail`; `⏳ Pending verification` section stays
+  (it's the gate for moving cards Pending dogfood → Done).
+
+### Opening an issue
+
+Use one of the three templates (`.github/ISSUE_TEMPLATE/`):
+- **Bug report** — Steps / Expected / Actual / Concrete sample / Env
+  (rule 15 — paste the exact broken output as a fixture seed).
+- **Feature request** — Problem / Proposed shape / Acceptance items
+  (rule 9 — answer the spec-interview questions before opening).
+- **Tech debt** — Current / Target / Build-vs-buy check / Verification
+  (rule 16 — exhaust deps before proposing hand-rolled code).
+
+Discussions for open-ended questions. Security via private GHSA.
+
+### PR workflow
+
+- **PR required** for changes to `src/` or `src-bun/` (CI gates merge).
+- **Direct push** allowed for docs-only / CI-only changes.
+- **Branch name:** `<sprint-or-type>/<short-slug>` (e.g.
+  `sprint-b/mcp-oauth-login`, `tech-debt/extract-agent-section`).
+- **PR title:** Conventional Commits (same as commit message).
+- **Link the issue:** `Fixes #N` (auto-closes on merge) or `Refs #N`.
+- **Use the PR template** (`.github/PULL_REQUEST_TEMPLATE.md`) — the
+  anti-laziness checklist IS the gate. Don't tick what you haven't verified.
+- **Code-review subagent** — before requesting merge, run
+  `bun run pr:review` (or invoke the `code-review` subagent against the
+  diff manually) and address findings or note them as deliberate.
+- **CI required checks:** `lint`, `test`, `smoke`, `e2e`, `build-matrix (ubuntu-latest)`.
+- **Auto-merge:** label a PR with `automerge` to have it squash-merge
+  itself once required checks pass (primarily for Dependabot patches).
+
+### gh CLI cheat-sheet
+
+```pwsh
+# What's in the current sprint?
+gh issue list --milestone "Sprint B"
+
+# Open the failing-manual-test backlog
+gh issue list --label manual-test-fail --state open
+
+# Filter to my area
+gh issue list --label "area:mcp" --state open
+
+# Create an issue from the bug template
+gh issue create --template bug_report.yml
+
+# Open a draft PR
+gh pr create --draft --title "feat(chat): foo" --body "Fixes #N"
+
+# Run the code-review subagent against the current branch
+bun run pr:review
+```
 
 ## Security considerations
 

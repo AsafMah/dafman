@@ -1,0 +1,64 @@
+name: Feature request
+description: Propose a new capability or improvement.
+title: "feat: "
+labels: ["enhancement", "needs-spec"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Per AGENTS.md rule 9, agents MUST spec-interview before implementing
+        non-trivial features. The fields below are the spec interview. Be
+        explicit about scope and defaults; "I'll assume sensible" turns into
+        rework cycles.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user need or workflow is unsupported / painful today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: |
+        High-level description. Sketches / mock-ups welcome. Cover the spec interview prompts:
+        - Scope: one shape vs. many?
+        - Defaults: what should the user see on first use?
+        - Keyboard / shortcut shape?
+        - Empty / edge / error states?
+        - What existing component is replaced vs. extended?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance items (per AGENTS.md rule 11)
+      description: |
+        One bullet per behavior that has to be true for this to be considered done.
+        These become E2E / manual test items.
+      value: |
+        - [ ] 
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: textarea
+    id: roadmap
+    attributes:
+      label: Roadmap alignment
+      description: Which plan(s) under `plans/*.prompt.md` does this fit into? Or is it new direction (`needs-spec`)?
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context

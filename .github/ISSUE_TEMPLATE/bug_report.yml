@@ -1,0 +1,91 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill in **steps to reproduce** with enough
+        detail that an agent or maintainer can trigger the bug locally. Per
+        AGENTS.md rule 15, the agent will turn your concrete repro into a test
+        fixture before fixing — vague repros result in vague fixes.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence describing what went wrong.
+      placeholder: "Library tab refresh button doesn't reload after I edit an agent file externally."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, exact actions. Include any keyboard shortcuts, slash commands, or panel toggles.
+      placeholder: |
+        1. Open the Library tab (left rail → Library icon).
+        2. Switch to the Agents sub-tab.
+        3. Externally edit `~/.config/copilot/agents/reviewer.agent.md` and save.
+        4. Click the Refresh button in the Library header.
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error toasts, console output, log file lines if any.
+    validations:
+      required: true
+
+  - type: textarea
+    id: concrete_sample
+    attributes:
+      label: Concrete sample (per AGENTS.md rule 15)
+      description: |
+        If the bug involves a specific piece of input/output (broken ANSI, malformed token count, weird command output, agent file shape), paste the exact text inside a code fence so it can be lifted into a test fixture verbatim.
+      render: text
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - **OS:** 
+        - **Dafman commit:** (`git rev-parse --short HEAD`)
+        - **Bun version:** (`bun --version`)
+        - **Copilot SDK:** (`bun pm ls | grep @github/copilot`)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Tail of `%LOCALAPPDATA%\com.dafman.app\dev\dafman-YYYY-MM-DD.log` (Windows)
+        or `~/Library/Logs/com.dafman.app/` (macOS) — paste the last ~50 lines
+        around when the bug fired.
+      render: text
+
+  - type: checkboxes
+    id: manual_test
+    attributes:
+      label: Manual test list
+      description: AGENTS.md rule 10 — if this bug shouldn't be in MANUAL_TESTS.md going forward, leave unchecked. If it should be added as a manual-verification item once fixed, check the box and the agent will add a row.
+      options:
+        - label: Add to MANUAL_TESTS.md "Pending verification" after fix lands
