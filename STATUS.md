@@ -17,6 +17,7 @@
 > ships today.
 
 **Current sprint queue (open issues):**
+- 🗂️ **[Project board: dafman work](https://github.com/users/AsafMah/projects/2)** — kanban over all issues (Backlog → Sprint → In progress → Pending dogfood → Done)
 - [Sprint B — MCP UX repair](https://github.com/AsafMah/dafman/milestone/1) (6 issues)
 - [Sprint C — slash `/skill` / `/mcp`](https://github.com/AsafMah/dafman/milestone/2) (2 issues)
 - [Sprint D — Jobs panel + bottom bar](https://github.com/AsafMah/dafman/milestone/3) (3 issues)
