@@ -3,9 +3,6 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
-### Added (Issue #22 — 2026-05-28)
-- **Library → Agents refresh button.** Agents now has a PrimeVue refresh icon button beside `New agent`; it re-runs the existing agents library load path and shows PrimeVue's button loading spinner while the refresh is in flight.
-
 ### Fixed
 - **Jobs panel spinner centered.** Running job status icons now use a square icon box with an explicit center transform origin so the spinner rotates around its own center.
 
