@@ -787,19 +787,19 @@ describe('SessionRegistry', () => {
     );
     const id = await reg.create();
     const config = client.createdConfigs[0] as {
-      onExitPlanMode: (req: {
+      onExitPlanModeRequest: (req: {
         summary: string;
         planContent?: string;
         actions: string[];
         recommendedAction: string;
       }) => Promise<unknown>;
-      onAutoModeSwitch: (req: {
+      onAutoModeSwitchRequest: (req: {
         errorCode?: string;
         retryAfterSeconds?: number;
       }) => Promise<unknown>;
     };
 
-    const exitPromise = config.onExitPlanMode({
+    const exitPromise = config.onExitPlanModeRequest({
       summary: '- Looks good',
       planContent: '# Plan',
       actions: ['interactive', 'autopilot'],
@@ -820,7 +820,7 @@ describe('SessionRegistry', () => {
       selectedAction: 'interactive',
     });
 
-    const autoPromise = config.onAutoModeSwitch({
+    const autoPromise = config.onAutoModeSwitchRequest({
       errorCode: 'rate_limit',
       retryAfterSeconds: 30,
     });
