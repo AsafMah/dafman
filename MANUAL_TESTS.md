@@ -63,6 +63,13 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #22 — Library Agents refresh button (2026-05-28)
+
+- **22.1** ⏳ **External agent file appears after refresh.**
+  - **Steps:** run `bun run dev`, open Library → Agents, keep the tab open, then drop or create a valid agent file externally under `~/.config/copilot/agents/`. Click the `Refresh agents list` icon button in the Agents header.
+  - **Expected:** the button shows a spinner during reload and the new agent appears without switching tabs.
+  - **Why not automated:** depends on a real dev app session plus an external filesystem mutation in the user's Copilot agents directory.
+
 ### Sprint D — Jobs spinner center (issue #15, 2026-05-28)
 
 - **D15.1** ⏳ **Running job spinner rotates in place.**
