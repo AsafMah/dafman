@@ -1,5 +1,10 @@
 # Dafman
 
+[![CI](https://github.com/AsafMah/dafman/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AsafMah/dafman/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/AsafMah/dafman/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/AsafMah/dafman/actions/workflows/codeql.yml)
+[![Built with Bun](https://img.shields.io/badge/built%20with-Bun-fbf0df?logo=bun&logoColor=black)](https://bun.sh)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > A desktop UI for the GitHub Copilot CLI — built on
 > [Electrobun](https://docs.electrobunny.ai/electrobun/) (Bun + native webview)
 > with a Vue 3 renderer. One language end-to-end, no Electron.

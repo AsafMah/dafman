@@ -1,0 +1,55 @@
+# Dependabot configuration.
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Strategy: weekly grouped updates, separating patch/minor (auto-mergeable
+# once CI green) from major (manual review). Same shape for GitHub Actions
+# pins.
+
+version: 2
+updates:
+  # ── npm (Bun reads package.json + bun.lock) ─────────────────────────
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "area:deps"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      patch-and-minor:
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+      major:
+        patterns: ["*"]
+        update-types: ["major"]
+    ignore:
+      # Pinned: see package.json#overrides and DEVLOG for rationale.
+      # Lexical is intentionally held at 0.44 (DecoratorNode API churn
+      # in 0.45+); bumping requires a planned migration pass.
+      - dependency-name: "@lexical/*"
+      - dependency-name: "lexical"
+
+  # ── GitHub Actions pins ─────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "area:ci"
+      - "area:deps"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      actions:
+        patterns: ["*"]

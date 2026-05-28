@@ -1,0 +1,83 @@
+# actions/labeler config.
+# Docs: https://github.com/actions/labeler
+#
+# Maps changed paths to area labels so triage is automatic. Tied to
+# `.github/workflows/labeler.yml`.
+
+"area:backend":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src-bun/**'
+
+"area:chat":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/components/chat/**'
+          - 'src/lib/chatEvents/**'
+          - 'src/stores/chat/**'
+
+"area:terminal":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/components/terminal/**'
+          - 'src/stores/terminal/**'
+          - 'src-bun/app/terminal/**'
+
+"area:library":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/components/library/**'
+          - 'src/composables/library/**'
+          - 'src-bun/app/library/**'
+
+"area:shell":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/components/shell/**'
+          - 'src/stores/shell/**'
+
+"area:mcp":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/components/library/Mcp*'
+          - 'src/components/library/**/Mcp*'
+          - 'src-bun/app/mcp/**'
+
+"area:agents":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/components/session/details/**'
+          - 'src-bun/app/library/agent*'
+
+"area:layout":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/stores/shell/layoutStore.ts'
+          - 'src/stores/shell/groupsStore.ts'
+          - 'src/lib/bootLayout.ts'
+          - 'src/lib/composePersistLayout.ts'
+
+"area:palette":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/lib/palette.ts'
+          - 'src/lib/sessionCommands.ts'
+          - 'src/lib/registerBuiltinCommands.ts'
+          - 'src/components/shell/CommandPalette*'
+
+"area:ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+"area:deps":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'package.json'
+          - 'bun.lock'
+
+"docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
