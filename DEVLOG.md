@@ -10,6 +10,24 @@
 
 ---
 
+## 2026-05-28 — Issue #22 Library Agents refresh button
+
+**Takeaway:** Added the missing Library → Agents refresh affordance so users can reload filesystem-backed agent files without switching tabs.
+
+**Receipts:**
+- `src/components/library/LibraryAgentsTab.vue` now renders a PrimeVue text/small `pi-refresh` button immediately left of `New agent`, wired to the same `load()` path used on mount.
+- `src/composables/library/useAgentsLibrary.ts` now exposes a non-breaking `loading` ref for the button's `:loading` spinner.
+- `src/components/library/__tests__/LibraryAgentsTab.refresh.test.ts` mocks `useAgentsLibrary`, mounts the tab, clicks `Refresh agents list`, and verifies `load()` is called again.
+
+**Verification:**
+- `bun test src\\components\\library\\__tests__\\LibraryAgentsTab.refresh.test.ts` — 1 pass.
+- `bun test src\\components\\library` — 1 pass.
+- `bun run check` — green (lint + backend TS + ESLint warnings only + tests + build + prod/hmr smoke).
+
+**Manual dogfood pending:** see `MANUAL_TESTS.md` Issue #22 row for external file-drop verification.
+
+---
+
 ## 2026-05-28 — Jobs spinner pivot centered (#15)
 
 **Takeaway:** Fixed the Jobs panel active-job spinner so PrimeIcons rotates from a square, centered icon box instead of orbiting around an off-center glyph box.
