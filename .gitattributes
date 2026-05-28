@@ -3,6 +3,12 @@
 # `core.autocrlf=true` checkout-converts-to-CRLF trap on Windows.
 * text=auto eol=lf
 
+# Lockfiles must not be touched by line-ending normalization — bun's
+# install consistency check is sensitive to byte-exact content. Mark
+# binary so git ships the bytes through unchanged.
+bun.lock binary
+package-lock.json binary
+
 # Binary types (no normalization).
 *.png  binary
 *.jpg  binary
