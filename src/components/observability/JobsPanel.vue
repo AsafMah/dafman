@@ -368,7 +368,11 @@ function statusIcon(job: JobRecord): string {
 
 .job-main > .pi {
   margin-top: 0.15rem;
+  width: 1em;
+  height: 1em;
+  text-align: center;
   color: var(--p-primary-color);
+  transform-origin: 50% 50%;
   flex-shrink: 0;
 }
 

@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed
+- **Jobs panel spinner centered.** Running job status icons now use a square icon box with an explicit center transform origin so the spinner rotates around its own center.
+
 ### Changed (Process / Workflow — 2026-05-28)
 - **Work-tracking migrated to GitHub Issues** + Projects board + sprint milestones. `plans/TODO.md` frozen as `plans/TODO_archive.md`. `MANUAL_TESTS.md` failing-rows section replaced with pointer to `gh issue list --label manual-test-fail`. Pending-verification section kept.
 - **CI level-up.** `ci.yml` refactored: parallel `lint`/`test`/`smoke`/`e2e` jobs that mirror `bun run check` exactly. Bun install cache + Playwright cache + concurrency cancel-in-progress. CodeQL workflow (javascript-typescript, weekly + PR). Dependabot (npm + GH-actions weekly, grouped, `@lexical/*` pinned). Auto-labeler (path globs → area:* labels). Stale-bot (90d issues / 30d PRs). Automerge workflow. Branch protection on `main` requires `lint`/`test`/`smoke`/`e2e`/`build-matrix(ubuntu-latest)`.
