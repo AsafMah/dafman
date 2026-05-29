@@ -53,7 +53,7 @@ replays — single instance short-circuits on `entries.has(sessionId)`).
   takes the `!isActive` branch (re-activates) and a second click collapses.
   Confirmed with a throwaway probe. This is a real, minor UX quirk (likely
   worth its own issue) but out of scope for #29 — flow 14's close assertion
-  polls the cog via `expect(...).toPass()` to tolerate it.
+  polls the cog via `expect(...).toPass()` to tolerate it. Filed as #54.
 - **Rail inner width is group-min minus ~35px chrome.** The right edge group
   honors a 380px floor (`panels.ts` SessionDetails.minimumSize), but the inner
   `.session-details` content renders at ~345px (the vertical activity-tab strip

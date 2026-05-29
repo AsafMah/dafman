@@ -46,7 +46,7 @@ test("details rail does not auto-open on session create; cog opens + toggles it"
   // open. Note: after interacting with a control *inside* the rail, the rail
   // is no longer dockview's active panel, so the first cog click re-activates
   // it (activateEdgePanel's `!isActive` branch) and a second click collapses
-  // it. Poll the cog until the rail reports closed (cog flips to its open
+  // it. See #54. Poll the cog until the rail reports closed (cog flips to its open
   // label, driven by layoutStore.detailsOpen) rather than asserting DOM
   // visibility — dockview keeps the collapsed panel mounted.
   const openCog = page.getByRole("button", { name: "Open session details", exact: true });
