@@ -14,8 +14,9 @@
 /// - Per-session `send()` triggers a scripted reply via injected
 ///   event scripts (defaults to a simple assistant.message reply).
 /// - `session.on(cb)` fan-out for scripted events.
-/// - `getMessages()` returns the per-session event log so resume
-///   replays correctly.
+/// - `getEvents()` returns the per-session event log so resume
+///   replays correctly. (Renamed from `getMessages()` to match the
+///   real SDK — see issue #29.)
 ///
 /// **Catalog persistence**: session state (id + cwd) is persisted
 /// to a JSON file under the caller-supplied `catalogPath`. This is
@@ -201,7 +202,7 @@ class FakeCopilotSession {
     await this.scriptRef.current(args, push, this.state);
   }
 
-  async getMessages(): Promise<Record<string, unknown>[]> {
+  async getEvents(): Promise<Record<string, unknown>[]> {
     return [...this.state.history];
   }
 

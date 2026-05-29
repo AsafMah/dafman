@@ -10,7 +10,65 @@
 
 ---
 
-## 2026-05-28 — Library tabs auto-refresh on session switch (#51)
+## 2026-05-29 — Full E2E green again: 18/48 → 48/48 (#29)
+
+**Takeaway:** The "session.getEvents undefined" in #29's title was a minor
+red herring. The 18 flow failures were **stale tests**, not product bugs —
+the current UI is correct. Two deliberate UI commits landed without the E2E
+flows being updated:
+
+1. **`6343902`** removed details-rail auto-open on session create
+   (`layoutStore.ts:565`). Flows that asserted `.session-details` visible
+   immediately timed out. Fix: open it explicitly via the composer cog.
+2. **`e39bdc9`** replaced the ActivityBar with native dockview edge tabs.
+   Tabs now render as `<div class="activity-bar-tab" aria-label="…">`
+   (`ActivityBarTab.vue:107`) — role `generic`, NOT buttons — with shortened
+   labels ("Library — MCP servers" → "Library"). So
+   `getByRole("button", {name:/library/i})` never matched → 30s timeouts.
+
+**Fix (test-only, user-approved aria-label strategy):** added two helpers to
+`e2e/full/harness/pageHarness.ts` — `openActivityTab(page, label)` (clicks
+`.activity-bar-tab[aria-label="<label>"]`) and `openDetailsRail(page)` (clicks
+the composer cog, awaits `.session-details`). Threaded through flows 07, 14–20.
+
+**Genuine bug also fixed:** `FakeCopilotClient` exposed `getMessages()` but
+production resume calls `session.getEvents()` (real SDK renamed it;
+`node_modules/@github/copilot-sdk/dist/session.d.ts:203`). Renamed +
+test-first regression `src-bun/__tests__/fakeClientResume.test.ts` (drives
+two `SessionRegistry` instances sharing one fake client so resume actually
+replays — single instance short-circuits on `entries.has(sessionId)`).
+
+**Receipts / gotchas discovered while fixing the flows:**
+
+- **`.session-details` is always count 1, never 0 after first open.** Dockview
+  lazily mounts the seeded edge-tab panel on first activation, then keeps it
+  mounted (collapsed/hidden) — it does NOT unmount on close. So "rail closed"
+  can't be asserted via `toHaveCount(0)` or `toBeHidden` (the collapsed panel
+  still reports `visible`). The reliable closed-signal is the cog flipping back
+  to its "Open session details" label (driven by `layoutStore.detailsOpen`).
+- **The cog needs two clicks to close after you interact with a control inside
+  the rail.** `activateEdgePanel` (`layoutStore.ts:863`) collapses only when
+  `panel.api.isActive && !isCollapsed`. After clicking a button *inside* the
+  rail, the rail is no longer dockview's active panel, so the first cog click
+  takes the `!isActive` branch (re-activates) and a second click collapses.
+  Confirmed with a throwaway probe. This is a real, minor UX quirk (likely
+  worth its own issue) but out of scope for #29 — flow 14's close assertion
+  polls the cog via `expect(...).toPass()` to tolerate it. Filed as #54.
+- **Rail inner width is group-min minus ~35px chrome.** The right edge group
+  honors a 380px floor (`panels.ts` SessionDetails.minimumSize), but the inner
+  `.session-details` content renders at ~345px (the vertical activity-tab strip
+  + borders eat the rest). The old auto-open path sized the inner element
+  directly; the edge-tab refactor means inner = group − strip. Flow 14's width
+  assertion lowered 380 → 340 to match (mirrors the Library check's 320 < 360).
+- **Second session in tests:** via the Sessions activity panel's "New session"
+  button (`SessionsManager.vue:466`), not a nonexistent topbar button or
+  Ctrl+N. Flow 20 updated accordingly.
+
+**Process:** re-added the `Full E2E (real test-server + fake SDK)` job to
+`.github/branch-protection.json` required checks (it was dropped during the
+#29 mitigation). Verified: `bun run lint`, `lint:tsc-bun`,
+`fakeClientResume.test.ts`, and full `bun run e2e:run` (48/48) all green.
+
 
 **Takeaway:** Added `watch(activeSessionId, () => void load())` to
 the three session-scoped Library tabs (Agents / Skills / MCP); Tools

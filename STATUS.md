@@ -24,6 +24,10 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
+**Recently fixed:** #29 — Full E2E back to 48/48 (stale flows updated for the
+no-auto-open rail + dockview edge tabs; fake-client `getEvents` drift fixed;
+Full E2E re-added to required checks). 2026-05-29.
+
 **Active milestone:** **Groups v3 (nested DockviewVue) shipped** (2026-05-27).
 Three-phase landing of the workspace-groups feature. After two failed prior
 attempts (v1 nested-dockview with `require()` + race bugs reverted at `a1d7a21`;
