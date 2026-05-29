@@ -7,11 +7,13 @@
 /// not yet in the configured list get an "Enable" shortcut that
 /// calls `addMcpConfig` + `enableMcpServers`.
 
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Dialog from 'primevue/dialog';
 import { useToastStore } from '@/stores/app/toastStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 import McpServerForm from '@/components/library/McpServerForm.vue';
 import {
   useMcpLibrary,
@@ -21,6 +23,7 @@ import {
 } from '@/composables/library/useMcpLibrary';
 
 const toasts = useToastStore();
+const { activeSessionId } = storeToRefs(useLayoutStore());
 
 const {
   configured,
@@ -112,6 +115,12 @@ async function onSignIn(entry: ConfiguredEntry) {
 }
 
 onMounted(() => {
+  void loadAll();
+});
+/// Auto-reload when the user switches to a different session — MCP
+/// config uses session's workingDirectory to surface project-scoped
+/// discovered servers. Mirror LibraryInstructionsTab pattern. Per #51.
+watch(activeSessionId, () => {
   void loadAll();
 });
 </script>

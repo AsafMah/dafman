@@ -63,6 +63,25 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #51 — Library tabs auto-refresh on session switch (2026-05-28)
+
+- **51.1** ⏳ **Agents tab auto-refreshes.**
+  - **Steps:** open two sessions A and B with different `workingDirectory` (one with project agents in `<cwd>/.github/agents/`, one without). Open Library → Agents while focused on A. Switch to B.
+  - **Expected:** the project-agent section updates (becomes empty if B has no project agents). No need to click Refresh.
+  - **Why not automated:** smoke stub can't simulate session-switch + IPC re-fetch flow without a full E2E harness; covered conceptually by the new `watch` but verification needs the live dockview event.
+
+- **51.2** ⏳ **Skills tab auto-refreshes.**
+  - **Steps:** as above with Library → Skills.
+  - **Expected:** skill list updates when switching sessions whose `<cwd>/.github/skills/` differs.
+
+- **51.3** ⏳ **MCP tab auto-refreshes.**
+  - **Steps:** as above with Library → MCP. Drop an `.vscode/mcp.json` under one session's cwd, none under the other.
+  - **Expected:** the Discovered section updates on switch.
+
+- **51.4** ⏳ **No infinite loops / re-render storms.**
+  - **Steps:** switch sessions rapidly (5+ times in a few seconds).
+  - **Expected:** each switch triggers exactly one reload per tab; no console errors or visible spinner thrashing.
+
 ### Issue #22 — Library Agents refresh button (2026-05-28, second attempt)
 
 - **22.1** ⏳ **Refresh button appears next to "New agent".**
