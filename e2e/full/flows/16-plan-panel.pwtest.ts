@@ -6,6 +6,7 @@
 
 import { test, expect } from "@playwright/test";
 import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
+import { openDetailsRail } from "../harness/pageHarness";
 
 let harness: BunHarness;
 
@@ -21,6 +22,7 @@ test("plan: empty state → edit → save round-trips", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
 
+  await openDetailsRail(page);
   const details = page.locator(".session-details").first();
   await expect(details).toBeVisible({ timeout: 5_000 });
 

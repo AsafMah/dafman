@@ -11,6 +11,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
+import { openDetailsRail } from "../harness/pageHarness";
 
 let harness: BunHarness;
 
@@ -33,9 +34,10 @@ test("Export JSON contains user + assistant items after a turn", async ({ page }
   // into the store (and therefore into rec.events).
   await expect(page.locator("text=ok: hello world").first()).toBeVisible({ timeout: 5_000 });
 
-  // The details rail opens by default (Phase 18a). Click the JSON
-  // export button (Phase 18b+ shortened the label from "Export JSON"
-  // to "JSON" with a tooltip).
+  // The details rail no longer auto-opens (commit 6343902) — open it
+  // via the cog. The JSON export button lives in the rail (Phase 18b+
+  // shortened the label from "Export JSON" to "JSON" with a tooltip).
+  await openDetailsRail(page);
   await page.getByRole("button", { name: /^JSON$/ }).click();
 
   // Read the file from the test-server's userData exports dir.

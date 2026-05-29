@@ -9,6 +9,7 @@
 
 import { test, expect } from "@playwright/test";
 import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
+import { openDetailsRail } from "../harness/pageHarness";
 
 let harness: BunHarness;
 
@@ -25,6 +26,7 @@ test("tools section lists built-in tools and changing state surfaces a restart t
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
+  await openDetailsRail(page);
   const detailsPanel = page.locator(".session-details").first();
   await expect(detailsPanel).toBeVisible({ timeout: 5_000 });
 

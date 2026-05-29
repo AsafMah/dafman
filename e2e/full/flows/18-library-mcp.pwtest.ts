@@ -7,6 +7,7 @@
 
 import { test, expect } from "@playwright/test";
 import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
+import { openActivityTab } from "../harness/pageHarness";
 
 let harness: BunHarness;
 
@@ -22,9 +23,8 @@ test("library opens from activity bar and lists discovered MCP servers", async (
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
 
-  // Activity bar button: aria-label "Library — MCP servers + Skills".
-  const libBtn = page.getByRole("button", { name: /library/i }).first();
-  await libBtn.click();
+  // Activity tab: aria-label "Library" (dockview edge tab, role generic).
+  await openActivityTab(page, "Library");
 
   const library = page.locator(".library-panel");
   await expect(library).toBeVisible({ timeout: 5_000 });
@@ -50,7 +50,7 @@ test("library opens from activity bar and lists discovered MCP servers", async (
 test("add MCP server via structured form → moves to configured list", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
-  await page.getByRole("button", { name: /library/i }).first().click();
+  await openActivityTab(page, "Library");
 
   const library = page.locator(".library-panel");
   await expect(library).toBeVisible({ timeout: 5_000 });
@@ -77,7 +77,7 @@ test("add MCP server via structured form → moves to configured list", async ({
 test("JSON mode of the form round-trips with structured", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
-  await page.getByRole("button", { name: /library/i }).first().click();
+  await openActivityTab(page, "Library");
   await page.locator(".library-panel").getByRole("button", { name: /^Add$/i }).click();
 
   const dialog = page.locator(".p-dialog");

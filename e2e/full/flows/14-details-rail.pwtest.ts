@@ -7,6 +7,7 @@
 
 import { test, expect } from "@playwright/test";
 import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
+import { openActivityTab, openDetailsRail } from "../harness/pageHarness";
 
 let harness: BunHarness;
 
@@ -18,15 +19,17 @@ test.afterEach(async () => {
   await harness.teardown();
 });
 
-test("details rail opens by default on session create + cog toggles it", async ({ page }) => {
+test("details rail does not auto-open on session create; cog opens + toggles it", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
-  // The right-rail panel should be visible automatically — locate by
-  // the unique heading text the component renders.
+  // The rail no longer auto-opens on session create (commit 6343902).
+  await expect(page.locator(".session-details")).toHaveCount(0);
+
+  // Open it via the composer cog.
+  await openDetailsRail(page);
   const detailsPanel = page.locator(".session-details").first();
-  await expect(detailsPanel).toBeVisible({ timeout: 5_000 });
   const settingsToggle = detailsPanel.getByRole("button", {
     name: /session settings/i,
   });
@@ -38,15 +41,23 @@ test("details rail opens by default on session create + cog toggles it", async (
   await expect(detailsPanel.locator("text=Workspace")).toBeVisible();
   await expect(detailsPanel.getByRole("button", { name: /fork/i })).toBeVisible();
 
-  // Click the cog (rendered by SessionHeaderControls in the tab actions).
-  // The cog has aria-label "Close session details" when open.
-  const cog = page.getByRole("button", { name: /close session details/i }).first();
-  await cog.click();
-  await expect(page.locator(".session-details")).toHaveCount(0);
+  // Click the cog (rendered by SessionHeaderControls in the tab actions)
+  // to close the rail. The cog has aria-label "Close session details" when
+  // open. Note: after interacting with a control *inside* the rail, the rail
+  // is no longer dockview's active panel, so the first cog click re-activates
+  // it (activateEdgePanel's `!isActive` branch) and a second click collapses
+  // it. Poll the cog until the rail reports closed (cog flips to its open
+  // label, driven by layoutStore.detailsOpen) rather than asserting DOM
+  // visibility — dockview keeps the collapsed panel mounted.
+  const openCog = page.getByRole("button", { name: "Open session details", exact: true });
+  await expect(async () => {
+    const closeCog = page.getByRole("button", { name: /close session details/i });
+    if (await closeCog.count()) await closeCog.first().click();
+    await expect(openCog).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 6_000 });
 
   // Re-open via the same cog (now labelled "Open session details").
-  const cogOpen = page.getByRole("button", { name: /open session details/i }).first();
-  await cogOpen.click();
+  await openCog.first().click();
   await expect(page.locator(".session-details").first()).toBeVisible({ timeout: 3_000 });
 });
 
@@ -58,12 +69,17 @@ test("composer toolbar icons and edge panel minimum widths stay visible", async 
   await expect(page.locator(".lex-format-glyph-bold").first()).toHaveText("B");
   await expect(page.locator(".lex-format-glyph-italic").first()).toHaveText("I");
 
+  await openDetailsRail(page);
   const detailsWidth = await page.locator(".session-details").first().evaluate((el) =>
     el.getBoundingClientRect().width,
   );
-  expect(detailsWidth).toBeGreaterThanOrEqual(380);
+  // The edge group honors a 380px floor (panels.ts SessionDetails.minimumSize),
+  // but the inner .session-details content is that minus the ~35px vertical
+  // activity-tab strip + chrome — same offset the Library check (>=320 for a
+  // 360 group) below accounts for.
+  expect(detailsWidth).toBeGreaterThanOrEqual(340);
 
-  await page.getByRole("button", { name: /Library — MCP servers/i }).click();
+  await openActivityTab(page, "Library");
   const libraryPanel = page.locator(".library-panel").first();
   await expect(libraryPanel).toBeVisible({ timeout: 3_000 });
   const libraryWidth = await libraryPanel.evaluate((el) =>
@@ -88,11 +104,16 @@ test("composer toolbar switches to compact controls on narrow panes", async ({ p
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
+  // The compact breakpoint was calibrated with the 380px details rail
+  // open (it used to auto-open). Open it explicitly so the composer
+  // pane is narrow enough to force the toolbar into compact mode.
+  await openDetailsRail(page);
+
   await expect(page.locator(".mode-button-group:visible, .mode-select-shell:visible").first()).toBeVisible();
   const formatOverflow = page.locator(".lex-format-overflow").first();
   await expect(formatOverflow).toBeVisible();
   const inlineBeforeMenu = await page.locator(".lex-markdown-tools .lex-toolbar-btn").evaluateAll((buttons) =>
-    buttons
+      buttons
       .filter((button) => getComputedStyle(button).display !== "none")
       .map((button) => button.getAttribute("aria-label")),
   );
@@ -250,7 +271,7 @@ test("terminals activity panel opens manager without creating a terminal", async
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
-  await page.getByRole("button", { name: /Terminals — running shells/i }).click();
+  await openActivityTab(page, "Terminals");
   const panel = page.locator(".terminals-panel").first();
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Terminals" })).toBeVisible();
@@ -263,7 +284,7 @@ test("terminal toolbar supports find without buffer or paste buttons", async ({ 
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
-  await page.getByRole("button", { name: /Terminals — running shells/i }).click();
+  await openActivityTab(page, "Terminals");
   const panel = page.locator(".terminals-panel").first();
   await expect(panel).toBeVisible();
   const command = process.platform === "win32" ? "cmd.exe" : "printf";

@@ -8,6 +8,7 @@
 
 import { test, expect } from "@playwright/test";
 import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
+import { openActivityTab, openDetailsRail } from "../harness/pageHarness";
 
 let harness: BunHarness;
 
@@ -24,7 +25,7 @@ test("skills tab renders groups by source from the discover RPC", async ({ page 
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
 
   // Open Library → Skills.
-  await page.getByRole("button", { name: /library/i }).first().click();
+  await openActivityTab(page, "Library");
   await page.getByRole("tab", { name: "Skills" }).click();
 
   const library = page.locator(".library-panel");
@@ -45,7 +46,7 @@ test("skills tab renders groups by source from the discover RPC", async ({ page 
 test("toggling a skill pushes the full disabled list via setGloballyDisabledSkills", async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
-  await page.getByRole("button", { name: /library/i }).first().click();
+  await openActivityTab(page, "Library");
   await page.getByRole("tab", { name: "Skills" }).click();
 
   const library = page.locator(".library-panel");
@@ -77,6 +78,7 @@ test("Manage globally link in right-rail opens Library Skills tab", async ({ pag
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
   await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
 
+  await openDetailsRail(page);
   const details = page.locator(".session-details").first();
   await expect(details).toBeVisible({ timeout: 5_000 });
   // Skills section is expanded by default; click the link directly.
