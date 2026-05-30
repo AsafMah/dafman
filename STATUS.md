@@ -24,7 +24,10 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #9 — discovered-MCP-server work: part-1 (toggle persistence)
+**Recently fixed:** #85 — empty workspace groups close without confirmation;
+non-empty group-close confirmations now have a real header, destructive/secondary
+button styling, clearer wording, and Cancel as the default focus. 2026-05-30.
+#9 — discovered-MCP-server work: part-1 (toggle persistence)
 repro fixture added (`tools/manual-fixtures/mcp-discovery/`, MANUAL_TESTS §9.1)
 and the stale `.vscode/mcp.json` path retired (Copilot CLI dropped it; use
 `.mcp.json`); parts 2/3 (edit/override + source path) filed upstream as
