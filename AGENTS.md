@@ -108,6 +108,35 @@ class name would have surfaced instantly.)
   `record.events` — bounds memory to `MAX_EVENTS_PER_SESSION` and keeps
   `droppedEventCount` consistent.
 
+### Working on Windows — write files as LF
+
+The repo is **LF-only** (`.gitattributes` `* text=auto eol=lf`, `.editorconfig`
+`end_of_line = lf`, prettier `endOfLine: "lf"`, `core.autocrlf=false` locally).
+But Windows PowerShell `Set-Content` / `Out-File` / `>` and `echo` default to
+**CRLF**, which makes git nag *"CRLF will be replaced by LF"* on the next `git
+add` (the blob still commits as LF — it's just noise). When generating or
+rewriting a file from PowerShell, write LF explicitly:
+
+```pwsh
+# LF-safe write (no BOM, no CRLF):
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($path, ($text -replace "`r`n", "`n"), $utf8NoBom)
+```
+
+Prefer the `create` / `edit` tools or `bun`/`node` for file generation (they
+honour the EOL config). If you do dirty the tree with CRLF, fix it in place
+rather than committing the churn:
+
+```pwsh
+# Re-normalize every CRLF working-tree file back to LF:
+git ls-files --eol | Where-Object { $_ -match 'w/crlf' } | ForEach-Object {
+  $p = ($_ -split 'eol=lf', 2)[1].Trim()
+  $u = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($p, ([System.IO.File]::ReadAllText($p) -replace "`r`n","`n"), $u)
+}
+git add --renormalize .
+```
+
 ### SDK gotchas (don't re-burn; full list in `ARCHITECTURE.md` §8)
 
 - **Bundled CLI JS needs Node ≥ 24** — `src-bun/app/client.ts` resolves the
