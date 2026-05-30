@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, toRef } from 'vue';
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, toRef, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import MessageComposer from '@/components/chat/MessageComposer.vue';
 import MessageContent from '@/components/chat/MessageContent.vue';
@@ -139,11 +139,81 @@ onMounted(() => {
     }),
   );
   initCommandResults();
+  // A reveal intent may already be parked for us (Jobs panel "Go to
+  // session" on a freshly-opened panel — the request landed before we
+  // mounted). Consume it now that the DOM exists.
+  void consumePendingReveal();
 });
 
 onBeforeUnmount(() => {
   for (const off of busSubscriptions.splice(0)) off();
 });
+
+function rafTick(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+/// Reveal a parked navigation intent (issue #16). With a `toolCallId`,
+/// scroll the spawning tool-call card into view and flash it; without
+/// one (autopilot jobs), fall back to the bottom. The transcript node
+/// may not be rendered the instant we're asked (a freshly-opened panel
+/// is still painting its v-for), so we retry across a bounded number of
+/// frames before giving up and scrolling to the bottom.
+async function revealTarget(target: { toolCallId?: string }): Promise<void> {
+  if (!target.toolCallId) {
+    await scrollToBottom();
+
+    return;
+  }
+
+  const selector = `[data-tool-call-id="${CSS.escape(target.toolCallId)}"]`;
+  const maxAttempts = 8;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await nextTick();
+    await rafTick();
+
+    const el = messagesEl.value?.querySelector<HTMLElement>(selector);
+
+    if (el) {
+      el.scrollIntoView({ block: 'center' });
+      flashReveal(el);
+
+      return;
+    }
+  }
+
+  // Target never rendered (collapsed/trimmed history or id mismatch) —
+  // land the user on the live work instead of stranding them at the top.
+  await scrollToBottom();
+}
+
+function flashReveal(el: HTMLElement): void {
+  el.classList.remove('reveal-flash');
+  // Force reflow so re-adding the class restarts the animation.
+  void el.offsetWidth;
+  el.classList.add('reveal-flash');
+  window.setTimeout(() => el.classList.remove('reveal-flash'), 1600);
+}
+
+async function consumePendingReveal(): Promise<void> {
+  const target = layoutStore.consumeReveal(props.sessionId);
+
+  if (!target) return;
+
+  await revealTarget(target);
+}
+
+/// Already-open panel: a reveal request arrives after we've mounted.
+/// Non-immediate so we don't double-fire with the onMounted consume.
+watch(
+  () => layoutStore.pendingReveal[props.sessionId],
+  (target) => {
+    if (!target) return;
+
+    void consumePendingReveal();
+  },
+);
 
 /// "Agent is working right now" indicator for the in-chat card. Reads
 /// the session record's authoritative `isThinking` flag (driven by
@@ -320,6 +390,7 @@ const commandsRun = computed(() => {
         <div
           v-else-if="item.kind === 'tool'"
           class="message-shell"
+          :data-tool-call-id="item.toolCallId"
         >
           <ToolCallBlock
             :tool-name="item.toolName"
@@ -580,6 +651,33 @@ const commandsRun = computed(() => {
 </template>
 
 <style scoped>
+/* Brief highlight when "Go to session" (Jobs panel) reveals the
+   tool-call card that spawned a background job (issue #16). Uses a
+   box-shadow + background pulse so it doesn't shift layout. The flash
+   class is toggled imperatively in `flashReveal`; the .message-shell
+   div carries the scoped attribute so a plain scoped selector matches. */
+.message-shell.reveal-flash {
+  animation: reveal-flash 1.6s ease-out;
+  border-radius: 8px;
+}
+
+@keyframes reveal-flash {
+  0% {
+    background: color-mix(in srgb, var(--p-primary-500) 22%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-primary-500) 45%, transparent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-shell.reveal-flash {
+    animation-duration: 0.01ms;
+  }
+}
+
 .fork-notice {
   display: inline-flex;
   align-items: center;

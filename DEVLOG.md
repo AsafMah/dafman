@@ -10,6 +10,62 @@
 
 ---
 
+## 2026-05-30 — #16 Jobs "Go to session" reveals the spawning tool call
+
+**Takeaway:** A `setTimeout`-gated bus emit for cross-panel navigation is a
+lost-intent race. When the destination component mounts *after* the navigation
+is requested (freshly-opened dockview panel), a transient mitt emit is dropped
+because mitt has no replay. The durable fix is to park the navigation intent in
+a store and let the destination consume it on mount **and** via a watch — that
+covers both "panel already open" (watch fires) and "panel opens in response to
+the click" (onMounted consumes the parked intent).
+
+**Root cause (issue #16):** `jobsStore.openOwningSession` activated the owning
+session's panel then did `setTimeout(() => busEmit('scroll-to-bottom', …), 100)`.
+Two bugs: (1) on a freshly-opened panel the 100 ms emit raced the async
+ChatWindow mount — `busOn('scroll-to-bottom')` registers in `onMounted`, so an
+emit before that is silently dropped (mitt, no replay — see `src/lib/bus.ts`).
+(2) Even when it landed, scrolling to the *bottom* is wrong: the user clicked a
+specific job and expects to see the *message that spawned it*, not the latest
+work.
+
+**Fix (renderer-only):**
+- `layoutStore`: added `pendingReveal` ref + `requestReveal(sessionId, target)`
+  (REPLACE the entry, never merge — a stale `toolCallId` must not survive a
+  later bottom-scroll request) + `consumeReveal(sessionId)` (read+delete).
+- `jobsStore.openOwningSession(sessionId, toolCallId?)`: open/activate the
+  panel, then `layout.requestReveal(sessionId, { toolCallId })`. Dropped the
+  `setTimeout`/`busEmit` path and the now-unused bus import.
+- `JobsPanel.vue`: pass `job.toolCallId` to the click handler.
+- `ChatWindow.vue`: added `:data-tool-call-id` to the tool `.message-shell`
+  wrapper; `revealTarget(target)` does nextTick + double-rAF, queries
+  `[data-tool-call-id="${CSS.escape(id)}"]`, `scrollIntoView({block:'center'})`
+  + a 1.6 s highlight flash; **retries across 8 frames before falling back to
+  the bottom** so a not-yet-rendered transcript node doesn't drop the intent.
+  Consumes the intent in `onMounted` (fresh panel) and a non-immediate, falsy-
+  guarded `watch` on `pendingReveal[sessionId]` (already-open panel).
+
+**Rubber-duck (duck-16):** confirmed store-over-bus, flagged four tightenings I
+adopted: (1) don't consume a toolCallId reveal before the DOM node exists →
+retry-then-fallback inside `revealTarget`; (2) replace-not-merge in
+`requestReveal`; (3) falsy-guard the watcher against deletion re-fire; (4)
+`CSS.escape` the selector.
+
+**Gotcha re-learned:** `<style scoped>` is CSS — `///` JS doc-comments are a
+`CssSyntaxError` (caught by `bun run smoke`'s `vite build`, not by `vue-tsc`).
+Use `/* */` in style blocks.
+
+**Gates:** `bun run lint` (vue-tsc) clean; `bun run lint:eslint` 0 errors (18
+pre-existing warnings, incl. the same `no-dynamic-delete` pattern `groupsStore`
+already uses); targeted `jobsStore.test.ts` 5/5, `ChatWindow.test.ts` 10/10;
+`bun run smoke` 4/4 (prod + hmr).
+
+**Manual test:** appended #16 to `MANUAL_TESTS.md` — the scroll geometry +
+dockview panel-mount timing with a real spawned background task isn't
+reproducible in happy-dom/smoke.
+
+---
+
 ## 2026-05-30 — #35: per-message agentMode pass-through
 
 **Takeaway.** Wired `MessageOptions.agentMode` (new in SDK beta.9) through
