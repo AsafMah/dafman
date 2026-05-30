@@ -154,6 +154,8 @@ These items lived in `_archive/plan-tech-debt.prompt.md`. All shipped.
 - `SessionRegistry` correctness (`shutdownAll`, `earlyEventBuffer`, entry-deletion ordering, unsubscribe ordering, history replay) (`687d05b`)
 - Type / UX / perf nits (T3, U1, U2, U3, U6, U7, U8) (`b7014dc`)
 - Safe dep bumps + deferred dep bumps shipped (21d)
+- #46 — 15 deprecated string template refs → `useTemplateRef` (Vue 3.5) across 9 SFCs (`8bacf51`)
+- #48 — 5 ineffective dynamic imports resolved (Rolldown/vite@8 build warning-free) (`45a9101`)
 
 ## Major themes (from former `plan-backlog-audit` §A)
 

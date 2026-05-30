@@ -24,7 +24,13 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #9 — discovered-MCP-server work: part-1 (toggle persistence)
+**Recently fixed:** #46 — 15 deprecated string template refs migrated to
+`useTemplateRef` (Vue 3.5); the other 6 `ref="x"` sites were already on
+`useTemplateRef` (the string is its binding key, not the deprecated pattern)
+(`8bacf51`). #48 — 5 ineffective dynamic imports resolved: eager test-bridge
+stores in `main.ts` + `chatEvents` in `SessionDetailsPanel` hoisted to static,
+`exportConversation` left dynamic; `vite@8`/Rolldown build now warning-free
+(`45a9101`). 2026-05-30. #9 — discovered-MCP-server work: part-1 (toggle persistence)
 repro fixture added (`tools/manual-fixtures/mcp-discovery/`, MANUAL_TESTS §9.1)
 and the stale `.vscode/mcp.json` path retired (Copilot CLI dropped it; use
 `.mcp.json`); parts 2/3 (edit/override + source path) filed upstream as
