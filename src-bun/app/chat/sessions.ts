@@ -418,9 +418,7 @@ export class SessionRegistry {
       // replayed event so the renderer reducer clears its stuck
       // `isThinking`. Build a NEW array — `capped` may alias the
       // original history (when total <= cap), which must not be mutated.
-      const replay = historyEndsMidTurn(capped)
-        ? [...capped, RESUME_SETTLED_EVENT]
-        : capped;
+      const replay = historyEndsMidTurn(capped) ? [...capped, RESUME_SETTLED_EVENT] : capped;
 
       await this.replayHistory(actualId, replay);
       log.info('session resumed', {

@@ -330,7 +330,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   // `session.task_complete`. Both end the turn, so clear the spinner.
   // Mapped to handleThinkingOff (not handleTurnEnd) to avoid firing OS
   // notifications + unseenTurns bumps for a turn the user themselves stopped.
-  'abort': handleThinkingOff,
+  abort: handleThinkingOff,
   'session.task_complete': handleThinkingOff,
   // #20: synthetic terminator appended by the bun resume path when the
   // persisted history ends mid-turn (app killed while the agent was
