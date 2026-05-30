@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (#85 — 2026-05-30)
+- **Closing an empty workspace group no longer opens a confirmation dialog.** Empty groups now close immediately because no sessions would be lost. Non-empty group closes still require confirmation, but the dialog now has a clear title, explicit "this will close sessions" wording, a danger-styled **Close group** action, a secondary **Cancel** action, and defaults focus to Cancel so the destructive action is not focused by accident.
+
 ### Fixed (#66 — 2026-05-30)
 - **The composer toolbar no longer overlaps its controls when the chat pane is resized — it reflows, then wraps.** At a narrow band of widths (~750–760 px, right at the `@container (max-width: 760px)` breakpoint) the left group's auto-approve button painted ~3–5 px over the center group's command-trigger. Root cause was structural, not a breakpoint to nudge: the three toolbar groups (`.lex-toolbar-left/center/right`) carried `min-width: 0`, which lets the flexbox algorithm shrink a group's *box* below its own rigid (already container-query-collapsed) content; the toolbar had **no `flex-wrap`** and only `overflow-x: hidden`, so the over-sized content spilled sideways over the neighbouring group instead of wrapping. (This is the same class of bug as #17 resurfacing in a new spot.) Fix: drop `min-width: 0` from the three groups so a group is never sized below its content, and add `flex-wrap: wrap` + `row-gap` to the toolbar so that when even the collapsed content can't fit one line, the right-hand controls drop to a clean second row — the graceful fallback the existing code comment already promised but never implemented. Regression coverage is a new E2E flow (`e2e/full/flows/25-composer-resize.pwtest.ts`) that drives the real composer across 36 viewport widths (320→1280, straddling every breakpoint) and asserts no two visible toolbar controls overlap on both axes at any width — it fails on the pre-fix bundle (750/760 px) and passes after.
 
@@ -1161,5 +1164,4 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - N/A ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â initial release.
 ### Fixed
 - N/A ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â initial release.
-
 

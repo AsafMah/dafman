@@ -10,6 +10,33 @@
 
 ---
 
+## 2026-05-30 — #85 group-close confirmation polish
+
+**Takeaway.** Empty group closes now skip PrimeVue confirmation entirely; there is
+nothing to discard. Non-empty group closes still confirm, but the global
+`ConfirmDialog` now receives a real `header`, danger/secondary button props, clear
+"this will close sessions" wording, and `defaultFocus: 'reject'` so keyboard focus
+lands on Cancel instead of the destructive action.
+
+**Receipts.**
+- `src/components/shell/GroupTab.vue` now centralizes close handling in
+  `closeGroupOrConfirm`: `sessionCount === 0` calls `useGroupsActions.deleteGroup`
+  immediately, while `count > 0` calls `confirm.require` with
+  `acceptProps: { severity: 'danger' }`, `rejectProps: { severity: 'secondary',
+  text: true }`, and `defaultFocus: 'reject'`.
+- PrimeVue source check: `node_modules/primevue/confirmationoptions/index.d.ts`
+  exposes `header`, `acceptProps`, `rejectProps`, and `defaultFocus`; ConfirmDialog
+  consumes them in `node_modules/primevue/confirmdialog/index.mjs`.
+- Test-first regression coverage:
+  `src/components/shell/__tests__/GroupTab.closeConfirm.test.ts` fails on the old
+  empty-group prompt and missing destructive options, then passes after the fix.
+
+**Manual follow-up.** Added `MANUAL_TESTS.md` §85.1 because happy-dom can assert
+the confirm options and focus target, but not the final PrimeVue dialog pixels in
+the running app.
+
+---
+
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
 
 **Takeaway.** Walked the `MANUAL_TESTS.md ⏳ Pending verification` queue live in

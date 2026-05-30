@@ -70,6 +70,22 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #85 — Group-close confirmation polish (2026-05-30)
+
+#### 85.1 - Empty groups close directly; non-empty close confirmation looks destructive.
+
+- [ ] result:
+
+- **Steps:**
+  1. In `bun run dev`, create at least two groups.
+  2. Close an empty group via the tab `×` and via right-click → **Close group**.
+  3. Create/open a session in a group, then close that non-empty group via the tab `×`.
+- **Expected:** empty groups close immediately with no dialog. The non-empty close
+  opens a dialog titled **Close group**, the destructive action is styled as
+  danger, **Cancel** is secondary, and keyboard focus defaults to Cancel.
+- **Why not automated:** the unit test asserts the ConfirmDialog options, but the
+  final PrimeVue dialog header/button rendering and focus ring are browser pixels.
+
 ### Issue #9 — Discovered MCP server toggle persistence (2026-05-30)
 
 > Repro fixture: [`tools/manual-fixtures/mcp-discovery/`](tools/manual-fixtures/mcp-discovery/).
