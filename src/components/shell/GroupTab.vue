@@ -134,6 +134,31 @@ function pickSwatch(swatch: string): void {
   groupsStore.setGroupColor(groupId.value, swatch);
 }
 
+function closeGroupOrConfirm(id: string, target?: HTMLElement): void {
+  const count = sessionCount.value;
+
+  if (count === 0) {
+    groupsActions.deleteGroup(id);
+
+    return;
+  }
+
+  confirm.require({
+    ...(target ? { target } : {}),
+    header: 'Close group',
+    message: `Close ${count} session${count === 1 ? '' : 's'} in "${displayName.value}"? This will close ${
+      count === 1 ? 'that session' : 'those sessions'
+    }.`,
+    icon: 'pi pi-exclamation-triangle',
+    acceptProps: { label: 'Close group', severity: 'danger' },
+    rejectProps: { label: 'Cancel', severity: 'secondary', text: true },
+    defaultFocus: 'reject',
+    accept: () => {
+      groupsActions.deleteGroup(id);
+    },
+  });
+}
+
 // ─── Right-click context menu ────────────────────────────────────────
 
 const ctxMenuRef = useTemplateRef<InstanceType<typeof ContextMenu>>('ctxMenuRef');
@@ -168,19 +193,7 @@ const menuItems = computed<MenuItem[]>(() => [
 
       if (!id) return;
 
-      const count = sessionCount.value;
-      const detail =
-        count > 0
-          ? `Close ${count} session${count === 1 ? '' : 's'} in "${displayName.value}"?`
-          : `Close empty group "${displayName.value}"?`;
-
-      confirm.require({
-        message: detail,
-        icon: 'pi pi-exclamation-triangle',
-        acceptLabel: 'Close',
-        rejectLabel: 'Cancel',
-        accept: () => groupsActions.deleteGroup(id),
-      });
+      closeGroupOrConfirm(id);
     },
   },
 ]);
@@ -201,25 +214,10 @@ function onClose(event: MouseEvent): void {
   // with the user before closing all sessions in this group.
   if (groupsStore.groups.length <= 1) return;
 
-  const count = sessionCount.value;
-  const detail =
-    count > 0
-      ? `Close ${count} session${count === 1 ? '' : 's'} in "${displayName.value}"?`
-      : `Close empty group "${displayName.value}"?`;
-
-  confirm.require({
-    target: event.currentTarget as HTMLElement,
-    message: detail,
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Close',
-    rejectLabel: 'Cancel',
-    accept: () => {
-      // useGroupsActions.deleteGroup handles the full orchestration:
-      // closes sessions in this group, removes the outer body panel,
-      // calls groupsStore.deleteGroup. Idempotent + safe.
-      groupsActions.deleteGroup(id);
-    },
-  });
+  // useGroupsActions.deleteGroup handles the full orchestration:
+  // closes sessions in this group, removes the outer body panel,
+  // calls groupsStore.deleteGroup. Idempotent + safe.
+  closeGroupOrConfirm(id, event.currentTarget as HTMLElement);
 }
 </script>
 
