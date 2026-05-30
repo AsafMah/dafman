@@ -8,7 +8,7 @@
 /// `settingsStore.appearance.enableMermaid` upstream; this component
 /// only renders when the gate is already on.
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, useId, watch } from 'vue';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 const props = defineProps<{
@@ -19,10 +19,11 @@ const svg = ref<string>('');
 const error = ref<string>('');
 const ready = ref(false);
 
-// Unique id per instance so two diagrams on the same page don't
-// collide on mermaid's internal element-id allocator.
-let counter = 0;
-const localId = `mermaid-${Date.now()}-${++counter}`;
+// App-wide unique id so two diagrams in the same message don't collide on
+// mermaid's internal element-id allocator. A per-instance counter is always
+// 1, and Date.now() ties for diagrams mounted in the same tick — both would
+// share an id and render into the same element.
+const localId = `mermaid-${useId()}`;
 
 type MermaidModule = {
   default: {
