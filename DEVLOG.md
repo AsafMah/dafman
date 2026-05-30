@@ -10,6 +10,52 @@
 
 ---
 
+## 2026-05-30 — fix #17: composer mode selector compact (narrow-pane) form restored
+
+**Takeaway:** the "bottom bar resize regression" and "small-mode selector
+missing" in #17 are the *same* bug. Commit `6343902` (problems.md sweep)
+removed the `@container (max-width: 620px)` rule that hid `.mode-button-group`
+on narrow panes — its accompanying swap target `.mode-select-shell` never
+existed in the codebase, so rather than build the fallback, the agent deleted
+the hide and left a justification comment ("3-icon SelectButton is ~90px, fits
+without the swap"). The user disagreed: at narrow widths the segmented control
+crowds the toolbar and the bottom bar reflow looks broken.
+
+**Fix:** `src/components/chat/ModeButtonGroup.vue` now renders both forms:
+- the existing `SelectButton` (3-icon segmented control), class `.mode-button-group`
+- a new icon-only PrimeVue `Select`, class `.mode-select-compact`, whose `#value`
+  slot shows just the active mode's icon (colored per mode via `--mode-color`)
+  and whose `#option` slot lists icon + label.
+
+A `@container (max-width: 620px)` rule in the component's scoped styles hides the
+segmented control and shows the compact Select. The container context is the
+`.lex-composer-toolbar` `<footer>` (`container-type: inline-size`) — the same
+container the sibling `@container` rules in `MessageComposer.vue` already target,
+so the mechanism is proven in this exact spot. Container queries resolve against
+the nearest containment ancestor regardless of which component's stylesheet the
+rule lives in, so a child component's scoped `@container` works fine.
+
+**Receipts:**
+- Culprit: `git show 6343902` (MessageComposer.vue toolbar bullet).
+- Issue source rows: `plans/TODO_archive.md:76` (Shell & layout row 7),
+  `MANUAL_TESTS_archive.md:332-337` (the original spec: "Narrow panes switch
+  mode to an icon select").
+- Dead CSS noticed but left alone: `SessionHeaderControls.vue` still carries
+  `.compact-select-mode` / `.compact-mode-group` rules from when mode lived in
+  the header — unused now (mode moved to the composer), out of scope for #17.
+
+**Test:** `src/components/chat/__tests__/ModeButtonGroup.compact.test.ts` —
+asserts both forms render and the compact Select reflects the active mode
+(class + trigger icon). Test-first verified: 2/3 assertions fail on the pre-fix
+component (compact Select absent), all pass after. The width-based visual swap
+itself can't be unit-tested (happy-dom has no layout, so `@container` never
+matches) — added to `MANUAL_TESTS.md` per rule 10.
+
+**Gates:** `lint:eslint` 0 errors / 17 pre-existing warnings, `vue-tsc` clean,
+targeted test 3/3, `bun run smoke` 4/4.
+
+---
+
 ## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
 
 **Takeaway.** Two follow-up warnings from the #20 work, both addressed without
