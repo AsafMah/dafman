@@ -10,6 +10,61 @@
 
 ---
 
+## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
+
+**Takeaway.** Walked the `MANUAL_TESTS.md ⏳ Pending verification` queue live in
+`bun run dev`. **17 items verified** (all Visual 18.1/18.2/17.1/17.2, all Agents
+A1–A3, Library 22.1/22.2/22.3). Seven issues filed from findings. The big lesson:
+a failing manual check is NOT automatically a dafman bug — root-cause it first.
+Codified the whole loop into a new project skill so the next agent doesn't
+re-derive it.
+
+**Issues filed (#76–#82).**
+- #76 `bug(chat)` — fenced code blocks render dark in light mode. Root cause:
+  `MessageContent.vue:71` routes top-level fenced blocks through the CodeMirror
+  `CodeEditor`, which hardcodes `oneDark` (`CodeEditor.vue:20,94`) regardless of
+  appearance. (`.lex-code` is already theme-aware, so it's only the CM surface.)
+- #77 `enhancement(library)` — Library tab-header affordances inconsistent
+  (deferred to redesign).
+- #78 `enhancement(library)` — agent Select button flashes a refresh affordance
+  on instant select; debounce/optimistic-render the common path.
+- #79 `bug(palette)` — `/agent` (and siblings) toggles the panel **closed** when
+  already open; should reveal+focus.
+- #80 `feat(palette)` — no slash-command autocomplete/typeahead in the composer.
+- #81 `feat(library)` — dafman doesn't surface SDK agent-load **rejections**:
+  an invalid `.agent.md` still lists (fs scan) and looks selectable, then fails
+  with a cryptic "custom agent X not found".
+- #82 `bug(library)` — Agents **Refresh** is fs-scan only
+  (`useAgentsLibrary.ts:25` → `listAgentFiles`, no `agent.reload()`), so an
+  externally-dropped/edited agent appears in the list but isn't selectable until
+  a create/edit/delete or restart triggers the SDK reload.
+
+**The "reviewer not found" rabbit hole (why rule 2 of the new skill exists).**
+A hand-authored fixture `~/.copilot/agents/reviewer.agent.md` failed to select.
+It was tempting to file a dafman select bug. It was NOT one: the fixture's
+`mcp-servers.github` block was missing the SDK-**required** `tools` array.
+Verified in SDK source (`node_modules/@github/copilot/app.js`): agent schema
+`sht` → `U2` does `schema.safeParse(n)`; on failure the agent is **silently
+dropped**. `tMs` (http MCP) = `{ url, headers?, timeout?, tools (required),
+type:["http","sse"] }`; unknown keys are stripped+warned, not fatal. Adding
+`tools: []` fixed selectability. dafman's own *form-created* agent (`tester`)
+always worked. The invalid fixture, chased correctly, is what surfaced #81+#82.
+(Stored a memory on the `.agent.md` safeParse behavior.)
+
+**New skill.** `.github/skills/manual-tests/SKILL.md` — mirrors `code-audit`'s
+structure. Hard rules: update `MANUAL_TESTS.md` as you go (the user caught me
+tracking only in SQL); root-cause before filing (dafman bug vs invalid fixture
+vs SDK constraint, verify against `node_modules`); one issue per finding with
+template+labels; structured `ask_user` forms; literal-claim vs feature-intent;
+clean up throwaway fixtures. Includes the dev-log path, restart recipe, and the
+`.agent.md` fixture schema gotcha.
+
+**Process note.** `MANUAL_TESTS.md` result lines for the 17 walked items are now
+filled (`- [x] result: v PASS …` / failures cross-referenced to issues). Agents
++ Visual sub-sections are effectively done bar the two code-block/refresh issues;
+remaining queue: MCP (9.1/10.1/51.3/7.x), Jobs (16.x/D15.1), Library auto-refresh
+(51.1/51.2/51.4), instruction theming (19.1/19.2).
+
 ## 2026-05-30 — #9 MCP discovery: part-1 repro fixture + parts 2/3 filed upstream (copilot-sdk#1518)
 
 **Takeaway.** #9's original `.vscode/mcp.json` repro is **stale** — Copilot CLI

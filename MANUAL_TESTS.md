@@ -141,7 +141,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 18.1 - All dockview chrome is light in light mode.
 
-- [ ] result: 
+- [x] result: v PASS — chrome is light. New adjacent bug found: fenced code blocks in the transcript stay dark in light mode (CodeMirror `oneDark` hardcoded) → filed #76.
 
 - **Steps:** set the app to light mode (or system on a light OS). Open a
   session. Open the edge panels: Jobs, Terminals, Session details, Library.
@@ -157,7 +157,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 18.2 - Library Tools "Enable all" / "Disable all" and the composer mode select read with good contrast in light mode.
 
-- [ ] result: 
+- [x] result: v PASS
 
 - **Steps:** in light mode, open Library → Tools (see the Enable all / Disable
   all buttons) and the composer toolbar's mode select.
@@ -167,7 +167,7 @@ section is verified) or get a GitHub issue filed (with label
   the underlying tokens are invertible but the perceived weakness only shows
   against the real rendered chrome.
 - **Measured baseline (light mode, post-#18, via `bun run inspect`):** *Enable
-  all* `#475569` on `#f1f5f9` ≈ 6:1 (good); *Disable all* (text variant) and
+  all* `#475569` on `#f1f5f9` ≈ 6:1 (good); *Disable all* (text variant) andO
   the unselected composer mode select use `--p-text-muted-color` (slate-500
   `#64748b`) ≈ 4.5:1 — AA-passing but on the muted side. If these still read
   "weak" when dogfooding, file a follow-up to bump those muted controls to a
@@ -204,7 +204,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 17.1 - Mode selector swaps to a compact icon Select on narrow panes.
 
-- [ ] result: 
+- [x] result: v PASS
 
 - **Steps:** open a session so the composer shows. Drag the chat pane (or window) from wide to narrow, watching the bottom-bar mode control on the left.
 - **Expected:** while wide, the 3-icon segmented control (Interactive / Plan / Autopilot) shows. Once the composer toolbar drops below ~620px, it swaps to a single icon-only dropdown showing the current mode's icon; opening it lists all three modes with icon + label. The bottom bar reflows smoothly the whole way — no overflow, clipping, or jump.
@@ -212,7 +212,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 17.2 - Compact Select changes mode and stays in sync.
 
-- [ ] result: 
+- [x] result: v PASS
 
 - **Steps:** at narrow width, pick a different mode from the compact dropdown. Widen back out.
 - **Expected:** the selection persists, the wide segmented control reflects the same mode, and the per-mode accent color (blue / amber / purple) matches.
@@ -294,7 +294,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 22.1 - Refresh button appears next to "New agent".
 
-- [ ] result: 
+- [x] result: v PASS — Refresh works. Tab-header action affordances are inconsistent across Library tabs (deferred to Library redesign) → tracked #77.
 
 - **Steps:** open Library → Agents.
 - **Expected:** a `Refresh` button with `pi-refresh` icon sits in the
@@ -305,7 +305,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 22.2 - External agent file appears after Refresh click.
 
-- [ ] result: 
+- [x] result: v PASS (literal) — a dropped `~/.copilot/agents/*.agent.md` appears after Refresh. BUT the feature intent is broken: the agent appears yet is NOT selectable until a create/edit/delete or restart triggers an SDK reload (Refresh is fs-scan only). Filed as bug #82. Separately, files the SDK rejects (e.g. invalid `mcp-servers`) appear selectable-looking but fail with a cryptic "not found" → #81.
 
 - **Steps:** with the Agents tab open, drop a valid `.agent.md`
   file under `~/.copilot/agents/` (or `<cwd>/.github/agents/` with
@@ -316,7 +316,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 22.3 - Rows still styled as cards (no E.8 regression).
 
-- [ ] result: 
+- [x] result: v PASS
 
 - **Steps:** look at any agent row in the list.
 - **Expected:** bordered card with name + path stacked on the left,
@@ -338,7 +338,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A1.1 - Select button per row.
 
-- [ ] result: 
+- [x] result: v PASS
 
 - **Steps:** open Library → Agents → click `Select` on any row.
 - **Expected:** header gets the agent chip; the clicked row turns
@@ -349,7 +349,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A1.2 - Deselect.
 
-- [ ] result: 
+- [x] result: v PASS — toggle works, but on the common instant-select path it flashes a refresh affordance; smoothness polish → #78.
 
 - **Steps:** click `Deselect` on the currently selected row.
 - **Expected:** header chip disappears; row's button returns to
@@ -357,7 +357,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A1.3 - Disabled state with no active session.
 
-- [ ] result: 
+- [x] result: v PASS
 
 - **Steps:** close every chat tab → open Library → Agents.
 - **Expected:** Select button shows but is disabled. Hover gives a
@@ -365,7 +365,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A1.4 - Loading state during IPC.
 
-- [ ] result: 
+- [x] result: v PASS — once the fixture was valid, selecting `reviewer` shows a brief loading state on the button. (The earlier failure was an invalid fixture, not a dafman bug — see A3.1.)
 
 - **Steps:** click `Select` on a slow agent (e.g. one whose YAML
   is verbose so the SDK takes a moment).
@@ -377,7 +377,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A2.1 - Edit opens form prefilled.
 
-- [ ] result: 
+- [x] result: v PASS — name/displayName/description/tools/skills/model all prefilled.
 
 - **Steps:** click the pencil icon on any existing agent row.
 - **Expected:** form opens with title `Edit <name>`. Name and Scope
@@ -387,7 +387,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A2.2 - Edit save persists known fields + preserves unknown frontmatter.
 
-- [ ] result: 
+- [x] result: v PASS — verified byte-for-byte on disk after save: `mcp-servers` (nested github http), `github.toolsets`, and `custom-plugin-key` all preserved intact.
 
 - **Steps:** create an agent file by hand at
   `~/.copilot/agents/foo.agent.md` with a `mcp-servers:` block in
@@ -399,7 +399,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A2.3 - Preserved-keys hint shows when there are unknown frontmatter keys.
 
-- [ ] result: 
+- [x] result: v PASS — hint shows and lists `mcp-servers`, `github`, `custom-plugin-key`.
 
 - **Steps:** open Edit on the file above (which has `mcp-servers:`).
 - **Expected:** blue info banner at the top of the form: "Unknown
@@ -408,7 +408,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A2.4 - Preserved-keys hint hidden when there's nothing to preserve.
 
-- [ ] result: 
+- [x] result: v PASS — hint hidden when editing plain `Stella` (name+description only).
 
 - **Steps:** create an agent via `New agent`, save it. Then Edit.
 - **Expected:** no preserved-keys banner.
@@ -417,7 +417,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A3.1 - `/agent reviewer` selects the agent.
 
-- [ ] result: 
+- [x] result: v PASS — `/agent reviewer` and Library Select both work. ROOT CAUSE of the earlier "custom agent reviewer not found": the fixture's `mcp-servers.github` block was missing the SDK-required `tools` array, so the SDK's `.agent.md` schema (`safeParse`) rejected the whole file and silently dropped the agent. Adding `tools: []` fixed it. dafman's own create→select flow was never broken (form-created `tester` always worked). The real dafman gap this surfaced — dafman doesn't flag SDK-rejected agent files — is filed as #81.
 
 - **Steps:** type `/agent reviewer` (with a real agent name) in
   composer → Enter.
@@ -428,7 +428,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A3.2 - `/agent unknown` warns + lists available.
 
-- [ ] result: 
+- [x] result: v PASS — warns and lists available agents. Two follow-ups raised: no inline autocomplete/typeahead → #80; the unknown is only surfaced after submit, not before.
 
 - **Steps:** type `/agent unknown-name` → Enter.
 - **Expected:** warn toast "No agent named 'unknown-name'.
@@ -436,7 +436,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### A3.3 - `/agent` with no argument opens Library.
 
-- [ ] result: 
+- [x] result: v PASS — opens Library → Agents. Follow-up: running it again while already open toggles it CLOSED; should focus instead (applies to sibling slash commands) → #79.
 
 - **Steps:** type `/agent` → Enter (or pick from slash menu).
 - **Expected:** right-edge Library panel opens to the Agents tab.
