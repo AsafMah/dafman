@@ -24,7 +24,10 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #29 — Full E2E back to 48/48 (stale flows updated for the
+**Recently fixed:** #20 — resume no longer stuck on "Thinking…" after the app
+exits mid-turn (bun appends a synthetic `dafman.resume_settled` terminator to
+the resume replay when history ends mid-turn; reducer clears `isThinking`).
+2026-05-30. #29 — Full E2E back to 48/48 (stale flows updated for the
 no-auto-open rail + dockview edge tabs; fake-client `getEvents` drift fixed;
 Full E2E re-added to required checks). 2026-05-29.
 

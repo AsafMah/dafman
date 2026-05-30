@@ -69,6 +69,46 @@ const HISTORY_REPLAY_CAP = 500;
 /// chunks.
 const HISTORY_REPLAY_BATCH = 50;
 
+/// #20: synthetic terminator appended to the resume replay stream when
+/// the persisted history ends mid-turn. Not an SDK event — the renderer
+/// reducer maps `dafman.resume_settled` to "clear isThinking" (see
+/// `sessionReducer.ts`). Cast through `SessionEvent` because the SDK's
+/// event union doesn't (and shouldn't) know about our dafman.* control
+/// events.
+const RESUME_SETTLED_EVENT = {
+  type: 'dafman.resume_settled',
+  data: {},
+} as unknown as SessionEvent;
+
+/// #20: mirror of the renderer reducer's `isThinking` transitions over a
+/// replayed history slice. Returns true when the trailing state is
+/// "mid-turn" (a `turn_start` with no matching terminal boundary —
+/// turn_end / idle / error / abort / task_complete) — the stuck-spinner
+/// condition. A freshly-resumed session never legitimately resumes
+/// mid-turn (the SDK does not auto-continue an interrupted turn:
+/// `continuePendingWork` defaults to false), so a true result is always
+/// safe to terminate.
+function historyEndsMidTurn(events: ReadonlyArray<SessionEvent>): boolean {
+  let thinking = false;
+
+  for (const event of events) {
+    switch (event.type) {
+      case 'assistant.turn_start':
+        thinking = true;
+        break;
+      case 'assistant.turn_end':
+      case 'session.idle':
+      case 'session.error':
+      case 'abort':
+      case 'session.task_complete':
+        thinking = false;
+        break;
+    }
+  }
+
+  return thinking;
+}
+
 /// S1: per-session disconnect timeout during `shutdownAll`. If the
 /// SDK's `session.disconnect()` doesn't resolve in this window we
 /// force-clear the entry and move on — the OS process exit handles
@@ -373,11 +413,19 @@ export class SessionRegistry {
       const capped =
         total > HISTORY_REPLAY_CAP ? history.slice(total - HISTORY_REPLAY_CAP) : history;
 
-      await this.replayHistory(actualId, capped);
+      // #20: if the replayed slice ends mid-turn (app exited while the
+      // agent was thinking), append a synthetic terminator as the last
+      // replayed event so the renderer reducer clears its stuck
+      // `isThinking`. Build a NEW array — `capped` may alias the
+      // original history (when total <= cap), which must not be mutated.
+      const replay = historyEndsMidTurn(capped) ? [...capped, RESUME_SETTLED_EVENT] : capped;
+
+      await this.replayHistory(actualId, replay);
       log.info('session resumed', {
         sessionId: actualId,
         historyCount: total,
         replayedCount: capped.length,
+        settledMidTurn: replay.length > capped.length,
         workingDirectory: effectiveCwd ?? null,
       });
     } catch (err) {
