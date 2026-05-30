@@ -27,6 +27,8 @@ import { revealPath } from '@/lib/pathActions';
 import { useAgentsLibrary } from '@/composables/library/useAgentsLibrary';
 import { useSessionAgents } from '@/components/session/details/useSessionAgents';
 import LibraryAgentsTabSection from '@/components/library/LibraryAgentsTabSection.vue';
+import LibraryTabHeader from '@/components/library/LibraryTabHeader.vue';
+import type { LibraryTabHeaderAction } from '@/components/library/libraryTabHeader';
 
 const toasts = useToastStore();
 const sessionsStore = useSessionsStore();
@@ -43,6 +45,24 @@ const activeSession = computed(() => {
 
   return sessionsStore.getSession(id) ?? null;
 });
+
+const headerActions = computed<LibraryTabHeaderAction[]>(() => [
+  {
+    key: 'refresh',
+    label: 'Refresh',
+    icon: 'pi pi-refresh',
+    ariaLabel: 'Refresh agents list',
+    title: 'Refresh agents list',
+  },
+  {
+    key: 'new',
+    label: 'New agent',
+    icon: 'pi pi-plus',
+    title: activeSession.value ? 'New agent' : 'Open a session first',
+    disabled: !activeSession.value,
+    variant: 'primary',
+  },
+]);
 
 const {
   files,
@@ -314,11 +334,22 @@ async function deleteFile(entry: AgentFileEntry) {
 async function reveal(path: string) {
   await revealPath(path, 'Reveal failed');
 }
+
+function onHeaderAction(action: string) {
+  if (action === 'refresh') {
+    void load();
+  } else if (action === 'new') {
+    openForm();
+  }
+}
 </script>
 
 <template>
   <div class="agents-tab">
-    <header class="agents-header">
+    <LibraryTabHeader
+      :actions="headerActions"
+      @action="onHeaderAction"
+    >
       <span class="agents-summary">
         <span v-if="!loaded">Loading…</span>
         <span
@@ -328,24 +359,7 @@ async function reveal(path: string) {
         >
         <span v-else>{{ files.length }} agent{{ files.length === 1 ? '' : 's' }}</span>
       </span>
-      <Button
-        icon="pi pi-refresh"
-        size="small"
-        severity="secondary"
-        text
-        label="Refresh"
-        aria-label="Refresh agents list"
-        @click="load"
-      />
-      <Button
-        size="small"
-        :disabled="!activeSession"
-        :title="activeSession ? '' : 'Open a session first'"
-        icon="pi pi-plus"
-        label="New agent"
-        @click="openForm"
-      />
-    </header>
+    </LibraryTabHeader>
 
     <div
       v-if="!activeSession && loaded"
@@ -554,19 +568,8 @@ async function reveal(path: string) {
   min-height: 100%;
 }
 
-.agents-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--p-surface-border);
-}
-
 .agents-summary {
-  flex: 1;
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
+  min-width: 0;
 }
 
 .agents-summary .error {
