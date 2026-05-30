@@ -52,7 +52,35 @@ next `loadAll`. Tests: `src/composables/library/__tests__/useMcpLibrary.test.ts`
 Per rules 4/9/12 I did NOT fabricate a persistence "fix." User chose
 dogfood-first for #9; #10 ships alone on `sprint-b/10-mcp-remove-view-jump`.
 
-## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
+## 2026-05-30 — #35: per-message agentMode pass-through
+
+**Takeaway.** Wired `MessageOptions.agentMode` (new in SDK beta.9) through
+`SessionRegistry.send`. Pass-through design (user's call via spec-interview):
+each send carries the session's current `modeBySession` value; an optional
+trailing `agentMode` param overrides it for a single message. The
+session-wide toggle stays — it's not redundant.
+
+**Why the toggle stays (the issue's open acceptance question).** #35 asked
+"does this let us drop the session-wide plan-mode toggle entirely?" No.
+`modeBySession` is read by `sessionConfigBuilder` to short-circuit
+`onPermissionRequest` / `onUserInputRequest` / `onElicitationRequest` when
+the session is in `autopilot` (return `user-not-available` / auto-decline).
+That gating is a *session* property, not a per-turn one — per-message
+`agentMode` only sets the SDK's per-turn UI mode and never reaches our
+permission handlers. Dropping the toggle would break autopilot gating.
+
+**SDK reality check (rule 0 / rule 23).** The bump to beta.9 was already
+committed (PR #6, `57ac07f`) but my local `node_modules` was stale at beta.7
+— `bun install` synced it. Confirmed `MessageOptions.agentMode` exists at
+`node_modules/@github/copilot-sdk/dist/types.d.ts:1644`. `SessionMode`
+(`interactive|plan|autopilot`) is a subset of the SDK's `agentMode`
+(`+shell`), so pass-through is type-safe with no narrowing.
+
+**Scope.** Backend-only: `sessions.ts` send path + `fakeClient.ts` /
+test-fake `send` arg capture. No IPC or composer change (user chose
+pass-through over a composer override control). Test in `sessions.test.ts`.
+
+
 
 **Takeaway.** Two follow-up warnings from the #20 work, both addressed without
 behavior change. (1) `SessionRegistry.resume()` was CC 21 (rule 20) — split into

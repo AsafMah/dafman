@@ -57,7 +57,7 @@ interface FakeSessionState {
 }
 
 export type SendScript = (
-  args: { prompt: string; mode?: string; attachments?: unknown[] },
+  args: { prompt: string; mode?: string; attachments?: unknown[]; agentMode?: string },
   push: (event: Record<string, unknown>) => void,
   state: FakeSessionState,
 ) => void | Promise<void>;
@@ -192,7 +192,12 @@ class FakeCopilotSession {
     return () => this.state.listeners.delete(callback);
   }
 
-  async send(args: { prompt: string; mode?: string; attachments?: unknown[] }): Promise<void> {
+  async send(args: {
+    prompt: string;
+    mode?: string;
+    attachments?: unknown[];
+    agentMode?: string;
+  }): Promise<void> {
     const push = (event: Record<string, unknown>) => {
       this.state.history.push(event);
 
