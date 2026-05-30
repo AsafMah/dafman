@@ -12,6 +12,7 @@ import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { openUrl } from '@/lib/pathActions';
+import { PRODUCT_NAME } from '@/lib/product';
 
 export type McpConfig = Record<string, unknown>;
 
@@ -227,14 +228,23 @@ export function useMcpLibrary() {
     name: string,
   ): Promise<{ state: 'no-session' | 'started' | 'already-signed-in' | 'failed' }> {
     const sessionsStore = useSessionsStore();
-    const session = sessionsStore.sessions[0];
+    // Prefer the active session (whose workspace/config the Library is
+    // showing) and fall back to any open session — the OAuth flow runs
+    // through a live session but isn't otherwise session-specific.
+    const session =
+      sessionsStore.getSession(useLayoutStore().activeSessionId) ?? sessionsStore.sessions[0];
 
     if (!session) return { state: 'no-session' };
 
     try {
+      // Pass our product name so the OAuth consent screen names the app
+      // requesting access instead of the SDK's neutral fallback. The SDK
+      // applies this to newly-registered dynamic clients only; existing
+      // registrations keep the name they were created with.
       const result = await invokeCommand('loginToMcpServer', {
         sessionId: session.id,
         serverName: name,
+        clientName: PRODUCT_NAME,
       });
 
       if (result.authorizationUrl) {

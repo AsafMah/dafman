@@ -63,6 +63,32 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #7 — MCP HTTP OAuth Sign-in flow (2026-05-30)
+
+- **7.1** ⏳ **Sign-in opens the system browser and completes OAuth end-to-end.**
+  - **Steps:** add a real HTTP MCP server that requires OAuth (e.g. the GitHub
+    remote MCP `{ type: 'http', url: … }`). With at least one session open, go to
+    Library → MCP, find the server under Configured (http badge), click
+    **Sign in**.
+  - **Expected:** an *OAuth started* toast appears, your **system browser** opens
+    the provider consent page (not an in-app webview), and after you approve, the
+    browser shows the loopback success page and the server reconnects in the app
+    without re-entering token fields. If the server was already authenticated, no
+    browser opens and an *Already signed in* toast shows instead.
+  - **Why not automated:** real provider auth + OS-keychain token persistence
+    can't be driven in CI (the issue itself notes this).
+
+- **7.2** ⏳ **The OAuth consent screen names the app "Dafman".**
+  - **Steps:** trigger 7.1 against a server that registers a **fresh** dynamic
+    OAuth client (one that hasn't been authenticated from this machine before).
+    Read the app-name on the provider consent screen.
+  - **Expected:** the consent screen shows *Dafman* as the requesting client.
+  - **Why not automated:** the displayed client name is rendered by the external
+    provider. **Note:** the SDK applies `clientName` to *newly-registered* dynamic
+    clients only — a server whose client was already registered under the old
+    neutral fallback keeps that name until its registration is cleared (use a
+    fresh server / forced re-auth to see the branded name).
+
 ### Issue #18 — Light-mode dock chrome follows the theme (2026-05-30)
 
 - **18.1** ⏳ **All dockview chrome is light in light mode.**
