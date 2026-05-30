@@ -901,16 +901,22 @@ export const useLayoutStore = defineStore('layout', () => {
 
     if (!group || !panel) return;
 
-    const isActive = panel.api.isActive;
     const isCollapsed = group.isCollapsed();
+    // "Shown" = the edge is expanded AND this panel is the one currently
+    // displayed in it. Deliberately NOT `panel.api.isActive`: that is also false
+    // whenever the panel's group isn't dockview's globally-active group, which it
+    // stops being the moment the user clicks any control inside the rail — making
+    // the cog need two clicks to collapse (#54). `group.activePanel` tracks the
+    // displayed panel regardless of global focus.
+    const isShown = !isCollapsed && panel.group.activePanel?.id === id;
 
-    if (isActive && !isCollapsed) {
+    if (isShown) {
       group.collapse();
 
       return;
     }
 
-    if (!isActive) panel.api.setActive();
+    if (!panel.api.isActive) panel.api.setActive();
 
     if (isCollapsed) group.expand();
   }
