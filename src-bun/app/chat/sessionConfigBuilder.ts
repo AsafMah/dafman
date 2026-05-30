@@ -21,11 +21,14 @@ import type {
   ExitPlanModeResult,
   PermissionRequest,
   PermissionRequestResult,
+  PreMcpToolCallInput,
   Tool,
   UserInputRequest,
   UserInputResponse,
 } from '../client/copilotSdk';
 import { log } from '../observability/logging';
+import { recordMcpToolCall, extractArgKeys } from '../observability/audit';
+import { toErrorMessage } from '../shared/errorMessage';
 import { summarizePermission, toPlainObject } from './sessionHelpers';
 import type {
   AutoModeSwitchRequestData,
@@ -216,6 +219,47 @@ export function buildBaseSessionConfig(deps: SessionConfigBuilderDeps, sessionId
           request: data,
         });
       }) as Promise<AutoModeSwitchResponse>;
+    },
+    // #37: observe-only MCP tool-call hook. Records a forensic audit
+    // entry (server/tool/argKeys, never raw arg values) which the
+    // existing subscribeAudit → auditEvent pipeline surfaces in the
+    // renderer's Activity view. The hook can only rewrite `_meta`
+    // (it can't block or modify args) so we return undefined to
+    // preserve it. Defensive: never throws — an audit failure must
+    // not break or delay the MCP critical path.
+    //
+    // NOTE: tool/session lifecycle hooks live under `config.hooks`
+    // (the SDK's `SessionHooks` surface), NOT at the top level like
+    // `onPermissionRequest` / `onUserInputRequest`. Placing it at the
+    // top level would make the SDK silently ignore it.
+    hooks: {
+      onPreMcpToolCall: (input: PreMcpToolCallInput): undefined => {
+        const sid = sessionId();
+
+        try {
+          const { argKeys, argKeyCount } = extractArgKeys(input.arguments);
+
+          log.info('mcp tool call', {
+            sessionId: sid,
+            serverName: input.serverName,
+            toolName: input.toolName,
+            argKeyCount,
+          });
+
+          void recordMcpToolCall({
+            sessionId: sid,
+            serverName: input.serverName,
+            toolName: input.toolName,
+            ...(input.toolCallId ? { toolCallId: input.toolCallId } : {}),
+            argKeys,
+            argKeyCount,
+          });
+        } catch (err) {
+          log.warn('mcp audit hook failed', { sessionId: sid, error: toErrorMessage(err) });
+        }
+
+        return undefined;
+      },
     },
     streaming: deps.streamingResolver(),
     ...(() => {

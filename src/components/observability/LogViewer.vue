@@ -145,7 +145,29 @@ function auditLabel(entry: AuditEntry): string {
     return `${entry.status} · ${entry.command}${exit}`;
   }
 
+  if (entry.kind === 'mcp') {
+    const keys = entry.argKeys?.length ? ` · ${entry.argKeys.join(', ')}` : '';
+
+    return `${entry.serverName} · ${entry.toolName}${keys}`;
+  }
+
   return `${entry.allowed ? 'opened' : 'blocked'} · ${entry.url}`;
+}
+
+/// Per-kind CSS class for an audit row. A function (not an inline
+/// template ternary) so adding kinds stays a flat switch instead of
+/// a nested 4-way ternary.
+function auditRowClass(entry: AuditEntry): string {
+  switch (entry.kind) {
+    case 'permission':
+      return `audit-perm-${entry.decision}`;
+    case 'command':
+      return `audit-command-${entry.status}`;
+    case 'mcp':
+      return 'audit-mcp';
+    default:
+      return entry.allowed ? 'audit-url-ok' : 'audit-url-blocked';
+  }
 }
 
 function formatTime(ts: string): string {
@@ -303,21 +325,14 @@ function formatFields(fields: Record<string, unknown>): string {
         v-if="auditStore.entries.length === 0"
         class="logviewer-empty"
       >
-        No audit entries yet. Permission decisions and URL opens land here as they happen.
+        No audit entries yet. Permission decisions, URL opens, and MCP tool calls land here as they
+        happen.
       </div>
       <article
         v-for="(entry, idx) in auditStore.entries"
         :key="`${entry.ts}-${idx}`"
         class="logviewer-row-record"
-        :class="
-          entry.kind === 'permission'
-            ? `audit-perm-${entry.decision}`
-            : entry.kind === 'command'
-              ? `audit-command-${entry.status}`
-              : entry.allowed
-                ? 'audit-url-ok'
-                : 'audit-url-blocked'
-        "
+        :class="auditRowClass(entry)"
         :title="entry.ts"
       >
         <span class="logviewer-ts">{{ fmtTime(entry.ts) }}</span>
@@ -334,6 +349,16 @@ function formatFields(fields: Record<string, unknown>): string {
           class="logviewer-fields"
         >
           {{ entry.cwd }}
+        </span>
+        <span
+          v-else-if="
+            entry.kind === 'mcp' &&
+            entry.argKeyCount &&
+            entry.argKeyCount > (entry.argKeys?.length ?? 0)
+          "
+          class="logviewer-fields"
+        >
+          +{{ entry.argKeyCount - (entry.argKeys?.length ?? 0) }} more arg(s)
         </span>
       </article>
     </div>
@@ -495,6 +520,9 @@ function formatFields(fields: Record<string, unknown>): string {
 }
 .logviewer-row-record.audit-url-ok {
   background: color-mix(in srgb, var(--p-text-color) 3%, transparent);
+}
+.logviewer-row-record.audit-mcp {
+  background: color-mix(in srgb, var(--p-primary-color) 5%, transparent);
 }
 
 .logviewer-row-tabs {

@@ -9,6 +9,7 @@
 //   audit/permissions.jsonl   — every respondToRequest decision
 //   audit/urls.jsonl          — every openUrl + decision
 //   audit/commands.jsonl      — direct user-initiated shell commands
+//   audit/mcp.jsonl           — every MCP tool call (server/tool/argKeys)
 //
 // Schema: each line a JSON object with `ts` (ISO8601), `kind`, and
 // kind-specific fields. Stable; future readers (an in-app Activity
@@ -67,7 +68,34 @@ export interface CommandAuditEntry {
   truncated?: boolean;
 }
 
-export type AuditEntry = PermissionAuditEntry | UrlAuditEntry | CommandAuditEntry;
+/// One MCP tool invocation, recorded by the SDK `onPreMcpToolCall`
+/// hook. Deliberately records NO argument values — only the MCP
+/// server name, tool name, and the top-level argument key names
+/// (`argKeys`, capped) so a reader can answer "which MCP tool ran,
+/// when, on which session, shaped by which inputs" without the raw
+/// (possibly secret-bearing) argument payload landing on disk.
+export interface McpToolCallAuditEntry {
+  ts: string;
+  kind: 'mcp';
+  sessionId: string;
+  serverName: string;
+  toolName: string;
+  /// SDK-supplied correlation id when present.
+  toolCallId?: string;
+  /// Top-level own-enumerable string keys of the arguments object,
+  /// capped at `ARG_KEYS_CAP`. Empty when arguments isn't a plain
+  /// object. Key NAMES only — never values.
+  argKeys?: string[];
+  /// Total key count before the `ARG_KEYS_CAP` truncation, so a
+  /// reader can tell when `argKeys` was clipped.
+  argKeyCount?: number;
+}
+
+export type AuditEntry =
+  | PermissionAuditEntry
+  | UrlAuditEntry
+  | CommandAuditEntry
+  | McpToolCallAuditEntry;
 
 interface AuditConfig {
   dir: string | null;
@@ -80,6 +108,22 @@ const subscribers = new Set<Subscriber>();
 
 const RECENT_CAP = 500;
 const recent: AuditEntry[] = [];
+
+/// Cap on how many top-level argument key names land in an mcp
+/// audit entry. Bounds the on-disk record size for tools called
+/// with very wide argument objects.
+const ARG_KEYS_CAP = 20;
+
+/// Maps each audit kind to its JSONL filename. Exhaustive over the
+/// `AuditEntry` union so adding a kind without a file is a compile
+/// error (vs the previous ternary that silently defaulted unknown
+/// kinds to commands.jsonl).
+const AUDIT_FILES: Record<AuditEntry['kind'], string> = {
+  permission: 'permissions.jsonl',
+  url: 'urls.jsonl',
+  command: 'commands.jsonl',
+  mcp: 'mcp.jsonl',
+};
 
 export interface InitAuditOptions {
   dir: string;
@@ -124,7 +168,7 @@ async function hydrateRecent(): Promise<void> {
 
   if (!dir) return;
 
-  const files = ['permissions.jsonl', 'urls.jsonl', 'commands.jsonl'];
+  const files = ['permissions.jsonl', 'urls.jsonl', 'commands.jsonl', 'mcp.jsonl'];
   const collected: AuditEntry[] = [];
 
   for (const name of files) {
@@ -190,14 +234,7 @@ async function append(entry: AuditEntry): Promise<void> {
 
   if (!dir) return;
 
-  const file = join(
-    dir,
-    entry.kind === 'permission'
-      ? 'permissions.jsonl'
-      : entry.kind === 'url'
-        ? 'urls.jsonl'
-        : 'commands.jsonl',
-  );
+  const file = join(dir, AUDIT_FILES[entry.kind]);
   const line = `${JSON.stringify(entry)}\n`;
 
   try {
@@ -233,6 +270,36 @@ export function recordUrl(entry: Omit<UrlAuditEntry, 'ts' | 'kind'>): Promise<vo
 
 export function recordCommand(entry: Omit<CommandAuditEntry, 'ts' | 'kind'>): Promise<void> {
   return append({ ts: new Date().toISOString(), kind: 'command', ...entry });
+}
+
+export function recordMcpToolCall(
+  entry: Omit<McpToolCallAuditEntry, 'ts' | 'kind'>,
+): Promise<void> {
+  return append({ ts: new Date().toISOString(), kind: 'mcp', ...entry });
+}
+
+/// Derive the forensic-safe `argKeys` / `argKeyCount` for an mcp
+/// audit entry from an MCP tool's raw `arguments` value. Records
+/// only top-level own-enumerable string key NAMES (never values),
+/// capped at `ARG_KEYS_CAP`. Returns empty key list for non-plain
+/// objects (arrays, primitives, null). Defensive: never throws —
+/// `Object.keys` on an exotic/proxy object that throws degrades to
+/// an empty list rather than breaking the MCP call path.
+export function extractArgKeys(args: unknown): {
+  argKeys: string[];
+  argKeyCount: number;
+} {
+  if (args === null || typeof args !== 'object' || Array.isArray(args)) {
+    return { argKeys: [], argKeyCount: 0 };
+  }
+
+  try {
+    const keys = Object.keys(args as Record<string, unknown>);
+
+    return { argKeys: keys.slice(0, ARG_KEYS_CAP), argKeyCount: keys.length };
+  } catch {
+    return { argKeys: [], argKeyCount: 0 };
+  }
 }
 
 /// Test-only.

@@ -197,6 +197,56 @@ reproducible in happy-dom/smoke.
 
 ---
 
+## 2026-05-30 — #37: preMcpToolCall audit-log + Activity surfacing
+
+**Takeaway.** Wired the SDK `onPreMcpToolCall` hook as an observe-only audit
+recorder (4th audit kind `mcp`), reusing the whole existing audit→Activity
+pipeline. Two findings the next agent should not re-learn the hard way.
+
+**Finding 1 — the hook can't block.** The issue framing ("block MCP") was
+wrong. `onPreMcpToolCall`'s output type (`PreMcpToolCallHookOutput`) only
+carries `metaToUse` — it can rewrite `_meta` (undefined=preserve,
+object=replace, null=omit) and nothing else. No arg modification, no deny.
+MCP blocking is `onPermissionRequest` (`PermissionRequestMcp`) + `excludedTools`.
+So #37's deliverable is the forensic record + Activity surfacing, not a gate.
+Returning `undefined` preserves `_meta`; fire-and-forget (no await on the audit
+write) keeps the MCP path latency-free.
+
+**Finding 2 (caught in review, would have shipped a silent no-op) — hooks live
+under `config.hooks`.** Unlike `onPermissionRequest` / `onUserInputRequest` /
+`onAutoModeSwitchRequest` (top-level `SessionConfig` fields), the tool/session
+lifecycle hooks (`onPreToolUse`, `onPreMcpToolCall`, `onPostToolUse`,
+`onSessionStart`, …) live on the SDK's `SessionHooks` interface, attached via
+`SessionConfig.hooks?: SessionHooks`
+(`node_modules/@github/copilot-sdk/dist/types.d.ts:1008` SessionHooks,
+`:1386` `hooks?`, `:1487` SessionConfig). `buildBaseSessionConfig` returns an
+untyped object literal, so placing `onPreMcpToolCall` at the top level
+type-checks fine but the SDK never reads it — it would have shipped a hook that
+silently never fires. tsc caught it only because the derived
+`PreMcpToolCallInput` type (`copilotSdk.ts`) reached
+`SessionConfig['onPreMcpToolCall']`, which doesn't exist; corrected to
+`NonNullable<SessionConfig['hooks']>['onPreMcpToolCall']`, and the builder now
+nests the hook under `hooks: { onPreMcpToolCall }`.
+
+**argKeys privacy.** Record top-level own-enumerable key NAMES only, capped at
+`ARG_KEYS_CAP = 20`, plus `argKeyCount` (pre-truncation total). Never values —
+a `token` key name is not a secret value. `extractArgKeys` is plain-object-only
+(arrays/primitives/null → empty) and wrapped in try/catch so a throwing proxy
+`arguments` degrades to empty instead of breaking the call.
+
+**sessionId choice.** The hook can receive `(input, invocation)` where
+`invocation.sessionId` may differ from `input.sessionId` for sub-agents. The
+audit `sessionId` uses the Dafman closure `sessionId()` (consistent with every
+other audit entry in this builder), not the SDK input's — so MCP calls from a
+sub-agent attribute to the owning Dafman session.
+
+**Tests.** `audit.test.ts` (writes `mcp.jsonl`, fans out, no value leak;
+`extractArgKeys` cap/defensive units), `sessionConfigBuilder.test.ts` (new —
+build config via `buildBaseSessionConfig`, call `config.hooks.onPreMcpToolCall`,
+assert returns `undefined` + records + swallows exotic `arguments`),
+`wire-contract.test.ts` (mcp sample added, snapshot regenerated). Full
+`bun run check` green; smoke 4/4.
+
 ## 2026-05-30 — #35: per-message agentMode pass-through
 
 **Takeaway.** Wired `MessageOptions.agentMode` (new in SDK beta.9) through
@@ -225,7 +275,7 @@ committed (PR #6, `57ac07f`) but my local `node_modules` was stale at beta.7
 test-fake `send` arg capture. No IPC or composer change (user chose
 pass-through over a composer override control). Test in `sessions.test.ts`.
 
-
+## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
 
 **Takeaway.** Two follow-up warnings from the #20 work, both addressed without
 behavior change. (1) `SessionRegistry.resume()` was CC 21 (rule 20) — split into
