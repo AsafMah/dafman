@@ -112,7 +112,14 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 9.1 - Toggling a discovered MCP server off survives an app restart.
 
-- [ ] result: 
+- [x] result: ⛔ WAS BLOCKED by #96 — step 3 failed: Library → MCP → Discovered showed
+  only User-source servers (JetBrains intellij/rider), **never** the workspace
+  `.mcp.json` servers (`fixture-memory`/`fixture-everything`), so there was
+  nothing to toggle. Root-caused to a dafman bug (discovery `workingDirectory`
+  keyed off `layoutStore.activeSessionId`, which diverges from the opened
+  session) — NOT an SDK constraint: `copilot mcp list` run from the fixture cwd
+  lists both workspace servers correctly. **✅ Fix merged in #97 (keys discovery
+  off `lastFocusedSessionId`); ⏳ re-verify 9.1 live before promoting to passed.**
 
 - **Steps:**
   1. `bun run dev`.
@@ -210,7 +217,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 19.1 - Instruction file content inverts correctly in dark mode.
 
-- [ ] result: 
+- [x] result: v PASS — markdown box/text/list/link/table/blockquote invert cleanly both ways. (Fenced code block staying dark in light mode is the known #76 bug, fix in flight — not a 19.1 regression.)
 
 - **Steps:** open Library → Instructions, expand an instruction file that has
   rendered markdown (headings, paragraphs, a list, a code span/block, a link).
@@ -225,7 +232,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 19.2 - Raw HTML inside an instruction file also themes correctly.
 
-- [ ] result: 
+- [x] result: v PASS — raw `<code>`/`<a>`/`<pre>`/`<blockquote>` theme identically to markdown equivalents, legible both modes.
 
 - **Steps:** in an instruction file, include a literal raw `<code>inline</code>`
   and/or `<a href="…">link</a>` (HTML, not markdown). Expand it; toggle theme.
@@ -255,7 +262,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 10.1 - Removing a configured MCP server doesn't bounce to Discovered.
 
-- [ ] result: 
+- [x] result: v PASS — a uniquely-named configured server (not in any `.mcp.json`) disappears on Remove and does not reappear under Discovered.
 
 - **Steps:** Library → MCP. Add/configure an MCP server so it appears under
   the **Configured** section. Click its Remove (trash) action.
@@ -296,7 +303,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 51.1 - Agents tab auto-refreshes.
 
-- [ ] result: 
+- [x] result: v PASS — project-agents section updates on session switch (demo-project-agent → empty) without Refresh.
 
 - **Steps:** open two sessions A and B with different `workingDirectory` (one with project agents in `<cwd>/.github/agents/`, one without). Open Library → Agents while focused on A. Switch to B.
 - **Expected:** the project-agent section updates (becomes empty if B has no project agents). No need to click Refresh.
@@ -304,21 +311,21 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 51.2 - Skills tab auto-refreshes.
 
-- [ ] result: 
+- [x] result: v PASS — skill list updates on switch.
 
 - **Steps:** as above with Library → Skills.
 - **Expected:** skill list updates when switching sessions whose `<cwd>/.github/skills/` differs.
 
 #### 51.3 - MCP tab auto-refreshes.
 
-- [ ] result: 
+- [x] result: v PASS — Discovered section updates on switch (fixture-memory via `.mcp.json` → none). Used `.mcp.json` (not `.vscode/mcp.json`, which is no longer discovered).
 
 - **Steps:** as above with Library → MCP. Drop an `.vscode/mcp.json` under one session's cwd, none under the other.
 - **Expected:** the Discovered section updates on switch.
 
 #### 51.4 - No infinite loops / re-render storms.
 
-- [ ] result: 
+- [x] result: v PASS — rapid switching reloads each tab once, no thrash, no error-level log entries. Minor: a split-second loading flash on each reload (same instant-resolution pattern as #78) → filed #93.
 
 - **Steps:** switch sessions rapidly (5+ times in a few seconds).
 - **Expected:** each switch triggers exactly one reload per tab; no console errors or visible spinner thrashing.

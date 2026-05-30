@@ -10,6 +10,50 @@
 
 ---
 
+## 2026-05-30 — Merge train (7 fix PRs + #94) + dogfood reconciliation + #88 re-spec
+
+**Takeaway.** Landed the reviewed dogfood-fix backlog as a sequential merge
+train — #84, #89, #90, #91, #92, #95, #97, then #94 — each rebased onto a
+fast-moving `main`, conflicts resolved, squash-merged via GitHub auto-merge.
+Two PRs (#97, #94) had real *code* conflicts with #95's `LibraryTabHeader`
+refactor; the rest were additive doc conflicts. Re-spec'd #88 (composer Enter
+keybinding) from a hardcoded swap to a **settings feature** per user direction,
+and reconciled this session's dogfood results into `MANUAL_TESTS.md`.
+
+**Receipts / things future-me needs.**
+- **Merge-train mechanics.** Every fix PR prepends an `[Unreleased]` CHANGELOG
+  block, a "Recently fixed" STATUS line, a new top DEVLOG H2, and sometimes a
+  MANUAL_TESTS section — so each next rebase conflicts on those same regions.
+  Resolution = keep BOTH (additive); new DEVLOG H2 goes ABOVE the `---`/Dogfood
+  separator. After each merge, scan **all four** doc files for markers before
+  `rebase --continue` (a missed DEVLOG conflict got committed-with-markers on
+  #91 and needed a `--amend`).
+- **git gotcha.** `git rebase --continue` opens an interactive editor and HANGS
+  the shell tool — always `$env:GIT_EDITOR="true"` in the same command.
+- **#97 code conflict** (`LibraryMcpTab.vue`): combined #97's
+  `lastFocusedSessionId` destructure with #95's `headerActions` array; both the
+  reload `watch` and the `<LibraryTabHeader>` coexist.
+- **#94 code conflict** (`LibraryAgentsTab.vue`): #95 replaced inline buttons
+  with `<LibraryTabHeader @action="onHeaderAction">`; rewired the `'refresh'`
+  branch to `void refresh()` (reloadSdk) so #94's SDK-reload intent survived the
+  header abstraction. `load()` stays list-only (mount + session-switch); only
+  the explicit Refresh action reloads the SDK.
+- **Prettier ≠ vue-tsc (re-burned).** #94's CI Lint job failed on a single
+  `prettier/prettier` error in `sessions.ts:897` (multi-line signature reformat)
+  that local `bun run lint` (vue-tsc only) never catches. `bunx prettier --write`
+  + `bunx eslint` fixed it; amend + force-push re-triggered auto-merge. Worktree
+  gates MUST run `bun run lint:eslint`, not just `bun run lint`.
+- **#88 re-spec.** Issue body + title rewritten to a settings-based design
+  (`composer.submitKeybinding: 'enter' | 'mod-enter'`, default `'enter'`). The
+  blocking detail: in `'enter'` mode a plain-Enter handler at HIGH priority
+  steals Enter from open slash/mention typeahead menus — handler must detect an
+  open menu (per-editor `WeakMap`, NOT window events, per rule 18) and
+  `return false`; Ctrl+Enter must explicitly `INSERT_PARAGRAPH_COMMAND`.
+- **Dogfood results** filled into MANUAL_TESTS §9.1 (was blocked by #96, fix
+  merged in #97 — re-verify live), 19.1, 19.2, 10.1, 51.1, 51.2.
+
+---
+
 ## 2026-05-30 — #76 CodeMirror code blocks follow light mode
 
 **Takeaway.** Fenced code blocks rendered through CodeMirror no longer pin the

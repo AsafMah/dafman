@@ -24,7 +24,14 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #77 — Library tab header actions now share one
+**Recently fixed:** #94 — Library Agents Refresh now reloads the Copilot SDK
+(not just the filesystem listing); mount + session-switch stay list-only so only
+the explicit Refresh action triggers an SDK reload. 2026-05-30. #97 — discovered
+MCP servers now key off the focused workspace (`lastFocusedSessionId`) instead of
+`activeSessionId`, so `.mcp.json` servers from the opened session actually appear
+under Discovered (unblocks MANUAL_TESTS §9.1). 2026-05-30. #84 — each mermaid
+diagram in a message renders in its own block (previously the first block stacked
+all diagrams overlapping and the rest were empty). 2026-05-30. #77 — Library tab header actions now share one
 `LibraryTabHeader` affordance across Agents / Skills / MCP / Tools /
 Instructions, preserving handlers while normalizing placement, labels, titles,
 and accessible names. 2026-05-30. #79 — Library-opening slash commands (`/agent`, `/skill`,
