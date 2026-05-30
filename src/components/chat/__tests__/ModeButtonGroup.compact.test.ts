@@ -27,7 +27,7 @@ function seedSession(id: string, mode: SessionMode) {
 function mount(sessionId = 's1') {
   return render(ModeButtonGroup, {
     props: { sessionId },
-    global: { plugins: [PrimeVue] },
+    global: { plugins: [PrimeVue], stubs: { teleport: true } },
   });
 }
 
