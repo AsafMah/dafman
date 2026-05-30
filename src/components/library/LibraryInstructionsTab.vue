@@ -379,7 +379,13 @@ watch(
   overflow: auto;
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-sm);
-  background: var(--p-surface-100);
+  /* Invertible inset surface: mix page text into the content background
+   * so it tracks the theme automatically (mirrors .lex-code in
+   * lexical.css). The numeric surface scale (--p-surface-100/900) does
+   * NOT invert under .app-dark, which is why the old hand-rolled
+   * `:global(.app-dark)` overrides existed — replaced here with tokens
+   * that flip on their own. */
+  background: color-mix(in srgb, var(--p-text-color) 4%, var(--p-content-background));
   color: var(--p-text-color);
 }
 
@@ -388,21 +394,26 @@ watch(
   line-height: 1.35;
 }
 
-:global(.app-dark) .instruction-content {
-  background: var(--p-surface-900);
-  color: var(--p-text-color);
-}
-
-:global(.app-dark) .instruction-content :deep(code) {
-  background: var(--p-surface-800);
-  color: var(--p-text-color);
-}
-
-:global(.app-dark) .instruction-content :deep(pre) {
-  background: var(--p-surface-800);
-}
-
-:global(.app-dark) .instruction-content :deep(a) {
+/* Fallbacks for raw-HTML <a>/<code>/<pre> that markdown-it passes through
+ * verbatim (allowed by the DOMPurify config in lib/markdown.ts) and so
+ * never receive the .lex-link/.lex-text-code/.lex-code classes. Markdown
+ * *syntax* already inverts via those lex-* classes; these guards cover the
+ * raw-HTML case in BOTH themes using invertible tokens. */
+.instruction-content :deep(a:not(.lex-link)) {
   color: var(--p-primary-color);
+}
+
+.instruction-content :deep(code:not(.lex-text-code):not(.lex-code)) {
+  font-family: var(--p-font-family-mono, ui-monospace, monospace);
+  background: color-mix(in srgb, var(--p-text-color) 10%, transparent);
+  border-radius: var(--p-border-radius-sm);
+  padding: 0.05rem 0.3rem;
+}
+
+.instruction-content :deep(pre:not(.lex-code)) {
+  background: color-mix(in srgb, var(--p-text-color) 8%, var(--p-content-background));
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-md);
+  padding: 0.5rem 0.75rem;
 }
 </style>

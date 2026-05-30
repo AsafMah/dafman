@@ -10,7 +10,35 @@
 
 ---
 
-## 2026-05-30 — #23: Library Agents project section verified (already fixed by #51)
+## 2026-05-30 — #19: Instructions markdown theme-token inversion
+
+**Takeaway.** The Library Instructions content box rendered with a
+non-inverting background in both themes. Root cause: `.instruction-content`
+used `background: var(--p-surface-100)`. PrimeVue's **numeric** surface scale
+(`--p-surface-50`…`--p-surface-950`) is fixed — `surface-100` stays light in
+both light and dark mode; only the **semantic** tokens (`--p-content-background`,
+`--p-text-color`, etc.) invert under `.app-dark`. The previous author had
+masked the symptom with four hand-rolled `:global(.app-dark)` override blocks
+(a rule-0 workaround smell), which is why it "sort of" worked but looked wrong.
+
+**Fix** (`src/components/library/LibraryInstructionsTab.vue`):
+- Background → `color-mix(in srgb, var(--p-text-color) 4%, var(--p-content-background))`
+  — the identical construction `.lex-code` (lexical.css:88, at 8%) already uses
+  and which renders correctly in dark mode app-wide, so the inversion is proven
+  by a shipped precedent, not just reasoning.
+- Deleted all four `:global(.app-dark)` override blocks.
+- Added `:not(.lex-*)` fallback rules for raw `<a>`/`<code>`/`<pre>` typed
+  literally in an instruction file — these pass DOMPurify's allowlist but never
+  receive a `.lex-*` class from markdown-it (lib/markdown.ts only tags
+  markdown-generated nodes), so without the fallback they'd render unstyled.
+
+**Verification.** `bun run lint` ✅, `bun run smoke` ✅ (CSS parses, bundle
+boots clean), real `bun run dev` boot — log clean, no runtime errors. Computed
+color inversion has no geometry in happy-dom, so the visual check is a new
+`MANUAL_TESTS.md` §19 entry (light/dark expand of an instruction file) rather
+than a unit assertion.
+
+
 
 **Takeaway.** #23 ("Library Agents tab does not show project agents") is already
 fixed; closed as verified rather than re-implemented. The full resolution chain
