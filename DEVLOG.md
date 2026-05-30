@@ -10,6 +10,61 @@
 
 ---
 
+## 2026-05-30 — #7 MCP HTTP OAuth: the flow was already wired; brand it + use the active session
+
+**Takeaway:** #7 ("HTTP transport has no OAuth popup login flow") was, on
+investigation, ~90% already implemented. The Sign-in button (#8) →
+`useMcpLibrary.signIn` → `loginToMcpServer` IPC → `sessionMcpService.loginToServer`
+→ `session.rpc.mcp.oauth.login({serverName})` chain already returns an
+`authorizationUrl`, which `signIn` opens via `openUrl` (system browser). The SDK
+runtime starts the loopback callback listener *before* returning, completes the
+token exchange in the background, persists the token, and reconnects (signalled
+via `session.mcp_server_status_changed`). So the "popup flow" already exists.
+
+**Why no embedded webview popup:** opening the **system browser** is the correct
+design, not a shortcut. RFC 8252 ("OAuth 2.0 for Native Apps") mandates an
+external user-agent for desktop OAuth; embedded webviews are rejected by major
+providers (Google) and are a known anti-pattern. So I deliberately did **not**
+build an in-app popup window. Recorded here so a future agent doesn't "fix" #7 by
+adding an embedded webview.
+
+**The two real gaps (both closed):**
+1. **`clientName` never passed.** `McpOauthLoginRequest.clientName` (rpc.d.ts:3521)
+   is the consent-screen display name; the SDK doc explicitly says "callers driving
+   interactive auth should pass their own surface-specific label." It was already
+   plumbed through every backend layer (ipc/types.ts → index.ts → sessions.ts →
+   sessionMcpService) — the renderer's `signIn` just never sent it, so the consent
+   screen showed the SDK's neutral fallback. Now `signIn` passes `PRODUCT_NAME`
+   (new `src/lib/product.ts` = `'Dafman'`), which the SDK applies to
+   *newly-registered* dynamic clients only; existing registrations keep their old
+   name (noted in MANUAL_TESTS §7.2).
+2. **`signIn` used `sessions[0]`, not the active session.** Rubber-duck catch. The
+   OAuth flow runs through a live session; `loadAll()` already prefers
+   `layoutStore.activeSessionId`. `signIn` now mirrors that
+   (`getSession(activeSessionId) ?? sessions[0]`) so multi-session users
+   authenticate through the session whose workspace the Library reflects.
+
+**Deliberately out of scope:**
+- **`callbackSuccessMessage`** (loopback success-page copy): SDK-recommended but
+  pure polish, and it would need a new optional field plumbed through 4 backend
+  layers + a wire-contract snapshot. Rubber-duck agreed this over-scopes a bug
+  fix. Left for an optional follow-up.
+- **`registerInterest('mcp.oauth_required')`** (rpc.d.ts:5659): gates the
+  *agent-driven* OAuth path (a mid-session tool call needing auth) — when no
+  consumer registers interest, the runtime uses a "browserless fallback that
+  silently reuses cached tokens." This does **not** affect the user-initiated
+  Library Sign-in (which calls `mcp.oauth.login` directly). But it likely means
+  our reducer's `mcp.oauth_required`/`oauth_completed` toast handlers are dead
+  code for the agent-driven case unless we `registerInterest`. Separate concern;
+  not bundled into #7. Worth a future issue if we want interactive mid-session
+  MCP auth prompts.
+
+**Receipts:** `src/composables/library/useMcpLibrary.ts` (signIn — clientName +
+active-session); `src/lib/product.ts` (new); `src/composables/library/__tests__/useMcpLibrary.test.ts`
+(3 new tests: branded clientName, active-session selection, no-session path).
+Gate: vue-tsc 0, eslint 0 errors / 19 pre-existing warnings, 711 tests pass,
+smoke 4/4.
+
 ## 2026-05-30 — #18 light-mode dock chrome was pinned dark (dockview `theme` prop, not a wrapper class)
 
 **Takeaway:** dockview-core v6 themes via a **`theme` _prop_** (a `DockviewTheme`

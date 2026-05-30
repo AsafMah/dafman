@@ -3,6 +3,8 @@ import { createPinia, setActivePinia } from 'pinia';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import type { CommandMap, CommandName } from '@/ipc/types';
 import { useMcpLibrary, type DiscoveredEntry } from '@/composables/library/useMcpLibrary';
+import { useSessionsStore, type SessionRecord } from '@/stores/chat/sessionsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 
 function makeBridge(
   handlers: Partial<{
@@ -47,9 +49,7 @@ describe('useMcpLibrary removeConfig (#10 — stays out of Discovered)', () => {
     setRpcBridge(bridge);
 
     const lib = useMcpLibrary();
-    lib.configured.value = [
-      { name: 'github', config: { url: 'https://x' }, transport: 'http' },
-    ];
+    lib.configured.value = [{ name: 'github', config: { url: 'https://x' }, transport: 'http' }];
     // The same server is ALSO present in the in-memory discovered list
     // (it round-trips through mcp.discover with source "user", or it is a
     // live session server). Before the fix, removing the config dropped it
@@ -89,5 +89,53 @@ describe('useMcpLibrary removeConfig (#10 — stays out of Discovered)', () => {
 
     expect(lib.discovered.value.map((d) => d.name)).toEqual(['other']);
     expect(lib.newlyDiscovered.value.map((d) => d.name)).toEqual(['other']);
+  });
+});
+
+describe('useMcpLibrary signIn (#7 — branded OAuth + active session)', () => {
+  function seedSession(id: string): void {
+    const store = useSessionsStore();
+    store.sessions.push({ id } as unknown as SessionRecord);
+  }
+
+  test('passes the product name as clientName so the consent screen is branded', async () => {
+    const { bridge, calls } = makeBridge({
+      loginToMcpServer: async () => ({ authorizationUrl: null }),
+    });
+    setRpcBridge(bridge);
+    seedSession('sess-1');
+
+    const lib = useMcpLibrary();
+    const result = await lib.signIn('github');
+
+    expect(result.state).toBe('already-signed-in');
+    const login = calls.find((c) => c.name === 'loginToMcpServer');
+    expect(login?.args).toMatchObject({ serverName: 'github', clientName: 'Dafman' });
+  });
+
+  test('runs the flow through the active session, not just the first one', async () => {
+    const { bridge, calls } = makeBridge({
+      loginToMcpServer: async () => ({ authorizationUrl: null }),
+    });
+    setRpcBridge(bridge);
+    seedSession('sess-1');
+    seedSession('sess-2');
+    useLayoutStore().activeSessionId = 'sess-2';
+
+    const lib = useMcpLibrary();
+    await lib.signIn('github');
+
+    const login = calls.find((c) => c.name === 'loginToMcpServer');
+    expect(login?.args).toMatchObject({ sessionId: 'sess-2' });
+  });
+
+  test('returns no-session when there are no sessions to authenticate through', async () => {
+    const { bridge } = makeBridge();
+    setRpcBridge(bridge);
+
+    const lib = useMcpLibrary();
+    const result = await lib.signIn('github');
+
+    expect(result.state).toBe('no-session');
   });
 });
