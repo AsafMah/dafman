@@ -22,10 +22,10 @@
 > **Workflow (now):**
 > 1. New feature ships → an agent appends a checklist below under
 >    `## Pending verification` per AGENTS.md rule #10.
-> 2. User dogfoods. For each item: tick its `- [ ]` box, change the
->    `**Result:**` line to mark `✅ Pass` or `❌ Fail`, and jot anything
->    notable after `notes:`. Expand the `<details>` for the steps.
-> 3. `❌ Fail` items get an issue filed (use `.github/ISSUE_TEMPLATE/bug_report.yml`,
+> 2. User dogfoods. For each item: tick its `- [ ]` box once tried, then
+>    type a pass/fail mark and your note on the same `result:` line
+>    (e.g. `- [x] result: v works` or `- [x] result: x <repro>`).
+> 3. Failing items get an issue filed (use `.github/ISSUE_TEMPLATE/bug_report.yml`,
 >    label `manual-test-fail`) and the row is removed from this file
 >    (the issue body cites the archive line for history).
 > 4. When the section's last item is verified, the agent moves the
@@ -33,17 +33,12 @@
 >
 > **Format per pending item** (agents: match this so it stays fill-friendly):
 > ````md
-> #### 12.3 — One-line claim being verified
+> #### 12.3 - One-line claim being verified
 >
-> - [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
->
-> <details><summary>Steps · Expected · Why not automated</summary>
->
+> - [ ] result: 
 > - **Steps:** what to do.
 > - **Expected:** what you should see.
 > - **Why not automated:** the one-line reason.
->
-> </details>
 > ````
 
 ---
@@ -70,7 +65,7 @@ bodies cite the archive section heading so the back-link works.
 ## ⏳ Pending verification — new since last dogfood
 
 These are checklist items added by recent feature commits but not yet
-walked by the user. After dogfooding, items move to ✅ (then to
+walked by the user. After dogfooding, items move to verified (then to
 [`MANUAL_TESTS_archive.md`](MANUAL_TESTS_archive.md) when the whole
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
@@ -82,11 +77,9 @@ section is verified) or get a GitHub issue filed (with label
 > the SDK boundary — tracked upstream in `github/copilot-sdk` (see the #9 issue
 > comment). This item verifies **only part 1 (toggle persistence)**.
 
-#### 9.1— Toggling a discovered MCP server off survives an app restart.
+#### 9.1 - Toggling a discovered MCP server off survives an app restart.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:**
   1. `bun run dev`.
@@ -112,15 +105,11 @@ section is verified) or get a GitHub issue filed (with label
   longer discovered** — Copilot CLI removed that support; a `.vscode`-based repro
   would show zero discovered servers and mislead the test.
 
-</details>
-
 ### Issue #7 — MCP HTTP OAuth Sign-in flow (2026-05-30)
 
-#### 7.1 — Sign-in opens the system browser and completes OAuth end-to-end.
+#### 7.1 - Sign-in opens the system browser and completes OAuth end-to-end.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** add a real HTTP MCP server that requires OAuth (e.g. the GitHub
   remote MCP `{ type: 'http', url: … }`). With at least one session open, go to
@@ -134,13 +123,9 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** real provider auth + OS-keychain token persistence
   can't be driven in CI (the issue itself notes this).
 
-</details>
+#### 7.2 - The OAuth consent screen names the app "Dafman".
 
-#### 7.2 — The OAuth consent screen names the app "Dafman".
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** trigger 7.1 against a server that registers a **fresh** dynamic
   OAuth client (one that hasn't been authenticated from this machine before).
@@ -152,15 +137,11 @@ section is verified) or get a GitHub issue filed (with label
   neutral fallback keeps that name until its registration is cleared (use a
   fresh server / forced re-auth to see the branded name).
 
-</details>
-
 ### Issue #18 — Light-mode dock chrome follows the theme (2026-05-30)
 
-#### 18.1 — All dockview chrome is light in light mode.
+#### 18.1 - All dockview chrome is light in light mode.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** set the app to light mode (or system on a light OS). Open a
   session. Open the edge panels: Jobs, Terminals, Session details, Library.
@@ -174,13 +155,9 @@ section is verified) or get a GitHub issue filed (with label
   `--dv-*` → `--p-*` bridge can't be asserted in unit tests (only verified live
   via `bun run inspect`).
 
-</details>
+#### 18.2 - Library Tools "Enable all" / "Disable all" and the composer mode select read with good contrast in light mode.
 
-#### 18.2 — Library Tools "Enable all" / "Disable all" and the composer mode select read with good contrast in light mode.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** in light mode, open Library → Tools (see the Enable all / Disable
   all buttons) and the composer toolbar's mode select.
@@ -196,15 +173,11 @@ section is verified) or get a GitHub issue filed (with label
   "weak" when dogfooding, file a follow-up to bump those muted controls to a
   higher-contrast token.
 
-</details>
-
 ### Issue #19 — Instructions markdown respects theme tokens (2026-05-30)
 
-#### 19.1 — Instruction file content inverts correctly in dark mode.
+#### 19.1 - Instruction file content inverts correctly in dark mode.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** open Library → Instructions, expand an instruction file that has
   rendered markdown (headings, paragraphs, a list, a code span/block, a link).
@@ -217,13 +190,9 @@ section is verified) or get a GitHub issue filed (with label
   `.app-dark`; happy-dom resolves no CSS custom-property cascade, so the
   inverted vs non-inverted token values can't be asserted in unit tests.
 
-</details>
+#### 19.2 - Raw HTML inside an instruction file also themes correctly.
 
-#### 19.2 — Raw HTML inside an instruction file also themes correctly.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** in an instruction file, include a literal raw `<code>inline</code>`
   and/or `<a href="…">link</a>` (HTML, not markdown). Expand it; toggle theme.
@@ -231,41 +200,29 @@ section is verified) or get a GitHub issue filed (with label
   token colors as the markdown-generated equivalents — legible in both themes.
 - **Why not automated:** same computed-color-cascade limitation as 19.1.
 
-</details>
-
 ### Issue #17 — composer mode selector compact form on narrow panes (2026-05-30)
 
-#### 17.1 — Mode selector swaps to a compact icon Select on narrow panes.
+#### 17.1 - Mode selector swaps to a compact icon Select on narrow panes.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** open a session so the composer shows. Drag the chat pane (or window) from wide to narrow, watching the bottom-bar mode control on the left.
 - **Expected:** while wide, the 3-icon segmented control (Interactive / Plan / Autopilot) shows. Once the composer toolbar drops below ~620px, it swaps to a single icon-only dropdown showing the current mode's icon; opening it lists all three modes with icon + label. The bottom bar reflows smoothly the whole way — no overflow, clipping, or jump.
 - **Why not automated:** the swap is driven by a CSS `@container (max-width: 620px)` query; happy-dom has no layout so the query never matches in unit tests. Smoke boots the bundle but doesn't drive a session-active composer through a width sweep.
 
-</details>
+#### 17.2 - Compact Select changes mode and stays in sync.
 
-#### 17.2 — Compact Select changes mode and stays in sync.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** at narrow width, pick a different mode from the compact dropdown. Widen back out.
 - **Expected:** the selection persists, the wide segmented control reflects the same mode, and the per-mode accent color (blue / amber / purple) matches.
 - **Why not automated:** depends on the live container-query swap being active (see 17.1).
 
-</details>
-
 ### Issue #10 — MCP "Remove" no longer jumps to Discovered (2026-05-30)
 
-#### 10.1 — Removing a configured MCP server doesn't bounce to Discovered.
+#### 10.1 - Removing a configured MCP server doesn't bounce to Discovered.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** Library → MCP. Add/configure an MCP server so it appears under
   the **Configured** section. Click its Remove (trash) action.
@@ -276,100 +233,68 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** the unit test covers the in-memory list sync; this
   item confirms the live render of the two sibling sections matches.
 
-</details>
-
 ### Issue #16 — Jobs "Go to session" scrolls to spawning tool call (2026-05-30)
 
-#### 16.1 — Reveal scrolls to the spawning tool-call card (cross-session).
+#### 16.1 - Reveal scrolls to the spawning tool-call card (cross-session).
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** in session A with a long transcript, spawn a background task (a tool call early in the history that runs in the background). Switch to session B. Open the Jobs panel and click "Go to session" (the up-right arrow) on A's job.
 - **Expected:** the app switches to session A and scrolls so the tool-call card that spawned the job is centered in view (not the top of the transcript), with a brief highlight flash on the card.
 - **Why not automated:** real `scrollIntoView` geometry + dockview panel-mount timing with a live spawned background task isn't reproducible in happy-dom/smoke; the unit test stubs `scrollIntoView` and asserts it's called on the matching node, but can't verify actual scroll position.
 
-</details>
+#### 16.2 - Freshly-opened panel still reveals (timing path).
 
-#### 16.2 — Freshly-opened panel still reveals (timing path).
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** close session A's panel entirely (leave only B open). Spawn-and-track a job for A beforehand. From the Jobs panel click "Go to session" so A's panel opens fresh.
 - **Expected:** A opens AND scrolls to the spawning card — the reveal is not lost to the async panel mount.
 - **Why not automated:** the lost-intent race only manifests with the real dockview async mount; covered conceptually by the store-parked intent + onMounted consume, but needs the live panel lifecycle.
 
-</details>
+#### 16.3 - Autopilot job falls back to bottom.
 
-#### 16.3 — Autopilot job falls back to bottom.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** start an autopilot session (no spawning tool call → job has no `toolCallId`). From another session, click "Go to session" on that autopilot job.
 - **Expected:** switches to the session and scrolls to the bottom (latest work), no error.
 - **Why not automated:** depends on the autopilot session lifecycle + live scroll geometry.
 
-</details>
-
 ### Issue #51 — Library tabs auto-refresh on session switch (2026-05-28)
 
-#### 51.1 — Agents tab auto-refreshes.
+#### 51.1 - Agents tab auto-refreshes.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** open two sessions A and B with different `workingDirectory` (one with project agents in `<cwd>/.github/agents/`, one without). Open Library → Agents while focused on A. Switch to B.
 - **Expected:** the project-agent section updates (becomes empty if B has no project agents). No need to click Refresh.
 - **Why not automated:** smoke stub can't simulate session-switch + IPC re-fetch flow without a full E2E harness; covered conceptually by the new `watch` but verification needs the live dockview event.
 
-</details>
+#### 51.2 - Skills tab auto-refreshes.
 
-#### 51.2 — Skills tab auto-refreshes.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** as above with Library → Skills.
 - **Expected:** skill list updates when switching sessions whose `<cwd>/.github/skills/` differs.
 
-</details>
+#### 51.3 - MCP tab auto-refreshes.
 
-#### 51.3 — MCP tab auto-refreshes.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** as above with Library → MCP. Drop an `.vscode/mcp.json` under one session's cwd, none under the other.
 - **Expected:** the Discovered section updates on switch.
 
-</details>
+#### 51.4 - No infinite loops / re-render storms.
 
-#### 51.4 — No infinite loops / re-render storms.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** switch sessions rapidly (5+ times in a few seconds).
 - **Expected:** each switch triggers exactly one reload per tab; no console errors or visible spinner thrashing.
 
-</details>
-
 ### Issue #22 — Library Agents refresh button (2026-05-28, second attempt)
 
-#### 22.1 — Refresh button appears next to "New agent".
+#### 22.1 - Refresh button appears next to "New agent".
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** open Library → Agents.
 - **Expected:** a `Refresh` button with `pi-refresh` icon sits in the
@@ -378,13 +303,9 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** visual placement / responsive layout in the
   real dockview right rail isn't reliably assertable from the smoke stub.
 
-</details>
+#### 22.2 - External agent file appears after Refresh click.
 
-#### 22.2 — External agent file appears after Refresh click.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** with the Agents tab open, drop a valid `.agent.md`
   file under `~/.copilot/agents/` (or `<cwd>/.github/agents/` with
@@ -393,13 +314,9 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** external filesystem mutation + real SDK
   listAgents call.
 
-</details>
+#### 22.3 - Rows still styled as cards (no E.8 regression).
 
-#### 22.3 — Rows still styled as cards (no E.8 regression).
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** look at any agent row in the list.
 - **Expected:** bordered card with name + path stacked on the left,
@@ -407,29 +324,21 @@ section is verified) or get a GitHub issue filed (with label
   Two-row CSS grid layout. NOT a plain HTML list.
 - **Why not automated:** vue-tsc + smoke don't catch scoped-CSS-doesn't-match-child-element issues; this is the regression class that ate 2 PRs already this session.
 
-</details>
-
 ### Sprint D — Jobs spinner center (issue #15, 2026-05-28)
 
-#### D15.1 — Running job spinner rotates in place.
+#### D15.1 - Running job spinner rotates in place.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** run `bun run dev`, start a chat session, ask the agent to spawn a background task, then open the Jobs panel while the job is `starting` or `running`.
 - **Expected:** the spinner beside the active job rotates around its own center without orbiting an off-center point.
 - **Why not automated:** the bug is a visual glyph/transform-origin artifact in the live browser compositor; unit tests cannot reliably assert the perceived rotation pivot.
 
-</details>
-
 ### Sprint A1 — Library Agents Select / Deselect (commit `bca5704`, 2026-05-27)
 
-#### A1.1 — Select button per row.
+#### A1.1 - Select button per row.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** open Library → Agents → click `Select` on any row.
 - **Expected:** header gets the agent chip; the clicked row turns
@@ -438,37 +347,25 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** filesystem + SDK + reactive header chip
   + custom CSS state across the full stack.
 
-</details>
+#### A1.2 - Deselect.
 
-#### A1.2 — Deselect.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** click `Deselect` on the currently selected row.
 - **Expected:** header chip disappears; row's button returns to
   `Select`; row tint clears.
 
-</details>
+#### A1.3 - Disabled state with no active session.
 
-#### A1.3 — Disabled state with no active session.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** close every chat tab → open Library → Agents.
 - **Expected:** Select button shows but is disabled. Hover gives a
   tooltip about needing a session.
 
-</details>
+#### A1.4 - Loading state during IPC.
 
-#### A1.4 — Loading state during IPC.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** click `Select` on a slow agent (e.g. one whose YAML
   is verbose so the SDK takes a moment).
@@ -476,15 +373,11 @@ section is verified) or get a GitHub issue filed (with label
   other rows' buttons are disabled (one-at-a-time semantics from
   `useSessionAgents`).
 
-</details>
-
 ### Sprint A2 — Library Agents Edit button (2026-05-27)
 
-#### A2.1 — Edit opens form prefilled.
+#### A2.1 - Edit opens form prefilled.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** click the pencil icon on any existing agent row.
 - **Expected:** form opens with title `Edit <name>`. Name and Scope
@@ -492,13 +385,9 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** form prefill + scope/name lock across all
   fields needs a full Vue mount + DOM read.
 
-</details>
+#### A2.2 - Edit save persists known fields + preserves unknown frontmatter.
 
-#### A2.2 — Edit save persists known fields + preserves unknown frontmatter.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** create an agent file by hand at
   `~/.copilot/agents/foo.agent.md` with a `mcp-servers:` block in
@@ -508,39 +397,27 @@ section is verified) or get a GitHub issue filed (with label
   updated, `mcp-servers:` block still present byte-for-byte.
 - **Why not automated:** filesystem round-trip + SDK reload chain.
 
-</details>
+#### A2.3 - Preserved-keys hint shows when there are unknown frontmatter keys.
 
-#### A2.3 — Preserved-keys hint shows when there are unknown frontmatter keys.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** open Edit on the file above (which has `mcp-servers:`).
 - **Expected:** blue info banner at the top of the form: "Unknown
   frontmatter keys preserved: edits won't strip `mcp-servers`,
   `github`, plugin keys, etc."
 
-</details>
+#### A2.4 - Preserved-keys hint hidden when there's nothing to preserve.
 
-#### A2.4 — Preserved-keys hint hidden when there's nothing to preserve.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** create an agent via `New agent`, save it. Then Edit.
 - **Expected:** no preserved-keys banner.
 
-</details>
-
 ### Sprint A3 — `/agent <name>` selects (2026-05-27)
 
-#### A3.1 — `/agent reviewer` selects the agent.
+#### A3.1 - `/agent reviewer` selects the agent.
 
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** type `/agent reviewer` (with a real agent name) in
   composer → Enter.
@@ -549,41 +426,32 @@ section is verified) or get a GitHub issue filed (with label
   last message.
 - **Why not automated:** SDK roundtrip + reactive header chip.
 
-</details>
+#### A3.2 - `/agent unknown` warns + lists available.
 
-#### A3.2 — `/agent unknown` warns + lists available.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** type `/agent unknown-name` → Enter.
 - **Expected:** warn toast "No agent named 'unknown-name'.
   Available: foo, bar, baz". Chip does NOT change.
 
-</details>
+#### A3.3 - `/agent` with no argument opens Library.
 
-#### A3.3 — `/agent` with no argument opens Library.
-
-- [ ] **Result:** ⬜ Pass · ⬜ Fail — notes:
-
-<details><summary>Steps · Expected · Why not automated</summary>
+- [ ] result: 
 
 - **Steps:** type `/agent` → Enter (or pick from slash menu).
 - **Expected:** right-edge Library panel opens to the Agents tab.
-
-</details>
 
 ---
 
 ## How to use this list
 
-Walk the `## ⏳ Pending verification` items above. For each one: expand its
-`<details>`, follow the **Steps**, then record the outcome on that item's
-`**Result:**` line —
+Walk the `## ⏳ Pending verification` items above. For each one: follow its
+**Steps**, then record the outcome on that item's `result:` line —
 
-- **Pass:** tick the `- [x]` box and change `⬜ Pass` → `✅ Pass`.
-- **Fail:** change `⬜ Fail` → `❌ Fail`, add a one-line repro after `notes:`.
-  I'll file it under `manual-test-fail` and remove the row.
+- **Pass:** tick the `- [x]` box and write a pass mark + note, e.g.
+  `- [x] result: v fixture servers persisted across restart`.
+- **Fail:** tick the box and write a fail mark + one-line repro, e.g.
+  `- [x] result: x toggle reset to on after relaunch`. I'll file it
+  under `manual-test-fail` and remove the row.
 - **N/A** ("I don't care about this case"): say so — I'll remove it (with a
   note in the relevant commit message).
