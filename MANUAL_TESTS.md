@@ -63,6 +63,18 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #17 — composer mode selector compact form on narrow panes (2026-05-30)
+
+- **17.1** ⏳ **Mode selector swaps to a compact icon Select on narrow panes.**
+  - **Steps:** open a session so the composer shows. Drag the chat pane (or window) from wide to narrow, watching the bottom-bar mode control on the left.
+  - **Expected:** while wide, the 3-icon segmented control (Interactive / Plan / Autopilot) shows. Once the composer toolbar drops below ~620px, it swaps to a single icon-only dropdown showing the current mode's icon; opening it lists all three modes with icon + label. The bottom bar reflows smoothly the whole way — no overflow, clipping, or jump.
+  - **Why not automated:** the swap is driven by a CSS `@container (max-width: 620px)` query; happy-dom has no layout so the query never matches in unit tests. Smoke boots the bundle but doesn't drive a session-active composer through a width sweep.
+
+- **17.2** ⏳ **Compact Select changes mode and stays in sync.**
+  - **Steps:** at narrow width, pick a different mode from the compact dropdown. Widen back out.
+  - **Expected:** the selection persists, the wide segmented control reflects the same mode, and the per-mode accent color (blue / amber / purple) matches.
+  - **Why not automated:** depends on the live container-query swap being active (see 17.1).
+
 ### Issue #10 — MCP "Remove" no longer jumps to Discovered (2026-05-30)
 
 - **10.1** ⏳ **Removing a configured MCP server doesn't bounce to Discovered.**

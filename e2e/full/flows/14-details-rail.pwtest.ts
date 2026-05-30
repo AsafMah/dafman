@@ -109,7 +109,12 @@ test("composer toolbar switches to compact controls on narrow panes", async ({ p
   // pane is narrow enough to force the toolbar into compact mode.
   await openDetailsRail(page);
 
-  await expect(page.locator(".mode-button-group:visible, .mode-select-shell:visible").first()).toBeVisible();
+  // At this narrow width the 3-icon segmented control (.mode-button-group)
+  // must hide and the compact icon-only Select (.mode-select-compact) must
+  // take its place — the #17 narrow-pane swap. (.mode-select-shell was the
+  // never-existent class the original regression referenced.)
+  await expect(page.locator(".mode-select-compact").first()).toBeVisible();
+  await expect(page.locator(".mode-button-group").first()).toBeHidden();
   const formatOverflow = page.locator(".lex-format-overflow").first();
   await expect(formatOverflow).toBeVisible();
   const inlineBeforeMenu = await page.locator(".lex-markdown-tools .lex-toolbar-btn").evaluateAll((buttons) =>
@@ -158,7 +163,7 @@ test("composer toolbar keeps markdown inline after first compact step", async ({
   const composer = page.locator(".lex-composer-input").first();
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
-  await expect(page.locator(".mode-button-group:visible, .mode-select-shell:visible").first()).toBeVisible();
+  await expect(page.locator(".mode-button-group:visible, .mode-select-compact:visible").first()).toBeVisible();
   await expect(page.locator(".lex-markdown-tools").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Bold" })).toBeVisible();
   const inlineLabels = await page.locator(".lex-markdown-tools .lex-toolbar-btn").evaluateAll((buttons) =>
@@ -177,7 +182,7 @@ test("composer toolbar does not overlap at very small widths", async ({ page }) 
   await composer.waitFor({ state: "visible", timeout: 15_000 });
 
   await expect(page.locator(".lex-format-overflow").first()).toBeVisible();
-  await expect(page.locator(".mode-button-group:visible, .mode-select-shell:visible").first()).toBeVisible();
+  await expect(page.locator(".mode-button-group:visible, .mode-select-compact:visible").first()).toBeVisible();
   await expect(page.locator(".lex-session-shell-toggle").first()).toBeHidden();
   const toolbarOverflow = await page.locator(".lex-composer-toolbar").first().evaluate((el) =>
     el.scrollWidth - el.clientWidth,
