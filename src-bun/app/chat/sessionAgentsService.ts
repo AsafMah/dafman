@@ -122,12 +122,26 @@ export class SessionAgentsService {
 
   // ---------- Filesystem agent files (Phase 19b.2) ----------
 
-  async listFiles(sessionId: string): Promise<AgentFileEntry[]> {
+  async listFiles(
+    sessionId: string,
+    options: { reloadSdk?: boolean } = {},
+  ): Promise<AgentFileEntry[]> {
     const entry = this.ctx.getEntry(sessionId);
     const opts: Parameters<typeof listAgentFiles>[0] = {
       includeUser: true,
       includeProject: true,
     };
+
+    if (options.reloadSdk) {
+      try {
+        await this.reload(sessionId);
+      } catch (err) {
+        log.warn('agent.reload before listAgentFiles failed', {
+          sessionId,
+          error: toErrorMessage(err),
+        });
+      }
+    }
 
     if (entry.workingDirectory) opts.workingDirectory = entry.workingDirectory;
 

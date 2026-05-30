@@ -894,7 +894,7 @@ export class SessionRegistry {
   // exist for Project-scope writes (User scope doesn't need one
   // — see `listAgentFilesGlobal`).
 
-  async listAgentFiles(sessionId: string): Promise<
+  async listAgentFiles(sessionId: string, options: { reloadSdk?: boolean } = {}): Promise<
     Array<{
       scope: AgentFileScope;
       name: string;
@@ -902,7 +902,7 @@ export class SessionRegistry {
       canonical: boolean;
     }>
   > {
-    return this.agents.listFiles(sessionId);
+    return this.agents.listFiles(sessionId, options);
   }
 
   /// User-scope only — for the Library tab when no session is
