@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
 import { useToolsLibrary, type ToolItem } from '@/composables/library/useToolsLibrary';
+import LibraryTabHeader from '@/components/library/LibraryTabHeader.vue';
+import type { LibraryTabHeaderAction } from '@/components/library/libraryTabHeader';
 
 type ToolGroup = { label: string; items: ToolItem[] };
 
@@ -16,6 +17,17 @@ const toasts = useToastStore();
 
 const { tools, loaded, error, load } = useToolsLibrary();
 const expanded = ref<Set<string>>(new Set());
+const headerActions: LibraryTabHeaderAction[] = [
+  { key: 'enable-all', label: 'Enable all', title: 'Enable all tools by default' },
+  { key: 'disable-all', label: 'Disable all', title: 'Disable all tools by default' },
+  {
+    key: 'refresh',
+    label: 'Refresh',
+    icon: 'pi pi-refresh',
+    title: 'Refresh tools list',
+    ariaLabel: 'Refresh tools list',
+  },
+];
 
 function toolKey(tool: ToolItem): string {
   return tool.namespacedName ?? tool.name;
@@ -102,34 +114,24 @@ function toggleExpanded(key: string) {
 onMounted(() => {
   void load();
 });
+
+function onHeaderAction(action: string) {
+  if (action === 'enable-all') {
+    void setAll(true);
+  } else if (action === 'disable-all') {
+    void setAll(false);
+  } else if (action === 'refresh') {
+    void load();
+  }
+}
 </script>
 
 <template>
   <div class="tools-tab">
-    <div class="tab-actions">
-      <Button
-        label="Enable all"
-        size="small"
-        severity="secondary"
-        @click="setAll(true)"
-      />
-      <Button
-        label="Disable all"
-        size="small"
-        severity="secondary"
-        text
-        @click="setAll(false)"
-      />
-      <Button
-        icon="pi pi-refresh"
-        size="small"
-        severity="secondary"
-        text
-        title="Refresh"
-        aria-label="Refresh"
-        @click="load"
-      />
-    </div>
+    <LibraryTabHeader
+      :actions="headerActions"
+      @action="onHeaderAction"
+    />
     <p class="hint">
       Global tool toggles apply to newly-created sessions. Existing sessions keep their current SDK
       tool registry.
@@ -206,13 +208,6 @@ onMounted(() => {
   flex-direction: column;
   gap: 0.7rem;
   min-width: 0;
-}
-
-.tab-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
 }
 
 .hint,

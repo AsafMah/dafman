@@ -13,12 +13,23 @@ import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
 import { revealPath } from '@/lib/pathActions';
 import { useInstructionsLibrary } from '@/composables/library/useInstructionsLibrary';
+import LibraryTabHeader from '@/components/library/LibraryTabHeader.vue';
+import type { LibraryTabHeaderAction } from '@/components/library/libraryTabHeader';
 
 const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
 
 const { sources, loaded, error, load: loadSources } = useInstructionsLibrary();
 const expanded = ref<Set<string>>(new Set());
+const headerActions: LibraryTabHeaderAction[] = [
+  {
+    key: 'refresh',
+    label: 'Refresh',
+    icon: 'pi pi-refresh',
+    title: 'Refresh instructions list',
+    ariaLabel: 'Refresh instructions list',
+  },
+];
 
 const activeSession = computed(() => {
   const id = layoutStore.activeSessionId;
@@ -71,6 +82,10 @@ async function reveal(src: InstructionSource) {
   await revealPath(src.path, 'Reveal failed');
 }
 
+function onHeaderAction(action: string) {
+  if (action === 'refresh') void load();
+}
+
 onMounted(load);
 watch(
   () => activeSession.value?.workingDirectory ?? '',
@@ -82,7 +97,10 @@ watch(
 
 <template>
   <div class="instructions-tab">
-    <header class="instructions-header">
+    <LibraryTabHeader
+      :actions="headerActions"
+      @action="onHeaderAction"
+    >
       <span class="instructions-summary">
         <span v-if="!loaded">Loading…</span>
         <span
@@ -97,15 +115,7 @@ watch(
           found
         </span>
       </span>
-      <Button
-        icon="pi pi-refresh"
-        size="small"
-        severity="secondary"
-        text
-        label="Refresh"
-        @click="load"
-      />
-    </header>
+    </LibraryTabHeader>
 
     <div
       v-if="!activeSession"
@@ -247,18 +257,8 @@ watch(
   min-width: 0;
 }
 
-.instructions-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
 .instructions-summary {
   min-width: 0;
-  font-size: 0.8rem;
-  color: var(--p-text-muted-color);
   overflow-wrap: anywhere;
 }
 

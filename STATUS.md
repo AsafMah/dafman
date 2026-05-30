@@ -24,7 +24,10 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #9 — discovered-MCP-server work: part-1 (toggle persistence)
+**Recently fixed:** #77 — Library tab header actions now share one
+`LibraryTabHeader` affordance across Agents / Skills / MCP / Tools /
+Instructions, preserving handlers while normalizing placement, labels, titles,
+and accessible names. 2026-05-30. #9 — discovered-MCP-server work: part-1 (toggle persistence)
 repro fixture added (`tools/manual-fixtures/mcp-discovery/`, MANUAL_TESTS §9.1)
 and the stale `.vscode/mcp.json` path retired (Copilot CLI dropped it; use
 `.mcp.json`); parts 2/3 (edit/override + source path) filed upstream as

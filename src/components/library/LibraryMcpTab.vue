@@ -16,6 +16,8 @@ import Dialog from 'primevue/dialog';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import McpServerForm from '@/components/library/McpServerForm.vue';
+import LibraryTabHeader from '@/components/library/LibraryTabHeader.vue';
+import type { LibraryTabHeaderAction } from '@/components/library/libraryTabHeader';
 import {
   useMcpLibrary,
   type ConfiguredEntry,
@@ -25,6 +27,16 @@ import {
 
 const toasts = useToastStore();
 const { activeSessionId } = storeToRefs(useLayoutStore());
+const headerActions: LibraryTabHeaderAction[] = [
+  { key: 'add', label: 'Add', icon: 'pi pi-plus', title: 'Add MCP server', variant: 'primary' },
+  {
+    key: 'refresh',
+    label: 'Refresh',
+    icon: 'pi pi-refresh',
+    title: 'Refresh MCP servers',
+    ariaLabel: 'Refresh MCP servers',
+  },
+];
 
 const {
   configured,
@@ -125,27 +137,22 @@ onMounted(() => {
 watch(activeSessionId, () => {
   void loadAll();
 });
+
+function onHeaderAction(action: string) {
+  if (action === 'add') {
+    openAddDialog();
+  } else if (action === 'refresh') {
+    void loadAll();
+  }
+}
 </script>
 
 <template>
   <div class="mcp-tab">
-    <div class="tab-actions">
-      <Button
-        icon="pi pi-plus"
-        label="Add"
-        size="small"
-        @click="openAddDialog"
-      />
-      <Button
-        icon="pi pi-refresh"
-        size="small"
-        severity="secondary"
-        text
-        title="Refresh"
-        :aria-label="'Refresh'"
-        @click="loadAll"
-      />
-    </div>
+    <LibraryTabHeader
+      :actions="headerActions"
+      @action="onHeaderAction"
+    />
     <div
       v-if="!loaded"
       class="empty-hint"
@@ -268,17 +275,6 @@ watch(activeSessionId, () => {
   flex-direction: column;
   gap: 0.7rem;
   min-width: 0;
-}
-
-.tab-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding-bottom: 0.3rem;
-}
-
-.tab-actions :deep(.p-button) {
-  flex-shrink: 0;
 }
 
 .mcp-section {
