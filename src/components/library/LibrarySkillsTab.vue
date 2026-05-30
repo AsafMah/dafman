@@ -14,10 +14,21 @@ import MessageContent from '@/components/chat/MessageContent.vue';
 import { revealPath } from '@/lib/pathActions';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSkillsLibrary, type Skill } from '@/composables/library/useSkillsLibrary';
+import LibraryTabHeader from '@/components/library/LibraryTabHeader.vue';
+import type { LibraryTabHeaderAction } from '@/components/library/libraryTabHeader';
 
 const { skills, loaded, error, load, setEnabled } = useSkillsLibrary();
 const { activeSessionId } = storeToRefs(useLayoutStore());
 const expandedItems = ref<Set<string>>(new Set());
+const headerActions: LibraryTabHeaderAction[] = [
+  {
+    key: 'refresh',
+    label: 'Refresh',
+    icon: 'pi pi-refresh',
+    title: 'Refresh skills list',
+    ariaLabel: 'Refresh skills list',
+  },
+];
 
 const grouped = computed(() => {
   const out = new Map<string, Skill[]>();
@@ -65,20 +76,18 @@ onMounted(() => {
 watch(activeSessionId, () => {
   void load();
 });
+
+function onHeaderAction(action: string) {
+  if (action === 'refresh') void load();
+}
 </script>
 
 <template>
   <div class="skills-tab">
-    <div class="tab-actions">
-      <Button
-        icon="pi pi-refresh"
-        size="small"
-        severity="secondary"
-        text
-        label="Refresh"
-        @click="load"
-      />
-    </div>
+    <LibraryTabHeader
+      :actions="headerActions"
+      @action="onHeaderAction"
+    />
     <div
       v-if="!loaded"
       class="empty-hint"
@@ -169,12 +178,6 @@ watch(activeSessionId, () => {
   flex-direction: column;
   gap: 0.7rem;
   min-width: 0;
-}
-
-.tab-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
 }
 
 .skill-group {

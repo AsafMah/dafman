@@ -24,7 +24,10 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #79 — Library-opening slash commands (`/agent`, `/skill`,
+**Recently fixed:** #77 — Library tab header actions now share one
+`LibraryTabHeader` affordance across Agents / Skills / MCP / Tools /
+Instructions, preserving handlers while normalizing placement, labels, titles,
+and accessible names. 2026-05-30. #79 — Library-opening slash commands (`/agent`, `/skill`,
 `/skills`, `/mcp`, `/library`) now reveal/focus the right-rail Library panel
 instead of toggling it closed when already displayed. 2026-05-30. #85 — empty workspace groups close without confirmation;
 non-empty group-close confirmations now have a real header, destructive/secondary
