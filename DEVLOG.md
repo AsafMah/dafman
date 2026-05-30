@@ -12,6 +12,8 @@
 
 ## 2026-05-30 — #46 + #48 tech-debt sweep: useTemplateRef migration + ineffective dynamic imports
 
+**Shipped via PR #75** (branch `tech-debt/refs-and-dynimports`).
+
 **Takeaway.** Two independent tech-debt issues cleared in one worktree
 (`tech-debt/refs-and-dynimports`). Both issue scans were stale; the diff that
 matters is smaller than the issue bodies imply, and the difference is the whole

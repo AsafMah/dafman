@@ -30,7 +30,7 @@
 (`8bacf51`). #48 — 5 ineffective dynamic imports resolved: eager test-bridge
 stores in `main.ts` + `chatEvents` in `SessionDetailsPanel` hoisted to static,
 `exportConversation` left dynamic; `vite@8`/Rolldown build now warning-free
-(`45a9101`). 2026-05-30. #9 — discovered-MCP-server work: part-1 (toggle persistence)
+(`45a9101`). Both shipped via PR #75. 2026-05-30. #9 — discovered-MCP-server work: part-1 (toggle persistence)
 repro fixture added (`tools/manual-fixtures/mcp-discovery/`, MANUAL_TESTS §9.1)
 and the stale `.vscode/mcp.json` path retired (Copilot CLI dropped it; use
 `.mcp.json`); parts 2/3 (edit/override + source path) filed upstream as
