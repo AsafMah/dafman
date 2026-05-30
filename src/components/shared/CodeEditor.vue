@@ -17,11 +17,15 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { EditorState, Compartment, type Extension } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
-import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
-import { buildCodeMirrorTheme, resolveLanguageWithFallback } from '@/lib/codeMirrorShared';
+import {
+  buildCodeMirrorTheme,
+  codeMirrorThemeExtensionFor,
+  resolveLanguageWithFallback,
+} from '@/lib/codeMirrorShared';
+import { useDockviewTheme } from '@/composables/useDockviewTheme';
 
 const props = withDefaults(
   defineProps<{
@@ -51,9 +55,11 @@ const emit = defineEmits<{
 
 const host = ref<HTMLDivElement | null>(null);
 const toasts = useToastStore();
+const { isDark } = useDockviewTheme();
 let view: EditorView | null = null;
 const langCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
+const themeCompartment = new Compartment();
 
 /// Resolved display label for the header bar. Falls back through:
 /// 1. Explicit `language` prop (e.g. "typescript")
@@ -91,7 +97,7 @@ function baseExtensions(): Extension[] {
     EditorView.lineWrapping,
     ...(props.showLineNumbers ? [lineNumbers()] : []),
     langCompartment.of([]),
-    oneDark,
+    themeCompartment.of(codeMirrorThemeExtensionFor(isDark.value)),
     EditorView.updateListener.of((update) => {
       if (update.docChanged && !props.readonly) {
         emit('update:modelValue', update.state.doc.toString());
@@ -167,6 +173,14 @@ watch(
     });
   },
 );
+
+watch(isDark, (next) => {
+  if (!view) return;
+
+  view.dispatch({
+    effects: themeCompartment.reconfigure(codeMirrorThemeExtensionFor(next)),
+  });
+});
 </script>
 
 <template>

@@ -14,8 +14,17 @@
 
 import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { oneDark } from '@codemirror/theme-one-dark';
 
 import { resolveLanguageExtension, resolveLanguageForFile } from '@/lib/codeLanguage';
+
+export const codeMirrorLightTheme: Extension = syntaxHighlighting(defaultHighlightStyle);
+export const codeMirrorDarkTheme: Extension = oneDark;
+
+export function codeMirrorThemeExtensionFor(isDark: boolean): Extension {
+  return isDark ? codeMirrorDarkTheme : codeMirrorLightTheme;
+}
 
 export interface CodeMirrorThemeOptions {
   /// Max content height before scroll. `0` = fit content.
