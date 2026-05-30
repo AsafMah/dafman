@@ -24,7 +24,9 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #85 — empty workspace groups close without confirmation;
+**Recently fixed:** #79 — Library-opening slash commands (`/agent`, `/skill`,
+`/skills`, `/mcp`, `/library`) now reveal/focus the right-rail Library panel
+instead of toggling it closed when already displayed. 2026-05-30. #85 — empty workspace groups close without confirmation;
 non-empty group-close confirmations now have a real header, destructive/secondary
 button styling, clearer wording, and Cancel as the default focus. 2026-05-30.
 #78 — Library Agents Select keeps the duplicate-click
