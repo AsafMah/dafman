@@ -89,6 +89,23 @@ section is verified) or get a GitHub issue filed (with label
     close #9. If it DOES, capture the exact repro (server source category +
     steps) on the issue so the runtime root cause can be found.**
 
+### Issue #16 — Jobs "Go to session" scrolls to spawning tool call (2026-05-30)
+
+- **16.1** ⏳ **Reveal scrolls to the spawning tool-call card (cross-session).**
+  - **Steps:** in session A with a long transcript, spawn a background task (a tool call early in the history that runs in the background). Switch to session B. Open the Jobs panel and click "Go to session" (the up-right arrow) on A's job.
+  - **Expected:** the app switches to session A and scrolls so the tool-call card that spawned the job is centered in view (not the top of the transcript), with a brief highlight flash on the card.
+  - **Why not automated:** real `scrollIntoView` geometry + dockview panel-mount timing with a live spawned background task isn't reproducible in happy-dom/smoke; the unit test stubs `scrollIntoView` and asserts it's called on the matching node, but can't verify actual scroll position.
+
+- **16.2** ⏳ **Freshly-opened panel still reveals (timing path).**
+  - **Steps:** close session A's panel entirely (leave only B open). Spawn-and-track a job for A beforehand. From the Jobs panel click "Go to session" so A's panel opens fresh.
+  - **Expected:** A opens AND scrolls to the spawning card — the reveal is not lost to the async panel mount.
+  - **Why not automated:** the lost-intent race only manifests with the real dockview async mount; covered conceptually by the store-parked intent + onMounted consume, but needs the live panel lifecycle.
+
+- **16.3** ⏳ **Autopilot job falls back to bottom.**
+  - **Steps:** start an autopilot session (no spawning tool call → job has no `toolCallId`). From another session, click "Go to session" on that autopilot job.
+  - **Expected:** switches to the session and scrolls to the bottom (latest work), no error.
+  - **Why not automated:** depends on the autopilot session lifecycle + live scroll geometry.
+
 ### Issue #51 — Library tabs auto-refresh on session switch (2026-05-28)
 
 - **51.1** ⏳ **Agents tab auto-refreshes.**

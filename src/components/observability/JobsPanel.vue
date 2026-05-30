@@ -243,7 +243,7 @@ function statusIcon(job: JobRecord): string {
                 size="small"
                 severity="secondary"
                 :aria-label="`Open session for ${job.title}`"
-                @click="jobsStore.openOwningSession(job.sessionId)"
+                @click="jobsStore.openOwningSession(job.sessionId, job.toolCallId)"
               />
               <Button
                 v-if="job.canPromoteToBackground"
