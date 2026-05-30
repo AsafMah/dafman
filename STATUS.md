@@ -55,7 +55,7 @@ outside the session cwd).
 "Allow all" flag and run mode (new dafman-owned `session-metadata.json` store +
 rehydrate-on-resume; the SDK persists neither across resume). 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
 auto-refreshes now delay the visible loading affordance so cached/instant reloads
-do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #36 — failed tool executions are now observed via the SDK `postToolUseFailure` hook (beta.9), recorded as a `toolFailure` audit entry and surfaced in the Activity log + Jobs panel with the SDK-provided error context. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
+do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #36 — failed tool executions are now observed via the SDK `postToolUseFailure` hook (beta.9), recorded as a `toolFailure` audit entry and surfaced in the Activity log + Jobs panel with the SDK-provided error context. 2026-05-31. #81 — Library Agents now annotates filesystem-discovered custom agent files with SDK load state; rejected files are visibly flagged and selection / `/agent <name>` reports the validation failure instead of "not found". 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only
 the explicit Refresh action triggers an SDK reload. 2026-05-30. #97 — discovered
 MCP servers now key off the focused workspace (`lastFocusedSessionId`) instead of
