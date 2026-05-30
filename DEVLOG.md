@@ -10,6 +10,26 @@
 
 ---
 
+## 2026-05-30 — #78 Library agent Select no-flash loading affordance
+
+**Takeaway.** Library → Agents now keeps duplicate-click protection immediate
+while delaying the PrimeVue loading/refresh affordance long enough that an
+instant Select no longer flashes.
+
+**Receipts.**
+- `LibraryAgentsTabSection.vue` now drives Button `loading` from a delayed
+  visible-busy ref (`useTimeoutFn`, 180 ms) while `disabled` still reads the raw
+  `agentBusyName`, so synchronous select/deselect resolves before any spinner
+  icon is mounted.
+- `LibraryAgentsTabSection.loading.test.ts` is the regression guard: it fails on
+  the pre-fix direct `:loading="agentBusyName === entry.name"` binding, asserts
+  an instant select has no `p-button-loading` while the button is disabled, and
+  asserts the affordance appears after a genuinely pending operation.
+- Local validation run for this issue used the user-requested parallel-worktree
+  gate only (`bun run lint`, `bun run lint:eslint`, `bun test`,
+  `bunx vite build`); smoke/e2e/electrobun build are deferred to CI because of
+  fixed-port collisions across worktrees.
+
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
 
 **Takeaway.** Walked the `MANUAL_TESTS.md ⏳ Pending verification` queue live in
