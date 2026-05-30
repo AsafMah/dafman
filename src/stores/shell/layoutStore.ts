@@ -162,6 +162,37 @@ export const useLayoutStore = defineStore('layout', () => {
     layoutRev.value++;
   }
 
+  /// Pending "scroll the transcript to this spot" intents, keyed by
+  /// session id. Durable navigation intent (issue #16): "Go to session"
+  /// in the Jobs panel needs to reveal the tool-call card that spawned
+  /// the job, but the target ChatWindow may not be mounted yet when the
+  /// request is made (a freshly-opened panel mounts async). A plain bus
+  /// emit would be dropped (mitt has no replay). So we park the intent
+  /// here and let each ChatWindow consume it on mount AND via a watch,
+  /// which is race-free for both the freshly-opened and already-open
+  /// cases. `toolCallId` undefined ⇒ "scroll to bottom" (e.g. autopilot
+  /// jobs that have no spawning tool call).
+  const pendingReveal = ref<Record<string, { toolCallId?: string }>>({});
+
+  function requestReveal(sessionId: string, target: { toolCallId?: string }): void {
+    // Replace (never merge) so a tool-call reveal can't leave a stale
+    // toolCallId behind a later "scroll to bottom" request.
+    pendingReveal.value = { ...pendingReveal.value, [sessionId]: { ...target } };
+  }
+
+  function consumeReveal(sessionId: string): { toolCallId?: string } | null {
+    const target = pendingReveal.value[sessionId];
+
+    if (!target) return null;
+
+    const next = { ...pendingReveal.value };
+
+    delete next[sessionId];
+    pendingReveal.value = next;
+
+    return target;
+  }
+
   /// Programmatic setter for `activeSessionId`. Used by GroupPanel.vue's
   /// per-inner `onDidActivePanelChange` subscription so chat-tab
   /// switches inside the active group update the active-session ref
@@ -1170,6 +1201,9 @@ export const useLayoutStore = defineStore('layout', () => {
     activeSessionId,
     layoutRev,
     bumpLayoutRev,
+    pendingReveal,
+    requestReveal,
+    consumeReveal,
     setActiveSessionId,
     detailsOpen,
     enforceKnownEdgeMinimums,

@@ -63,6 +63,61 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #17 — composer mode selector compact form on narrow panes (2026-05-30)
+
+- **17.1** ⏳ **Mode selector swaps to a compact icon Select on narrow panes.**
+  - **Steps:** open a session so the composer shows. Drag the chat pane (or window) from wide to narrow, watching the bottom-bar mode control on the left.
+  - **Expected:** while wide, the 3-icon segmented control (Interactive / Plan / Autopilot) shows. Once the composer toolbar drops below ~620px, it swaps to a single icon-only dropdown showing the current mode's icon; opening it lists all three modes with icon + label. The bottom bar reflows smoothly the whole way — no overflow, clipping, or jump.
+  - **Why not automated:** the swap is driven by a CSS `@container (max-width: 620px)` query; happy-dom has no layout so the query never matches in unit tests. Smoke boots the bundle but doesn't drive a session-active composer through a width sweep.
+
+- **17.2** ⏳ **Compact Select changes mode and stays in sync.**
+  - **Steps:** at narrow width, pick a different mode from the compact dropdown. Widen back out.
+  - **Expected:** the selection persists, the wide segmented control reflects the same mode, and the per-mode accent color (blue / amber / purple) matches.
+  - **Why not automated:** depends on the live container-query swap being active (see 17.1).
+
+### Issue #10 — MCP "Remove" no longer jumps to Discovered (2026-05-30)
+
+- **10.1** ⏳ **Removing a configured MCP server doesn't bounce to Discovered.**
+  - **Steps:** Library → MCP. Add/configure an MCP server so it appears under
+    the **Configured** section. Click its Remove (trash) action.
+  - **Expected:** the server disappears from Configured and does **not**
+    immediately re-appear under the **Discovered** section. (A server that's
+    *also* defined in a workspace file may legitimately return after the next
+    refresh — that's correct.)
+  - **Why not automated:** the unit test covers the in-memory list sync; this
+    item confirms the live render of the two sibling sections matches.
+
+### Issue #9 — MCP discovered-toggle persistence (DOGFOOD-FIRST — 2026-05-30)
+
+- **9.1** ⏳ **Disabled discovered MCP server stays disabled across restart.**
+  - **Steps:** Library → MCP. Toggle OFF a server in the **Discovered**
+    section. Fully quit the app. Relaunch. Open Library → MCP again.
+  - **Expected:** the server is still toggled OFF.
+  - **Why not automated:** persistence is enforced by the CLI's user-config
+    disabled list (SDK `mcp.config.disable`), which only round-trips across a
+    real process restart. Our code already routes through the persisted
+    config-level disable (rpc.d.ts:3367) — this test confirms whether the
+    original "doesn't persist" bug still reproduces. **If it does NOT repro,
+    close #9. If it DOES, capture the exact repro (server source category +
+    steps) on the issue so the runtime root cause can be found.**
+
+### Issue #16 — Jobs "Go to session" scrolls to spawning tool call (2026-05-30)
+
+- **16.1** ⏳ **Reveal scrolls to the spawning tool-call card (cross-session).**
+  - **Steps:** in session A with a long transcript, spawn a background task (a tool call early in the history that runs in the background). Switch to session B. Open the Jobs panel and click "Go to session" (the up-right arrow) on A's job.
+  - **Expected:** the app switches to session A and scrolls so the tool-call card that spawned the job is centered in view (not the top of the transcript), with a brief highlight flash on the card.
+  - **Why not automated:** real `scrollIntoView` geometry + dockview panel-mount timing with a live spawned background task isn't reproducible in happy-dom/smoke; the unit test stubs `scrollIntoView` and asserts it's called on the matching node, but can't verify actual scroll position.
+
+- **16.2** ⏳ **Freshly-opened panel still reveals (timing path).**
+  - **Steps:** close session A's panel entirely (leave only B open). Spawn-and-track a job for A beforehand. From the Jobs panel click "Go to session" so A's panel opens fresh.
+  - **Expected:** A opens AND scrolls to the spawning card — the reveal is not lost to the async panel mount.
+  - **Why not automated:** the lost-intent race only manifests with the real dockview async mount; covered conceptually by the store-parked intent + onMounted consume, but needs the live panel lifecycle.
+
+- **16.3** ⏳ **Autopilot job falls back to bottom.**
+  - **Steps:** start an autopilot session (no spawning tool call → job has no `toolCallId`). From another session, click "Go to session" on that autopilot job.
+  - **Expected:** switches to the session and scrolls to the bottom (latest work), no error.
+  - **Why not automated:** depends on the autopilot session lifecycle + live scroll geometry.
+
 ### Issue #51 — Library tabs auto-refresh on session switch (2026-05-28)
 
 - **51.1** ⏳ **Agents tab auto-refreshes.**

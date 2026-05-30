@@ -635,6 +635,7 @@ export class SessionRegistry {
     text: string,
     mode?: 'enqueue' | 'immediate',
     attachments?: SendMessageAttachment[],
+    agentMode?: SessionMode,
   ): Promise<string> {
     const entry = this.entries.get(sessionId);
 
@@ -658,8 +659,14 @@ export class SessionRegistry {
           : attachment,
       );
 
+      // #35: pass per-message agentMode through to the SDK. Defaults
+      // to the session-wide mode (the toggle stays the source of
+      // truth); an explicit override scopes the mode to this one send.
+      const effectiveAgentMode = agentMode ?? this.modeBySession.get(sessionId) ?? 'interactive';
+
       return await entry.session.send({
         prompt: text,
+        agentMode: effectiveAgentMode,
         ...(mode ? { mode } : {}),
         ...(sdkAttachments && sdkAttachments.length > 0
           ? {

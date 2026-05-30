@@ -22,7 +22,6 @@ export interface ConfiguredEntry {
   /// config blob doesn't include a type discriminator (some shapes
   /// only set `command` for local and `url` for http).
   transport: 'local' | 'http';
-  hasOauth: boolean;
 }
 
 export interface DiscoveredEntry {
@@ -32,34 +31,27 @@ export interface DiscoveredEntry {
   enabled: boolean;
 }
 
-/// Classify a raw MCP config into transport + OAuth presence. Exported
-/// so the form can hint defaults without re-implementing the heuristic.
-export function classifyTransport(config: McpConfig): {
-  transport: 'local' | 'http';
-  hasOauth: boolean;
-} {
+/// Classify a raw MCP config's transport. Exported so the form can
+/// hint defaults without re-implementing the heuristic.
+///
+/// We deliberately do NOT try to detect OAuth from the static config
+/// (an `oauthClientId`/`oauthGrantType` field): real HTTP MCP servers
+/// — e.g. the GitHub remote MCP `{ type: 'http', url: … }` — negotiate
+/// OAuth dynamically and carry neither field, so any static heuristic
+/// permanently hides their Sign-in affordance. The Sign-in flow itself
+/// is the source of truth (it warns when there's no session and
+/// reports "already signed in" when the server needs no OAuth).
+export function classifyTransport(config: McpConfig): 'local' | 'http' {
   const type = typeof config.type === 'string' ? config.type : null;
 
-  if (type === 'http' || type === 'sse') {
-    return {
-      transport: 'http',
-      hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType),
-    };
-  }
+  if (type === 'http' || type === 'sse') return 'http';
 
-  if (type === 'local' || type === 'stdio') {
-    return { transport: 'local', hasOauth: false };
-  }
+  if (type === 'local' || type === 'stdio') return 'local';
 
   // No explicit type — infer from shape. `url` field implies http.
-  if (typeof config.url === 'string') {
-    return {
-      transport: 'http',
-      hasOauth: Boolean(config.oauthClientId) || Boolean(config.oauthGrantType),
-    };
-  }
+  if (typeof config.url === 'string') return 'http';
 
-  return { transport: 'local', hasOauth: false };
+  return 'local';
 }
 
 export function useMcpLibrary() {
@@ -106,11 +98,11 @@ export function useMcpLibrary() {
         sessionMcpsPromise,
       ]);
 
-      configured.value = Object.entries(configs).map(([name, config]) => {
-        const c = classifyTransport(config);
-
-        return { name, config, ...c };
-      });
+      configured.value = Object.entries(configs).map(([name, config]) => ({
+        name,
+        config,
+        transport: classifyTransport(config),
+      }));
 
       const merged = new Map<string, DiscoveredEntry>();
 
@@ -188,6 +180,13 @@ export function useMcpLibrary() {
     try {
       await invokeCommand('removeMcpConfig', { name });
       configured.value = configured.value.filter((e) => e.name !== name);
+      // Also drop it from the in-memory discovered list. A configured
+      // server round-trips through `mcp.discover` (source "user") and may
+      // be a live session server too, so without this it re-surfaces under
+      // the Discovered section the instant it leaves `configured` — the
+      // "Remove jumps to Discovered" bug (#10). A genuine workspace-file
+      // server legitimately returns on the next `loadAll`.
+      discovered.value = discovered.value.filter((d) => d.name !== name);
 
       return true;
     } catch (err) {

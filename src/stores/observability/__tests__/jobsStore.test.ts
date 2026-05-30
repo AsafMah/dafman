@@ -4,6 +4,7 @@ import { nextTick, reactive } from 'vue';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import type { CommandMap, CommandName, JobRecord } from '@/ipc/types';
 import { useJobsStore } from '@/stores/observability/jobsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 import {
   useSessionsStore,
   _resetSessionsStoreForTest,
@@ -145,5 +146,31 @@ describe('jobsStore', () => {
     await nextTick();
 
     expect(store.jobs[0]?.status).toBe('completed');
+  });
+
+  test('openOwningSession parks a reveal intent for the spawning tool call', async () => {
+    const { bridge } = makeBridge();
+    setRpcBridge(bridge);
+    const layout = useLayoutStore();
+    const store = useJobsStore();
+
+    store.openOwningSession('s1', 'tc-42');
+
+    // Consuming returns the toolCallId so the ChatWindow can scroll to
+    // the spawning card rather than the top of the transcript (#16).
+    expect(layout.pendingReveal['s1']).toEqual({ toolCallId: 'tc-42' });
+    expect(layout.consumeReveal('s1')).toEqual({ toolCallId: 'tc-42' });
+    expect(layout.consumeReveal('s1')).toBeNull();
+  });
+
+  test('openOwningSession without a toolCallId parks a bottom-scroll intent', () => {
+    const { bridge } = makeBridge();
+    setRpcBridge(bridge);
+    const layout = useLayoutStore();
+    const store = useJobsStore();
+
+    store.openOwningSession('s1');
+
+    expect(layout.pendingReveal['s1']).toEqual({ toolCallId: undefined });
   });
 });
