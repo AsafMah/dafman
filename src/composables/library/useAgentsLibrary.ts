@@ -10,18 +10,20 @@ import { invokeCommand } from '@/ipc/invoke';
 import { useToastStore } from '@/stores/app/toastStore';
 import type { AgentFileEntry, AgentFileScope, AgentFileSpec } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { useDelayedLoadedFlag } from '@/composables/library/useDelayedLoadedFlag';
 
 export function useAgentsLibrary() {
   const files = ref<AgentFileEntry[]>([]);
-  const loaded = ref(false);
+  const { loaded, beginLoading } = useDelayedLoadedFlag();
   const error = ref<string | null>(null);
 
   async function load(
     sessionId: string | undefined,
     options: { reloadSdk?: boolean } = {},
   ): Promise<void> {
+    const finishLoading = beginLoading();
+
     error.value = null;
-    loaded.value = false;
 
     try {
       if (sessionId) {
@@ -36,7 +38,7 @@ export function useAgentsLibrary() {
     } catch (err) {
       error.value = toErrorMessage(err);
     } finally {
-      loaded.value = true;
+      finishLoading();
     }
   }
 

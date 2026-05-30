@@ -13,6 +13,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { openUrl } from '@/lib/pathActions';
 import { PRODUCT_NAME } from '@/lib/product';
+import { useDelayedLoadedFlag } from '@/composables/library/useDelayedLoadedFlag';
 
 export type McpConfig = Record<string, unknown>;
 
@@ -58,7 +59,7 @@ export function classifyTransport(config: McpConfig): 'local' | 'http' {
 export function useMcpLibrary() {
   const configured = ref<ConfiguredEntry[]>([]);
   const discovered = ref<DiscoveredEntry[]>([]);
-  const loaded = ref(false);
+  const { loaded, beginLoading } = useDelayedLoadedFlag();
   const error = ref<string | null>(null);
   /// Live connection status per server name, from the active session's
   /// `mcp.list()`. Drives the Sign-in affordance: an HTTP server only
@@ -98,8 +99,9 @@ export function useMcpLibrary() {
   }
 
   async function loadAll(): Promise<void> {
+    const finishLoading = beginLoading();
+
     error.value = null;
-    loaded.value = false;
 
     try {
       // Pass the last focused chat session's workingDirectory (or any
@@ -150,7 +152,7 @@ export function useMcpLibrary() {
     } catch (err) {
       error.value = toErrorMessage(err);
     } finally {
-      loaded.value = true;
+      finishLoading();
     }
   }
 

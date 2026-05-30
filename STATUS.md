@@ -24,7 +24,9 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #94 — Library Agents Refresh now reloads the Copilot SDK
+**Recently fixed:** #93 — Library Agents / Skills / MCP session-switch
+auto-refreshes now delay the visible loading affordance so cached/instant reloads
+do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only
 the explicit Refresh action triggers an SDK reload. 2026-05-30. #97 — discovered
 MCP servers now key off the focused workspace (`lastFocusedSessionId`) instead of

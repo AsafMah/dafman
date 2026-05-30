@@ -8,6 +8,27 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-05-31 — #93 Library tab auto-refresh loading flash
+
+**Takeaway.** Agents / Skills / MCP Library tabs now share a delayed visible
+loaded flag for session-switch reloads. Instant/cached reloads keep the current
+tab content visible instead of briefly swapping to `Loading…`; reloads that stay
+pending past 180 ms still surface the loading affordance.
+
+**Receipts.**
+- Shared seam: `src/composables/library/useDelayedLoadedFlag.ts` mirrors the
+  #78 `useTimeoutFn` delay and uses a reload generation token so an older reload
+  cannot cancel a newer pending reload.
+- Consumers: `useAgentsLibrary`, `useSkillsLibrary`, and `useMcpLibrary` call
+  `beginLoading()` at load start and finish through the returned generation-bound
+  callback, preserving the same IPC calls and reload count.
+- Test-first receipt: `useDelayedLoadedFlag.test.ts` was added before the helper
+  existed (first run failed on missing module), then passed after implementation;
+  it covers instant reloads, genuinely slow reloads, and overlapping reloads.
+- Port-free validation only per issue instructions; fixed-port smoke/e2e and
+  Electrobun build are deferred to CI. Passed locally: `bun run lint`,
+  `bun run lint:eslint`, `bun test`, `bunx vite build`.
+
 ---
 
 ## 2026-05-30 — Merge train (7 fix PRs + #94) + dogfood reconciliation + #88 re-spec

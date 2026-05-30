@@ -9,6 +9,7 @@ import { useToastStore } from '@/stores/app/toastStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { useDelayedLoadedFlag } from '@/composables/library/useDelayedLoadedFlag';
 
 export interface Skill {
   name: string;
@@ -21,7 +22,7 @@ export interface Skill {
 
 export function useSkillsLibrary() {
   const skills = ref<Skill[]>([]);
-  const loaded = ref(false);
+  const { loaded, beginLoading } = useDelayedLoadedFlag();
   const error = ref<string | null>(null);
 
   function getSessionId(): string | undefined {
@@ -33,8 +34,9 @@ export function useSkillsLibrary() {
   }
 
   async function load(): Promise<void> {
+    const finishLoading = beginLoading();
+
     error.value = null;
-    loaded.value = false;
 
     try {
       const sessionsStore = useSessionsStore();
@@ -50,7 +52,7 @@ export function useSkillsLibrary() {
     } catch (err) {
       error.value = toErrorMessage(err);
     } finally {
-      loaded.value = true;
+      finishLoading();
     }
   }
 
