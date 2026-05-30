@@ -92,6 +92,37 @@ describe('useMcpLibrary removeConfig (#10 — stays out of Discovered)', () => {
   });
 });
 
+
+describe('useMcpLibrary workspace discovery cwd (#96)', () => {
+  function seedSession(id: string, workingDirectory: string): void {
+    const store = useSessionsStore();
+    store.sessions.push({ id, workingDirectory } as unknown as SessionRecord);
+  }
+
+  test('discovers from the last focused chat session when activeSessionId is stale on the Library panel', async () => {
+    const { bridge, calls } = makeBridge({
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+    });
+    setRpcBridge(bridge);
+    seedSession('stale-session', 'C:\\repo\\stale');
+    seedSession('focused-session', 'C:\\repo\\focused');
+
+    const layoutStore = useLayoutStore();
+    layoutStore.setActiveSessionId('focused-session');
+    layoutStore.activeSessionId = 'stale-session';
+
+    const lib = useMcpLibrary();
+    await lib.loadAll();
+
+    const discover = calls.find((c) => c.name === 'discoverMcpServers');
+    expect(discover?.args).toEqual({ workingDirectory: 'C:\\repo\\focused' });
+    const liveList = calls.find((c) => c.name === 'listSessionMcpServers');
+    expect(liveList?.args).toEqual({ sessionId: 'focused-session' });
+  });
+});
+
 describe('useMcpLibrary signIn (#7 — branded OAuth + active session)', () => {
   function seedSession(id: string): void {
     const store = useSessionsStore();

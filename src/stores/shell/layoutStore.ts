@@ -148,6 +148,11 @@ export const useLayoutStore = defineStore('layout', () => {
   /// sync; consumers (command palette `when()` predicates, future
   /// status-bar bindings, …) just read the ref.
   const activeSessionId = ref<string | null>(null);
+  /// Last chat panel that actually held focus. Edge panels such as the
+  /// Library can legitimately make `activeSessionId` null/stale, but
+  /// workspace-scoped surfaces still need the chat session the user was
+  /// viewing before opening the edge panel.
+  const lastFocusedSessionId = ref<string | null>(null);
   /// Reactive counter bumped on every layout change (outer + each
   /// inner dockview's `onDidLayoutChange`, wired by App.vue and
   /// GroupPanel.vue). Consumers that depend on the panel-set —
@@ -200,6 +205,13 @@ export const useLayoutStore = defineStore('layout', () => {
   /// only sees outer-level events).
   function setActiveSessionId(sessionId: string | null): void {
     activeSessionId.value = sessionId;
+
+    if (sessionId) lastFocusedSessionId.value = sessionId;
+  }
+
+  function bindActiveSession(sessionId: string): void {
+    activeSessionId.value = sessionId;
+    lastFocusedSessionId.value = sessionId;
   }
 
   /// Reactive flag for the singleton session-details right-rail
@@ -305,7 +317,7 @@ export const useLayoutStore = defineStore('layout', () => {
     const panel = dock.activeGroup?.activePanel;
 
     if (panel && panel.api.component === 'chat') {
-      activeSessionId.value = panel.api.id;
+      bindActiveSession(panel.api.id);
 
       return;
     }
@@ -326,7 +338,7 @@ export const useLayoutStore = defineStore('layout', () => {
       const innerActive = inner?.activeGroup?.activePanel;
 
       if (innerActive && innerActive.api.component === 'chat') {
-        activeSessionId.value = innerActive.api.id;
+        bindActiveSession(innerActive.api.id);
 
         return;
       }
@@ -370,7 +382,7 @@ export const useLayoutStore = defineStore('layout', () => {
         const id = panelId(activeChat);
 
         if (id) {
-          activeSessionId.value = id;
+          bindActiveSession(id);
 
           return;
         }
@@ -381,7 +393,7 @@ export const useLayoutStore = defineStore('layout', () => {
           const id = panelId(p);
 
           if (id) {
-            activeSessionId.value = id;
+            bindActiveSession(id);
 
             return;
           }
@@ -1223,6 +1235,7 @@ export const useLayoutStore = defineStore('layout', () => {
     api,
     bodyApi,
     activeSessionId,
+    lastFocusedSessionId,
     layoutRev,
     bumpLayoutRev,
     pendingReveal,
