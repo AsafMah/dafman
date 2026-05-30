@@ -5,7 +5,6 @@ import type { JobRecord } from '@/ipc/types';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
-import { emit as busEmit } from '@/lib/bus';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 type LocalAutopilotMeta = {
@@ -138,16 +137,20 @@ export const useJobsStore = defineStore('jobs', () => {
     }
   }
 
-  function openOwningSession(sessionId: string): void {
+  /// Open + activate the owning session's panel, then park a "reveal"
+  /// intent so the ChatWindow scrolls to the tool-call card that
+  /// spawned this job (issue #16). When the job has no `toolCallId`
+  /// (autopilot-session jobs), the reveal falls back to scrolling to
+  /// the bottom so the user lands on the live work. The intent is
+  /// stored (not bus-emitted) so it survives a freshly-opened panel
+  /// that hasn't mounted its ChatWindow yet — mitt has no replay.
+  function openOwningSession(sessionId: string, toolCallId?: string): void {
     const layout = useLayoutStore();
 
     if (!layout.isPanelOpen(sessionId)) layout.addPanel(sessionId);
 
     layout.activatePanel(sessionId);
-    // Scroll to the bottom so the user sees the active work
-    setTimeout(() => {
-      busEmit('scroll-to-bottom', { sessionId });
-    }, 100);
+    layout.requestReveal(sessionId, { toolCallId });
   }
 
   async function startAutopilot(sessionId: string, goal: string): Promise<void> {
