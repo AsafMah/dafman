@@ -12,7 +12,7 @@ type Handler = (event: { type: string; [k: string]: unknown }) => void;
 interface FakeSession {
   sessionId: string;
   on(handler: Handler): () => void;
-  send(args: { prompt: string; attachments?: unknown[] }): Promise<string>;
+  send(args: { prompt: string; attachments?: unknown[]; agentMode?: string }): Promise<string>;
   setModel(model: string, opts?: { reasoningEffort?: string }): Promise<void>;
   getEvents(): Promise<Array<{ type: string; [k: string]: unknown }>>;
   disconnect(): Promise<void>;
@@ -86,6 +86,7 @@ interface FakeSession {
   };
   lastSentPrompt?: string;
   lastSentAttachments?: unknown[];
+  lastSentAgentMode?: string;
   lastModel?: { model: string; opts?: { reasoningEffort?: string } };
   history: Array<{ type: string; [k: string]: unknown }>;
   currentMode: string;
@@ -124,9 +125,10 @@ function makeFakeSession(
         listener = null;
       };
     },
-    async send({ prompt, attachments }) {
+    async send({ prompt, attachments, agentMode }) {
       session.lastSentPrompt = prompt;
       session.lastSentAttachments = attachments;
+      session.lastSentAgentMode = agentMode;
       return 'msg-id';
     },
     async setModel(model, opts) {
@@ -350,6 +352,31 @@ describe('SessionRegistry', () => {
       model: 'claude',
       opts: { reasoningEffort: 'high' },
     });
+  });
+
+  test('#35: send passes agentMode through to the SDK (passthrough + override)', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const fake = client.createdSessions[0]!;
+
+    // Default passthrough: a fresh session is 'interactive', so an
+    // ordinary send carries agentMode: 'interactive'.
+    await reg.send(id, 'hello');
+    expect(fake.lastSentAgentMode).toBe('interactive');
+
+    // Explicit per-message override scopes the mode to one send,
+    // even though the session-wide mode is still 'interactive'.
+    await reg.send(id, 'plan this', undefined, undefined, 'plan');
+    expect(fake.lastSentAgentMode).toBe('plan');
+    expect(fake.currentMode).toBe('interactive');
+
+    // Passthrough tracks the session-wide toggle: after switching the
+    // session to 'plan', a plain send inherits it.
+    await reg.setMode(id, 'plan');
+    await reg.send(id, 'still planning');
+    expect(fake.lastSentAgentMode).toBe('plan');
   });
 
   test('send converts command result pills into temp file attachments', async () => {
