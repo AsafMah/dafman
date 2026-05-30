@@ -878,9 +878,11 @@ export type DafmanRPC = {
       /// Phase 19b.2. Filesystem-backed agent CRUD. Separate from
       /// `session.rpc.agent.*` because the SDK surface only sees
       /// loaded agents; the Library tab needs to enumerate,
-      /// create, and delete the .agent.md files directly.
+      /// create, and delete the .agent.md files directly. Explicit
+      /// Refresh may ask this path to SDK-reload first so the file
+      /// list and selectable registry do not drift mid-session.
       listAgentFiles: {
-        params: { sessionId: string };
+        params: { sessionId: string; reloadSdk?: boolean };
         response: AgentFileEntry[];
       };
       listAgentFilesGlobal: {

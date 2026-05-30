@@ -425,9 +425,9 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   }),
   listJobs: rpcGuard(async () => sessions.listJobs()),
   listAgentFiles: rpcGuard(async (args) => {
-    const { sessionId } = args as { sessionId: string };
+    const { sessionId, reloadSdk } = args as { sessionId: string; reloadSdk?: boolean };
 
-    return sessions.listAgentFiles(sessionId);
+    return sessions.listAgentFiles(sessionId, reloadSdk === undefined ? {} : { reloadSdk });
   }),
   listAgentFilesGlobal: rpcGuard(async () => sessions.listAgentFilesGlobal()),
   writeAgentFile: rpcGuard(async (args) => {

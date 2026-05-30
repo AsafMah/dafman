@@ -506,6 +506,24 @@ exports[`IPC wire contracts promoteTask request shape 1`] = `
 }
 `;
 
+exports[`IPC wire contracts listAgentFiles refresh request shape 1`] = `
+{
+  "reloadSdk": true,
+  "sessionId": "sess-1",
+}
+`;
+
+exports[`IPC wire contracts listAgentFiles response shape 1`] = `
+[
+  {
+    "canonical": true,
+    "name": "dropped",
+    "path": "C:\\repo\\dafman\\.github\\agents\\dropped.agent.md",
+    "scope": "project",
+  },
+]
+`;
+
 exports[`IPC wire contracts createTerminal request shape 1`] = `
 {
   "args": [

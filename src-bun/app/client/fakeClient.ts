@@ -96,6 +96,15 @@ class FakeCopilotSession {
   private readonly scriptRef: { current: SendScript };
   public readonly rpc: Record<string, RpcNamespace>;
   private readonly skillsDisabled = new Set<string>();
+  private readonly agents = [
+    {
+      name: 'fake-agent',
+      displayName: 'Fake Agent',
+      description: 'Fake custom agent for smoke and E2E tests.',
+      path: 'fake://agents/fake-agent.agent.md',
+    },
+  ];
+  private currentAgentName: string | null = null;
 
   constructor(state: FakeSessionState, scriptRef: { current: SendScript }) {
     this.sessionId = state.sessionId;
@@ -165,6 +174,28 @@ class FakeCopilotSession {
         read: async () => ({ exists: false, content: null, path: null }),
         update: async () => undefined,
         delete: async () => undefined,
+      },
+      agent: {
+        list: async () => ({ agents: this.agents }),
+        getCurrent: async () => ({
+          agent: this.currentAgentName
+            ? (this.agents.find((a) => a.name === this.currentAgentName) ?? null)
+            : null,
+        }),
+        select: async (args?: unknown) => {
+          const { name } = (args ?? {}) as { name: string };
+          const agent = this.agents.find((a) => a.name === name);
+
+          if (!agent) throw new Error(`unknown agent: ${name}`);
+
+          this.currentAgentName = name;
+
+          return { agent };
+        },
+        deselect: async () => {
+          this.currentAgentName = null;
+        },
+        reload: async () => ({ agents: this.agents }),
       },
       mcp: {
         list: async () => ({ servers: [] }),
