@@ -241,6 +241,46 @@ function handleOauthCompleted(record: SessionRecord, payload: SessionEventPayloa
   }
 }
 
+// #69: agent-driven OAuth nudge. We deliberately do NOT call
+// `eventLog.registerInterest('mcp.oauth_required')` — doing so flips the
+// SDK runtime from its browserless-fallback path to one that *blocks* the
+// MCP connection awaiting `respondToMcpOAuth(requestId, OAuthClientProvider)`
+// (see `buildMcpOAuthHandler` in @github/copilot/sdk). Without a full
+// provider implementation that would hang the connection, so the
+// `mcp.oauth_required`/`_completed` handlers above stay dormant. Instead we
+// surface the runtime's own outcome: when the browserless fallback finds no
+// cached token it flips the server to `needs-auth`, which arrives here as a
+// `session.mcp_server_status_changed`. We toast a sign-in prompt (the user
+// completes it via the Library Sign-in button, which drives `mcp.oauth.login`
+// → system browser) and confirm once the server reconnects.
+function handleMcpServerStatusChanged(record: SessionRecord, payload: SessionEventPayload): void {
+  const d = (payload.data ?? {}) as { serverName?: unknown; status?: unknown };
+
+  if (typeof d.serverName !== 'string') return;
+
+  const name = d.serverName;
+  const status = typeof d.status === 'string' ? d.status : '';
+
+  if (status === 'needs-auth') {
+    if (record._toastedNeedsAuth.has(name)) return;
+
+    record._toastedNeedsAuth.add(name);
+    useToastStore().warn(
+      'MCP server needs sign-in',
+      `${name} requires authorization. Open the Library panel and click Sign-in to authenticate.`,
+    );
+
+    return;
+  }
+
+  // Reaching a non-auth-gated state clears the de-dup guard so a later
+  // re-auth re-prompts; a transition straight to `connected` after we
+  // prompted confirms the recovery.
+  if (record._toastedNeedsAuth.delete(name) && status === 'connected') {
+    useToastStore().success('MCP signed in', `${name} connection established`);
+  }
+}
+
 // Extract workspace cwd from session.start / session.resume.
 function handleSessionCwd(record: SessionRecord, payload: SessionEventPayload): void {
   const ctx = (payload.data as { context?: { cwd?: unknown } }).context;
@@ -319,6 +359,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   'session.plan_changed': handlePlanChanged,
   'mcp.oauth_required': handleOauthRequired,
   'mcp.oauth_completed': handleOauthCompleted,
+  'session.mcp_server_status_changed': handleMcpServerStatusChanged,
   'session.start': handleSessionCwd,
   'session.resume': handleSessionCwd,
   'assistant.turn_start': handleTurnStart,

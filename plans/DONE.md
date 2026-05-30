@@ -109,6 +109,7 @@ Legend:
 | Library → Custom agents tab | ✅ | `LibraryAgentsTab.vue` |
 | Library → Tools tab | ✅ | `LibraryToolsTab.vue` |
 | MCP OAuth toast | ✅ | Phase 22a (DEVLOG 2026-05-25) |
+| MCP agent-driven `needs-auth` sign-in prompt | ✅ | #69 — `sessionReducer.ts` `handleMcpServerStatusChanged` (DEVLOG 2026-05-30); deliberately no `registerInterest` (would hang the connection) |
 | Agent picker (per-session) | ✅ | gear popover |
 | `getQuota` exposed in SessionDetails | 🟦 | rendered numerically; no usage graph |
 | `/fork` session | ✅ | `useMessageActions.ts` (composer fork button) |

@@ -10,6 +10,66 @@
 
 ---
 
+## 2026-05-30 — #69 agent-driven MCP OAuth: status-toast, NOT registerInterest (it would hang the connection)
+
+**Takeaway:** #69's filed "proposed shape" (register interest in `mcp.oauth_required`
++ drive the flow via `mcp.oauth.login`) is **unsafe** and would regress. The SDK's
+`buildMcpOAuthHandler` (`node_modules/@github/copilot/sdk/index.js`, found via
+`rg buildMcpOAuthHandler`) is a gate:
+
+```js
+buildMcpOAuthHandler(){
+  return this.hasEventListeners("mcp.oauth_required")
+    ? (e,r,n,o,s) => this.pendingRequests.requestMcpOAuth(e,r,n,s)   // DELEGATE: emits event, AWAITS respondToMcpOAuth
+    : async (...) => new Iee(...).authenticate(r,{browserless:true,...}) // FALLBACK: cached-token reuse, else throws → needs-auth
+}
+```
+
+`requestMcpOAuth` does `Promise.withResolvers()`, stashes the resolver under a fresh
+`requestId`, emits `mcp.oauth_required`, and **returns the unresolved promise to the
+MCP host** — which blocks the connection until someone calls
+`respondToMcpOAuth(requestId, provider)` with an `OAuthClientProvider`. The event
+payload (`session-events.d.ts:5286` `McpOauthRequiredData`) carries **no
+`authorizationUrl`** — just `requestId` / `serverName` / `serverUrl` /
+`staticClientConfig`. And `mcp.oauth.login` (rpc, keyed by `serverName`, `rpc.d.ts:9986`)
+runs a *separate* flow; it never resolves that pending `requestId`. So registering
+interest + only toasting (or only calling `login`) = **hung MCP connection** —
+strictly worse than the silent-ish failure today.
+
+**What today actually does (no interest registered):** browserless fallback. If a
+cached token is valid → connects immediately. If not → throws
+`MCPOAuthBrowserRequiredError` → processor converts to `needs-auth` → server status
+flips, which #70/#8 already surface as a Library **Sign-in** button. So a recovery
+path exists; what was missing was a *prompt* at the moment of the flip (the reducer's
+`mcp.oauth_required` toast handlers are dead code — the event never fires without
+`registerInterest`).
+
+**Fix (Option A, user-chosen over the risky full-delegation Option B):** react to the
+runtime's real signal. New reducer handler `handleMcpServerStatusChanged` on
+`session.mcp_server_status_changed`: `needs-auth` → warn toast naming the server +
+pointing at Library Sign-in; transition to `connected` for a server we prompted →
+success toast. De-duped per server name via new `SessionRecord._toastedNeedsAuth: Set<string>`
+(runtime re-emits `needs-auth` on every connect attempt); guard clears on
+`connected`/`disabled`/`not_configured` so a later re-auth re-prompts. The dormant
+`mcp.oauth_required`/`_completed` handlers are left in place (a brief comment marks
+them dormant-pending-registerInterest) in case we ever build the full
+`OAuthClientProvider` (Option B).
+
+**Integration check (rule 4a):** the bun `SessionEventForwarder.forward` forwards
+*every* event type unfiltered (`session.mcp_server_status_changed` is in renderer-side
+`IGNORED_EVENTS`, but that's the transcript layer — the side-effect reducer
+`applyToRecord` still runs the handler). Confirmed by code, not guessed. The agent-driven
+OAuth round-trip needs a real OAuth-gated MCP server mid-session, so it's a manual
+test, not E2E.
+
+**Receipts:** `src/stores/chat/sessionReducer.ts` (`handleMcpServerStatusChanged` +
+`EVENT_HANDLERS` wiring + dormancy comment); `src/stores/chat/sessionsStore.ts`
+(`_toastedNeedsAuth` field + 2 init sites); test fixtures updated repo-wide
+(`Playground.vue`, `sessionCommands.test.ts`, `registerBuiltinCommands.test.ts`,
+`sessionsStore.boundedEvents.test.ts`, `jobsStore.test.ts`);
+`sessionsStore.mcpOauth.test.ts` (+5 needs-auth tests). Gate: vue-tsc 0, eslint
+0 errors / 19 pre-existing warnings, 720 tests pass (+9), smoke 4/4.
+
 ## 2026-05-30 — #66 composer-toolbar resize overlap (structural flex fix) + #72 filed
 
 **Takeaway.** The recurring composer bottom-bar overlap (#17, now #66) is a

@@ -166,6 +166,7 @@ describe('registerBuiltinCommands — Reset Layout', () => {
       touchedFiles: [],
       commandsRun: 0,
       _toastedOauthRequests: new Set(),
+      _toastedNeedsAuth: new Set(),
       _artifactToolCallIds: new Set(),
     });
     const layoutStore = useLayoutStore();
