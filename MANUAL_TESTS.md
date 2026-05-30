@@ -63,6 +63,38 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #9 — Discovered MCP server toggle persistence (2026-05-30)
+
+> Repro fixture: [`tools/manual-fixtures/mcp-discovery/`](tools/manual-fixtures/mcp-discovery/).
+> Parts 2 (edit/delete discovered rows) & 3 (source path) of #9 are blocked at
+> the SDK boundary — tracked upstream in `github/copilot-sdk` (see the #9 issue
+> comment). This item verifies **only part 1 (toggle persistence)**.
+
+- **9.1** ⏳ **Toggling a discovered MCP server off survives an app restart.**
+  - **Steps:**
+    1. `bun run dev`.
+    2. Create a session whose **working directory** is
+       `tools/manual-fixtures/mcp-discovery` (the folder with the fixture
+       `.mcp.json`).
+    3. Open Library → MCP → **Discovered**. Confirm `fixture-memory` and
+       `fixture-everything` are listed.
+    4. Toggle `fixture-memory` **off**.
+    5. **Fully quit** Dafman (not just close the window) and relaunch.
+    6. Reopen a session in the same folder and look at Library → MCP →
+       Discovered.
+  - **Expected:** `fixture-memory` is still toggled **off**; `fixture-everything`
+    is still **on**. (The toggle routes through the SDK's persisted disabled list
+    via `mcp.config.disable` / `enable`.)
+  - **If it does NOT persist:** the bug is live — re-file under `manual-test-fail`
+    with the app/SDK version. The code path is already correct, so a failure means
+    the SDK's persisted-disabled-list write/read regressed; capture
+    `~/.copilot` MCP state before/after if possible.
+  - **Why not automated:** needs a real app process restart + the SDK's on-disk
+    persisted-disabled-list round-trip; not reachable from `bun test`.
+  - **Note:** use `.mcp.json` (the fixture does). `.vscode/mcp.json` is **no
+    longer discovered** — Copilot CLI removed that support; a `.vscode`-based repro
+    would show zero discovered servers and mislead the test.
+
 ### Issue #7 — MCP HTTP OAuth Sign-in flow (2026-05-30)
 
 - **7.1** ⏳ **Sign-in opens the system browser and completes OAuth end-to-end.**

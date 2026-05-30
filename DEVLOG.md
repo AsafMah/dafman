@@ -10,6 +10,45 @@
 
 ---
 
+## 2026-05-30 — #9 MCP discovery: part-1 repro fixture + parts 2/3 filed upstream (copilot-sdk#1518)
+
+**Takeaway.** #9's original `.vscode/mcp.json` repro is **stale** — Copilot CLI
+removed `.vscode/mcp.json` support; discovery now only reads `.mcp.json` /
+`.github/mcp.json` in the session cwd. Part 1 (discovered-server toggle
+persistence) is dogfoddable via a new fixture; parts 2/3 (edit/override + source
+path) are SDK-blocked and now tracked upstream.
+
+**`.vscode/mcp.json` is dead.** Bundled SDK string: *"Copilot CLI's incomplete
+support for .vscode/mcp.json has been removed … migrate to .mcp.json"*. A
+`.vscode`-based repro shows **zero** discovered servers — would have silently
+misled the dogfood. Fixture deliberately uses `.mcp.json`
+(`{ "mcpServers": { "<name>": {…} } }`, key confirmed `api.schema.json:5452`).
+
+**Part-1 fixture.** `tools/manual-fixtures/mcp-discovery/.mcp.json` (+ README)
+declares two discoverable stdio servers (`@modelcontextprotocol/server-memory`,
+`-everything` via `npx`). `MANUAL_TESTS.md` §9.1 = the dogfood checklist
+(open session in that folder → toggle discovered server off → restart → verify
+persistence). Toggle routes through SDK's persisted disabled list
+(`mcp.config.disable`/`enable`), documented as persisted.
+
+**Parts 2/3 SDK gap — receipts.** Discovery shapes carry identity+status only, no
+launch config / origin path:
+- `DiscoveredMcpServer` (`rpc.d.ts` ~2657) = `{ name, type?, source, enabled }`
+- `McpServer` (`rpc.d.ts` ~4148) = `{ name, status, source?, error }`
+- `McpServerSource` enum = `user|workspace|plugin|builtin` (coarse, no path)
+No command/args/url/env/headers or origin file path → can't render a source-file
+detail view or edit/override a discovered workspace/plugin server. Filed
+**github/copilot-sdk#1518** asking discovery to return resolved config + source
+path.
+
+**Which SDK.** Our runtime imports **`@github/copilot-sdk`** (standalone
+multi-platform, repo `github/copilot-sdk`), *not* the bundled `@github/copilot`
+CLI — both share identical MCP shapes, so the upstream ask went to
+`github/copilot-sdk`. #9 left **open + `blocked`** on copilot-sdk#1518 for parts
+2/3; commented with all of the above.
+
+---
+
 ## 2026-05-30 — #66 composer-toolbar resize overlap (structural flex fix) + #72 filed
 
 **Takeaway.** The recurring composer bottom-bar overlap (#17, now #66) is a

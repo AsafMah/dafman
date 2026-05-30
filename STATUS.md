@@ -24,7 +24,12 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #20 — resume no longer stuck on "Thinking…" after the app
+**Recently fixed:** #9 — discovered-MCP-server work: part-1 (toggle persistence)
+repro fixture added (`tools/manual-fixtures/mcp-discovery/`, MANUAL_TESTS §9.1)
+and the stale `.vscode/mcp.json` path retired (Copilot CLI dropped it; use
+`.mcp.json`); parts 2/3 (edit/override + source path) filed upstream as
+`github/copilot-sdk#1518`, #9 left open + `blocked`. 2026-05-30. #20 — resume no
+longer stuck on "Thinking…" after the app
 exits mid-turn (bun appends a synthetic `dafman.resume_settled` terminator to
 the resume replay when history ends mid-turn; reducer clears `isThinking`).
 2026-05-30. #29 — Full E2E back to 48/48 (stale flows updated for the
