@@ -672,7 +672,7 @@ describe('IPC wire contracts — diagnostics', () => {
     expect(sample).toMatchSnapshot();
   });
 
-  test('AuditEntry permission + url shapes', () => {
+  test('AuditEntry permission + url + mcp shapes', () => {
     const samples: import('../rpc').AuditEntry[] = [
       {
         ts: '2026-05-22T00:00:00.000Z',
@@ -698,6 +698,16 @@ describe('IPC wire contracts — diagnostics', () => {
         url: 'https://github.com/login',
         allowed: true,
         reason: 'ok',
+      },
+      {
+        ts: '2026-05-22T00:00:03.000Z',
+        kind: 'mcp',
+        sessionId: 'sess-1',
+        serverName: 'github',
+        toolName: 'create_issue',
+        toolCallId: 'tc-1',
+        argKeys: ['title', 'body'],
+        argKeyCount: 2,
       },
     ];
     expect(samples).toMatchSnapshot();

@@ -9,9 +9,11 @@ import {
   initAudit,
   recentAudit,
   recordCommand,
+  recordMcpToolCall,
   recordPermission,
   recordUrl,
   subscribeAudit,
+  extractArgKeys,
 } from '../app/observability/audit';
 import type { AuditEntry } from '../app/observability/audit';
 
@@ -92,6 +94,58 @@ describe('audit log writer', () => {
     expect(parsed.command).toBe('echo SECRET');
     expect(parsed).not.toHaveProperty('stdout');
     expect(parsed).not.toHaveProperty('stderr');
+  });
+
+  test('recordMcpToolCall appends to mcp.jsonl, fans out, and records no arg values', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dafman-audit-'));
+    await initAudit({ dir });
+    const seen: AuditEntry[] = [];
+    const unsubscribe = subscribeAudit((entry) => seen.push(entry));
+    await recordMcpToolCall({
+      sessionId: 'sess-1',
+      serverName: 'github',
+      toolName: 'create_issue',
+      toolCallId: 'tc-1',
+      argKeys: ['title', 'token'],
+      argKeyCount: 2,
+    });
+    // Ring + subscriber.
+    const ring = recentAudit();
+    expect(ring).toHaveLength(1);
+    expect(ring[0]?.kind).toBe('mcp');
+    expect(seen).toHaveLength(1);
+    // Own file (not commingled with commands).
+    const content = await readFile(join(dir, 'mcp.jsonl'), 'utf8');
+    const parsed = JSON.parse(content.trim());
+    expect(parsed.kind).toBe('mcp');
+    expect(parsed.serverName).toBe('github');
+    expect(parsed.toolName).toBe('create_issue');
+    expect(parsed.toolCallId).toBe('tc-1');
+    expect(parsed.argKeys).toEqual(['title', 'token']);
+    // Key NAMES only — never values. A secret value passed as the
+    // `token` arg must not appear anywhere in the record.
+    expect(content).not.toContain('commands.jsonl');
+    unsubscribe();
+  });
+
+  test('extractArgKeys records key names only, caps the list, and is defensive', () => {
+    // Plain object → top-level key names + total count.
+    expect(extractArgKeys({ title: 'x', token: 'secret-value' })).toEqual({
+      argKeys: ['title', 'token'],
+      argKeyCount: 2,
+    });
+    // Values never leak.
+    expect(extractArgKeys({ token: 'secret-value' }).argKeys).not.toContain('secret-value');
+    // Cap at 20, but argKeyCount reports the true total.
+    const wide: Record<string, number> = {};
+    for (let i = 0; i < 30; i++) wide[`k${i}`] = i;
+    const out = extractArgKeys(wide);
+    expect(out.argKeys).toHaveLength(20);
+    expect(out.argKeyCount).toBe(30);
+    // Non-plain-object inputs degrade to empty.
+    expect(extractArgKeys(null)).toEqual({ argKeys: [], argKeyCount: 0 });
+    expect(extractArgKeys([1, 2, 3])).toEqual({ argKeys: [], argKeyCount: 0 });
+    expect(extractArgKeys('string')).toEqual({ argKeys: [], argKeyCount: 0 });
   });
 
   test('ring buffer caps at 500 entries', async () => {

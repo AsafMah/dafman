@@ -966,6 +966,16 @@ export type AuditEntry =
       exitCode?: number | null;
       durationMs?: number;
       truncated?: boolean;
+    }
+  | {
+      ts: string;
+      kind: 'mcp';
+      sessionId: string;
+      serverName: string;
+      toolName: string;
+      toolCallId?: string;
+      argKeys?: string[];
+      argKeyCount?: number;
     };
 
 export type CommandName = keyof CommandMap;

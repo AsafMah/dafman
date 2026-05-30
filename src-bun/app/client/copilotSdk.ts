@@ -84,3 +84,13 @@ export type UserInputResponse = Awaited<
 /// SDK's `"low" | "medium" | "high" | "xhigh"` (which would silently
 /// drift if the SDK adds a level).
 export type ReasoningEffort = NonNullable<SessionConfig['reasoningEffort']>;
+
+/// `PreMcpToolCallHookInput` is not exported from the SDK index
+/// (added in beta.8) — derive it from `SessionConfig['hooks']`. The
+/// MCP hook lives on the SDK's `SessionHooks` surface (under
+/// `config.hooks`), NOT at the top level like `onUserInputRequest`.
+/// The hook fires before every MCP tool invocation; its output can
+/// only rewrite `_meta` (it can't block or modify args).
+export type PreMcpToolCallInput = Parameters<
+  NonNullable<NonNullable<SessionConfig['hooks']>['onPreMcpToolCall']>
+>[0];
