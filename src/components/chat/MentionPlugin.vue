@@ -23,13 +23,7 @@
 ///      us the textNode, then we insert the pill using the
 ///      attachment cached in `pendingAttachment`.
 
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  useTemplateRef,
-} from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import { TextNode, $createTextNode, $isTextNode } from 'lexical';
 import {
   TypeaheadMenuPlugin,
