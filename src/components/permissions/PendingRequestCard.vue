@@ -26,7 +26,7 @@
 //     `mode: "form"` shows a "not yet supported" notice + Cancel
 //     (form-schema renderer is the next ticket).
 
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import Button from 'primevue/button';
 import RadioButton from 'primevue/radiobutton';
 import Textarea from 'primevue/textarea';
@@ -86,7 +86,7 @@ const inputAnswer = ref('');
 const inputChoice = ref<string | null>(null);
 const urlOpened = ref(false);
 const formContent = ref<Record<string, unknown>>({});
-const formComponentRef = ref<{ validate: () => string | null } | null>(null);
+const formComponentRef = useTemplateRef<{ validate: () => string | null }>('formComponentRef');
 const exitPlanFeedback = ref('');
 
 // Type-narrowed accessors so the template doesn't need casts.
