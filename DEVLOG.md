@@ -10,6 +10,32 @@
 
 ---
 
+## 2026-05-30 — #76 CodeMirror code blocks follow light mode
+
+**Takeaway.** Fenced code blocks rendered through CodeMirror no longer pin the
+dark `oneDark` theme in light mode. `CodeEditor.vue` now reads the existing
+app-theme source of truth (`useDockviewTheme().isDark`) and reconfigures a
+CodeMirror theme `Compartment` live; `DiffEditor.vue` uses the same shared
+selector and rebuilds its MergeView/inline view on theme flips because its
+language lifecycle already avoids post-mount reconfigure.
+
+**Receipts.**
+- Root cause from #76 confirmed: `src/components/shared/CodeEditor.vue` and
+  `src/components/details/DiffEditor.vue` both had unconditional `oneDark`
+  extensions.
+- Shared seam: `src/lib/codeMirrorShared.ts` exports
+  `codeMirrorThemeExtensionFor(isDark)`, returning CodeMirror's default light
+  syntax highlighting for light mode and `oneDark` only for dark mode.
+- Test-first receipt: `bun test src\lib\__tests__\codeMirrorShared.test.ts`
+  failed before the helper existed, then passed after implementation.
+- Local validation run for this PR intentionally excludes dev/smoke/e2e and
+  electrobun build per the parallel-worktree fixed-port constraint in #76's task;
+  CI required checks cover those.
+
+**Manual verification owed.**
+- See `MANUAL_TESTS.md` §76.1 for the live rendered-colour check; happy-dom does
+  not resolve CodeMirror's real CSS cascade.
+
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
 
 **Takeaway.** Walked the `MANUAL_TESTS.md ⏳ Pending verification` queue live in

@@ -70,6 +70,23 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #76 — Fenced CodeMirror code blocks follow app theme (2026-05-30)
+
+#### 76.1 - Transcript fenced code blocks switch between light and dark CodeMirror themes.
+
+- [ ] result: 
+
+- **Steps:** set the app to light mode, open a session containing a top-level
+  fenced code block in the transcript, then toggle the app to dark mode and back
+  while the message remains visible.
+- **Expected:** in light mode the CodeMirror-rendered block uses a light surface
+  with dark, legible syntax; in dark mode it switches to the dark `oneDark`
+  styling. The already-rendered block updates without needing to reload the
+  session.
+- **Why not automated:** the remaining assertion is rendered CodeMirror CSS
+  cascade and perceived contrast; happy-dom does not compute the live custom
+  property/theme styles.
+
 ### Issue #9 — Discovered MCP server toggle persistence (2026-05-30)
 
 > Repro fixture: [`tools/manual-fixtures/mcp-discovery/`](tools/manual-fixtures/mcp-discovery/).
