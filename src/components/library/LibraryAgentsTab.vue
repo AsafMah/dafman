@@ -88,6 +88,10 @@ async function load() {
   await loadFiles(activeSession.value?.id);
 }
 
+async function refresh() {
+  await loadFiles(activeSession.value?.id, { reloadSdk: true });
+}
+
 onMounted(load);
 /// Mirrors the LibraryInstructionsTab pattern: when the user switches
 /// to a different session the project-scope agent file list changes
@@ -335,7 +339,7 @@ async function reveal(path: string) {
         text
         label="Refresh"
         aria-label="Refresh agents list"
-        @click="load"
+        @click="refresh"
       />
       <Button
         size="small"

@@ -103,6 +103,7 @@ interface FakeSession {
   }>;
   currentAgentName: string | null;
   agentReloadCount: number;
+  onAgentReload?: () => void;
   /// 19b.1: stateful tasks fixture.
   tasksList: Array<Record<string, unknown>>;
   cancelCalls: string[];
@@ -202,6 +203,7 @@ function makeFakeSession(
         },
         async reload() {
           session.agentReloadCount++;
+          session.onAgentReload?.();
           return { agents: session.agentsList.slice() };
         },
       },
@@ -1084,6 +1086,32 @@ describe('SessionRegistry', () => {
     expect(fake.agentReloadCount).toBe(1);
     expect(out).toHaveLength(1);
     expect(out[0]?.name).toBe('a1');
+  });
+
+  test('19b.2: listAgentFiles can refresh the SDK registry before returning filesystem rows', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const fake = client.createdSessions[0]!;
+
+    fake.onAgentReload = () => {
+      fake.agentsList = [
+        {
+          name: 'dropped',
+          displayName: 'Dropped Agent',
+          description: 'Added outside dafman while the session was running',
+        },
+      ];
+    };
+
+    await expect(reg.selectAgent(id, 'dropped')).rejects.toBeInstanceOf(AppError);
+    await reg.listAgentFiles(id);
+    expect(fake.agentReloadCount).toBe(0);
+
+    await reg.listAgentFiles(id, { reloadSdk: true });
+    expect(fake.agentReloadCount).toBe(1);
+    await expect(reg.selectAgent(id, 'dropped')).resolves.toMatchObject({ name: 'dropped' });
   });
 
   test('19a: all agent RPCs reject with SessionNotFound on unknown sessionId', async () => {
