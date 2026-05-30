@@ -63,6 +63,32 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #10 — MCP "Remove" no longer jumps to Discovered (2026-05-30)
+
+- **10.1** ⏳ **Removing a configured MCP server doesn't bounce to Discovered.**
+  - **Steps:** Library → MCP. Add/configure an MCP server so it appears under
+    the **Configured** section. Click its Remove (trash) action.
+  - **Expected:** the server disappears from Configured and does **not**
+    immediately re-appear under the **Discovered** section. (A server that's
+    *also* defined in a workspace file may legitimately return after the next
+    refresh — that's correct.)
+  - **Why not automated:** the unit test covers the in-memory list sync; this
+    item confirms the live render of the two sibling sections matches.
+
+### Issue #9 — MCP discovered-toggle persistence (DOGFOOD-FIRST — 2026-05-30)
+
+- **9.1** ⏳ **Disabled discovered MCP server stays disabled across restart.**
+  - **Steps:** Library → MCP. Toggle OFF a server in the **Discovered**
+    section. Fully quit the app. Relaunch. Open Library → MCP again.
+  - **Expected:** the server is still toggled OFF.
+  - **Why not automated:** persistence is enforced by the CLI's user-config
+    disabled list (SDK `mcp.config.disable`), which only round-trips across a
+    real process restart. Our code already routes through the persisted
+    config-level disable (rpc.d.ts:3367) — this test confirms whether the
+    original "doesn't persist" bug still reproduces. **If it does NOT repro,
+    close #9. If it DOES, capture the exact repro (server source category +
+    steps) on the issue so the runtime root cause can be found.**
+
 ### Issue #16 — Jobs "Go to session" scrolls to spawning tool call (2026-05-30)
 
 - **16.1** ⏳ **Reveal scrolls to the spawning tool-call card (cross-session).**
