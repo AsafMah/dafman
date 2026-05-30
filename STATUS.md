@@ -24,7 +24,10 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #78 — Library Agents Select keeps the duplicate-click
+**Recently fixed:** #85 — empty workspace groups close without confirmation;
+non-empty group-close confirmations now have a real header, destructive/secondary
+button styling, clearer wording, and Cancel as the default focus. 2026-05-30.
+#78 — Library Agents Select keeps the duplicate-click
 disable immediate but delays the loading/refresh affordance, preventing the
 instant-selection flash. 2026-05-30. #76 — fenced CodeMirror code blocks now follow the app
 light/dark theme instead of hardcoding `oneDark`, with a shared testable theme
