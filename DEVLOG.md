@@ -10,6 +10,30 @@
 
 ---
 
+## 2026-05-30 — #79 Library slash commands reveal instead of toggle-close
+
+**Takeaway.** Fixed `/agent` (and the shared Library-opening siblings) so command
+navigation is idempotent: if Library is already open, the command focuses it
+instead of collapsing the right rail.
+
+**Receipts.**
+- `src/stores/shell/layoutStore.ts` adds `revealEdgePanel(id, edge)`, a
+  programmatic show/focus helper that deliberately never collapses an already
+  displayed edge panel. `activateEdgePanel` keeps its activity-tab toggle
+  semantics for rail clicks.
+- `src/lib/sessionCommands.ts` routes `openLibraryTab()` through
+  `revealEdgePanel(PANEL_IDS.library, 'right')`, covering `/agent`, `/skill`,
+  `/skills`, `/mcp`, and `/library`.
+- Regression coverage:
+  `src/stores/__tests__/sessionCommands.libraryPanel.test.ts` proves each command
+  keeps an already-open Library panel expanded and focuses it; it also covers the
+  collapsed → expanded path.
+
+**Validation.** Targeted red/green:
+`bun test src\stores\__tests__\sessionCommands.libraryPanel.test.ts`. Local PR
+gate passed: `bun run lint`; `bun run lint:eslint` (pre-existing warnings only);
+`bun test`; `bunx vite build`.
+
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
 
 **Takeaway.** Walked the `MANUAL_TESTS.md ⏳ Pending verification` queue live in
