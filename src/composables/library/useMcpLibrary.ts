@@ -84,31 +84,37 @@ export function useMcpLibrary() {
     return status === undefined || status === 'needs-auth';
   }
 
+  function getLibrarySession() {
+    const sessionsStore = useSessionsStore();
+    const layoutStore = useLayoutStore();
+
+    return (
+      sessionsStore.getSession(layoutStore.lastFocusedSessionId) ??
+      sessionsStore.getSession(layoutStore.activeSessionId) ??
+      sessionsStore.sessions.find((s) => s.workingDirectory) ??
+      sessionsStore.sessions[0] ??
+      null
+    );
+  }
+
   async function loadAll(): Promise<void> {
     error.value = null;
     loaded.value = false;
 
     try {
-      const sessionsStore = useSessionsStore();
-      // Pass the active session's workingDirectory (or any open
-      // session's, falling back to none) so the SDK's discovery picks
-      // up workspace-level `.mcp.json` files. Without this, servers
-      // configured per-workspace (e.g. the github MCP a session has
-      // already auto-connected to) would NOT show up in the Library
-      // — the SDK's mcp.discover defaults to user-config only.
-      const activeId = useLayoutStore().activeSessionId;
-      const active = sessionsStore.getSession(activeId);
-      const wd =
-        active?.workingDirectory ||
-        sessionsStore.sessions.find((s) => s.workingDirectory)?.workingDirectory ||
-        '';
-      // Also query the active session's live MCP list — it includes
+      // Pass the last focused chat session's workingDirectory (or any
+      // open session's, falling back to none) so SDK discovery picks up
+      // workspace-level `.mcp.json` files even while the Library edge
+      // panel owns focus and `activeSessionId` is null/stale.
+      const librarySession = getLibrarySession();
+      const wd = librarySession?.workingDirectory || '';
+      // Also query the Library session's live MCP list — it includes
       // servers that the SDK auto-discovered AND connected to, which
       // mcp.discover (server-scoped) may miss for plugin-supplied
       // configs that only register against a live session. We also use
       // its per-server `status` to gate the Sign-in affordance.
-      const sessionMcpsPromise = activeId
-        ? invokeCommand('listSessionMcpServers', { sessionId: activeId }).catch(
+      const sessionMcpsPromise = librarySession
+        ? invokeCommand('listSessionMcpServers', { sessionId: librarySession.id }).catch(
             () => [] as Array<{ name: string; status: string }>,
           )
         : Promise.resolve([] as Array<{ name: string; status: string }>);
@@ -248,12 +254,10 @@ export function useMcpLibrary() {
   async function signIn(
     name: string,
   ): Promise<{ state: 'no-session' | 'started' | 'already-signed-in' | 'failed' }> {
-    const sessionsStore = useSessionsStore();
-    // Prefer the active session (whose workspace/config the Library is
-    // showing) and fall back to any open session — the OAuth flow runs
-    // through a live session but isn't otherwise session-specific.
-    const session =
-      sessionsStore.getSession(useLayoutStore().activeSessionId) ?? sessionsStore.sessions[0];
+    // Prefer the same last-focused session whose workspace/config the
+    // Library is showing, then fall back to any open session — the OAuth
+    // flow runs through a live session but isn't otherwise session-specific.
+    const session = getLibrarySession();
 
     if (!session) return { state: 'no-session' };
 

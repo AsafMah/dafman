@@ -125,6 +125,14 @@ normalizing placement, labels, title tooltips, and accessible names.
   refactor covered by component tests; smoke/e2e/electrobun-build are deferred
   to CI for this parallel worktree per the issue instructions.
 
+## 2026-05-30 — #96 MCP discovery uses the last focused chat workspace
+
+**Takeaway.** Library → MCP → Discovered was passing the wrong cwd to `mcp.discover` whenever the Library edge panel made `layoutStore.activeSessionId` null/stale, so workspace `.mcp.json` servers disappeared and only user-source servers remained. The fix records `layoutStore.lastFocusedSessionId` whenever a chat panel actually receives focus, then makes MCP discovery/list/sign-in prefer that session before falling back to the active/any open session.
+
+**Receipts.** Root cause was the old cwd derivation in `src/composables/library/useMcpLibrary.ts:91-119`, which trusted `activeSessionId` for both `discoverMcpServers` and `listSessionMcpServers`. `src/stores/shell/layoutStore.ts:150-155,206-215,304-332,364-392,1204-1209` now keeps the last focused chat id alongside the nullable active id. `src/composables/library/useMcpLibrary.ts:87-124` resolves the Library session from `lastFocusedSessionId` → `activeSessionId` → any open cwd before invoking discovery/live-list, and `src/components/library/LibraryMcpTab.vue:27,122-127` reloads when either id changes so session switches still refresh the list.
+
+**Test.** Added `src/composables/library/__tests__/useMcpLibrary.test.ts:96-123`: it seeds a stale active session plus a focused session, simulates Library-panel divergence, and asserts `discoverMcpServers` gets `C:\repo\focused` and `listSessionMcpServers` gets `focused-session`. Verified red first (pre-fix call used `C:\repo\stale`), then green.
+
 ---
 
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill

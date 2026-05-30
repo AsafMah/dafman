@@ -26,7 +26,7 @@ import {
 } from '@/composables/library/useMcpLibrary';
 
 const toasts = useToastStore();
-const { activeSessionId } = storeToRefs(useLayoutStore());
+const { activeSessionId, lastFocusedSessionId } = storeToRefs(useLayoutStore());
 const headerActions: LibraryTabHeaderAction[] = [
   { key: 'add', label: 'Add', icon: 'pi pi-plus', title: 'Add MCP server', variant: 'primary' },
   {
@@ -134,7 +134,7 @@ onMounted(() => {
 /// Auto-reload when the user switches to a different session — MCP
 /// config uses session's workingDirectory to surface project-scoped
 /// discovered servers. Mirror LibraryInstructionsTab pattern. Per #51.
-watch(activeSessionId, () => {
+watch([activeSessionId, lastFocusedSessionId], () => {
   void loadAll();
 });
 
