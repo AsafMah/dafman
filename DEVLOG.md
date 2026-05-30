@@ -10,7 +10,30 @@
 
 ---
 
-## 2026-05-30 — #19: Instructions markdown theme-token inversion
+## 2026-05-30 — Compressed AGENTS.md + personal instructions
+
+**Takeaway.** Both agent-instruction files had grown verbose and overlapping.
+Compressed without dropping any actionable directive (rubber-duck-verified):
+`AGENTS.md` 40 KB → 24 KB (848 → 419 lines), personal cross-repo
+`~/.copilot/copilot-instructions.md` 13 KB → 6.2 KB.
+
+**What changed.** Cut war-story precedent paragraphs to short parentheticals,
+collapsed the dev-command + label tables, deduped the repeated `plans/DONE.md`
+pointer. All anti-laziness rules 0–24 (incl. 4a), every Hard rule, every SDK
+gotcha / code-style constraint / dev command preserved. Moved all
+dafman-specific content (commands, paths, commit receipts, the dafman-only
+"smoke before push" rule, `tools/inspect.ts` section) OUT of the personal
+cross-repo file — it now holds only generic, repo-agnostic working principles
+(JetBrains-MCP-first, the 10 anti-regression principles, the diagnostic ladder
+in generic form). Backups of both originals saved under the session
+`files/` folder.
+
+**Verification.** rubber-duck diff of OLD vs NEW for both files → "no blocking
+lost teeth"; restored three minor items it flagged (`bun run inspect` `--url`/
+`5173` option, the archive-fact-promotion instruction, a one-line E2E coverage
+pointer). Docs-only change → direct-push to main.
+
+
 
 **Takeaway.** The Library Instructions content box rendered with a
 non-inverting background in both themes. Root cause: `.instruction-content`
