@@ -105,6 +105,26 @@ instead of collapsing the right rail.
 gate passed: `bun run lint`; `bun run lint:eslint` (pre-existing warnings only);
 `bun test`; `bunx vite build`.
 
+## 2026-05-30 — #77 Library tab header actions unified
+
+**Takeaway.** Agents, Skills, MCP, Tools, and Instructions now render their
+Library header actions through one shared `LibraryTabHeader` affordance instead
+of per-tab `tab-actions` / header markup. The refactor preserves the existing
+handlers (`load`, `loadAll`, `openForm`, `openAddDialog`, `setAll`) while
+normalizing placement, labels, title tooltips, and accessible names.
+
+**Receipts.**
+- Shared component + type: `src/components/library/LibraryTabHeader.vue`,
+  `src/components/library/libraryTabHeader.ts`.
+- Consumers: `LibraryAgentsTab.vue`, `LibrarySkillsTab.vue`,
+  `LibraryMcpTab.vue`, `LibraryToolsTab.vue`, `LibraryInstructionsTab.vue`.
+- Coverage: `src/components/library/__tests__/LibraryTabHeader.test.ts`
+  verifies rendering, click emission, disabled no-fire, metadata, and reactive
+  disabled/title state.
+- No manual-test checklist added: this is a behavior-preserving component
+  refactor covered by component tests; smoke/e2e/electrobun-build are deferred
+  to CI for this parallel worktree per the issue instructions.
+
 ---
 
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
