@@ -87,6 +87,12 @@ section is verified) or get a GitHub issue filed (with label
   - **Why not automated:** contrast-on-rendered-background is a visual judgement;
     the underlying tokens are invertible but the perceived weakness only shows
     against the real rendered chrome.
+  - **Measured baseline (light mode, post-#18, via `bun run inspect`):** *Enable
+    all* `#475569` on `#f1f5f9` ≈ 6:1 (good); *Disable all* (text variant) and
+    the unselected composer mode select use `--p-text-muted-color` (slate-500
+    `#64748b`) ≈ 4.5:1 — AA-passing but on the muted side. If these still read
+    "weak" when dogfooding, file a follow-up to bump those muted controls to a
+    higher-contrast token.
 
 ### Issue #19 — Instructions markdown respects theme tokens (2026-05-30)
 
