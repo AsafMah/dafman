@@ -10,6 +10,48 @@
 
 ---
 
+## 2026-05-30 — #10 MCP "Remove jumps to Discovered" fixed; #9 found SDK-blocked
+
+**Takeaway:** #10 was a one-line in-memory list-sync bug, fixed test-first.
+Investigating its sibling #9 (discovered-toggle persistence + source path +
+edit/delete) revealed #9 is largely blocked by SDK semantics — the code path
+is already correct for persistence and the SDK doesn't expose what the issue
+asks for. Surfaced to the user; they'll dogfood persistence first before any
+#9 code lands.
+
+**#10 root cause (`useMcpLibrary.removeConfig`):** The MCP Library renders
+Configured and Discovered as two sibling `<section>`s in `LibraryMcpTab.vue`
+(NOT tabs). `newlyDiscovered` = `discovered` minus configured names. A
+configured server round-trips through `mcp.discover` with `source: "user"` (and
+may also be live in a session). `removeConfig` filtered only `configured.value`
+locally, so the instant a server left `configured` it re-appeared under the
+Discovered `<section>` — read by the user as "Remove bounced it to Discovered."
+Fix: also `discovered.value = discovered.value.filter(d => d.name !== name)` in
+the success path. A genuine workspace-file server legitimately returns on the
+next `loadAll`. Tests: `src/composables/library/__tests__/useMcpLibrary.test.ts`
+(test-first; 2 pass).
+
+**#9 investigation — why it's SDK-blocked (receipts in
+`node_modules/@github/copilot/copilot-sdk/generated/rpc.d.ts`):**
+1. **Persistence is already wired correctly.** The discovered toggle →
+   `setEnabled` → `enableMcpServers`/`disableMcpServers` →
+   `client.rpc.mcp.config.enable/disable`. SDK doc (rpc.d.ts:3367) for
+   `McpConfigDisableRequest.names`: *"Each server is added to the **persisted**
+   disabled list so new sessions skip it."* So our code path persists by
+   construction. The original "doesn't persist" repro can't be reproduced
+   statically — needs a live app restart dogfood. Likely already fixed by the
+   config-level routing, or a subtler runtime repro.
+2. **Source file path is not available.** `McpServerSource` is a fixed enum
+   (`user|workspace|plugin|builtin`, session-events.d.ts:304) — a *category*,
+   not a path. We already surface the category. A literal path would be a guess.
+3. **Edit/Delete on discovered rows is semantically blocked.** `config.remove`
+   / `config.update` only touch *user* configuration; a workspace/plugin/builtin
+   server is defined in someone else's file and can't be deleted or edited by
+   us. Only `disable` (toggle off) is offered, which is correct.
+
+Per rules 4/9/12 I did NOT fabricate a persistence "fix." User chose
+dogfood-first for #9; #10 ships alone on `sprint-b/10-mcp-remove-view-jump`.
+
 ## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
 
 **Takeaway.** Two follow-up warnings from the #20 work, both addressed without

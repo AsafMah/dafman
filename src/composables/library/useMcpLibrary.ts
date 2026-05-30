@@ -188,6 +188,13 @@ export function useMcpLibrary() {
     try {
       await invokeCommand('removeMcpConfig', { name });
       configured.value = configured.value.filter((e) => e.name !== name);
+      // Also drop it from the in-memory discovered list. A configured
+      // server round-trips through `mcp.discover` (source "user") and may
+      // be a live session server too, so without this it re-surfaces under
+      // the Discovered section the instant it leaves `configured` — the
+      // "Remove jumps to Discovered" bug (#10). A genuine workspace-file
+      // server legitimately returns on the next `loadAll`.
+      discovered.value = discovered.value.filter((d) => d.name !== name);
 
       return true;
     } catch (err) {
