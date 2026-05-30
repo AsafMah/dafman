@@ -83,7 +83,7 @@ function openLibraryTab(tab = 'mcp'): void {
   }
 
   // Library lives on the right edge in v2.
-  useLayoutStore().activateEdgePanel(PANEL_IDS.library, 'right');
+  useLayoutStore().revealEdgePanel(PANEL_IDS.library, 'right');
 }
 
 /// Runs Dafman's local slash command when the typed text is one of

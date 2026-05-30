@@ -921,6 +921,24 @@ export const useLayoutStore = defineStore('layout', () => {
     if (isCollapsed) group.expand();
   }
 
+  /// Reveals and focuses an edge panel without toggling it closed.
+  /// Use for programmatic navigation where the intent is always "show this
+  /// panel" (for example slash commands), not activity-bar click toggles.
+  function revealEdgePanel(id: string, edge: 'left' | 'right'): void {
+    const dock = api.value;
+
+    if (!dock) return;
+
+    const group = dock.getEdgeGroup(edge);
+    const panel = dock.getPanel(id);
+
+    if (!group || !panel) return;
+
+    if (!panel.api.isActive || panel.group.activePanel?.id !== id) panel.api.setActive();
+
+    if (group.isCollapsed()) group.expand();
+  }
+
   /// v1 entry point retained for back-compat with callers that still
   /// pass `EdgePanelOptions`. In v2 every activity-bar panel is
   /// seeded at boot via `seedDefaultLayout`, so this just delegates
@@ -1223,6 +1241,7 @@ export const useLayoutStore = defineStore('layout', () => {
     replaceMissingPanel,
     openEdgePanel,
     activateEdgePanel,
+    revealEdgePanel,
     toggleSettings,
     toggleSessionDetailsPanel,
     isSessionDetailsOpen,
