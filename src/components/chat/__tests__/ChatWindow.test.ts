@@ -56,6 +56,7 @@ import {
   type PendingRequestListener,
 } from '@/ipc/invoke';
 import { _resetSessionsStoreForTest } from '@/stores/chat/sessionsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useCommandResultsStore } from '@/stores/chat/commandResultsStore';
 import type {
   CommandMap,
@@ -199,6 +200,15 @@ function assistantEvent(text: string, eventId?: string): SessionEventPayload {
     eventType: 'assistant.message',
     data: { messageId, text },
     ...(eventId ? { eventId } : {}),
+  };
+}
+
+function toolEvent(toolCallId: string, name = 'shell'): SessionEventPayload {
+  return {
+    sessionId: 's1',
+    eventType: 'tool.execution_start',
+    data: { toolCallId, name, args: {} },
+    eventId: `evt-${toolCallId}`,
   };
 }
 
@@ -592,5 +602,84 @@ describe('ChatWindow', () => {
     // event flush will repopulate from the live stream.)
     await flushFrames();
     expect(utils.container.querySelectorAll('.stub-assistant').length).toBe(0);
+  });
+
+  /// Issue #16: the Jobs panel "Go to session" parks a reveal intent in
+  /// layoutStore; ChatWindow must scroll the spawning tool-call card
+  /// into view (not the top of the transcript). Two timing paths:
+  /// already-open panel (request after mount → watch) and freshly-opened
+  /// panel (request before mount → onMounted consume).
+  function ensureRevealDomShims(): Array<() => void> {
+    const restores: Array<() => void> = [];
+    const proto = Element.prototype as unknown as { scrollIntoView?: unknown };
+
+    if (typeof proto.scrollIntoView !== 'function') {
+      proto.scrollIntoView = function scrollIntoView() {};
+      restores.push(() => {
+        delete proto.scrollIntoView;
+      });
+    }
+    const cssHost = globalThis as unknown as { CSS?: { escape?: (s: string) => string } };
+
+    if (!cssHost.CSS) {
+      cssHost.CSS = { escape: (s: string) => s };
+      restores.push(() => {
+        delete cssHost.CSS;
+      });
+    } else if (typeof cssHost.CSS.escape !== 'function') {
+      cssHost.CSS.escape = (s: string) => s;
+    }
+
+    return restores;
+  }
+
+  test('reveal scrolls the spawning tool card into view (already-open panel)', async () => {
+    const restores = ensureRevealDomShims();
+    const scrollSpy = mock(() => {});
+
+    Element.prototype.scrollIntoView = scrollSpy as unknown as Element['scrollIntoView'];
+
+    try {
+      const utils = await mountChat({ events: [toolEvent('tc-1'), toolEvent('tc-2')] });
+
+      const target = utils.container.querySelector('[data-tool-call-id="tc-2"]');
+
+      expect(target).not.toBeNull();
+
+      const layout = useLayoutStore();
+
+      layout.requestReveal('s1', { toolCallId: 'tc-2' });
+      await flushFrames(10);
+
+      expect(scrollSpy).toHaveBeenCalled();
+      // Intent consumed once handled (not left to re-fire).
+      expect(layout.pendingReveal['s1']).toBeUndefined();
+      expect(target!.classList.contains('reveal-flash')).toBe(true);
+    } finally {
+      for (const r of restores) r();
+    }
+  });
+
+  test('reveal parked before mount is consumed on mount (fresh panel)', async () => {
+    const restores = ensureRevealDomShims();
+    const scrollSpy = mock(() => {});
+
+    Element.prototype.scrollIntoView = scrollSpy as unknown as Element['scrollIntoView'];
+
+    try {
+      // Park the intent BEFORE the panel mounts — mimics a freshly
+      // opened panel whose ChatWindow registers after the Jobs click.
+      const layout = useLayoutStore();
+
+      layout.requestReveal('s1', { toolCallId: 'tc-7' });
+
+      await mountChat({ events: [toolEvent('tc-7')] });
+      await flushFrames(10);
+
+      expect(scrollSpy).toHaveBeenCalled();
+      expect(layout.pendingReveal['s1']).toBeUndefined();
+    } finally {
+      for (const r of restores) r();
+    }
   });
 });
