@@ -10,6 +10,57 @@
 
 ---
 
+## 2026-05-30 — #66 composer-toolbar resize overlap (structural flex fix) + #72 filed
+
+**Takeaway.** The recurring composer bottom-bar overlap (#17, now #66) is a
+`min-width: 0` + no-`flex-wrap` defect, not a breakpoint-tuning problem. Fixed
+structurally so it can't recur, with a 36-width E2E geometry assertion as the
+guard.
+
+**Repro receipts.** Built a test-first E2E flow
+(`e2e/full/flows/25-composer-resize.pwtest.ts`) that boots the real composer
+(`autosession=1`), walks a 36-step viewport ladder, and measures the bounding
+rects of every visible toolbar control (`.lex-toolbar-btn`, `.mode-button-group`,
+`.mode-select-compact`, `.workspace-chip`, `.approve-all-button`,
+`.session-terminal-button`, `.compact-select`), flagging any pair that
+intersects on **both** axes by >1 px. Against the pre-fix bundle it reported
+overlaps only at **750 px (5 px)** and **760 px (3 px)** — the left group's
+`approve-all-button` over the center group's command-trigger. Everywhere else
+the container queries + JS overflow-collapse already reflowed cleanly, which is
+why the bug was subtle and "only at certain widths".
+
+**Mechanism.** `.lex-toolbar-left/center/right` each had `min-width: 0`. That
+overrides the flex default (`min-width: auto` = min-content) and lets the flex
+algorithm shrink a group's box *below its content*. The group's content
+(e.g. the 3-icon mode SelectButton, which is itself `flex: 0 0 auto`) can't
+shrink, so it overflowed the shrunken box. The toolbar had no `flex-wrap`, and
+`overflow-x: hidden` only clips at the toolbar's own edge — so the overflow
+painted over the adjacent group (center has `z-index: 1`, left did not, so
+center won the stack). Classic flexbox overlap.
+
+**Fix** (`src/components/chat/MessageComposer.vue` styles):
+- Removed `min-width: 0` from the three groups → a group is never sized below
+  its (already-collapsed) content, so it can't spill into a neighbour.
+- Added `flex-wrap: wrap` + `row-gap: 0.3rem` to `.lex-composer-toolbar` → when
+  the collapsed content genuinely doesn't fit one line, the right-hand controls
+  wrap to a second row. Verified visually via a throwaway screenshot probe:
+  755 px → clean 2-row toolbar (Terminal/Model/gear on row 2, right-aligned);
+  460 px → everything collapses back to a single row. No overlap at any width.
+
+Deliberately did **not** nudge the `@container` breakpoints or the
+`useComposerToolbarLayout` width thresholds — that's the brittle path that let
+#17 regress into #66. Wrapping is the structural safety net.
+
+**Gate.** vue-tsc 0, eslint 0 errors (19 pre-existing warnings), 715 unit
+tests, smoke 4/4, flow 01 (composer send) green, flow 25 (new) green.
+
+**Also filed #72** — after #70 gated the MCP Sign-in button on `needs-auth`,
+an already-`connected` HTTP server has no auth affordance, so there's no way to
+re-authenticate an expired token or switch accounts. Logged as a follow-up
+(needs an SDK force-reauth surface check before implementing).
+
+---
+
 ## 2026-05-30 — #70 MCP Sign-in only when needed: the `needs-auth` status was being thrown away
 
 **Takeaway:** "Why do all HTTP servers show Sign in, even ones that don't need
