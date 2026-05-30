@@ -63,6 +63,31 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #18 — Light-mode dock chrome follows the theme (2026-05-30)
+
+- **18.1** ⏳ **All dockview chrome is light in light mode.**
+  - **Steps:** set the app to light mode (or system on a light OS). Open a
+    session. Open the edge panels: Jobs, Terminals, Session details, Library.
+    Look at the group tab bar, the session tabs, the main panel background, and
+    each edge panel's background + title.
+  - **Expected:** every dock surface is light (white / pale grey) with dark,
+    legible text — no near-black panels, no dark group/tab bars. Switch to dark
+    mode: everything inverts to the dark chrome cleanly (no light-on-light).
+  - **Why not automated:** dockview applies its theme className/vars to its own
+    root at runtime; happy-dom resolves no CSS custom-property cascade, so the
+    `--dv-*` → `--p-*` bridge can't be asserted in unit tests (only verified live
+    via `bun run inspect`).
+
+- **18.2** ⏳ **Library Tools "Enable all" / "Disable all" and the composer mode
+    select read with good contrast in light mode.**
+  - **Steps:** in light mode, open Library → Tools (see the Enable all / Disable
+    all buttons) and the composer toolbar's mode select.
+  - **Expected:** the buttons and the mode select have clearly legible text
+    against their background — no washed-out / "weak" low-contrast controls.
+  - **Why not automated:** contrast-on-rendered-background is a visual judgement;
+    the underlying tokens are invertible but the perceived weakness only shows
+    against the real rendered chrome.
+
 ### Issue #19 — Instructions markdown respects theme tokens (2026-05-30)
 
 - **19.1** ⏳ **Instruction file content inverts correctly in dark mode.**

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { onMounted, onBeforeUnmount, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Toast, { type ToastMessageOptions } from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
@@ -22,7 +22,7 @@ import { useBootStore } from '@/stores/app/bootStore';
 // import { useJobsStore } from '@/stores/observability/jobsStore';
 import { useConfirm } from 'primevue/useconfirm';
 import ConfirmDialog from 'primevue/confirmdialog';
-import { resolveIsDark } from '@/lib/theme';
+import { useDockviewTheme } from '@/composables/useDockviewTheme';
 import { registerBuiltinCommands } from '@/lib/registerBuiltinCommands';
 import { on as busOn } from '@/lib/bus';
 import { isActivityBarPanel } from '@/constants/panels';
@@ -42,9 +42,8 @@ const primeToast = useToast();
 const primeConfirm = useConfirm();
 
 const { sessions } = storeToRefs(sessionsStore);
-const { settings } = storeToRefs(settingsStore);
 
-const prefersDark = ref(false);
+const { isDark: isDarkMode, dockviewTheme } = useDockviewTheme();
 
 const PLAYGROUND_PANEL_ID = 'playground';
 
@@ -88,10 +87,6 @@ function openPlayground() {
   });
 }
 
-const isDarkMode = computed(() =>
-  resolveIsDark(settings.value.appearance.theme, prefersDark.value),
-);
-
 function applyThemeClass(isDark: boolean) {
   document.documentElement.classList.toggle('app-dark', isDark);
 }
@@ -120,14 +115,6 @@ onBeforeUnmount(() => {
 });
 
 onMounted(async () => {
-  const mql = window.matchMedia('(prefers-color-scheme: dark)');
-
-  prefersDark.value = mql.matches;
-  mql.addEventListener('change', (e) => {
-    prefersDark.value = e.matches;
-  });
-  applyThemeClass(isDarkMode.value);
-
   // Splash watchdog. Whatever happens below — uncaught rejection,
   // dockview throw, infinite await on a hung RPC — the splash MUST
   // dismiss quickly so the user can actually use the app. Normal
@@ -457,6 +444,7 @@ function onDockReady(event: DockviewReadyEvent) {
       >
         <DockviewVue
           class="dock"
+          :theme="dockviewTheme"
           watermark-component="watermark"
           default-tab-component="chatTab"
           left-header-actions-component="groupsHeaderActions"

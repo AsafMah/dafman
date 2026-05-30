@@ -33,6 +33,7 @@ import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useGroupsActions } from '@/composables/useGroupsActions';
+import { useDockviewTheme } from '@/composables/useDockviewTheme';
 import { schedulePersist } from '@/lib/persistScheduler';
 
 type UserParams = { groupId?: string; color?: string; name?: string };
@@ -61,6 +62,7 @@ const groupsStore = useGroupsStore();
 const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
 const groupsActions = useGroupsActions();
+const { dockviewTheme } = useDockviewTheme();
 
 let removeSub: { dispose(): void } | null = null;
 let layoutSub: { dispose(): void } | null = null;
@@ -195,6 +197,7 @@ onBeforeUnmount(() => {
   <div class="group-panel-root">
     <DockviewVue
       class="group-inner"
+      :theme="dockviewTheme"
       watermark-component="watermark"
       default-tab-component="chatTab"
       @ready="onInnerReady"

@@ -10,7 +10,60 @@
 
 ---
 
+## 2026-05-30 — #18 light-mode dock chrome was pinned dark (dockview `theme` prop, not a wrapper class)
+
+**Takeaway:** dockview-core v6 themes via a **`theme` _prop_** (a `DockviewTheme`
+object `{ name, className, ... }`), NOT a CSS class on a wrapper. With no prop it
+falls back to `themeAbyss` (dark) and writes `--dv-*` vars onto its OWN root
+element. Our `style.css` `--dv-*` → `--p-*` bridge keys off `.dockview-theme-light`
+on the `.dock-wrapper` ancestor — but dockview's own root (where abyss put the
+dark vars) is a *closer* ancestor, so abyss-dark always won, in both modes. Light
+mode was the visible victim (chat cards light, all dock chrome black).
+
+**Receipts:**
+- `node_modules/dockview-core/dist/esm/dockview/dockviewComponent.js`:
+  `const theme = this._options.theme ?? themeAbyss`.
+- `node_modules/dockview-core/dist/esm/dockview/theme.js:1-8`: `themeDark` →
+  `{ name:'dark', className:'dockview-theme-dark' }`; `themeLight` →
+  `{ name:'light', className:'dockview-theme-light' }`.
+- Live `bun run inspect ".dv-dockview" --rpc-stub --eval ...` BEFORE: light mode
+  `htmlClasses=""`, `--p-content-background=#ffffff`, but
+  `--dv-group-view-background-color=#000c18`. AFTER the fix: `#ffffff`.
+
+**Fix (single root cause, not 7 surface patches — AGENTS rule 0):**
+- New `src/composables/useDockviewTheme.ts`: `resolveIsDark(theme, usePreferredDark)`
+  → `isDark`; `dockviewTheme = isDark ? themeDark : themeLight`. Shared by both
+  hosts. Replaced App.vue's hand-rolled `matchMedia` block with VueUse
+  `usePreferredDark` (rule 16).
+- `App.vue` (outer `<DockviewVue class="dock">`) and
+  `GroupPanel.vue` (inner `<DockviewVue class="group-inner">` = the v3 nested
+  session-tab dockview) both now pass `:theme="dockviewTheme"`.
+- Removed App.vue's now-dead `prefersDark` ref / `matchMedia` listener / local
+  `isDarkMode` computed / `settings` destructure; the existing
+  `watch(isDarkMode, applyThemeClass, { immediate:true })` still drives the
+  `.app-dark` html class.
+
+**Why every enumerated surface fixed itself with one change:** read the sources —
+`LibraryPanel.vue` (title = `--p-text-muted-color`), `MessageComposer.vue` /
+`ModeButtonGroup.vue` (composer + mode select = `--p-content-background` /
+`color-mix(... --p-content-background)`), `LibraryToolsTab.vue` (Enable/Disable
+all = PrimeVue secondary buttons) all already use invertible tokens. They only
+looked dark/weak because they were painted on the abyss-dark dockview group bg.
+Confirmed live: `Enable all` button now `#475569` text on `#f1f5f9` (~6:1).
+`StatusBar.vue` was already correct (`--p-surface-200` light + `.app-dark`
+override → `#e2e8f0` in light, verified) — out of scope.
+
+**Filed #66** (separate bug): composer bar doesn't reflow correctly on resize and
+gets overlapped — recurring responsive regression, different from #17.
+
+**Tests:** `useDockviewTheme.test.ts` (light→themeLight, dark→themeDark, reacts to
+setting flips). MANUAL_TESTS §18 added for the light/dark visual sweep (dockview
+chrome has no geometry in happy-dom, so it can't be asserted in unit tests).
+
+---
+
 ## 2026-05-30 — #54 rail cog one-click-to-close
+
 
 **Takeaway.** The session-details / Library rail cog needed two clicks to
 collapse after you touched anything inside the rail. Root cause: the edge-panel
