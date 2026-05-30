@@ -3,7 +3,8 @@
 ///
 /// Configured + Discovered server lists. Add via dialog.
 /// Per-row enable/disable (global allowlist), edit, remove,
-/// sign-in (for http transports with oauth). Discovered servers
+/// sign-in (for http transports; OAuth is negotiated by the SDK at
+/// sign-in time, so the button shows for every http server). Discovered servers
 /// not yet in the configured list get an "Enable" shortcut that
 /// calls `addMcpConfig` + `enableMcpServers`.
 
@@ -185,7 +186,7 @@ watch(activeSessionId, () => {
                 @update:model-value="() => toggleEnable(entry)"
               />
               <Button
-                v-if="entry.transport === 'http' && entry.hasOauth"
+                v-if="entry.transport === 'http'"
                 icon="pi pi-sign-in"
                 label="Sign in"
                 size="small"

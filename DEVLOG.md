@@ -56,7 +56,176 @@ targeted test 3/3, `bun run smoke` 4/4.
 
 ---
 
-## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
+## 2026-05-30 — fix #8: MCP Sign-in button hidden on real HTTP servers
+
+**Takeaway.** The Library → MCP "Sign in" button was gated on a static-config
+OAuth heuristic (`entry.hasOauth`) that is almost always wrong. HTTP MCP servers
+negotiate OAuth dynamically; the canonical example — GitHub's remote MCP — is
+configured as `{ type: 'http', url: … }` with no `oauthClientId`/`oauthGrantType`,
+so `classifyTransport` set `hasOauth: false` and the button was permanently
+hidden for exactly the servers that need it. Fix: show Sign-in for any
+`transport === 'http'` server; delete the `hasOauth` field outright.
+
+**Why the issue's root-cause text was stale.** #8 described "the conditional
+that hides it when there is no active session also hides it when there IS one."
+The visible `v-if` no longer referenced session state (it was
+`entry.transport === 'http' && entry.hasOauth` after the Phase B2 composable
+extraction, `511114b`). The *symptom* (button missing on configured HTTP
+servers) persisted for a different reason — the `hasOauth` gate — so I
+reproduced the real failure (rule 15) before touching code rather than chasing
+the stale framing.
+
+**Why always-show is safe.** The sign-in path already handles every state
+gracefully: `useMcpLibrary.signIn` returns `no-session` (→ warn toast "Create a
+session first"), `started` (→ browser launched), `already-signed-in` (→ success
+toast when the SDK's `mcp.oauth.login` returns no `authorizationUrl`, i.e. the
+server needs no OAuth), or `failed` (→ error toast). So a non-OAuth HTTP server
+just yields a harmless "Already signed in" — far better than an invisible
+button. The SDK's `mcp.oauth.login` is the real source of truth for whether
+OAuth is needed; a static-config sniff can't be.
+
+**Receipts.**
+- `src/composables/library/useMcpLibrary.ts` — `classifyTransport` now returns
+  `'local' | 'http'` (was `{ transport, hasOauth }`); `hasOauth` removed from
+  `ConfiguredEntry`. Doc comment explains why static OAuth detection is wrong.
+- `src/components/library/LibraryMcpTab.vue:189` — `v-if="entry.transport === 'http'"`.
+- `src/components/library/__tests__/LibraryMcpTab.signin.test.ts` (new) — renders
+  the tab with a fake RPC bridge; asserts Sign-in shows for an http server with
+  no static OAuth fields and stays hidden for a stdio server. Verified
+  test-first: fails on pre-fix `hasOauth` gate, passes after.
+
+Gates: `lint:eslint` (0 errors, 17 pre-existing warnings), `lint` (vue-tsc),
+targeted test (2/2), `smoke` (4/4).
+
+---
+
+## 2026-05-30 — #10 MCP "Remove jumps to Discovered" fixed; #9 found SDK-blocked
+
+**Takeaway:** #10 was a one-line in-memory list-sync bug, fixed test-first.
+Investigating its sibling #9 (discovered-toggle persistence + source path +
+edit/delete) revealed #9 is largely blocked by SDK semantics — the code path
+is already correct for persistence and the SDK doesn't expose what the issue
+asks for. Surfaced to the user; they'll dogfood persistence first before any
+#9 code lands.
+
+**#10 root cause (`useMcpLibrary.removeConfig`):** The MCP Library renders
+Configured and Discovered as two sibling `<section>`s in `LibraryMcpTab.vue`
+(NOT tabs). `newlyDiscovered` = `discovered` minus configured names. A
+configured server round-trips through `mcp.discover` with `source: "user"` (and
+may also be live in a session). `removeConfig` filtered only `configured.value`
+locally, so the instant a server left `configured` it re-appeared under the
+Discovered `<section>` — read by the user as "Remove bounced it to Discovered."
+Fix: also `discovered.value = discovered.value.filter(d => d.name !== name)` in
+the success path. A genuine workspace-file server legitimately returns on the
+next `loadAll`. Tests: `src/composables/library/__tests__/useMcpLibrary.test.ts`
+(test-first; 2 pass).
+
+**#9 investigation — why it's SDK-blocked (receipts in
+`node_modules/@github/copilot/copilot-sdk/generated/rpc.d.ts`):**
+1. **Persistence is already wired correctly.** The discovered toggle →
+   `setEnabled` → `enableMcpServers`/`disableMcpServers` →
+   `client.rpc.mcp.config.enable/disable`. SDK doc (rpc.d.ts:3367) for
+   `McpConfigDisableRequest.names`: *"Each server is added to the **persisted**
+   disabled list so new sessions skip it."* So our code path persists by
+   construction. The original "doesn't persist" repro can't be reproduced
+   statically — needs a live app restart dogfood. Likely already fixed by the
+   config-level routing, or a subtler runtime repro.
+2. **Source file path is not available.** `McpServerSource` is a fixed enum
+   (`user|workspace|plugin|builtin`, session-events.d.ts:304) — a *category*,
+   not a path. We already surface the category. A literal path would be a guess.
+3. **Edit/Delete on discovered rows is semantically blocked.** `config.remove`
+   / `config.update` only touch *user* configuration; a workspace/plugin/builtin
+   server is defined in someone else's file and can't be deleted or edited by
+   us. Only `disable` (toggle off) is offered, which is correct.
+
+Per rules 4/9/12 I did NOT fabricate a persistence "fix." User chose
+dogfood-first for #9; #10 ships alone on `sprint-b/10-mcp-remove-view-jump`.
+
+## 2026-05-30 — #16 Jobs "Go to session" reveals the spawning tool call
+
+**Takeaway:** A `setTimeout`-gated bus emit for cross-panel navigation is a
+lost-intent race. When the destination component mounts *after* the navigation
+is requested (freshly-opened dockview panel), a transient mitt emit is dropped
+because mitt has no replay. The durable fix is to park the navigation intent in
+a store and let the destination consume it on mount **and** via a watch — that
+covers both "panel already open" (watch fires) and "panel opens in response to
+the click" (onMounted consumes the parked intent).
+
+**Root cause (issue #16):** `jobsStore.openOwningSession` activated the owning
+session's panel then did `setTimeout(() => busEmit('scroll-to-bottom', …), 100)`.
+Two bugs: (1) on a freshly-opened panel the 100 ms emit raced the async
+ChatWindow mount — `busOn('scroll-to-bottom')` registers in `onMounted`, so an
+emit before that is silently dropped (mitt, no replay — see `src/lib/bus.ts`).
+(2) Even when it landed, scrolling to the *bottom* is wrong: the user clicked a
+specific job and expects to see the *message that spawned it*, not the latest
+work.
+
+**Fix (renderer-only):**
+- `layoutStore`: added `pendingReveal` ref + `requestReveal(sessionId, target)`
+  (REPLACE the entry, never merge — a stale `toolCallId` must not survive a
+  later bottom-scroll request) + `consumeReveal(sessionId)` (read+delete).
+- `jobsStore.openOwningSession(sessionId, toolCallId?)`: open/activate the
+  panel, then `layout.requestReveal(sessionId, { toolCallId })`. Dropped the
+  `setTimeout`/`busEmit` path and the now-unused bus import.
+- `JobsPanel.vue`: pass `job.toolCallId` to the click handler.
+- `ChatWindow.vue`: added `:data-tool-call-id` to the tool `.message-shell`
+  wrapper; `revealTarget(target)` does nextTick + double-rAF, queries
+  `[data-tool-call-id="${CSS.escape(id)}"]`, `scrollIntoView({block:'center'})`
+  + a 1.6 s highlight flash; **retries across 8 frames before falling back to
+  the bottom** so a not-yet-rendered transcript node doesn't drop the intent.
+  Consumes the intent in `onMounted` (fresh panel) and a non-immediate, falsy-
+  guarded `watch` on `pendingReveal[sessionId]` (already-open panel).
+
+**Rubber-duck (duck-16):** confirmed store-over-bus, flagged four tightenings I
+adopted: (1) don't consume a toolCallId reveal before the DOM node exists →
+retry-then-fallback inside `revealTarget`; (2) replace-not-merge in
+`requestReveal`; (3) falsy-guard the watcher against deletion re-fire; (4)
+`CSS.escape` the selector.
+
+**Gotcha re-learned:** `<style scoped>` is CSS — `///` JS doc-comments are a
+`CssSyntaxError` (caught by `bun run smoke`'s `vite build`, not by `vue-tsc`).
+Use `/* */` in style blocks.
+
+**Gates:** `bun run lint` (vue-tsc) clean; `bun run lint:eslint` 0 errors (18
+pre-existing warnings, incl. the same `no-dynamic-delete` pattern `groupsStore`
+already uses); targeted `jobsStore.test.ts` 5/5, `ChatWindow.test.ts` 10/10;
+`bun run smoke` 4/4 (prod + hmr).
+
+**Manual test:** appended #16 to `MANUAL_TESTS.md` — the scroll geometry +
+dockview panel-mount timing with a real spawned background task isn't
+reproducible in happy-dom/smoke.
+
+---
+
+## 2026-05-30 — #35: per-message agentMode pass-through
+
+**Takeaway.** Wired `MessageOptions.agentMode` (new in SDK beta.9) through
+`SessionRegistry.send`. Pass-through design (user's call via spec-interview):
+each send carries the session's current `modeBySession` value; an optional
+trailing `agentMode` param overrides it for a single message. The
+session-wide toggle stays — it's not redundant.
+
+**Why the toggle stays (the issue's open acceptance question).** #35 asked
+"does this let us drop the session-wide plan-mode toggle entirely?" No.
+`modeBySession` is read by `sessionConfigBuilder` to short-circuit
+`onPermissionRequest` / `onUserInputRequest` / `onElicitationRequest` when
+the session is in `autopilot` (return `user-not-available` / auto-decline).
+That gating is a *session* property, not a per-turn one — per-message
+`agentMode` only sets the SDK's per-turn UI mode and never reaches our
+permission handlers. Dropping the toggle would break autopilot gating.
+
+**SDK reality check (rule 0 / rule 23).** The bump to beta.9 was already
+committed (PR #6, `57ac07f`) but my local `node_modules` was stale at beta.7
+— `bun install` synced it. Confirmed `MessageOptions.agentMode` exists at
+`node_modules/@github/copilot-sdk/dist/types.d.ts:1644`. `SessionMode`
+(`interactive|plan|autopilot`) is a subset of the SDK's `agentMode`
+(`+shell`), so pass-through is type-safe with no narrowing.
+
+**Scope.** Backend-only: `sessions.ts` send path + `fakeClient.ts` /
+test-fake `send` arg capture. No IPC or composer change (user chose
+pass-through over a composer override control). Test in `sessions.test.ts`.
+
+
 
 **Takeaway.** Two follow-up warnings from the #20 work, both addressed without
 behavior change. (1) `SessionRegistry.resume()` was CC 21 (rule 20) — split into
