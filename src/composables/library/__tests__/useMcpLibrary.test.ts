@@ -139,3 +139,41 @@ describe('useMcpLibrary signIn (#7 — branded OAuth + active session)', () => {
     expect(result.state).toBe('no-session');
   });
 });
+
+describe('useMcpLibrary needsSignIn (#7 follow-up — gate Sign-in on needs-auth)', () => {
+  test('hides Sign-in for a connected server, shows it for a needs-auth server', async () => {
+    const { bridge } = makeBridge({
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [
+        { name: 'connected-srv', status: 'connected' },
+        { name: 'auth-srv', status: 'needs-auth' },
+      ],
+    });
+    setRpcBridge(bridge);
+    // loadAll only queries the live list when there's an active session.
+    useSessionsStore().sessions.push({ id: 'sess-1' } as unknown as SessionRecord);
+    useLayoutStore().activeSessionId = 'sess-1';
+
+    const lib = useMcpLibrary();
+    await lib.loadAll();
+
+    expect(lib.needsSignIn('connected-srv')).toBe(false);
+    expect(lib.needsSignIn('auth-srv')).toBe(true);
+  });
+
+  test('treats unknown status (no live data for the server) as "might need auth"', async () => {
+    const { bridge } = makeBridge({
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+    });
+    setRpcBridge(bridge);
+
+    const lib = useMcpLibrary();
+    await lib.loadAll();
+
+    // No active session / no live status → don't hide the affordance.
+    expect(lib.needsSignIn('anything')).toBe(true);
+  });
+});

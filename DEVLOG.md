@@ -10,6 +10,44 @@
 
 ---
 
+## 2026-05-30 — #70 MCP Sign-in only when needed: the `needs-auth` status was being thrown away
+
+**Takeaway:** "Why do all HTTP servers show Sign in, even ones that don't need
+it?" — because the gate was `entry.transport === 'http'` (LibraryMcpTab.vue:189),
+an over-correction from #8. The #8-era gate keyed on static `oauthClientId` /
+`oauthGrantType` config fields, but real dynamic-OAuth servers (GitHub remote MCP
+= `{ type: 'http', url }`) carry neither, so it hid the button for exactly the
+servers that needed it. #8 flipped to "always show for http" — noisy.
+
+**The signal we already had but discarded:** the SDK session-live `mcp.list()`
+returns a per-server `McpServerStatus` with a `needs-auth` value ("The server
+requires authentication before it can connect") vs `connected`
+(`node_modules/@github/copilot/copilot-sdk/generated/session-events.d.ts:316-328`).
+`loadAll` already fetched `listSessionMcpServers` but typed the result as
+`Array<{ name: string }>` (via the `.catch` fallback) and used only the names to
+merge into Discovered — the `status` was dropped on the floor.
+
+**Fix:** capture `status` into a `serverStatus` Map in `loadAll`; new
+`needsSignIn(name)` returns true when status is `needs-auth` **or unknown**.
+Unknown deliberately shows the button — no active session, or a configured server
+not loaded into the current session, means we lack data, so hiding would make auth
+unreachable. `connected` / `disabled` / `pending` hide it. Template gate is now
+`entry.transport === 'http' && needsSignIn(entry.name)`.
+
+**Edge cases considered:** (1) re-auth / switch-account on an already-connected
+server now has no button — acceptable; that's a `forceReauth` need, separate from
+this noise fix. (2) status is per the **active** session (the Library reloads on
+`activeSessionId` change), so a server connected in session A but not loaded in
+active session B reads unknown → shows the button (safe fallback).
+
+**Receipts:** `src/composables/library/useMcpLibrary.ts` (serverStatus +
+needsSignIn + status capture in loadAll); `src/components/library/LibraryMcpTab.vue:189`
+(gate). Tests: `useMcpLibrary.test.ts` (needsSignIn connected/needs-auth/unknown),
+`LibraryMcpTab.signin.test.ts` (connected hides, needs-auth shows). Gate: vue-tsc
+0, eslint 0 errors, 715 tests, smoke 4/4.
+
+---
+
 ## 2026-05-30 — #7 MCP HTTP OAuth: the flow was already wired; brand it + use the active session
 
 **Takeaway:** #7 ("HTTP transport has no OAuth popup login flow") was, on
