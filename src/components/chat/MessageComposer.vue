@@ -693,32 +693,41 @@ const primaryTooltip = computed(() =>
    * children. Give it a container context here so it reacts to the
    * toolbar's width, not the page width. */
   container-type: inline-size;
-  /* No overlap: controls shrink/hide first; very small panes wrap rows.
-   * Never show a horizontal scrollbar in the composer chrome. */
+  /* No overlap, ever: the three groups are sized to their (already
+   * container-query-collapsed) content and are not allowed to shrink
+   * below it — see the `min-width` note on the groups below. When even
+   * the collapsed content can't fit on one line, the toolbar WRAPS to a
+   * second row rather than letting a group spill over its neighbour
+   * (the #66 / #17 regression). Never show a horizontal scrollbar in
+   * the composer chrome. */
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
   overflow-x: hidden;
   overflow-y: visible;
 }
 
+/* `min-width: auto` (the default — i.e. do NOT set `min-width: 0`) is
+ * load-bearing here: it stops the flex algorithm from shrinking a group
+ * below its min-content width. With `min-width: 0` a group's box could
+ * shrink under its rigid content, which then painted OVER the adjacent
+ * group (#66). Wrapping (above) is the intended fallback instead. */
 .lex-toolbar-left,
 .lex-toolbar-center,
 .lex-toolbar-right {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  min-width: 0;
 }
 
 .lex-toolbar-left {
   justify-content: flex-start;
   flex: 0 1 auto;
-  min-width: 0;
   overflow: visible;
 }
 
 .lex-toolbar-center {
   justify-content: center;
   flex: 0 1 auto;
-  min-width: 0;
   position: relative;
   z-index: 1;
 }
@@ -727,7 +736,6 @@ const primaryTooltip = computed(() =>
   justify-content: flex-end;
   flex: 0 1 auto;
   margin-left: auto;
-  min-width: 0;
   position: relative;
   z-index: 1;
 }
