@@ -322,30 +322,10 @@ export class SessionRegistry {
     }
 
     const client = tryGetClient();
-    // Look up the persisted cwd BEFORE resume so we can hand it
-    // back to the SDK explicitly. The SDK is supposed to remember
-    // the cwd in its on-disk catalog, but we hit a bug in prod
-    // where resumed sessions ended up with `process.cwd()` (the
-    // Electrobun exe folder). Reading the catalog and pinning the
-    // value here closes that gap end-to-end.
-    let persistedCwd: string | undefined;
-    let persistedSummary: string | undefined;
-
-    try {
-      const meta = await client.getSessionMetadata(sessionId);
-
-      if (meta?.context?.workingDirectory) persistedCwd = meta.context.workingDirectory;
-
-      // Also grab the persisted title so we don't have to wait for
-      // the post-resume re-poll (which only fires AFTER replayHistory
-      // finishes — can be 100s of ms on long sessions, during which
-      // the tab + sidebar show "untitled").
-      if (typeof meta?.summary === 'string' && meta.summary.trim()) {
-        persistedSummary = meta.summary;
-      }
-    } catch {
-      /* non-fatal */
-    }
+    // Look up the persisted cwd + title BEFORE resume so we can hand
+    // them back to the SDK / UI explicitly (see readPersistedMeta).
+    const { cwd: persistedCwd, summary: persistedSummary } =
+      await this.readPersistedMeta(sessionId);
 
     const effectiveCwd = opts.workingDirectory ?? persistedCwd;
     let resolvedSessionId: string | null = null;
@@ -401,23 +381,65 @@ export class SessionRegistry {
     // Hydrate transcript. Failures here aren't fatal — the session is
     // connected and will receive live events; we just won't have the
     // scrollback.
-    //
-    // S5: cap history at the last `HISTORY_REPLAY_CAP` events to
-    // avoid blocking the event loop on long-lived sessions. Replay
-    // in `HISTORY_REPLAY_BATCH`-sized chunks separated by
-    // `queueMicrotask` yields so the renderer can paint between
-    // batches instead of receiving one giant IPC flood.
+    await this.hydrateHistory(session, actualId, effectiveCwd);
+
+    // Poll the title immediately after resume so restored sessions show
+    // their persisted title without needing a new turn (session.idle).
+    this.forwarder.pollTitleFromMetadata(actualId);
+
+    return actualId;
+  }
+
+  /// Reads the persisted cwd + title from the SDK's on-disk catalog
+  /// before resume. The SDK is supposed to remember the cwd, but we hit
+  /// a prod bug where resumed sessions ended up with `process.cwd()`
+  /// (the Electrobun exe folder); pinning the catalog value here closes
+  /// that gap. The summary is grabbed eagerly so the tab + sidebar show
+  /// the right title immediately rather than waiting for the post-resume
+  /// re-poll (which only fires AFTER replayHistory — 100s of ms on long
+  /// sessions). Non-fatal: returns `{}` if the metadata read throws.
+  private async readPersistedMeta(sessionId: string): Promise<{ cwd?: string; summary?: string }> {
+    try {
+      const meta = await tryGetClient().getSessionMetadata(sessionId);
+      const result: { cwd?: string; summary?: string } = {};
+
+      if (meta?.context?.workingDirectory) result.cwd = meta.context.workingDirectory;
+
+      if (typeof meta?.summary === 'string' && meta.summary.trim()) {
+        result.summary = meta.summary;
+      }
+
+      return result;
+    } catch {
+      return {};
+    }
+  }
+
+  /// Hydrates the renderer transcript from persisted history after a
+  /// resume.
+  ///
+  /// S5: caps history at the last `HISTORY_REPLAY_CAP` events to avoid
+  /// blocking the event loop on long-lived sessions; `replayHistory`
+  /// chunks the replay so the renderer can paint between batches.
+  ///
+  /// #20: if the replayed slice ends mid-turn (app exited while the
+  /// agent was thinking), appends a synthetic terminator as the last
+  /// replayed event so the renderer reducer clears its stuck
+  /// `isThinking`. A NEW array is built — `capped` may alias the
+  /// original history (when total <= cap), which must not be mutated.
+  ///
+  /// Non-fatal: a failure just means no scrollback (the live session is
+  /// already connected and will receive new events).
+  private async hydrateHistory(
+    session: CopilotSession,
+    actualId: string,
+    effectiveCwd: string | undefined,
+  ): Promise<void> {
     try {
       const history = await session.getEvents();
       const total = history.length;
       const capped =
         total > HISTORY_REPLAY_CAP ? history.slice(total - HISTORY_REPLAY_CAP) : history;
-
-      // #20: if the replayed slice ends mid-turn (app exited while the
-      // agent was thinking), append a synthetic terminator as the last
-      // replayed event so the renderer reducer clears its stuck
-      // `isThinking`. Build a NEW array — `capped` may alias the
-      // original history (when total <= cap), which must not be mutated.
       const replay = historyEndsMidTurn(capped) ? [...capped, RESUME_SETTLED_EVENT] : capped;
 
       await this.replayHistory(actualId, replay);
@@ -434,12 +456,6 @@ export class SessionRegistry {
         error: toErrorMessage(err),
       });
     }
-
-    // Poll the title immediately after resume so restored sessions show
-    // their persisted title without needing a new turn (session.idle).
-    this.forwarder.pollTitleFromMetadata(actualId);
-
-    return actualId;
   }
 
   async getCurrentModel(sessionId: string): Promise<string | null> {

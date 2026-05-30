@@ -161,7 +161,7 @@ async function installRpcStub(page: Page): Promise<void> {
   });
 }
 
-test("renderer bundle boots to ready without console errors", async ({ page }) => {
+test("renderer bundle boots to ready without console errors", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
 
@@ -200,13 +200,23 @@ test("renderer bundle boots to ready without console errors", async ({ page }) =
   // mostly a "don't regress by 2x overnight" guard rather than a strict
   // user-facing target. Log the actual value either way so trends are
   // visible in CI artifacts.
+  //
+  // Asserted on the `prod` project only — that's the rollup IIFE bundle
+  // we actually ship, so it's the one boot-perf signal that matters. The
+  // `hmr` project boots `vite dev`, whose first page load also pays a
+  // one-time esbuild dep-optimization cost (~1.0-1.2s on CI runners)
+  // unrelated to our bundle; gating on it produced chronic ~5-12% flakes
+  // (#20 follow-up). hmr exists to catch dep-optimizer chunk-order bugs,
+  // not to measure boot perf, so we log-only there.
   const bootCostMs = await page.evaluate(() => {
     const t = performance.timing;
     return t.domContentLoadedEventEnd - t.navigationStart;
   });
   // eslint-disable-next-line no-console
-  console.log(`[smoke:boot-cost] DOMContentLoaded = ${bootCostMs}ms`);
-  expect(bootCostMs, `boot cost ${bootCostMs}ms exceeded 1000 ms gate`).toBeLessThan(1000);
+  console.log(`[smoke:boot-cost] (${testInfo.project.name}) DOMContentLoaded = ${bootCostMs}ms`);
+  if (testInfo.project.name === "prod") {
+    expect(bootCostMs, `boot cost ${bootCostMs}ms exceeded 1000 ms gate`).toBeLessThan(1000);
+  }
 
   // The dockview body is mounted exactly once, when bootStore.phase
   // flips to "ready". So waiting for the dockview root is equivalent
