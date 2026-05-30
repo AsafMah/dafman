@@ -23,7 +23,7 @@
 ///      us the textNode, then we insert the pill using the
 ///      attachment cached in `pendingAttachment`.
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, useTemplateRef } from 'vue';
 import { TextNode, $createTextNode, $isTextNode } from 'lexical';
 import {
   TypeaheadMenuPlugin,
@@ -49,7 +49,7 @@ const props = defineProps<{
 const editor = useLexicalComposer();
 const query = ref('');
 const menuParent = ref<HTMLElement | null>(null);
-const pickerRef = ref<InstanceType<typeof FilePicker> | null>(null);
+const pickerRef = useTemplateRef<InstanceType<typeof FilePicker>>('pickerRef');
 /// Tunnel: set by click handlers, consumed by onSelectOption.
 const pendingAttachment = ref<SendMessageAttachment | null>(null);
 

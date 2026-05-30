@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -35,8 +35,8 @@ const compact = computed(
 const terminalStore = useTerminalStore();
 const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
-const host = ref<HTMLElement | null>(null);
-const searchInput = ref<HTMLInputElement | null>(null);
+const host = useTemplateRef<HTMLElement>('host');
+const searchInput = useTemplateRef<HTMLInputElement>('searchInput');
 const searchOpen = ref(false);
 const searchQuery = ref('');
 const searchResultLabel = ref('');
