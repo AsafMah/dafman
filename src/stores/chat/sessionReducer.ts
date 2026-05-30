@@ -325,6 +325,13 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   'assistant.turn_end': handleTurnEnd,
   'session.idle': handleThinkingOff,
   'session.error': handleThinkingOff,
+  // Turn terminators that aren't turn_end/idle: a `session.abort()` (stop
+  // button / interrupt-send) emits `abort`, and the agent can signal
+  // `session.task_complete`. Both end the turn, so clear the spinner.
+  // Mapped to handleThinkingOff (not handleTurnEnd) to avoid firing OS
+  // notifications + unseenTurns bumps for a turn the user themselves stopped.
+  'abort': handleThinkingOff,
+  'session.task_complete': handleThinkingOff,
   // #20: synthetic terminator appended by the bun resume path when the
   // persisted history ends mid-turn (app killed while the agent was
   // thinking). Clears the stuck spinner. Deliberately NOT mapped to

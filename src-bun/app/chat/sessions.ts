@@ -82,10 +82,12 @@ const RESUME_SETTLED_EVENT = {
 
 /// #20: mirror of the renderer reducer's `isThinking` transitions over a
 /// replayed history slice. Returns true when the trailing state is
-/// "mid-turn" (a `turn_start` with no matching terminal boundary) — the
-/// stuck-spinner condition. A freshly-resumed session never legitimately
-/// resumes mid-turn (the SDK does not auto-continue an interrupted
-/// turn), so a true result is always safe to terminate.
+/// "mid-turn" (a `turn_start` with no matching terminal boundary —
+/// turn_end / idle / error / abort / task_complete) — the stuck-spinner
+/// condition. A freshly-resumed session never legitimately resumes
+/// mid-turn (the SDK does not auto-continue an interrupted turn:
+/// `continuePendingWork` defaults to false), so a true result is always
+/// safe to terminate.
 function historyEndsMidTurn(events: ReadonlyArray<SessionEvent>): boolean {
   let thinking = false;
 
@@ -97,6 +99,8 @@ function historyEndsMidTurn(events: ReadonlyArray<SessionEvent>): boolean {
       case 'assistant.turn_end':
       case 'session.idle':
       case 'session.error':
+      case 'abort':
+      case 'session.task_complete':
         thinking = false;
         break;
     }

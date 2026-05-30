@@ -455,6 +455,25 @@ describe('SessionRegistry', () => {
     expect(emitted.map((p) => p.eventType)).not.toContain('dafman.resume_settled');
   });
 
+  test('#20: resume treats a trailing persisted abort/task_complete as settled', async () => {
+    // `abort` (persisted user-initiated stop) and `session.task_complete`
+    // are turn terminators too. If history ends with one of them the turn
+    // is NOT mid-flight, so no synthetic terminator should be appended.
+    for (const terminator of ['abort', 'session.task_complete']) {
+      const client = new FakeClient();
+      client.nextResumeHistory = [
+        { type: 'assistant.turn_start', data: { turnId: 't1' } },
+        { type: terminator, data: {} },
+      ];
+      _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+      const emitted: SessionEventPayload[] = [];
+      const reg = new SessionRegistry((p) => emitted.push(p));
+      await reg.resume(`sess-${terminator}`);
+
+      expect(emitted.map((p) => p.eventType)).not.toContain('dafman.resume_settled');
+    }
+  });
+
   test('resume is idempotent for an already-registered session', async () => {
     const client = new FakeClient();
     _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
