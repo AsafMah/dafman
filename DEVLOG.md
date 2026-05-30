@@ -10,7 +10,34 @@
 
 ---
 
-## 2026-05-30 — #20 resume stuck on "Thinking…" (exit-while-thinking)
+## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
+
+**Takeaway.** Two follow-up warnings from the #20 work, both addressed without
+behavior change. (1) `SessionRegistry.resume()` was CC 21 (rule 20) — split into
+two natural-seam helpers. (2) The renderer smoke `boot cost < 1000ms` gate was
+chronically flaking on CI's `hmr` variant (1041–1125ms) — scoped it to `prod`.
+
+**resume() refactor (`src-bun/app/chat/sessions.ts`).** Extracted two
+self-contained concerns, each with its own try/catch, dropping `resume()` below
+the CC-15 gate:
+- `readPersistedMeta(sessionId)` — the pre-resume `getSessionMetadata` read for
+  persisted cwd + title. Non-fatal (`{}` on throw), same as the old inline
+  swallow.
+- `hydrateHistory(session, actualId, effectiveCwd)` — the S5 cap + #20 synthetic
+  terminator + chunked `replayHistory` + the `session resumed` log. Non-fatal.
+Behavior-preserving: the 47 `sessions.test.ts` cases (cwd-pinning, title emit,
+#20 mid-turn terminator, idempotent re-resume) all still pass untouched.
+
+**Smoke boot gate (`e2e/smoke.pwtest.ts`).** The gate now asserts only on the
+`prod` project (rollup IIFE bundle — what actually ships, and the only
+perf-representative path), and log-only on `hmr`. The `hmr` project boots
+`vite dev`, whose first page load pays a one-time esbuild dep-optimization cost
+(~1.0–1.2s on CI runners) unrelated to our bundle; `hmr` exists to catch
+dep-optimizer chunk-order bugs (per the playwright.config.ts comment), not to
+measure boot perf. Threshold value unchanged (1000ms) — only its scope. The
+log line now carries the variant name so trends stay visible for both.
+
+
 
 **Takeaway.** The stuck-spinner-on-resume bug was exactly the user's
 hypothesis: kill the app while the agent is mid-turn → the persisted
