@@ -39,7 +39,7 @@
             v-if="currentAgentName === entry.name"
             size="small"
             severity="secondary"
-            :loading="agentBusyName === '__deselect__'"
+            :loading="visibleAgentBusyName === '__deselect__'"
             :disabled="!activeSession || !!agentBusyName"
             label="Deselect"
             :aria-label="`Deselect agent ${entry.name}`"
@@ -48,7 +48,7 @@
           <Button
             v-else
             size="small"
-            :loading="agentBusyName === entry.name"
+            :loading="visibleAgentBusyName === entry.name"
             :disabled="!activeSession || !!agentBusyName"
             label="Select"
             :aria-label="`Select agent ${entry.name}`"
@@ -85,10 +85,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue';
+import { useTimeoutFn } from '@vueuse/core';
 import Button from 'primevue/button';
 import type { AgentFileEntry } from '@/ipc/types';
 
-defineProps<{
+const LOADING_AFFORDANCE_DELAY_MS = 180;
+
+const props = defineProps<{
   title: string;
   keyPrefix: string;
   entries: AgentFileEntry[];
@@ -96,6 +100,26 @@ defineProps<{
   agentBusyName: string | null;
   activeSession: boolean;
 }>();
+
+const visibleAgentBusyName = ref<string | null>(null);
+const { start, stop } = useTimeoutFn(
+  () => {
+    visibleAgentBusyName.value = props.agentBusyName;
+  },
+  LOADING_AFFORDANCE_DELAY_MS,
+  { immediate: false },
+);
+
+watch(
+  () => props.agentBusyName,
+  (name) => {
+    stop();
+    visibleAgentBusyName.value = null;
+
+    if (name) start();
+  },
+  { immediate: true },
+);
 
 defineEmits<{
   (e: 'select' | 'reveal', payload: string): void;
