@@ -10,7 +10,46 @@
 
 ---
 
-## 2026-05-30 — #9 MCP discovery: part-1 repro fixture + parts 2/3 filed upstream (copilot-sdk#1518)
+## 2026-05-30 — #46 + #48 tech-debt sweep: useTemplateRef migration + ineffective dynamic imports
+
+**Shipped via PR #75** (branch `tech-debt/refs-and-dynimports`).
+
+**Takeaway.** Two independent tech-debt issues cleared in one worktree
+(`tech-debt/refs-and-dynimports`). Both issue scans were stale; the diff that
+matters is smaller than the issue bodies imply, and the difference is the whole
+lesson.
+
+**#46 — string template refs (`45a9101`→`8bacf51`).** The issue listed "19
+sites", but `git grep 'ref="'` surfaced 21, and only **15** were genuinely
+deprecated. The rest were already correct: `useTemplateRef('x')` **requires**
+the template to carry `ref="x"` (a string) — that string is the binding key, not
+the deprecated pattern. The deprecated pattern is specifically `ref="x"` +
+a same-named `const x = ref(null)` that Vue's compiler auto-binds. So
+ChatTab/GroupTab(×3)/MessageComposer.`toolbarRef` were already migrated and must
+**not** have their `ref="..."` strings touched. Migrated the 15 real ones
+(`ref<T | null>(null)` → `useTemplateRef<T>('x')`) across 9 SFCs. Safe because
+`useTemplateRef` returns a **readonly** shallowRef and `git grep '<name>.value ='`
+proved none are written. Only gotcha: CodeEditor.vue's `host` was its *only*
+`ref` usage, so vue-tsc flagged the now-unused `ref` import (TS6133) — dropped it.
+
+**#48 — ineffective dynamic imports (`45a9101`).** Rolldown (vite@8) flags
+`import('m')` as ineffective when `m` is *also* statically imported elsewhere —
+it can't move to its own chunk, so the dynamic form buys nothing. Fix per site
+is "pick the form matching real intent":
+- `main.ts` test-bridge: the 4 stores/composables are statically imported by 5+
+  components each → eager anyway, and the comment already said "eager-load the
+  test surface" → hoisted to static imports.
+- `SessionDetailsPanel.onExport`: `chatEvents` is eager via
+  `useChatTimelineState` → hoisted to static; `exportConversation` is **only**
+  dynamically imported here (genuinely deferred) → left dynamic. Splitting the
+  one `await import` line into static+dynamic is the correct resolution, not
+  blanket-static.
+
+**Verification.** `vite@8` is rolldown-vite, so the warning check is real:
+`vite build` is now `INEFFECTIVE_DYNAMIC_IMPORT`-free. Full gate green —
+vue-tsc, eslint (0 errors), 715 tests, smoke 4/4 incl. the jobs-spinner probe.
+No runtime behavior change in either issue (template strings unchanged; eager
+modules stayed eager), so no new manual-test rows.
 
 **Takeaway.** #9's original `.vscode/mcp.json` repro is **stale** — Copilot CLI
 removed `.vscode/mcp.json` support; discovery now only reads `.mcp.json` /

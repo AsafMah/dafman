@@ -246,8 +246,8 @@ function appendText(value: string): void {
 /// The popover hosts the same FilePicker the @-trigger uses, with
 /// its own search input (since the editor isn't the source of the
 /// query here) and the native Browse… escape hatch.
-const filePickerPopover = ref<InstanceType<typeof Popover> | null>(null);
-const formatPopover = ref<InstanceType<typeof Popover> | null>(null);
+const filePickerPopover = useTemplateRef<InstanceType<typeof Popover>>('filePickerPopover');
+const formatPopover = useTemplateRef<InstanceType<typeof Popover>>('formatPopover');
 
 function openFilePicker(event: Event): void {
   filePickerPopover.value?.toggle(event);

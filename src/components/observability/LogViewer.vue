@@ -9,7 +9,7 @@
 /// lets the user temporarily widen or narrow what they see without
 /// changing what reaches disk.
 
-import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, useTemplateRef, watch, nextTick } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
@@ -32,7 +32,7 @@ const tabOptions = [
   { label: 'Activity', value: 'activity' as Tab },
 ];
 
-const listEl = ref<HTMLElement | null>(null);
+const listEl = useTemplateRef<HTMLElement>('listEl');
 const followTail = ref(true);
 
 const levelOptions = LEVEL_NAMES.map((name) => ({

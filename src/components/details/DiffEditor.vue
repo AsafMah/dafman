@@ -13,7 +13,7 @@
 /// up-front and rebuilding on prop change is simpler and always
 /// shows tokens correctly.
 
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { EditorState, type Extension } from '@codemirror/state';
 import { MergeView, unifiedMergeView } from '@codemirror/merge';
@@ -36,7 +36,7 @@ const props = withDefaults(
   { initialMode: 'inline', maxHeight: 480 },
 );
 
-const host = ref<HTMLDivElement | null>(null);
+const host = useTemplateRef<HTMLDivElement>('host');
 const mode = ref<Mode>(props.initialMode);
 let mergeView: MergeView | null = null;
 let inlineView: EditorView | null = null;

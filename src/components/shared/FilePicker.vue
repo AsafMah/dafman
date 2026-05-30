@@ -22,7 +22,7 @@
 /// Single-pick per spec: select dismisses the popup. Multi-select
 /// can be re-opened. Directories attach as `directory` pills.
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { invokeCommand } from '@/ipc/invoke';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useEventListener } from '@vueuse/core';
@@ -82,8 +82,8 @@ const showHidden = ref(readPref(LS_HIDDEN));
 const showIgnored = ref(readPref(LS_IGNORED));
 const results = ref<WorkspaceFileMatch[]>([]);
 const highlightedIndex = ref(0);
-const searchInputRef = ref<HTMLInputElement | null>(null);
-const listRef = ref<HTMLElement | null>(null);
+const searchInputRef = useTemplateRef<HTMLInputElement>('searchInputRef');
+const listRef = useTemplateRef<HTMLElement>('listRef');
 
 const effectiveQuery = computed(() =>
   props.showSearchInput ? internalQuery.value : props.externalQuery,

@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, toRef, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  ref,
+  toRef,
+  useTemplateRef,
+  watch,
+} from 'vue';
 import { storeToRefs } from 'pinia';
 import MessageComposer from '@/components/chat/MessageComposer.vue';
 import MessageContent from '@/components/chat/MessageContent.vue';
@@ -69,15 +78,15 @@ const settingsStore = useSettingsStore();
 const toasts = useToastStore();
 const { settings } = storeToRefs(settingsStore);
 
-const messagesEl = ref<HTMLElement | null>(null);
-const tileEl = ref<HTMLElement | null>(null);
-const composerRef = ref<{
+const messagesEl = useTemplateRef<HTMLElement>('messagesEl');
+const tileEl = useTemplateRef<HTMLElement>('tileEl');
+const composerRef = useTemplateRef<{
   focus: () => void;
   appendText?: (text: string) => void;
   addAttachment?: (attachment: SendMessageAttachment) => void;
   exitCommandMode?: () => void;
   enterCommandMode?: () => void;
-} | null>(null);
+}>('composerRef');
 
 const sessionIdRef = computed(() => props.sessionId);
 

@@ -9,7 +9,7 @@
 // component just reads + dispatches actions. Self-contained: takes
 // only `sessionId` as a prop.
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import Chip from 'primevue/chip';
@@ -39,7 +39,7 @@ const terminalStore = useTerminalStore();
 const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
 const settings = storeToRefs(useSettingsStore()).settings;
-const modelTreeRef = ref<InstanceType<typeof TreeSelect> | null>(null);
+const modelTreeRef = useTemplateRef<InstanceType<typeof TreeSelect>>('modelTreeRef');
 
 let offOpenModelSelector: (() => void) | null = null;
 
