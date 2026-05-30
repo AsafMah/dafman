@@ -10,7 +10,37 @@
 
 ---
 
-## 2026-05-30 — Compressed AGENTS.md + personal instructions
+## 2026-05-30 — #54 rail cog one-click-to-close
+
+**Takeaway.** The session-details / Library rail cog needed two clicks to
+collapse after you touched anything inside the rail. Root cause: the edge-panel
+toggle keyed off `panel.api.isActive`, which is only true when the panel's group
+is *also* dockview's globally-active group. Clicking a control inside the rail
+moves global focus off that group, so `isActive` flips false while the rail is
+still visibly open → the first cog click takes the "open it" (re-activate)
+branch instead of collapsing. Fixed by keying off the group's *displayed* panel
+instead.
+
+**The fix.** `activateEdgePanel` (`src/stores/shell/layoutStore.ts:894`) now
+computes `isShown = !isCollapsed && panel.group.activePanel?.id === id`. dafman's
+dockview-core is a fork; `IDockviewPanel.group` is a `DockviewGroupPanel` whose
+`.activePanel` tracks the currently-displayed panel **independent of global
+focus** — exactly the signal we want. `panel.api.isActive` / `setActive` is still
+used for the *activate* path (switching which panel a multi-panel edge shows).
+
+**Multi-panel edge preserved.** The right edge group holds both `sessionDetails`
+and `library`. Clicking the Library tab while session-details is displayed must
+*switch*, not collapse. The `activePanel?.id === id` check handles this: only the
+displayed panel collapses; a non-displayed sibling tab activates.
+
+**Test-first.** Extended the bespoke fake DockviewApi in
+`layoutStore.edgeTabs.test.ts` to track per-edge `activePanelId` separately from
+each panel's `isActive`, and exposed `getPanel(id).group.activePanel`. New #54
+repro (open rail → flip panel `isActive=false` while keeping it displayed →
+assert single `activateEdgePanel` collapses) **failed before the fix, passes
+after**. Added a sibling-switch guard test. Full gate green: vue-tsc 0,
+eslint 0 errors, 705 tests, smoke 4/4.
+
 
 **Takeaway.** Both agent-instruction files had grown verbose and overlapping.
 Compressed without dropping any actionable directive (rubber-duck-verified):

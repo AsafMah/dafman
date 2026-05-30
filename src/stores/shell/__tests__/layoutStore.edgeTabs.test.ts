@@ -18,6 +18,10 @@ interface FakeEdgeGroup {
   id: string;
   collapsed: boolean;
   panelIds: string[];
+  // Which panel the group is currently *displaying*. Tracked separately from
+  // each panel's global `isActive` so tests can reproduce "rail still shows this
+  // panel but it lost dockview's global-active status" (#54).
+  activePanelId?: string;
 }
 
 interface FakePanel {
@@ -69,9 +73,31 @@ function makeDock(): FakeDock {
 
       if (!p) return undefined;
 
+      const edge = [...edges.values()].find((g) => g.panelIds.includes(id));
+
       return {
         id: p.id,
-        api: { isActive: p.isActive, setActive: () => { p.isActive = true; } },
+        api: {
+          get isActive() {
+            return p.isActive;
+          },
+          setActive: () => {
+            // Mimic dockview: activating a panel makes it the group's displayed
+            // panel and deactivates its siblings in the same edge group.
+            if (edge) {
+              for (const other of panels) {
+                if (edge.panelIds.includes(other.id)) other.isActive = false;
+              }
+              edge.activePanelId = p.id;
+            }
+            p.isActive = true;
+          },
+        },
+        group: {
+          get activePanel() {
+            return edge?.activePanelId ? { id: edge.activePanelId } : undefined;
+          },
+        },
       };
     },
     getEdgeGroup(position: string) {
@@ -225,5 +251,51 @@ describe('layoutStore.activateEdgePanel', () => {
     // No seed — no panels, no edge group.
 
     expect(() => store.activateEdgePanel('not-there', 'left')).not.toThrow();
+  });
+
+  // Regression for #54: after the user interacts with a control inside the rail,
+  // the rail panel is still the one displayed but is no longer dockview's
+  // globally-active panel. A single cog click must still collapse it — the toggle
+  // decision keys off "is this the displayed panel", not `panel.api.isActive`.
+  test('displayed-but-not-globally-active panel still collapses on one click (#54)', () => {
+    const dock = makeDock();
+    const store = useLayoutStore();
+    store.setApi(dock.api);
+    store.seedDefaultLayout();
+
+    // Open the details rail.
+    store.activateEdgePanel(PANEL_IDS.sessionDetails, 'right');
+    expect(dock.edges.get('right')?.collapsed).toBe(false);
+
+    // Simulate clicking a control inside the rail: the panel loses global-active
+    // status, but the group still displays it (activePanelId unchanged).
+    const panel = dock.panels.find((p) => p.id === PANEL_IDS.sessionDetails);
+    if (panel) panel.isActive = false;
+    expect(dock.edges.get('right')?.activePanelId).toBe(PANEL_IDS.sessionDetails);
+
+    // One cog click must collapse it.
+    store.activateEdgePanel(PANEL_IDS.sessionDetails, 'right');
+
+    expect(dock.edges.get('right')?.collapsed).toBe(true);
+  });
+
+  // Guard the multi-panel edge semantics the `activePanel` check must preserve:
+  // when a *different* panel is displayed in the same edge group, clicking this
+  // panel's tab switches to it rather than collapsing the group.
+  test('clicking a tab whose panel is not displayed switches instead of collapsing', () => {
+    const dock = makeDock();
+    const store = useLayoutStore();
+    store.setApi(dock.api);
+    store.seedDefaultLayout();
+
+    // Show sessionDetails on the right edge.
+    store.activateEdgePanel(PANEL_IDS.sessionDetails, 'right');
+    expect(dock.edges.get('right')?.activePanelId).toBe(PANEL_IDS.sessionDetails);
+
+    // Click the sibling library tab (same right edge group).
+    store.activateEdgePanel(PANEL_IDS.library, 'right');
+
+    expect(dock.edges.get('right')?.collapsed).toBe(false);
+    expect(dock.edges.get('right')?.activePanelId).toBe(PANEL_IDS.library);
   });
 });
