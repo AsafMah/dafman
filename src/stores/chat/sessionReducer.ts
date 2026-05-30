@@ -325,6 +325,11 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   'assistant.turn_end': handleTurnEnd,
   'session.idle': handleThinkingOff,
   'session.error': handleThinkingOff,
+  // #20: synthetic terminator appended by the bun resume path when the
+  // persisted history ends mid-turn (app killed while the agent was
+  // thinking). Clears the stuck spinner. Deliberately NOT mapped to
+  // handleTurnEnd — that fires OS notifications + unseenTurns bumps.
+  'dafman.resume_settled': handleThinkingOff,
   'permission.completed': handlePendingCompleted,
   'user_input.completed': handlePendingCompleted,
   'elicitation.completed': handlePendingCompleted,

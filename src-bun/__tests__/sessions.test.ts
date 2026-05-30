@@ -418,6 +418,43 @@ describe('SessionRegistry', () => {
     expect(emitted[2]?.eventType).toBe('assistant.turn_end');
   });
 
+  test('#20: resume appends dafman.resume_settled when history ends mid-turn', async () => {
+    // App was killed while the agent was thinking: the persisted
+    // history ends with a dangling `assistant.turn_start` and no
+    // terminal boundary. A freshly-resumed session does NOT
+    // auto-continue the interrupted turn, so without a synthetic
+    // terminator the renderer's `isThinking` would stay stuck true.
+    const client = new FakeClient();
+    client.nextResumeHistory = [
+      { type: 'assistant.message', data: { messageId: 'm1' } },
+      { type: 'assistant.turn_start', data: { turnId: 't1' } },
+    ];
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+    await reg.resume('sess-mid-turn');
+
+    expect(emitted.map((p) => p.eventType)).toEqual([
+      'assistant.message',
+      'assistant.turn_start',
+      'dafman.resume_settled',
+    ]);
+  });
+
+  test('#20: resume does NOT append the terminator when history ends cleanly', async () => {
+    const client = new FakeClient();
+    client.nextResumeHistory = [
+      { type: 'assistant.turn_start', data: { turnId: 't1' } },
+      { type: 'assistant.turn_end', data: { turnId: 't1' } },
+    ];
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+    await reg.resume('sess-clean');
+
+    expect(emitted.map((p) => p.eventType)).not.toContain('dafman.resume_settled');
+  });
+
   test('resume is idempotent for an already-registered session', async () => {
     const client = new FakeClient();
     _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);

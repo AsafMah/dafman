@@ -10,6 +10,67 @@
 
 ---
 
+## 2026-05-30 — #20 resume stuck on "Thinking…" (exit-while-thinking)
+
+**Takeaway.** The stuck-spinner-on-resume bug was exactly the user's
+hypothesis: kill the app while the agent is mid-turn → the persisted
+transcript ends with a dangling `assistant.turn_start` and no terminal
+boundary → on resume the bun side replays that history through the same
+forwarder as live events → renderer reducer (`sessionReducer.ts`) derives
+`isThinking = true` and nothing ever clears it, because a freshly-resumed
+SDK session does **not** auto-continue the interrupted turn (no
+`assistant.turn_end` / `session.idle` is emitted).
+
+**Root cause receipts.** `src/stores/chat/sessionReducer.ts` derives
+`isThinking` purely from events: `assistant.turn_start` → true
+(`handleTurnStart`), `assistant.turn_end` / `session.idle` /
+`session.error` → false (`handleTurnEnd` / `handleThinkingOff`).
+`SessionRegistry.resume` (`src-bun/app/chat/sessions.ts`) calls
+`session.getEvents()`, caps to the last `HISTORY_REPLAY_CAP` (500), and
+replays through `forward` — same path as live events. A dangling
+`turn_start` → stuck.
+
+**Fix.** In `resume()`, after computing the `capped` slice, scan it with
+`historyEndsMidTurn` (a faithful mirror of the reducer's three isThinking
+transitions). If it ends mid-turn, replay `[...capped,
+RESUME_SETTLED_EVENT]` where the marker is
+`{ type: 'dafman.resume_settled', data: {} }`. Appending to the replay
+slice (rather than a separate `this.emit` after `replayHistory`) keeps the
+terminator bounded inside the replay stream as the last event — no extra
+timing surface, no live-event interleaving hole. Built a **new** array so
+the original `history` (which `capped` aliases when `total <= cap`) is
+never mutated.
+
+Renderer: added `'dafman.resume_settled': handleThinkingOff` to
+`EVENT_HANDLERS`. Deliberately **not** reused `assistant.turn_end` — that
+fires OS notifications + `unseenTurns` bumps, which we don't want for a
+synthetic terminator.
+
+**Why `dafman.resume_settled` needs nothing else.** It's a synthetic
+`dafman.*` control event (precedent: `dafman.pending_request/response`).
+The transcript pipeline (`src/lib/chatEvents.ts`) silently skips unknown
+types (`if (!handler) continue;`), so it renders no chat bubble. The
+`split.test.ts` completeness check iterates a hardcoded `KNOWN_SDK_EVENTS`
+list (SDK schema only), so synthetic events are exempt — no IGNORED_EVENTS
+entry required. `SessionEventPayload.eventType` is free-form `string` on
+both sides of the wire, so no rpc/types update needed.
+
+**Tests.** Bun `sessions.test.ts`: positive (history ends in `turn_start`
+→ emitted ends with `dafman.resume_settled`) + negative (ends in
+`turn_end` → marker absent). Renderer `sessionsStore.restore.test.ts`:
+fire `turn_start` then `dafman.resume_settled` → `isThinking` false.
+
+**Manual test (not automated).** Steps: start a session, send a prompt,
+and **hard-kill the app** (Task Manager / `kill -9`) while the spinner is
+active; relaunch and re-open that session. Expected: the spinner clears on
+resume instead of hanging forever. *Why not automated:* the E2E harness's
+`restart()` does a clean shutdown that emits a proper turn boundary —
+reproducing the dangling `turn_start` needs an abrupt process kill
+mid-turn, which the harness can't drive. The unit tests cover the exact
+synthesis + clearing logic at both boundaries instead.
+
+---
+
 ## 2026-05-29 — Full E2E green again: 18/48 → 48/48 (#29)
 
 **Takeaway:** The "session.getEvents undefined" in #29's title was a minor

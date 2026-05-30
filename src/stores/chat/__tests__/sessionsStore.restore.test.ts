@@ -279,6 +279,27 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
     expect(record!.isThinking).toBe(false);
   });
 
+  test('#20: dafman.resume_settled clears a mid-turn isThinking on resume', async () => {
+    // Synthetic terminator appended by the bun resume path when the
+    // persisted history ends mid-turn (app killed while thinking).
+    // Must clear the spinner exactly like a real turn boundary.
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args) => ({
+      sessionId: (args as { sessionId: string }).sessionId,
+      cwd: null,
+      model: null,
+    });
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession('s1');
+
+    fire(event('s1', 'assistant.turn_start', { turnId: 't1' }));
+    expect(record!.isThinking).toBe(true);
+
+    fire(event('s1', 'dafman.resume_settled', {}));
+    expect(record!.isThinking).toBe(false);
+  });
+
   test('file and command artifacts are tracked across restored history', async () => {
     const { bridge, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args, fire) => {
