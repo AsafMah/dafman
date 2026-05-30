@@ -63,6 +63,27 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #19 — Instructions markdown respects theme tokens (2026-05-30)
+
+- **19.1** ⏳ **Instruction file content inverts correctly in dark mode.**
+  - **Steps:** open Library → Instructions, expand an instruction file that has
+    rendered markdown (headings, paragraphs, a list, a code span/block, a link).
+    Toggle the app between light and dark mode (theme switch) while the file is expanded.
+  - **Expected:** in **light** mode the content box is a subtle light surface with
+    dark text; in **dark** mode the box is a subtle dark surface with light text.
+    Code spans/blocks, links, blockquotes, table borders all stay legible and
+    invert with the theme — no light-on-light or dark-on-dark, no stuck-light box.
+  - **Why not automated:** the bug is purely a computed-color inversion under
+    `.app-dark`; happy-dom resolves no CSS custom-property cascade, so the
+    inverted vs non-inverted token values can't be asserted in unit tests.
+
+- **19.2** ⏳ **Raw HTML inside an instruction file also themes correctly.**
+  - **Steps:** in an instruction file, include a literal raw `<code>inline</code>`
+    and/or `<a href="…">link</a>` (HTML, not markdown). Expand it; toggle theme.
+  - **Expected:** the raw `<code>`/`<a>`/`<pre>` render with the same invertible
+    token colors as the markdown-generated equivalents — legible in both themes.
+  - **Why not automated:** same computed-color-cascade limitation as 19.1.
+
 ### Issue #17 — composer mode selector compact form on narrow panes (2026-05-30)
 
 - **17.1** ⏳ **Mode selector swaps to a compact icon Select on narrow panes.**
