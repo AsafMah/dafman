@@ -37,6 +37,7 @@ function makeRecord(id: string): SessionRecord {
     touchedFiles: [],
     commandsRun: 0,
     _toastedOauthRequests: new Set<string>(),
+    _toastedNeedsAuth: new Set<string>(),
     _artifactToolCallIds: new Set<string>(),
   };
 }

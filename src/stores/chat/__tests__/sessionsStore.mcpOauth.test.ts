@@ -34,6 +34,7 @@ function makeRecord(id: string): SessionRecord {
     touchedFiles: [],
     commandsRun: 0,
     _toastedOauthRequests: new Set<string>(),
+    _toastedNeedsAuth: new Set<string>(),
     _artifactToolCallIds: new Set<string>(),
   };
 }
@@ -115,6 +116,111 @@ describe('sessionsStore — MCP OAuth toast', () => {
       sessionId: 's1',
       eventType: 'mcp.oauth_completed',
       data: { requestId: 'req-orphan' },
+    });
+
+    expect(toasts.pending.length).toBe(0);
+  });
+});
+
+describe('sessionsStore — MCP needs-auth toast (#69)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  test('needs-auth status change warns and names the server', () => {
+    const sessions = useSessionsStore();
+    const toasts = useToastStore();
+    const rec = makeRecord('s1');
+    sessions.sessions.push(rec);
+
+    sessions.applySessionEvent({
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'needs-auth' },
+    });
+
+    expect(toasts.pending.length).toBe(1);
+    expect(toasts.pending[0]?.severity).toBe('warn');
+    expect(toasts.pending[0]?.detail ?? '').toContain('sentry');
+    expect(rec._toastedNeedsAuth.has('sentry')).toBe(true);
+  });
+
+  test('repeated needs-auth for the same server is de-duped', () => {
+    const sessions = useSessionsStore();
+    const toasts = useToastStore();
+    const rec = makeRecord('s1');
+    sessions.sessions.push(rec);
+
+    const payload = {
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'needs-auth' },
+    };
+    sessions.applySessionEvent(payload);
+    sessions.applySessionEvent(payload);
+
+    expect(toasts.pending.length).toBe(1);
+  });
+
+  test('connected after a needs-auth prompt confirms recovery and clears the guard', () => {
+    const sessions = useSessionsStore();
+    const toasts = useToastStore();
+    const rec = makeRecord('s1');
+    sessions.sessions.push(rec);
+
+    sessions.applySessionEvent({
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'needs-auth' },
+    });
+    toasts.consume(); // clear the warn
+
+    sessions.applySessionEvent({
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'connected' },
+    });
+
+    expect(toasts.pending.length).toBe(1);
+    expect(toasts.pending[0]?.severity).toBe('success');
+    expect(rec._toastedNeedsAuth.has('sentry')).toBe(false);
+  });
+
+  test('clearing the guard lets a later re-auth re-prompt', () => {
+    const sessions = useSessionsStore();
+    const toasts = useToastStore();
+    const rec = makeRecord('s1');
+    sessions.sessions.push(rec);
+
+    const needsAuth = {
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'needs-auth' },
+    };
+    sessions.applySessionEvent(needsAuth);
+    sessions.applySessionEvent({
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'connected' },
+    });
+    toasts.consume();
+
+    sessions.applySessionEvent(needsAuth);
+
+    expect(toasts.pending.length).toBe(1);
+    expect(toasts.pending[0]?.severity).toBe('warn');
+  });
+
+  test('a plain connect (no prior needs-auth) does not toast', () => {
+    const sessions = useSessionsStore();
+    const toasts = useToastStore();
+    const rec = makeRecord('s1');
+    sessions.sessions.push(rec);
+
+    sessions.applySessionEvent({
+      sessionId: 's1',
+      eventType: 'session.mcp_server_status_changed',
+      data: { serverName: 'sentry', status: 'connected' },
     });
 
     expect(toasts.pending.length).toBe(0);
