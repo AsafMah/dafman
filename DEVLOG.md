@@ -10,6 +10,34 @@
 
 ---
 
+## 2026-05-30 — #23: Library Agents project section verified (already fixed by #51)
+
+**Takeaway.** #23 ("Library Agents tab does not show project agents") is already
+fixed; closed as verified rather than re-implemented. The full resolution chain
+is correct end-to-end and was hardened by the #51/#52 refresh work. Added a
+service-level regression test as the missing guard.
+
+**Chain audit.** `useAgentsLibrary.load(sessionId)` → IPC `listAgentFiles` →
+`SessionRegistry.listAgentFiles` → `SessionAgentsService.listFiles` (resolves
+`entry.workingDirectory` from the session context, passes `includeProject: true`)
+→ `agentFiles.listAgentFiles` → `scanDir(<cwd>/.github/agents)`. `entry.working
+Directory` is populated on create (`sessions.ts:292`) and resume (`:546`).
+`LibraryAgentsTab.vue:98-103` re-runs `load()` on `activeSession.id` change
+(the #51 fix) so switching to a session with a project surfaces its agents.
+
+**Why it looked broken pre-#51.** The tab loaded once `onMounted`; before the
+session-switch watch landed it never re-listed when you switched into a session
+with a `.github/agents/` dir, so the Project section stayed empty.
+
+**Guard added.** `src-bun/__tests__/sessionAgentsServiceListFiles.test.ts` —
+the file-layer `listAgentFiles` was already covered by `agentFiles.test.ts`,
+but the SERVICE boundary (resolving `entry.workingDirectory`) was not. New test
+drops `<cwd>/.github/agents/reviewer.agent.md`, builds the service with a fake
+ctx reporting that cwd, asserts the Project entry surfaces with the exact path,
+and asserts no project agents when the session has no working directory.
+
+---
+
 ## 2026-05-30 — fix #17: composer mode selector compact (narrow-pane) form restored
 
 **Takeaway:** the "bottom bar resize regression" and "small-mode selector
