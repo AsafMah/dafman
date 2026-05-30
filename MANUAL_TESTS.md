@@ -63,6 +63,22 @@ walked by the user. After dogfooding, items move to ✅ (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #69 — Agent-driven MCP OAuth prompt (2026-05-30)
+
+- **69.1** ⏳ **A mid-session MCP tool call that needs auth surfaces a sign-in prompt, not a silent failure.**
+  - **Steps:** configure an HTTP MCP server that requires OAuth and is **not**
+    yet authenticated (no cached token — sign out / use a fresh account). Open a
+    session and ask the agent to use a tool from that server (so the *agent*, not a
+    Library button, triggers the connection).
+  - **Expected:** a **warn** toast appears naming the server ("… requires
+    authorization. Open the Library panel and click Sign-in…"), and the server
+    shows `needs-auth` in Library → MCP with a **Sign-in** button. Completing
+    Sign-in (system browser) reconnects the server; you then see a **success**
+    toast ("… connection established"). The warn toast does **not** repeat on every
+    retry while it stays `needs-auth`.
+  - **Why not automated:** needs a real OAuth-gated MCP server reached mid-session
+    by the agent + real provider auth; can't be driven in CI.
+
 ### Issue #7 — MCP HTTP OAuth Sign-in flow (2026-05-30)
 
 - **7.1** ⏳ **Sign-in opens the system browser and completes OAuth end-to-end.**

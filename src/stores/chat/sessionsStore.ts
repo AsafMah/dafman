@@ -135,6 +135,12 @@ export type SessionRecord = {
   /// can pair `_completed` events with their `_required`. Internal —
   /// renderer surfaces never read this directly.
   _toastedOauthRequests: Set<string>;
+  /// #69: server names we've toasted a `needs-auth` prompt for, so a
+  /// repeated `session.mcp_server_status_changed(needs-auth)` (status
+  /// re-emits on every connection attempt / resume) doesn't spam the
+  /// user. Cleared when the server reaches `connected` so a later
+  /// re-auth re-prompts. Internal — renderer surfaces don't read it.
+  _toastedNeedsAuth: Set<string>;
   _artifactToolCallIds: Set<string>;
 };
 
@@ -470,6 +476,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         commandsRun: 0,
 
         _toastedOauthRequests: new Set<string>(),
+        _toastedNeedsAuth: new Set<string>(),
         _artifactToolCallIds: new Set<string>(),
       });
 
@@ -588,6 +595,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         commandsRun: 0,
 
         _toastedOauthRequests: new Set<string>(),
+        _toastedNeedsAuth: new Set<string>(),
         _artifactToolCallIds: new Set<string>(),
       });
 

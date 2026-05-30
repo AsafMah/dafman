@@ -24,7 +24,11 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #20 — resume no longer stuck on "Thinking…" after the app
+**Recently fixed:** #69 — an agent-driven MCP tool call that needs OAuth now
+raises a sign-in prompt (warn toast → Library Sign-in) on the runtime's
+`needs-auth` status flip, instead of failing silently; deliberately NOT via
+`registerInterest('mcp.oauth_required')`, which would block the MCP connection
+awaiting an `OAuthClientProvider` we don't implement. 2026-05-30. #20 — resume no longer stuck on "Thinking…" after the app
 exits mid-turn (bun appends a synthetic `dafman.resume_settled` terminator to
 the resume replay when history ends mid-turn; reducer clears `isThinking`).
 2026-05-30. #29 — Full E2E back to 48/48 (stale flows updated for the
