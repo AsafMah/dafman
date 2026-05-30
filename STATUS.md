@@ -49,7 +49,13 @@ outside the session cwd).
 "Allow all" flag and run mode (new dafman-owned `session-metadata.json` store +
 rehydrate-on-resume; the SDK persists neither across resume). 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
 auto-refreshes now delay the visible loading affordance so cached/instant reloads
-do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
+do not flash `Loading…` while slow reloads still show feedback. 2026-05-31.
+#88 — composer submit is now a user setting
+(Settings → Composer): **Enter sends / Ctrl+Enter newline** (new default) vs
+**Ctrl+Enter sends / Enter newline** (previous behavior); settings v15, existing
+users migrate to `'enter'`. Plain Enter still selects open slash/mention
+typeahead items; Ctrl+Enter inserts a newline even with a menu open. 2026-05-31.
+#94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only
 the explicit Refresh action triggers an SDK reload. 2026-05-30. #97 — discovered
 MCP servers now key off the focused workspace (`lastFocusedSessionId`) instead of
