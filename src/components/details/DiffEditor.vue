@@ -17,9 +17,13 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { EditorState, type Extension } from '@codemirror/state';
 import { MergeView, unifiedMergeView } from '@codemirror/merge';
-import { oneDark } from '@codemirror/theme-one-dark';
 import Button from 'primevue/button';
-import { buildCodeMirrorTheme, resolveLanguageWithFallback } from '@/lib/codeMirrorShared';
+import {
+  buildCodeMirrorTheme,
+  codeMirrorThemeExtensionFor,
+  resolveLanguageWithFallback,
+} from '@/lib/codeMirrorShared';
+import { useDockviewTheme } from '@/composables/useDockviewTheme';
 
 type Mode = 'inline' | 'side-by-side';
 
@@ -38,6 +42,7 @@ const props = withDefaults(
 
 const host = ref<HTMLDivElement | null>(null);
 const mode = ref<Mode>(props.initialMode);
+const { isDark } = useDockviewTheme();
 let mergeView: MergeView | null = null;
 let inlineView: EditorView | null = null;
 let resolvedLang: Extension | null = null;
@@ -49,7 +54,7 @@ function commonExtensions(): Extension[] {
     EditorView.lineWrapping,
     lineNumbers(),
     ...(resolvedLang ? [resolvedLang] : []),
-    oneDark,
+    codeMirrorThemeExtensionFor(isDark.value),
     buildCodeMirrorTheme({
       maxHeight: props.maxHeight,
       contentPadding: '0.3rem 0.5rem',
@@ -139,6 +144,8 @@ watch(
     void rebuild();
   },
 );
+
+watch(isDark, () => buildSync());
 
 function toggleMode(): void {
   mode.value = mode.value === 'inline' ? 'side-by-side' : 'inline';
