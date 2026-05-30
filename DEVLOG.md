@@ -10,6 +10,49 @@
 
 ---
 
+## 2026-05-30 — fix #8: MCP Sign-in button hidden on real HTTP servers
+
+**Takeaway.** The Library → MCP "Sign in" button was gated on a static-config
+OAuth heuristic (`entry.hasOauth`) that is almost always wrong. HTTP MCP servers
+negotiate OAuth dynamically; the canonical example — GitHub's remote MCP — is
+configured as `{ type: 'http', url: … }` with no `oauthClientId`/`oauthGrantType`,
+so `classifyTransport` set `hasOauth: false` and the button was permanently
+hidden for exactly the servers that need it. Fix: show Sign-in for any
+`transport === 'http'` server; delete the `hasOauth` field outright.
+
+**Why the issue's root-cause text was stale.** #8 described "the conditional
+that hides it when there is no active session also hides it when there IS one."
+The visible `v-if` no longer referenced session state (it was
+`entry.transport === 'http' && entry.hasOauth` after the Phase B2 composable
+extraction, `511114b`). The *symptom* (button missing on configured HTTP
+servers) persisted for a different reason — the `hasOauth` gate — so I
+reproduced the real failure (rule 15) before touching code rather than chasing
+the stale framing.
+
+**Why always-show is safe.** The sign-in path already handles every state
+gracefully: `useMcpLibrary.signIn` returns `no-session` (→ warn toast "Create a
+session first"), `started` (→ browser launched), `already-signed-in` (→ success
+toast when the SDK's `mcp.oauth.login` returns no `authorizationUrl`, i.e. the
+server needs no OAuth), or `failed` (→ error toast). So a non-OAuth HTTP server
+just yields a harmless "Already signed in" — far better than an invisible
+button. The SDK's `mcp.oauth.login` is the real source of truth for whether
+OAuth is needed; a static-config sniff can't be.
+
+**Receipts.**
+- `src/composables/library/useMcpLibrary.ts` — `classifyTransport` now returns
+  `'local' | 'http'` (was `{ transport, hasOauth }`); `hasOauth` removed from
+  `ConfiguredEntry`. Doc comment explains why static OAuth detection is wrong.
+- `src/components/library/LibraryMcpTab.vue:189` — `v-if="entry.transport === 'http'"`.
+- `src/components/library/__tests__/LibraryMcpTab.signin.test.ts` (new) — renders
+  the tab with a fake RPC bridge; asserts Sign-in shows for an http server with
+  no static OAuth fields and stays hidden for a stdio server. Verified
+  test-first: fails on pre-fix `hasOauth` gate, passes after.
+
+Gates: `lint:eslint` (0 errors, 17 pre-existing warnings), `lint` (vue-tsc),
+targeted test (2/2), `smoke` (4/4).
+
+---
+
 ## 2026-05-30 — tech-debt: resume() complexity + flaky hmr smoke boot gate
 
 **Takeaway.** Two follow-up warnings from the #20 work, both addressed without
