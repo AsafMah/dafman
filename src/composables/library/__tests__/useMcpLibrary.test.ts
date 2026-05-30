@@ -48,7 +48,7 @@ describe('useMcpLibrary removeConfig (#10 — stays out of Discovered)', () => {
 
     const lib = useMcpLibrary();
     lib.configured.value = [
-      { name: 'github', config: { url: 'https://x' }, transport: 'http', hasOauth: false },
+      { name: 'github', config: { url: 'https://x' }, transport: 'http' },
     ];
     // The same server is ALSO present in the in-memory discovered list
     // (it round-trips through mcp.discover with source "user", or it is a
@@ -79,7 +79,7 @@ describe('useMcpLibrary removeConfig (#10 — stays out of Discovered)', () => {
     setRpcBridge(bridge);
 
     const lib = useMcpLibrary();
-    lib.configured.value = [{ name: 'github', config: {}, transport: 'http', hasOauth: false }];
+    lib.configured.value = [{ name: 'github', config: {}, transport: 'http' }];
     lib.discovered.value = [
       { name: 'github', source: 'user', enabled: true },
       { name: 'other', source: 'workspace', enabled: true },
