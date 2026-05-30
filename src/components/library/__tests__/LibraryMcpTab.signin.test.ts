@@ -14,6 +14,8 @@ import { cleanup, render, waitFor } from '@testing-library/vue';
 import LibraryMcpTab from '@/components/library/LibraryMcpTab.vue';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import type { CommandName, CommandMap } from '@/ipc/types';
+import { useSessionsStore, type SessionRecord } from '@/stores/chat/sessionsStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 
 interface FakeBridge extends RpcBridge {
   setNext<N extends CommandName>(name: N, value: CommandMap[N]['result']): void;
@@ -76,5 +78,37 @@ describe('LibraryMcpTab — Sign-in button (#8)', () => {
 
     await waitFor(() => expect(utils.getByText('stdioserver')).toBeDefined());
     expect(utils.queryByText('Sign in')).toBeNull();
+  });
+
+  test('hides Sign in for an http server already connected in the active session', async () => {
+    bridge.setNext('listMcpConfigs', {
+      remote: { type: 'http', url: 'https://api.example.invalid/mcp/' },
+    });
+    bridge.setNext('discoverMcpServers', []);
+    // An active session whose live MCP list reports the server connected
+    // means it's authenticated / needs no auth — Sign-in should hide.
+    bridge.setNext('listSessionMcpServers', [{ name: 'remote', status: 'connected' }]);
+    useSessionsStore().sessions.push({ id: 'sess-1' } as unknown as SessionRecord);
+    useLayoutStore().activeSessionId = 'sess-1';
+
+    const utils = render(LibraryMcpTab, { global: { stubs } });
+
+    await waitFor(() => expect(utils.getByText('remote')).toBeDefined());
+    expect(utils.queryByText('Sign in')).toBeNull();
+  });
+
+  test('shows Sign in for an http server reported needs-auth in the active session', async () => {
+    bridge.setNext('listMcpConfigs', {
+      remote: { type: 'http', url: 'https://api.example.invalid/mcp/' },
+    });
+    bridge.setNext('discoverMcpServers', []);
+    bridge.setNext('listSessionMcpServers', [{ name: 'remote', status: 'needs-auth' }]);
+    useSessionsStore().sessions.push({ id: 'sess-1' } as unknown as SessionRecord);
+    useLayoutStore().activeSessionId = 'sess-1';
+
+    const utils = render(LibraryMcpTab, { global: { stubs } });
+
+    await waitFor(() => expect(utils.getByText('remote')).toBeDefined());
+    expect(utils.getByText('Sign in')).toBeDefined();
   });
 });

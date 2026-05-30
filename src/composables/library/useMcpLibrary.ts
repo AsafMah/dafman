@@ -60,11 +60,29 @@ export function useMcpLibrary() {
   const discovered = ref<DiscoveredEntry[]>([]);
   const loaded = ref(false);
   const error = ref<string | null>(null);
+  /// Live connection status per server name, from the active session's
+  /// `mcp.list()`. Drives the Sign-in affordance: an HTTP server only
+  /// needs sign-in when its status is `needs-auth`. A server absent from
+  /// this map has unknown status (e.g. no active session, or not loaded
+  /// into the current session) — callers treat unknown as "might need
+  /// auth" so the affordance isn't hidden when we simply lack data.
+  const serverStatus = ref<Map<string, string>>(new Map());
 
   const knownNames = computed(() => new Set(configured.value.map((e) => e.name)));
   const newlyDiscovered = computed(() =>
     discovered.value.filter((d) => !knownNames.value.has(d.name)),
   );
+
+  /// Whether an HTTP server should surface the Sign-in button. True when
+  /// the live status is `needs-auth`, or when status is unknown (no
+  /// session-live data to rule it out). A `connected` / `disabled` /
+  /// `pending` server does NOT show Sign-in — it's already usable or not
+  /// gated on auth, which is the #8-era over-show this fixes.
+  function needsSignIn(name: string): boolean {
+    const status = serverStatus.value.get(name);
+
+    return status === undefined || status === 'needs-auth';
+  }
 
   async function loadAll(): Promise<void> {
     error.value = null;
@@ -87,17 +105,20 @@ export function useMcpLibrary() {
       // Also query the active session's live MCP list — it includes
       // servers that the SDK auto-discovered AND connected to, which
       // mcp.discover (server-scoped) may miss for plugin-supplied
-      // configs that only register against a live session.
+      // configs that only register against a live session. We also use
+      // its per-server `status` to gate the Sign-in affordance.
       const sessionMcpsPromise = activeId
         ? invokeCommand('listSessionMcpServers', { sessionId: activeId }).catch(
-            () => [] as Array<{ name: string }>,
+            () => [] as Array<{ name: string; status: string }>,
           )
-        : Promise.resolve([] as Array<{ name: string }>);
+        : Promise.resolve([] as Array<{ name: string; status: string }>);
       const [configs, disc, sessionMcps] = await Promise.all([
         invokeCommand('listMcpConfigs', {}),
         invokeCommand('discoverMcpServers', wd ? { workingDirectory: wd } : {}),
         sessionMcpsPromise,
       ]);
+
+      serverStatus.value = new Map(sessionMcps.map((s) => [s.name, s.status]));
 
       configured.value = Object.entries(configs).map(([name, config]) => ({
         name,
@@ -274,5 +295,6 @@ export function useMcpLibrary() {
     removeConfig,
     upsertConfig,
     signIn,
+    needsSignIn,
   };
 }

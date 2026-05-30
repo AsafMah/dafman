@@ -38,6 +38,7 @@ const {
   removeConfig,
   upsertConfig,
   signIn,
+  needsSignIn,
 } = useMcpLibrary();
 
 async function toggleEnable(entry: ConfiguredEntry) {
@@ -186,7 +187,7 @@ watch(activeSessionId, () => {
                 @update:model-value="() => toggleEnable(entry)"
               />
               <Button
-                v-if="entry.transport === 'http'"
+                v-if="entry.transport === 'http' && needsSignIn(entry.name)"
                 icon="pi pi-sign-in"
                 label="Sign in"
                 size="small"
