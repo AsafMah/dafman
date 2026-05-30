@@ -16,13 +16,19 @@ export function useAgentsLibrary() {
   const loaded = ref(false);
   const error = ref<string | null>(null);
 
-  async function load(sessionId: string | undefined): Promise<void> {
+  async function load(
+    sessionId: string | undefined,
+    options: { reloadSdk?: boolean } = {},
+  ): Promise<void> {
     error.value = null;
     loaded.value = false;
 
     try {
       if (sessionId) {
-        files.value = await invokeCommand('listAgentFiles', { sessionId });
+        files.value = await invokeCommand('listAgentFiles', {
+          sessionId,
+          ...(options.reloadSdk ? { reloadSdk: true } : {}),
+        });
       } else {
         // No session: user-scope only.
         files.value = await invokeCommand('listAgentFilesGlobal', {});

@@ -17,6 +17,7 @@ import type {
   CommandResultEvent,
   CommandResultRecord,
   SendMessageAttachment,
+  AgentFileEntry,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -400,6 +401,26 @@ describe('IPC wire contracts', () => {
 
   test('promoteTask request shape', () => {
     const sample = { sessionId: 'sess-1', id: 'agent-1' };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('listAgentFiles refresh request shape', () => {
+    const sample: { sessionId: string; reloadSdk?: boolean } = {
+      sessionId: 'sess-1',
+      reloadSdk: true,
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('listAgentFiles response shape', () => {
+    const sample: AgentFileEntry[] = [
+      {
+        scope: 'project',
+        name: 'dropped',
+        path: 'C:\\repo\\dafman\\.github\\agents\\dropped.agent.md',
+        canonical: true,
+      },
+    ];
     expect(sample).toMatchSnapshot();
   });
 

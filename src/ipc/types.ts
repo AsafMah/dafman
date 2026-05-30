@@ -710,7 +710,7 @@ export type CommandMap = {
     result: JobRecord[];
   };
   listAgentFiles: {
-    args: { sessionId: string };
+    args: { sessionId: string; reloadSdk?: boolean };
     result: AgentFileEntry[];
   };
   listAgentFilesGlobal: {

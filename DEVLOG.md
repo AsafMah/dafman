@@ -133,6 +133,31 @@ normalizing placement, labels, title tooltips, and accessible names.
 
 **Test.** Added `src/composables/library/__tests__/useMcpLibrary.test.ts:96-123`: it seeds a stale active session plus a focused session, simulates Library-panel divergence, and asserts `discoverMcpServers` gets `C:\repo\focused` and `listSessionMcpServers` gets `focused-session`. Verified red first (pre-fix call used `C:\repo\stale`), then green.
 
+## 2026-05-30 — #82 Agents Refresh now SDK-reloads dropped files
+
+**Takeaway.** Library → Agents Refresh no longer leaves the filesystem list ahead
+of the SDK registry: the explicit refresh path now asks `listAgentFiles` to run
+the existing session-scoped `session.rpc.agent.reload()` flow before scanning
+disk, so a valid externally-dropped `.agent.md` can be selected immediately.
+
+**Receipts.**
+- Renderer: `LibraryAgentsTab.vue` keeps mount/session-switch `load()` list-only
+  but binds the Refresh button to `refresh()` → `useAgentsLibrary.load(sessionId,
+  { reloadSdk: true })`, avoiding extra SDK reloads on watch ticks and preserving
+  the no-session global list-only path.
+- Backend: `SessionRegistry.listAgentFiles(sessionId, { reloadSdk })` delegates
+  to `SessionAgentsService.listFiles`; when requested, it reuses
+  `SessionAgentsService.reload(sessionId)` (`session.rpc.agent.reload()`) before
+  `listAgentFiles(opts)`. SDK contract verified in
+  `node_modules/@github/copilot/copilot-sdk/generated/rpc.d.ts`: `agent.reload`
+  "Reloads custom agent definitions and returns the refreshed list."
+- Coverage: `src-bun/__tests__/sessions.test.ts` proves the default list path
+  does not reload, while `{ reloadSdk: true }` bumps the fake SDK reload counter
+  and makes the newly-loaded `dropped` agent selectable. Wire snapshots pin the
+  new `listAgentFiles` refresh request shape.
+- Scope note: reload failures remain best-effort/logged so #81 (surfacing SDK
+  load rejections) stays separate.
+
 ---
 
 ## 2026-05-30 — Dogfood sweep: Visual + Agents verified; 7 issues filed; new `manual-tests` skill
