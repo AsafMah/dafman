@@ -13,6 +13,7 @@ import { BrowserView, BrowserWindow, Updater, Utils } from 'electrobun/bun';
 import { ensureClient, shutdownClient, tryGetClient } from './app/client/client';
 import { browseDirectorySync } from './app/filesystem/directoryBrowser';
 import { rpcGuard } from './app/shared/errors';
+import { acquireSingleInstanceLock } from './app/shared/singleInstance';
 import {
   getLogDir as currentLogDir,
   getLogLevel,
@@ -54,6 +55,31 @@ const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 
 await initLogger({ logDir: Utils.paths.userLogs });
+
+// Single-instance guard. Two instances on the same build channel share one
+// WebView2 user-data folder + dafman's JSON state and crash the webview.
+// Acquire BEFORE touching any shared state (audit, settings, sessions, the
+// window). The lock lives under the channel-scoped userData dir, so different
+// channels (dev/canary/stable) still coexist — see `bun run install:canary`.
+const singleInstance = acquireSingleInstanceLock(join(Utils.paths.userData, 'dafman.lock'));
+
+if (!singleInstance.acquired) {
+  const pidNote =
+    singleInstance.existingPid !== undefined ? ` (pid ${singleInstance.existingPid})` : '';
+  // Loud, synchronous stderr so `bun run dev` doesn't look like a silent
+  // no-op; log.warn alone may never flush before we exit.
+  process.stderr.write(
+    `\ndafman is already running for this channel${pidNote}. Exiting this instance.\n` +
+      'To run a second instance alongside it, use a different channel: `bun run install:canary`.\n\n',
+  );
+  log.warn('duplicate instance blocked', {
+    ...(singleInstance.existingPid !== undefined
+      ? { existingPid: singleInstance.existingPid }
+      : {}),
+  });
+  process.exit(0);
+}
+
 await initAudit({ dir: join(Utils.paths.userData, 'audit') });
 
 // Install the stderr filter *after* the logger is up (so dropped lines
@@ -669,8 +695,14 @@ const handleShutdownSignal = async (signal: string): Promise<void> => {
     });
   }
 
+  // Release the single-instance lock last, after all shared state is torn
+  // down, so a relaunch can't start while we're still touching it.
+  singleInstance.release();
+
   process.exit(0);
 };
 
 process.on('SIGINT', () => void handleShutdownSignal('SIGINT'));
 process.on('SIGTERM', () => void handleShutdownSignal('SIGTERM'));
+// Final safety net for exit paths that bypass the signal handler.
+process.on('exit', () => singleInstance.release());

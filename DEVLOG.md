@@ -8,7 +8,70 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
-## 2026-05-31 — #105 `<system_notification>` wrapper leak into transcript
+## 2026-05-31 — single-instance guard fixes the multi-instance webview crash
+
+**Takeaway:** the crash the user hit ("it crashed" during dogfood setup) is
+caused by **≥2 dafman instances running on the same build channel**, not a JS
+bug — they share one WebView2 user-data folder
+(`%LOCALAPPDATA%\com.dafman.app\<channel>\WebView2`) **and** dafman's JSON state
+(settings, session-metadata, audit, command-results), and that collision
+silently kills the webview with **no JS error in the log**. Electrobun ships no
+single-instance API, so the fix is ours: a PID+token lockfile.
+
+**The fix.** `src-bun/app/shared/singleInstance.ts` →
+`acquireSingleInstanceLock(lockPath)` returns `{ acquired, existingPid?, release }`.
+It `openSync(path, 'wx')` a JSON lock `{pid, token, startedAt}`; on EEXIST it
+reads the holder and, if the PID is dead or the file is corrupt, takes the lock
+over (with a read-back verify to narrow the stale-takeover TOCTOU); on any
+unexpected FS error it fails *open* (a dev tool must not be bricked by a lock
+bug). `release()` is idempotent and token-checked — it only deletes a lock we
+still own. Framework-agnostic (no `electrobun/bun` import) so `bun test` can
+exercise it directly. Wired in `src-bun/index.ts` right after `initLogger` and
+**before** `initAudit`/settings/sessions/window — a duplicate writes a loud
+synchronous `process.stderr.write` (log.warn alone may never flush before
+`process.exit(0)`), logs `duplicate instance blocked`, and exits 0. `release()`
+runs in `handleShutdownSignal` (last, after everything else) and on
+`process.on('exit')`.
+
+**Why channel-scoping is the whole design.** The lock lives at
+`join(Utils.paths.userData, 'dafman.lock')`, and `Utils.paths.userData =
+join(appData, identifier, channel)` where `channel` is baked in at build time
+(`Resources/version.json`). So the lock is automatically channel-scoped: it
+blocks same-channel duplicates (the crash) but lets `dev`/`canary`/`stable`
+coexist. That cross-channel split is also the answer to "I want a second
+instance to develop with" — `BrowserWindow` exposes no `partition` override, so
+you cannot redirect WebView2 from bun at runtime; a different channel is the
+only runtime isolation primitive.
+
+**Dead end — the in-place build bundle is NOT runnable.** First attempt at a
+`launch:canary` convenience ran `build/canary-win-x64/dafman-canary/bin/launcher`
+directly. That bundle is a *packaging intermediate*: `bin/launcher` is an
+extension-less PE next to a compressed `Resources/*.tar.zst`, with no extracted
+runtime tree. Running it creates no userData and exits. The **runnable** artifact
+is the sibling Setup stub `dafman-Setup-canary.exe` (same self-extracting PE)
+**paired with its `dafman-Setup-canary.tar.zst`** — the stub reads the sibling
+tarball to install + launch. (Contrast: `electrobun dev` emits a fully extracted
+tree with `bin/launcher.exe` + `bun.exe` + dlls, which *is* runnable. Also note:
+libuv on Windows won't `spawn` an extension-less PE — needs `.exe`.) So
+`tools/launch-channel.ts` was deleted and replaced with
+`tools/install-channel.ts` (`bun run install:canary` = `build:canary` then run
+the Setup installer).
+
+**Runtime verification.** On the dev bundle: D1 (new code) booted and wrote
+`%LOCALAPPDATA%\com.dafman.app\dev\dafman.lock` (`pid 219784`); launching D2
+from the extracted `launcher.exe` → D2 exited(0), lock unchanged, NO second
+app-bun process, and the shared dev log recorded
+`{"level":"warn","message":"duplicate instance blocked","existingPid":219784}`.
+Guard confirmed end-to-end. `release()` on graceful shutdown is proven by unit
+test only — a Windows force-kill is `TerminateProcess`, which bypasses the JS
+exit handlers and leaves a stale lock, which the next boot's stale-takeover path
+reclaims (so the user-visible behavior is still correct).
+
+**Not yet runtime-proven:** the canary Setup GUI flow + installed-canary
+coexistence (high confidence from the channel-path logic, but the NSIS installer
+pops an interactive GUI I didn't drive). Captured in `MANUAL_TESTS.md`.
+
+
 
 **Takeaway:** the literal `<system_notification>…</system_notification>` text
 was NOT something the renderer added and NOT a missing markdown strip — it came

@@ -12,6 +12,7 @@
     "start": "vite build && electrobun dev",
     "build": "vite build && electrobun build",
     "build:canary": "vite build && electrobun build --env=canary",
+    "install:canary": "bun run build:canary && bun run tools/install-channel.ts canary",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",

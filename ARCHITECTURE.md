@@ -116,6 +116,8 @@ resolve tsconfig path aliases for the bun entry graph, so backend imports stay r
 ```
 bun.start
   └─ initLogger()                            // src-bun/app/observability/logging.ts
+  └─ acquireSingleInstanceLock()             // src-bun/app/shared/singleInstance.ts
+       └─ duplicate on same channel → loud stderr + process.exit(0)
   └─ installStderrFilter()                   // drops node-pty conpty noise on Windows
   └─ SettingsService.loadOrDefault()         // src-bun/app/config/settings.ts
   └─ defineRPC<DafmanRPC>({ bun: {...} })    // registers ~30 handlers
@@ -125,6 +127,19 @@ bun.start
             └─ deny-by-default permission model installed
             └─ existing sessions resumed via session.getEvents()
 ```
+
+**Single-instance guard.** Two dafman instances on the *same* build channel
+share one WebView2 user-data folder (`…/<identifier>/<channel>/WebView2`) **and**
+dafman's JSON state (settings, session metadata, audit, command results) — that
+collision silently kills the webview (no JS error in the log). Electrobun ships
+no single-instance API, so `acquireSingleInstanceLock` (a PID+token lockfile at
+`join(Utils.paths.userData, 'dafman.lock')`) blocks the duplicate before it
+touches shared state. The lock path is channel-scoped, so a *different* channel
+(`dev` vs `canary` vs `stable`) coexists cleanly — that cross-channel split is
+the supported "run a second instance while developing" workflow
+(`bun run install:canary`; see §8). The in-place `electrobun build` output is a
+packaged Setup stub + sibling `.tar.zst`, **not** a runnable tree — you must run
+the Setup installer (`tools/install-channel.ts`), not the bare `bin/launcher`.
 
 ## 4. Renderer (`src/`)
 
@@ -399,6 +414,15 @@ Total: **308 tests** as of writing. `bun run check` is the gate:
    vars before attaching listeners.** Reading `this.__field` from a closure
    later throws because Lexical wraps the node in a read-only proxy after
    `createDOM`.
+8. **Electrobun has no single-instance lock, and the in-place build output
+   isn't runnable.** Same-channel duplicates crash the shared WebView2 folder
+   (see §3 Lifecycle → "Single-instance guard"); the guard is ours, not the
+   framework's. `electrobun build --env=canary` emits a packaged Setup stub +
+   sibling `.tar.zst`, not an extracted launcher tree — run the Setup installer
+   (`bun run install:canary`), never the bare `bin/launcher`. Build channels
+   (dev/canary/stable) are the only runtime isolation primitive: userData +
+   WebView2 are keyed on the build-time `channel`, and `BrowserWindow` exposes
+   no `partition` override.
 
 ## 9. What's not here yet (link to plans)
 

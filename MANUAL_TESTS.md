@@ -70,6 +70,47 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Single-instance guard + canary coexistence (2026-05-31)
+
+#### SI.1 - Second instance on the same channel is blocked, not crashed.
+
+- [ ] result:
+
+- **Steps:** start dafman with `bun run dev`. With it still running, open a second
+  terminal and run `bun run dev` again (same `dev` channel).
+- **Expected:** the second invocation prints a loud note like *"dafman is already
+  running for this channel (pid N). Exiting this instance."* and exits cleanly;
+  no second app window appears, the first window keeps working, and the shared
+  dev log contains a `duplicate instance blocked` warn line. (Before the fix, the
+  webview of one or both instances would silently die.)
+- **Why not automated:** spawning two real Electrobun windows against the live
+  WebView2 user-data folder; the lock logic itself is unit-tested, but the
+  webview-crash avoidance is only observable by running two real instances.
+
+#### SI.2 - A force-killed instance's stale lock is reclaimed on next launch.
+
+- [ ] result:
+
+- **Steps:** `bun run dev`, then force-kill it (`Stop-Process -Id <app-bun-pid>`,
+  i.e. Task Manager / TerminateProcess — NOT a clean Ctrl-C). Immediately
+  `bun run dev` again.
+- **Expected:** the new instance starts normally (it detects the stale lock left
+  by the dead PID and takes it over); it does NOT refuse to start.
+- **Why not automated:** requires a real TerminateProcess that bypasses the JS
+  exit handlers, leaving the on-disk lock behind.
+
+#### SI.3 - A canary instance runs alongside the dev instance.
+
+- [ ] result:
+
+- **Steps:** with `bun run dev` running, run `bun run install:canary` and complete
+  the Setup installer, then launch the installed canary app.
+- **Expected:** both windows run at the same time with no crash; they keep
+  separate state (sessions/settings in dev do not appear in canary and vice
+  versa), because each channel has its own WebView2 folder + JSON state.
+- **Why not automated:** drives the interactive NSIS Setup GUI and a second
+  installed app coexisting with the dev build.
+
 ### Issue #103 — Sub-agent cards fold from bottom/header chrome (2026-05-31)
 
 #### 103.1 - Tall sub-agent cards can be collapsed after scrolling to the bottom.
