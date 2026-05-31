@@ -18,6 +18,13 @@ export interface SessionHistoryCompactionResult {
   messagesRemoved: number | null;
 }
 
+/// Mirrors `AppInfo` in `src-bun/rpc.ts`. Build-time identity (release
+/// channel + version) used by the StatusBar channel pill.
+export interface AppInfo {
+  channel: string;
+  version: string;
+}
+
 export interface Appearance {
   theme: ThemeChoice;
   reasoningVisibility: ReasoningVisibility;
@@ -898,6 +905,7 @@ export type CommandMap = {
   };
   getSettings: { args: Record<string, never>; result: Settings };
   updateSettings: { args: { next: Settings }; result: Settings };
+  getAppInfo: { args: Record<string, never>; result: AppInfo };
   getLogDir: { args: Record<string, never>; result: string };
   openLogFolder: { args: Record<string, never>; result: boolean };
   revealPath: { args: { path: string }; result: boolean };

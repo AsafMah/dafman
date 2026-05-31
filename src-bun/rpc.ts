@@ -53,6 +53,17 @@ export interface Appearance {
   enableMermaid: boolean;
 }
 
+/// Build-time identity of the running app. Sourced from the bundled
+/// `Resources/version.json` via Electrobun's `Updater.getLocalInfo()`.
+/// `channel` is the release channel (`dev` / `canary` / `stable`); the
+/// renderer surfaces a pill + the OS window title is suffixed for any
+/// non-stable channel so a dev/canary instance is never mistaken for a
+/// stable one running side-by-side.
+export interface AppInfo {
+  channel: string;
+  version: string;
+}
+
 export interface Settings {
   version: number;
   appearance: Appearance;
@@ -1116,6 +1127,7 @@ export type DafmanRPC = {
       };
       getSettings: { params: Record<string, never>; response: Settings };
       updateSettings: { params: { next: Settings }; response: Settings };
+      getAppInfo: { params: Record<string, never>; response: AppInfo };
       getLogDir: { params: Record<string, never>; response: string };
       openLogFolder: {
         params: Record<string, never>;

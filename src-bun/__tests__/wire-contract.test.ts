@@ -108,6 +108,14 @@ describe('IPC wire contracts', () => {
     expect(sample).toMatchSnapshot();
   });
 
+  test('AppInfo shape', () => {
+    const sample: import('../rpc').AppInfo = {
+      channel: 'canary',
+      version: '0.1.0',
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
   test('Settings with v3 groups layout', () => {
     const sample: Settings = {
       version: 13,

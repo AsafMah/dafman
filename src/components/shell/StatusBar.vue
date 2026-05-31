@@ -14,10 +14,23 @@
 
 import Button from 'primevue/button';
 import Tooltip from 'primevue/tooltip';
+import { computed } from 'vue';
+
+import { useAppInfo } from '@/composables/useAppInfo';
 
 const vTooltip = Tooltip;
 
 const isDev = import.meta.env.DEV;
+
+const { appInfo } = useAppInfo();
+
+// Only surface the pill for non-stable channels — a stable build needs no
+// badge. `dev` and `canary` are the two non-stable channels we ship.
+const channel = computed(() => appInfo.value?.channel ?? '');
+const showChannelPill = computed(() => channel.value === 'dev' || channel.value === 'canary');
+const channelTooltip = computed(() =>
+  appInfo.value ? `${appInfo.value.channel} build · v${appInfo.value.version}` : '',
+);
 
 const emit = defineEmits<{
   openSettings: [];
@@ -29,6 +42,14 @@ const emit = defineEmits<{
   <footer class="status-bar">
     <div class="status-bar-left">
       <span class="status-bar-brand">dafman</span>
+      <span
+        v-if="showChannelPill"
+        v-tooltip.top="channelTooltip"
+        class="channel-pill"
+        :class="`channel-pill-${channel}`"
+        :aria-label="`${channel} build`"
+        >{{ channel }}</span
+      >
     </div>
     <div class="status-bar-center">
       <!-- Reserved for live indicators (active session, model id,
@@ -101,6 +122,31 @@ const emit = defineEmits<{
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--p-text-color);
+}
+
+/* Release-channel badge next to the brand. Only mounted for non-stable
+ * channels (dev / canary). Tinted per channel so a dev/canary instance
+ * running alongside a stable one is unmistakable. */
+.channel-pill {
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--channel-color) 45%, transparent);
+  background: color-mix(in srgb, var(--channel-color) 18%, transparent);
+  color: var(--channel-color);
+  user-select: none;
+}
+
+.channel-pill-canary {
+  --channel-color: var(--p-amber-500, #f59e0b);
+}
+
+.channel-pill-dev {
+  --channel-color: var(--p-violet-500, #8b5cf6);
 }
 
 /* PrimeVue's text/rounded Button default height is 2rem — too tall
