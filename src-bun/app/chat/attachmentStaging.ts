@@ -22,12 +22,10 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-/// MimeTypes the host CLI inlines directly from a `blob` attachment.
-/// Mirrors `sct` (images) ∪ `Ios` ∪ `aKt` (native documents) in
-/// `node_modules/@github/copilot/app.js`. Anything NOT in this set is
-/// dropped by the host and must be staged to a file instead.
-const HOST_INLINABLE_BLOB_MIMES = new Set<string>([
-  // Images — host emits an `image_url` content part (`sct`).
+/// Images the host inlines as an `image_url` content part (`sct` in
+/// app.js). The host checks `sct.has(a.mimeType)` against the RAW
+/// mimeType — no normalization — so we match exactly the same way.
+const HOST_INLINABLE_IMAGE_MIMES = new Set<string>([
   'image/png',
   'image/jpeg',
   'image/jpg',
@@ -38,7 +36,13 @@ const HOST_INLINABLE_BLOB_MIMES = new Set<string>([
   'image/x-icon',
   'image/heic',
   'image/avif',
-  // Native documents — host emits a `file` content part (`Ios` ∪ `aKt`).
+]);
+
+/// Native documents the host inlines as a `file` content part
+/// (`Ios` ∪ `aKt` in app.js). The host's `fae`→`wIn`→`mUe`/`hUe`
+/// branch normalizes the mimeType via `pR` (strip `;`-params,
+/// lower-case) before the set check, so we normalize too.
+const HOST_INLINABLE_DOC_MIMES = new Set<string>([
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.oasis.opendocument.text',
@@ -50,13 +54,19 @@ const HOST_INLINABLE_BLOB_MIMES = new Set<string>([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]);
 
-/// True when the host CLI can inline a `blob` of this mimeType as
-/// model content. The host normalizes the mimeType by taking the part
-/// before any `;` and lower-casing it, so we do the same.
+/// True when the host CLI can inline a `blob` of this mimeType as model
+/// content. Mirrors the host's asymmetry exactly: the image branch
+/// (`sct.has(a.mimeType)`) matches the raw mimeType, while the document
+/// branch (`mUe`/`hUe`) normalizes first. Matching the host precisely
+/// matters — over-accepting (e.g. treating `image/png; charset=...` as
+/// inlinable when the host's raw `sct` check would miss it) would skip
+/// staging and silently lose the attachment, re-introducing #110.
 export function isHostInlinableBlobMime(mimeType: string): boolean {
+  if (HOST_INLINABLE_IMAGE_MIMES.has(mimeType)) return true;
+
   const normalized = (mimeType.split(';')[0] ?? '').trim().toLowerCase();
 
-  return HOST_INLINABLE_BLOB_MIMES.has(normalized);
+  return HOST_INLINABLE_DOC_MIMES.has(normalized);
 }
 
 export interface StagedFileAttachment {

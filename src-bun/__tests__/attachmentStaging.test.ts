@@ -38,8 +38,17 @@ describe('isHostInlinableBlobMime', () => {
     }
   });
 
-  test('normalizes parameters and casing like the host', () => {
-    expect(isHostInlinableBlobMime('IMAGE/PNG; charset=binary')).toBe(true);
+  test('normalizes the document branch but matches images raw, like the host', () => {
+    // Host's document branch normalizes (pR): a parameterized PDF mime
+    // still inlines.
+    expect(isHostInlinableBlobMime('application/pdf; charset=binary')).toBe(true);
+    // Host's image branch checks the RAW mimeType — a parameterized /
+    // upper-cased image mime is NOT in `sct`, so the host would drop the
+    // blob and we must stage it (report not-inlinable).
+    expect(isHostInlinableBlobMime('IMAGE/PNG; charset=binary')).toBe(false);
+    expect(isHostInlinableBlobMime('image/png; charset=binary')).toBe(false);
+    // Exact image mime still inlines.
+    expect(isHostInlinableBlobMime('image/png')).toBe(true);
     expect(isHostInlinableBlobMime('  text/markdown ; charset=utf-8')).toBe(false);
   });
 });
