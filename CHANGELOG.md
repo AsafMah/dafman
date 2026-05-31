@@ -3,6 +3,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (#105 — 2026-05-31)
+- **The literal `<system_notification>` wrapper no longer leaks into rendered sub-agent reports (or top-level system callouts).** The CLI runtime emits `system.notification` events whose `data.content` is wrapped in `<system_notification>…</system_notification>` XML tags (`SystemNotificationData.content`, `node_modules/@github/copilot/copilot-sdk/generated/session-events.d.ts:3901`). The reducer's `system.notification` handler pushed that raw content as a `system` chat item, which both `ChatWindow.vue` and `SubagentBlock.vue` render as literal `{{ item.text }}` (no markdown strip), so the envelope showed up as visible text. Fix: a scoped `unwrapSystemNotification` helper strips the exact `<system_notification>` tags (including a dangling streaming open tag) in `calloutHandlers.ts` before the content reaches the timeline, keeping the inner message and dropping empty wrappers. Regression coverage in `src/lib/chatEvents/__tests__/calloutHandlers.test.ts`.
+
+
 ### Fixed (#93 — 2026-05-31)
 - **Library Agents / Skills / MCP session-switch reloads no longer flash a Loading indicator when the refresh resolves instantly.** The shared library list loading flag now keeps stale content visible during cached/fast reloads and only exposes the loading affordance after the same short delay used by the Agents Select affordance, while genuinely slow reloads still show feedback.
 
