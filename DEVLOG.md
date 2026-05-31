@@ -39,6 +39,16 @@ panel tabs, not arbitrary chrome). The StatusBar is the modern always-visible
 chrome strip already reserved for "live indicators" and hosting the brand, so
 the pill lives there — the honest equivalent of the requested placement.
 
+**Release-channel default bug (caught reviewing this feature):** `electrobun
+build` defaults `--env` to `dev` (`node_modules/electrobun/src/cli/index.ts:2081`,
+valid set `["dev","canary","stable"]`), so `bun run build` — the documented
+"release bundle" — was tagging release artifacts as the `dev` channel. With the
+new indicator that would paint a `DEV` pill on a stable release; independently it
+keys userData/WebView2 on `dev`. Fixed in the same PR: `package.json` `build` is
+now `electrobun build --env=stable`. CI's build matrix calls `bunx electrobun
+build` directly (not the `build` script), so it's unaffected; `bun run check`
+(which does call `bun run build`) now packages stable locally.
+
 **Not runtime-verified:** the live pixel tint and OS title bar need a packaged
 channel build — the smoke harness RPC stub returns nothing for `getAppInfo`, so
 the pill is hidden there by design. Pill logic is unit-tested (4 cases:
