@@ -54,6 +54,7 @@ Legend:
 | Sessions Manager edge panel | ✅ | `src/components/session/SessionsManager.vue` |
 | Per-session settings rail (`SessionDetailsPanel`) | ✅ | `src/components/session/SessionDetailsPanel.vue` |
 | Per-session accent color | ✅ | `src/lib/color.ts` |
+| Release-channel indicator (StatusBar pill + OS window title, non-stable only) | ✅ | `src/components/shell/StatusBar.vue` + `src-bun/app/shared/appIdentity.ts`; `getAppInfo` RPC (#121, `5c66291`) |
 
 ## Messaging & UX
 
@@ -72,6 +73,7 @@ Legend:
 | File / image attachments (Lexical DecoratorNode) | ✅ | `src/lexical/AttachmentNode.ts` |
 | Slash commands (local) | ✅ | `SlashCommandPlugin.vue` + `sessionCommands.ts` |
 | Per-session gear popover | ✅ | `SessionHeaderControls.vue` |
+| Delayed agent-busy spinner (no flash on instant Select/Deselect) | ✅ | `src/composables/useDelayedBusyValue.ts` + `SessionDetailsPanel.vue` (#99, `5492493`) |
 | Bounded `record.events` ring buffer (5000) | ✅ | `sessionsStore.ts` |
 | Markdown rendering (`markdown-it` + Prism + DOMPurify + KaTeX) | ✅ | `src/lib/markdown.ts` |
 | Mermaid diagrams (opt-in, lazy) | ✅ | `src/components/chat/MermaidBlock.vue` |
