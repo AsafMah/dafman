@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _setClientForTest } from '../app/client/client';
 import { SessionRegistry } from '../app/chat/sessions';
+import { _setStagingDirForTest } from '../app/chat/attachmentStaging';
 import { AppError } from '../app/shared/errors';
 import type { SessionEventPayload } from '../rpc';
 
@@ -292,6 +293,7 @@ class FakeClient {
 
 afterEach(() => {
   _setClientForTest(null);
+  _setStagingDirForTest(null);
 });
 
 describe('SessionRegistry', () => {
@@ -381,39 +383,121 @@ describe('SessionRegistry', () => {
     expect(fake.lastSentAgentMode).toBe('plan');
   });
 
-  test('send converts command result pills into temp file attachments', async () => {
+  test('send converts command result pills into temp file attachments the host can read (#110)', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const stagingDir = mkdtempSync(join(tmpdir(), 'dafman-stage-cmd-'));
+    _setStagingDirForTest(stagingDir);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const fake = client.createdSessions[0]!;
+
+    try {
+      await reg.send(id, 'use this', undefined, [
+        {
+          type: 'commandResult',
+          displayName: 'cmd-result.md',
+          result: {
+            id: 'cmd-1',
+            sessionId: id,
+            command: 'echo hi',
+            cwd: process.cwd(),
+            shell: 'pwsh.exe',
+            status: 'completed',
+            stdout: 'hi\n',
+            stderr: '',
+            truncated: false,
+            createdAt: new Date().toISOString(),
+            exitCode: 0,
+          },
+        },
+      ]);
+
+      expect(fake.lastSentPrompt).toBe('use this');
+      expect(fake.lastSentAttachments).toHaveLength(1);
+
+      // A text/markdown blob is NOT host-inlinable, so it must be staged
+      // to a real file (`type:'file'`) — a raw blob would be dropped and
+      // the model would never see the command output.
+      const sent = fake.lastSentAttachments?.[0] as {
+        type?: string;
+        path?: string;
+        displayName?: string;
+      };
+      expect(sent.type).toBe('file');
+      expect(sent.displayName).toBe('cmd-result.md');
+      expect(sent.path).toStartWith(stagingDir);
+
+      // The staged file actually contains the rendered command markdown.
+      const contents = readFileSync(sent.path!, 'utf8');
+      expect(contents).toContain('# Command result');
+      expect(contents).toContain('echo hi');
+    } finally {
+      rmSync(stagingDir, { recursive: true, force: true });
+    }
+  });
+
+  test('send stages a dropped text/code blob (octet-stream) as a readable file (#110)', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const stagingDir = mkdtempSync(join(tmpdir(), 'dafman-stage-ts-'));
+    _setStagingDirForTest(stagingDir);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const fake = client.createdSessions[0]!;
+    const source = "export const answer = 42;\nconsole.log('hi');\n";
+
+    try {
+      // This is exactly the shape the composer produces for a dropped
+      // `.ts` file: an empty `File.type` becomes `application/octet-stream`.
+      await reg.send(id, 'summarize this', undefined, [
+        {
+          type: 'blob',
+          data: Buffer.from(source, 'utf8').toString('base64'),
+          mimeType: 'application/octet-stream',
+          displayName: 'answer.ts',
+        },
+      ]);
+
+      expect(fake.lastSentAttachments).toHaveLength(1);
+      const sent = fake.lastSentAttachments?.[0] as {
+        type?: string;
+        path?: string;
+        displayName?: string;
+      };
+      // Pre-fix this stayed a blob and the host dropped it; now it is a
+      // path attachment the host reads from disk.
+      expect(sent.type).toBe('file');
+      expect(sent.displayName).toBe('answer.ts');
+      expect(sent.path).toEndWith('answer.ts');
+      expect(readFileSync(sent.path!, 'utf8')).toBe(source);
+    } finally {
+      rmSync(stagingDir, { recursive: true, force: true });
+    }
+  });
+
+  test('send leaves a host-inlinable image blob untouched (#110)', async () => {
     const client = new FakeClient();
     _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
     const reg = new SessionRegistry(() => {});
     const id = await reg.create();
     const fake = client.createdSessions[0]!;
-    await reg.send(id, 'use this', undefined, [
+
+    await reg.send(id, 'look', undefined, [
       {
-        type: 'commandResult',
-        displayName: 'cmd-result.md',
-        result: {
-          id: 'cmd-1',
-          sessionId: id,
-          command: 'echo hi',
-          cwd: process.cwd(),
-          shell: 'pwsh.exe',
-          status: 'completed',
-          stdout: 'hi\n',
-          stderr: '',
-          truncated: false,
-          createdAt: new Date().toISOString(),
-          exitCode: 0,
-        },
+        type: 'blob',
+        data: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64'),
+        mimeType: 'image/png',
+        displayName: 'shot.png',
       },
     ]);
-    expect(fake.lastSentPrompt).toBe('use this');
-    expect(fake.lastSentAttachments).toHaveLength(1);
+
+    // Images inline fine as blobs — leave them alone (no disk write).
     expect(fake.lastSentAttachments?.[0]).toMatchObject({
       type: 'blob',
-      mimeType: 'text/markdown',
-      displayName: 'cmd-result.md',
+      mimeType: 'image/png',
+      displayName: 'shot.png',
     });
-    expect(typeof (fake.lastSentAttachments?.[0] as { data?: string }).data).toBe('string');
   });
 
   test('disconnect on unknown sessionId throws SessionNotFound', async () => {

@@ -96,6 +96,59 @@ registry still supplies summaries/language inference, but the expanded
   (262 pass); `bun run smoke` (4 pass).
 
 ---
+## 2026-05-31 — #110 dropped text/code files invisible to the agent (host drops non-inlinable blobs)
+
+**Takeaway.** A dragged/pasted text/code file never reached the model because the
+**bundled host CLI silently drops any `blob` attachment it can't inline** — and
+it only inlines images and native office/PDF docs, NOT text. A "real text mime"
+fix (the issue's first candidate) does **nothing**. Fix is at the
+`SessionRegistry.send` boundary: stage non-inlinable blobs to a temp file and
+send a `type:'file'` attachment, which the host reads from disk via its
+`<tagged_files>` flow (works for out-of-cwd paths). Same drop affected the
+`text/markdown` "attach command result" pill, so that's fixed too.
+
+**Receipts (host CLI, `node_modules/@github/copilot/app.js`).**
+- `Jio` (attachment → content parts, ~offset 6236.5k): for a `blob` it only
+  produces content when `sct.has(mimeType)` (image) or `fae(a)` (native doc);
+  otherwise it falls through and returns `undefined` → the attachment is filtered
+  out. No text path for blobs.
+- `fae(blob) = wIn(mimeType)`, `wIn = mUe || hUe`, `mUe = Ios.has(...)`,
+  `hUe = aKt.has(...)`. `Ios = new Set(iKt.values())` where `iKt` is ONLY the 9
+  office/pdf extensions (`.doc/.docx/.odt/.pdf/.ppt/.pptx/.rtf/.xls/.xlsx`);
+  `aKt = {application/pdf}`. So `wIn('text/plain') === false`,
+  `wIn('text/markdown') === false`, `wIn('application/octet-stream') === false`.
+  Verified by reconstructing the predicate and evaluating it: text/code/markdown
+  ⇒ DROPPED; image/png ⇒ inline image; application/pdf/msword ⇒ inline doc.
+- `sct` (images that DO inline): png/jpeg/jpg/gif/webp/bmp/tiff/x-icon/heic/avif.
+- Path attachments take a different route: `Kio` (`<tagged_files>`) reads
+  `BXs(path)` from disk for any `type:'file'` whose extension isn't an
+  office/pdf native doc and isn't an image — **no cwd restriction**, so an
+  absolute out-of-cwd path's content gets embedded. That's why the fix sends a
+  `type:'file'`.
+
+**Why not the renderer `file.path` approach.** Electrobun 1.18.1 native webviews
+expose no filesystem path for a dropped `File` (no path bridge in
+`node_modules/electrobun/dist/api/browser/*`, no `File.path` patch), so the
+issue's "send a `type:'file'` for drops that expose a path" can't fire in the
+renderer. Staging the bytes bun-side always works and centralizes the logic at
+the one IPC/SDK boundary (rule 14).
+
+**Code.** New `src-bun/app/chat/attachmentStaging.ts`
+(`isHostInlinableBlobMime`, `stageBlobToFile`, `_setStagingDirForTest`); wired in
+`src-bun/app/chat/sessions.ts` `send()`. Staged files live under
+`tmpdir()/dafman-attachments/<uuid>/<original-name>` (filename preserved for
+syntax context); a 6h TTL sweep on each stage bounds disk without racing the
+host's async prompt assembly (so we don't delete per-send).
+
+**Tests.** `src-bun/__tests__/attachmentStaging.test.ts` (predicate +
+write/sanitize) and three boundary tests in `sessions.test.ts`: a dropped
+octet-stream `.ts` blob → staged file with exact content; command-result pill →
+staged `.md` file containing the rendered markdown; `image/png` blob left as a
+blob. The command-result test previously asserted the dropped blob shape — it now
+asserts the file, i.e. it fails on pre-fix code.
+
+**Runtime confirmation** is `MANUAL_TESTS.md` §110 (needs the live host CLI +
+model round-trip; can't be automated here).
 
 ## 2026-05-31 — #93 Library tab auto-refresh loading flash
 
