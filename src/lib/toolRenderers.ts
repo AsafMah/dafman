@@ -65,7 +65,7 @@ function clip(value: string, max = 160): string {
 /// Infer prism language from a filename / extension. Returns "text"
 /// for anything not in the explicit map (prism's grammars are
 /// case-sensitive ids; @lexical/code maps friendly names → grammars).
-function languageForFile(path: string): string {
+export function languageForFile(path: string): string {
   if (!path) return 'text';
 
   const dot = path.lastIndexOf('.');
@@ -251,8 +251,10 @@ const RENDERERS: Record<string, ToolRenderer> = {
   write_file: writeFileRenderer,
   writeFile: writeFileRenderer,
   create: writeFileRenderer,
+  create_file: writeFileRenderer,
 
   edit: editRenderer,
+  edit_file: editRenderer,
   str_replace_editor: editRenderer,
   str_replace: editRenderer,
 

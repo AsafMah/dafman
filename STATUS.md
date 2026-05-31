@@ -27,7 +27,10 @@
 **Recently fixed:** #103 — sub-agent transcript cards can now collapse from the
 full header row or the bottom footer affordance, with the expanded body kept out
 of the click target so inner links/tool controls do not fold the card.
-2026-05-31. #93 — Library Agents / Skills / MCP session-switch
+#106/#107 — create/write-file tool calls now show the
+`file_text` body as syntax-highlighted file content, and edit/str-replace calls
+render a single old/new diff instead of duplicating the change in an extra
+result block. 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
 auto-refreshes now delay the visible loading affordance so cached/instant reloads
 do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only

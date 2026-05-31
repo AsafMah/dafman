@@ -33,6 +33,22 @@ describe('getToolRenderer', () => {
     );
   });
 
+  test('file edit aliases share create/edit renderers', () => {
+    const createOut = getToolRenderer('create_file')({
+      args: { path: 'src/example.ts' },
+      toolName: 'create_file',
+    });
+    const editOut = getToolRenderer('edit_file')({
+      args: { path: 'src/example.ts', old_str: 'before' },
+      toolName: 'edit_file',
+    });
+
+    expect(createOut.summary).toBe('write src/example.ts');
+    expect(createOut.resultLanguage).toBe('typescript');
+    expect(editOut.summary).toBe('edit src/example.ts  · before');
+    expect(editOut.resultLanguage).toBe('diff');
+  });
+
   test('apply_patch sniffs the first file path from the patch body', () => {
     const r = getToolRenderer('apply_patch');
     const patch = `*** Update File: src/foo.ts\n@@\n-old\n+new\n`;
