@@ -744,7 +744,17 @@ export type DafmanRPC = {
         /// surface it here because `getMessages()` history doesn't
         /// include `session.resume`, so the renderer otherwise has
         /// no chance to learn the workspace path on restore.
-        response: { sessionId: string; cwd: string | null; model: string | null };
+        /// `approveAll` + `mode` are the dafman-persisted per-session
+        /// permission/run-mode state, re-applied during resume and
+        /// handed back so the renderer's `SessionRecord` shows the
+        /// restored values immediately (the SDK remembers neither).
+        response: {
+          sessionId: string;
+          cwd: string | null;
+          model: string | null;
+          approveAll: boolean;
+          mode: SessionMode;
+        };
       };
       listSessions: {
         params: Record<string, never>;

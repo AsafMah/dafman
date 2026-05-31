@@ -36,7 +36,10 @@ command-result pills) are now actually read by the agent: the bundled host CLI
 silently drops `blob` attachments it can't inline (anything but images / office /
 PDF), so `SessionRegistry.send` now stages non-inlinable blobs to a temp file and
 sends a `type:'file'` attachment the host reads from disk (works for paths
-outside the session cwd). 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
+outside the session cwd).
+#109 — re-opening a session now restores the per-session
+"Allow all" flag and run mode (new dafman-owned `session-metadata.json` store +
+rehydrate-on-resume; the SDK persists neither across resume). 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
 auto-refreshes now delay the visible loading affordance so cached/instant reloads
 do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only

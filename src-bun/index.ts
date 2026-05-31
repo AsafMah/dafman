@@ -33,6 +33,7 @@ import {
 } from './app/observability/audit';
 import { toModelSummary } from './app/library/models';
 import { SessionRegistry } from './app/chat/sessions';
+import { SessionMetadataStore } from './app/chat/sessionMetadataStore';
 import { McpRegistry } from './app/library/mcpRegistry';
 import { SkillsRegistry } from './app/library/skillsRegistry';
 import { TerminalRegistry } from './app/terminal/terminalRegistry';
@@ -122,12 +123,16 @@ let emitCommandResult: (payload: CommandResultEvent) => void = (payload) => {
     kind: payload.kind,
   });
 };
+const sessionMetadataStore = SessionMetadataStore.loadOrDefault(
+  join(Utils.paths.userData, 'session-metadata.json'),
+);
 const sessions = new SessionRegistry(
   (payload) => emitEvent(payload),
   (payload) => emitPending(payload),
   () => settings.get().appearance.streaming,
   () => settings.get().tools.defaultExcluded,
   () => settings.get().tools.defaultAllowed,
+  sessionMetadataStore,
 );
 const mcp = new McpRegistry();
 const skills = new SkillsRegistry();
@@ -229,8 +234,15 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         // display the exe folder as the workspace.
         const cwd = (await sessions.getCwd(actualId)) ?? null;
         const currentModel = await sessions.getCurrentModel(actualId).catch(() => null);
+        // Hand back the dafman-persisted per-session state that
+        // `resume()` just re-applied, so the renderer's SessionRecord
+        // shows the restored "Allow all" + run mode without a separate
+        // round-trip. `getMode` reads the (now-restored) live SDK mode;
+        // `getApproveAll` reads our in-memory mirror.
+        const mode = await sessions.getMode(actualId).catch(() => 'interactive' as const);
+        const approveAll = sessions.getApproveAll(actualId);
 
-        return { sessionId: actualId, cwd, model: currentModel };
+        return { sessionId: actualId, cwd, model: currentModel, approveAll, mode };
       }),
       listSessions: rpcGuard(async () => sessions.list()),
       deleteSession: rpcGuard(async ({ sessionId }) => sessions.deleteCliSession(sessionId)),

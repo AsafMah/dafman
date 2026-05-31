@@ -88,6 +88,33 @@ section is verified) or get a GitHub issue filed (with label
   the remaining claim is the real scroll-position/visual affordance in the live
   browser.
 
+### Issue #109 — Per-session "Allow all" + run mode survive reopen (2026-05-31)
+
+#### 109.1 - "Allow all" and run mode persist across app restart.
+
+- [ ] result: 
+
+- **Steps:** open a session, toggle **"Allow all"** ON in the header and switch
+  the run mode (e.g. to **autopilot** or **plan**). Fully quit and relaunch the
+  app (`bun run dev`), then let the session restore (or reopen it).
+- **Expected:** the restored session header shows **"Allow all" still ON** and
+  the **same run mode** you left it in — not the global default. A
+  `<userData>/session-metadata.json` file holds the per-session values.
+- **Why not automated:** requires a real app quit + relaunch and the OS user-data
+  directory; the registry-level close→reopen is unit-tested, but the full
+  process-restart + renderer paint path is dogfood-only.
+
+#### 109.2 - Permanently deleting a session clears its persisted flags.
+
+- [ ] result: 
+
+- **Steps:** enable "Allow all" on a session, then **delete** it from the CLI
+  sidebar (permanent delete, not just close). Create a brand-new session.
+- **Expected:** the new session starts at the global default posture; the deleted
+  session's entry is gone from `session-metadata.json`.
+- **Why not automated:** end-to-end delete + new-session creation against the real
+  on-disk store and SDK catalog.
+
 ### Issue #76 — Fenced CodeMirror code blocks follow app theme (2026-05-30)
 
 #### 76.1 - Transcript fenced code blocks switch between light and dark CodeMirror themes.

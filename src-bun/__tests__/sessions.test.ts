@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { _setClientForTest } from '../app/client/client';
 import { SessionRegistry } from '../app/chat/sessions';
 import { _setStagingDirForTest } from '../app/chat/attachmentStaging';
+import { SessionMetadataStore } from '../app/chat/sessionMetadataStore';
 import { AppError } from '../app/shared/errors';
 import type { SessionEventPayload } from '../rpc';
 
@@ -668,6 +669,44 @@ describe('SessionRegistry', () => {
 
     await reg.resetApprovals(id);
     expect(fake.approvalsReset).toBe(1);
+  });
+
+  test('resume restores persisted approveAll + run mode after close + reopen', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const store = SessionMetadataStore.loadOrDefault(
+      join(mkdtempSync(join(tmpdir(), 'dafman-sessmeta-')), 'session-metadata.json'),
+    );
+    const reg = new SessionRegistry(
+      () => {},
+      () => {},
+      () => true,
+      () => [],
+      () => [],
+      store,
+    );
+    const id = await reg.create();
+
+    // User flips "Allow all" on and switches to autopilot — both writes
+    // go through to dafman's metadata store via setApproveAll/setMode.
+    await reg.setApproveAll(id, true);
+    await reg.setMode(id, 'autopilot');
+
+    // Close the pane. The session stays resumable, but the in-memory
+    // mirrors are dropped (this is the regression: nothing rehydrated
+    // them on reopen before this fix).
+    await reg.disconnect(id);
+    expect(reg.getApproveAll(id)).toBe(false);
+
+    // Reopen the same session — resume() must re-apply the persisted
+    // values to BOTH the live SDK session and the in-memory mirrors.
+    await reg.resume(id);
+
+    expect(reg.getApproveAll(id)).toBe(true);
+    expect(await reg.getMode(id)).toBe('autopilot');
+    const resumed = client.resumedSessions.at(-1)!;
+    expect(resumed.approveAll).toBe(true);
+    expect(resumed.currentMode).toBe('autopilot');
   });
 
   test('session-rpc methods on unknown sessionId throw SessionNotFound', async () => {

@@ -395,6 +395,8 @@ describe('IPC wire contracts', () => {
       sessionId: 'sess-1',
       cwd: 'D:\\repo\\dafman',
       model: 'gpt-5.5',
+      approveAll: true,
+      mode: 'autopilot' as const,
     };
     expect(sample).toMatchSnapshot();
   });

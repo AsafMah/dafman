@@ -559,6 +559,10 @@ export const useSessionsStore = defineStore('sessions', () => {
 
         if (!existing.model && response.model) existing.model = response.model;
 
+        // Reflect the restored per-session permission/run-mode state.
+        existing.approveAll = response.approveAll;
+        existing.mode = response.mode;
+
         return existing;
       }
 
@@ -571,8 +575,12 @@ export const useSessionsStore = defineStore('sessions', () => {
         model: response.model,
         reasoningEffort: null,
         title: null,
-        mode: null,
-        approveAll: false,
+        // Restored from dafman's per-session metadata store (the bun
+        // side re-applied them during resume). The fire-and-forget
+        // getSessionMode below still runs but now just confirms what
+        // the resume response already gave us.
+        mode: response.mode,
+        approveAll: response.approveAll,
         reasoningVisibilityOverride: 'default',
         workingDirectory: response.cwd ?? null,
         defaultSendMode: 'steer',

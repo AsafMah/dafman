@@ -22,6 +22,7 @@ import type { ReasoningEffort } from '../client/copilotSdk';
 import type { SessionHistoryCompactionResult, SessionMode } from '../../rpc';
 import type { PendingRequestQueue } from './pendingRequests';
 import type { SessionServiceContext } from './sessionServiceContext';
+import type { SessionMetadataPersistence } from './sessionMetadataStore';
 
 export interface AccountQuotaEntry {
   isUnlimitedEntitlement: boolean;
@@ -48,6 +49,10 @@ export interface SessionMetadataServiceDeps {
   /// Settled by `setMode` when the SDK switches to autopilot
   /// (mirrors the `session.mode_changed` event-forwarder branch).
   pending: PendingRequestQueue;
+  /// dafman-owned on-disk persistence for `approveAll` + `mode`.
+  /// Written through by `setApproveAll` / `setMode` so the values
+  /// survive close + reopen (the SDK remembers neither across resume).
+  persistence: SessionMetadataPersistence;
 }
 
 export class SessionMetadataService {
@@ -114,6 +119,7 @@ export class SessionMetadataService {
     await this.ctx.wrapSdk(async () => {
       await entry.session.rpc.mode.set({ mode });
       this.deps.modeBySession.set(sessionId, mode);
+      this.deps.persistence.setMode(sessionId, mode);
 
       if (mode === 'autopilot') {
         this.deps.pending.settleForSession(sessionId, 'autopilot-mode');
@@ -211,8 +217,10 @@ export class SessionMetadataService {
 
     // Source of truth for OUR onPermissionRequest handler. Mirror to
     // the SDK so any SDK-internal short-circuits that respect this
-    // flag stay consistent.
+    // flag stay consistent, and persist so the flag survives a close +
+    // reopen (the SDK doesn't remember approve-all across resume).
     this.deps.approveAllBySession.set(sessionId, enabled);
+    this.deps.persistence.setApproveAll(sessionId, enabled);
 
     return this.ctx.wrapSdk(async () => {
       const result = (await entry.session.rpc.permissions.setApproveAll({
