@@ -8,6 +8,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Added (#103 — 2026-05-31)
 - **Sub-agent transcript cards can now be collapsed from the full header row or the bottom footer affordance.** The affordances are native buttons with `aria-expanded` / `aria-controls`, while the expanded body remains outside the click target so links, nested tool controls, and other inner interactive content do not accidentally fold the parent card.
+
+### Fixed (#106, #107 — 2026-05-31)
+- **Create/edit tool calls now render their file changes once, in the file-aware view.** `create`/write-file calls show the `file_text` body as syntax-highlighted file content instead of a raw JSON argument blob, and edit/str-replace calls suppress the redundant result block once the old/new arguments are rendered as a diff.
+
 ### Fixed (#93 — 2026-05-31)
 - **Library Agents / Skills / MCP session-switch reloads no longer flash a Loading indicator when the refresh resolves instantly.** The shared library list loading flag now keeps stale content visible during cached/fast reloads and only exposes the loading affordance after the same short delay used by the Agents Select affordance, while genuinely slow reloads still show feedback.
 

@@ -71,6 +71,31 @@ do not accidentally toggle the parent card.
   cannot prove.
 
 ---
+## 2026-05-31 — #106/#107 create/edit tool rendering
+
+**Takeaway.** Create/write-file tool details now render the submitted
+`file_text` as syntax-highlighted file content, and edit/str-replace tool
+details render the change once as the old/new diff. The collapsed renderer
+registry still supplies summaries/language inference, but the expanded
+`ToolDetails.vue` branch owns the de-duplication.
+
+**Receipts.**
+- `ToolDetails.vue` now reuses `languageForFile(path)` for read/write/view
+  blocks, renders `file_text`/`content`/`text` args for write-family tools before
+  considering result text, and keeps empty string args distinct from missing args.
+- Edit-family tools now detect old/new arg field presence, including
+  delete-all edits with `new_str: ""`, and suppress the result block once a
+  `DiffEditor` can represent the change.
+- Test-first receipt: `ToolDetails.rendering.test.ts` failed on the old behavior
+  (create showed `{"ok":true}` and edit rendered an extra CommandBlock), then
+  passed after the fix. Targeted run:
+  `bun test src\components\permissions\__tests__\ToolDetails.rendering.test.ts src\lib\__tests__\toolRenderers.test.ts`.
+- Local gate passed: `bun run lint`; `bun run lint:eslint` (0 errors,
+  19 pre-existing warnings); `bun test` (748 pass, 52 snapshots);
+  `bun test src\components\permissions\__tests__\ToolDetails.rendering.test.ts src\lib src\components\chat`
+  (262 pass); `bun run smoke` (4 pass).
+
+---
 
 ## 2026-05-31 — #93 Library tab auto-refresh loading flash
 

@@ -19,6 +19,7 @@ import GrepResults from '@/components/details/GrepResults.vue';
 import GlobResults from '@/components/details/GlobResults.vue';
 import JsonValueView from '@/components/shared/JsonValueView.vue';
 import ArgumentsPreview from '@/components/shared/ArgumentsPreview.vue';
+import { languageForFile } from '@/lib/toolRenderers';
 
 const props = defineProps<{
   toolName: string;
@@ -65,7 +66,9 @@ const TOOL_KIND_BY_NAME: Readonly<Record<string, ToolKind>> = {
   write_file: 'write',
   writeFile: 'write',
   create: 'write',
+  create_file: 'write',
   edit: 'edit',
+  edit_file: 'edit',
   str_replace_editor: 'edit',
   str_replace: 'edit',
   apply_patch: 'apply_patch',
@@ -91,26 +94,35 @@ const kind = computed<ToolKind>(() => {
 
 // Args probes — defensive on `unknown` shape.
 function s(...keys: string[]): string {
+  return argString(...keys) ?? '';
+}
+
+function argString(...keys: string[]): string | undefined {
   const a = props.args;
 
-  if (!a) return '';
+  if (!a) return undefined;
 
   for (const k of keys) {
+    if (!(k in a)) continue;
+
     const v = a[k];
 
-    if (typeof v === 'string' && v.length > 0) return v;
+    if (typeof v === 'string') return v;
   }
 
-  return '';
+  return undefined;
 }
 
 const shellCommand = computed(() => s('command', 'cmd'));
 const shellCwd = computed(() => s('cwd', 'workingDirectory'));
 
 const filePath = computed(() => s('path', 'filePath', 'fileName', 'file_path'));
+const fileLanguage = computed(() => languageForFile(filePath.value));
+const writeContent = computed(() => argString('file_text', 'content', 'text'));
 
-const editOld = computed(() => s('oldText', 'old_str', 'old'));
-const editNew = computed(() => s('newText', 'new_str', 'new'));
+const editOld = computed(() => argString('oldText', 'old_str', 'old'));
+const editNew = computed(() => argString('newText', 'new_str', 'new'));
+const hasEditDiff = computed(() => editOld.value !== undefined || editNew.value !== undefined);
 
 const patchInput = computed(() => s('input', 'patch', 'diff'));
 
@@ -171,17 +183,6 @@ const viewContent = computed(() => {
   }
 
   return raw;
-});
-
-// Language inference for results
-const fileExtension = computed(() => {
-  const p = filePath.value;
-
-  if (!p) return '';
-
-  const m = /\.([a-z0-9]+)$/i.exec(p);
-
-  return m ? m[1].toLowerCase() : '';
 });
 
 const argsJson = computed(() => {
@@ -270,7 +271,7 @@ const isStructuredResult = computed(() => {
       <CommandBlock
         v-if="hasResult"
         :code="liveResult"
-        :lang="fileExtension || 'text'"
+        :lang="fileLanguage"
         :filename="filePath"
       />
     </template>
@@ -283,9 +284,21 @@ const isStructuredResult = computed(() => {
         icon="file-edit"
       />
       <CommandBlock
-        v-if="hasResult"
+        v-if="writeContent !== undefined && writeContent.length > 0"
+        :code="writeContent"
+        :lang="fileLanguage"
+        :filename="filePath"
+      />
+      <p
+        v-else-if="writeContent === ''"
+        class="tool-empty"
+      >
+        Empty file
+      </p>
+      <CommandBlock
+        v-else-if="hasResult"
         :code="liveResult"
-        :lang="fileExtension || 'text'"
+        :lang="fileLanguage"
         :filename="filePath"
       />
     </template>
@@ -298,13 +311,14 @@ const isStructuredResult = computed(() => {
         icon="pencil"
       />
       <DiffEditor
-        v-if="editOld !== undefined || editNew !== undefined"
+        v-if="hasEditDiff"
         :old-text="editOld ?? ''"
         :new-text="editNew ?? ''"
+        :language="fileLanguage"
         :filename="filePath"
       />
       <CommandBlock
-        v-if="hasResult"
+        v-if="hasResult && !hasEditDiff"
         :code="liveResult"
         lang="text"
       />
@@ -373,7 +387,7 @@ const isStructuredResult = computed(() => {
       <CommandBlock
         v-if="viewContent"
         :code="viewContent"
-        :lang="fileExtension || 'text'"
+        :lang="fileLanguage"
         :filename="filePath"
       />
     </template>
@@ -492,6 +506,12 @@ const isStructuredResult = computed(() => {
 .tool-meta-range {
   font-size: 0.78rem;
   color: var(--p-text-muted-color);
+}
+
+.tool-empty {
+  margin: 0;
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
 }
 
 .tool-preview {
