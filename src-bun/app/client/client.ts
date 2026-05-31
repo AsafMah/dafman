@@ -5,6 +5,7 @@
 // returns the existing instance and `start()` is only invoked once.
 
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CopilotClient, RuntimeConnection } from './copilotSdk';
 import { AppError } from '../shared/errors';
@@ -33,9 +34,19 @@ export const _setClientForTest = setClientForTest;
 /// `cliPath` so the SDK spawns the binary directly instead of falling
 /// back to the JS entrypoint, which requires Node 24+ for
 /// `node:sqlite` and crashes immediately under older Node runtimes.
-/// Returns `undefined` if the platform package isn't installed (e.g.
-/// running on an arch without prebuilds, or `npm install --no-optional`),
-/// in which case we let the SDK use its bundled JS path.
+///
+/// Two resolution strategies, in order:
+///   1. `import.meta.resolve` of the npm package — works in `bun run dev`
+///      and anywhere node_modules is on disk.
+///   2. A bundle-relative sibling of the bun entry (`import.meta.dir`) —
+///      a PACKAGED build has no node_modules, so electrobun.config.ts copies
+///      the native binary to `Resources/app/bun/<copilot[.exe]>`, right next
+///      to the emitted `index.js`. Without this the SDK falls back to its own
+///      `getBundledCliPath()` (`import.meta.resolve('@github/copilot/sdk')`),
+///      which also has no node_modules and throws on every chat.
+///
+/// Returns `undefined` only if neither is found (e.g. an arch without
+/// prebuilds), in which case we let the SDK use its bundled JS path.
 function resolvePlatformCliBinary(): string | undefined {
   const pkg = `@github/copilot-${process.platform}-${process.arch}`;
 
@@ -47,6 +58,12 @@ function resolvePlatformCliBinary(): string | undefined {
   } catch {
     /* package not installed for this platform; fall through */
   }
+
+  // Packaged-build fallback: the binary copied next to the bun entry.
+  const binName = process.platform === 'win32' ? 'copilot.exe' : 'copilot';
+  const bundled = join(import.meta.dir, binName);
+
+  if (existsSync(bundled)) return bundled;
 
   return undefined;
 }

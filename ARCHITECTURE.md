@@ -423,6 +423,18 @@ Total: **308 tests** as of writing. `bun run check` is the gate:
    (dev/canary/stable) are the only runtime isolation primitive: userData +
    WebView2 are keyed on the build-time `channel`, and `BrowserWindow` exposes
    no `partition` override.
+9. **Packaged builds bundle no node_modules — the Copilot CLI must be copied
+   in.** `electrobun build` emits only `Resources/app/bun/index.js` + `views/`.
+   `electrobun.config.ts` copies the platform-native `@github/copilot-<plat>-<arch>/copilot[.exe]`
+   to `Resources/app/bun/`, and `client.ts` `resolvePlatformCliBinary()` falls
+   back to `join(import.meta.dir, 'copilot[.exe]')` when the npm resolve misses
+   (i.e. packaged mode; `bun run dev` still resolves from node_modules). Passing
+   that real `cliPath` to the SDK bypasses its `getBundledCliPath()`
+   (`import.meta.resolve('@github/copilot/sdk')`), which throws with no
+   node_modules. **Electrobun's copy step only logs-and-continues on a missing
+   source** (`node_modules/electrobun/src/cli/index.ts`), so the config `throw`s
+   at build time if the binary is absent — otherwise CI stays green while
+   shipping a bundle whose SDK can't start.
 
 ## 9. What's not here yet (link to plans)
 
