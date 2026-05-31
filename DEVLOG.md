@@ -180,6 +180,22 @@ coexistence (high confidence from the channel-path logic, but the NSIS installer
 pops an interactive GUI I didn't drive). Captured in `MANUAL_TESTS.md`.
 
 
+## 2026-05-31 — #99 Session Details agent busy affordance delay
+
+**Takeaway.** Session Details now matches the Library Agents picker: selecting or deselecting an agent disables duplicate clicks immediately, but the visible PrimeVue loading spinner is delayed by 180ms so instant/cached IPC completions do not flash.
+
+**Receipts.**
+- Added `useDelayedBusyValue`, a generic delayed-busy composable that clears synchronously when the busy value resolves and restarts its timer when the pending operation changes.
+- `SessionDetailsPanel.vue` keeps `agentBusyName` for immediate disable state and uses `visibleAgentBusyName` only for the spinner binding.
+- Regression test: `bun test src/composables/__tests__/useDelayedBusyValue.test.ts` covers instant completion, slow pending display, and busy-value changes before the delay elapses.
+- Validation passed locally: `bun run lint`; `bun test`.
+
+**Manual verification.**
+- See `MANUAL_TESTS.md` §99.1 for the live rail visual check.
+
+---
+
+## 2026-05-31 — #105 `<system_notification>` wrapper leak into transcript
 
 **Takeaway:** the literal `<system_notification>…</system_notification>` text
 was NOT something the renderer added and NOT a missing markdown strip — it came

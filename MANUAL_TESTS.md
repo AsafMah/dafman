@@ -155,6 +155,15 @@ section is verified) or get a GitHub issue filed (with label
   `BrowserWindow` (`src-bun/index.ts`) from the packaged channel; not reachable
   from the renderer test harness.
 
+### Issue #99 — Session details agent Select/Deselect avoids instant loading flash (2026-05-31)
+
+#### 99.1 - Instant agent Select/Deselect stays visually steady.
+
+- [ ] result:
+- **Steps:** in `bun run dev`, open a chat session with the Session Details right rail visible. Click **Select** on an agent that resolves quickly, then click **Deselect**.
+- **Expected:** the buttons disable immediately while the IPC call is pending, but the spinner only appears if the operation is still pending after a short delay; instant/cached resolves do not flash a spinner.
+- **Why not automated:** the composable timing is unit-tested, but the remaining claim is the visible PrimeVue button affordance in the live rail.
+
 ### Issue #103 — Sub-agent cards fold from bottom/header chrome (2026-05-31)
 
 #### 103.1 - Tall sub-agent cards can be collapsed after scrolling to the bottom.

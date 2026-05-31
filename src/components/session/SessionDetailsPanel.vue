@@ -21,6 +21,7 @@ import MessageContent from '@/components/chat/MessageContent.vue';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
 import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
+import { useDelayedBusyValue } from '@/composables/useDelayedBusyValue';
 import {
   useSessionAgents,
   useSessionTasks,
@@ -57,6 +58,7 @@ const {
   agentSourceLabel,
   reset: resetAgents,
 } = useSessionAgents(sessionId, record);
+const visibleAgentBusyName = useDelayedBusyValue(agentBusyName);
 
 const {
   sessionTasks,
@@ -544,7 +546,7 @@ async function onForkSession() {
               v-if="record.currentAgent?.name === agent.name"
               size="small"
               severity="secondary"
-              :loading="agentBusyName === '__deselect__'"
+              :loading="visibleAgentBusyName === '__deselect__'"
               :disabled="!!agentBusyName"
               label="Deselect"
               :aria-label="`Deselect agent ${agent.displayName}`"
@@ -553,7 +555,7 @@ async function onForkSession() {
             <Button
               v-else
               size="small"
-              :loading="agentBusyName === agent.name"
+              :loading="visibleAgentBusyName === agent.name"
               :disabled="!!agentBusyName"
               label="Select"
               :aria-label="`Select agent ${agent.displayName}`"
