@@ -13,7 +13,6 @@
 /// up here (those stay top-level).
 
 import { computed, ref } from 'vue';
-import Button from 'primevue/button';
 import MessageContent from '@/components/chat/MessageContent.vue';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import ToolCallBlock from '@/components/chat/ToolCallBlock.vue';
@@ -46,8 +45,10 @@ const expanded = computed(() => {
 });
 
 function toggle() {
+  const nextExpanded = !expanded.value;
+
   userToggled.value = true;
-  userExpanded.value = !expanded.value;
+  userExpanded.value = nextExpanded;
 }
 
 /// Format elapsed: `startedAt`→`completedAt` or `startedAt`→now.
@@ -57,6 +58,7 @@ const elapsedLabel = computed(() =>
     completedAt: props.completedAt,
   }),
 );
+const bodyId = computed(() => `subagent-body-${props.agentId}`);
 </script>
 
 <template>
@@ -65,15 +67,18 @@ const elapsedLabel = computed(() =>
     :class="`status-${status}`"
     :aria-label="`Sub-agent ${displayName}, ${status}`"
   >
-    <header class="subagent-header">
-      <Button
-        text
-        size="small"
-        :icon="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
-        :aria-expanded="expanded"
-        :aria-label="`Toggle sub-agent ${displayName}`"
-        class="subagent-toggle"
-        @click="toggle"
+    <button
+      type="button"
+      class="subagent-header"
+      :aria-expanded="expanded"
+      :aria-controls="expanded ? bodyId : undefined"
+      :aria-label="`Toggle sub-agent ${displayName}`"
+      @click="toggle"
+    >
+      <i
+        :class="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+        class="subagent-toggle-icon"
+        aria-hidden="true"
       />
       <i
         class="pi pi-users subagent-icon"
@@ -94,7 +99,7 @@ const elapsedLabel = computed(() =>
         class="subagent-elapsed"
         >{{ elapsedLabel }}</span
       >
-    </header>
+    </button>
     <p
       v-if="description"
       class="subagent-desc"
@@ -110,6 +115,7 @@ const elapsedLabel = computed(() =>
     </p>
     <div
       v-if="expanded"
+      :id="bodyId"
       class="subagent-body"
     >
       <div
@@ -173,6 +179,21 @@ const elapsedLabel = computed(() =>
              reducer; no branches needed. -->
       </template>
     </div>
+    <button
+      v-if="expanded"
+      type="button"
+      class="subagent-footer-toggle"
+      :aria-expanded="expanded"
+      :aria-controls="expanded ? bodyId : undefined"
+      :aria-label="`Collapse sub-agent ${displayName}`"
+      @click="toggle"
+    >
+      <i
+        class="pi pi-chevron-up"
+        aria-hidden="true"
+      />
+      <span>Collapse sub-agent</span>
+    </button>
   </article>
 </template>
 
@@ -202,10 +223,19 @@ const elapsedLabel = computed(() =>
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.subagent-toggle {
+.subagent-toggle-icon {
   flex-shrink: 0;
+  color: var(--p-text-muted-color);
 }
 
 .subagent-icon {
@@ -303,5 +333,27 @@ const elapsedLabel = computed(() =>
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.subagent-footer-toggle {
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--p-primary-color) 24%, transparent);
+  border-radius: var(--p-border-radius-sm);
+  background: color-mix(in srgb, var(--p-primary-color) 6%, transparent);
+  color: var(--p-text-secondary-color);
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.subagent-header:focus-visible,
+.subagent-footer-toggle:focus-visible {
+  outline: 2px solid var(--p-focus-ring-color, var(--p-primary-color));
+  outline-offset: 2px;
 }
 </style>

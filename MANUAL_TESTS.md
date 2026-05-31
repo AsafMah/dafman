@@ -70,6 +70,24 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #103 — Sub-agent cards fold from bottom/header chrome (2026-05-31)
+
+#### 103.1 - Tall sub-agent cards can be collapsed after scrolling to the bottom.
+
+- [ ] result:
+
+- **Steps:** in `bun run dev`, open a chat transcript with a long sub-agent card,
+  scroll to the bottom of that card, click **Collapse sub-agent**, reopen it from
+  the header row, then click a nested link/tool-card control inside the expanded
+  body.
+- **Expected:** the footer collapses the card without needing to scroll back to
+  the top, the header row reopens/collapses it, keyboard focus rings appear on
+  both affordances, and inner transcript controls do not collapse the parent
+  card.
+- **Why not automated:** the unit test covers event routing and ARIA state, but
+  the remaining claim is the real scroll-position/visual affordance in the live
+  browser.
+
 ### Issue #76 — Fenced CodeMirror code blocks follow app theme (2026-05-30)
 
 #### 76.1 - Transcript fenced code blocks switch between light and dark CodeMirror themes.
