@@ -8,6 +8,54 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-05-31 — release-channel indicator (StatusBar pill + window title)
+
+**Takeaway:** a dev/canary build now self-identifies, so a side-by-side
+dev+canary+stable set is distinguishable at a glance. Two surfaces:
+- **StatusBar pill** (`src/components/shell/StatusBar.vue`) — a small uppercase
+  pill next to the brand, only mounted for non-stable channels (`dev`/`canary`),
+  tinted per channel (`channel-pill-dev` violet, `channel-pill-canary` amber,
+  via `--p-violet-500`/`--p-amber-500` palette tokens — no hardcoded hex).
+- **OS window title** (`src-bun/index.ts`) — suffixed `Dafman — <channel>` for
+  non-stable; bare `Dafman` on stable.
+
+**Wiring receipts:**
+- Channel/version comes from `Updater.getLocalInfo()` (bundled
+  `Resources/version.json`; `node_modules/electrobun/dist/api/bun/core/Updater.ts:1138`).
+  No existing IPC exposed it to the renderer, so added a `getAppInfo` RPC
+  returning `{ channel, version }` (`src-bun/rpc.ts` `AppInfo` + CommandMap,
+  handler in `src-bun/index.ts`; mirrored in `src/ipc/types.ts`; wire-contract
+  snapshot in `src-bun/__tests__/wire-contract.test.ts`). Deliberately a new RPC
+  rather than piggybacking `getSettings` — channel is build identity, not user
+  config.
+- Renderer reads it via `useAppInfo` (`src/composables/useAppInfo.ts`):
+  module-level one-shot fetch (channel is immutable for the process), best-effort
+  — if the bridge isn't ready or the RPC rejects (e.g. the smoke stub doesn't
+  implement it), `appInfo` stays null and the pill simply doesn't render.
+
+**Scope note (rule 6):** the user asked for an "activity-bar pill", but the
+custom ActivityBar was replaced by dockview vertical-tab rails (which only host
+panel tabs, not arbitrary chrome). The StatusBar is the modern always-visible
+chrome strip already reserved for "live indicators" and hosting the brand, so
+the pill lives there — the honest equivalent of the requested placement.
+
+**Release-channel default bug (caught reviewing this feature):** `electrobun
+build` defaults `--env` to `dev` (`node_modules/electrobun/src/cli/index.ts:2081`,
+valid set `["dev","canary","stable"]`), so `bun run build` — the documented
+"release bundle" — was tagging release artifacts as the `dev` channel. With the
+new indicator that would paint a `DEV` pill on a stable release; independently it
+keys userData/WebView2 on `dev`. Fixed in the same PR: `package.json` `build` is
+now `electrobun build --env=stable`. CI's build matrix calls `bunx electrobun
+build` directly (not the `build` script), so it's unaffected; `bun run check`
+(which does call `bun run build`) now packages stable locally.
+
+**Not runtime-verified:** the live pixel tint and OS title bar need a packaged
+channel build — the smoke harness RPC stub returns nothing for `getAppInfo`, so
+the pill is hidden there by design. Pill logic is unit-tested (4 cases:
+canary/dev show + tint, stable/null hide); StatusBar mount + the best-effort
+catch path are exercised by `bun run smoke` (boots with no console errors).
+Filed `MANUAL_TESTS.md` CI.1 (pill) + CI.2 (window title) for the visual check.
+
 ## 2026-05-31 — packaged builds couldn't start the Copilot SDK
 
 **Takeaway:** the first real packaged build (canary, via the Setup installer)

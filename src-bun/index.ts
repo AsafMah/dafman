@@ -14,6 +14,7 @@ import { ensureClient, shutdownClient, tryGetClient } from './app/client/client'
 import { browseDirectorySync } from './app/filesystem/directoryBrowser';
 import { rpcGuard } from './app/shared/errors';
 import { acquireSingleInstanceLock } from './app/shared/singleInstance';
+import { channelWindowTitle } from './app/shared/appIdentity';
 import {
   getLogDir as currentLogDir,
   getLogLevel,
@@ -66,6 +67,7 @@ const singleInstance = acquireSingleInstanceLock(join(Utils.paths.userData, 'daf
 if (!singleInstance.acquired) {
   const pidNote =
     singleInstance.existingPid !== undefined ? ` (pid ${singleInstance.existingPid})` : '';
+
   // Loud, synchronous stderr so `bun run dev` doesn't look like a silent
   // no-op; log.warn alone may never flush before we exit.
   process.stderr.write(
@@ -373,6 +375,11 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       listCommandResults: rpcGuard(async ({ sessionId }) => commandResults.list(sessionId)),
       getSettings: rpcGuard(async () => settings.get()),
       updateSettings: rpcGuard(async ({ next }) => settings.update(next)),
+      getAppInfo: rpcGuard(async () => {
+        const info = await Updater.getLocalInfo();
+
+        return { channel: info.channel, version: info.version };
+      }),
       getLogDir: rpcGuard(async () => currentLogDir()),
       openLogFolder: rpcGuard(async () => {
         const dir = currentLogDir();
@@ -559,8 +566,14 @@ async function getMainViewUrl(): Promise<string> {
 
 const url = await getMainViewUrl();
 
+// Suffix the OS window title with the release channel for any non-stable
+// build (`dafman — canary`) so a dev/canary instance running side-by-side
+// with a stable one is unmistakable. Stable keeps the bare title.
+const { channel: appChannel } = await Updater.getLocalInfo();
+const windowTitle = channelWindowTitle(appChannel);
+
 const mainWindow = new BrowserWindow({
-  title: 'Dafman',
+  title: windowTitle,
   url,
   rpc,
   frame: { width: 1200, height: 800, x: 100, y: 100 },

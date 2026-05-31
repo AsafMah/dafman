@@ -10,7 +10,7 @@
     "prep:dist": "bun run tools/prep-dist.ts",
     "hmr": "vite --port 5173",
     "start": "vite build && electrobun dev",
-    "build": "vite build && electrobun build",
+    "build": "vite build && electrobun build --env=stable",
     "build:canary": "vite build && electrobun build --env=canary",
     "install:canary": "bun run build:canary && bun run tools/install-channel.ts canary",
     "test": "bun test",

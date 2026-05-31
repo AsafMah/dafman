@@ -123,6 +123,38 @@ section is verified) or get a GitHub issue filed (with label
   in the packaged app; `bun run dev` resolves the CLI from node_modules so it
   can't catch the packaged-resolution path.
 
+### Channel indicator — StatusBar pill + OS window title (2026-05-31)
+
+#### CI.1 - Non-stable channel pill shows in the StatusBar, tinted per channel.
+
+- [ ] result:
+
+- **Steps:** launch the `dev` build (`bun run dev`) and, separately, the
+  installed `canary` build.
+- **Expected:** the bottom StatusBar shows a small uppercase pill next to the
+  `dafman` brand — `DEV` (violet) on the dev build, `CANARY` (amber) on the
+  canary build. Hovering the pill shows a tooltip like `canary build · v0.1.0`.
+  A `stable` build shows **no** pill.
+- **Why not automated:** the channel comes from the bundled
+  `Resources/version.json` (`Updater.getLocalInfo()`), which only exists in a
+  packaged build; the smoke harness RPC stub returns nothing for `getAppInfo`,
+  so the pill is intentionally hidden there. Pill render logic is unit-tested
+  (`src/components/shell/__tests__/StatusBar.test.ts`) but the live tint/value
+  needs eyes on a real channel build.
+
+#### CI.2 - OS window title is suffixed on non-stable channels.
+
+- [ ] result:
+
+- **Steps:** look at the native OS window title bar (and the taskbar entry) for
+  the dev and canary builds.
+- **Expected:** the title reads `Dafman — dev` / `Dafman — canary` for those
+  channels; a stable build keeps the bare `Dafman`. This makes a side-by-side
+  dev+canary pair distinguishable in Alt-Tab / the taskbar.
+- **Why not automated:** the OS-level window title is set by Electrobun's
+  `BrowserWindow` (`src-bun/index.ts`) from the packaged channel; not reachable
+  from the renderer test harness.
+
 ### Issue #103 — Sub-agent cards fold from bottom/header chrome (2026-05-31)
 
 #### 103.1 - Tall sub-agent cards can be collapsed after scrolling to the bottom.
