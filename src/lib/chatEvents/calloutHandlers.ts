@@ -3,7 +3,7 @@
 // severity). Distinct from `assistant.*` so they're styled
 // differently and never confused with model output.
 
-import { pickNumber, pickString } from '@/lib/chatEvents/helpers';
+import { pickNumber, pickString, unwrapSystemNotification } from '@/lib/chatEvents/helpers';
 import type { ChatItem } from '@/lib/chatEvents';
 import type { Handler } from '@/lib/chatEvents/context';
 
@@ -99,7 +99,9 @@ export const calloutHandlers: Record<string, Handler> = {
   },
 
   'system.notification': (ctx, data) => {
-    const content = pickString(data, ['content']);
+    // The SDK wraps the notification text in <system_notification> XML tags;
+    // strip the envelope so it never leaks into the transcript as literal text.
+    const content = unwrapSystemNotification(pickString(data, ['content']));
 
     if (content) ctx.pushSystem(content, 'info');
   },

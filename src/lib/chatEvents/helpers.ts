@@ -22,6 +22,18 @@ export function pickString(data: unknown, keys: readonly string[]): string {
   return '';
 }
 
+/// Unwrap the `<system_notification>...</system_notification>` envelope the
+/// CLI runtime puts around `system.notification` event content
+/// (`SystemNotificationData.content` —
+/// node_modules/@github/copilot/copilot-sdk/generated/session-events.d.ts:3901).
+/// The inner text is the message we want to surface; the tags themselves are
+/// pure transport noise and must never reach the transcript as literal text.
+/// Scoped to the exact tag name so unrelated user content is untouched; also
+/// drops a dangling open tag that can arrive mid-stream before its close.
+export function unwrapSystemNotification(content: string): string {
+  return content.replace(/<\/?system_notification[^>]*>/gi, '').trim();
+}
+
 export function pickNumber(data: unknown, keys: readonly string[]): number | null {
   if (!data || typeof data !== 'object') return null;
 
