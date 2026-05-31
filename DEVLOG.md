@@ -8,6 +8,37 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-05-31 — #105 `<system_notification>` wrapper leak into transcript
+
+**Takeaway:** the literal `<system_notification>…</system_notification>` text
+was NOT something the renderer added and NOT a missing markdown strip — it came
+straight from the SDK. The CLI runtime emits a dedicated `system.notification`
+event whose `data.content` is "typically wrapped in `<system_notification>` XML
+tags" (`SystemNotificationData.content`,
+`node_modules/@github/copilot/copilot-sdk/generated/session-events.d.ts:3901`,
+`SystemNotificationEvent` at :3869).
+
+**Where it leaked:** `src/lib/chatEvents/calloutHandlers.ts` `system.notification`
+handler took that raw `content` and pushed it verbatim as a `kind:'system'` chat
+item (`ctx.pushSystem(content, 'info')`). System items render as literal
+`{{ item.text }}` in both `ChatWindow.vue:525` and `SubagentBlock.vue:169` — they
+never go through `renderMarkdownSegments` (which DID already strip the wrapper for
+assistant messages, `src/lib/markdown.ts:328`). So the envelope showed up as
+visible text, most visibly in sub-agent reports.
+
+**Fix layer:** strip at the source seam (the reducer handler), not the markdown
+render. Added `unwrapSystemNotification` (`src/lib/chatEvents/helpers.ts`) — a
+scoped `replace(/<\/?system_notification[^>]*>/gi, '').trim()` that removes only
+the exact tags (incl. a dangling streaming open tag) and keeps the inner message;
+empty wrappers drop to no item. Unlike the markdown strip (which DELETES the whole
+block, correct for noise embedded mid-assistant-message), here the inner text IS
+the notification, so we unwrap rather than delete.
+
+**Tests:** `src/lib/chatEvents/__tests__/calloutHandlers.test.ts` (4 cases:
+full wrapper, dangling open tag, plain passthrough, empty-wrapper drop). Failed on
+pre-fix behavior, green after. Gates: `bun run lint`, `bun run lint:eslint` (0
+errors), `bun test` (chatEvents + components/chat), `bun run smoke` all green.
+
 ## 2026-05-31 — #93 Library tab auto-refresh loading flash
 
 **Takeaway.** Agents / Skills / MCP Library tabs now share a delayed visible
