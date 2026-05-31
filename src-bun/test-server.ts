@@ -249,8 +249,11 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       ...(reasoningEffort ? { reasoningEffort } : {}),
     });
     const cwd = (await sessions.getCwd(actualId)) ?? null;
+    const model2 = await sessions.getCurrentModel(actualId).catch(() => null);
+    const mode = await sessions.getMode(actualId).catch(() => 'interactive' as const);
+    const approveAll = sessions.getApproveAll(actualId);
 
-    return { sessionId: actualId, cwd };
+    return { sessionId: actualId, cwd, model: model2, approveAll, mode };
   }),
   getSettings: rpcGuard(async () => settings.get()),
   updateSettings: rpcGuard(async (args) => {

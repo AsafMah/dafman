@@ -615,7 +615,13 @@ export type CommandMap = {
       model: string | null;
       reasoningEffort: string | null;
     };
-    result: { sessionId: string; cwd: string | null; model: string | null };
+    result: {
+      sessionId: string;
+      cwd: string | null;
+      model: string | null;
+      approveAll: boolean;
+      mode: SessionMode;
+    };
   };
   listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
   deleteSession: { args: { sessionId: string }; result: string };

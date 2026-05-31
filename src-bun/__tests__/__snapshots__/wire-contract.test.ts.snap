@@ -493,7 +493,9 @@ exports[`IPC wire contracts createSession request — model defaults 1`] = `
 
 exports[`IPC wire contracts resumeSession response — cwd and current model 1`] = `
 {
+  "approveAll": true,
   "cwd": "D:\\repo\\dafman",
+  "mode": "autopilot",
   "model": "gpt-5.5",
   "sessionId": "sess-1",
 }

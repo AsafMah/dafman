@@ -118,7 +118,7 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
           deltaContent: 'world',
         }),
       );
-      return { sessionId, cwd: null, model: null };
+      return { sessionId, cwd: null, model: null, approveAll: false, mode: 'interactive' };
     };
     setRpcBridge(bridge);
 
@@ -139,6 +139,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
 
@@ -157,6 +159,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -178,6 +182,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -204,6 +210,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -237,6 +245,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -257,6 +267,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -288,6 +300,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -313,6 +327,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -350,7 +366,7 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
           arguments: { path: 'src/App.vue' },
         }),
       );
-      return { sessionId, cwd: null, model: null };
+      return { sessionId, cwd: null, model: null, approveAll: false, mode: 'interactive' };
     };
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -387,6 +403,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     setRpcBridge(bridge);
     const store = useSessionsStore();
@@ -433,6 +451,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     handlers.sendMessage = async () => 'msg-1';
     setRpcBridge(bridge);
@@ -488,6 +508,8 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
       sessionId: (args as { sessionId: string }).sessionId,
       cwd: null,
       model: null,
+      approveAll: false,
+      mode: 'interactive',
     });
     handlers.sendMessage = async () => 'msg-2';
     setRpcBridge(bridge);

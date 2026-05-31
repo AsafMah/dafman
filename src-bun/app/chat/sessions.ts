@@ -39,6 +39,10 @@ import { SessionMcpService } from './sessionMcpService';
 import { SessionEventForwarder } from './sessionEventForwarder';
 import { buildBaseSessionConfig } from './sessionConfigBuilder';
 import { SessionMetadataService } from './sessionMetadataService';
+import {
+  noopSessionMetadataPersistence,
+  type SessionMetadataPersistence,
+} from './sessionMetadataStore';
 import type {
   PendingRequestPayload,
   RespondToRequestParams,
@@ -180,6 +184,13 @@ export class SessionRegistry {
     /// entirely in that case (passing an empty array would tell
     /// the SDK to allow no tools at all, per the SDK docs).
     private readonly allowedToolsResolver: () => string[] = () => [],
+    /// dafman-owned persistence for per-session `approveAll` + `mode`.
+    /// The SDK does NOT remember either across resume (approve-all isn't
+    /// in its persisted snapshot; the high-level client API doesn't
+    /// surface the persisted run mode), so we keep them ourselves and
+    /// re-apply on resume. Defaults to a no-op so registries built
+    /// without a store behave exactly as before.
+    private readonly persistence: SessionMetadataPersistence = noopSessionMetadataPersistence,
   ) {
     this.serviceCtx = {
       getEntry: (sessionId) => this.getEntryOrThrow(sessionId),
@@ -200,6 +211,7 @@ export class SessionRegistry {
       approveAllBySession: this.approveAllBySession,
       modeBySession: this.modeBySession,
       pending: this.pending,
+      persistence: this.persistence,
     });
   }
 
@@ -366,6 +378,17 @@ export class SessionRegistry {
     });
     this.modeBySession.set(actualId, 'interactive');
 
+    // Restore dafman-owned per-session state the SDK forgets across
+    // resume: the "Allow all" flag (never in the SDK's persisted
+    // snapshot) and the run mode (the high-level client API doesn't
+    // surface the persisted mode, so a freshly-resumed session reports
+    // the SDK default). Re-apply via the metadata service so BOTH the
+    // SDK session and our in-memory mirrors reflect the restored value;
+    // the `resumeSession` RPC then hands them back to the renderer's
+    // `SessionRecord`. Non-fatal — a restore failure just leaves the
+    // session at its default posture.
+    await this.restorePersistedMeta(actualId);
+
     // Emit the persisted title eagerly — before the (potentially
     // slow) history replay — so the tab + sidebar show the right
     // name immediately. The post-resume `pollTitleFromMetadata`
@@ -389,6 +412,37 @@ export class SessionRegistry {
     this.forwarder.pollTitleFromMetadata(actualId);
 
     return actualId;
+  }
+
+  /// Re-applies dafman-persisted per-session `approveAll` + `mode` after
+  /// a resume. Delegates to the metadata service so the SDK session and
+  /// the in-memory mirrors (`approveAllBySession` / `modeBySession`) are
+  /// updated together — the same write path the renderer toggles take.
+  /// Best-effort: each piece is restored independently and failures are
+  /// logged, never thrown (the session is already live).
+  private async restorePersistedMeta(sessionId: string): Promise<void> {
+    const persisted = this.persistence.get(sessionId);
+
+    if (!persisted) return;
+
+    if (persisted.approveAll === true) {
+      try {
+        await this.metadata.setApproveAll(sessionId, true);
+      } catch (err) {
+        log.warn('restore approveAll failed', { sessionId, error: toErrorMessage(err) });
+      }
+    }
+
+    // Only re-apply a non-default mode — calling setMode('interactive')
+    // is harmless but pointless, and skipping it avoids a redundant SDK
+    // round-trip on the common case.
+    if (persisted.mode && persisted.mode !== 'interactive') {
+      try {
+        await this.metadata.setMode(sessionId, persisted.mode);
+      } catch (err) {
+        log.warn('restore mode failed', { sessionId, error: toErrorMessage(err) });
+      }
+    }
   }
 
   /// Reads the persisted cwd + title from the SDK's on-disk catalog
@@ -606,6 +660,11 @@ export class SessionRegistry {
     }
 
     this.approveAllBySession.delete(sessionId);
+    // Drop our persisted copy too — the CLI session is gone for good,
+    // so there's nothing to restore on a future open. (Plain `disconnect`
+    // and `shutdownAll` deliberately leave the store intact: those keep
+    // the session resumable.)
+    this.persistence.delete(sessionId);
     const client = tryGetClient();
 
     try {
@@ -833,6 +892,14 @@ export class SessionRegistry {
 
   async setApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
     return this.metadata.setApproveAll(sessionId, enabled);
+  }
+
+  /// Current in-memory "approve all" mirror for a session (default
+  /// `false`). Surfaced so the `resumeSession` RPC can hand the restored
+  /// value back to the renderer — its `SessionRecord.approveAll`
+  /// otherwise has no way to learn the rehydrated state.
+  getApproveAll(sessionId: string): boolean {
+    return this.approveAllBySession.get(sessionId) ?? false;
   }
 
   // ---------- Custom agents (Phase 19a) ----------

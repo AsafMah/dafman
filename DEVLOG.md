@@ -150,6 +150,50 @@ asserts the file, i.e. it fails on pre-fix code.
 **Runtime confirmation** is `MANUAL_TESTS.md` §110 (needs the live host CLI +
 model round-trip; can't be automated here).
 
+## 2026-05-31 — #109 Persist + restore per-session approve-all & run mode
+
+**Takeaway:** Per-session "Allow all" and run mode were in-memory only on
+`SessionRegistry` (`approveAllBySession` / `modeBySession` Maps,
+`sessions.ts:150-151`), deleted on close (`:607` deleteCli, `:1069` disconnect,
+`:1129` shutdownAll) with **no rehydrate on resume**, so reopening a session
+reverted approve-all to the global `defaultApproveAll` and mode to the SDK
+default. Fix: a dafman-owned per-session store
+(`src-bun/app/chat/sessionMetadataStore.ts` → `<userData>/session-metadata.json`)
+that `setApproveAll`/`setMode` write through, plus a `restorePersistedMeta`
+step in `resume()` that re-applies both to the live SDK session **and** the
+in-memory mirrors. `resumeSession` RPC response gained `approveAll` + `mode` so
+the renderer `SessionRecord` paints the restored state without a separate
+round-trip.
+
+**SDK persistence verdict (rule 4 — verified, didn't assume):**
+- **approve-all is NOT SDK-persisted** — not a field on the persisted
+  `SessionMetadataSnapshot` (`copilot-sdk/dist/generated/rpc.d.ts:7422`). dafman
+  must own it. Unambiguous.
+- **run mode:** the low-level `SessionMetadataSnapshot` *does* carry
+  `currentMode` (`rpc.d.ts:7464`), but the **high-level `client.getSessionMetadata()`
+  returns `SessionMetadata`** (`copilot-sdk/dist/types.d.ts:1728`) which has
+  **no mode field** — only `sessionId/startTime/modifiedTime/summary/isRemote/context`.
+  So the API surface dafman actually uses can't read the persisted mode, and a
+  freshly-resumed session reports the SDK default via `mode.get()`. Owning mode
+  in our store is therefore both necessary (given our API surface) and safe
+  (we just re-call `setMode` with the last-known value; no conflict).
+
+**Lifecycle nuance:** only `deleteCliSession` drops the persisted entry
+(`persistence.delete`) — the session is gone for good. `disconnect` (close pane)
+and `shutdownAll` (app quit) deliberately leave it intact so reopen restores.
+
+**Test:** `src-bun/__tests__/sessions.test.ts` — "resume restores persisted
+approveAll + run mode after close + reopen" (set both → `disconnect` →
+`resume` → assert restored on SDK session + in-memory mirrors). Verified RED by
+commenting the `restorePersistedMeta` call (1 fail), GREEN with it.
+
+**Wire change:** `resumeSession` response `{ …, approveAll, mode }` — synced in
+`src-bun/rpc.ts`, `src/ipc/types.ts`, `test-server.ts`, and the
+`wire-contract.test.ts` snapshot.
+
+**Gates:** `lint:tsc-bun` clean · `lint` (vue-tsc) clean · `lint:eslint` 0
+errors (21 pre-existing warnings) · `bun test` 744 pass · `smoke` 4 pass.
+
 ## 2026-05-31 — #93 Library tab auto-refresh loading flash
 
 **Takeaway.** Agents / Skills / MCP Library tabs now share a delayed visible
