@@ -64,7 +64,7 @@ Legend:
 | Reasoning on `assistant.message` (not delta events) | ✅ | `src/lib/chatEvents/messageHandlers.ts` |
 | Per-session model + reasoning-effort picker | ✅ | `src/components/session/SessionHeaderControls.vue` |
 | Tool-call rendering (per-tool components) | ✅ | `src/components/chat/ToolCallBlock.vue` |
-| Nested sub-agent rendering | ✅ | `src/components/chat/SubagentBlock.vue` |
+| Nested sub-agent rendering + header/footer fold affordances | ✅ | `src/components/chat/SubagentBlock.vue`; `SubagentBlock.test.ts` (#103) |
 | Composer toolbar (WYSIWYG buttons) | ✅ | `src/composables/composerFormat.ts` |
 | Steering / message queueing / interrupt (Ctrl+Enter) | ✅ | composer `SplitButton` + `queueSend` |
 | Message actions (copy / quote / retry / edit / fork) | ✅ | `src/components/chat/MessageActions.vue` |

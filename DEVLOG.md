@@ -39,6 +39,39 @@ full wrapper, dangling open tag, plain passthrough, empty-wrapper drop). Failed 
 pre-fix behavior, green after. Gates: `bun run lint`, `bun run lint:eslint` (0
 errors), `bun test` (chatEvents + components/chat), `bun run smoke` all green.
 
+---
+
+## 2026-05-31 — #103 Sub-agent cards fold from header/footer chrome
+
+**Takeaway.** Tall sub-agent transcript cards no longer require scrolling back
+to the top chevron to collapse. The full header row is now the top toggle, and
+expanded cards render a bottom **Collapse sub-agent** button; both are native
+buttons with `aria-expanded` / `aria-controls`. The nested transcript body stays
+outside those click targets so links, nested tool controls, and message content
+do not accidentally toggle the parent card.
+
+**Receipts.**
+- Implementation: `src/components/chat/SubagentBlock.vue` replaces the tiny
+  PrimeVue chevron button with a full-width native header button, adds a footer
+  collapse button, and preserves the existing running-vs-completed auto-default
+  plus `userToggled` override. While writing the regression, the old `toggle()`
+  order proved the collapsed completed state could not open reliably in
+  happy-dom; `toggle()` now snapshots `!expanded.value` before setting
+  `userToggled`.
+- Test-first receipt: `SubagentBlock.test.ts` first failed against the old
+  header-only behavior / toggle ordering, then passed after the implementation.
+  Coverage asserts the header and footer affordances toggle `aria-expanded`, and
+  a nested tool-card button click leaves the parent expanded.
+- Validation passed locally: `bun test src\components\chat`,
+  `bun run lint`, `bun run lint:eslint` (pre-existing warnings only),
+  `bun test`, and `bun run smoke`.
+
+**Manual verification.**
+- See `MANUAL_TESTS.md` §103.1 for the visual/scroll dogfood pass that happy-dom
+  cannot prove.
+
+---
+
 ## 2026-05-31 — #93 Library tab auto-refresh loading flash
 
 **Takeaway.** Agents / Skills / MCP Library tabs now share a delayed visible
