@@ -30,7 +30,13 @@ of the click target so inner links/tool controls do not fold the card.
 #106/#107 — create/write-file tool calls now show the
 `file_text` body as syntax-highlighted file content, and edit/str-replace calls
 render a single old/new diff instead of duplicating the change in an extra
-result block. 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
+result block.
+#110 — drag-and-dropped / pasted text/code files (and
+command-result pills) are now actually read by the agent: the bundled host CLI
+silently drops `blob` attachments it can't inline (anything but images / office /
+PDF), so `SessionRegistry.send` now stages non-inlinable blobs to a temp file and
+sends a `type:'file'` attachment the host reads from disk (works for paths
+outside the session cwd). 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
 auto-refreshes now delay the visible loading affordance so cached/instant reloads
 do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only

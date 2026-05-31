@@ -499,6 +499,45 @@ section is verified) or get a GitHub issue filed (with label
 - **Steps:** type `/agent` → Enter (or pick from slash menu).
 - **Expected:** right-edge Library panel opens to the Agents tab.
 
+### Issue #110 — Dropped text/code files are seen by the agent (2026-05-31)
+
+#### 110.1 - Drag-and-drop an out-of-cwd `.ts`/`.md` file, agent reads its content.
+
+- [ ] result:
+
+- **Steps:** start a session whose working directory is some folder A. Create a
+  text/code file (e.g. `notes.ts` with a unique sentinel line like
+  `// SENTINEL-12345`) in a DIFFERENT folder B that is NOT under A. Drag that
+  file from the OS file manager onto the composer; an attachment pill appears.
+  Send "What does the attached file say? Quote the sentinel line."
+- **Expected:** the agent quotes `// SENTINEL-12345` (it actually read the
+  content). It must NOT say it "can't find the file".
+- **Why not automated:** confirming the real bundled host CLI ingests the staged
+  file and surfaces it to the model requires the live CLI + a model round-trip;
+  the staging transform itself is unit-tested at the `SessionRegistry.send`
+  boundary (`src-bun/__tests__/sessions.test.ts`, `attachmentStaging.test.ts`).
+
+#### 110.2 - "Attach command result" pill content reaches the agent.
+
+- [ ] result:
+
+- **Steps:** run a command in the integrated terminal that prints a unique
+  sentinel, use the "attach result" affordance to add it to the composer, then
+  ask the agent to summarize the command output and quote the sentinel.
+- **Expected:** the agent quotes the sentinel from the command output (the
+  markdown result is staged to a file and read, not dropped).
+- **Why not automated:** same as 110.1 — needs the live host CLI + model.
+
+#### 110.3 - Dropped image still inlines (regression guard).
+
+- [ ] result:
+
+- **Steps:** drag a `.png`/`.jpg` onto the composer and ask the agent to
+  describe it.
+- **Expected:** the agent describes the image (images stay inline blobs; the fix
+  only re-routes non-inlinable blobs).
+- **Why not automated:** needs the live host CLI + a vision round-trip.
+
 ---
 
 ## How to use this list

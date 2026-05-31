@@ -25,6 +25,7 @@ import { searchWorkspaceFiles } from '../filesystem/fileSearch';
 import { type AgentFileSpec, type AgentScope as AgentFileScope } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
 import { commandResultBlobAttachment } from './sessionHelpers';
+import { isHostInlinableBlobMime, stageBlobToFile } from './attachmentStaging';
 import {
   wrapSdkError,
   type SessionEntryView,
@@ -653,10 +654,26 @@ export class SessionRegistry {
     }
 
     try {
-      const sdkAttachments = (attachments ?? []).map((attachment) =>
-        attachment.type === 'commandResult'
-          ? commandResultBlobAttachment(attachment.result, attachment.displayName)
-          : attachment,
+      const sdkAttachments = await Promise.all(
+        (attachments ?? []).map(async (attachment) => {
+          const resolved =
+            attachment.type === 'commandResult'
+              ? commandResultBlobAttachment(attachment.result, attachment.displayName)
+              : attachment;
+
+          // #110: the host CLI silently DROPS blob attachments it can't
+          // inline (anything but images / office docs / PDF — including
+          // dropped text/code files that ship as application/octet-stream
+          // and text/markdown command-result pills). Stage those to a
+          // real file and hand the SDK a `type:'file'` attachment, which
+          // the host reads from disk via its <tagged_files> flow (works
+          // for paths outside the session cwd).
+          if (resolved.type === 'blob' && !isHostInlinableBlobMime(resolved.mimeType)) {
+            return await stageBlobToFile(resolved);
+          }
+
+          return resolved;
+        }),
       );
 
       // #35: pass per-message agentMode through to the SDK. Defaults
