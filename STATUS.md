@@ -24,7 +24,15 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** #103 — sub-agent transcript cards can now collapse from the
+**Recently fixed:** Single-instance crash — launching dafman while another copy
+is already open on the same build channel no longer kills the webview. A
+PID+token lockfile (`src-bun/app/shared/singleInstance.ts`, acquired in
+`src-bun/index.ts` before any shared-state init) blocks the duplicate, which
+prints a loud stderr note and exits 0; stale locks from force-killed instances
+are reclaimed. The lock is channel-scoped, so `dev`/`canary`/`stable` coexist —
+`bun run install:canary` builds + installs a second channel to run alongside
+`bun run dev`.
+#103 — sub-agent transcript cards can now collapse from the
 full header row or the bottom footer affordance, with the expanded body kept out
 of the click target so inner links/tool controls do not fold the card.
 #106/#107 — create/write-file tool calls now show the
