@@ -20,7 +20,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 type Channel = 'canary' | 'stable';
 
@@ -50,7 +50,19 @@ function resolveInstaller(channel: Channel): { command: string; args: string[]; 
   if (os === 'win') {
     const setup = join(bundleDir, `${APP_NAME}-Setup${suffix(channel)}.exe`);
 
-    return { command: setup, args: [], artifact: setup };
+    // The Setup stub's manifest requests `requireAdministrator`, so a plain
+    // `spawn(setup)` fails with `EACCES: permission denied, uv_spawn`. Launch
+    // it through PowerShell's `Start-Process -Verb RunAs`, which raises the
+    // UAC consent prompt and runs the installer elevated. `artifact` stays the
+    // raw .exe path so the existence check below still points at the build.
+    const command = 'powershell';
+    const args = [
+      '-NoProfile',
+      '-Command',
+      `Start-Process -FilePath '${resolve(setup)}' -Verb RunAs`,
+    ];
+
+    return { command, args, artifact: setup };
   }
 
   if (os === 'macos') {
@@ -88,7 +100,11 @@ if (osToken() === 'linux' || command === '') {
   process.exit(0);
 }
 
-console.log(`Running ${channelArg} installer: ${command}`);
+console.log(`Running ${channelArg} installer: ${artifact}`);
+
+if (osToken() === 'win') {
+  console.log('Accept the Windows UAC prompt to install/update the channel.');
+}
 
 const child = spawn(command, args, { detached: true, stdio: 'ignore' });
 
