@@ -104,12 +104,24 @@ section is verified) or get a GitHub issue filed (with label
 - [ ] result:
 
 - **Steps:** with `bun run dev` running, run `bun run install:canary` and complete
-  the Setup installer, then launch the installed canary app.
+  the Setup installer (accept the UAC prompt), then launch the installed canary app.
 - **Expected:** both windows run at the same time with no crash; they keep
   separate state (sessions/settings in dev do not appear in canary and vice
   versa), because each channel has its own WebView2 folder + JSON state.
-- **Why not automated:** drives the interactive NSIS Setup GUI and a second
-  installed app coexisting with the dev build.
+- **Why not automated:** drives the interactive NSIS Setup GUI / UAC elevation
+  and a second installed app coexisting with the dev build.
+
+#### SI.4 - The installed canary can actually start a chat (SDK loads).
+
+- [ ] result:
+
+- **Steps:** after installing canary (SI.3), open a session and send a message.
+- **Expected:** the agent responds normally — NO `Cannot find module
+  '@github/copilot/sdk'` error. (The native `copilot.exe` is bundled at
+  `…\canary\app\Resources\app\bun\copilot.exe` and resolved bundle-relative.)
+- **Why not automated:** requires the elevated installer + a live SDK round-trip
+  in the packaged app; `bun run dev` resolves the CLI from node_modules so it
+  can't catch the packaged-resolution path.
 
 ### Issue #103 — Sub-agent cards fold from bottom/header chrome (2026-05-31)
 

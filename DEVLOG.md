@@ -8,7 +8,67 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
-## 2026-05-31 — single-instance guard fixes the multi-instance webview crash
+## 2026-05-31 — packaged builds couldn't start the Copilot SDK
+
+**Takeaway:** the first real packaged build (canary, via the Setup installer)
+crashed on every chat with `SDK error: Cannot find module '@github/copilot/sdk'
+from …\canary\app\Resources\app\bun\index.js`. Root cause: dafman had **only
+ever run via `bun run dev`** (node_modules on disk), hiding a packaging gap —
+`electrobun build` bundles **only** `Resources/app/bun/index.js` (a Bun.build
+output) + `Resources/app/views/`, with **no node_modules**. So nothing provides
+the Copilot CLI runtime the SDK must spawn.
+
+**The chain.** `src-bun/app/client/client.ts` `resolvePlatformCliBinary()` does
+`import.meta.resolve('@github/copilot-' + platform + '-' + arch)` (whose only
+real file is a ~132 MB `copilot.exe`) and, if found, passes it to the SDK as
+`cliPath` via `RuntimeConnection.forStdio({ path })`. In the packaged bundle
+that resolve throws (no node_modules) → undefined → no `cliPath` → the SDK falls
+back to its own `getBundledCliPath()` =
+`import.meta.resolve('@github/copilot/sdk')`
+(`node_modules/@github/copilot-sdk/dist/client.js:107`) → also throws → crash.
+`getBundledCliPath()` is only reached when no `cliPath` is supplied
+(`resolvedCliPath = conn.path ?? env.COPILOT_CLI_PATH ?? getBundledCliPath()`),
+so providing a real `cliPath` bypasses it entirely.
+
+**The fix (two halves).**
+1. *Bundle the binary.* `electrobun.config.ts` is plain TS evaluated at build
+   time on the building machine, so it computes
+   `@github/copilot-${process.platform}-${process.arch}` and adds the native
+   binary to `build.copy` → lands at `Resources/app/bun/copilot.exe`, a sibling
+   of `index.js`. Each CI runner (ubuntu/macos/windows) installs only its own
+   optional dep, so the per-OS source exists (host == target; no cross-compile).
+2. *Resolve it at runtime.* `resolvePlatformCliBinary()` keeps the
+   `import.meta.resolve` attempt first (that's what makes `bun run dev` work),
+   then falls back to `join(import.meta.dir, 'copilot[.exe]')`. In the bundle
+   `import.meta.dir` = `Resources/app/bun/`, so it finds the copied binary.
+
+**Gotcha the rubber-duck caught (critical).** Electrobun's copy step only
+**logs-and-continues** when a source is missing
+(`node_modules/electrobun/src/cli/index.ts:3288`), so a missing binary would
+ship a silently-broken bundle with **green CI**. The config now `throw`s at
+build time if `node_modules/@github/copilot-<plat>-<arch>/copilot[.exe]` is
+absent.
+
+**Verification (static — the runtime step needs UAC).**
+- `tar -tf` of the canary tarball lists `dafman-canary/Resources/app/bun/copilot.exe`
+  right next to `index.js` (installer grew 32 MB → 99 MB compressed).
+- The bundled `index.js` keeps `join(import.meta.dir, binName)` **literally**
+  (Bun did not inline `import.meta.dir` to a source path), so it resolves the
+  sibling at runtime.
+- `lint:tsc-bun`, `lint:eslint` (0 errors), `bun test src-bun` (262 pass) green.
+- NOT yet runtime-proven: launching the installed canary and sending a chat —
+  the Setup installer pops a **UAC elevation prompt** that can't be auto-accepted
+  (stopping the launching shell cancels the pending prompt → "operation was
+  canceled by the user"). Handed to the user to accept + dogfood (MANUAL_TESTS
+  SI.4).
+
+**Open follow-ups (not done here):** mac/linux need the executable bit preserved
+on the copied `copilot` (Node `cpSync` generally preserves mode; assert with a
+postBuild `test -x` / `chmod` if we ever ship those) and macOS signing of the
+nested binary; auto-update delta patches will diff the 132 MB binary each
+release once `release.baseUrl` is configured.
+
+
 
 **Takeaway:** the crash the user hit ("it crashed" during dogfood setup) is
 caused by **≥2 dafman instances running on the same build channel**, not a JS
