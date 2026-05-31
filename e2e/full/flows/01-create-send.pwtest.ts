@@ -29,10 +29,10 @@ test("create session, send 'hello', assistant reply renders", async ({ page }) =
 
   await composer.click();
   await page.keyboard.type("hello");
-  // Default send chord is Ctrl+Enter (plain Enter inserts a newline
-  // so markdown line breaks work; the SubmitOnEnter plugin in
-  // src/lexical/plugins.ts only handles modifier chords).
-  await page.keyboard.press("Control+Enter");
+  // Default send chord is plain Enter (sends at the session's Steer/Queue
+  // default; Ctrl+Enter inserts a hard newline). See SubmitOnEnter in
+  // src/lexical/plugins.ts.
+  await page.keyboard.press("Enter");
 
   // Default fakeClient script echoes `ok: hello` as an assistant
   // message. Wait for it to appear in the transcript.

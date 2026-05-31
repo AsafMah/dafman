@@ -106,6 +106,76 @@ failing with the guard disabled.
 MANUAL_TESTS dogfood result-fills (KB.* etc.) were committed to the Enter branch
 where the KB section lives.
 
+## 2026-05-31 — composer Enter keybindings (fixed chord scheme, supersedes #88 setting)
+
+**Takeaway:** the composer now uses a fixed conventional-chat keybinding
+scheme (plain Enter sends), NOT the configurable Enter-vs-Ctrl+Enter *setting*
+that PR #102 / issue #88 proposed. The user locked a 6-chord spec via an
+`ask_user` form and chose "fixed scheme, drop the setting":
+
+| Chord | Action |
+|---|---|
+| `Enter` | submit `default` (resolves to session Steer/Queue toggle); **defers to an open `/`/`@` menu** |
+| `Shift+Enter` | soft line break (consumed only when a menu is open, else Lexical default) |
+| `Ctrl/Cmd+Enter` | hard newline (new paragraph) |
+| `Ctrl+Shift+Enter` | submit `queue` (force) |
+| `Alt+Enter` | submit `steer` (force) |
+| `Ctrl+Alt+Enter` | submit `interrupt` (force) |
+
+**Why fresh branch, not #102:** #102 built a whole settings surface
+(`ComposerSettingsSection`, `settings.ts` v15, wire-contract entries,
+`submitKeybinding` toggle). The fixed scheme makes Enter *always* send, so the
+setting is moot. I reused #102's setting-INDEPENDENT infrastructure (it had
+already cracked the hard problem) and dropped everything else.
+
+**Reused from #102 (the menu-coordination, which is the real difficulty of
+"Enter sends"):**
+- `src/lexical/composerMenuState.ts` — per-editor `WeakMap<LexicalEditor,
+  Set<'slash'|'mention'>>`. The lexical-vue `TypeaheadMenuPlugin` registers
+  `KEY_ENTER_COMMAND` at `COMMAND_PRIORITY_LOW` and selects the highlighted
+  option on **any** Enter (it does NOT check modifiers — verified in
+  `node_modules/lexical-vue/dist/shared/LexicalMenu.vine.js:306`). Our
+  `SubmitOnEnter` runs at `COMMAND_PRIORITY_HIGH`, so plain Enter would steal
+  the keystroke and send instead of selecting. The HIGH handler reads the
+  registry synchronously (NOT Vue reactivity — that flushes on a microtask and
+  would be stale for a sync keydown; NOT a `window` event — rule 18) and
+  returns `false` (defer) when a menu is active.
+- `MentionPlugin.vue` / `SlashCommandPlugin.vue` mark menu-active synchronously
+  in their query/select/unmount callbacks. **Active only when there's a
+  selectable option:** a zero-match `/foo` or settled-empty `@nomatch` stays
+  inactive so plain Enter SENDS the raw text. Mention also treats `loading` as
+  active to dodge the async file-search race (`FilePicker.vue` emits a new
+  `results-state` event, synchronous `loading:true` before the await).
+
+**New / changed here:**
+- `resolveEnterAction(e, menuActive)` — pure resolver, fixed mapping (no
+  keybinding param). `classifyEnterChord` builds a deterministic `c?s?a` key
+  string so `Ctrl+Alt` is always `'ca'` (rubber-duck worried about ordering —
+  non-issue by construction).
+- Added `'steer'` to `ComposerSubmitMode` (`'default'|'steer'|'queue'|
+  'interrupt'`). `useChatSubmit` already does `mode==='default' ? defaultMode :
+  mode`; `'steer'` ∈ `SendMode` so it passes through with no code change.
+- **Shift+Enter + open menu** (rubber-duck "Blocking #1", actually pre-existing):
+  the modifier-blind LOW handler would otherwise SELECT on Shift+Enter. Fixed by
+  consuming Shift+Enter at HIGH and dispatching `INSERT_LINE_BREAK_COMMAND` when
+  a menu is active (plain passthrough when not, to preserve well-tested
+  non-menu behavior). Both `INSERT_LINE_BREAK_COMMAND` and
+  `INSERT_PARAGRAPH_COMMAND` are registered in both plain-text and rich-text
+  modes (`node_modules/@lexical/plain-text/LexicalPlainText.dev.js:143,150`), so
+  Ctrl+Enter / Shift+Enter work regardless of the markdown-shortcuts gate.
+- Ctrl+Enter consumes + dispatches `INSERT_PARAGRAPH_COMMAND` explicitly (not
+  passthrough) so it inserts a newline even while a menu is open.
+- e2e flows **01** + **07** flipped `Control+Enter` → `Enter`; flow **02**
+  (`@README`+Enter inserts a pill) is unchanged and now exercises the
+  menu-defer path. Stale "Ctrl+Enter" comments updated in `ChatWindow.vue`,
+  `sessionsStore.ts`, `MessageComposer.vue` tooltip + SplitButton interrupt hint.
+
+**Gates:** `bun run lint` (vue-tsc), `lint:eslint` (0 errors), `bun test` (800
+pass), e2e 01/02/07 (5 pass), smoke (4 pass). No `src-bun/` changes.
+
+**Issue/PR housekeeping:** PR #102 closed (superseded); #88 re-scoped from
+"setting" to this fixed scheme and closed by the new PR.
+
 ## 2026-05-31 — release-channel indicator (StatusBar pill + window title)
 
 **Takeaway:** a dev/canary build now self-identifies, so a side-by-side

@@ -7,9 +7,14 @@
 // reasoning / user messages) renders full markdown via `MessageContent`.
 //
 // Wire contract: emits `submit` with the trimmed plain-text content
-// when Enter is pressed or the send button is clicked. Shift+Enter
-// inserts a newline. Disabled state flows through `EditableSync` since
-// `lexical-vue`'s composer only reads `editable` once on mount.
+// when the send chord is pressed or the send button is clicked. The
+// fixed keybinding scheme: plain Enter sends at the session's current
+// Steer/Queue default; Shift+Enter inserts a soft line break;
+// Ctrl/Cmd+Enter inserts a hard newline (new paragraph); Alt+Enter
+// force-steers; Ctrl+Shift+Enter force-queues; Ctrl+Alt+Enter
+// interrupts. Implemented in `SubmitOnEnter` (src/lexical/plugins.ts).
+// Disabled state flows through `EditableSync` since `lexical-vue`'s
+// composer only reads `editable` once on mount.
 //
 // Markdown keystroke shortcuts (`# ` -> heading, `**bold**`, fenced
 // code, etc. auto-formatting AS YOU TYPE) are gated behind
@@ -79,7 +84,7 @@ const props = withDefaults(
     disabled?: boolean;
     placeholder?: string;
     enableMarkdownShortcuts?: boolean;
-    /// Per-session default for the primary send button + Ctrl+Enter.
+    /// Per-session default for the primary send button + plain Enter.
     /// Defaults to "steer".
     defaultMode?: DefaultSendMode;
     /// When provided, mounts the slash-command typeahead bound to
@@ -328,7 +333,7 @@ async function onSubmit(payload: ComposerSubmitPayload) {
 
 /// Dropdown items for the SplitButton — let the user change the
 /// session's default send mode (the action attached to the primary
-/// button + plain Ctrl+Enter). Interrupt is intentionally NOT eligible
+/// button + plain Enter). Interrupt is intentionally NOT eligible
 /// as a default — it always aborts the current turn, which is a
 /// destructive choice that should require an explicit modifier.
 const defaultModeItems = computed<MenuItem[]>(() => [
@@ -344,7 +349,7 @@ const defaultModeItems = computed<MenuItem[]>(() => [
   },
   { separator: true },
   {
-    label: 'Send & interrupt current turn',
+    label: 'Send & interrupt current turn (Ctrl+Alt+Enter)',
     icon: 'pi pi-stop-circle',
     command: () => triggerSubmit('interrupt'),
   },
@@ -385,8 +390,8 @@ const primaryLabel = computed(() => '');
 const primaryIcon = computed(() => (props.defaultMode === 'queue' ? 'pi pi-clock' : 'pi pi-send'));
 const primaryTooltip = computed(() =>
   props.defaultMode === 'queue'
-    ? 'Queue (Ctrl+Enter) — wait behind current turn. Alt+Enter forces queue; Ctrl+Shift+Enter interrupts.'
-    : 'Steer (Ctrl+Enter) — send immediately into current turn. Alt+Enter queues; Ctrl+Shift+Enter interrupts.',
+    ? 'Queue (Enter) — wait behind current turn. Ctrl+Enter inserts a newline. Alt+Enter steers; Ctrl+Shift+Enter queues; Ctrl+Alt+Enter interrupts.'
+    : 'Steer (Enter) — send immediately into current turn. Ctrl+Enter inserts a newline. Alt+Enter steers; Ctrl+Shift+Enter queues; Ctrl+Alt+Enter interrupts.',
 );
 
 /// SplitButton-style submit. Primary action runs the session's

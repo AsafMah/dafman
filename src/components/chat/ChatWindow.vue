@@ -269,12 +269,12 @@ const timelineItems = computed(() => {
 });
 
 /// Submission handler. The composer always submits a payload —
-/// `mode: "default"` (Ctrl+Enter, primary button), `mode: "queue"`
-/// (Alt+Enter — force queue regardless of default), or
-/// `mode: "interrupt"` (Ctrl+Shift+Enter / dropdown). We resolve
-/// `"default"` against the session's `defaultSendMode` inside
-/// `useChatSubmit` so the downstream sessionsStore action only sees
-/// concrete SendMode values.
+/// `mode: "default"` (plain Enter, primary button), `mode: "steer"`
+/// (Alt+Enter — force steer), `mode: "queue"` (Ctrl+Shift+Enter —
+/// force queue), or `mode: "interrupt"` (Ctrl+Alt+Enter / dropdown).
+/// We resolve `"default"` against the session's `defaultSendMode`
+/// inside `useChatSubmit` so the downstream sessionsStore action only
+/// sees concrete SendMode values.
 const { sendMessage } = useChatSubmit({
   getSessionId: () => props.sessionId,
   getDefaultSendMode: () => props.defaultSendMode,
