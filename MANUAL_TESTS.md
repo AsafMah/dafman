@@ -70,6 +70,18 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #127 — agent Select/Deselect transition (2026-06-01)
+
+> Intent-gap follow-up to dogfood item 99.1: the literal no-spinner-flash check
+> passed, but selecting one agent still flashed every row's button.
+
+#### AST.1 - Selecting one agent does not flash the whole list
+
+- [ ] result:
+- **Steps:** Open Session Details → Agents with at least two agents visible. Click **Select** on a non-active agent, then click **Deselect** on the active agent.
+- **Expected:** Only the clicked row shows the pending disabled state; the other rows' Select/Deselect buttons do not visibly flash. The active row's Select ↔ Deselect change fades smoothly without a hard flicker.
+- **Why not automated:** The unit test covers disabled-state scoping and the concurrency guard, but visual transition timing and perceived flicker require a live WebView render.
+
 ### Issue #137 — chat transcript scroll anchoring (2026-06-01)
 
 > All four verified PASS during the 2026-06-01 dogfood (live `bun run dev`).

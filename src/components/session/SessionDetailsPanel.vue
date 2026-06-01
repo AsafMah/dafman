@@ -60,6 +60,15 @@ const {
   reset: resetAgents,
 } = useSessionAgents(sessionId, record);
 const visibleAgentBusyName = useDelayedBusyValue(agentBusyName);
+const DESELECT_AGENT_BUSY_NAME = '__deselect__';
+
+function isSelectAgentBusy(agentName: string): boolean {
+  return agentBusyName.value === agentName;
+}
+
+function isDeselectAgentBusy(agentName: string): boolean {
+  return agentBusyName.value === DESELECT_AGENT_BUSY_NAME || agentBusyName.value === agentName;
+}
 
 const {
   sessionTasks,
@@ -542,25 +551,31 @@ async function onForkSession() {
                 {{ agentSourceLabel(agent) }}
               </small>
             </button>
-            <Button
-              v-if="record.currentAgent?.name === agent.name"
-              size="small"
-              severity="secondary"
-              :loading="visibleAgentBusyName === '__deselect__'"
-              :disabled="!!agentBusyName"
-              label="Deselect"
-              :aria-label="`Deselect agent ${agent.displayName}`"
-              @click="deselectAgent"
-            />
-            <Button
-              v-else
-              size="small"
-              :loading="visibleAgentBusyName === agent.name"
-              :disabled="!!agentBusyName"
-              label="Select"
-              :aria-label="`Select agent ${agent.displayName}`"
-              @click="selectAgent(agent.name)"
-            />
+            <span class="agent-action-shell">
+              <Transition name="agent-action-fade">
+                <Button
+                  v-if="record.currentAgent?.name === agent.name"
+                  key="deselect"
+                  size="small"
+                  severity="secondary"
+                  :loading="visibleAgentBusyName === DESELECT_AGENT_BUSY_NAME"
+                  :disabled="isDeselectAgentBusy(agent.name)"
+                  label="Deselect"
+                  :aria-label="`Deselect agent ${agent.displayName}`"
+                  @click="deselectAgent"
+                />
+                <Button
+                  v-else
+                  key="select"
+                  size="small"
+                  :loading="visibleAgentBusyName === agent.name"
+                  :disabled="isSelectAgentBusy(agent.name)"
+                  label="Select"
+                  :aria-label="`Select agent ${agent.displayName}`"
+                  @click="selectAgent(agent.name)"
+                />
+              </Transition>
+            </span>
             <Button
               v-if="agent.path"
               icon="pi pi-file-edit"
@@ -1554,6 +1569,34 @@ async function onForkSession() {
   padding: 0.05rem 0.35rem;
   background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
   border-radius: 0.25rem;
+}
+
+.agent-action-shell {
+  position: relative;
+  display: inline-grid;
+  min-width: 5.8rem;
+  justify-self: end;
+}
+
+.agent-action-shell > :deep(.p-button) {
+  grid-area: 1 / 1;
+  justify-self: stretch;
+}
+
+.agent-action-fade-enter-active,
+.agent-action-fade-leave-active {
+  transition: opacity var(--p-transition-duration, 120ms) ease;
+}
+
+.agent-action-fade-leave-active {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.agent-action-fade-enter-from,
+.agent-action-fade-leave-to {
+  opacity: 0;
 }
 
 /* Tasks list (19b.1). Vertical layout per row — status pill + agent

@@ -41,7 +41,11 @@ menu still wins Enter to select. Pure resolver `resolveEnterAction`
 supersedes the #88 "submit-keybinding setting" proposal (PR #102 closed).
 Manual keyboard walk pending: `MANUAL_TESTS.md` KB.1–KB.6.
 
-**Recently fixed:** #137 — chat transcript scroll anchoring: streaming no longer
+**Recently fixed:** #127 — Session Details agent Select/Deselect no longer
+flashes every row: the busy/disabled state is scoped to the clicked row while
+`useSessionAgents` still globally ignores concurrent select/deselect clicks, and
+the active-row Select ↔ Deselect swap now fades via Vue `<Transition>`. #137 —
+chat transcript scroll anchoring: streaming no longer
 yanks you to the bottom while you're reading earlier messages (a "Jump to latest"
 pill offers the return instead), and focusing/switching into a session restores
 its scroll position rather than jumping to the top. One pin-based model in
