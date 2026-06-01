@@ -345,6 +345,9 @@ export interface AgentFileEntry {
   name: string;
   path: string;
   canonical: boolean;
+  loadStatus: 'loaded' | 'rejected' | 'unknown';
+  loadMessage?: string;
+  loadWarnings?: string[];
 }
 
 export type InstructionScope = 'global' | 'project';
@@ -988,6 +991,15 @@ export type AuditEntry =
       serverName: string;
       toolName: string;
       toolCallId?: string;
+      argKeys?: string[];
+      argKeyCount?: number;
+    }
+  | {
+      ts: string;
+      kind: 'toolFailure';
+      sessionId: string;
+      toolName: string;
+      error: string;
       argKeys?: string[];
       argKeyCount?: number;
     };

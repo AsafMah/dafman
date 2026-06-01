@@ -337,7 +337,9 @@ async function onResume(session: SessionMetadataSummary) {
       layoutStore.activatePanel(session.sessionId);
     }
 
-    busEmit('scroll-to-bottom', { sessionId: session.sessionId });
+    // Restore-aware: just focus. `focus-composer` re-pins to the bottom
+    // only if the user was already there (a scrolled-up reader keeps
+    // their place); we no longer force a scroll-to-bottom here.
     busEmit('focus-composer', { sessionId: session.sessionId });
 
     return;

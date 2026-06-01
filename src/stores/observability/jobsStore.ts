@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
-import { invokeCommand } from '@/ipc/invoke';
-import type { JobRecord } from '@/ipc/types';
+import { invokeCommand, onAuditEvent } from '@/ipc/invoke';
+import type { AuditEntry, JobRecord } from '@/ipc/types';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
@@ -158,6 +158,10 @@ export const useJobsStore = defineStore('jobs', () => {
 
     if (!trimmed) return;
 
+    // Wire the tool-failure audit listener now that a live autopilot job
+    // will exist to enrich (lazy — see ensureAuditSubscription).
+    ensureAuditSubscription();
+
     const id = `autopilot:${sessionId}:${Date.now()}`;
     const session = useSessionsStore().getSession(sessionId);
     const job: JobRecord = {
@@ -202,6 +206,55 @@ export const useJobsStore = defineStore('jobs', () => {
 
   function updateLocalJob(id: string, patch: Partial<JobRecord>): void {
     localJobs.value = localJobs.value.map((job) => (job.id === id ? { ...job, ...patch } : job));
+  }
+
+  /// #36: surface SDK-observed tool failures on the jobs panel.
+  /// The backend `onPostToolUseFailure` hook records a `toolFailure`
+  /// audit entry carrying the SDK-provided `error` string; we listen on
+  /// the same audit pipeline the Activity view uses and attach that
+  /// structured error context to the matching active autopilot job so
+  /// the panel renders the actual failure (not just our parsed stream
+  /// event).
+  ///
+  /// The subscription is lazy (mirrors `sessionsStore.ensureSubscription`):
+  /// it's wired the first time an autopilot job is started, not at store
+  /// setup. Subscribing eagerly at `defineStore` time crashes the boot
+  /// smoke harness, whose minimal RPC stub omits the `on*` channel
+  /// methods — and there's nothing to enrich until an autopilot job
+  /// exists anyway. The subscription returns an unsubscribe stored on
+  /// the store for lifecycle cleanup (rule: no background sub without
+  /// teardown).
+  let auditUnsubscribe: (() => void) | null = null;
+
+  function handleToolFailureAudit(entry: AuditEntry): void {
+    if (entry.kind !== 'toolFailure') return;
+
+    for (const job of localJobs.value) {
+      if (
+        job.source !== 'autopilot-session' ||
+        job.sessionId !== entry.sessionId ||
+        !isActiveStatus(job.status)
+      ) {
+        continue;
+      }
+
+      updateLocalJob(job.id, {
+        latestResponse: `⚠ ${entry.toolName} failed: ${entry.error}`,
+      });
+    }
+  }
+
+  function ensureAuditSubscription(): void {
+    if (auditUnsubscribe) return;
+
+    auditUnsubscribe = onAuditEvent(handleToolFailureAudit);
+  }
+
+  function dispose(): void {
+    if (auditUnsubscribe) {
+      auditUnsubscribe();
+      auditUnsubscribe = null;
+    }
   }
 
   function taskIdFromJob(job: JobRecord): string {
@@ -282,5 +335,6 @@ export const useJobsStore = defineStore('jobs', () => {
     promoteJob,
     openOwningSession,
     startAutopilot,
+    dispose,
   };
 });

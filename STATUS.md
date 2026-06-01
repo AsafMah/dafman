@@ -24,7 +24,22 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** Single-instance crash — launching dafman while another copy
+**Recently fixed:** Composer Enter keybindings — the composer now sends on plain
+**Enter** (the conventional chat default) under a fixed chord scheme
+(Shift+Enter soft newline, Ctrl+Enter hard newline, Alt+Enter steer,
+Ctrl+Shift+Enter queue, Ctrl+Alt+Enter interrupt); an open `/`/`@` typeahead
+menu still wins Enter to select. Pure resolver `resolveEnterAction`
+(`src/lexical/plugins.ts`) + per-editor menu registry
+(`src/lexical/composerMenuState.ts`). This is a fixed scheme, not a setting —
+supersedes the #88 "submit-keybinding setting" proposal (PR #102 closed).
+Manual keyboard walk pending: `MANUAL_TESTS.md` KB.1–KB.6.
+
+**Recently fixed:** #137 — chat transcript scroll anchoring: streaming no longer
+yanks you to the bottom while you're reading earlier messages (a "Jump to latest"
+pill offers the return instead), and focusing/switching into a session restores
+its scroll position rather than jumping to the top. One pin-based model in
+`useChatScroll.ts` (VueUse `useScroll`) replaces the per-flush `scrollToBottom()`.
+Single-instance crash — launching dafman while another copy
 is already open on the same build channel no longer kills the webview. A
 PID+token lockfile (`src-bun/app/shared/singleInstance.ts`, acquired in
 `src-bun/index.ts` before any shared-state init) blocks the duplicate, which
@@ -32,6 +47,7 @@ prints a loud stderr note and exits 0; stale locks from force-killed instances
 are reclaimed. The lock is channel-scoped, so `dev`/`canary`/`stable` coexist —
 `bun run install:canary` builds + installs a second channel to run alongside
 `bun run dev`.
+#69 — an agent-driven MCP tool call that needs OAuth now raises a sign-in prompt (warn toast → Library Sign-in) on the runtime's `needs-auth` status flip, instead of failing silently; deliberately NOT via `registerInterest('mcp.oauth_required')`, which would block the MCP connection awaiting an `OAuthClientProvider` we don't implement. 2026-05-30.
 #103 — sub-agent transcript cards can now collapse from the
 full header row or the bottom footer affordance, with the expanded body kept out
 of the click target so inner links/tool controls do not fold the card.
@@ -49,7 +65,7 @@ outside the session cwd).
 "Allow all" flag and run mode (new dafman-owned `session-metadata.json` store +
 rehydrate-on-resume; the SDK persists neither across resume). 2026-05-31. #93 — Library Agents / Skills / MCP session-switch
 auto-refreshes now delay the visible loading affordance so cached/instant reloads
-do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
+do not flash `Loading…` while slow reloads still show feedback. 2026-05-31. #36 — failed tool executions are now observed via the SDK `postToolUseFailure` hook (beta.9), recorded as a `toolFailure` audit entry and surfaced in the Activity log + Jobs panel with the SDK-provided error context. 2026-05-31. #81 — Library Agents now annotates filesystem-discovered custom agent files with SDK load state; rejected files are visibly flagged and selection / `/agent <name>` reports the validation failure instead of "not found". 2026-05-31. #94 — Library Agents Refresh now reloads the Copilot SDK
 (not just the filesystem listing); mount + session-switch stay list-only so only
 the explicit Refresh action triggers an SDK reload. 2026-05-30. #97 — discovered
 MCP servers now key off the focused workspace (`lastFocusedSessionId`) instead of

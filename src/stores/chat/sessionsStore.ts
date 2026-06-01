@@ -78,9 +78,9 @@ export type SessionRecord = {
   /// `data.context.cwd` (which the CLI persists across resume).
   workingDirectory: string | null;
   /// Per-session default for the composer's primary send action. Used
-  /// when the user hits Ctrl+Enter or clicks the SplitButton's main
+  /// when the user hits plain Enter or clicks the SplitButton's main
   /// button. Initial value is "steer" — keeps the agent responsive
-  /// (Ctrl+Enter while a turn is running injects rather than queues
+  /// (steering while a turn is running injects rather than queues
   /// behind it). Not persisted across reloads in v1.
   defaultSendMode: DefaultSendMode;
   /// FIFO queue of SDK-blocking pending callbacks. New requests
@@ -135,6 +135,12 @@ export type SessionRecord = {
   /// can pair `_completed` events with their `_required`. Internal —
   /// renderer surfaces never read this directly.
   _toastedOauthRequests: Set<string>;
+  /// #69: server names we've toasted a `needs-auth` prompt for, so a
+  /// repeated `session.mcp_server_status_changed(needs-auth)` (status
+  /// re-emits on every connection attempt / resume) doesn't spam the
+  /// user. Cleared when the server reaches `connected` so a later
+  /// re-auth re-prompts. Internal — renderer surfaces don't read it.
+  _toastedNeedsAuth: Set<string>;
   _artifactToolCallIds: Set<string>;
 };
 
@@ -470,6 +476,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         commandsRun: 0,
 
         _toastedOauthRequests: new Set<string>(),
+        _toastedNeedsAuth: new Set<string>(),
         _artifactToolCallIds: new Set<string>(),
       });
 
@@ -596,6 +603,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         commandsRun: 0,
 
         _toastedOauthRequests: new Set<string>(),
+        _toastedNeedsAuth: new Set<string>(),
         _artifactToolCallIds: new Set<string>(),
       });
 

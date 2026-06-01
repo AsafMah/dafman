@@ -70,14 +70,105 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #137 — chat transcript scroll anchoring (2026-06-01)
+
+> All four verified PASS during the 2026-06-01 dogfood (live `bun run dev`).
+
+#### SC.1 - At the bottom, streaming sticks to the bottom.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — stays pinned to the bottom as the reply streams.
+- **Steps:** open a session, scroll to the bottom, send a prompt and let the reply stream in.
+- **Expected:** the transcript stays pinned to the bottom, following the newest content.
+- **Why not automated:** real streaming cadence + live scroll metrics; happy-dom reports 0 scroll dimensions so the unit test can't exercise the pinned-follow visually.
+
+#### SC.2 - Scrolled up, streaming does NOT yank; a "Jump to latest" pill appears.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — position held; pill appeared.
+- **Steps:** while a reply is streaming, scroll up to re-read an earlier message; keep watching.
+- **Expected:** your scroll position is held (no yank to bottom); a floating **Jump to latest** pill appears once new content lands below.
+- **Why not automated:** the no-yank guarantee depends on real DOM scroll events + frame timing.
+
+#### SC.3 - The pill returns you to the latest on click.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — click landed at the bottom, pill dismissed.
+- **Steps:** with the pill showing (from SC.2), click it.
+- **Expected:** the transcript jumps to the bottom and the pill disappears; you're re-pinned.
+- **Why not automated:** visual affordance + landing position.
+
+#### SC.4 - Focusing a session restores position, never the top.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — pinned sessions reopen at bottom; scrolled-up sessions keep position; none jumped to top.
+- **Steps:** open several sessions; in one scroll up, in another stay at the bottom; click between them.
+- **Expected:** a pinned session reopens at the bottom; a scrolled-up session keeps its position; neither lands at the very top.
+- **Why not automated:** multi-session focus timing + per-session scroll restore.
+
+### Composer Enter keybindings — fixed chord scheme (2026-05-31)
+
+> Plain Enter now sends. Full scheme: Enter=send (current mode),
+> Shift+Enter=soft newline, Ctrl/Cmd+Enter=hard newline, Alt+Enter=steer,
+> Ctrl+Shift+Enter=queue, Ctrl+Alt+Enter=interrupt. The e2e flows cover the
+> happy send + @-pill path; these manual checks cover the keyboard/menu-timing
+> interactions automation can't assert with confidence.
+
+#### KB.1 - Plain Enter sends at the current mode
+
+- [ ] result:
+- **Steps:** In an empty chat, set the send-mode toggle to **Steer**, type `hello`, press **Enter**. Then set the toggle to **Queue**, type `world`, press **Enter** while a turn is running.
+- **Expected:** First message sends immediately (steer). Second is queued behind the running turn (queue) — not interrupting.
+- **Why not automated:** Mode-toggle + live-turn timing; the e2e fake doesn't model steer-vs-queue scheduling visibly.
+
+#### KB.2 - Ctrl+Enter inserts a hard newline; Shift+Enter a soft one
+
+- [ ] result:
+- **Steps:** Type `line one`, press **Ctrl+Enter**, type `line two`. Then press **Shift+Enter** and type `line three`. Do NOT send.
+- **Expected:** Nothing sends. You see three visible lines in the composer (Ctrl+Enter = block/paragraph break, Shift+Enter = soft break within). Caret stays in the editor.
+- **Why not automated:** Visual caret/line rendering inside Lexical.
+
+#### KB.3 - Enter selects a slash/mention menu item instead of sending
+
+- [ ] result:
+- **Steps:** Type `/` and wait for the slash menu; arrow to a command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
+- **Expected:** Enter runs the highlighted slash command (no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
+- **Why not automated:** Flow 02 covers the @-pill case; the slash-run case and the "no accidental send" assertion are worth an eyeball.
+
+#### KB.4 - Enter on a zero-match `/` or `@` SENDS the raw text
+
+- [ ] result:
+- **Steps:** Type `/notacommand` (no menu match), press **Enter**. Then type `@zzzznomatch`, wait for the picker to settle empty, press **Enter**.
+- **Expected:** Each sends the raw text as a normal message (no menu was active to capture Enter).
+- **Why not automated:** Depends on the async file-search settling to empty before the keystroke — timing-sensitive.
+
+#### KB.5 - Modifier sends ignore the menu; Shift+Enter in a menu is a soft break
+
+- [ ] result:
+- **Steps:** With a `/` or `@` menu open: press **Alt+Enter** (steer), and in another attempt **Ctrl+Shift+Enter** (queue) and **Ctrl+Alt+Enter** (interrupt). Separately, with a menu open, press **Shift+Enter**.
+- **Expected:** The three modifier chords send immediately (menu does not capture them). Shift+Enter inserts a soft newline (does NOT select the highlighted menu item).
+- **Why not automated:** Menu-open + modifier-chord timing; the "Shift+Enter doesn't select" guard is the subtle one.
+
+#### KB.6 - Enter on an empty composer does nothing; IME commit doesn't send
+
+- [ ] result:
+- **Steps:** With an empty composer, press **Enter** a few times. Then (if you have an IME) type with composition and press Enter to COMMIT a candidate.
+- **Expected:** Empty Enter does nothing (no stray newline, no send). The IME-commit Enter commits the candidate and does NOT send the message.
+- **Why not automated:** Native IME composition can't be driven reliably in CI.
+
 ### Single-instance guard + canary coexistence (2026-05-31)
 
 #### SI.1 - Second instance on the same channel is blocked, not crashed.
 
-- [ ] result:
+- [x] result: ✓ PASS (2026-06-01 dogfood) — 2nd instance printed *"dafman is already
+  running for this channel (pid 176084). Exiting this instance."*, emitted the
+  `duplicate instance blocked` warn line (existingPid 176084), exited cleanly (code 0,
+  `[stopEventLoop] clean event loop exit`), no 2nd window, first instance untouched.
+  NOTE: a 2nd `bun run dev` can't reach the guard — `electrobun dev --watch` aborts at
+  its rebuild step with `EACCES rm build/dev-win-x64` (the live instance locks the build
+  dir) before bun-main runs. Validated instead via the already-built launcher
+  `build/dev-win-x64/dafman-dev/bin/launcher.exe`, the faithful guard path (same bun-main +
+  same channel lock a packaged 2nd instance hits).
 
-- **Steps:** start dafman with `bun run dev`. With it still running, open a second
-  terminal and run `bun run dev` again (same `dev` channel).
+- **Steps:** start dafman with `bun run dev`. With it still running, launch the
+  already-built `build/dev-win-x64/dafman-dev/bin/launcher.exe` (a 2nd `bun run dev`
+  instead dies at electrobun's rebuild on the locked build dir, never reaching the guard).
 - **Expected:** the second invocation prints a loud note like *"dafman is already
   running for this channel (pid N). Exiting this instance."* and exits cleanly;
   no second app window appears, the first window keeps working, and the shared
@@ -89,7 +180,13 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.2 - A force-killed instance's stale lock is reclaimed on next launch.
 
-- [ ] result:
+- [x] result: ✓ PASS (2026-06-01 dogfood) — verified the real reclaim path on a throwaway
+  lock without disturbing the live instance: spawned + killed a process (pid 256784),
+  confirmed it dead via the same `process.kill(pid,0)` probe the guard uses, wrote a real
+  lock file owned by that dead pid, then ran the real `acquireSingleInstanceLock` (no
+  injected seam) → `acquired:true`, lock rewritten to our own pid. Also unit-covered:
+  `src-bun/__tests__/singleInstance.test.ts:54` ('takes over a stale lock left by a dead
+  process', real fs).
 
 - **Steps:** `bun run dev`, then force-kill it (`Stop-Process -Id <app-bun-pid>`,
   i.e. Task Manager / TerminateProcess — NOT a clean Ctrl-C). Immediately
@@ -101,7 +198,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.3 - A canary instance runs alongside the dev instance.
 
-- [ ] result:
+- [ ] result: ⏸ DEFERRED (2026-06-01) — canary build not dogfood-ready yet (user); revisit once it installs/launches cleanly.
 
 - **Steps:** with `bun run dev` running, run `bun run install:canary` and complete
   the Setup installer (accept the UAC prompt), then launch the installed canary app.
@@ -113,7 +210,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.4 - The installed canary can actually start a chat (SDK loads).
 
-- [ ] result:
+- [ ] result: ⏸ DEFERRED (2026-06-01) — depends on SI.3 (canary install); canary not dogfood-ready yet (user).
 
 - **Steps:** after installing canary (SI.3), open a session and send a message.
 - **Expected:** the agent responds normally — NO `Cannot find module
@@ -209,7 +306,55 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** end-to-end delete + new-session creation against the real
   on-disk store and SDK catalog.
 
-### Issue #76 — Fenced CodeMirror code blocks follow app theme (2026-05-30)
+### Issue #81 — SDK-rejected custom agents are flagged (2026-05-31)
+
+#### 81.1 - Bad `.agent.md` is visibly rejected and `/agent` reports the validation error.
+
+- [ ] result:
+
+- **Steps:**
+  1. In `bun run dev`, open a session in any workspace.
+  2. Create `~/.copilot/agents/broken-agent.agent.md` with frontmatter that has
+     `description` but an invalid modeled key, e.g. `mcp-servers.github` without
+     the required `tools: []`.
+  3. Open Library → Agents and click **Refresh**.
+  4. Try the row action for `broken-agent`, then run `/agent broken-agent` in the
+     composer.
+- **Expected:** the row is marked **SDK rejected**, displays the SDK validation
+  message, the row action shows the same actionable message, and `/agent
+  broken-agent` reports the load failure instead of "No agent named".
+- **Why not automated:** the final confidence check depends on the real Copilot
+  SDK/CLI discovery + reload path and live file locations outside the test fake.
+
+### Issue #36 — `postToolUseFailure` hook → Activity log + Jobs panel (2026-05-31)
+
+#### 36.1 - A failed tool execution appears in the Activity log with the SDK error.
+
+- [ ] result: 
+- **Steps:** `bun run dev`, open a session, and trigger a tool that fails (e.g.
+  ask the agent to `str_replace` text that does not exist in a file, or run a
+  shell command that exits non-zero). Open Diagnostics → Activity (the LogViewer
+  audit tab).
+- **Expected:** a red-tinted `TOOLFAILURE` row appears reading
+  `<toolName> failed · <error message>`, where the error text is the SDK's
+  failure message (not just "tool errored"). No raw argument VALUES appear.
+- **Why not automated:** needs a real CLI tool execution + the SDK host firing
+  the `failure` result; the renderer's audit-tab paint is visual.
+
+#### 36.2 - A tool failure during an Autopilot run surfaces on the Jobs panel.
+
+- [ ] result: 
+- **Steps:** open the Jobs panel, Start Autopilot with a goal that will make the
+  agent run a tool that fails. Watch the active Autopilot job row while the tool
+  fails.
+- **Expected:** the active job's latest-response line briefly shows
+  `⚠ <toolName> failed: <error>` (the SDK error context) while the job is still
+  running; it returns to the normal completion text once the turn completes. The
+  Activity-log entry (36.1) persists regardless.
+- **Why not automated:** depends on live Autopilot timing + a real failing tool;
+  the transient job-row text is a visual/timing assertion.
+
+
 
 #### 76.1 - Transcript fenced code blocks switch between light and dark CodeMirror themes.
 
@@ -283,6 +428,22 @@ section is verified) or get a GitHub issue filed (with label
 - **Note:** use `.mcp.json` (the fixture does). `.vscode/mcp.json` is **no
   longer discovered** — Copilot CLI removed that support; a `.vscode`-based repro
   would show zero discovered servers and mislead the test.
+
+### Issue #69 — Agent-driven MCP OAuth prompt (2026-05-30)
+
+- **69.1** ⏳ **A mid-session MCP tool call that needs auth surfaces a sign-in prompt, not a silent failure.**
+  - **Steps:** configure an HTTP MCP server that requires OAuth and is **not**
+    yet authenticated (no cached token — sign out / use a fresh account). Open a
+    session and ask the agent to use a tool from that server (so the *agent*, not a
+    Library button, triggers the connection).
+  - **Expected:** a **warn** toast appears naming the server ("… requires
+    authorization. Open the Library panel and click Sign-in…"), and the server
+    shows `needs-auth` in Library → MCP with a **Sign-in** button. Completing
+    Sign-in (system browser) reconnects the server; you then see a **success**
+    toast ("… connection established"). The warn toast does **not** repeat on every
+    retry while it stays `needs-auth`.
+  - **Why not automated:** needs a real OAuth-gated MCP server reached mid-session
+    by the agent + real provider auth; can't be driven in CI.
 
 ### Issue #7 — MCP HTTP OAuth Sign-in flow (2026-05-30)
 
