@@ -45,6 +45,7 @@ const toasts = useToastStore();
 // Singleton rail: bind to whichever chat panel is active.
 const sessionId = computed<string>(() => layoutStore.activeSessionId ?? '');
 const record = computed(() => sessionsStore.getSession(sessionId.value));
+const isDeleted = computed(() => record.value?.isDeleted ?? false);
 
 // ---------- Composables ----------
 const {
@@ -152,6 +153,8 @@ watch(
 );
 
 function onRenameSubmit() {
+  if (isDeleted.value) return;
+
   const trimmed = nameDraft.value.trim();
 
   if (!trimmed) return;
@@ -164,7 +167,7 @@ function onRenameSubmit() {
 const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
   set: (value) => {
-    if (!value || value === record.value?.mode) return;
+    if (isDeleted.value || !value || value === record.value?.mode) return;
 
     void sessionsStore.setSessionMode(sessionId.value, value);
   },
@@ -187,6 +190,8 @@ const reasoningChoice = computed<ReasoningVisibility>({
     return v;
   },
   set: (value) => {
+    if (isDeleted.value) return;
+
     sessionsStore.setSessionReasoningOverride(sessionId.value, value);
   },
 });
@@ -208,6 +213,8 @@ function revealFile(path: string) {
 const approveAll = computed(() => record.value?.approveAll ?? false);
 
 function onToggleApproveAll(next: boolean) {
+  if (isDeleted.value) return;
+
   void sessionsStore.setSessionApproveAll(sessionId.value, next);
 }
 
@@ -296,14 +303,20 @@ async function onExport(format: 'markdown' | 'json'): Promise<void> {
 }
 
 function onCompactNow() {
+  if (isDeleted.value) return;
+
   void sessionsStore.compactSessionHistory(sessionId.value);
 }
 
 function onResetApprovals() {
+  if (isDeleted.value) return;
+
   void sessionsStore.resetSessionApprovals(sessionId.value);
 }
 
 async function onForkSession() {
+  if (isDeleted.value) return;
+
   try {
     const newId = await sessionsStore.forkSession(sessionId.value);
 
@@ -329,9 +342,21 @@ async function onForkSession() {
         text
         label="Fork"
         title="Fork this session into a new independent thread"
+        :disabled="isDeleted"
         @click="onForkSession"
       />
     </header>
+    <div
+      v-if="isDeleted"
+      class="deleted-details-banner"
+      role="status"
+    >
+      <i
+        class="pi pi-lock"
+        aria-hidden="true"
+      />
+      This session was deleted. Details are read-only.
+    </div>
 
     <section class="row row-stack section">
       <button
@@ -369,12 +394,13 @@ async function onForkSession() {
               size="small"
               placeholder="Untitled"
               class="rename-input"
+              :disabled="isDeleted"
             />
             <Button
               type="submit"
               label="Save"
               size="small"
-              :disabled="!nameDraft.trim()"
+              :disabled="!nameDraft.trim() || isDeleted"
             />
           </form>
         </section>
@@ -392,6 +418,7 @@ async function onForkSession() {
             :allow-empty="false"
             size="small"
             aria-label="Agent run mode"
+            :disabled="isDeleted"
           >
             <template #option="slotProps">
               <i
@@ -416,6 +443,7 @@ async function onForkSession() {
             option-value="value"
             size="small"
             aria-label="Reasoning visibility for this session"
+            :disabled="isDeleted"
           />
         </label>
 
@@ -464,6 +492,7 @@ async function onForkSession() {
           </span>
           <ToggleSwitch
             :model-value="approveAll"
+            :disabled="isDeleted"
             @update:model-value="onToggleApproveAll"
           />
         </section>
@@ -559,7 +588,7 @@ async function onForkSession() {
                   size="small"
                   severity="secondary"
                   :loading="visibleAgentBusyName === DESELECT_AGENT_BUSY_NAME"
-                  :disabled="isDeselectAgentBusy(agent.name)"
+                  :disabled="isDeselectAgentBusy(agent.name) || isDeleted"
                   label="Deselect"
                   :aria-label="`Deselect agent ${agent.displayName}`"
                   @click="deselectAgent"
@@ -569,7 +598,7 @@ async function onForkSession() {
                   key="select"
                   size="small"
                   :loading="visibleAgentBusyName === agent.name"
-                  :disabled="isSelectAgentBusy(agent.name)"
+                  :disabled="isSelectAgentBusy(agent.name) || isDeleted"
                   label="Select"
                   :aria-label="`Select agent ${agent.displayName}`"
                   @click="selectAgent(agent.name)"
@@ -600,7 +629,7 @@ async function onForkSession() {
         <button
           type="button"
           class="link-button manage-globally"
-          :disabled="!sessionId"
+          :disabled="!sessionId || isDeleted"
           @click="reloadAgents"
         >
           Reload from disk →
@@ -858,6 +887,7 @@ async function onForkSession() {
             <ToggleSwitch
               :model-value="skill.enabled"
               :aria-label="`Enable skill ${skill.name}`"
+              :disabled="isDeleted"
               @update:model-value="() => toggleSkill(skill)"
             />
             <div
@@ -985,6 +1015,7 @@ async function onForkSession() {
                   size="small"
                   class="tool-state-button"
                   :aria-label="`Restriction for ${t.name}`"
+                  :disabled="isDeleted"
                   @update:model-value="(v: ToolState) => setToolState(t, v)"
                 />
                 <div
@@ -1042,6 +1073,7 @@ async function onForkSession() {
             <ToggleSwitch
               :model-value="mcpEnabled(s)"
               :aria-label="`Enable MCP server ${s.name}`"
+              :disabled="isDeleted"
               @update:model-value="(v: boolean) => setMcpServerEnabled(s, v)"
             />
             <div
@@ -1093,11 +1125,13 @@ async function onForkSession() {
               rows="8"
               class="plan-editor"
               aria-label="Plan content (markdown)"
+              :disabled="isDeleted"
             ></textarea>
             <div class="plan-actions">
               <Button
                 label="Save"
                 size="small"
+                :disabled="isDeleted"
                 @click="savePlan"
               />
               <Button
@@ -1130,6 +1164,7 @@ async function onForkSession() {
               icon="pi pi-pencil"
               size="small"
               severity="secondary"
+              :disabled="isDeleted"
               @click="startEditPlan"
             />
           </template>
@@ -1300,6 +1335,7 @@ async function onForkSession() {
         size="small"
         severity="secondary"
         title="Compact session history"
+        :disabled="isDeleted"
         @click="onCompactNow"
       />
       <Button
@@ -1308,6 +1344,7 @@ async function onForkSession() {
         size="small"
         severity="secondary"
         title="Reset session approvals"
+        :disabled="isDeleted"
         @click="onResetApprovals"
       />
     </section>
@@ -1353,6 +1390,17 @@ async function onForkSession() {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.deleted-details-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-md, 8px);
+  color: var(--p-text-muted-color);
+  background: color-mix(in srgb, var(--p-content-background) 92%, var(--p-text-color));
 }
 
 /* PrimeVue SelectButton in the mode row sometimes lays out its

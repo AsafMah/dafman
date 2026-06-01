@@ -48,6 +48,10 @@ const record = computed(() => sessionsStore.getSession(sessionId.value));
 const accent = computed(() => record.value?.accent ?? 'var(--p-primary-color)');
 
 const displayTitle = computed(() => {
+  if (record.value?.isDeleted) {
+    return `${record.value.title ?? sessionId.value.slice(0, 8)} (deleted)`;
+  }
+
   if (title.value) return title.value;
 
   return record.value?.title ?? sessionId.value.slice(0, 8);
@@ -57,11 +61,18 @@ const displayTitle = computed(() => {
 /// `pendingRequest.type` + `isThinking` + `unseenTurns` to one of
 /// five semantic styles via the shared `indicatorStyle` helper.
 const indicator = computed(() =>
-  indicatorStyle(
-    record.value?.pendingRequests[0]?.kind,
-    record.value?.isThinking ?? false,
-    record.value?.unseenTurns ?? 0,
-  ),
+  record.value?.isDeleted
+    ? {
+        iconSuffix: 'lock',
+        color: 'var(--p-text-muted-color)',
+        label: 'Session deleted',
+        pulse: false,
+      }
+    : indicatorStyle(
+        record.value?.pendingRequests[0]?.kind,
+        record.value?.isThinking ?? false,
+        record.value?.unseenTurns ?? 0,
+      ),
 );
 
 // ─── Right-click context menu ─────────────────────────────────────────

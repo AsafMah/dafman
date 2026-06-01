@@ -56,6 +56,8 @@ onMounted(() => {
   offOpenModelSelector = busOn('open-model-selector', ({ sessionId }) => {
     if (sessionId !== props.sessionId) return;
 
+    if (isDeleted.value) return;
+
     if (props.area !== 'all' && props.area !== 'composer-right') return;
 
     modelTreeRef.value?.show();
@@ -81,6 +83,7 @@ const record = computed(() => sessionsStore.getSession(props.sessionId));
 const renameDialogVisible = ref(false);
 const renameDraft = ref('');
 const renameSaving = ref(false);
+const isDeleted = computed(() => record.value?.isDeleted ?? false);
 
 const effectiveModelId = computed(
   () => record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
@@ -168,7 +171,7 @@ const modelTreeChoice = computed<Record<string, unknown> | null>({
     return { [id]: true };
   },
   set: (value) => {
-    if (!value || !record.value) return;
+    if (!value || !record.value || isDeleted.value) return;
 
     const id = Object.keys(value)[0];
 
@@ -200,7 +203,7 @@ const effortChoice = computed<string | null>({
     selectedModel.value?.defaultReasoningEffort ??
     null,
   set: (value) => {
-    if (!value || !record.value?.model) return;
+    if (!value || !record.value?.model || isDeleted.value) return;
 
     void sessionsStore.setSessionModel(props.sessionId, record.value.model, value);
   },
@@ -226,6 +229,8 @@ const reasoningChoice = computed<ReasoningVisibility>({
     return v;
   },
   set: (value) => {
+    if (isDeleted.value) return;
+
     sessionsStore.setSessionReasoningOverride(props.sessionId, value);
   },
 });
@@ -233,7 +238,7 @@ const reasoningChoice = computed<ReasoningVisibility>({
 const approveAll = computed(() => record.value?.approveAll ?? false);
 
 function toggleApproveAll() {
-  if (!record.value) return;
+  if (!record.value || isDeleted.value) return;
 
   void sessionsStore.setSessionApproveAll(props.sessionId, !approveAll.value);
 }
@@ -266,6 +271,8 @@ function onWorkspaceClick() {
 const agentChipLabel = computed(() => record.value?.currentAgent?.displayName ?? null);
 
 function onAgentChipClick() {
+  if (isDeleted.value) return;
+
   if (!detailsOpen.value) layoutStore.toggleSessionDetailsPanel();
 }
 
@@ -314,6 +321,8 @@ function requestTerminalFocus(terminalId: string): void {
 }
 
 async function openSessionTerminal() {
+  if (isDeleted.value) return;
+
   try {
     busEmit('close-command-terminal', { sessionId: props.sessionId });
     const terminal = await terminalStore.getOrCreateSessionTerminal(props.sessionId);
@@ -344,6 +353,7 @@ async function openSessionTerminal() {
       :aria-pressed="approveAll"
       :title="approveAll ? 'Auto-approve all tools is ON' : 'Auto-approve all tools is OFF'"
       :class="{ 'approve-all-active': approveAll }"
+      :disabled="isDeleted"
       @click="toggleApproveAll"
     />
     <Chip
@@ -368,10 +378,11 @@ async function openSessionTerminal() {
       class="session-terminal-button"
       aria-label="Open session terminal"
       title="Open session terminal"
+      :disabled="isDeleted"
       @click="openSessionTerminal"
     />
     <Chip
-      v-if="agentChipLabel && props.area === 'all'"
+      v-if="agentChipLabel && props.area === 'all' && !isDeleted"
       :label="agentChipLabel"
       icon="pi pi-user"
       class="agent-chip"
@@ -395,7 +406,7 @@ async function openSessionTerminal() {
       filter
       append-to="body"
       placeholder="Model"
-      :disabled="models.length === 0"
+      :disabled="models.length === 0 || isDeleted"
       aria-label="Model for this session"
       class="compact-select compact-tree-select"
     >
@@ -427,6 +438,7 @@ async function openSessionTerminal() {
       filter
       append-to="body"
       placeholder="Effort"
+      :disabled="isDeleted"
       aria-label="Reasoning effort for this session"
       class="compact-select compact-select-effort"
     />
@@ -441,6 +453,7 @@ async function openSessionTerminal() {
       filter
       append-to="body"
       placeholder="Reasoning"
+      :disabled="isDeleted"
       aria-label="Reasoning visibility for this session"
       class="compact-select compact-select-reasoning"
     />
@@ -455,6 +468,7 @@ async function openSessionTerminal() {
       :aria-pressed="approveAll"
       :title="approveAll ? 'Auto-approve all tools is ON' : 'Auto-approve all tools is OFF'"
       :class="{ 'approve-all-active': approveAll }"
+      :disabled="isDeleted"
       @click="toggleApproveAll"
     />
     <Button

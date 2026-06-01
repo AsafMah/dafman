@@ -58,12 +58,14 @@ const props = defineProps<{
     | ElicitationRequestData
     | ExitPlanModeRequestData
     | AutoModeSwitchRequestData;
+  readOnly?: boolean;
 }>();
 
 const sessionsStore = useSessionsStore();
 const toasts = useToastStore();
 
 const style = computed(() => styleFor(props.pendingKind));
+const actionsDisabled = computed(() => props.readOnly ?? false);
 
 const title = computed(() => {
   switch (props.pendingKind) {
@@ -113,6 +115,8 @@ const asAutoModeSwitch = computed(() =>
 // surfacing a card. User can revert via the session-header gear
 // menu (the toggle there mirrors the same state).
 async function permissionRespond(decision: 'approveOnce' | 'reject'): Promise<void> {
+  if (actionsDisabled.value) return;
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -121,6 +125,8 @@ async function permissionRespond(decision: 'approveOnce' | 'reject'): Promise<vo
 }
 
 async function permissionAllowAndStopAsking(): Promise<void> {
+  if (actionsDisabled.value) return;
+
   // Approve this request first, THEN flip the toggle. Doing it in
   // the other order would race the next-emit window: the registry
   // could short-circuit a queued sibling request before we got to
@@ -147,6 +153,8 @@ async function permissionAllowForSession(payload: {
   approval?: PermissionApprovalRule;
   domain?: string;
 }): Promise<void> {
+  if (actionsDisabled.value) return;
+
   showRuleEditor.value = false;
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
@@ -174,6 +182,8 @@ const userInputSubmittable = computed(() => {
 });
 
 async function userInputSubmit(): Promise<void> {
+  if (actionsDisabled.value) return;
+
   const req = asUserInput.value;
 
   if (!req) return;
@@ -197,6 +207,8 @@ async function userInputSubmit(): Promise<void> {
 }
 
 async function userInputCancel(): Promise<void> {
+  if (actionsDisabled.value) return;
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -206,6 +218,8 @@ async function userInputCancel(): Promise<void> {
 
 // Elicitation actions.
 async function openElicitationUrl(): Promise<void> {
+  if (actionsDisabled.value) return;
+
   const req = asElicitation.value;
 
   if (!req) return;
@@ -224,6 +238,8 @@ async function openElicitationUrl(): Promise<void> {
 }
 
 async function elicitationAccept(): Promise<void> {
+  if (actionsDisabled.value) return;
+
   // Form-mode: validate first, then ship the collected content.
   if (asElicitation.value && asElicitation.value.mode === 'form') {
     const formRef = formComponentRef.value;
@@ -259,6 +275,8 @@ async function elicitationAccept(): Promise<void> {
 }
 
 async function elicitationCancel(action: 'decline' | 'cancel' = 'cancel'): Promise<void> {
+  if (actionsDisabled.value) return;
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -270,6 +288,8 @@ async function exitPlanRespond(
   approved: boolean,
   selectedAction?: 'interactive' | 'autopilot' | 'exit_only' | 'autopilot_fleet',
 ): Promise<void> {
+  if (actionsDisabled.value) return;
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -283,6 +303,8 @@ async function exitPlanRespond(
 }
 
 async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<void> {
+  if (actionsDisabled.value) return;
+
   await sessionsStore.respondToPending({
     sessionId: props.sessionId,
     requestId: props.requestId,
@@ -316,6 +338,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="Reject"
           severity="danger"
           size="small"
+          :disabled="actionsDisabled"
           @click="permissionRespond('reject')"
         />
         <Button
@@ -324,6 +347,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="secondary"
           size="small"
           icon="pi pi-shield"
+          :disabled="actionsDisabled"
           @click="showRuleEditor = true"
         />
         <Button
@@ -331,12 +355,14 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="secondary"
           size="small"
           icon="pi pi-bolt"
+          :disabled="actionsDisabled"
           @click="permissionAllowAndStopAsking"
         />
         <Button
           label="Allow once"
           severity="primary"
           size="small"
+          :disabled="actionsDisabled"
           @click="permissionRespond('approveOnce')"
         />
       </div>
@@ -363,6 +389,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
             v-model="inputChoice"
             :name="`pending-${requestId}`"
             :value="choice"
+            :disabled="actionsDisabled"
           />
           <span>{{ choice }}</span>
         </label>
@@ -381,6 +408,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
         <Textarea
           v-model="inputAnswer"
           rows="3"
+          :disabled="actionsDisabled"
           @keydown.ctrl.enter.prevent="userInputSubmit"
         />
         <span class="pending-card-hint">Ctrl+Enter to submit</span>
@@ -390,13 +418,14 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="Cancel"
           severity="secondary"
           size="small"
+          :disabled="actionsDisabled"
           @click="userInputCancel"
         />
         <Button
           label="Submit"
           severity="primary"
           size="small"
-          :disabled="!userInputSubmittable"
+          :disabled="!userInputSubmittable || actionsDisabled"
           @click="userInputSubmit"
         />
       </div>
@@ -421,6 +450,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="Decline"
           severity="secondary"
           size="small"
+          :disabled="actionsDisabled"
           @click="elicitationCancel('decline')"
         />
         <Button
@@ -429,6 +459,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="primary"
           icon="pi pi-external-link"
           size="small"
+          :disabled="actionsDisabled"
           @click="openElicitationUrl"
         />
         <Button
@@ -437,6 +468,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="primary"
           icon="pi pi-check"
           size="small"
+          :disabled="actionsDisabled"
           @click="elicitationAccept"
         />
       </div>
@@ -449,6 +481,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
         ref="formComponentRef"
         v-model="formContent"
         :schema="asElicitation.requestedSchema as Record<string, unknown>"
+        :disabled="actionsDisabled"
       />
       <p
         v-else
@@ -471,6 +504,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="Decline"
           severity="secondary"
           size="small"
+          :disabled="actionsDisabled"
           @click="elicitationCancel('decline')"
         />
         <Button
@@ -479,6 +513,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="primary"
           icon="pi pi-check"
           size="small"
+          :disabled="actionsDisabled"
           @click="elicitationAccept"
         />
         <Button
@@ -486,6 +521,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="Cancel"
           severity="secondary"
           size="small"
+          :disabled="actionsDisabled"
           @click="elicitationCancel('cancel')"
         />
       </div>
@@ -508,6 +544,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
         <Textarea
           v-model="exitPlanFeedback"
           rows="3"
+          :disabled="actionsDisabled"
         />
       </div>
       <div class="pending-card-actions">
@@ -515,12 +552,14 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="Exit only"
           severity="secondary"
           size="small"
+          :disabled="actionsDisabled"
           @click="exitPlanRespond(false, 'exit_only')"
         />
         <Button
           label="Continue interactive"
           severity="primary"
           size="small"
+          :disabled="actionsDisabled"
           @click="exitPlanRespond(true, 'interactive')"
         />
         <Button
@@ -528,6 +567,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="warn"
           size="small"
           icon="pi pi-bolt"
+          :disabled="actionsDisabled"
           @click="exitPlanRespond(true, 'autopilot')"
         />
         <Button
@@ -535,6 +575,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="warn"
           size="small"
           icon="pi pi-users"
+          :disabled="actionsDisabled"
           @click="exitPlanRespond(true, 'autopilot_fleet')"
         />
       </div>
@@ -553,12 +594,14 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           label="No"
           severity="secondary"
           size="small"
+          :disabled="actionsDisabled"
           @click="autoModeRespond('no')"
         />
         <Button
           label="Yes"
           severity="primary"
           size="small"
+          :disabled="actionsDisabled"
           @click="autoModeRespond('yes')"
         />
         <Button
@@ -566,6 +609,7 @@ async function autoModeRespond(response: 'yes' | 'yes_always' | 'no'): Promise<v
           severity="warn"
           size="small"
           icon="pi pi-bolt"
+          :disabled="actionsDisabled"
           @click="autoModeRespond('yes_always')"
         />
       </div>

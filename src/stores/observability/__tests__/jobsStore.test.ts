@@ -72,6 +72,8 @@ function sessionRecord(id = 's1'): SessionRecord {
     planRefreshCounter: 0,
     touchedFiles: [],
     commandsRun: 0,
+    isDeleted: false,
+    deletedAt: null,
     _toastedOauthRequests: new Set<string>(),
     _toastedNeedsAuth: new Set<string>(),
     _artifactToolCallIds: new Set<string>(),

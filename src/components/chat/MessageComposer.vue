@@ -324,6 +324,8 @@ const initialConfig = computed(() => ({
 }));
 
 async function onSubmit(payload: ComposerSubmitPayload) {
+  if (props.disabled) return;
+
   if (props.sessionId && (await runLocalSlashCommand(props.sessionId, payload.text))) {
     return;
   }
@@ -504,6 +506,7 @@ const primaryTooltip = computed(() =>
             <ModeButtonGroup
               v-if="props.sessionId"
               :session-id="props.sessionId"
+              :disabled="props.disabled"
             />
             <slot name="session-left-controls" />
           </div>

@@ -64,6 +64,9 @@ const props = defineProps<{
   /// Per-session default mode for the composer's primary send action.
   /// "steer" maps to SDK `mode: "immediate"`; "queue" to `"enqueue"`.
   defaultSendMode: 'steer' | 'queue';
+  /// True after the CLI-side session was permanently deleted while
+  /// this panel stayed open. Transcript remains visible read-only.
+  deleted?: boolean;
   commandsRun?: number;
   /// Optional override for the send action. When provided, ChatWindow
   /// calls this instead of `sessionsStore.sendMessage`. Used by the dev
@@ -246,6 +249,8 @@ watch(
 /// emit `assistant.turn_start`). Used for the in-chat spinner card
 /// — the tab + sidebar dot read `record.isThinking` directly.
 const recordIsThinking = computed(() => {
+  if (props.deleted) return false;
+
   const r = sessionsStore.getSession(props.sessionId);
 
   if (!r) return false;
@@ -297,6 +302,16 @@ const { sendMessage } = useChatSubmit({
       sessionsStore.sendMessage(sessionId, text, mode, attachments),
   },
 });
+
+async function submitMessage(payload: Parameters<typeof sendMessage>[0]): Promise<void> {
+  if (props.deleted) {
+    toasts.warn('Session deleted', 'This session is read-only. Start or resume another session.');
+
+    return;
+  }
+
+  await sendMessage(payload);
+}
 
 function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
@@ -411,6 +426,7 @@ const commandsRun = computed(() => {
               kind="reasoning"
               :text="item.text"
               :event-id="item.eventId"
+              :read-only="props.deleted"
               @quote="onMessageQuote"
               @fork="onMessageFork(itemIndexById(item.id))"
             />
@@ -439,6 +455,7 @@ const commandsRun = computed(() => {
               :event-id="item.eventId"
               :tool-args-text="item.args ? JSON.stringify(item.args, null, 2) : ''"
               :tool-result-text="item.resultContent || item.partialOutput || ''"
+              :read-only="props.deleted"
               @fork="onMessageFork(itemIndexById(item.id))"
             />
           </div>
@@ -462,6 +479,7 @@ const commandsRun = computed(() => {
             :pending-kind="item.pendingKind"
             :message="item.message"
             :request="item.request"
+            :read-only="props.deleted"
           />
           <button
             v-else-if="item.kind === 'forkNotice'"
@@ -559,6 +577,7 @@ const commandsRun = computed(() => {
                 :kind="item.kind"
                 :text="item.text"
                 :event-id="'eventId' in item ? item.eventId : undefined"
+                :read-only="props.deleted"
                 @quote="onMessageQuote"
                 @edit="onMessageEdit(item.id)"
                 @retry="onMessageRetry(itemIndexById(item.id))"
@@ -667,12 +686,32 @@ const commandsRun = computed(() => {
       class="chat-composer"
       @submit.prevent
     >
+      <div
+        v-if="props.deleted"
+        class="deleted-banner"
+        role="status"
+      >
+        <i
+          class="pi pi-lock"
+          aria-hidden="true"
+        />
+        <div>
+          <strong>This session was deleted.</strong>
+          <span>The transcript is read-only and new messages are disabled.</span>
+        </div>
+      </div>
       <MessageComposer
         ref="composerRef"
+        :disabled="props.deleted"
+        :placeholder="
+          props.deleted
+            ? 'This deleted session is read-only.'
+            : 'Ask anything — use @ to attach files, / for commands.'
+        "
         :default-mode="props.defaultSendMode"
         :session-id="props.sendHandler ? undefined : props.sessionId"
         :command-terminal-id="commandTerminalId"
-        @submit="sendMessage"
+        @submit="submitMessage"
         @request-command-terminal="onRequestCommandTerminal"
         @open-full-terminal="openFullSessionTerminal"
         @update:default-mode="onUpdateDefaultMode"
@@ -975,6 +1014,28 @@ const commandsRun = computed(() => {
 
 .chat-composer {
   flex: 0 0 auto;
+}
+
+.deleted-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0.5rem 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-md, 8px);
+  color: var(--p-text-muted-color);
+  background: color-mix(in srgb, var(--p-content-background) 92%, var(--p-text-color));
+}
+
+.deleted-banner strong {
+  display: block;
+  color: var(--p-text-color);
+}
+
+.deleted-banner span {
+  display: block;
+  font-size: 0.85rem;
 }
 
 /* Pending-request banner: type-tinted (color comes from

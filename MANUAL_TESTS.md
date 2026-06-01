@@ -93,6 +93,14 @@ section is verified) or get a GitHub issue filed (with label
 - **Expected:** The new row appears immediately and its label changes after each rename without pressing Refresh.
 - **Why not automated:** Store tests cover the catalog upsert, but the live sidebar needs WebView rendering, grouping, and relative-time ordering verification.
 
+### Issue #129 — deleted open session panel tombstone (2026-06-02)
+
+#### DSP.1 - Deleting an open session makes its panel read-only
+
+- [ ] result:
+- **Steps:** Run `bun run dev`; open a saved session from the Sessions Manager so its chat panel/tab is visible. In the Sessions Manager, permanently delete that same session and accept the confirmation. Try typing/sending in the still-open panel, and inspect the tab label/icon.
+- **Expected:** The panel remains open but clearly says the session was deleted, the composer is disabled/read-only, no new message is accepted or sent, and the tab indicates the deleted state.
+- **Why not automated:** Requires the real Sessions Manager confirmation flow, dockview tab rendering, and Lexical disabled/editability behavior inside the live Electrobun WebView.
 ### Issue #127 — agent Select/Deselect transition (2026-06-01)
 
 > Intent-gap follow-up to dogfood item 99.1: the literal no-spinner-flash check

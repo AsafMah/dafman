@@ -32,6 +32,9 @@ const props = defineProps<{
   /// Tool-specific payloads — JSON-stringified args / raw result.
   toolArgsText?: string;
   toolResultText?: string;
+  /// Read-only transcript mode. Copy remains available; actions that
+  /// mutate or target the session (quote/edit/retry/fork) are disabled.
+  readOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -116,7 +119,7 @@ function quoteToCommand(text: string): string {
       text
       size="small"
       class="msg-action"
-      :disabled="!text"
+      :disabled="!text || readOnly"
       @click="emit('quote', quoteToCommand(text ?? ''))"
     />
 
@@ -128,7 +131,7 @@ function quoteToCommand(text: string): string {
       text
       size="small"
       class="msg-action"
-      :disabled="!text || !canAnchor"
+      :disabled="!text || !canAnchor || readOnly"
       :title="
         canAnchor
           ? 'Edit and resend (replaces history from here)'
@@ -145,7 +148,7 @@ function quoteToCommand(text: string): string {
       text
       size="small"
       class="msg-action"
-      :disabled="!canAnchor"
+      :disabled="!canAnchor || readOnly"
       title="Re-run the previous user message"
       @click="emit('retry')"
     />
@@ -158,7 +161,7 @@ function quoteToCommand(text: string): string {
       text
       size="small"
       class="msg-action"
-      :disabled="!canAnchor"
+      :disabled="!canAnchor || readOnly"
       title="Create a new session branched at this point"
       @click="emit('fork')"
     />
