@@ -70,6 +70,38 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #137 — chat transcript scroll anchoring (2026-06-01)
+
+> All four verified PASS during the 2026-06-01 dogfood (live `bun run dev`).
+
+#### SC.1 - At the bottom, streaming sticks to the bottom.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — stays pinned to the bottom as the reply streams.
+- **Steps:** open a session, scroll to the bottom, send a prompt and let the reply stream in.
+- **Expected:** the transcript stays pinned to the bottom, following the newest content.
+- **Why not automated:** real streaming cadence + live scroll metrics; happy-dom reports 0 scroll dimensions so the unit test can't exercise the pinned-follow visually.
+
+#### SC.2 - Scrolled up, streaming does NOT yank; a "Jump to latest" pill appears.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — position held; pill appeared.
+- **Steps:** while a reply is streaming, scroll up to re-read an earlier message; keep watching.
+- **Expected:** your scroll position is held (no yank to bottom); a floating **Jump to latest** pill appears once new content lands below.
+- **Why not automated:** the no-yank guarantee depends on real DOM scroll events + frame timing.
+
+#### SC.3 - The pill returns you to the latest on click.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — click landed at the bottom, pill dismissed.
+- **Steps:** with the pill showing (from SC.2), click it.
+- **Expected:** the transcript jumps to the bottom and the pill disappears; you're re-pinned.
+- **Why not automated:** visual affordance + landing position.
+
+#### SC.4 - Focusing a session restores position, never the top.
+
+- [x] result: ✓ PASS (2026-06-01 dogfood) — pinned sessions reopen at bottom; scrolled-up sessions keep position; none jumped to top.
+- **Steps:** open several sessions; in one scroll up, in another stay at the bottom; click between them.
+- **Expected:** a pinned session reopens at the bottom; a scrolled-up session keeps its position; neither lands at the very top.
+- **Why not automated:** multi-session focus timing + per-session scroll restore.
+
 ### Single-instance guard + canary coexistence (2026-05-31)
 
 #### SI.1 - Second instance on the same channel is blocked, not crashed.

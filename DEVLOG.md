@@ -42,6 +42,70 @@ misleading and would waste the next dogfooder's time chasing the EACCES).
   remaining failure in the broader queue is #136 (110.2, command-result staged
   as file not inlined), already filed.
 
+## 2026-06-01 — unified chat scroll anchoring (#137)
+
+**Takeaway:** replaced the scattered `scrollToBottom()` calls with a single
+pin-based anchoring model so the transcript stops fighting the user. Two bugs
+fixed: (A) streaming yanked you to the bottom while you were reading earlier
+messages; (B) focusing/switching into a session sometimes jumped to the top.
+
+**Model (`useChatScroll.ts`):** `isPinned` flips **only** on real DOM scroll
+events via VueUse `useScroll`'s `onScroll` (fires after `setArrivedState`,
+`node_modules/@vueuse/core/dist/index.js:4615`). Pin when `arrivedState.bottom`;
+un-pin **only** when `directions.top` (scrollTop decreased = user scrolled up).
+This is the key race-fix: content-growth and programmatic bottom-scrolls both
+scroll *down*, so streaming can never un-pin a user sitting at the bottom (a
+naive `isPinned = arrivedState.bottom` would flicker un-pinned during growth).
+`autoScrollIfPinned()` re-checks the pin **after** the nextTick + double-rAF gate
+(TOCTOU: the user may scroll up during those 2 frames) before writing to the
+bottom; if not pinned it sets `hasUnseenLatest`. `showJumpToLatest =
+!isPinned && hasUnseenLatest` drives the floating pill (`ChatWindow.vue`).
+`useElementVisibility` re-pins on panel re-activation.
+
+**Bug-1 site:** `useChatTimelineState.ts:179` flushed with an unconditional
+scroll — the injected option is now `afterFlush` (wired to `autoScrollIfPinned`).
+**Bug-2 sites:** initial scroll is orchestrated in `ChatWindow.onMounted`
+(`consumePendingReveal().then(revealed => { if (!revealed) scrollToBottom() })`
+— reveal #16 owns the scroll when a card reveal is pending, else bottom);
+`focus-composer` now routes to `autoScrollIfPinned` (restore-aware) and
+`SessionsManager.vue` no longer force-emits `scroll-to-bottom` on an
+already-open session. `scroll-to-bottom` bus event now has no emitters; the
+`ChatWindow` listener is kept as the canonical force-to-bottom primitive.
+
+**Tests:** `ChatWindow.test.ts` gained `installScrollMetrics()` /
+`rerenderProps()` helpers (happy-dom reports scrollHeight/clientHeight = 0, so
+`arrivedState.bottom` is true by default and the existing tests keep auto-
+scrolling; to exercise the scrolled-up path tests `Object.defineProperty` the
+metrics and dispatch synthetic `scroll` events — first at the bottom to seed
+`internalY`+pin, then up to trigger the `directions.top` un-pin). 12 tests pass.
+
+**Runtime-verified (dogfood SC.1–SC.4, all PASS):** stick-at-bottom; no-yank +
+pill while scrolled up; pill jumps to latest; focus never lands at top.
+
+**Gate:** vue-tsc 0, eslint 0 errors, `bun test ChatWindow` 13 pass, smoke 4.
+
+**Review finding (PR #138, fixed):** the code-review pass caught a Medium race
+in the reveal (#16) integration — `revealTarget`'s synchronous `unpin()` could
+be silently undone by the trailing **async** `scrollIntoView` `scroll` event:
+when the revealed card sits within `AT_BOTTOM_OFFSET_PX` of the tail that event
+has `arrivedState.bottom === true` and re-pins, so the next flush yanks the user
+off the just-revealed card. Fix: `unpin()` sets a `suppressNextRepin` flag and
+`onScroll` swallows the FIRST scroll event after an unpin (the programmatic
+settle) — deterministic, no wall-clock guess; the flag self-clears on that first
+event so a mid-transcript reveal never leaves it armed, and a real upward scroll
+still un-pins. (First cut used a 300ms `repinSuppressedUntil` timestamp; replaced
+on the rule-0 pre-flight self-check — a hardcoded timing window is the exact
+magic-number workaround rules 0/16 warn against.) Regression test "reveal near
+the tail is not undone by the trailing scrollIntoView scroll event" — verified
+failing with the guard disabled.
+
+**Git note:** this work was initially staged on `feat/composer-enter-keybindings`
+(PR #125) by accident; split onto `fix/chat-scroll-anchoring` off `main` via
+`git stash` → `checkout -b … origin/main` → `stash pop` (clean 3-way, #125's
+6-line ChatWindow comment change correctly absent). The intermingled
+MANUAL_TESTS dogfood result-fills (KB.* etc.) were committed to the Enter branch
+where the KB section lives.
+
 ## 2026-05-31 — release-channel indicator (StatusBar pill + window title)
 
 **Takeaway:** a dev/canary build now self-identifies, so a side-by-side
