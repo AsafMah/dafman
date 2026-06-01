@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (#135 — duplicate session event forwarding — 2026-06-01)
+- **Chat session events now render once instead of twice.** Fresh-created and resumed sessions no longer double-forward the SDK stream through both `config.onEvent` and `session.on`, fixing duplicate user messages, duplicate reasoning blocks, and doubled backend event log lines.
+
 ### Fixed (#137 — chat scroll anchoring — 2026-06-01)
 - **The chat transcript now stays where you put it.** Scrolling up to re-read an earlier message no longer gets yanked back to the bottom when new content streams in — the transcript sticks to the bottom only while you're actually at the bottom. When new content arrives while you're scrolled up, a floating **"Jump to latest"** pill appears and returns you on click instead of stealing your position. Focusing or switching into a session now *restores* its scroll position (pinned → bottom; scrolled-up → keep where you were) and never jumps to the top. Implemented as one anchoring model in `useChatScroll.ts` (VueUse `useScroll`: pin on `arrivedState.bottom`, un-pin only on an actual upward scroll, so streaming and content-growth can't un-pin you), replacing the previous unconditional `scrollToBottom()` on every flush. Regression coverage in `src/components/chat/__tests__/ChatWindow.test.ts`; runtime-only behavior (focus restore, pill, no-yank) in `MANUAL_TESTS.md` SC.1–SC.4.
 
