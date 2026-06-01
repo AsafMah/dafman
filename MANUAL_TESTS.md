@@ -256,6 +256,26 @@ section is verified) or get a GitHub issue filed (with label
 - **Why not automated:** end-to-end delete + new-session creation against the real
   on-disk store and SDK catalog.
 
+### Issue #81 — SDK-rejected custom agents are flagged (2026-05-31)
+
+#### 81.1 - Bad `.agent.md` is visibly rejected and `/agent` reports the validation error.
+
+- [ ] result:
+
+- **Steps:**
+  1. In `bun run dev`, open a session in any workspace.
+  2. Create `~/.copilot/agents/broken-agent.agent.md` with frontmatter that has
+     `description` but an invalid modeled key, e.g. `mcp-servers.github` without
+     the required `tools: []`.
+  3. Open Library → Agents and click **Refresh**.
+  4. Try the row action for `broken-agent`, then run `/agent broken-agent` in the
+     composer.
+- **Expected:** the row is marked **SDK rejected**, displays the SDK validation
+  message, the row action shows the same actionable message, and `/agent
+  broken-agent` reports the load failure instead of "No agent named".
+- **Why not automated:** the final confidence check depends on the real Copilot
+  SDK/CLI discovery + reload path and live file locations outside the test fake.
+
 ### Issue #36 — `postToolUseFailure` hook → Activity log + Jobs panel (2026-05-31)
 
 #### 36.1 - A failed tool execution appears in the Activity log with the SDK error.
