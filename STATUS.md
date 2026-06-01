@@ -24,6 +24,16 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
+**Recently fixed:** Composer Enter keybindings — the composer now sends on plain
+**Enter** (the conventional chat default) under a fixed chord scheme
+(Shift+Enter soft newline, Ctrl+Enter hard newline, Alt+Enter steer,
+Ctrl+Shift+Enter queue, Ctrl+Alt+Enter interrupt); an open `/`/`@` typeahead
+menu still wins Enter to select. Pure resolver `resolveEnterAction`
+(`src/lexical/plugins.ts`) + per-editor menu registry
+(`src/lexical/composerMenuState.ts`). This is a fixed scheme, not a setting —
+supersedes the #88 "submit-keybinding setting" proposal (PR #102 closed).
+Manual keyboard walk pending: `MANUAL_TESTS.md` KB.1–KB.6.
+
 **Recently fixed:** #137 — chat transcript scroll anchoring: streaming no longer
 yanks you to the bottom while you're reading earlier messages (a "Jump to latest"
 pill offers the return instead), and focusing/switching into a session restores

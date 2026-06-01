@@ -102,6 +102,56 @@ section is verified) or get a GitHub issue filed (with label
 - **Expected:** a pinned session reopens at the bottom; a scrolled-up session keeps its position; neither lands at the very top.
 - **Why not automated:** multi-session focus timing + per-session scroll restore.
 
+### Composer Enter keybindings — fixed chord scheme (2026-05-31)
+
+> Plain Enter now sends. Full scheme: Enter=send (current mode),
+> Shift+Enter=soft newline, Ctrl/Cmd+Enter=hard newline, Alt+Enter=steer,
+> Ctrl+Shift+Enter=queue, Ctrl+Alt+Enter=interrupt. The e2e flows cover the
+> happy send + @-pill path; these manual checks cover the keyboard/menu-timing
+> interactions automation can't assert with confidence.
+
+#### KB.1 - Plain Enter sends at the current mode
+
+- [ ] result:
+- **Steps:** In an empty chat, set the send-mode toggle to **Steer**, type `hello`, press **Enter**. Then set the toggle to **Queue**, type `world`, press **Enter** while a turn is running.
+- **Expected:** First message sends immediately (steer). Second is queued behind the running turn (queue) — not interrupting.
+- **Why not automated:** Mode-toggle + live-turn timing; the e2e fake doesn't model steer-vs-queue scheduling visibly.
+
+#### KB.2 - Ctrl+Enter inserts a hard newline; Shift+Enter a soft one
+
+- [ ] result:
+- **Steps:** Type `line one`, press **Ctrl+Enter**, type `line two`. Then press **Shift+Enter** and type `line three`. Do NOT send.
+- **Expected:** Nothing sends. You see three visible lines in the composer (Ctrl+Enter = block/paragraph break, Shift+Enter = soft break within). Caret stays in the editor.
+- **Why not automated:** Visual caret/line rendering inside Lexical.
+
+#### KB.3 - Enter selects a slash/mention menu item instead of sending
+
+- [ ] result:
+- **Steps:** Type `/` and wait for the slash menu; arrow to a command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
+- **Expected:** Enter runs the highlighted slash command (no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
+- **Why not automated:** Flow 02 covers the @-pill case; the slash-run case and the "no accidental send" assertion are worth an eyeball.
+
+#### KB.4 - Enter on a zero-match `/` or `@` SENDS the raw text
+
+- [ ] result:
+- **Steps:** Type `/notacommand` (no menu match), press **Enter**. Then type `@zzzznomatch`, wait for the picker to settle empty, press **Enter**.
+- **Expected:** Each sends the raw text as a normal message (no menu was active to capture Enter).
+- **Why not automated:** Depends on the async file-search settling to empty before the keystroke — timing-sensitive.
+
+#### KB.5 - Modifier sends ignore the menu; Shift+Enter in a menu is a soft break
+
+- [ ] result:
+- **Steps:** With a `/` or `@` menu open: press **Alt+Enter** (steer), and in another attempt **Ctrl+Shift+Enter** (queue) and **Ctrl+Alt+Enter** (interrupt). Separately, with a menu open, press **Shift+Enter**.
+- **Expected:** The three modifier chords send immediately (menu does not capture them). Shift+Enter inserts a soft newline (does NOT select the highlighted menu item).
+- **Why not automated:** Menu-open + modifier-chord timing; the "Shift+Enter doesn't select" guard is the subtle one.
+
+#### KB.6 - Enter on an empty composer does nothing; IME commit doesn't send
+
+- [ ] result:
+- **Steps:** With an empty composer, press **Enter** a few times. Then (if you have an IME) type with composition and press Enter to COMMIT a candidate.
+- **Expected:** Empty Enter does nothing (no stray newline, no send). The IME-commit Enter commits the candidate and does NOT send the message.
+- **Why not automated:** Native IME composition can't be driven reliably in CI.
+
 ### Single-instance guard + canary coexistence (2026-05-31)
 
 #### SI.1 - Second instance on the same channel is blocked, not crashed.

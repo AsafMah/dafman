@@ -29,7 +29,7 @@ test("Export JSON contains user + assistant items after a turn", async ({ page }
   await composer.waitFor({ state: "visible", timeout: 15_000 });
   await composer.click();
   await page.keyboard.type("hello world");
-  await page.keyboard.press("Control+Enter");
+  await page.keyboard.press("Enter");
   // Wait for assistant reply to render so we know events have flowed
   // into the store (and therefore into rec.events).
   await expect(page.locator("text=ok: hello world").first()).toBeVisible({ timeout: 5_000 });

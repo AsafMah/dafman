@@ -12,7 +12,8 @@
 // Mode semantics:
 // - `default` → resolved against the session's `defaultSendMode`
 //   (`steer` or `queue`)
-// - `queue` / `interrupt` → passed through unchanged
+// - `steer` / `queue` / `interrupt` → passed through unchanged (each is
+//   already a concrete `SendMode`)
 //
 // The busy guard (`isSending.value`) is intentionally NOT here:
 // queuing/steering while a turn is in flight is the whole point of
