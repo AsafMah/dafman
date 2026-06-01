@@ -781,4 +781,52 @@ describe('ChatWindow', () => {
     expect(m.scrollTop).toBe(1000);
     expect(utils.container.querySelector('.jump-to-latest')).toBeNull();
   });
+
+  test('reveal near the tail is not undone by the trailing scrollIntoView scroll event', async () => {
+    // Regression (PR #138 review): scrollIntoView dispatches its `scroll`
+    // event ASYNC. When a revealed card sits within AT_BOTTOM_OFFSET_PX of
+    // the tail, that trailing event has arrivedState.bottom === true and
+    // would re-pin — undoing revealTarget's unpin() so the next flush yanks
+    // the user off the card. The UNPIN_REPIN_GUARD_MS guard must swallow it.
+    const restores = ensureRevealDomShims();
+
+    try {
+      const utils = await mountChat({
+        events: [toolEvent('tc-1'), assistantEvent('hi', 'e2')],
+      });
+      const el = utils.container.querySelector('.chat-messages') as HTMLElement;
+      const m = installScrollMetrics(el);
+
+      // User starts pinned at the bottom.
+      m.scrollTop = 700;
+      el.dispatchEvent(new Event('scroll'));
+      await nextTick();
+
+      // Reveal an up-transcript card → revealTarget scrollIntoViews it and
+      // unpins (arming the guard).
+      const layout = useLayoutStore();
+
+      layout.requestReveal('s1', { toolCallId: 'tc-1' });
+      await flushFrames(10);
+
+      // The trailing programmatic scrollIntoView event lands in the bottom
+      // zone (near-tail target). Without the guard this re-pins.
+      m.scrollTop = 750;
+      el.dispatchEvent(new Event('scroll'));
+      await nextTick();
+
+      // New content streams in.
+      await utils.rerender(
+        rerenderProps([toolEvent('tc-1'), assistantEvent('hi', 'e2'), assistantEvent('more', 'e3')]),
+      );
+      await flushFrames();
+
+      // The reveal stuck: the user was NOT yanked to the bottom, and the
+      // pill is offered instead.
+      expect(m.scrollTop).toBe(750);
+      expect(utils.container.querySelector('.jump-to-latest')).not.toBeNull();
+    } finally {
+      for (const r of restores) r();
+    }
+  });
 });

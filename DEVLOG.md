@@ -82,7 +82,18 @@ metrics and dispatch synthetic `scroll` events — first at the bottom to seed
 **Runtime-verified (dogfood SC.1–SC.4, all PASS):** stick-at-bottom; no-yank +
 pill while scrolled up; pill jumps to latest; focus never lands at top.
 
-**Gate:** vue-tsc 0, eslint 0 errors, `bun test ChatWindow` 12 pass, smoke 4.
+**Gate:** vue-tsc 0, eslint 0 errors, `bun test ChatWindow` 13 pass, smoke 4.
+
+**Review finding (PR #138, fixed):** the code-review pass caught a Medium race
+in the reveal (#16) integration — `revealTarget`'s synchronous `unpin()` could
+be silently undone by the trailing **async** `scrollIntoView` `scroll` event:
+when the revealed card sits within `AT_BOTTOM_OFFSET_PX` of the tail that event
+has `arrivedState.bottom === true` and re-pins, so the next flush yanks the user
+off the just-revealed card. Fix: `unpin()` arms a `repinSuppressedUntil`
+timestamp (`UNPIN_REPIN_GUARD_MS = 300`) and `onScroll` skips the bottom-zone
+re-pin while it's live (a real upward scroll still un-pins and clears the guard).
+Regression test "reveal near the tail is not undone by the trailing
+scrollIntoView scroll event" — verified failing with the guard disabled.
 
 **Git note:** this work was initially staged on `feat/composer-enter-keybindings`
 (PR #125) by accident; split onto `fix/chat-scroll-anchoring` off `main` via
