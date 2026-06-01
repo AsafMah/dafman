@@ -56,6 +56,41 @@ menu-defer resolver behavior was not regressed.
 previous wording could pass accidentally by selecting the first command. KB.7
 covers the Tab completion half of #132.
 
+## 2026-06-01 — agent select busy state scoped (#127)
+
+**Takeaway:** the Session Details agent-list flash was not a PrimeVue spinner bug;
+it was our own bulk disabled-state binding. Every row used
+`:disabled="!!agentBusyName"`, so one select/deselect IPC flipped every Select /
+Deselect button disabled→enabled in the same render. The fix scopes the visual
+disabled state to the row whose operation is pending while leaving the
+composable's global `agentBusyName` early-return guard intact, so cross-row
+clicks during an in-flight select still no-op instead of launching concurrent SDK
+agent RPCs.
+
+**Receipts:**
+- `src/components/session/SessionDetailsPanel.vue` now disables Select with
+  `agentBusyName === agent.name`; the active Deselect row handles both its
+  `__deselect__` sentinel and a same-row select busy state. Other rows stay
+  visually enabled, eliminating the whole-list flash.
+- The active row's Select ↔ Deselect swap is wrapped in Vue's built-in
+  `<Transition>` with an opacity fade and a fixed action shell so the adjacent
+  file-edit affordance doesn't jump during the cross-fade. No new dependency and
+  no keyframes.
+- Rubber-duck critique caught the important sentinel pitfall: a naive
+  `agentBusyName === agent.name` on Deselect would have left the clicked Deselect
+  button enabled because `deselectAgent()` stores `__deselect__`.
+- Regression coverage:
+  `src/components/session/__tests__/SessionDetailsPanel.agentActions.test.ts`
+  keeps `selectAgent` / `deselectAgent` promises pending and asserts only the
+  clicked row is disabled; it also clicks a second enabled row and verifies the
+  global handler guard prevents a second select RPC.
+
+**Validation:**
+- `bun test src/components/session/__tests__/SessionDetailsPanel.agentActions.test.ts`
+- `bun run lint`
+- `bun run lint:eslint` (existing warnings only; 0 errors)
+- `bun run smoke`
+
 ## 2026-06-01 — single-instance guard dogfooded (SI.1/SI.2 PASS)
 
 **Takeaway:** the single-instance guard (`src-bun/app/shared/singleInstance.ts`)
