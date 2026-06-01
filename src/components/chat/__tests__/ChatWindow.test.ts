@@ -787,7 +787,7 @@ describe('ChatWindow', () => {
     // event ASYNC. When a revealed card sits within AT_BOTTOM_OFFSET_PX of
     // the tail, that trailing event has arrivedState.bottom === true and
     // would re-pin — undoing revealTarget's unpin() so the next flush yanks
-    // the user off the card. The UNPIN_REPIN_GUARD_MS guard must swallow it.
+    // the user off the card. unpin()'s suppress-next-repin flag must swallow it.
     const restores = ensureRevealDomShims();
 
     try {

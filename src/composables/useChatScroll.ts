@@ -50,18 +50,6 @@ import { useElementVisibility, useResizeObserver, useScroll } from '@vueuse/core
 /// message". Locked dogfood spec (2026-06-01 scroll total-solution).
 const AT_BOTTOM_OFFSET_PX = 80;
 
-/// After `unpin()` (the reveal flow lands on an up-transcript card), the
-/// browser dispatches the `scrollIntoView`-induced `scroll` event
-/// ASYNCHRONOUSLY. If the revealed card sits within `AT_BOTTOM_OFFSET_PX`
-/// of the tail, that trailing event would re-enter `onScroll` with
-/// `arrivedState.bottom === true` and silently re-pin — undoing the
-/// unpin and letting the next flush yank the user off the card. We
-/// suppress exactly that bottom-zone re-pin for a short window after an
-/// `unpin()` so the reveal sticks. The window only gates programmatic
-/// settle; a real upward user scroll (`directions.top`) still un-pins,
-/// and any bottom arrival after it expires re-pins normally.
-const UNPIN_REPIN_GUARD_MS = 300;
-
 export interface UseChatScrollReturn {
   /// Force the transcript to the latest message and pin it there.
   /// Explicit user intent only.
@@ -89,10 +77,16 @@ export function useChatScroll(
   /// moment they return to (or are snapped back to) the bottom.
   const hasUnseenLatest = ref(false);
 
-  /// Timestamp (ms) until which an `arrivedState.bottom` re-pin is
-  /// suppressed — set by `unpin()` to survive the trailing programmatic
-  /// scrollIntoView event (see UNPIN_REPIN_GUARD_MS).
-  let repinSuppressedUntil = 0;
+  /// `unpin()` (reveal flow) sets isPinned=false synchronously, but the
+  /// browser then dispatches the `scrollIntoView`-induced `scroll` event
+  /// ASYNCHRONOUSLY. For a near-tail reveal that trailing event arrives
+  /// with `arrivedState.bottom === true` and would re-pin, undoing the
+  /// unpin so the next flush yanks the user off the card. We swallow
+  /// exactly the FIRST scroll event after an unpin (the programmatic
+  /// settle) — deterministic, no wall-clock guess. A real upward scroll
+  /// still un-pins; the flag self-clears on that first event so a
+  /// mid-transcript reveal never leaves a stale guard armed.
+  let suppressNextRepin = false;
 
   const { arrivedState, directions } = useScroll(messagesEl, {
     offset: { bottom: AT_BOTTOM_OFFSET_PX },
@@ -102,16 +96,17 @@ export function useChatScroll(
     // never up), so our own scrollToBottom / streaming can never
     // accidentally un-pin the user.
     onScroll() {
+      // Consume the post-unpin settle on the first event, whatever its
+      // position, so a mid-transcript reveal can't leave it armed.
+      const settling = suppressNextRepin;
+
+      suppressNextRepin = false;
+
       if (arrivedState.bottom) {
-        // Suppress the trailing programmatic re-pin right after a reveal
-        // unpin (the scrollIntoView scroll event lands here); a real
-        // upward scroll below still un-pins via the else-branch.
-        if (Date.now() < repinSuppressedUntil) return;
+        if (settling) return;
 
         isPinned.value = true;
       } else if (directions.top) {
-        // User scrolled up out of the bottom zone — end any reveal guard.
-        repinSuppressedUntil = 0;
         isPinned.value = false;
       }
     },
@@ -162,7 +157,7 @@ export function useChatScroll(
 
   function unpin(): void {
     isPinned.value = false;
-    repinSuppressedUntil = Date.now() + UNPIN_REPIN_GUARD_MS;
+    suppressNextRepin = true;
   }
 
   // Re-pin when the panel becomes visible again. dockview hides inactive

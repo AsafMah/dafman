@@ -89,11 +89,15 @@ in the reveal (#16) integration — `revealTarget`'s synchronous `unpin()` could
 be silently undone by the trailing **async** `scrollIntoView` `scroll` event:
 when the revealed card sits within `AT_BOTTOM_OFFSET_PX` of the tail that event
 has `arrivedState.bottom === true` and re-pins, so the next flush yanks the user
-off the just-revealed card. Fix: `unpin()` arms a `repinSuppressedUntil`
-timestamp (`UNPIN_REPIN_GUARD_MS = 300`) and `onScroll` skips the bottom-zone
-re-pin while it's live (a real upward scroll still un-pins and clears the guard).
-Regression test "reveal near the tail is not undone by the trailing
-scrollIntoView scroll event" — verified failing with the guard disabled.
+off the just-revealed card. Fix: `unpin()` sets a `suppressNextRepin` flag and
+`onScroll` swallows the FIRST scroll event after an unpin (the programmatic
+settle) — deterministic, no wall-clock guess; the flag self-clears on that first
+event so a mid-transcript reveal never leaves it armed, and a real upward scroll
+still un-pins. (First cut used a 300ms `repinSuppressedUntil` timestamp; replaced
+on the rule-0 pre-flight self-check — a hardcoded timing window is the exact
+magic-number workaround rules 0/16 warn against.) Regression test "reveal near
+the tail is not undone by the trailing scrollIntoView scroll event" — verified
+failing with the guard disabled.
 
 **Git note:** this work was initially staged on `feat/composer-enter-keybindings`
 (PR #125) by accident; split onto `fix/chat-scroll-anchoring` off `main` via
