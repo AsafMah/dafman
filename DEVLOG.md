@@ -8,6 +8,40 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-01 — single-instance guard dogfooded (SI.1/SI.2 PASS)
+
+**Takeaway:** the single-instance guard (`src-bun/app/shared/singleInstance.ts`)
+works exactly as designed when a 2nd same-channel instance launches — but you
+**cannot** observe it via two `bun run dev` invocations. `electrobun dev --watch`
+aborts at its rebuild step with `EACCES: permission denied, rm
+'build/dev-win-x64'` (the live instance locks the build dir) **before** bun-main
+ever runs, so the guard is never reached. The faithful repro is the already-built
+launcher `build/dev-win-x64/dafman-dev/bin/launcher.exe`, which spawns the real
+bun-main against the real channel lock — the same path a packaged 2nd instance
+hits. Updated SI.1's steps in `MANUAL_TESTS.md` to say so (the previous step was
+misleading and would waste the next dogfooder's time chasing the EACCES).
+
+**Receipts:**
+- **SI.1 PASS** — launching `launcher.exe` while the dev instance ran printed
+  `dafman is already running for this channel (pid 176084). Exiting this
+  instance.`, emitted `{"level":"warn","message":"duplicate instance
+  blocked","existingPid":176084}`, then `[stopEventLoop] clean event loop exit`
+  with exit code 0. No 2nd window (the guard `process.exit(0)`s at the top of
+  `src-bun/index.ts`, before any BrowserWindow). First instance's 4 procs
+  untouched.
+- **SI.2 PASS** — reclaim of a stale dead-PID lock verified end-to-end with the
+  *real* liveness probe (no injected seam): spawned+killed a process (pid 256784),
+  confirmed dead via the same `process.kill(pid,0)` the guard uses, wrote a real
+  lock file owned by it, then ran the real `acquireSingleInstanceLock` on a
+  throwaway path → `acquired:true`, lock rewritten to our own pid. The
+  user's live dev lock was never touched. Unit coverage:
+  `src-bun/__tests__/singleInstance.test.ts:54` (dead-process reclaim, real fs).
+- **SI.3/SI.4 DEFERRED** — need an installed canary alongside dev; canary isn't
+  dogfood-ready yet (user).
+- This closes the actionable part of the single-instance dogfood section; the
+  remaining failure in the broader queue is #136 (110.2, command-result staged
+  as file not inlined), already filed.
+
 ## 2026-05-31 — release-channel indicator (StatusBar pill + window title)
 
 **Takeaway:** a dev/canary build now self-identifies, so a side-by-side

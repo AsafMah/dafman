@@ -74,10 +74,19 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.1 - Second instance on the same channel is blocked, not crashed.
 
-- [ ] result:
+- [x] result: ✓ PASS (2026-06-01 dogfood) — 2nd instance printed *"dafman is already
+  running for this channel (pid 176084). Exiting this instance."*, emitted the
+  `duplicate instance blocked` warn line (existingPid 176084), exited cleanly (code 0,
+  `[stopEventLoop] clean event loop exit`), no 2nd window, first instance untouched.
+  NOTE: a 2nd `bun run dev` can't reach the guard — `electrobun dev --watch` aborts at
+  its rebuild step with `EACCES rm build/dev-win-x64` (the live instance locks the build
+  dir) before bun-main runs. Validated instead via the already-built launcher
+  `build/dev-win-x64/dafman-dev/bin/launcher.exe`, the faithful guard path (same bun-main +
+  same channel lock a packaged 2nd instance hits).
 
-- **Steps:** start dafman with `bun run dev`. With it still running, open a second
-  terminal and run `bun run dev` again (same `dev` channel).
+- **Steps:** start dafman with `bun run dev`. With it still running, launch the
+  already-built `build/dev-win-x64/dafman-dev/bin/launcher.exe` (a 2nd `bun run dev`
+  instead dies at electrobun's rebuild on the locked build dir, never reaching the guard).
 - **Expected:** the second invocation prints a loud note like *"dafman is already
   running for this channel (pid N). Exiting this instance."* and exits cleanly;
   no second app window appears, the first window keeps working, and the shared
@@ -89,7 +98,13 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.2 - A force-killed instance's stale lock is reclaimed on next launch.
 
-- [ ] result:
+- [x] result: ✓ PASS (2026-06-01 dogfood) — verified the real reclaim path on a throwaway
+  lock without disturbing the live instance: spawned + killed a process (pid 256784),
+  confirmed it dead via the same `process.kill(pid,0)` probe the guard uses, wrote a real
+  lock file owned by that dead pid, then ran the real `acquireSingleInstanceLock` (no
+  injected seam) → `acquired:true`, lock rewritten to our own pid. Also unit-covered:
+  `src-bun/__tests__/singleInstance.test.ts:54` ('takes over a stale lock left by a dead
+  process', real fs).
 
 - **Steps:** `bun run dev`, then force-kill it (`Stop-Process -Id <app-bun-pid>`,
   i.e. Task Manager / TerminateProcess — NOT a clean Ctrl-C). Immediately
@@ -101,7 +116,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.3 - A canary instance runs alongside the dev instance.
 
-- [ ] result:
+- [ ] result: ⏸ DEFERRED (2026-06-01) — canary build not dogfood-ready yet (user); revisit once it installs/launches cleanly.
 
 - **Steps:** with `bun run dev` running, run `bun run install:canary` and complete
   the Setup installer (accept the UAC prompt), then launch the installed canary app.
@@ -113,7 +128,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SI.4 - The installed canary can actually start a chat (SDK loads).
 
-- [ ] result:
+- [ ] result: ⏸ DEFERRED (2026-06-01) — depends on SI.3 (canary install); canary not dogfood-ready yet (user).
 
 - **Steps:** after installing canary (SI.3), open a session and send a message.
 - **Expected:** the agent responds normally — NO `Cannot find module
