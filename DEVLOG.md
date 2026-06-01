@@ -91,6 +91,32 @@ agent RPCs.
 - `bun run lint:eslint` (existing warnings only; 0 errors)
 - `bun run smoke`
 
+## 2026-06-01 — tab-bar maximize affordance restored (#128)
+
+**Takeaway:** restored the tab-bar maximize/restore affordance that regressed
+after the dockview/tab refactors. `5a1da9e` originally added a custom
+`ChatTab` button (not a dockview-native option) wired to
+`panel.api.maximize()` / `exitMaximized()`; dockview 6.6.1 exposes those APIs
+but no built-in maximize button in `DockviewOptions`, only custom header-action
+renderers. Current v3 layout has two tab surfaces, so the regression fix restores
+the custom button on both inner session tabs (`ChatTab.vue`) and outer group tabs
+(`GroupTab.vue`) via shared `usePanelLifecycle` state.
+
+**Receipts:**
+- Original baseline: `git show 5a1da9e` says "ChatTab: maximize/restore toggle
+  button next to close (uses dockview panel.api.maximize()/exitMaximized())".
+- Native-vs-custom check: `node_modules/dockview-core/dist/esm/dockview/options.d.ts`
+  has header action hooks but no native maximize-button option; panel APIs expose
+  `maximize()` / `isMaximized()` / `exitMaximized()`.
+- Restored wiring: `src/composables/usePanelLifecycle.ts` tracks maximized state
+  and toggles the panel API; `src/components/chat/ChatTab.vue` and
+  `src/components/shell/GroupTab.vue` render accessible Maximize/Restore buttons.
+- Tests: `src/components/chat/__tests__/ChatTab.maximize.test.ts` and
+  `src/components/shell/__tests__/GroupTab.closeConfirm.test.ts` assert the
+  button renders and invokes maximize/restore.
+- Manual checklist: `MANUAL_TESTS.md` MX.1 covers the live dockview visual
+  interaction; e2e layout flow 21 + `bun run smoke` are the runtime gates.
+
 ## 2026-06-01 — single-instance guard dogfooded (SI.1/SI.2 PASS)
 
 **Takeaway:** the single-instance guard (`src-bun/app/shared/singleInstance.ts`)
