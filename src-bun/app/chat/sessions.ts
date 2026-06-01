@@ -24,7 +24,7 @@ import { buildBuiltInTools } from '../library/tools';
 import { searchWorkspaceFiles } from '../filesystem/fileSearch';
 import { type AgentFileSpec, type AgentScope as AgentFileScope } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
-import { commandResultBlobAttachment } from './sessionHelpers';
+import { commandResultPromptBlock, stripCommandResultPromptBlocks } from './sessionHelpers';
 import { isHostInlinableBlobMime, stageBlobToFile } from './attachmentStaging';
 import {
   type AgentLoadDiagnostics,
@@ -169,6 +169,10 @@ export class SessionRegistry {
   private readonly mcp: SessionMcpService;
   private readonly forwarder: SessionEventForwarder;
   private readonly metadata: SessionMetadataService;
+  private readonly promptEchoRewrites = new Map<
+    string,
+    Array<{ sdkPrompt: string; displayPrompt: string }>
+  >();
 
   /// `streamingResolver` is called at session create/resume time to
   /// pick the current SDK streaming mode. Decoupled from on-disk
@@ -733,7 +737,70 @@ export class SessionRegistry {
   /// `session.on(...)` subscription that calls this.
   private forward(sessionId: string, event: SessionEvent): void {
     this.captureAgentLoadDiagnostics(sessionId, event);
-    this.forwarder.forward(sessionId, event);
+    this.forwarder.forward(sessionId, this.rewritePromptEchoForDisplay(sessionId, event));
+  }
+
+  private rememberPromptEchoRewrite(
+    sessionId: string,
+    sdkPrompt: string,
+    displayPrompt: string,
+  ): void {
+    const rewrites = this.promptEchoRewrites.get(sessionId) ?? [];
+
+    rewrites.push({ sdkPrompt, displayPrompt });
+    this.promptEchoRewrites.set(sessionId, rewrites);
+  }
+
+  private rewritePromptEchoForDisplay(sessionId: string, event: SessionEvent): SessionEvent {
+    if (event.type !== 'user.message') return event;
+
+    const rawData = (event as { data?: unknown }).data;
+
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return event;
+
+    const data = rawData as Record<string, unknown>;
+    const content = ['content', 'text', 'message']
+      .map((key) => data[key])
+      .find((value): value is string => typeof value === 'string');
+
+    if (!content) return event;
+
+    const displayPrompt =
+      this.takePromptEchoRewrite(sessionId, content) ?? stripCommandResultPromptBlocks(content);
+
+    if (displayPrompt === content) return event;
+
+    const rewrittenData = { ...data };
+
+    for (const key of ['content', 'text', 'message']) {
+      if (rewrittenData[key] === content) {
+        rewrittenData[key] = displayPrompt;
+      }
+    }
+
+    return { ...(event as object), data: rewrittenData } as SessionEvent;
+  }
+
+  private takePromptEchoRewrite(sessionId: string, content: string): string | null {
+    const rewrites = this.promptEchoRewrites.get(sessionId);
+
+    if (!rewrites || rewrites.length === 0) return null;
+
+    const index = rewrites.findIndex((rewrite) => rewrite.sdkPrompt === content);
+
+    if (index === -1) return null;
+
+    const rewrite = rewrites[index];
+
+    if (!rewrite) return null;
+
+    rewrites.splice(index, 1);
+
+    if (rewrites.length === 0) {
+      this.promptEchoRewrites.delete(sessionId);
+    }
+
+    return rewrite.displayPrompt;
   }
 
   private captureAgentLoadDiagnostics(sessionId: string, event: SessionEvent): void {
@@ -778,35 +845,50 @@ export class SessionRegistry {
     }
 
     try {
-      const sdkAttachments = await Promise.all(
-        (attachments ?? []).map(async (attachment) => {
-          const resolved =
-            attachment.type === 'commandResult'
-              ? commandResultBlobAttachment(attachment.result, attachment.displayName)
-              : attachment;
+      const promptBlocks: string[] = [];
+      const sdkAttachments = (
+        await Promise.all(
+          (attachments ?? []).map(async (attachment) => {
+            if (attachment.type === 'commandResult') {
+              promptBlocks.push(
+                commandResultPromptBlock(attachment.result, attachment.displayName),
+              );
 
-          // #110: the host CLI silently DROPS blob attachments it can't
-          // inline (anything but images / office docs / PDF — including
-          // dropped text/code files that ship as application/octet-stream
-          // and text/markdown command-result pills). Stage those to a
-          // real file and hand the SDK a `type:'file'` attachment, which
-          // the host reads from disk via its <tagged_files> flow (works
-          // for paths outside the session cwd).
-          if (resolved.type === 'blob' && !isHostInlinableBlobMime(resolved.mimeType)) {
-            return await stageBlobToFile(resolved);
-          }
+              return null;
+            }
 
-          return resolved;
-        }),
-      );
+            // #110: the host CLI silently DROPS blob attachments it can't
+            // inline (anything but images / office docs / PDF — including
+            // dropped text/code files that ship as application/octet-stream).
+            // Stage those to a real file and hand the SDK a `type:'file'`
+            // attachment, which the host exposes through <tagged_files>.
+            // Command-result pills are user-authored text context for this
+            // turn, so the branch above appends them to the prompt (#136).
+            if (attachment.type === 'blob' && !isHostInlinableBlobMime(attachment.mimeType)) {
+              return await stageBlobToFile(attachment);
+            }
+
+            return attachment;
+          }),
+        )
+      ).filter((attachment) => attachment !== null);
+
+      const effectivePrompt =
+        promptBlocks.length > 0
+          ? [text.trimEnd(), ...promptBlocks].filter(Boolean).join('\n\n')
+          : text;
 
       // #35: pass per-message agentMode through to the SDK. Defaults
       // to the session-wide mode (the toggle stays the source of
       // truth); an explicit override scopes the mode to this one send.
       const effectiveAgentMode = agentMode ?? this.modeBySession.get(sessionId) ?? 'interactive';
 
+      if (effectivePrompt !== text) {
+        this.rememberPromptEchoRewrite(sessionId, effectivePrompt, text);
+      }
+
       return await entry.session.send({
-        prompt: text,
+        prompt: effectivePrompt,
         agentMode: effectiveAgentMode,
         ...(mode ? { mode } : {}),
         ...(sdkAttachments && sdkAttachments.length > 0

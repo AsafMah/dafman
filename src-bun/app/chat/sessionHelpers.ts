@@ -6,10 +6,14 @@
 
 import type { PermissionRequest } from '../client/copilotSdk';
 import type { AgentInfo, CommandResultRecord, JobRecord, TaskInfo, TaskStatus } from '../../rpc';
+import { randomUUID } from 'node:crypto';
 
 // ---------------------------------------------------------------------------
 // Command-result helpers
 // ---------------------------------------------------------------------------
+
+const COMMAND_RESULT_PROMPT_BLOCK_TAG = 'dafman_attached_command_result';
+const COMMAND_RESULT_PROMPT_BLOCK_OPEN = `<${COMMAND_RESULT_PROMPT_BLOCK_TAG}`;
 
 /// Strip ANSI / OSC escape sequences so rendered markdown is clean.
 function cleanAnsi(value: string): string {
@@ -54,6 +58,43 @@ export function safeFilePart(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'command-result';
 }
 
+export function commandResultDisplayName(
+  result: CommandResultRecord,
+  displayName?: string,
+): string {
+  return displayName ?? `command-result-${safeFilePart(result.id)}.md`;
+}
+
+export function commandResultPromptBlock(
+  result: CommandResultRecord,
+  displayName?: string,
+): string {
+  const blockId = randomUUID();
+
+  return [
+    `${COMMAND_RESULT_PROMPT_BLOCK_OPEN} id="${blockId}">`,
+    `Attached command result: ${commandResultDisplayName(result, displayName)}`,
+    '',
+    commandResultMarkdown(result).trimEnd(),
+    `</${COMMAND_RESULT_PROMPT_BLOCK_TAG} id="${blockId}">`,
+  ].join('\n');
+}
+
+export function stripCommandResultPromptBlocks(prompt: string): string {
+  if (!prompt.includes(COMMAND_RESULT_PROMPT_BLOCK_OPEN)) return prompt;
+
+  return prompt
+    .replace(
+      /\n{0,2}<dafman_attached_command_result>\n[\s\S]*?\n<\/dafman_attached_command_result>/g,
+      '',
+    )
+    .replace(
+      /\n{0,2}<dafman_attached_command_result id="([0-9a-f-]+)">\n[\s\S]*?\n<\/dafman_attached_command_result id="\1">/g,
+      '',
+    )
+    .trimEnd();
+}
+
 export function commandResultBlobAttachment(
   result: CommandResultRecord,
   displayName?: string,
@@ -65,7 +106,7 @@ export function commandResultBlobAttachment(
     type: 'blob',
     data,
     mimeType: 'text/markdown',
-    displayName: displayName ?? `command-result-${safeFilePart(result.id)}.md`,
+    displayName: commandResultDisplayName(result, displayName),
   };
 }
 

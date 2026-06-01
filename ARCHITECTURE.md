@@ -368,6 +368,12 @@ attachment payload. `consumeComposerText(editor)` walks the root in document
 order before clearing, returning `{ text, attachments[] }`. Position N in the
 text ⇔ `attachments[N]` in the SDK payload.
 
+On the Bun side, command-result pills are not passed to the SDK as file/blob
+attachments: `SessionRegistry.send` appends their rendered markdown to the prompt
+text and strips them from `attachments` before calling the SDK. Dragged/pasted
+text-code file blobs still use `attachmentStaging.ts` to become `type:'file'`
+attachments because the host CLI drops non-inlinable blobs.
+
 ### Reasoning
 
 The CLI emits reasoning **on `assistant.message`** (not on
@@ -435,6 +441,12 @@ Total: **308 tests** as of writing. `bun run check` is the gate:
    source** (`node_modules/electrobun/src/cli/index.ts`), so the config `throw`s
    at build time if the binary is absent — otherwise CI stays green while
    shipping a bundle whose SDK can't start.
+10. **Host attachment delivery is asymmetric.** In
+   `node_modules/@github/copilot/app.js`, `Jio` only inlines blob images and
+   native office/PDF docs; `type:'file'` attachments flow through
+   `<tagged_files>` (`Kio`/`BXs`) instead of becoming unconditional prompt text.
+   Use file staging for real dropped text/code files, but inline
+   user-attached command-result text into the prompt.
 
 ## 9. What's not here yet (link to plans)
 

@@ -31,6 +31,11 @@ sidebar catalog, and dockview tab renames target the inner session dockview
 instead of the outer group shell. Manual live dogfood pending:
 `MANUAL_TESTS.md` RP.1–RP.3.
 
+**Recently fixed:** #136 — attached command-result pills are inlined into the
+SDK prompt instead of staged as `type:'file'` temp attachments, because the host
+only exposes file attachments through `<tagged_files>` / read-on-demand context.
+The visible user-message echo is rewritten back to the original composer text.
+Manual dogfood pending: `MANUAL_TESTS.md` 110.2.
 **Recently fixed:** #132 — slash-command autocomplete now selects/completes the
 highlighted item instead of the first filtered command. The Tab-complete path
 mirrors lexical-vue's exposed `itemProps.selectedIndex`, while Enter remains on
@@ -86,8 +91,7 @@ of the click target so inner links/tool controls do not fold the card.
 `file_text` body as syntax-highlighted file content, and edit/str-replace calls
 render a single old/new diff instead of duplicating the change in an extra
 result block.
-#110 — drag-and-dropped / pasted text/code files (and
-command-result pills) are now actually read by the agent: the bundled host CLI
+#110 — drag-and-dropped / pasted text/code files are now actually read by the agent: the bundled host CLI
 silently drops `blob` attachments it can't inline (anything but images / office /
 PDF), so `SessionRegistry.send` now stages non-inlinable blobs to a temp file and
 sends a `type:'file'` attachment the host reads from disk (works for paths

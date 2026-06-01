@@ -5,17 +5,19 @@
 // Investigation (node_modules/@github/copilot/app.js, `Jio`/`fae`):
 // the bundled host CLI only turns a `blob` attachment into model
 // content when its mimeType is a recognized image (`sct`) OR a native
-// office/PDF document (`Ios` ∪ `aKt`). Every other blob — a dropped
+// office/PDF document (`Ios` ∪ `aKt`). Every other file blob — a dropped
 // `.ts`/`.py`/`.md` source file (whose webview `File.type` is empty,
-// so it ships as `application/octet-stream`), or a `text/markdown`
-// command-result pill — falls through both branches of `Jio` and is
-// SILENTLY DROPPED. The model then "can't find the file".
+// so it ships as `application/octet-stream`) — falls through both
+// branches of `Jio` and is SILENTLY DROPPED. The model then "can't
+// find the file".
 //
 // `type:'file'` path attachments take a different route: the host
-// reads them from disk and embeds the content in a `<tagged_files>`
-// XML block (`Kio`/`BXs`), which works for paths *outside* the session
-// cwd. So the fix is: for any blob the host can't inline, write the
-// decoded bytes to a real temp file and send it as a `type:'file'`.
+// exposes them through a `<tagged_files>` XML block (`Kio`/`BXs`),
+// which works for paths *outside* the session cwd. So the fix for real
+// dropped file blobs is: write the decoded bytes to a temp file and
+// send it as a `type:'file'`. User-authored command-result pills are
+// prompt text instead; `sessions.ts` inlines those before this staging
+// path.
 
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
