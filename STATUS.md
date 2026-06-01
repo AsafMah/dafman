@@ -32,6 +32,7 @@ prints a loud stderr note and exits 0; stale locks from force-killed instances
 are reclaimed. The lock is channel-scoped, so `dev`/`canary`/`stable` coexist —
 `bun run install:canary` builds + installs a second channel to run alongside
 `bun run dev`.
+#69 — an agent-driven MCP tool call that needs OAuth now raises a sign-in prompt (warn toast → Library Sign-in) on the runtime's `needs-auth` status flip, instead of failing silently; deliberately NOT via `registerInterest('mcp.oauth_required')`, which would block the MCP connection awaiting an `OAuthClientProvider` we don't implement. 2026-05-30.
 #103 — sub-agent transcript cards can now collapse from the
 full header row or the bottom footer affordance, with the expanded body kept out
 of the click target so inner links/tool controls do not fold the card.
