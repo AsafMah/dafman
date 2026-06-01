@@ -84,7 +84,7 @@ button styling, clearer wording, and Cancel as the default focus. 2026-05-30.
 disable immediate but delays the loading/refresh affordance, preventing the
 instant-selection flash. 2026-05-30. #76 — fenced CodeMirror code blocks now follow the app
 light/dark theme instead of hardcoding `oneDark`, with a shared testable theme
-selector and live CodeEditor reconfigure. 2026-05-30. #9 — discovered-MCP-server work: part-1 (toggle persistence)
+selector and live CodeEditor reconfigure. 2026-05-30. #46 — 15 deprecated string template refs migrated to `useTemplateRef` (Vue 3.5); the other 6 `ref="x"` sites were already on `useTemplateRef` (the string is its binding key, not the deprecated pattern) (`8bacf51`). #48 — 5 ineffective dynamic imports resolved: eager test-bridge stores in `main.ts` + `chatEvents` in `SessionDetailsPanel` hoisted to static, `exportConversation` left dynamic; `vite@8`/Rolldown build now warning-free (`45a9101`). Both shipped via PR #75. 2026-05-30. #9 — discovered-MCP-server work: part-1 (toggle persistence)
 repro fixture added (`tools/manual-fixtures/mcp-discovery/`, MANUAL_TESTS §9.1)
 and the stale `.vscode/mcp.json` path retired (Copilot CLI dropped it; use
 `.mcp.json`); parts 2/3 (edit/override + source path) filed upstream as

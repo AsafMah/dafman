@@ -14,7 +14,7 @@
 /// "editable but immutable" surface — confusing and slow on long
 /// outputs).
 
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue';
 import { EditorState, Compartment, type Extension } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import Button from 'primevue/button';
@@ -53,7 +53,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void;
 }>();
 
-const host = ref<HTMLDivElement | null>(null);
+const host = useTemplateRef<HTMLDivElement>('host');
 const toasts = useToastStore();
 const { isDark } = useDockviewTheme();
 let view: EditorView | null = null;
