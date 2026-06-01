@@ -22,6 +22,7 @@ import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
 import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
 import { useDelayedBusyValue } from '@/composables/useDelayedBusyValue';
+import { processEvents, defaultAmbient } from '@/lib/chatEvents';
 import {
   useSessionAgents,
   useSessionTasks,
@@ -257,7 +258,6 @@ async function onExport(format: 'markdown' | 'json'): Promise<void> {
   if (!rec) return;
 
   try {
-    const { processEvents, defaultAmbient } = await import('@/lib/chatEvents');
     const { formatConversation, exportFilenameStem } = await import('@/lib/exportConversation');
     const counter = { next: 1 };
     const result = processEvents([], defaultAmbient(), rec.events, counter, { live: false });

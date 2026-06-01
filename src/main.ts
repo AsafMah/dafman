@@ -49,6 +49,10 @@ import { createElectrobunBridge } from '@/ipc/electrobunBridge';
 import { createWebSocketBridge } from '@/ipc/wsBridge';
 import { installRendererLogBridge } from '@/ipc/rendererLog';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { useCommandRegistry } from '@/stores/shell/commandRegistry';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
+import { useGroupsActions } from '@/composables/useGroupsActions';
 
 const GreenAura = definePreset(Aura, {
   semantic: {
@@ -179,15 +183,10 @@ async function mountWith(Root: typeof App) {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('testBridge');
 
   if (testBridge || wsBridgeActive) {
-    // Eager-load the test surface. Earlier we tried lazy-loading on
-    // first method call to avoid extra boot work, but that made
-    // `getState()` return a Promise and broke the sync predicate
-    // contract Playwright callers rely on. Eager-load keeps the
-    // surface sync from the caller's perspective.
-    const { useCommandRegistry } = await import('@/stores/shell/commandRegistry');
-    const { useLayoutStore } = await import('@/stores/shell/layoutStore');
-    const { useGroupsStore } = await import('@/stores/shell/groupsStore');
-    const { useGroupsActions } = await import('@/composables/useGroupsActions');
+    // The test surface uses the same stores/composables the app eager-loads
+    // (statically imported above), so there's nothing to defer here. Earlier
+    // we lazy-loaded on first method call, but that made `getState()` return a
+    // Promise and broke the sync predicate contract Playwright callers rely on.
     const registry = useCommandRegistry();
     const layout = useLayoutStore();
     const groups = useGroupsStore();
