@@ -70,6 +70,29 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issues #131/#133/#134 — session rename propagation (2026-06-02)
+
+#### RP.1 - `/rename` opens a focused rename dialog and saves.
+
+- [ ] result:
+- **Steps:** Run `bun run dev`; open a session, type `/rename` in the composer, enter a new name, press **Enter** or click **Save**, then repeat and press **Escape** to cancel.
+- **Expected:** The Rename session dialog appears once, the input is focused/selected, Save persists the trimmed name, and Escape/cancel closes without changing the current name.
+- **Why not automated:** Unit coverage verifies the bus listener and save RPC, but live WebView focus, dialog stacking, and Escape behavior need the real PrimeVue/Dialog runtime.
+
+#### RP.2 - Session tab titles update after auto-title and manual rename.
+
+- [ ] result:
+- **Steps:** In `bun run dev`, create a session, send a first prompt that causes an auto-title, then rename it again from Session Details or `/rename`.
+- **Expected:** The dockview session tab changes from the short GUID to the generated title, then to the manual title, without reopening the tab or switching groups.
+- **Why not automated:** Store tests cover the inner dockview API call; live dogfood confirms dockview tab repaint/active-group behavior in the real nested layout.
+
+#### RP.3 - Sidebar session list updates on create and rename.
+
+- [ ] result:
+- **Steps:** Keep the Sessions sidebar open. Create a new session from the sidebar, rename it with `/rename`, then rename it from Session Details.
+- **Expected:** The new row appears immediately and its label changes after each rename without pressing Refresh.
+- **Why not automated:** Store tests cover the catalog upsert, but the live sidebar needs WebView rendering, grouping, and relative-time ordering verification.
+
 ### Issue #127 — agent Select/Deselect transition (2026-06-01)
 
 > Intent-gap follow-up to dogfood item 99.1: the literal no-spinner-flash check

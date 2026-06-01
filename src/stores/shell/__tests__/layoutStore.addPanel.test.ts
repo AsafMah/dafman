@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
 import type { DockviewApi } from 'dockview-core';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
 
 // Minimal fake dockview API. Covers only the methods the layoutStore
 // addPanel path actually touches; everything else throws so a future
@@ -16,7 +17,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 type FakeGroup = {
   id: string;
   locationType: 'grid' | 'edge';
-  panels: Array<{ id: string; component: string }>;
+  panels: Array<{ id: string; component: string; title?: string }>;
 };
 
 type AddPanelArgs = {
@@ -61,7 +62,18 @@ function makeFakeDock(initialGroups: FakeGroup[] = []): FakeDock {
     },
     getPanel(id: string) {
       for (const g of groups) {
-        for (const p of g.panels) if (p.id === id) return p;
+        for (const p of g.panels) {
+          if (p.id === id) {
+            return {
+              ...p,
+              api: {
+                setTitle(title: string) {
+                  p.title = title;
+                },
+              },
+            };
+          }
+        }
       }
       return undefined;
     },
@@ -266,5 +278,27 @@ describe('layoutStore.addPanel placement', () => {
 
     expect(dock.addPanelCalls).toHaveLength(0);
     expect(dock.addGroupCalls).toHaveLength(0);
+  });
+
+  test('renamePanel updates the active inner body panel title, not the outer group panel', () => {
+    const outer = makeFakeDock([
+      { id: 'group-1', locationType: 'grid', panels: [{ id: 'group-1', component: 'group' }] },
+    ]);
+    const inner = makeFakeDock([
+      { id: 'body-1', locationType: 'grid', panels: [{ id: 'session-1', component: 'chat' }] },
+    ]);
+    const store = useLayoutStore();
+    store.setApi(outer.api);
+
+    const groups = useGroupsStore();
+    groups.hydrate({
+      groups: [{ id: 'group-1', name: 'Default', color: '#3b82f6' }],
+      activeGroupId: 'group-1',
+    });
+    groups.registerInnerApi('group-1', inner.api);
+
+    store.renamePanel('session-1', 'Renamed session');
+
+    expect(inner.groups[0]?.panels[0]?.title).toBe('Renamed session');
   });
 });

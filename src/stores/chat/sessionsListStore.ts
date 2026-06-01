@@ -33,6 +33,31 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
   /// from "loaded but empty".
   const hasLoaded = ref(false);
 
+  function sortByModifiedDesc(list: SessionMetadataSummary[]): SessionMetadataSummary[] {
+    return [...list].sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
+  }
+
+  function liveSessionMetadata(
+    existing: SessionMetadataSummary | undefined,
+    summary: string | undefined,
+    cwd: string | undefined,
+  ): Pick<Partial<SessionMetadataSummary>, 'summary' | 'cwd' | 'repository' | 'branch'> {
+    const out: Pick<
+      Partial<SessionMetadataSummary>,
+      'summary' | 'cwd' | 'repository' | 'branch'
+    > = {};
+
+    if (summary) out.summary = summary;
+
+    if (cwd) out.cwd = cwd;
+
+    if (existing?.repository) out.repository = existing.repository;
+
+    if (existing?.branch) out.branch = existing.branch;
+
+    return out;
+  }
+
   async function refresh(): Promise<void> {
     const toasts = useToastStore();
 
@@ -43,7 +68,7 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
       const list = await invokeCommand('listSessions', {});
 
       // Most-recently-modified first.
-      sessions.value = [...list].sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
+      sessions.value = sortByModifiedDesc(list);
       hasLoaded.value = true;
     } catch (err) {
       const message = toErrorMessage(err);
@@ -53,6 +78,33 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Keep the durable catalog visibly in sync with currently-open
+  /// sessions. The SDK catalog refresh is still authoritative, but it
+  /// is pull-based; create/rename/title events need an immediate local
+  /// patch so the sidebar doesn't wait for a manual refresh.
+  function upsertLiveSession(record: {
+    id: string;
+    title: string | null;
+    workingDirectory: string | null;
+  }): void {
+    const existing = sessions.value.find((s) => s.sessionId === record.id);
+    const now = new Date().toISOString();
+    const summary = record.title?.trim() || existing?.summary;
+    const cwd = record.workingDirectory ?? existing?.cwd;
+    const next: SessionMetadataSummary = {
+      sessionId: record.id,
+      startTime: existing?.startTime ?? now,
+      modifiedTime: now,
+      isRemote: existing?.isRemote ?? false,
+      ...liveSessionMetadata(existing, summary, cwd),
+    };
+
+    sessions.value = sortByModifiedDesc([
+      next,
+      ...sessions.value.filter((s) => s.sessionId !== record.id),
+    ]);
   }
 
   /// Permanently delete the CLI-side session and drop it from the
@@ -158,6 +210,7 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
     hasLoaded,
     grouped,
     refresh,
+    upsertLiveSession,
     deleteSession,
     findByName,
   };

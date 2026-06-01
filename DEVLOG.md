@@ -8,6 +8,39 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-02 — session rename propagation (#131/#133/#134)
+
+**Takeaway:** the three rename bugs shared two propagation gaps: `/rename`
+emitted a typed bus event with no mounted rename UI listener, and title changes
+updated `SessionRecord` without reliably reaching the two cached layout/list
+surfaces. `/rename` now opens a PrimeVue rename dialog from the `area="all"`
+`SessionHeaderControls` instance, manual rename writes update the live record
+immediately, SDK `session.title_changed` events patch the sidebar catalog, and
+`layoutStore.renamePanel` searches the inner group dockviews where session tabs
+actually live before falling back to the outer shell.
+
+**Receipts:**
+- `/rename` path: `src/lib/sessionCommands.ts` emits `rename-session`;
+  `src/components/session/SessionHeaderControls.vue` now subscribes once
+  (only `area="all"` to avoid duplicate composer/header dialogs), opens
+  PrimeVue `Dialog` + `InputText`, and saves through
+  `sessionsStore.setSessionName`.
+- Tab title path: `src/App.vue` already watches `[session.id, session.title]`
+  and calls `layoutStore.renamePanel`; the bug was
+  `src/stores/shell/layoutStore.ts` looking only at the outer dockview. The fix
+  checks `bodyApi`, all registered `groupsStore.innerApis`, then the outer API.
+- Sidebar path: `src/stores/chat/sessionsListStore.ts` gained
+  `upsertLiveSession`, and `src/stores/chat/sessionsStore.ts` calls it after
+  create/resume, manual `setSessionName`, and live `session.title_changed`.
+
+**Tests:** test-first regressions cover all three failures:
+`src/components/session/__tests__/SessionHeaderControls.rename.test.ts`,
+`src/stores/shell/__tests__/layoutStore.addPanel.test.ts`, and
+`src/stores/chat/__tests__/sessionsStore.restore.test.ts`.
+
+**Manual:** `MANUAL_TESTS.md` RP.1–RP.3 queue live dialog focus/Escape,
+dockview tab repaint, and sidebar create/rename refresh dogfood.
+
 ## 2026-06-01 — session events forward once (#135)
 
 **Takeaway:** fixed the duplicate message/reasoning regression by making SDK

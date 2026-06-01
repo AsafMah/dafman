@@ -24,6 +24,13 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
+**Recently fixed:** #131/#133/#134 — session rename propagation is unified.
+`/rename` now opens the same session-name dialog from the typed bus, manual
+renames update the `SessionRecord` immediately, auto-title events patch the
+sidebar catalog, and dockview tab renames target the inner session dockview
+instead of the outer group shell. Manual live dogfood pending:
+`MANUAL_TESTS.md` RP.1–RP.3.
+
 **Recently fixed:** #132 — slash-command autocomplete now selects/completes the
 highlighted item instead of the first filtered command. The Tab-complete path
 mirrors lexical-vue's exposed `itemProps.selectedIndex`, while Enter remains on
