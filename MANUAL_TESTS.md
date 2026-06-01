@@ -127,9 +127,16 @@ section is verified) or get a GitHub issue filed (with label
 #### KB.3 - Enter selects a slash/mention menu item instead of sending
 
 - [ ] result:
-- **Steps:** Type `/` and wait for the slash menu; arrow to a command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
-- **Expected:** Enter runs the highlighted slash command (no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
+- **Steps:** Type `/` and wait for the slash menu; arrow to a **non-first** command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
+- **Expected:** Enter runs the highlighted slash command (not the first row; no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
 - **Why not automated:** Flow 02 covers the @-pill case; the slash-run case and the "no accidental send" assertion are worth an eyeball.
+
+#### KB.7 - Tab completes the highlighted slash command, not the first row
+
+- [ ] result:
+- **Steps:** Type `/` and wait for multiple slash-command results. Arrow to a **non-first** command and press **Tab**.
+- **Expected:** The typed slash query is replaced with the highlighted command plus a trailing space so you can add args; the first row is not chosen unless it is highlighted, and the command is not executed until you explicitly send/select.
+- **Why not automated:** The pure selection resolver is unit-tested, but the real keyboard highlight → Lexical command dispatch → rendered composer replacement path depends on live WebView2/Lexical focus timing.
 
 #### KB.4 - Enter on a zero-match `/` or `@` SENDS the raw text
 

@@ -24,6 +24,13 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
+**Recently fixed:** #132 — slash-command autocomplete now selects/completes the
+highlighted item instead of the first filtered command. The Tab-complete path
+mirrors lexical-vue's exposed `itemProps.selectedIndex`, while Enter remains on
+lexical-vue's `props.options[selectedIndex]` menu-selection path after the
+HIGH-priority Enter handler defers. Manual keyboard verification pending:
+`MANUAL_TESTS.md` KB.3 / KB.7.
+
 **Recently fixed:** Composer Enter keybindings — the composer now sends on plain
 **Enter** (the conventional chat default) under a fixed chord scheme
 (Shift+Enter soft newline, Ctrl+Enter hard newline, Alt+Enter steer,

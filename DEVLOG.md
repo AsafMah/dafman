@@ -29,6 +29,33 @@ the config callback and `session.on`; both failed with two forwarded events
 before the fix and pass with exactly one. They also assert the retained config
 callback cannot forward after `disconnect()`.
 
+## 2026-06-01 — slash-command autocomplete honors highlighted row (#132)
+
+**Takeaway:** fixed the slash-command menu's Tab completion so it uses the
+currently highlighted command instead of `filteredOptions[0]`. Enter remains on
+lexical-vue's built-in menu-selection path, which already emits the highlighted
+option when the HIGH-priority composer Enter handler defers to the menu.
+
+**lexical-vue receipt:** `node_modules/lexical-vue/dist/shared/LexicalMenu.vine.js`
+keeps `selectedIndex` (`setHighlightedIndex`, lines 181–185), passes it to the
+slot as `itemProps.selectedIndex` (lines 317–323), and its own Tab/Enter
+handlers call `selectOptionAndCleanUp(props.options[selectedIndex])` (lines
+299–313). `SlashCommandPlugin.vue` had a separate HIGH-priority Tab handler for
+"complete but don't execute" and that handler always picked `opts[0]`; it now
+tracks the exposed `itemProps.selectedIndex` and resolves through
+`resolveHighlightedOption()`.
+
+**Tests:** test-first repro added in
+`src/components/chat/__tests__/slashCommandSelection.test.ts`: selected index 2
+returned `"first"` before the helper fix, then returns `"third"` after. The
+fallback cases cover `null`/`undefined`, invalid indexes, and empty options.
+`src/lexical/__tests__/submitOnEnter.test.ts` still passes, confirming #125's
+menu-defer resolver behavior was not regressed.
+
+**Manual:** KB.3 now explicitly requires a non-first slash row, because the
+previous wording could pass accidentally by selecting the first command. KB.7
+covers the Tab completion half of #132.
+
 ## 2026-06-01 — single-instance guard dogfooded (SI.1/SI.2 PASS)
 
 **Takeaway:** the single-instance guard (`src-bun/app/shared/singleInstance.ts`)

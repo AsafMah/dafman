@@ -35,6 +35,7 @@ import {
 import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
 import { setComposerMenuActive } from '@/lexical/composerMenuState';
 import { SESSION_COMMANDS, type SessionCommand } from '@/lib/sessionCommands';
+import { resolveHighlightedOption } from '@/components/chat/slashCommandSelection';
 
 class SlashOption extends MenuOption {
   cmd: SessionCommand;
@@ -51,6 +52,7 @@ const props = defineProps<{
 const editor = useLexicalComposer();
 const query = ref('');
 const menuOpen = ref(false);
+const highlightedIndex = ref<number | null>(null);
 
 // Intercept Tab when the slash menu is open: replace the typed query
 // with the full command text (so user can add args), but do NOT execute.
@@ -63,7 +65,9 @@ const unregisterTab = editor.registerCommand(
 
     if (opts.length === 0) return false;
 
-    const selected = opts[0];
+    const selected = resolveHighlightedOption(opts, highlightedIndex.value);
+
+    if (selected === null) return false;
 
     event.preventDefault();
     editor.update(() => {
@@ -86,6 +90,7 @@ const unregisterTab = editor.registerCommand(
       }
     });
     menuOpen.value = false;
+    highlightedIndex.value = null;
     setComposerMenuActive(editor, 'slash', false);
 
     return true;
@@ -95,6 +100,7 @@ const unregisterTab = editor.registerCommand(
 
 onBeforeUnmount(() => {
   unregisterTab();
+  highlightedIndex.value = null;
   // Defensive: ensure we never leave this editor marked menu-active
   // (which would make `SubmitOnEnter` defer plain Enter forever).
   setComposerMenuActive(editor, 'slash', false);
@@ -137,6 +143,8 @@ function keepSelectedVisible(
   index: number,
   selectedIndex: number | null,
 ): void {
+  highlightedIndex.value = selectedIndex;
+
   if (index !== (selectedIndex ?? 0) || !(el instanceof HTMLElement)) return;
 
   void nextTick(() => {
@@ -158,6 +166,8 @@ function keepSelectedVisible(
 function onQueryChange(q: string | null) {
   query.value = q ?? '';
   menuOpen.value = q !== null;
+  highlightedIndex.value = menuOpen.value && filteredOptions.value.length > 0 ? 0 : null;
+
   // Synchronous (not a watcher) so the state is current when
   // `KEY_ENTER_COMMAND` fires in the same tick. Active only when there's
   // a selectable option — a zero-match `/foo` stays inactive so plain
@@ -180,6 +190,7 @@ async function onSelectOption(payload: {
   });
   closeMenu();
   menuOpen.value = false;
+  highlightedIndex.value = null;
   setComposerMenuActive(editor, 'slash', false);
 
   try {
