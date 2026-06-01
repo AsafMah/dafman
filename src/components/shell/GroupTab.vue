@@ -33,7 +33,7 @@ const props = defineProps<{
   api?: import('dockview-core').DockviewPanelApi;
 }>();
 
-const { panelApi, isActive } = usePanelLifecycle(props);
+const { panelApi, isActive, maximized, toggleMaximized } = usePanelLifecycle(props);
 const groupsStore = useGroupsStore();
 const groupsActions = useGroupsActions();
 const confirm = useConfirm();
@@ -259,9 +259,24 @@ function onClose(event: MouseEvent): void {
       >{{ sessionCount }}</span
     >
     <button
+      v-if="!isRenaming"
+      type="button"
+      class="group-tab-action"
+      :aria-label="maximized ? 'Restore group' : 'Maximize group'"
+      :title="maximized ? 'Restore group' : 'Maximize group'"
+      @pointerdown.stop
+      @click="toggleMaximized"
+    >
+      <i
+        class="pi"
+        :class="maximized ? 'pi-window-minimize' : 'pi-window-maximize'"
+        aria-hidden="true"
+      />
+    </button>
+    <button
       v-if="groupsStore.groups.length > 1 && !isRenaming"
       type="button"
-      class="group-tab-close"
+      class="group-tab-action group-tab-close"
       aria-label="Close group"
       @pointerdown.stop
       @click="onClose"
@@ -377,7 +392,7 @@ function onClose(event: MouseEvent): void {
   flex: 0 0 auto;
 }
 
-.group-tab-close {
+.group-tab-action {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -403,7 +418,13 @@ function onClose(event: MouseEvent): void {
   opacity: 0.85;
 }
 
-.group-tab-close:hover {
+.group-tab:hover .group-tab-action,
+.group-tab-active .group-tab-action,
+.group-tab-action:focus-visible {
+  opacity: 0.85;
+}
+
+.group-tab-action:hover {
   opacity: 1;
   background: color-mix(in srgb, var(--group-color) 35%, transparent);
 }

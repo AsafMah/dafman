@@ -20,7 +20,15 @@ export interface PanelLifecycle {
   panelApi: Ref<DockviewPanelApi | undefined>;
   title: Ref<string>;
   isActive: Ref<boolean>;
+  maximized: Ref<boolean>;
   close: (event: MouseEvent) => void;
+  toggleMaximized: (event: MouseEvent) => void;
+}
+
+interface MaximizeEvents {
+  onDidMaximizedChange?: (listener: (event: { isMaximized: boolean }) => void) => {
+    dispose(): void;
+  };
 }
 
 export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
@@ -28,9 +36,11 @@ export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
 
   const title = ref<string>(panelApi.value?.title ?? '');
   const isActive = ref<boolean>(panelApi.value?.isActive ?? false);
+  const maximized = ref<boolean>(panelApi.value?.isMaximized() ?? false);
 
   let unsubTitle: (() => void) | null = null;
   let unsubActive: (() => void) | null = null;
+  let unsubMaximized: (() => void) | null = null;
 
   watchEffect((onCleanup) => {
     const api = panelApi.value;
@@ -39,8 +49,10 @@ export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
 
     title.value = api.title ?? '';
     isActive.value = api.isActive;
+    maximized.value = api.isMaximized();
     unsubTitle?.();
     unsubActive?.();
+    unsubMaximized?.();
 
     const titleSub = api.onDidTitleChange((e) => {
       title.value = e.title ?? '';
@@ -49,15 +61,29 @@ export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
     const activeSub = api.onDidActiveChange(() => {
       isActive.value = api.isActive;
     });
+    const maximizedSub = (api as DockviewPanelApi & MaximizeEvents).onDidMaximizedChange?.(
+      (event) => {
+        maximized.value = event.isMaximized;
+      },
+    );
+    const dimensionsSub = api.onDidDimensionsChange(() => {
+      maximized.value = api.isMaximized();
+    });
 
     unsubTitle = () => titleSub.dispose();
     unsubActive = () => activeSub.dispose();
+    unsubMaximized = () => {
+      maximizedSub?.dispose();
+      dimensionsSub.dispose();
+    };
 
     onCleanup(() => {
       unsubTitle?.();
       unsubActive?.();
+      unsubMaximized?.();
       unsubTitle = null;
       unsubActive = null;
+      unsubMaximized = null;
     });
   });
 
@@ -65,6 +91,7 @@ export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
     onBeforeUnmount(() => {
       unsubTitle?.();
       unsubActive?.();
+      unsubMaximized?.();
     });
   }
 
@@ -73,5 +100,20 @@ export function usePanelLifecycle(props: PanelProps): PanelLifecycle {
     panelApi.value?.close();
   }
 
-  return { panelApi, title, isActive, close };
+  function toggleMaximized(event: MouseEvent) {
+    event.stopPropagation();
+    const api = panelApi.value;
+
+    if (!api) return;
+
+    if (api.isMaximized()) {
+      api.exitMaximized();
+    } else {
+      api.maximize();
+    }
+
+    maximized.value = api.isMaximized();
+  }
+
+  return { panelApi, title, isActive, maximized, close, toggleMaximized };
 }

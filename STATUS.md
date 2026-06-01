@@ -41,6 +41,12 @@ menu still wins Enter to select. Pure resolver `resolveEnterAction`
 supersedes the #88 "submit-keybinding setting" proposal (PR #102 closed).
 Manual keyboard walk pending: `MANUAL_TESTS.md` KB.1–KB.6.
 
+**Recently fixed:** #128 — session and group tab bars have their maximize/restore
+button again. The restored custom tab action uses dockview's
+`panel.api.maximize()` / `exitMaximized()` on the tab's own panel API, matching
+the `5a1da9e` regression baseline; unit coverage locks both `ChatTab` and
+`GroupTab`, with live dockview dogfood pending in `MANUAL_TESTS.md` MX.1.
+
 **Recently fixed:** #127 — Session Details agent Select/Deselect no longer
 flashes every row: the busy/disabled state is scoped to the clicked row while
 `useSessionAgents` still globally ignores concurrent select/deselect clicks, and
