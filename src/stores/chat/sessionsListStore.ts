@@ -26,6 +26,7 @@ export interface WorkspaceGroup {
 
 export const useSessionsListStore = defineStore('sessionsList', () => {
   const sessions = ref<SessionMetadataSummary[]>([]);
+  const deletedSessionIds = ref<Set<string>>(new Set());
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   /// Set to `true` the first time `refresh()` is invoked so the
@@ -44,6 +45,13 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
 
       // Most-recently-modified first.
       sessions.value = [...list].sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
+      // A manual delete tombstone only represents renderer-local knowledge.
+      // If a future refresh reports the id again (for example after a
+      // backend rollback or test fixture reset), stop treating it as deleted.
+      const liveIds = new Set(sessions.value.map((s) => s.sessionId));
+      deletedSessionIds.value = new Set(
+        [...deletedSessionIds.value].filter((sessionId) => !liveIds.has(sessionId)),
+      );
       hasLoaded.value = true;
     } catch (err) {
       const message = toErrorMessage(err);
@@ -65,6 +73,7 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
     try {
       await invokeCommand('deleteSession', { sessionId });
       sessions.value = sessions.value.filter((s) => s.sessionId !== sessionId);
+      deletedSessionIds.value = new Set(deletedSessionIds.value).add(sessionId);
       toasts.success('Session deleted', sessionId.slice(0, 8));
     } catch (err) {
       const message = toErrorMessage(err);
@@ -151,14 +160,20 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
     return undefined;
   }
 
+  function isDeleted(sessionId: string): boolean {
+    return deletedSessionIds.value.has(sessionId);
+  }
+
   return {
     sessions,
+    deletedSessionIds,
     isLoading,
     error,
     hasLoaded,
     grouped,
     refresh,
     deleteSession,
+    isDeleted,
     findByName,
   };
 });

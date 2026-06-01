@@ -33,8 +33,10 @@ import PrimeVue from 'primevue/config';
 /// DO have tests, so we leave them alone.
 const composerStub = {
   name: 'MessageComposer',
+  props: ['disabled', 'placeholder'],
   emits: ['submit', 'request-command-terminal', 'open-full-terminal', 'update:default-mode'],
-  template: '<div class="stub-composer" />',
+  template:
+    '<div class="stub-composer" :data-disabled="String(!!disabled)" :data-placeholder="placeholder || \'\'" />',
 };
 const editorStub = {
   name: 'MessageEditor',
@@ -56,6 +58,7 @@ import {
   type PendingRequestListener,
 } from '@/ipc/invoke';
 import { _resetSessionsStoreForTest } from '@/stores/chat/sessionsStore';
+import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useCommandResultsStore } from '@/stores/chat/commandResultsStore';
 import type {
@@ -126,8 +129,10 @@ function makeBridge(): BridgeHandle {
 const stubs = {
   MessageComposer: defineComponent({
     name: 'MessageComposer',
+    props: ['disabled', 'placeholder'],
     emits: ['submit', 'request-command-terminal', 'open-full-terminal', 'update:default-mode'],
-    template: '<div class="stub-composer" />',
+    template:
+      '<div class="stub-composer" :data-disabled="String(!!disabled)" :data-placeholder="placeholder || \'\'" />',
   }),
   MessageContent: defineComponent({
     name: 'MessageContent',
@@ -423,6 +428,38 @@ describe('ChatWindow', () => {
     expect(sentArgs.sessionId).toBe('s1');
     expect(sentArgs.text).toBe('attach this');
     expect(sentArgs.attachments).toEqual(attachments);
+  });
+
+  test('deleted session shows closed state and blocks composer submits', async () => {
+    const utils = await mountChat({ events: [userEvent('before delete', 'evt-before')] });
+    const sessionsList = useSessionsListStore();
+
+    await sessionsList.deleteSession('s1');
+    await nextTick();
+
+    const banner = utils.container.querySelector('.closed-session-banner');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('Session deleted');
+
+    const composerHost = utils.container.querySelector('.stub-composer');
+    expect(composerHost?.getAttribute('data-disabled')).toBe('true');
+    expect(composerHost?.getAttribute('data-placeholder')).toContain('deleted');
+
+    const composerEl = composerHost as HTMLElement & {
+      __vueParentComponent?: { emit: (e: string, p: unknown) => void };
+    };
+    composerEl.__vueParentComponent!.emit('submit', {
+      text: 'should not send',
+      mode: 'default',
+    });
+    await flushFrames();
+
+    const sendCalls = handle.calls.filter((c) => c.name === 'sendMessage');
+    expect(sendCalls.length).toBe(0);
+    const bubbles = Array.from(utils.container.querySelectorAll('.stub-user')).map((el) =>
+      el.textContent?.trim(),
+    );
+    expect(bubbles).toEqual(['before delete']);
   });
 
   test('retry walks back to the nearest user-with-eventId anchor', async () => {

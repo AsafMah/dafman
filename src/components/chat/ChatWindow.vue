@@ -25,7 +25,10 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useCommandTerminal } from '@/composables/useCommandTerminal';
 import { useChatScroll } from '@/composables/useChatScroll';
-import { useChatSubmit } from '@/composables/useChatSubmit';
+import {
+  useChatSubmit,
+  type ComposerSubmitPayloadWithAttachments,
+} from '@/composables/useChatSubmit';
 import { useChatTimelineState } from '@/composables/useChatTimelineState';
 import { useMessageActions } from '@/composables/useMessageActions';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
@@ -261,7 +264,7 @@ const timelineItems = computed(() => {
 /// `"default"` against the session's `defaultSendMode` inside
 /// `useChatSubmit` so the downstream sessionsStore action only sees
 /// concrete SendMode values.
-const { sendMessage } = useChatSubmit({
+const { sendMessage: submitMessage } = useChatSubmit({
   getSessionId: () => props.sessionId,
   getDefaultSendMode: () => props.defaultSendMode,
   getSendHandler: () => props.sendHandler,
@@ -321,6 +324,26 @@ const pendingStyle = computed(() => {
 
   return styleFor(req.kind);
 });
+
+const sessionDeleted = computed(() => sessionsListStore.isDeleted(props.sessionId));
+const composerPlaceholder = computed(() =>
+  sessionDeleted.value
+    ? 'This session was deleted. Close this tab or start a new session.'
+    : undefined,
+);
+
+async function sendMessage(payload: ComposerSubmitPayloadWithAttachments): Promise<void> {
+  if (sessionDeleted.value) {
+    toasts.warn(
+      'Session deleted',
+      'This session was permanently deleted and can no longer accept messages.',
+    );
+
+    return;
+  }
+
+  await submitMessage(payload);
+}
 
 /// Session command summary. File details moved to the right rail where
 /// the paths are actually useful and expandable.
@@ -619,12 +642,30 @@ const commandsRun = computed(() => {
       </div>
     </div>
 
+    <div
+      v-if="sessionDeleted"
+      class="closed-session-banner"
+      role="status"
+      aria-live="polite"
+    >
+      <i
+        class="pi pi-ban closed-session-icon"
+        aria-hidden="true"
+      />
+      <div class="closed-session-body">
+        <strong>Session deleted</strong>
+        <span>This session was permanently deleted and can no longer accept messages.</span>
+      </div>
+    </div>
+
     <form
       class="chat-composer"
       @submit.prevent
     >
       <MessageComposer
         ref="composerRef"
+        :disabled="sessionDeleted"
+        :placeholder="composerPlaceholder"
         :default-mode="props.defaultSendMode"
         :session-id="props.sendHandler ? undefined : props.sessionId"
         :command-terminal-id="commandTerminalId"
@@ -676,6 +717,33 @@ const commandsRun = computed(() => {
   .message-shell.reveal-flash {
     animation-duration: 0.01ms;
   }
+}
+
+.closed-session-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 1rem 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--p-red-500) 34%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--p-red-500) 10%, var(--p-content-background));
+  color: var(--p-text-color);
+}
+
+.closed-session-icon {
+  color: var(--p-red-500);
+}
+
+.closed-session-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.86rem;
+}
+
+.closed-session-body span {
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
 }
 
 .fork-notice {
