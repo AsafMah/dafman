@@ -81,7 +81,10 @@ const composerRef = ref<{
 
 const sessionIdRef = computed(() => props.sessionId);
 
-const { scrollToBottom } = useChatScroll(messagesEl, tileEl);
+const { scrollToBottom, autoScrollIfPinned, unpin, showJumpToLatest } = useChatScroll(
+  messagesEl,
+  tileEl,
+);
 
 const {
   items,
@@ -96,7 +99,7 @@ const {
   droppedEventCount: toRef(props, 'droppedEventCount'),
   sessionId: sessionIdRef,
   toasts,
-  scrollToBottom,
+  afterFlush: autoScrollIfPinned,
 });
 
 const {
@@ -120,7 +123,9 @@ onMounted(() => {
     busOn('focus-composer', ({ sessionId }) => {
       if (sessionId !== props.sessionId) return;
 
-      void scrollToBottom().then(() => composerRef.value?.focus());
+      // Restore-aware: only snap to the latest if the user was already
+      // pinned to the bottom; a scrolled-up reader keeps their place.
+      void autoScrollIfPinned().then(() => composerRef.value?.focus());
     }),
     busOn('open-command-terminal', ({ sessionId }) => {
       if (sessionId !== props.sessionId) return;
@@ -139,10 +144,14 @@ onMounted(() => {
     }),
   );
   initCommandResults();
-  // A reveal intent may already be parked for us (Jobs panel "Go to
-  // session" on a freshly-opened panel — the request landed before we
-  // mounted). Consume it now that the DOM exists.
-  void consumePendingReveal();
+  // Initial scroll position. A reveal intent may already be parked for
+  // us (Jobs panel "Go to session" on a freshly-opened panel — the
+  // request landed before we mounted); consume it first. Only if there
+  // was no reveal do we land on the latest message, so the two never
+  // fight (the reveal owns the scroll when present).
+  void consumePendingReveal().then((revealed) => {
+    if (!revealed) void scrollToBottom();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -178,6 +187,9 @@ async function revealTarget(target: { toolCallId?: string }): Promise<void> {
     if (el) {
       el.scrollIntoView({ block: 'center' });
       flashReveal(el);
+      // Drop the bottom-pin so the next auto-scroll doesn't immediately
+      // yank the user off the card we just revealed.
+      unpin();
 
       return;
     }
@@ -196,12 +208,14 @@ function flashReveal(el: HTMLElement): void {
   window.setTimeout(() => el.classList.remove('reveal-flash'), 1600);
 }
 
-async function consumePendingReveal(): Promise<void> {
+async function consumePendingReveal(): Promise<boolean> {
   const target = layoutStore.consumeReveal(props.sessionId);
 
-  if (!target) return;
+  if (!target) return false;
 
   await revealTarget(target);
+
+  return true;
 }
 
 /// Already-open panel: a reveal request arrives after we've mounted.
@@ -279,6 +293,10 @@ function onUpdateDefaultMode(next: DefaultSendMode) {
   sessionsStore.setDefaultSendMode(props.sessionId, next);
 }
 
+function onJumpToLatest(): void {
+  void scrollToBottom();
+}
+
 /// Inline edit mode for user messages: when set, the matching user
 /// bubble is replaced by a MessageEditor in place. Reset on save,
 /// fork-and-save, or cancel. Keyed by ChatItem.id (counter-derived).
@@ -349,118 +367,119 @@ const commandsRun = computed(() => {
     class="chat-tile"
     :style="{ '--accent': accentColor }"
   >
-    <div
-      ref="messagesEl"
-      class="chat-messages"
-    >
-      <p
-        v-if="items.length === 0"
-        class="empty-message"
+    <div class="chat-scroll-wrap">
+      <div
+        ref="messagesEl"
+        class="chat-messages"
       >
-        Start typing below to send a message.
-      </p>
+        <p
+          v-if="items.length === 0"
+          class="empty-message"
+        >
+          Start typing below to send a message.
+        </p>
 
-      <template
-        v-for="item in timelineItems"
-        :key="`${item.kind}-${item.id}`"
-      >
-        <CommandResultCard
-          v-if="item.kind === 'commandResult'"
-          :record="item.record"
-          @add="addCommandResultAttachment"
-          @cancel="cancelCommandResult"
-        />
-        <div
-          v-else-if="item.kind === 'reasoning' && reasoningVisibility !== 'hidden'"
-          class="message-shell"
+        <template
+          v-for="item in timelineItems"
+          :key="`${item.kind}-${item.id}`"
         >
-          <ReasoningBlock
-            :text="item.text"
-            :visibility="reasoningVisibility"
-            :opaque="item.kind === 'reasoning' && item.opaque === true"
+          <CommandResultCard
+            v-if="item.kind === 'commandResult'"
+            :record="item.record"
+            @add="addCommandResultAttachment"
+            @cancel="cancelCommandResult"
           />
-          <MessageActions
-            kind="reasoning"
-            :text="item.text"
-            :event-id="item.eventId"
-            @quote="onMessageQuote"
-            @fork="onMessageFork(itemIndexById(item.id))"
-          />
-        </div>
-        <div
-          v-else-if="item.kind === 'tool'"
-          class="message-shell"
-          :data-tool-call-id="item.toolCallId"
-        >
-          <ToolCallBlock
-            :tool-name="item.toolName"
-            :tool-call-id="item.toolCallId"
-            :mcp-server-name="item.mcpServerName"
-            :mcp-tool-name="item.mcpToolName"
-            :args="item.args"
-            :status="item.status"
-            :progress-message="item.progressMessage"
-            :partial-output="item.partialOutput"
-            :result-content="item.resultContent"
-            :error-message="item.errorMessage"
-            :error-code="item.errorCode"
+          <div
+            v-else-if="item.kind === 'reasoning' && reasoningVisibility !== 'hidden'"
+            class="message-shell"
+          >
+            <ReasoningBlock
+              :text="item.text"
+              :visibility="reasoningVisibility"
+              :opaque="item.kind === 'reasoning' && item.opaque === true"
+            />
+            <MessageActions
+              kind="reasoning"
+              :text="item.text"
+              :event-id="item.eventId"
+              @quote="onMessageQuote"
+              @fork="onMessageFork(itemIndexById(item.id))"
+            />
+          </div>
+          <div
+            v-else-if="item.kind === 'tool'"
+            class="message-shell"
+            :data-tool-call-id="item.toolCallId"
+          >
+            <ToolCallBlock
+              :tool-name="item.toolName"
+              :tool-call-id="item.toolCallId"
+              :mcp-server-name="item.mcpServerName"
+              :mcp-tool-name="item.mcpToolName"
+              :args="item.args"
+              :status="item.status"
+              :progress-message="item.progressMessage"
+              :partial-output="item.partialOutput"
+              :result-content="item.resultContent"
+              :error-message="item.errorMessage"
+              :error-code="item.errorCode"
+              :agent-id="item.agentId"
+            />
+            <MessageActions
+              kind="tool"
+              :event-id="item.eventId"
+              :tool-args-text="item.args ? JSON.stringify(item.args, null, 2) : ''"
+              :tool-result-text="item.resultContent || item.partialOutput || ''"
+              @fork="onMessageFork(itemIndexById(item.id))"
+            />
+          </div>
+          <SubagentBlock
+            v-else-if="item.kind === 'subagent'"
             :agent-id="item.agentId"
+            :agent-name="item.agentName"
+            :display-name="item.displayName"
+            :description="item.description"
+            :status="item.status"
+            :started-at="item.startedAt"
+            :completed-at="item.completedAt"
+            :error="item.error"
+            :items="item.items"
+            :reasoning-visibility="reasoningVisibility"
           />
-          <MessageActions
-            kind="tool"
-            :event-id="item.eventId"
-            :tool-args-text="item.args ? JSON.stringify(item.args, null, 2) : ''"
-            :tool-result-text="item.resultContent || item.partialOutput || ''"
-            @fork="onMessageFork(itemIndexById(item.id))"
+          <PendingRequestCard
+            v-else-if="item.kind === 'pendingRequest'"
+            :session-id="props.sessionId"
+            :request-id="item.requestId"
+            :pending-kind="item.pendingKind"
+            :message="item.message"
+            :request="item.request"
           />
-        </div>
-        <SubagentBlock
-          v-else-if="item.kind === 'subagent'"
-          :agent-id="item.agentId"
-          :agent-name="item.agentName"
-          :display-name="item.displayName"
-          :description="item.description"
-          :status="item.status"
-          :started-at="item.startedAt"
-          :completed-at="item.completedAt"
-          :error="item.error"
-          :items="item.items"
-          :reasoning-visibility="reasoningVisibility"
-        />
-        <PendingRequestCard
-          v-else-if="item.kind === 'pendingRequest'"
-          :session-id="props.sessionId"
-          :request-id="item.requestId"
-          :pending-kind="item.pendingKind"
-          :message="item.message"
-          :request="item.request"
-        />
-        <button
-          v-else-if="item.kind === 'forkNotice'"
-          type="button"
-          class="fork-notice"
-          :class="`dir-${item.direction}`"
-          :title="
-            item.direction === 'from'
-              ? `Open the parent session: ${item.referenceName}`
-              : `Open the forked session: ${item.referenceName}`
-          "
-          @click="onForkNoticeClick(item.referenceName)"
-        >
-          <i
-            class="pi pi-share-alt"
-            aria-hidden="true"
-          />
-          <span class="fork-notice-label">
-            {{ item.direction === 'from' ? 'Forked from' : 'Forked into' }}
-          </span>
-          <span class="fork-notice-target">{{ item.referenceName }}</span>
-          <i
-            class="pi pi-arrow-right"
-            aria-hidden="true"
-          />
-        </button>
-        <!-- Skip empty assistant items entirely. The model emits
+          <button
+            v-else-if="item.kind === 'forkNotice'"
+            type="button"
+            class="fork-notice"
+            :class="`dir-${item.direction}`"
+            :title="
+              item.direction === 'from'
+                ? `Open the parent session: ${item.referenceName}`
+                : `Open the forked session: ${item.referenceName}`
+            "
+            @click="onForkNoticeClick(item.referenceName)"
+          >
+            <i
+              class="pi pi-share-alt"
+              aria-hidden="true"
+            />
+            <span class="fork-notice-label">
+              {{ item.direction === 'from' ? 'Forked from' : 'Forked into' }}
+            </span>
+            <span class="fork-notice-target">{{ item.referenceName }}</span>
+            <i
+              class="pi pi-arrow-right"
+              aria-hidden="true"
+            />
+          </button>
+          <!-- Skip empty assistant items entirely. The model emits
              `assistant.message_start` (creating an empty item) before
              every turn; when the turn goes straight to a tool call
              without text, the empty card used to render as "..." right
@@ -469,76 +488,78 @@ const commandsRun = computed(() => {
              pendingRequest items are handled by PendingRequestCard
              above, so by the time we reach this branch the type is
              narrowed to user / assistant / system. -->
-        <div
-          v-else-if="item.kind !== 'reasoning' && !(item.kind === 'assistant' && item.text === '')"
-          class="message-shell"
-        >
-          <!-- Inline editor swap. Only user messages support editing; -->
-          <!-- canFork is true iff the item has a server-acknowledged   -->
-          <!-- eventId we can pin the fork to.                          -->
-          <MessageEditor
-            v-if="item.kind === 'user' && editingItemId === item.id"
-            :original-text="item.text"
-            :can-fork="Boolean('eventId' in item && item.eventId)"
-            @save="
-              (text) => onEditorSave('eventId' in item && item.eventId ? item.eventId : '', text)
+          <div
+            v-else-if="
+              item.kind !== 'reasoning' && !(item.kind === 'assistant' && item.text === '')
             "
-            @save-and-fork="
-              (text) =>
-                onEditorSaveFork('eventId' in item && item.eventId ? item.eventId : '', text)
-            "
-            @cancel="onEditorCancel"
-          />
-          <template v-else>
-            <article
-              class="message-card"
-              :class="[item.kind, item.kind === 'system' ? `severity-${item.severity}` : '']"
-            >
-              <header class="role-label">
-                {{
-                  item.kind === 'user'
-                    ? 'You'
-                    : item.kind === 'assistant'
-                      ? 'Assistant'
-                      : item.kind === 'system' && item.severity === 'warn'
-                        ? 'Warning'
-                        : item.kind === 'system' && item.severity === 'error'
-                          ? 'Error'
-                          : 'Info'
-                }}
-              </header>
-              <UserMessageBody
-                v-if="item.kind === 'user'"
-                :text="item.text"
-                label="Your message"
-                :attachments="item.attachments"
-              />
-              <MessageContent
-                v-else-if="item.kind === 'assistant'"
-                :text="item.text"
-                label="Assistant message"
-              />
-              <p
-                v-else
-                class="message-body"
-              >
-                {{ item.text }}
-              </p>
-            </article>
-            <MessageActions
-              :kind="item.kind"
-              :text="item.text"
-              :event-id="'eventId' in item ? item.eventId : undefined"
-              @quote="onMessageQuote"
-              @edit="onMessageEdit(item.id)"
-              @retry="onMessageRetry(itemIndexById(item.id))"
-              @fork="onMessageFork(itemIndexById(item.id))"
+            class="message-shell"
+          >
+            <!-- Inline editor swap. Only user messages support editing; -->
+            <!-- canFork is true iff the item has a server-acknowledged   -->
+            <!-- eventId we can pin the fork to.                          -->
+            <MessageEditor
+              v-if="item.kind === 'user' && editingItemId === item.id"
+              :original-text="item.text"
+              :can-fork="Boolean('eventId' in item && item.eventId)"
+              @save="
+                (text) => onEditorSave('eventId' in item && item.eventId ? item.eventId : '', text)
+              "
+              @save-and-fork="
+                (text) =>
+                  onEditorSaveFork('eventId' in item && item.eventId ? item.eventId : '', text)
+              "
+              @cancel="onEditorCancel"
             />
-          </template>
-        </div>
-      </template>
+            <template v-else>
+              <article
+                class="message-card"
+                :class="[item.kind, item.kind === 'system' ? `severity-${item.severity}` : '']"
+              >
+                <header class="role-label">
+                  {{
+                    item.kind === 'user'
+                      ? 'You'
+                      : item.kind === 'assistant'
+                        ? 'Assistant'
+                        : item.kind === 'system' && item.severity === 'warn'
+                          ? 'Warning'
+                          : item.kind === 'system' && item.severity === 'error'
+                            ? 'Error'
+                            : 'Info'
+                  }}
+                </header>
+                <UserMessageBody
+                  v-if="item.kind === 'user'"
+                  :text="item.text"
+                  label="Your message"
+                  :attachments="item.attachments"
+                />
+                <MessageContent
+                  v-else-if="item.kind === 'assistant'"
+                  :text="item.text"
+                  label="Assistant message"
+                />
+                <p
+                  v-else
+                  class="message-body"
+                >
+                  {{ item.text }}
+                </p>
+              </article>
+              <MessageActions
+                :kind="item.kind"
+                :text="item.text"
+                :event-id="'eventId' in item ? item.eventId : undefined"
+                @quote="onMessageQuote"
+                @edit="onMessageEdit(item.id)"
+                @retry="onMessageRetry(itemIndexById(item.id))"
+                @fork="onMessageFork(itemIndexById(item.id))"
+              />
+            </template>
+          </div>
+        </template>
 
-      <!-- Mid-turn indicator inside the chat. Visible whenever the
+        <!-- Mid-turn indicator inside the chat. Visible whenever the
            record reports `isThinking` (driven by assistant.turn_start
            / turn_end / session.idle in sessionsStore). Previously
            this card only showed before the FIRST delta — which made
@@ -548,16 +569,30 @@ const commandsRun = computed(() => {
            Now: appears at the bottom of the message list during the
            ENTIRE mid-turn period, AFTER all the items so the user
            sees "currently working" without losing prior context. -->
-      <article
-        v-if="recordIsThinking"
-        class="message-card assistant pending"
+        <article
+          v-if="recordIsThinking"
+          class="message-card assistant pending"
+        >
+          <header class="role-label">Assistant</header>
+          <p class="message-body">
+            <i class="pi pi-spin pi-spinner thinking-spinner" />
+            {{ ambient.intent || 'Thinking…' }}
+          </p>
+        </article>
+      </div>
+
+      <button
+        v-if="showJumpToLatest"
+        type="button"
+        class="jump-to-latest"
+        @click="onJumpToLatest"
       >
-        <header class="role-label">Assistant</header>
-        <p class="message-body">
-          <i class="pi pi-spin pi-spinner thinking-spinner" />
-          {{ ambient.intent || 'Thinking…' }}
-        </p>
-      </article>
+        <i
+          class="pi pi-arrow-down"
+          aria-hidden="true"
+        />
+        Jump to latest
+      </button>
     </div>
 
     <footer
@@ -749,6 +784,14 @@ const commandsRun = computed(() => {
   border-radius: 0 0 var(--p-border-radius-xl) var(--p-border-radius-xl);
 }
 
+.chat-scroll-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-messages {
   flex: 1 1 0;
   min-height: 0;
@@ -757,6 +800,48 @@ const commandsRun = computed(() => {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
+}
+
+/* Floating "jump to latest" pill — shown only while the user has
+   scrolled up AND new content has streamed in below them
+   (`showJumpToLatest`). Pinned to the bottom-centre of the scroll
+   viewport (above the composer), it doesn't scroll with the content. */
+.jump-to-latest {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--p-button-primary-color, #fff);
+  background: var(--p-primary-500);
+  border: 1px solid color-mix(in srgb, var(--p-primary-500) 60%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px color-mix(in srgb, black 25%, transparent);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    transform 0.12s ease;
+}
+
+.jump-to-latest:hover {
+  background: var(--p-primary-600, var(--p-primary-500));
+}
+
+.jump-to-latest .pi {
+  font-size: 0.72rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jump-to-latest {
+    transition: none;
+  }
 }
 
 .empty-message {

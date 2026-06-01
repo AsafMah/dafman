@@ -24,7 +24,12 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
-**Recently fixed:** Single-instance crash — launching dafman while another copy
+**Recently fixed:** #137 — chat transcript scroll anchoring: streaming no longer
+yanks you to the bottom while you're reading earlier messages (a "Jump to latest"
+pill offers the return instead), and focusing/switching into a session restores
+its scroll position rather than jumping to the top. One pin-based model in
+`useChatScroll.ts` (VueUse `useScroll`) replaces the per-flush `scrollToBottom()`.
+Single-instance crash — launching dafman while another copy
 is already open on the same build channel no longer kills the webview. A
 PID+token lockfile (`src-bun/app/shared/singleInstance.ts`, acquired in
 `src-bun/index.ts` before any shared-state init) blocks the duplicate, which

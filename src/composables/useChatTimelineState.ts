@@ -15,8 +15,9 @@
 //   resetForReplay({ markSending? })
 //
 // The session-events watcher and rAF-coalesced flush are owned here.
-// Toast emission (from reducer output) and scroll-to-bottom (after
-// each flush) are injected so the composable stays Pinia-free and
+// Toast emission (from reducer output) and the after-flush scroll hook
+// (`afterFlush`, which auto-scrolls only if the user is pinned to the
+// bottom) are injected so the composable stays Pinia-free and
 // unit-testable in isolation.
 //
 // `idCounter` is intentionally returned so consumers (notably
@@ -53,9 +54,10 @@ export interface UseChatTimelineStateOptions {
   droppedEventCount: Ref<number | undefined>;
   sessionId: Ref<string>;
   toasts: TimelineToasts;
-  /// Called after every successful flush so the transcript ends
-  /// scroll-pinned to the latest item.
-  scrollToBottom: () => Promise<void> | void;
+  /// Called after every successful flush. The implementation decides
+  /// whether to actually scroll (it only does so if the user is still
+  /// pinned to the bottom) — see `useChatScroll.autoScrollIfPinned`.
+  afterFlush: () => Promise<void> | void;
 }
 
 export interface UseChatTimelineStateReturn {
@@ -176,7 +178,7 @@ export function useChatTimelineState(
       }
     }
 
-    void opts.scrollToBottom();
+    void opts.afterFlush();
   }
 
   watch(

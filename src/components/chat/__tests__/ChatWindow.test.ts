@@ -284,6 +284,42 @@ async function flushFrames(n = 3): Promise<void> {
   }
 }
 
+/// Give the `.chat-messages` scroll container controllable scroll
+/// metrics. happy-dom reports 0 for scrollHeight/clientHeight (no
+/// layout), which makes `useScroll`'s arrivedState.bottom always read
+/// true — useless for exercising the scrolled-up path. We back the three
+/// metrics with a mutable object so a test can move `scrollTop` and
+/// dispatch a 'scroll' event to drive the stick-to-bottom state machine,
+/// and observe whether the composable wrote `scrollTop = scrollHeight`.
+function installScrollMetrics(el: HTMLElement): {
+  scrollHeight: number;
+  clientHeight: number;
+  scrollTop: number;
+} {
+  const m = { scrollHeight: 1000, clientHeight: 300, scrollTop: 0 };
+  Object.defineProperty(el, 'scrollHeight', { configurable: true, get: () => m.scrollHeight });
+  Object.defineProperty(el, 'clientHeight', { configurable: true, get: () => m.clientHeight });
+  Object.defineProperty(el, 'scrollTop', {
+    configurable: true,
+    get: () => m.scrollTop,
+    set: (v: number) => {
+      m.scrollTop = v;
+    },
+  });
+  return m;
+}
+
+function rerenderProps(events: SessionEventPayload[], droppedEventCount = 0) {
+  return {
+    sessionId: 's1',
+    accent: '#abc',
+    events,
+    droppedEventCount,
+    reasoningVisibilityOverride: 'default' as const,
+    defaultSendMode: 'steer' as const,
+  };
+}
+
 describe('ChatWindow', () => {
   let handle: BridgeHandle;
 
@@ -681,5 +717,68 @@ describe('ChatWindow', () => {
     } finally {
       for (const r of restores) r();
     }
+  });
+
+  test('streaming while scrolled up does NOT yank to bottom; pill appears and jumps on click', async () => {
+    const utils = await mountChat({ events: [userEvent('one', 'e1'), assistantEvent('hi', 'e2')] });
+    const el = utils.container.querySelector('.chat-messages') as HTMLElement;
+    const m = installScrollMetrics(el);
+
+    // 1. Seed the pin: user is at the bottom (700 + 300 ≥ 1000 − 80).
+    m.scrollTop = 700;
+    el.dispatchEvent(new Event('scroll'));
+    await nextTick();
+
+    // 2. User scrolls UP to read (100 < 700 → upward → un-pin).
+    m.scrollTop = 100;
+    el.dispatchEvent(new Event('scroll'));
+    await nextTick();
+
+    // No new content yet → no pill.
+    expect(utils.container.querySelector('.jump-to-latest')).toBeNull();
+
+    // 3. New assistant content streams in below the reader.
+    await utils.rerender(
+      rerenderProps([
+        userEvent('one', 'e1'),
+        assistantEvent('hi', 'e2'),
+        assistantEvent('more', 'e3'),
+      ]),
+    );
+    await flushFrames();
+
+    // The reader was NOT yanked down — scrollTop stays where they left it.
+    expect(m.scrollTop).toBe(100);
+
+    // The pill is now offered (scrolled up + unseen content below).
+    const pill = utils.container.querySelector('.jump-to-latest') as HTMLElement;
+
+    expect(pill).not.toBeNull();
+
+    // 4. Click it → snaps to the latest, pill disappears.
+    await fireEvent.click(pill);
+    await flushFrames();
+
+    expect(m.scrollTop).toBe(1000);
+    expect(utils.container.querySelector('.jump-to-latest')).toBeNull();
+  });
+
+  test('at the bottom, new content sticks (auto-scrolls) and offers no pill', async () => {
+    const utils = await mountChat({ events: [userEvent('one', 'e1')] });
+    const el = utils.container.querySelector('.chat-messages') as HTMLElement;
+    const m = installScrollMetrics(el);
+
+    // User sits at the bottom.
+    m.scrollTop = 700;
+    el.dispatchEvent(new Event('scroll'));
+    await nextTick();
+
+    // New content arrives.
+    await utils.rerender(rerenderProps([userEvent('one', 'e1'), assistantEvent('hi', 'e2')]));
+    await flushFrames();
+
+    // Stuck to the bottom (scrollTop driven to scrollHeight), no pill.
+    expect(m.scrollTop).toBe(1000);
+    expect(utils.container.querySelector('.jump-to-latest')).toBeNull();
   });
 });
