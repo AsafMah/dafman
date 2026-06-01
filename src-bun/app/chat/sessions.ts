@@ -281,35 +281,55 @@ export class SessionRegistry {
     // events buffer by sessionId. Drain to the real id after.
     let resolvedSessionId: string | null = null;
     const earlyEventBuffer: SessionEvent[] = [];
+    let configEventSink: ((event: SessionEvent) => void) | null = (event) => {
+      earlyEventBuffer.push(event);
+    };
     const earlyForward = (event: SessionEvent) => {
-      if (resolvedSessionId !== null) {
-        this.forward(resolvedSessionId, event);
-      } else {
-        earlyEventBuffer.push(event);
-      }
+      configEventSink?.(event);
     };
     const wd = opts.workingDirectory?.trim();
-    const session = await client.createSession({
-      ...this.baseSessionConfig(() => resolvedSessionId ?? 'pending'),
-      onEvent: earlyForward,
-      ...(wd ? { workingDirectory: wd } : {}),
-      ...(opts.model ? { model: opts.model } : {}),
-      ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort as ReasoningEffort } : {}),
-    });
+    let session: CopilotSession;
+
+    try {
+      session = await client.createSession({
+        ...this.baseSessionConfig(() => resolvedSessionId ?? 'pending'),
+        onEvent: earlyForward,
+        ...(wd ? { workingDirectory: wd } : {}),
+        ...(opts.model ? { model: opts.model } : {}),
+        ...(opts.reasoningEffort
+          ? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
+          : {}),
+      });
+    } catch (err) {
+      configEventSink = null;
+      throw err;
+    }
+
     const sessionId = session.sessionId;
 
     resolvedSessionId = sessionId;
-    // `onEvent` is one-shot for the early window; switch to `session.on`
-    // for the live stream and grab its unsubscribe handle.
-    const unsubscribe = session.on((event) => {
+    const unsubscribeLive = session.on((event) => {
       this.forward(sessionId, event);
     });
+    let unsubscribed = false;
+    const unsubscribe = () => {
+      if (unsubscribed) return;
+
+      unsubscribed = true;
+      configEventSink = null;
+      unsubscribeLive();
+    };
 
     this.entries.set(sessionId, { session, unsubscribe, ...(wd ? { workingDirectory: wd } : {}) });
     this.modeBySession.set(sessionId, 'interactive');
 
-    // Drain anything that fired during the createSession await.
+    // The SDK registers config.onEvent as a persistent session listener,
+    // so it must become inert once the single live session.on forwarder is attached.
+    configEventSink = null;
+
     for (const event of earlyEventBuffer) this.forward(sessionId, event);
+
+    earlyEventBuffer.length = 0;
 
     log.info('session created', { sessionId, workingDirectory: wd ?? null });
 
@@ -345,8 +365,12 @@ export class SessionRegistry {
 
     const effectiveCwd = opts.workingDirectory ?? persistedCwd;
     let resolvedSessionId: string | null = null;
+    const earlyEventBuffer: SessionEvent[] = [];
+    let configEventSink: ((event: SessionEvent) => void) | null = (event) => {
+      earlyEventBuffer.push(event);
+    };
     const earlyForward = (event: SessionEvent) => {
-      this.forward(resolvedSessionId ?? sessionId, event);
+      configEventSink?.(event);
     };
     let session: CopilotSession;
 
@@ -361,6 +385,7 @@ export class SessionRegistry {
         ...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
       });
     } catch (err) {
+      configEventSink = null;
       const message = toErrorMessage(err);
 
       log.warn('session resume failed', { sessionId, error: message });
@@ -370,9 +395,17 @@ export class SessionRegistry {
     const actualId = session.sessionId;
 
     resolvedSessionId = actualId;
-    const unsubscribe = session.on((event) => {
+    const unsubscribeLive = session.on((event) => {
       this.forward(actualId, event);
     });
+    let unsubscribed = false;
+    const unsubscribe = () => {
+      if (unsubscribed) return;
+
+      unsubscribed = true;
+      configEventSink = null;
+      unsubscribeLive();
+    };
 
     this.entries.set(actualId, {
       session,
@@ -380,6 +413,14 @@ export class SessionRegistry {
       ...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
     });
     this.modeBySession.set(actualId, 'interactive');
+
+    // The SDK keeps config.onEvent subscribed for the whole session; after
+    // attaching the single live forwarder, drain only the early buffered events.
+    configEventSink = null;
+
+    for (const event of earlyEventBuffer) this.forward(actualId, event);
+
+    earlyEventBuffer.length = 0;
 
     // Restore dafman-owned per-session state the SDK forgets across
     // resume: the "Allow all" flag (never in the SDK's persisted

@@ -8,6 +8,27 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-01 — session events forward once (#135)
+
+**Takeaway:** fixed the duplicate message/reasoning regression by making SDK
+`config.onEvent` a create/resume early-event buffer only. Once
+`SessionRegistry` attaches the single live `session.on` forwarder,
+`config.onEvent` becomes inert; disconnect also makes that config callback
+inert before unsubscribing the live listener.
+
+**SDK receipt:** `node_modules/@github/copilot-sdk/dist/client.js:727-729` and
+`:857-859` register `config.onEvent` by calling `session.on(config.onEvent)`;
+`node_modules/@github/copilot-sdk/dist/session.js:147-166` stores that handler
+in the persistent session handler set until an unsubscribe deletes it. The fake
+client mirrors the same persistence at
+`src-bun/app/client/fakeClient.ts:378-379,431`.
+
+**Tests:** added create + resume regressions in
+`src-bun/__tests__/sessions.test.ts` that fire the same live event through both
+the config callback and `session.on`; both failed with two forwarded events
+before the fix and pass with exactly one. They also assert the retained config
+callback cannot forward after `disconnect()`.
+
 ## 2026-06-01 — single-instance guard dogfooded (SI.1/SI.2 PASS)
 
 **Takeaway:** the single-instance guard (`src-bun/app/shared/singleInstance.ts`)

@@ -39,6 +39,13 @@ yanks you to the bottom while you're reading earlier messages (a "Jump to latest
 pill offers the return instead), and focusing/switching into a session restores
 its scroll position rather than jumping to the top. One pin-based model in
 `useChatScroll.ts` (VueUse `useScroll`) replaces the per-flush `scrollToBottom()`.
+
+**Recently fixed:** #135 — session events now forward exactly once for both
+fresh-created and resumed sessions. `config.onEvent` stays as the early-event
+buffer for create/resume races, then goes inert once the single live
+`session.on` forwarder is attached, fixing duplicate user messages, reasoning,
+and doubled backend event log lines.
+
 Single-instance crash — launching dafman while another copy
 is already open on the same build channel no longer kills the webview. A
 PID+token lockfile (`src-bun/app/shared/singleInstance.ts`, acquired in
