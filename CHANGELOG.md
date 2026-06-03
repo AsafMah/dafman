@@ -3,6 +3,18 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (#135 — duplicate session event forwarding — 2026-06-01)
+- **Chat session events now render once instead of twice.** Fresh-created and resumed sessions no longer double-forward the SDK stream through both `config.onEvent` and `session.on`, fixing duplicate user messages, duplicate reasoning blocks, and doubled backend event log lines.
+
+### Fixed (#132 — slash-command highlighted selection — 2026-06-01)
+- **Slash-command autocomplete now honors the highlighted item.** Pressing **Tab** to complete a `/` command uses lexical-vue's current `selectedIndex` instead of always completing the first filtered command, while **Enter** continues to defer through the menu and uses lexical-vue's own `props.options[selectedIndex]` selection path. Regression coverage in `src/components/chat/__tests__/slashCommandSelection.test.ts`; live keyboard verification is pending in `MANUAL_TESTS.md` KB.3 / KB.7.
+
+### Fixed (#127 — agent select transition — 2026-06-01)
+- **Selecting an agent in the Session Details rail no longer flashes the whole agent list.** The busy/disabled state is now scoped to the clicked Select/Deselect row while the handler still ignores concurrent select attempts globally, and the active row's Select ↔ Deselect swap uses Vue's built-in `<Transition>` for a soft fade instead of a hard cut. Regression coverage in `src/components/session/__tests__/SessionDetailsPanel.agentActions.test.ts`; visual transition timing is queued in `MANUAL_TESTS.md` AST.1.
+
+### Fixed (#128 — tab-bar maximize affordance — 2026-06-01)
+- **Session and group tabs have their maximize/restore button again.** The regression dropped the custom `pi-window-maximize` tab action originally shipped in `5a1da9e`; Dafman now restores it on both inner session tabs and outer group tabs, using dockview's `panel.api.maximize()` / `exitMaximized()` APIs with accessible Maximize/Restore labels. Unit coverage locks both tab buttons.
+
 ### Fixed (#137 — chat scroll anchoring — 2026-06-01)
 - **The chat transcript now stays where you put it.** Scrolling up to re-read an earlier message no longer gets yanked back to the bottom when new content streams in — the transcript sticks to the bottom only while you're actually at the bottom. When new content arrives while you're scrolled up, a floating **"Jump to latest"** pill appears and returns you on click instead of stealing your position. Focusing or switching into a session now *restores* its scroll position (pinned → bottom; scrolled-up → keep where you were) and never jumps to the top. Implemented as one anchoring model in `useChatScroll.ts` (VueUse `useScroll`: pin on `arrivedState.bottom`, un-pin only on an actual upward scroll, so streaming and content-growth can't un-pin you), replacing the previous unconditional `scrollToBottom()` on every flush. Regression coverage in `src/components/chat/__tests__/ChatWindow.test.ts`; runtime-only behavior (focus restore, pill, no-yank) in `MANUAL_TESTS.md` SC.1–SC.4.
 

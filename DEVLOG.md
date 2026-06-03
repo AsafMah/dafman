@@ -8,6 +8,115 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-01 — session events forward once (#135)
+
+**Takeaway:** fixed the duplicate message/reasoning regression by making SDK
+`config.onEvent` a create/resume early-event buffer only. Once
+`SessionRegistry` attaches the single live `session.on` forwarder,
+`config.onEvent` becomes inert; disconnect also makes that config callback
+inert before unsubscribing the live listener.
+
+**SDK receipt:** `node_modules/@github/copilot-sdk/dist/client.js:727-729` and
+`:857-859` register `config.onEvent` by calling `session.on(config.onEvent)`;
+`node_modules/@github/copilot-sdk/dist/session.js:147-166` stores that handler
+in the persistent session handler set until an unsubscribe deletes it. The fake
+client mirrors the same persistence at
+`src-bun/app/client/fakeClient.ts:378-379,431`.
+
+**Tests:** added create + resume regressions in
+`src-bun/__tests__/sessions.test.ts` that fire the same live event through both
+the config callback and `session.on`; both failed with two forwarded events
+before the fix and pass with exactly one. They also assert the retained config
+callback cannot forward after `disconnect()`.
+
+## 2026-06-01 — slash-command autocomplete honors highlighted row (#132)
+
+**Takeaway:** fixed the slash-command menu's Tab completion so it uses the
+currently highlighted command instead of `filteredOptions[0]`. Enter remains on
+lexical-vue's built-in menu-selection path, which already emits the highlighted
+option when the HIGH-priority composer Enter handler defers to the menu.
+
+**lexical-vue receipt:** `node_modules/lexical-vue/dist/shared/LexicalMenu.vine.js`
+keeps `selectedIndex` (`setHighlightedIndex`, lines 181–185), passes it to the
+slot as `itemProps.selectedIndex` (lines 317–323), and its own Tab/Enter
+handlers call `selectOptionAndCleanUp(props.options[selectedIndex])` (lines
+299–313). `SlashCommandPlugin.vue` had a separate HIGH-priority Tab handler for
+"complete but don't execute" and that handler always picked `opts[0]`; it now
+tracks the exposed `itemProps.selectedIndex` and resolves through
+`resolveHighlightedOption()`.
+
+**Tests:** test-first repro added in
+`src/components/chat/__tests__/slashCommandSelection.test.ts`: selected index 2
+returned `"first"` before the helper fix, then returns `"third"` after. The
+fallback cases cover `null`/`undefined`, invalid indexes, and empty options.
+`src/lexical/__tests__/submitOnEnter.test.ts` still passes, confirming #125's
+menu-defer resolver behavior was not regressed.
+
+**Manual:** KB.3 now explicitly requires a non-first slash row, because the
+previous wording could pass accidentally by selecting the first command. KB.7
+covers the Tab completion half of #132.
+
+## 2026-06-01 — agent select busy state scoped (#127)
+
+**Takeaway:** the Session Details agent-list flash was not a PrimeVue spinner bug;
+it was our own bulk disabled-state binding. Every row used
+`:disabled="!!agentBusyName"`, so one select/deselect IPC flipped every Select /
+Deselect button disabled→enabled in the same render. The fix scopes the visual
+disabled state to the row whose operation is pending while leaving the
+composable's global `agentBusyName` early-return guard intact, so cross-row
+clicks during an in-flight select still no-op instead of launching concurrent SDK
+agent RPCs.
+
+**Receipts:**
+- `src/components/session/SessionDetailsPanel.vue` now disables Select with
+  `agentBusyName === agent.name`; the active Deselect row handles both its
+  `__deselect__` sentinel and a same-row select busy state. Other rows stay
+  visually enabled, eliminating the whole-list flash.
+- The active row's Select ↔ Deselect swap is wrapped in Vue's built-in
+  `<Transition>` with an opacity fade and a fixed action shell so the adjacent
+  file-edit affordance doesn't jump during the cross-fade. No new dependency and
+  no keyframes.
+- Rubber-duck critique caught the important sentinel pitfall: a naive
+  `agentBusyName === agent.name` on Deselect would have left the clicked Deselect
+  button enabled because `deselectAgent()` stores `__deselect__`.
+- Regression coverage:
+  `src/components/session/__tests__/SessionDetailsPanel.agentActions.test.ts`
+  keeps `selectAgent` / `deselectAgent` promises pending and asserts only the
+  clicked row is disabled; it also clicks a second enabled row and verifies the
+  global handler guard prevents a second select RPC.
+
+**Validation:**
+- `bun test src/components/session/__tests__/SessionDetailsPanel.agentActions.test.ts`
+- `bun run lint`
+- `bun run lint:eslint` (existing warnings only; 0 errors)
+- `bun run smoke`
+
+## 2026-06-01 — tab-bar maximize affordance restored (#128)
+
+**Takeaway:** restored the tab-bar maximize/restore affordance that regressed
+after the dockview/tab refactors. `5a1da9e` originally added a custom
+`ChatTab` button (not a dockview-native option) wired to
+`panel.api.maximize()` / `exitMaximized()`; dockview 6.6.1 exposes those APIs
+but no built-in maximize button in `DockviewOptions`, only custom header-action
+renderers. Current v3 layout has two tab surfaces, so the regression fix restores
+the custom button on both inner session tabs (`ChatTab.vue`) and outer group tabs
+(`GroupTab.vue`) via shared `usePanelLifecycle` state.
+
+**Receipts:**
+- Original baseline: `git show 5a1da9e` says "ChatTab: maximize/restore toggle
+  button next to close (uses dockview panel.api.maximize()/exitMaximized())".
+- Native-vs-custom check: `node_modules/dockview-core/dist/esm/dockview/options.d.ts`
+  has header action hooks but no native maximize-button option; panel APIs expose
+  `maximize()` / `isMaximized()` / `exitMaximized()`.
+- Restored wiring: `src/composables/usePanelLifecycle.ts` tracks maximized state
+  and toggles the panel API; `src/components/chat/ChatTab.vue` and
+  `src/components/shell/GroupTab.vue` render accessible Maximize/Restore buttons.
+- Tests: `src/components/chat/__tests__/ChatTab.maximize.test.ts` and
+  `src/components/shell/__tests__/GroupTab.closeConfirm.test.ts` assert the
+  button renders and invokes maximize/restore.
+- Manual checklist: `MANUAL_TESTS.md` MX.1 covers the live dockview visual
+  interaction; e2e layout flow 21 + `bun run smoke` are the runtime gates.
+
 ## 2026-06-01 — single-instance guard dogfooded (SI.1/SI.2 PASS)
 
 **Takeaway:** the single-instance guard (`src-bun/app/shared/singleInstance.ts`)

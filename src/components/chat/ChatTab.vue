@@ -24,7 +24,14 @@ const props = defineProps<{
   api?: import('dockview-core').DockviewPanelApi;
 }>();
 
-const { panelApi, title, isActive, close: onClose } = usePanelLifecycle(props);
+const {
+  panelApi,
+  title,
+  isActive,
+  maximized,
+  close: onClose,
+  toggleMaximized,
+} = usePanelLifecycle(props);
 
 const sessionsStore = useSessionsStore();
 const groupsStore = useGroupsStore();
@@ -122,7 +129,21 @@ function groupColorOf(item: MenuItem): string | undefined {
     <span class="chat-tab-title">{{ displayTitle }}</span>
     <button
       type="button"
-      class="chat-tab-close"
+      class="chat-tab-action"
+      :aria-label="maximized ? 'Restore session' : 'Maximize session'"
+      :title="maximized ? 'Restore session' : 'Maximize session'"
+      @pointerdown.stop
+      @click="toggleMaximized"
+    >
+      <i
+        class="pi"
+        :class="maximized ? 'pi-window-minimize' : 'pi-window-maximize'"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      class="chat-tab-action chat-tab-close"
       aria-label="Close session"
       @pointerdown.stop
       @click="onClose"
@@ -233,7 +254,7 @@ function groupColorOf(item: MenuItem): string | undefined {
   min-width: 0;
 }
 
-.chat-tab-close {
+.chat-tab-action {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -259,7 +280,13 @@ function groupColorOf(item: MenuItem): string | undefined {
   opacity: 0.85;
 }
 
-.chat-tab-close:hover {
+.chat-tab:hover .chat-tab-action,
+.chat-tab-active .chat-tab-action,
+.chat-tab-action:focus-visible {
+  opacity: 0.85;
+}
+
+.chat-tab-action:hover {
   opacity: 1;
   background: color-mix(in srgb, var(--accent) 35%, transparent);
 }

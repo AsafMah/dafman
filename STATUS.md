@@ -24,6 +24,13 @@
 - [Sprint E — Light mode visual audit](https://github.com/AsafMah/dafman/milestone/4) (2 issues)
 - [M1 — Features (post-sprint backlog)](https://github.com/AsafMah/dafman/milestone/5) (9 issues)
 
+**Recently fixed:** #132 — slash-command autocomplete now selects/completes the
+highlighted item instead of the first filtered command. The Tab-complete path
+mirrors lexical-vue's exposed `itemProps.selectedIndex`, while Enter remains on
+lexical-vue's `props.options[selectedIndex]` menu-selection path after the
+HIGH-priority Enter handler defers. Manual keyboard verification pending:
+`MANUAL_TESTS.md` KB.3 / KB.7.
+
 **Recently fixed:** Composer Enter keybindings — the composer now sends on plain
 **Enter** (the conventional chat default) under a fixed chord scheme
 (Shift+Enter soft newline, Ctrl+Enter hard newline, Alt+Enter steer,
@@ -34,11 +41,28 @@ menu still wins Enter to select. Pure resolver `resolveEnterAction`
 supersedes the #88 "submit-keybinding setting" proposal (PR #102 closed).
 Manual keyboard walk pending: `MANUAL_TESTS.md` KB.1–KB.6.
 
-**Recently fixed:** #137 — chat transcript scroll anchoring: streaming no longer
+**Recently fixed:** #128 — session and group tab bars have their maximize/restore
+button again. The restored custom tab action uses dockview's
+`panel.api.maximize()` / `exitMaximized()` on the tab's own panel API, matching
+the `5a1da9e` regression baseline; unit coverage locks both `ChatTab` and
+`GroupTab`, with live dockview dogfood pending in `MANUAL_TESTS.md` MX.1.
+
+**Recently fixed:** #127 — Session Details agent Select/Deselect no longer
+flashes every row: the busy/disabled state is scoped to the clicked row while
+`useSessionAgents` still globally ignores concurrent select/deselect clicks, and
+the active-row Select ↔ Deselect swap now fades via Vue `<Transition>`. #137 —
+chat transcript scroll anchoring: streaming no longer
 yanks you to the bottom while you're reading earlier messages (a "Jump to latest"
 pill offers the return instead), and focusing/switching into a session restores
 its scroll position rather than jumping to the top. One pin-based model in
 `useChatScroll.ts` (VueUse `useScroll`) replaces the per-flush `scrollToBottom()`.
+
+**Recently fixed:** #135 — session events now forward exactly once for both
+fresh-created and resumed sessions. `config.onEvent` stays as the early-event
+buffer for create/resume races, then goes inert once the single live
+`session.on` forwarder is attached, fixing duplicate user messages, reasoning,
+and doubled backend event log lines.
+
 Single-instance crash — launching dafman while another copy
 is already open on the same build channel no longer kills the webview. A
 PID+token lockfile (`src-bun/app/shared/singleInstance.ts`, acquired in

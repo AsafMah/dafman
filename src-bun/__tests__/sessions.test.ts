@@ -316,6 +316,29 @@ describe('SessionRegistry', () => {
     expect((emitted[0]?.data as { intent?: string }).intent).toBe('hi');
   });
 
+  test('#135: create forwards a live SDK event exactly once when onEvent and session.on both see it', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+    const id = await reg.create();
+    const onEvent = client.createdConfigs[0]?.onEvent as Handler;
+    const fake = client.createdSessions[0]!;
+
+    const event = { type: 'assistant.intent', data: { intent: 'once' } };
+    onEvent(event);
+    fake.fire(event);
+
+    const matching = emitted.filter((p) => p.eventType === 'assistant.intent');
+    expect(matching).toHaveLength(1);
+    expect(matching[0]?.sessionId).toBe(id);
+
+    await reg.disconnect(id);
+    onEvent({ type: 'assistant.intent', data: { intent: 'after-close' } });
+    fake.fire({ type: 'assistant.intent', data: { intent: 'after-close' } });
+    expect(emitted.filter((p) => p.eventType === 'assistant.intent')).toHaveLength(1);
+  });
+
   test('forward coerces non-object data payloads to empty object', async () => {
     // SDK is typed as `data: Record<string, unknown>` but we can't
     // trust the wire — if a build ever sends `null` / array / string
@@ -530,6 +553,56 @@ describe('SessionRegistry', () => {
     });
     expect(emitted).toHaveLength(3);
     expect(emitted[2]?.eventType).toBe('assistant.turn_end');
+  });
+
+  test('#135: resume forwards a live SDK event exactly once when onEvent and session.on both see it', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+    const id = await reg.resume('sess-135');
+    const onEvent = client.resumedConfigs[0]?.onEvent as Handler;
+    const fake = client.resumedSessions[0]!;
+
+    const event = { type: 'assistant.intent', data: { intent: 'once' } };
+    onEvent(event);
+    fake.fire(event);
+
+    const matching = emitted.filter((p) => p.eventType === 'assistant.intent');
+    expect(matching).toHaveLength(1);
+    expect(matching[0]?.sessionId).toBe(id);
+
+    await reg.disconnect(id);
+    onEvent({ type: 'assistant.intent', data: { intent: 'after-close' } });
+    fake.fire({ type: 'assistant.intent', data: { intent: 'after-close' } });
+    expect(emitted.filter((p) => p.eventType === 'assistant.intent')).toHaveLength(1);
+  });
+
+  test('#135: resume buffers events fired during resumeSession await + drains under the actual sessionId', async () => {
+    class RacingResumeClient extends FakeClient {
+      override async resumeSession(
+        sessionId: string,
+        config: Record<string, unknown> = {},
+      ): Promise<FakeSession> {
+        this.resumedConfigs.push(config);
+        const s = makeFakeSession(`${sessionId}-actual`);
+        this.resumedSessions.push(s);
+        const onEvent = config.onEvent as Handler | undefined;
+        onEvent?.({ type: 'session.resume', data: { early: true } });
+        return s;
+      }
+    }
+
+    const client = new RacingResumeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+    const id = await reg.resume('sess-race');
+
+    const matching = emitted.filter((p) => p.eventType === 'session.resume');
+    expect(matching).toHaveLength(1);
+    expect(matching[0]?.sessionId).toBe(id);
+    expect(matching[0]?.sessionId).toBe('sess-race-actual');
   });
 
   test('#20: resume appends dafman.resume_settled when history ends mid-turn', async () => {

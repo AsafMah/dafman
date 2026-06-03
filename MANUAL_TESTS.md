@@ -70,6 +70,27 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #127 — agent Select/Deselect transition (2026-06-01)
+
+> Intent-gap follow-up to dogfood item 99.1: the literal no-spinner-flash check
+> passed, but selecting one agent still flashed every row's button.
+
+#### AST.1 - Selecting one agent does not flash the whole list
+
+- [ ] result:
+- **Steps:** Open Session Details → Agents with at least two agents visible. Click **Select** on a non-active agent, then click **Deselect** on the active agent.
+- **Expected:** Only the clicked row shows the pending disabled state; the other rows' Select/Deselect buttons do not visibly flash. The active row's Select ↔ Deselect change fades smoothly without a hard flicker.
+- **Why not automated:** The unit test covers disabled-state scoping and the concurrency guard, but visual transition timing and perceived flicker require a live WebView render.
+
+### Issue #128 — tab-bar maximize/restore button (2026-06-01)
+
+#### MX.1 - Session and group tabs maximize and restore from the tab bar.
+
+- [ ] result:
+- **Steps:** Run `bun run dev`; open at least two groups and two sessions in one group. Hover a session tab and click its maximize button, then click Restore. Repeat on a group tab.
+- **Expected:** The clicked tab's panel maximizes using dockview's layout behavior, the icon/label flips to Restore, and clicking Restore returns the previous layout without losing tab order, active session, or group state.
+- **Why not automated:** Requires visually confirming dockview's real maximize layout, hover affordance, and restore geometry in the live Electrobun webview; unit tests only prove the tab calls the API.
+
 ### Issue #137 — chat transcript scroll anchoring (2026-06-01)
 
 > All four verified PASS during the 2026-06-01 dogfood (live `bun run dev`).
@@ -127,9 +148,16 @@ section is verified) or get a GitHub issue filed (with label
 #### KB.3 - Enter selects a slash/mention menu item instead of sending
 
 - [ ] result:
-- **Steps:** Type `/` and wait for the slash menu; arrow to a command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
-- **Expected:** Enter runs the highlighted slash command (no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
+- **Steps:** Type `/` and wait for the slash menu; arrow to a **non-first** command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
+- **Expected:** Enter runs the highlighted slash command (not the first row; no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
 - **Why not automated:** Flow 02 covers the @-pill case; the slash-run case and the "no accidental send" assertion are worth an eyeball.
+
+#### KB.7 - Tab completes the highlighted slash command, not the first row
+
+- [ ] result:
+- **Steps:** Type `/` and wait for multiple slash-command results. Arrow to a **non-first** command and press **Tab**.
+- **Expected:** The typed slash query is replaced with the highlighted command plus a trailing space so you can add args; the first row is not chosen unless it is highlighted, and the command is not executed until you explicitly send/select.
+- **Why not automated:** The pure selection resolver is unit-tested, but the real keyboard highlight → Lexical command dispatch → rendered composer replacement path depends on live WebView2/Lexical focus timing.
 
 #### KB.4 - Enter on a zero-match `/` or `@` SENDS the raw text
 
