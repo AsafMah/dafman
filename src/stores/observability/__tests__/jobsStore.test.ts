@@ -166,7 +166,7 @@ describe('jobsStore', () => {
     let auditSubscriptions = 0;
     const { bridge } = makeBridge();
     // Count how many times the audit channel is wired.
-    const origOnAudit = bridge.onAuditEvent;
+    const origOnAudit = bridge.onAuditEvent!;
     bridge.onAuditEvent = (listener) => {
       auditSubscriptions += 1;
       return origOnAudit(listener);
