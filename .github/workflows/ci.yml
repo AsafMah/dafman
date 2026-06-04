@@ -22,13 +22,15 @@ permissions:
 jobs:
   # ── Tier-0: fast tree-wide hygiene ──────────────────────────────────
   #
-  # Catches unresolved Git conflict markers in ANY tracked file, including
-  # the Markdown docs (CHANGELOG/DEVLOG/STATUS) that the lint/test globs
-  # below never see. A stray `<<<<<<<` merged silently twice (#139, #142);
-  # this job makes that a red check instead of a prose reminder. No
-  # `bun install` — the checker only needs git + Bun's runtime.
+  # Catches (a) unresolved Git conflict markers in ANY tracked file —
+  # including the Markdown docs (CHANGELOG/DEVLOG/STATUS) the lint/test
+  # globs never see; a stray `<<<<<<<` merged silently twice (#139, #142);
+  # and (b) prod files that grow past their size budget (rule 19) — the
+  # D-phase splits silently regrew while the rule was prose (#150). Both
+  # are red checks now. No `bun install` — the checkers only need git +
+  # Bun's runtime.
   hygiene:
-    name: Hygiene (no conflict markers)
+    name: Hygiene (conflict markers + file sizes)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -37,6 +39,8 @@ jobs:
           bun-version: latest
       - name: Scan tracked files for conflict markers
         run: bun run lint:markers
+      - name: Enforce file-size budget
+        run: bun run lint:sizes
 
   # ── Tier-1: parallel gate jobs mirroring `bun run check` ─────────────
   #
