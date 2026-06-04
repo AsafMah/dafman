@@ -850,16 +850,21 @@ section is verified) or get a GitHub issue filed (with label
   the staging transform itself is unit-tested at the `SessionRegistry.send`
   boundary (`src-bun/__tests__/sessions.test.ts`, `attachmentStaging.test.ts`).
 
-#### 110.2 - "Attach command result" pill content reaches the agent.
+#### 110.2 - "Attach command result" pill content reaches the agent (#136).
 
-- [ ] result:
+- [ ] result: pending re-check after #136 fix — backend send-path regression now
+  proves the command result is inlined into the SDK prompt, not staged as a temp
+  file.
 
 - **Steps:** run a command in the integrated terminal that prints a unique
   sentinel, use the "attach result" affordance to add it to the composer, then
   ask the agent to summarize the command output and quote the sentinel.
 - **Expected:** the agent quotes the sentinel from the command output (the
-  markdown result is staged to a file and read, not dropped).
-- **Why not automated:** same as 110.1 — needs the live host CLI + model.
+  markdown result is inlined into the prompt for that turn, not hidden behind a
+  temp file the model may skip).
+- **Why not automated:** the send-path transform is covered in
+  `src-bun/__tests__/sessions.test.ts`, but confirming the real model quotes the
+  sentinel requires the live host CLI + model round-trip.
 
 #### 110.3 - Dropped image still inlines (regression guard).
 

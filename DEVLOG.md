@@ -41,6 +41,37 @@ actually live before falling back to the outer shell.
 **Manual:** `MANUAL_TESTS.md` RP.1–RP.3 queue live dialog focus/Escape,
 dockview tab repaint, and sidebar create/rename refresh dogfood.
 
+## 2026-06-02 — command-result pills inline into prompt (#136)
+
+**Takeaway:** command-result pills are now prompt context, not staged files.
+`SessionRegistry.send` appends the rendered command-result markdown to the SDK
+prompt and omits that pill from `attachments`, so the model receives terminal
+output without choosing to open a temp file. Other dropped text/code file blobs
+still use the #110 staging path.
+
+**SDK receipts:** `node_modules/@github/copilot/app.js:60` (`Jio` at byte
+6236674) only converts blob attachments into model parts for raw image mimes
+(`sct.has(a.mimeType)`) or native office/PDF docs (`fae(a)` → `Yio`). The same
+file's `Kio` at byte 6234707 builds `<tagged_files>` for `type:'file'` /
+directory attachments that are not native docs, and `BXs` at byte 6234012 reads
+file metadata for that path-listing flow. That means staged command-result files
+are not unconditional prompt text; they are a path context the host/model may
+choose not to open.
+
+**Implementation receipts:** `src-bun/app/chat/sessionHelpers.ts` now exposes
+`commandResultPromptBlock()`. `src-bun/app/chat/sessions.ts` consumes
+`type:'commandResult'` attachments by appending that block to `prompt` and keeps
+non-inlinable `blob` file attachments on `stageBlobToFile()`. The SDK prompt echo
+is rewritten back to the user's original visible text before forwarding
+`user.message`, avoiding a duplicate/giant chat bubble.
+
+**Tests:** updated the `SessionRegistry.send` boundary regression in
+`src-bun/__tests__/sessions.test.ts` to assert the sentinel command output lands
+in `fake.lastSentPrompt`, no SDK attachment is sent for the command-result pill,
+and the SDK `user.message` echo is displayed as the original text. The adjacent
+#110 file-blob staging test still proves dragged text/code blobs become readable
+`type:'file'` attachments.
+
 ## 2026-06-01 — session events forward once (#135)
 
 **Takeaway:** fixed the duplicate message/reasoning regression by making SDK
