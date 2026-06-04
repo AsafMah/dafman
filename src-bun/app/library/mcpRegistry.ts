@@ -12,9 +12,7 @@
 // `getSession(sessionId)` accessor here.
 
 import type { CopilotClient } from '../client/copilotSdk';
-import { tryGetClient } from '../client/client';
-import { AppError } from '../shared/errors';
-import { toErrorMessage } from '../shared/errorMessage';
+import { tryGetClient, withSdkClient } from '../client/client';
 
 export interface McpDiscoveredServer {
   name: string;
@@ -34,16 +32,8 @@ export class McpRegistry {
   /// resolves the client (let `ClientNotStarted` escape unwrapped),
   /// runs the SDK call, wraps anything else as `AppError.sdk` so the
   /// renderer's error UX stays predictable.
-  private async withClient<T>(fn: (client: CopilotClient) => Promise<T>): Promise<T> {
-    const client = this.getClient();
-
-    try {
-      return await fn(client);
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-
-      throw AppError.sdk(toErrorMessage(err));
-    }
+  private withClient<T>(fn: (client: CopilotClient) => Promise<T>): Promise<T> {
+    return withSdkClient(this.getClient, fn);
   }
 
   async listConfigs(): Promise<Record<string, Record<string, unknown>>> {
