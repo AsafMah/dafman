@@ -139,6 +139,53 @@ export default tseslint.config(
       ],
     },
   },
+  // ── Architecture boundary gates (AGENTS.md) ──────────────────
+  //
+  // Mechanize two prose rules that kept getting violated: src-bun/app/
+  // must stay unit-testable (only src-bun/index.ts touches the electrobun
+  // runtime), and renderer code must reach the backend through the typed
+  // src/ipc/invoke.ts layer — never raw electrobun.rpc.
+  {
+    files: ['src-bun/app/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['electrobun', 'electrobun/*'],
+              message:
+                'src-bun/app/ must not import electrobun — only src-bun/index.ts touches the runtime so `bun test` can exercise app/ directly. Inject the dependency instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,vue}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['electrobun', 'electrobun/*'],
+              message:
+                'Renderer code must not import electrobun directly — go through the typed src/ipc/invoke.ts layer. Only src/ipc/electrobunBridge.ts adapts the raw Electroview bridge.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The single sanctioned adapter for the raw Electroview bridge.
+    files: ['src/ipc/electrobunBridge.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': 'off',
+    },
+  },
 
   // ── max-lines-per-function overrides ──────────────────────────
   //
