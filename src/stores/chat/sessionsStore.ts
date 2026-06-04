@@ -131,6 +131,12 @@ export type SessionRecord = {
   /// footer's derived items, this survives the raw event ring-buffer cap.
   touchedFiles: string[];
   commandsRun: number;
+  /// True after the user permanently deletes the CLI-side session
+  /// while this record is still open in a panel. The transcript stays
+  /// visible, but every mutating action must treat the record as
+  /// read-only.
+  isDeleted: boolean;
+  deletedAt: string | null;
   /// 22a: requestIds of MCP OAuth required-events we've toasted, so a
   /// resume / replay doesn't duplicate the notification, and so we
   /// can pair `_completed` events with their `_required`. Internal —
@@ -258,6 +264,26 @@ export const useSessionsStore = defineStore('sessions', () => {
     });
   }
 
+  function assertSessionWritable(sessionId: string): void {
+    if (getSession(sessionId)?.isDeleted) {
+      throw new Error('This session was deleted and is read-only.');
+    }
+  }
+
+  function markSessionDeleted(sessionId: string): void {
+    const record = getSession(sessionId);
+
+    pendingEvents.delete(sessionId);
+    pendingRequestBuffer.delete(sessionId);
+
+    if (!record) return;
+
+    record.isDeleted = true;
+    record.deletedAt = new Date().toISOString();
+    record.pendingRequests.splice(0);
+    record.isThinking = false;
+    record.sawTurnBoundary = true;
+  }
   const isCreating = ref(false);
   let creationCount = 0;
 
@@ -281,6 +307,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       return;
     }
+
+    if (record.isDeleted) return;
 
     const previousTitle = record.title;
 
@@ -313,6 +341,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       return;
     }
+
+    if (record.isDeleted) return;
 
     applyPendingToRecord(record, payload);
   }
@@ -489,6 +519,8 @@ export const useSessionsStore = defineStore('sessions', () => {
         planRefreshCounter: 0,
         touchedFiles: [],
         commandsRun: 0,
+        isDeleted: false,
+        deletedAt: null,
 
         _toastedOauthRequests: new Set<string>(),
         _toastedNeedsAuth: new Set<string>(),
@@ -577,6 +609,8 @@ export const useSessionsStore = defineStore('sessions', () => {
       const existing = getSession(actualId);
 
       if (existing) {
+        if (existing.isDeleted) return existing;
+
         // Still backfill cwd if the existing record is missing it.
         if (!existing.workingDirectory && response.cwd) existing.workingDirectory = response.cwd;
 
@@ -617,6 +651,8 @@ export const useSessionsStore = defineStore('sessions', () => {
         planRefreshCounter: 0,
         touchedFiles: [],
         commandsRun: 0,
+        isDeleted: false,
+        deletedAt: null,
 
         _toastedOauthRequests: new Set<string>(),
         _toastedNeedsAuth: new Set<string>(),
@@ -716,6 +752,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     mode: SendMode = 'steer',
     attachments?: import('@/ipc/types').SendMessageAttachment[],
   ): Promise<void> {
+    assertSessionWritable(sessionId);
+
     // Vue reactive proxies don't always survive structured-clone /
     // JSON serialization through the Electrobun bridge — fields can
     // be silently dropped on the bun side. Deep-clone via JSON to
@@ -756,6 +794,8 @@ export const useSessionsStore = defineStore('sessions', () => {
   async function abortSession(sessionId: string): Promise<void> {
     const toasts = useToastStore();
 
+    assertSessionWritable(sessionId);
+
     try {
       await invokeCommand('abortSession', { sessionId });
     } catch (err) {
@@ -772,7 +812,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   function setDefaultSendMode(sessionId: string, next: DefaultSendMode): void {
     const record = getSession(sessionId);
 
-    if (record) record.defaultSendMode = next;
+    if (record && !record.isDeleted) record.defaultSendMode = next;
   }
 
   async function setSessionModel(
@@ -781,6 +821,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     reasoningEffort: string | null,
   ): Promise<void> {
     const toasts = useToastStore();
+
+    assertSessionWritable(sessionId);
 
     try {
       await invokeCommand('setSessionModel', {
@@ -804,6 +846,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function setSessionMode(sessionId: string, mode: SessionMode): Promise<void> {
     const toasts = useToastStore();
+
+    assertSessionWritable(sessionId);
 
     try {
       await invokeCommand('setSessionMode', { sessionId, mode });
@@ -832,6 +876,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     const toasts = useToastStore();
 
+    assertSessionWritable(sessionId);
+
     try {
       await invokeCommand('setSessionApproveAll', { sessionId, enabled });
       const record = getSession(sessionId);
@@ -847,6 +893,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function resetSessionApprovals(sessionId: string): Promise<void> {
     const toasts = useToastStore();
+
+    assertSessionWritable(sessionId);
 
     try {
       await invokeCommand('resetSessionApprovals', { sessionId });
@@ -864,6 +912,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     workingDirectory: string,
   ): Promise<string> {
     const toasts = useToastStore();
+
+    assertSessionWritable(sessionId);
     // Capture the baseWorkingDirectory read-only BEFORE the await
     // (so the RPC has it for relative-path resolution), but DO NOT
     // capture the record reference itself — it may be unmounted by
@@ -903,6 +953,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function compactSessionHistory(sessionId: string): Promise<void> {
     const toasts = useToastStore();
+
+    assertSessionWritable(sessionId);
 
     try {
       const result = await invokeCommand('compactSessionHistory', {
@@ -944,6 +996,8 @@ export const useSessionsStore = defineStore('sessions', () => {
   ): Promise<void> {
     const toasts = useToastStore();
 
+    assertSessionWritable(sessionId);
+
     try {
       await invokeCommand('truncateSessionHistory', { sessionId, eventId });
       // Drop local items at the truncation point too — otherwise we
@@ -982,6 +1036,8 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// the new session id so the caller can route to it / focus it.
   async function forkSession(sessionId: string, toEventId?: string): Promise<string> {
     const toasts = useToastStore();
+
+    assertSessionWritable(sessionId);
 
     try {
       const result = await invokeCommand('forkSession', {
@@ -1053,6 +1109,8 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     if (!trimmed) return;
 
+    assertSessionWritable(sessionId);
+
     try {
       await invokeCommand('setSessionName', { sessionId, name: trimmed });
       const record = getSession(sessionId);
@@ -1078,7 +1136,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   ): void {
     const record = getSession(sessionId);
 
-    if (record) record.reasoningVisibilityOverride = value;
+    if (record && !record.isDeleted) record.reasoningVisibilityOverride = value;
   }
 
   /// Sends the user's answer to a pending SDK callback. The bun
@@ -1095,6 +1153,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// `Session ${id} not found`).
   async function respondToPending(params: RespondToRequestParams): Promise<void> {
     const record = getSession(params.sessionId);
+
+    assertSessionWritable(params.sessionId);
+
     // Snapshot + remove the pending entry optimistically so the UI's
     // pending card disappears immediately on click. The
     // `dafman.pending_response` event is NOT appended until the RPC
@@ -1161,6 +1222,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     createSession,
     restoreSession,
     closeSession,
+    markSessionDeleted,
     sendMessage,
     abortSession,
     setDefaultSendMode,

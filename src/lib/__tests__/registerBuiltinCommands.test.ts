@@ -165,6 +165,8 @@ describe('registerBuiltinCommands — Reset Layout', () => {
       planRefreshCounter: 0,
       touchedFiles: [],
       commandsRun: 0,
+    isDeleted: false,
+    deletedAt: null,
       _toastedOauthRequests: new Set(),
       _toastedNeedsAuth: new Set(),
       _artifactToolCallIds: new Set(),

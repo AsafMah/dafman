@@ -8,6 +8,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Fixed (#136 — command-result pills inline into prompt — 2026-06-02)
 - **Attached command results now reach the agent as prompt context, not as optional temp files.** `SessionRegistry.send` appends the rendered command-result markdown to the SDK prompt and omits the command-result from `attachments`, while preserving the visible user-message text when the SDK echoes the turn. Dragged/dropped text files still use the #110 staging path. Regression coverage is at the `SessionRegistry.send` boundary in `src-bun/__tests__/sessions.test.ts`.
+
+### Fixed (#129 — deleted open session panel — 2026-06-02)
+- **Deleting a session now leaves any already-open panel in a clear read-only deleted state instead of a live composer.** The active `SessionRecord` is tombstoned after the catalog delete succeeds, preserving the transcript while disabling the composer and guarding send/session-mutation actions in the store. The tab title/icon now marks the session as deleted. Regression coverage in `src/stores/chat/__tests__/sessionsListStore.delete.test.ts`; live delete-while-open dogfood is queued in `MANUAL_TESTS.md` DSP.1.
 ### Fixed (#135 — duplicate session event forwarding — 2026-06-01)
 - **Chat session events now render once instead of twice.** Fresh-created and resumed sessions no longer double-forward the SDK stream through both `config.onEvent` and `session.on`, fixing duplicate user messages, duplicate reasoning blocks, and doubled backend event log lines.
 

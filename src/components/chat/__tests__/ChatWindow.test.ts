@@ -126,8 +126,11 @@ function makeBridge(): BridgeHandle {
 const stubs = {
   MessageComposer: defineComponent({
     name: 'MessageComposer',
+    props: ['disabled', 'placeholder'],
     emits: ['submit', 'request-command-terminal', 'open-full-terminal', 'update:default-mode'],
-    template: '<div class="stub-composer" />',
+    template:
+      '<div class="stub-composer" :data-disabled="String(!!disabled)" ' +
+      ':data-placeholder="placeholder || \'\'" />',
   }),
   MessageContent: defineComponent({
     name: 'MessageContent',
@@ -243,6 +246,7 @@ interface MountOptions {
   events?: SessionEventPayload[];
   droppedEventCount?: number;
   defaultSendMode?: 'steer' | 'queue';
+  deleted?: boolean;
 }
 
 async function mountChat(opts: MountOptions = {}) {
@@ -255,6 +259,7 @@ async function mountChat(opts: MountOptions = {}) {
       droppedEventCount: opts.droppedEventCount ?? 0,
       reasoningVisibilityOverride: 'default',
       defaultSendMode: opts.defaultSendMode ?? 'steer',
+      deleted: opts.deleted ?? false,
     },
     global: {
       plugins: [PrimeVue],
@@ -459,6 +464,37 @@ describe('ChatWindow', () => {
     expect(sentArgs.sessionId).toBe('s1');
     expect(sentArgs.text).toBe('attach this');
     expect(sentArgs.attachments).toEqual(attachments);
+  });
+
+  test('deleted session shows read-only banner, disables composer, and blocks sends', async () => {
+    const utils = await mountChat({
+      events: [userEvent('before delete', 'user-pre')],
+      deleted: true,
+    });
+
+    // Tombstone banner is visible and names the read-only state.
+    const banner = utils.container.querySelector('.deleted-banner');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('deleted');
+
+    // Composer is handed `disabled` so it can't accept input.
+    const composerHost = utils.container.querySelector('.stub-composer');
+    expect(composerHost?.getAttribute('data-disabled')).toBe('true');
+    expect(composerHost?.getAttribute('data-placeholder')).toContain('read-only');
+
+    // Even a forced submit emit is swallowed: no optimistic bubble, no
+    // `sendMessage` RPC. The pre-existing transcript stays put.
+    const composerEl = composerHost as HTMLElement & {
+      __vueParentComponent?: { emit: (e: string, p: unknown) => void };
+    };
+    composerEl.__vueParentComponent!.emit('submit', { text: 'should not send', mode: 'default' });
+    await flushFrames();
+
+    expect(handle.calls.filter((c) => c.name === 'sendMessage').length).toBe(0);
+    const bubbles = Array.from(utils.container.querySelectorAll('.stub-user')).map((el) =>
+      el.textContent?.trim(),
+    );
+    expect(bubbles).toEqual(['before delete']);
   });
 
   test('retry walks back to the nearest user-with-eventId anchor', async () => {

@@ -15,7 +15,7 @@ import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
 import type { SessionMode } from '@/ipc/types';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 
-const props = defineProps<{ sessionId: string }>();
+const props = defineProps<{ sessionId: string; disabled?: boolean }>();
 const sessionsStore = useSessionsStore();
 
 const record = computed(() => sessionsStore.getSession(props.sessionId));
@@ -23,7 +23,7 @@ const record = computed(() => sessionsStore.getSession(props.sessionId));
 const modeChoice = computed<SessionMode | null>({
   get: () => record.value?.mode ?? null,
   set: (value) => {
-    if (!value || value === record.value?.mode) return;
+    if (props.disabled || !value || value === record.value?.mode) return;
 
     void sessionsStore.setSessionMode(props.sessionId, value);
   },
@@ -46,6 +46,7 @@ const activeModeIcon = computed(
     option-label="label"
     option-value="value"
     :allow-empty="false"
+    :disabled="props.disabled"
     size="small"
     aria-label="Agent run mode"
     class="mode-button-group"
@@ -68,6 +69,7 @@ const activeModeIcon = computed(
     :options="MODE_OPTIONS"
     option-label="label"
     option-value="value"
+    :disabled="props.disabled"
     aria-label="Agent run mode"
     class="mode-select-compact"
     :class="modeClass"

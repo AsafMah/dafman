@@ -72,6 +72,41 @@ and the SDK `user.message` echo is displayed as the original text. The adjacent
 #110 file-blob staging test still proves dragged text/code blobs become readable
 `type:'file'` attachments.
 
+## 2026-06-02 — deleted sessions become read-only tombstones (#129)
+
+**Takeaway:** deleting a session from the Sessions Manager no longer leaves an
+open panel looking live. The panel keeps its transcript but switches to a
+deleted/read-only tombstone: the composer is disabled, the tab title/icon marks
+the session deleted, and store-level guards reject late send/session-mutation
+paths before they hit IPC.
+
+**Ownership model:** permanent delete is a catalog operation owned by
+`sessionsListStore`, while an already-open panel's runtime state stays owned by
+`sessionsStore.SessionRecord`. After the delete RPC succeeds,
+`sessionsListStore.deleteSession()` calls `sessionsStore.markSessionDeleted()`;
+the dockview panel id remains the session id, and no deleted state is copied into
+layout JSON.
+
+**Receipts:**
+- `src/stores/chat/sessionsStore.ts` adds `SessionRecord.isDeleted/deletedAt`,
+  `markSessionDeleted()`, late-event/pending buffering cleanup, and writable
+  guards for send/abort/model/mode/approval/history/fork/pending-response paths.
+- `src/stores/chat/sessionsListStore.ts` tombstones the open record after
+  `deleteSession` succeeds instead of only removing the catalog row.
+- `src/components/session/SessionsManager.vue` no longer removes the dockview
+  panel before permanent delete, so the user sees the tombstone state.
+- `src/components/chat/ChatWindow.vue`, `ChatPanel.vue`, `ChatTab.vue`, and
+  `MessageActions.vue` render the read-only affordance and disable composer /
+  session-targeting transcript actions.
+
+**Tests:** `src/stores/chat/__tests__/sessionsListStore.delete.test.ts` covers
+the delete transition and proves a deleted open session rejects future sends
+without issuing `sendMessage` IPC.
+
+**Manual:** DSP.1 in `MANUAL_TESTS.md` covers the live delete-while-open flow
+because it depends on the real Sessions Manager confirmation, dockview tab, and
+Lexical disabled composer in the Electrobun webview.
+
 ## 2026-06-01 — session events forward once (#135)
 
 **Takeaway:** fixed the duplicate message/reasoning regression by making SDK

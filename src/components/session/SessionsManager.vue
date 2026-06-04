@@ -382,10 +382,6 @@ function onDelete(event: Event, session: SessionMetadataSummary) {
     rejectProps: { severity: 'secondary', text: true, size: 'small' },
     accept: () => {
       void (async () => {
-        if (openSessionIds.value.has(session.sessionId)) {
-          layoutStore.removePanel(session.sessionId);
-        }
-
         try {
           await sessionsList.deleteSession(session.sessionId);
         } catch {

@@ -97,6 +97,7 @@ function dismissPanel() {
     :commands-run="record.commandsRun"
     :reasoning-visibility-override="record.reasoningVisibilityOverride"
     :default-send-mode="record.defaultSendMode"
+    :deleted="record.isDeleted"
   />
   <div
     v-else

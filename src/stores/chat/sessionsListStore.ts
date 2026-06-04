@@ -11,6 +11,7 @@ import { invokeCommand } from '@/ipc/invoke';
 import type { SessionMetadataSummary } from '@/ipc/types';
 import { basename } from '@/stores/shell/layoutStore';
 import { useToastStore } from '@/stores/app/toastStore';
+import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 export interface WorkspaceGroup {
@@ -116,6 +117,7 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
 
     try {
       await invokeCommand('deleteSession', { sessionId });
+      useSessionsStore().markSessionDeleted(sessionId);
       sessions.value = sessions.value.filter((s) => s.sessionId !== sessionId);
       toasts.success('Session deleted', sessionId.slice(0, 8));
     } catch (err) {

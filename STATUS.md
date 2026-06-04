@@ -36,6 +36,12 @@ SDK prompt instead of staged as `type:'file'` temp attachments, because the host
 only exposes file attachments through `<tagged_files>` / read-on-demand context.
 The visible user-message echo is rewritten back to the original composer text.
 Manual dogfood pending: `MANUAL_TESTS.md` 110.2.
+
+**Recently fixed:** #129 — deleting a session while its panel is still open now
+marks the active `SessionRecord` as deleted/read-only instead of leaving a live
+composer pointed at a missing CLI session. The transcript stays visible, the
+composer and session-targeting message actions are disabled, and the tab shows a
+deleted marker. Manual live dogfood pending: `MANUAL_TESTS.md` DSP.1.
 **Recently fixed:** #132 — slash-command autocomplete now selects/completes the
 highlighted item instead of the first filtered command. The Tab-complete path
 mirrors lexical-vue's exposed `itemProps.selectedIndex`, while Enter remains on
