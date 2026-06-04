@@ -11,6 +11,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Fixed (#129 — deleted open session panel — 2026-06-02)
 - **Deleting a session now leaves any already-open panel in a clear read-only deleted state instead of a live composer.** The active `SessionRecord` is tombstoned after the catalog delete succeeds, preserving the transcript while disabling the composer and guarding send/session-mutation actions in the store. The tab title/icon now marks the session as deleted. Regression coverage in `src/stores/chat/__tests__/sessionsListStore.delete.test.ts`; live delete-while-open dogfood is queued in `MANUAL_TESTS.md` DSP.1.
+
+### Fixed (#126 — composer typeahead viewport flip — 2026-06-02)
+- **Composer `@` file-picker and `/` slash-command popups now stay inside the viewport.** Both Lexical typeahead surfaces use `@floating-ui/dom` (`flip` + `shift`) against the caret anchor instead of a CSS-only upward `translateY`, so the default bottom composer can still pop upward while a high/edge composer flips below or shifts horizontally instead of clipping off-screen. Regression coverage locks out the old transform; live visual dogfood is queued in `MANUAL_TESTS.md` TF.1.
 ### Fixed (#135 — duplicate session event forwarding — 2026-06-01)
 - **Chat session events now render once instead of twice.** Fresh-created and resumed sessions no longer double-forward the SDK stream through both `config.onEvent` and `session.on`, fixing duplicate user messages, duplicate reasoning blocks, and doubled backend event log lines.
 

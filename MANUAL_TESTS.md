@@ -101,6 +101,15 @@ section is verified) or get a GitHub issue filed (with label
 - **Steps:** Run `bun run dev`; open a saved session from the Sessions Manager so its chat panel/tab is visible. In the Sessions Manager, permanently delete that same session and accept the confirmation. Try typing/sending in the still-open panel, and inspect the tab label/icon.
 - **Expected:** The panel remains open but clearly says the session was deleted, the composer is disabled/read-only, no new message is accepted or sent, and the tab indicates the deleted state.
 - **Why not automated:** Requires the real Sessions Manager confirmation flow, dockview tab rendering, and Lexical disabled/editability behavior inside the live Electrobun WebView.
+
+### Issue #126 — composer typeahead viewport flip (2026-06-02)
+
+#### TF.1 - @ and / popups flip or shift instead of clipping
+
+- [ ] result:
+- **Steps:** Run `bun run dev`. In a normal bottom-docked composer, type `/` and `@` and confirm both menus open above the caret. Then make the window short or otherwise place the composer/caret high in the viewport and repeat `/` and `@`.
+- **Expected:** The menus stay fully on-screen in both layouts. When there is not enough room above the caret they flip below; near side edges they shift horizontally rather than clipping.
+- **Why not automated:** Requires real WebView caret geometry, viewport clipping, and visual confirmation of flip/shift placement that happy-dom cannot model.
 ### Issue #127 — agent Select/Deselect transition (2026-06-01)
 
 > Intent-gap follow-up to dogfood item 99.1: the literal no-spinner-flash check

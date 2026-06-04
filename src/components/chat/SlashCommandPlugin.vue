@@ -36,6 +36,7 @@ import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
 import { setComposerMenuActive } from '@/lexical/composerMenuState';
 import { SESSION_COMMANDS, type SessionCommand } from '@/lib/sessionCommands';
 import { resolveHighlightedOption } from '@/components/chat/slashCommandSelection';
+import { useComposerTypeaheadFloating } from '@/components/chat/useComposerTypeaheadFloating';
 
 class SlashOption extends MenuOption {
   cmd: SessionCommand;
@@ -53,6 +54,7 @@ const editor = useLexicalComposer();
 const query = ref('');
 const menuOpen = ref(false);
 const highlightedIndex = ref<number | null>(null);
+const { setFloatingElement } = useComposerTypeaheadFloating();
 
 // Intercept Tab when the slash menu is open: replace the typed query
 // with the full command text (so user can add args), but do NOT execute.
@@ -215,9 +217,10 @@ async function onSelectOption(payload: {
     <template #default="{ anchorElementRef, itemProps }">
       <Teleport
         v-if="itemProps.options.length > 0 && anchorElementRef"
-        :to="anchorElementRef"
+        to="body"
       >
         <div
+          :ref="(el) => setFloatingElement(el, anchorElementRef)"
           class="slash-menu"
           role="listbox"
         >
@@ -252,12 +255,12 @@ async function onSelectOption(payload: {
 </template>
 
 <style scoped>
-/* CSS-only "pop above the caret" — the lexical-vue anchor positions
- * absolutely at the caret line; transform: translateY(-100%) lifts
- * the menu by its own height, then another line-height lifts it clear
- * of the typed trigger line. No
- * JS measurement, no race with first render. */
+/* Floating UI positions the menu above the caret by default, then flips below
+ * and shifts inside the viewport when the caret is near an edge. */
 .slash-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   min-width: 22rem;
@@ -271,13 +274,9 @@ async function onSelectOption(payload: {
   border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius-md);
   box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.28);
-  transform: translateY(calc(-100% - 2rem));
   /* z-index 1200 sits above dockview's edge-group z-index 999 (chrome,
    * left sidebar) so the slash menu wins when the picker geometry
-   * overlaps the sidebar. The `transform` already creates a stacking
-   * context here, so this z-index applies at the stacking-context
-   * root — matching MentionPlugin's `.mention-menu-anchor` (both must
-   * sit at the same layer). */
+   * overlaps the sidebar. */
   z-index: 1200;
 }
 
