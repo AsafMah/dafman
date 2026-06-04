@@ -16,6 +16,7 @@ import { setRpcBridge, type RpcBridge, type SessionEventListener } from '@/ipc/i
 import type { CommandMap, CommandName, SessionEventPayload } from '@/ipc/types';
 import { useSessionsStore, _resetSessionsStoreForTest } from '@/stores/chat/sessionsStore';
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
+import { useSessionSelectors } from '@/stores/chat/sessionSelectors';
 
 function makeFakeBridge(): {
   bridge: RpcBridge;
@@ -154,7 +155,7 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
     expect(record!.events[0]?.eventType).toBe('assistant.turn_start');
   });
 
-  test('setSessionName updates the live record title and sidebar catalog immediately', async () => {
+  test('setSessionName updates the owner record title; the sidebar derives it', async () => {
     const { bridge, handlers } = makeFakeBridge();
     handlers.createSession = async () => 'sess-rename';
     handlers.setSessionName = async () => 'Readable title';
@@ -169,27 +170,22 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
     await store.setSessionName('sess-rename', 'Readable title');
 
     expect(record!.title).toBe('Readable title');
-    expect(list.sessions.find((s) => s.sessionId === 'sess-rename')?.summary).toBe(
-      'Readable title',
-    );
+    expect(useSessionSelectors().displayTitle('sess-rename')).toBe('Readable title');
     expect(list.hasLoaded).toBe(false);
   });
 
-  test('session.title_changed refreshes the sidebar catalog for created sessions', async () => {
+  test('session.title_changed updates the owner record title; the sidebar derives it', async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.createSession = async () => 'sess-auto-title';
     setRpcBridge(bridge);
 
     const store = useSessionsStore();
-    const list = useSessionsListStore();
     const record = await store.createSession({ workingDirectory: 'C:\\repo\\dafman' });
 
     fire(event('sess-auto-title', 'session.title_changed', { title: 'Auto title' }));
 
     expect(record!.title).toBe('Auto title');
-    expect(list.sessions.find((s) => s.sessionId === 'sess-auto-title')?.summary).toBe(
-      'Auto title',
-    );
+    expect(useSessionSelectors().displayTitle('sess-auto-title')).toBe('Auto title');
   });
 
   test('events for unknown sessions buffer indefinitely then drain on a later restore', async () => {

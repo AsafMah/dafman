@@ -15,6 +15,7 @@ import { useConfirm } from 'primevue/useconfirm';
 import ConfirmPopup from 'primevue/confirmpopup';
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useSessionSelectors } from '@/stores/chat/sessionSelectors';
 import { indicatorStyle, type NotificationStyle } from '@/lib/notificationStyles';
 import { emit as busEmit } from '@/lib/bus';
 import { useSettingsStore } from '@/stores/app/settingsStore';
@@ -32,6 +33,7 @@ const clientStore = useClientStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
 const confirm = useConfirm();
+const { displayTitle } = useSessionSelectors();
 
 const { grouped, isLoading, hasLoaded, error } = storeToRefs(sessionsList);
 const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
@@ -369,7 +371,7 @@ async function onResume(session: SessionMetadataSummary) {
 }
 
 function onDelete(event: Event, session: SessionMetadataSummary) {
-  const label = session.summary ?? `session ${session.sessionId.slice(0, 8)}…`;
+  const label = sessionLabel(session);
 
   confirm.require({
     group: 'sessions-manager',
@@ -416,10 +418,11 @@ function relativeTime(iso: string): string {
   return new Date(then).toLocaleDateString();
 }
 
+/// Row label. Derives from the single-owner title selector: an open
+/// session shows its live `SessionRecord` title, a closed one the
+/// durable catalog summary, falling back to the short GUID (#149).
 function sessionLabel(session: SessionMetadataSummary): string {
-  if (session.summary && session.summary.trim()) return session.summary;
-
-  return `session ${session.sessionId.slice(0, 8)}…`;
+  return displayTitle(session.sessionId);
 }
 
 void toasts; // referenced inside async handlers

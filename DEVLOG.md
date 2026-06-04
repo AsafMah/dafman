@@ -8,6 +8,38 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-04 — normalize session title onto one owner (#149)
+
+**Takeaway:** the recurring "rename/title didn't update surface X" bug class
+(#129/#131/#133/#134) came from a session's title living in **three** hand-synced
+places — `SessionRecord.title` (owner), the sidebar catalog `summary`, and the
+dockview panel title (persisted in the layout JSON). Each surface had to be
+pushed on every change; a missed push was a stale tab or sidebar row. Fixed by
+making the title **derived**: one selector, every reader follows the owner.
+
+**Receipts:**
+- New `src/stores/chat/sessionSelectors.ts` — `useSessionSelectors()` with
+  `displayTitle(id)` = `record.title ?? catalog.summary ?? shortPanelTitle(id)`
+  and `sessionStatus(id)`. Resolution order pinned in
+  `src/stores/chat/__tests__/sessionSelectors.test.ts`. New file (not appended to
+  the 1255-line `sessionsStore.ts`) per the god-object rule (#150).
+- Tab (phase 2): `ChatTab.vue` now reads `displayTitle(sessionId)` instead of the
+  dockview-pushed `usePanelLifecycle.title`. Deleted the fan-out that fed that
+  pushed title: the `App.vue` title watcher, `layoutStore.renamePanel` (+ its
+  test). `usePanelLifecycle.title` stays — `SidebarTab` uses it for *static*
+  edge-panel titles. The #134 seam is now structurally impossible.
+- Sidebar (phase 3): `SessionsManager.sessionLabel` derives via the selector;
+  removed the `syncSidebarCatalog` title pushes on rename (`setSessionName`) and
+  `session.title_changed`. The catalog `summary` is now purely the RPC-refreshed
+  closed-session label (+ `findByName` matching); open sessions derive from the
+  record. Updated the two `sessionsStore.restore.test.ts` cases that asserted the
+  old catalog push to assert the derived `displayTitle` instead.
+- Residual: `addPanel` still seeds an initial dockview title via the injected
+  `sessionTitleResolver` — a one-time value, not a drift source (nothing reads it
+  for display now). The owner-write ESLint guard (#151) will lock the invariant.
+- Shipped as three gate-green PRs (selectors → tab → sidebar). Dogfood
+  `MANUAL_TESTS.md` SN.1–SN.2 (rename/auto-title propagation; restore re-derive).
+
 ## 2026-06-02 — session rename propagation (#131/#133/#134)
 
 **Takeaway:** the three rename bugs shared two propagation gaps: `/rename`
