@@ -867,22 +867,6 @@ export const useLayoutStore = defineStore('layout', () => {
     if (panel) panel.api.setActive();
   }
 
-  function renamePanel(sessionId: string, title: string): void {
-    const candidates = [bodyApi.value, ...Object.values(groupsStore.innerApis), api.value].filter(
-      (dock, index, all): dock is DockviewApi => !!dock && all.indexOf(dock) === index,
-    );
-
-    for (const dock of candidates) {
-      const panel = dock.getPanel(sessionId);
-
-      if (panel) {
-        panel.api.setTitle(title);
-
-        return;
-      }
-    }
-  }
-
   // ---------- Edge-group panels (sidebars / status bars) ----------
   //
   // Future side surfaces (Recent Sessions, Permission queue, Log viewer,
@@ -1256,7 +1240,6 @@ export const useLayoutStore = defineStore('layout', () => {
     addTerminalPanel,
     removePanel,
     activatePanel,
-    renamePanel,
     replaceMissingPanel,
     openEdgePanel,
     activateEdgePanel,
