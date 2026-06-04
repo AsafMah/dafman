@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, watch } from 'vue';
-import { storeToRefs } from 'pinia';
 import Toast, { type ToastMessageOptions } from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
 import { DockviewVue, type DockviewReadyEvent } from 'dockview-vue';
@@ -11,7 +10,7 @@ import { useClientStore } from '@/stores/app/clientStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
-import { useLayoutStore, composePanelTitle } from '@/stores/shell/layoutStore';
+import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useModelsStore } from '@/stores/library/modelsStore';
 import { useBootStore } from '@/stores/app/bootStore';
@@ -40,8 +39,6 @@ const modelsStore = useModelsStore();
 const bootStore = useBootStore();
 const primeToast = useToast();
 const primeConfirm = useConfirm();
-
-const { sessions } = storeToRefs(sessionsStore);
 
 const { isDark: isDarkMode, dockviewTheme } = useDockviewTheme();
 
@@ -295,21 +292,6 @@ watch(
 function closeToast({ message }: { message: ToastMessageOptions }) {
   primeToast.remove(message);
 }
-
-/// Keep each dockview tab's title in sync with both the SDK-supplied
-/// `session.title_changed` value and the session's workspace path. The
-/// composed title leads with the workspace basename — it's the most
-/// recognisable label, especially before the model has auto-summarised
-/// the conversation — followed by the SDK title (`folder · title`).
-watch(
-  () => sessions.value.map((s) => [s.id, s.title] as const),
-  (entries) => {
-    for (const [id, title] of entries) {
-      layoutStore.renamePanel(id, composePanelTitle(id, title));
-    }
-  },
-  { deep: true, immediate: true },
-);
 
 function onDockReady(event: DockviewReadyEvent) {
   console.info('[boot] onDockReady fired');
