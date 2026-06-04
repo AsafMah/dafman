@@ -107,6 +107,41 @@ without issuing `sendMessage` IPC.
 because it depends on the real Sessions Manager confirmation, dockview tab, and
 Lexical disabled composer in the Electrobun webview.
 
+
+## 2026-06-02 — composer typeahead popups use viewport collision (#126)
+
+**Takeaway:** fixed the `@` file-picker and `/` slash-command popup clipping by
+moving placement out of CSS transforms and into Floating UI. The menus still
+prefer above-caret placement for the normal bottom composer, but `flip()` moves
+them below the caret when the composer/caret is high in the viewport and
+`shift()` clamps them away from viewport edges.
+
+**Receipts:**
+- Root cause matched the issue body: `MentionPlugin.vue` and
+  `SlashCommandPlugin.vue` both used `transform: translateY(calc(-100% - 2rem))`,
+  which visually forced the menu above the caret after lexical-vue had already
+  positioned its anchor.
+- Build-vs-buy check: `lexical-vue` has internal menu positioning
+  (`node_modules/lexical-vue/dist/shared/LexicalMenu.vine.js`, `useMenuAnchorRef`),
+  but it flips using the editor root as its room-above boundary. Rubber-duck
+  review caught that a short bottom-docked composer would not reliably flip with
+  lexical-vue alone, so the fix uses `@floating-ui/dom` instead of bespoke math.
+- Shared primitive: `src/components/chat/useComposerTypeaheadFloating.ts` binds a
+  Lexical anchor element to the real menu surface with `computePosition()`,
+  `autoUpdate()`, `placement: 'top-start'`, `offset(8)`, `flip()`, and `shift()`.
+  `MentionPlugin.vue` and `SlashCommandPlugin.vue` both use it; their old
+  vertical transforms are gone.
+
+**Tests / validation:**
+- Test-first repro:
+  `src/components/chat/__tests__/typeaheadMenuPositioning.test.ts` failed against
+  the old transform and passes after the fix.
+- Targeted validation run so far:
+  `bun test src\components\chat\__tests__\typeaheadMenuPositioning.test.ts`,
+  `bun run lint`, `bun run lint:eslint` (existing warnings only, 0 errors).
+- Manual checklist appended as `MANUAL_TESTS.md` TF.1 because real caret
+  geometry, WebView viewport clipping, and perceived flip direction are visual
+  runtime behavior.
 ## 2026-06-01 — session events forward once (#135)
 
 **Takeaway:** fixed the duplicate message/reasoning regression by making SDK

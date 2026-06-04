@@ -35,6 +35,7 @@ import { $createAttachmentNode } from '@/lexical/AttachmentNode';
 import { setComposerMenuActive } from '@/lexical/composerMenuState';
 import type { SendMessageAttachment } from '@/ipc/types';
 import FilePicker from '@/components/shared/FilePicker.vue';
+import { useComposerTypeaheadFloating } from '@/components/chat/useComposerTypeaheadFloating';
 import { useEventListener } from '@vueuse/core';
 
 class SentinelOption extends MenuOption {
@@ -51,6 +52,7 @@ const editor = useLexicalComposer();
 const query = ref('');
 const menuParent = ref<HTMLElement | null>(null);
 const pickerRef = useTemplateRef<InstanceType<typeof FilePicker>>('pickerRef');
+const { setFloatingElement } = useComposerTypeaheadFloating();
 /// Tunnel: set by click handlers, consumed by onSelectOption.
 const pendingAttachment = ref<SendMessageAttachment | null>(null);
 /// Whether the `@` typeahead is currently matching (query non-null).
@@ -182,9 +184,12 @@ useEventListener(window, 'keydown', onWindowKey, true);
     <template #default="{ anchorElementRef, itemProps }">
       <Teleport
         v-if="itemProps.options.length > 0 && anchorElementRef"
-        :to="anchorElementRef"
+        to="body"
       >
-        <div class="mention-menu-anchor">
+        <div
+          :ref="(el) => setFloatingElement(el, anchorElementRef)"
+          class="mention-menu-anchor"
+        >
           <FilePicker
             ref="pickerRef"
             :session-id="props.sessionId"
@@ -208,19 +213,12 @@ useEventListener(window, 'keydown', onWindowKey, true);
 
 <style scoped>
 .mention-menu-anchor {
-  /* Lexical positions anchorElementRef at the caret's BOTTOM. To put
-   * the menu above the caret line we translate up by its own height
-   * plus a small gap. Matches the original MentionPlugin's idiom.
-   *
-   * `transform: translateY(...)` creates a NEW stacking context here,
-   * so any z-index set on `.file-picker` (the child) is confined to
-   * this local context. Without `z-index` set HERE, this element
-   * competes against dockview's edge groups (z-index: 999) at "auto",
-   * losing the z-fight when the picker overlaps the left sidebar.
-   * Setting z-index on the stacking-context root fixes it once: the
-   * picker's own z-index inside this element doesn't matter then. */
-  position: absolute;
+  /* Floating UI owns viewport collision/flip. Fixed positioning lets it place
+   * the real menu against the viewport while preserving shrink-to-fit width for
+   * the FilePicker that lexical-vue measures. */
+  position: fixed;
+  top: 0;
+  left: 0;
   z-index: 1200;
-  transform: translateY(calc(-100% - 2rem));
 }
 </style>

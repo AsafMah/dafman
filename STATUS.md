@@ -42,6 +42,12 @@ marks the active `SessionRecord` as deleted/read-only instead of leaving a live
 composer pointed at a missing CLI session. The transcript stays visible, the
 composer and session-targeting message actions are disabled, and the tab shows a
 deleted marker. Manual live dogfood pending: `MANUAL_TESTS.md` DSP.1.
+
+**Recently fixed:** #126 — composer `@` file-picker and `/` slash-command
+popups now use Floating UI collision positioning instead of a CSS-only upward
+translate. The menus prefer above-caret placement for the normal bottom
+composer, then flip below or shift inside the viewport when the caret is near a
+top/side edge. Manual viewport dogfood pending: `MANUAL_TESTS.md` TF.1.
 **Recently fixed:** #132 — slash-command autocomplete now selects/completes the
 highlighted item instead of the first filtered command. The Tab-complete path
 mirrors lexical-vue's exposed `itemProps.selectedIndex`, while Enter remains on

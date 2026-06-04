@@ -72,6 +72,7 @@ Legend:
 | `@file` / `@folder` picker | ✅ | `MentionPlugin.vue` + `FilePicker.vue` |
 | File / image attachments (Lexical DecoratorNode) | ✅ | `src/lexical/AttachmentNode.ts` |
 | Slash commands (local) | ✅ | `SlashCommandPlugin.vue` + `sessionCommands.ts` |
+| Composer typeahead viewport collision | ✅ | `src/components/chat/useComposerTypeaheadFloating.ts` + `@floating-ui/dom` (#126) |
 | Per-session gear popover | ✅ | `SessionHeaderControls.vue` |
 | Delayed agent-busy spinner (no flash on instant Select/Deselect) | ✅ | `src/composables/useDelayedBusyValue.ts` + `SessionDetailsPanel.vue` (#99, `5492493`) |
 | Bounded `record.events` ring buffer (5000) | ✅ | `sessionsStore.ts` |
