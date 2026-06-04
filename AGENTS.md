@@ -421,6 +421,15 @@ bump: read the release notes (~5 min), run `bun run lint`, fix surfaced errors
 check → opt in/out). Don't hand-wave with `@ts-ignore` / `_`-prefix / suppressed
 rules. `bun run check` is the gate.
 
+**25. Conflict markers are a build break, not a prose reminder.** CI's
+lint/test globs only see `src/**` + `src-bun/**`, so a stray Git conflict
+marker in a Markdown doc (CHANGELOG/DEVLOG/STATUS) used to merge silently —
+it bit us twice on the 2026-06-01 merge trains (#139, #142). `bun run
+lint:markers` (`tools/check-conflict-markers.ts`, wired into `bun run check`
+and the CI `Hygiene` job) scans every *tracked* file for `<<<<<<<` /
+`|||||||` / `>>>>>>>`. After any rebase/merge resolution, it must be green
+before you continue — don't eyeball the diff for markers, run the gate.
+
 ---
 
 ## Hard rules (do not violate)
@@ -431,7 +440,7 @@ In addition to the anti-laziness rules above:
 - Never commit secrets, tokens, or raw prompt content.
 - `src-bun/app/` never imports `electrobun/bun`.
 - Never throw raw `Error` from an RPC handler — use `rpcGuard`.
-- `bun run check` must stay green.
+- `bun run check` must stay green (includes `lint:markers` — no conflict markers in any tracked file, rule 25).
 - Never delete a `STATUS.md` item — move it (open → done), preserve history.
 - Never let `plans/DONE.md` drift — ship something matching an issue → close the issue AND record the capability + receipt; no new `plans/plan-*` files.
 - Never use `window.dispatchEvent` / `addEventListener('app:…')` for in-app messaging (rule 18).

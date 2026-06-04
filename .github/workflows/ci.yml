@@ -20,12 +20,29 @@ permissions:
   contents: read
 
 jobs:
+  # ── Tier-0: fast tree-wide hygiene ──────────────────────────────────
+  #
+  # Catches unresolved Git conflict markers in ANY tracked file, including
+  # the Markdown docs (CHANGELOG/DEVLOG/STATUS) that the lint/test globs
+  # below never see. A stray `<<<<<<<` merged silently twice (#139, #142);
+  # this job makes that a red check instead of a prose reminder. No
+  # `bun install` — the checker only needs git + Bun's runtime.
+  hygiene:
+    name: Hygiene (no conflict markers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Scan tracked files for conflict markers
+        run: bun run lint:markers
+
   # ── Tier-1: parallel gate jobs mirroring `bun run check` ─────────────
   #
   # Previously this was a single `check` job that ran lint + test + smoke
   # + e2e serially and missed three lint commands. Now split so each can
   # fail fast and we get a real CI gate matching the local `bun run check`.
-
   lint:
     name: Lint (vue-tsc + bun-entry + tsc-bun + eslint)
     runs-on: ubuntu-latest
