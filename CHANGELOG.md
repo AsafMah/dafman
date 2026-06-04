@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (#149 — session title normalized onto one owner — 2026-06-04)
+- **A session's display title now derives from a single owner instead of three hand-synced copies.** The dockview tab and the Sessions Manager sidebar read a `displayTitle(sessionId)` selector (`src/stores/chat/sessionSelectors.ts`) resolving `SessionRecord.title → catalog summary → short GUID`, so rename / auto-title propagate reactively with no fan-out. Removed the drift-prone sync — the App.vue title watcher, `layoutStore.renamePanel`, and the `syncSidebarCatalog` title pushes on rename/`title_changed` — which were the source of the #131/#133/#134 (stale tab/sidebar) propagation-gap class. Live rename/restore dogfood is queued in `MANUAL_TESTS.md` SN.1–SN.2.
+
 ### Fixed (#131, #133, #134 — session rename propagation — 2026-06-02)
 - **Session renames now propagate everywhere immediately.** `/rename` opens a PrimeVue rename dialog from the typed `rename-session` bus event, manual renames update the live `SessionRecord` without waiting for a delayed SDK echo, first-message auto-title events patch the sidebar catalog, and dockview tab titles now update inside the active inner group dockview instead of looking only at the outer group shell.
 

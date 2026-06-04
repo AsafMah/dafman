@@ -70,6 +70,26 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #149 — session title derives from one owner (2026-06-04)
+
+> Refactor: tab + sidebar now derive the title from the `SessionRecord`
+> via a selector instead of pushed copies. Confirm no propagation regressed
+> and restore re-derives cleanly. (RP.1–RP.3 still apply for the rename UI.)
+
+#### SN.1 - Rename and auto-title update the tab AND sidebar together
+
+- [ ] result:
+- **Steps:** Run `bun run dev`. Open a session with the Sessions sidebar visible. Send a first prompt so the model auto-titles it, then `/rename` it to something else.
+- **Expected:** On both the auto-title and the manual rename, the dockview tab label and the sidebar row update to the same new title immediately, with no Refresh and no stale label on either surface.
+- **Why not automated:** Cross-surface reactive propagation through the real dockview tab + edge-panel sidebar in the live WebView; unit tests cover the selector resolution but not the live two-surface render.
+
+#### SN.2 - Restored layout re-derives titles (no stale persisted title)
+
+- [ ] result:
+- **Steps:** With one or more auto-titled/renamed sessions open, fully restart the app so the layout restores from disk.
+- **Expected:** Each restored tab and sidebar row shows the correct current title once the session record hydrates (brief short-GUID flash during hydration is fine); no permanently stale title from the old persisted dockview title.
+- **Why not automated:** Requires a real persist→restart→restore cycle and record hydration timing the smoke harness doesn't model.
+
 ### Issues #131/#133/#134 — session rename propagation (2026-06-02)
 
 #### RP.1 - `/rename` opens a focused rename dialog and saves.

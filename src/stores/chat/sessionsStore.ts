@@ -310,13 +310,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     if (record.isDeleted) return;
 
-    const previousTitle = record.title;
-
     applyToRecord(record, payload);
-
-    if (payload.eventType === 'session.title_changed' && record.title !== previousTitle) {
-      syncSidebarCatalog(record);
-    }
   }
 
   /// Bun-side `pendingRequest` push handler. Appends to the matching
@@ -1117,7 +1111,6 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       if (record) {
         record.title = trimmed;
-        syncSidebarCatalog(record);
       }
     } catch (err) {
       const message = toErrorMessage(err);
