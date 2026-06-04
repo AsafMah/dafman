@@ -28,6 +28,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useNotificationsStore } from '@/stores/app/notificationsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
+import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { appendEvent, applyToRecord, shouldFireForRecord } from './sessionReducer';
 
@@ -249,6 +250,14 @@ export const useSessionsStore = defineStore('sessions', () => {
     return sessionById.value.get(id);
   }
 
+  function syncSidebarCatalog(record: SessionRecord): void {
+    useSessionsListStore().upsertLiveSession({
+      id: record.id,
+      title: record.title,
+      workingDirectory: record.workingDirectory,
+    });
+  }
+
   const isCreating = ref(false);
   let creationCount = 0;
 
@@ -273,7 +282,13 @@ export const useSessionsStore = defineStore('sessions', () => {
       return;
     }
 
+    const previousTitle = record.title;
+
     applyToRecord(record, payload);
+
+    if (payload.eventType === 'session.title_changed' && record.title !== previousTitle) {
+      syncSidebarCatalog(record);
+    }
   }
 
   /// Bun-side `pendingRequest` push handler. Appends to the matching
@@ -482,6 +497,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       sessions.value.push(record);
       drainPending(id, record);
+      syncSidebarCatalog(record);
       toasts.success('Session created', id);
       // 22c: apply the global `defaultApproveAll` setting to brand-new
       // sessions. The flag lives in the renderer's settings store so
@@ -613,6 +629,8 @@ export const useSessionsStore = defineStore('sessions', () => {
       // (assistant.message_*, tool.*, session.start, …), which would
       // otherwise be lost and the pane would render blank.
       const drained = drainPending(actualId, record);
+
+      syncSidebarCatalog(record);
 
       if (import.meta.env.DEV) {
         console.debug('[restoreSession] resumed', {
@@ -1031,9 +1049,18 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function setSessionName(sessionId: string, name: string): Promise<void> {
     const toasts = useToastStore();
+    const trimmed = name.trim();
+
+    if (!trimmed) return;
 
     try {
-      await invokeCommand('setSessionName', { sessionId, name });
+      await invokeCommand('setSessionName', { sessionId, name: trimmed });
+      const record = getSession(sessionId);
+
+      if (record) {
+        record.title = trimmed;
+        syncSidebarCatalog(record);
+      }
     } catch (err) {
       const message = toErrorMessage(err);
 

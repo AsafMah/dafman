@@ -868,13 +868,19 @@ export const useLayoutStore = defineStore('layout', () => {
   }
 
   function renamePanel(sessionId: string, title: string): void {
-    const dock = api.value;
+    const candidates = [bodyApi.value, ...Object.values(groupsStore.innerApis), api.value].filter(
+      (dock, index, all): dock is DockviewApi => !!dock && all.indexOf(dock) === index,
+    );
 
-    if (!dock) return;
+    for (const dock of candidates) {
+      const panel = dock.getPanel(sessionId);
 
-    const panel = dock.getPanel(sessionId);
+      if (panel) {
+        panel.api.setTitle(title);
 
-    if (panel) panel.api.setTitle(title);
+        return;
+      }
+    }
   }
 
   // ---------- Edge-group panels (sidebars / status bars) ----------

@@ -13,6 +13,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, wa
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import Chip from 'primevue/chip';
+import Dialog from 'primevue/dialog';
+import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import TreeSelect from 'primevue/treeselect';
 import type { TreeNode } from 'primevue/treenode';
@@ -40,8 +42,12 @@ const modelsStore = useModelsStore();
 const { models } = storeToRefs(modelsStore);
 const settings = storeToRefs(useSettingsStore()).settings;
 const modelTreeRef = useTemplateRef<InstanceType<typeof TreeSelect>>('modelTreeRef');
+const renameInputRef = useTemplateRef<InstanceType<typeof InputText> | HTMLInputElement>(
+  'renameInputRef',
+);
 
 let offOpenModelSelector: (() => void) | null = null;
+let offRenameSession: (() => void) | null = null;
 
 onMounted(() => {
   modelsStore.load().catch(() => {
@@ -54,14 +60,27 @@ onMounted(() => {
 
     modelTreeRef.value?.show();
   });
+
+  if (props.area === 'all') {
+    offRenameSession = busOn('rename-session', ({ sessionId }) => {
+      if (sessionId !== props.sessionId) return;
+
+      openRenameDialog();
+    });
+  }
 });
 
 onBeforeUnmount(() => {
   offOpenModelSelector?.();
   offOpenModelSelector = null;
+  offRenameSession?.();
+  offRenameSession = null;
 });
 
 const record = computed(() => sessionsStore.getSession(props.sessionId));
+const renameDialogVisible = ref(false);
+const renameDraft = ref('');
+const renameSaving = ref(false);
 
 const effectiveModelId = computed(
   () => record.value?.model ?? settings.value.appearance.defaultModelId ?? null,
@@ -250,6 +269,42 @@ function onAgentChipClick() {
   if (!detailsOpen.value) layoutStore.toggleSessionDetailsPanel();
 }
 
+function focusRenameInput(): void {
+  const inputRef = renameInputRef.value;
+  const maybeComponent = inputRef as { $el?: unknown } | null;
+  const input =
+    inputRef instanceof HTMLInputElement
+      ? inputRef
+      : maybeComponent?.$el instanceof HTMLInputElement
+        ? maybeComponent.$el
+        : null;
+
+  input?.focus();
+  input?.select();
+}
+
+function openRenameDialog(): void {
+  renameDraft.value = record.value?.title ?? '';
+  renameDialogVisible.value = true;
+  void nextTick(focusRenameInput);
+}
+
+async function submitRename(): Promise<void> {
+  const trimmed = renameDraft.value.trim();
+
+  if (!trimmed || renameSaving.value) return;
+
+  renameSaving.value = true;
+
+  try {
+    await sessionsStore.setSessionName(props.sessionId, trimmed);
+    renameDraft.value = trimmed;
+    renameDialogVisible.value = false;
+  } finally {
+    renameSaving.value = false;
+  }
+}
+
 function requestTerminalFocus(terminalId: string): void {
   for (const delay of [0, 50, 150]) {
     setTimeout(() => {
@@ -416,6 +471,41 @@ async function openSessionTerminal() {
       :class="{ 'cog-active': detailsOpen }"
       @click="toggleDetails"
     />
+    <Dialog
+      v-if="props.area === 'all'"
+      v-model:visible="renameDialogVisible"
+      modal
+      header="Rename session"
+      :draggable="false"
+      :style="{ width: 'min(28rem, calc(100vw - 2rem))' }"
+    >
+      <form
+        class="rename-form"
+        @submit.prevent="submitRename"
+      >
+        <label
+          class="sr-only"
+          :for="`rename-session-${props.sessionId}`"
+        >
+          Session name
+        </label>
+        <InputText
+          :id="`rename-session-${props.sessionId}`"
+          ref="renameInputRef"
+          v-model="renameDraft"
+          placeholder="Session name"
+          :disabled="renameSaving"
+          autofocus
+        />
+        <Button
+          type="submit"
+          label="Save"
+          size="small"
+          :loading="renameSaving"
+          :disabled="!renameDraft.trim() || renameSaving"
+        />
+      </form>
+    </Dialog>
   </div>
 </template>
 

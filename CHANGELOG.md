@@ -3,6 +3,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (#131, #133, #134 — session rename propagation — 2026-06-02)
+- **Session renames now propagate everywhere immediately.** `/rename` opens a PrimeVue rename dialog from the typed `rename-session` bus event, manual renames update the live `SessionRecord` without waiting for a delayed SDK echo, first-message auto-title events patch the sidebar catalog, and dockview tab titles now update inside the active inner group dockview instead of looking only at the outer group shell.
+
 ### Fixed (#135 — duplicate session event forwarding — 2026-06-01)
 - **Chat session events now render once instead of twice.** Fresh-created and resumed sessions no longer double-forward the SDK stream through both `config.onEvent` and `session.on`, fixing duplicate user messages, duplicate reasoning blocks, and doubled backend event log lines.
 
