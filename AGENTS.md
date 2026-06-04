@@ -110,32 +110,7 @@ class name would have surfaced instantly.)
 
 ### Working on Windows — write files as LF
 
-The repo is **LF-only** (`.gitattributes` `* text=auto eol=lf`, `.editorconfig`
-`end_of_line = lf`, prettier `endOfLine: "lf"`, `core.autocrlf=false` locally).
-But Windows PowerShell `Set-Content` / `Out-File` / `>` and `echo` default to
-**CRLF**, which makes git nag *"CRLF will be replaced by LF"* on the next `git
-add` (the blob still commits as LF — it's just noise). When generating or
-rewriting a file from PowerShell, write LF explicitly:
-
-```pwsh
-# LF-safe write (no BOM, no CRLF):
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($path, ($text -replace "`r`n", "`n"), $utf8NoBom)
-```
-
-Prefer the `create` / `edit` tools or `bun`/`node` for file generation (they
-honour the EOL config). If you do dirty the tree with CRLF, fix it in place
-rather than committing the churn:
-
-```pwsh
-# Re-normalize every CRLF working-tree file back to LF:
-git ls-files --eol | Where-Object { $_ -match 'w/crlf' } | ForEach-Object {
-  $p = ($_ -split 'eol=lf', 2)[1].Trim()
-  $u = New-Object System.Text.UTF8Encoding($false)
-  [System.IO.File]::WriteAllText($p, ([System.IO.File]::ReadAllText($p) -replace "`r`n","`n"), $u)
-}
-git add --renormalize .
-```
+The repo is **LF-only** (`.gitattributes` `* text=auto eol=lf`, `.editorconfig`, prettier `endOfLine: "lf"`, `core.autocrlf=false`). Write through the `create` / `edit` tools or `bun` / `node` — they honour the EOL config. PowerShell `Set-Content` / `Out-File` / `>` / `echo` emit CRLF and make git nag on `git add` (the blob still commits as LF — just noise); if you dirty the tree that way, `git add --renormalize .` fixes it.
 
 ### SDK gotchas (don't re-burn; full list in `ARCHITECTURE.md` §8)
 
@@ -233,225 +208,89 @@ bun run pr:review            # code-review subagent on current branch
 
 ---
 
-## Anti-laziness rules (HARD)
+## Working rules
 
-Binding, not aspirational — they exist because real regressions kept landing
-under the previous lax contract.
+These exist because real regressions kept landing. Two kinds:
 
-**0. Pre-flight check — before EVERY non-trivial change.** Ask:
-(1) **Am I being hacky?** — suppressing a warning, hardcoding a workaround,
-`_`-prefixing an actually-used var, bumping a complexity cap, `@ts-ignore`,
-`eslint-disable`, swallowing an error.
-(2) **Am I reinventing the wheel?** — PrimeVue (`ProgressSpinner`, `Dialog`,
-`Tooltip`, `Badge`, `Skeleton`, `VirtualScroller`…), VueUse (debounce,
-observers, localStorage, clipboard, focus), Vue 3.5+ (`useTemplateRef`, `useId`,
-`useModel`), our own composables, or an npm package may already do it.
-(3) **Am I acting without research?** — have I read the library's release notes
-for the version I'm on, the actual SDK/API surface (incl. `node_modules/…`
-source), and the codebase pattern for this surface?
-If yes to (1)/(2) or no to (3) — STOP, read first. (90 seconds here saves hours
-of rework; precedent: three 2026-05-28 regressions all skipped this.)
+- **[GATE]** — a check fails the build (`bun run check` / CI). You can't merge past it; don't argue with it, fix it.
+- **[JUDGMENT]** — no machine catches it, so it's on you. This is where the list earns its keep.
 
-**1. Never declare done with half-work.** "It compiles" / "tests pass" is not
-done if you skipped `bun run smoke` on a renderer-bundle / CSS-import /
-prism-order / Lexical / dockview change, or if a click handler isn't wired up.
-If I report it broken after you said done, this rule was violated.
+**Meta-rule: prefer a gate to a reminder.** When a mistake recurs, the fix is a mechanical check, not another [JUDGMENT] bullet — prose you have to remember is a latent regression. The conflict-marker bug merged *twice* as a reminder before it became `lint:markers`; the electrobun-import rules sat as prose for months before becoming ESLint errors (#152). Before adding a rule here, ask: can this be a gate?
 
-**2. Run the full gate before claiming done.** Minimum: `bun run lint`,
-`bun test`, `bun run smoke` (any UI / bundle / SDK / IPC / Lexical change). For
-dependency or settings-schema changes, full `bun run check`. Fix failures before
-claiming done.
+### Gate index — the [GATE] rules, enforced for you
 
-**3. Update the running docs.** Every substantive session: `STATUS.md` (move
-open→done, never delete), `DEVLOG.md` (new top H2, lead with the takeaway,
-capture wire/SDK facts + dead ends), `CHANGELOG.md` (`## [Unreleased]`,
-user-visible), `ARCHITECTURE.md` (if a module/invariant/IPC surface changed),
-`plans/DONE.md` (when a GH issue closes, record the capability + receipt; no new
-`plans/plan-*` files).
+| Gate | Command | What it catches |
+|---|---|---|
+| Renderer types | `bun run lint` (vue-tsc) | `src/` type errors |
+| Backend types | `bun run lint:tsc-bun` | new `src-bun/` TS errors — keep the count from rising |
+| Bun-entry reachability | `bun run lint:bun` | dead relative imports from the bun entrypoint |
+| ESLint | `bun run lint:eslint` | complexity > 15 (no global silencing); `src-bun/app/` and renderer must not import `electrobun` (only `index.ts` / `electrobunBridge.ts` may); style |
+| Unit tests + wire snapshot | `bun test` | logic regressions; **IPC `rpc.ts` ↔ `types.ts` drift** (`wire-contract.test.ts`) |
+| Conflict markers | `bun run lint:markers` | `<<<<<<<` / `|||||||` / `>>>>>>>` in any *tracked* file (incl. Markdown) |
+| Renderer smoke / full E2E | `bun run smoke` / `bun run e2e:run` | bundle boots without console errors; core flows |
+| Build matrix | `electrobun build` | native bundler / signing / dist regressions |
 
-**4. No unverified claims.** Don't claim a CLI/SDK/library behaves a way without
-checking — read `node_modules/…` source if needed (precedent: the
-`reasoning_opaque` investigation, DEVLOG 2026-05-21 — schema declared
-`assistant.reasoning_delta`; the bundled CLI never emitted it). Don't claim a
-regression fixed without a before/after test. Don't claim a UI change works
-without running it (`bun run dev` / `bun run smoke` / `@testing-library/vue`).
+All wired into `bun run check` and CI. **`bun run check` must stay green — non-negotiable.** Some [JUDGMENT] rules below have a gate *planned* (file-size guard, owner-store writes, rename-all-surfaces E2E — issues #150/#151); when it lands, the rule moves up here.
 
-**4a. Dogfood before `task_complete` (UI / IPC).** When a change touches the
-composer / Lexical plugins, any `searchWorkspaceFiles` / `pickAttachment` /
-`sendMessage` / `pendingRequest` IPC path, dockview layout / panel mount,
-groups v3 (`groupsStore` / `useGroupsActions` / `GroupPanel`), settings /
-`coerceLayout` / persist, or z-index / stacking decisions:
-1. Run the relevant existing E2E flow (`bun run e2e:run -- e2e/full/flows/<flow>.pwtest.ts`); layout/groups/settings changes MUST also pass flows 21–24. (The Tier-3 suite under `e2e/full/flows/` already covers session send/reply, @-picker, permissions + audit, layout/settings restore across restart, groups v3, file-picker/cwd/export persistence, and the details rail — pick the matching flow before adding a new one.)
-2. If no flow covers the path, add one in the same PR (flows 21/23 are templates; `bunHarness.restart()` + `__DAFMAN_TEST__` are the primitives).
-3. `bun run dev` once and actually exercise the changed flow.
-4. Lexical / trigger / DOM-selection work → pop chromium DevTools for stacking + visual.
-5. A step that can't be automated (native OS dialog / keyring / OS-modal) → `MANUAL_TESTS.md` (rule 10).
-"lint + tests + smoke were green" is NOT a substitute for running the app.
+### 1. Done means verified behavior, not a green checkmark. [JUDGMENT]
 
-**5. Test-first for behavior changes.** Bug fix → failing test first (or note in
-DEVLOG why a test was disproportionately expensive). New behavior → test
-alongside the code. (Renderer: `tools/bun-vue-loader.ts`; Lexical:
-`src/lexical/__tests__/`; store invariants: `src/stores/__tests__/`.)
+"It compiles" / "tests pass" is not done.
+- Renderer-bundle / CSS-import / prism-order / Lexical / dockview change, or any click handler → run `bun run smoke`. If I report it broken after you said done, this rule was violated.
+- **No unverified claims.** Don't assert a CLI/SDK/library behaves a way without reading `node_modules/…` source (precedent: `reasoning_opaque`, DEVLOG 2026-05-21 — the schema declared `assistant.reasoning_delta`; the bundled CLI never emitted it). No "regression fixed" without a before/after test.
+- **Dogfood UI/IPC before `task_complete`.** Touching the composer / Lexical plugins, any `searchWorkspaceFiles` / `pickAttachment` / `sendMessage` / `pendingRequest` path, dockview/panel mount, groups v3, settings / `coerceLayout` / persist, or z-index / stacking: run the matching `e2e/full/flows/<flow>.pwtest.ts` (layout/groups/settings MUST also pass flows 21–24); if none covers it, add one (flows 21/23 are templates; `bunHarness.restart()` + `__DAFMAN_TEST__` are the primitives). Then `bun run dev` and actually exercise it; Lexical / DOM-selection → pop chromium DevTools for stacking + visual. "lint + tests + smoke were green" is NOT running the app.
+- **Assert the interaction, not DOM existence**: focus lands on the intended input after click/switch; scroll sits at the expected end after load/resume (unless the user scrolled away); the narrow-pane matrix has no overflow/overlap (pin exact affordance positions when asked); two renderers never drive the same live PTY / editor / session.
+- **Attachment semantics end-to-end**: the pill is represented in the editor; deleting it removes it from the outgoing payload; the SDK receives what the UI shows; prefer a real file attachment when I asked for a file. Add a test at the `SessionRegistry.send` / IPC boundary — a renderer-only pill test is insufficient.
+- A step nothing can automate (native OS dialog / keyring / OS-modal, hover, drag-drop, multi-window timing, a11y) → append it to `MANUAL_TESTS.md` with **Steps / Expected / Why not automated**; the user runs it, passes get promoted, fails get re-filed with a repro.
 
-**6. No silent scope / library / approach swaps.** Deviating from the agreed
-plan mid-task → stop and tell the user first ("thinking of X instead of Y
-because Z — OK?"). Don't bury it in a commit message.
+### 2. Research before you write. [JUDGMENT]
 
-**7. Rubber-duck non-trivial work.** Multiple files, a new pattern, or an
-unfamiliar SDK surface → call the `rubber-duck` agent **before** implementing.
-Most failed solutions had blind spots a critique would have caught.
+Pre-flight every non-trivial change: **(1) Am I being hacky?** — suppressing a warning, hardcoding a workaround, `_`-prefixing an actually-used var, bumping a complexity cap, `@ts-ignore`, `eslint-disable`, swallowing an error. **(2) Am I reinventing the wheel?** — PrimeVue (`ProgressSpinner`, `Dialog`, `Tooltip`, `Badge`, `Skeleton`, `VirtualScroller`…), VueUse (debounce, observers, clipboard, focus), Vue 3.5+ (`useTemplateRef`, `useId`, `useModel`), our composables, or an npm package may already do it. **(3) Have I researched?** — the library's release notes for the version I'm on, the real SDK/API surface (incl. `node_modules/…` source), the codebase pattern for this surface. Yes to (1)/(2) or no to (3) → STOP, read first (precedent: three 2026-05-28 regressions all skipped this).
+- **Build vs buy.** Before any "small helper" (event bus, debounce/throttle, persistence, ANSI/log parsing, MIME maps, contrast, clipboard, observers, fuzzy search, virtual scroll, path / URL / date parsing, id gen, deep-equal, keybinding parsing): check `package.json` → `@vueuse/core` → PrimeVue → npm (`strip-ansi`, `mitt`, …), only then hand-roll. A 50-line helper today is a 300-line god-helper in six months.
+- **Install the proper dep, not a workaround table.** Library does 90% and the gap is niche dialects/shapes → install the official sub-package (`@codemirror/lang-vue`, `@codemirror/lang-sass`, …) or open upstream; a workaround table is the last resort and smells past 3 entries (precedent `42be1a6`→`032d06d`).
+- **Rubber-duck non-trivial work** (multiple files / a new pattern / an unfamiliar SDK surface) → call the `rubber-duck` agent **before** implementing. Most failed solutions had a blind spot a critique would have caught.
 
-**8. Don't be terse where it costs the next agent.** Commit messages explain
-**why**, not just what. DEVLOG entries cite receipts (paths, line numbers,
-SHAs). Stored memories cite their source so the next agent can re-verify.
+### 3. Spec and own the model before building. [JUDGMENT]
 
-**9. Spec-interview before you implement.** Any non-trivial feature (UI shape,
-IPC surface, file layout, user-visible behavior) → interview the user with
-`ask_user` (structured form, not free-form chat) until the spec is certain:
-scope (one shape vs many), defaults, keyboard shape, empty/edge/error states,
-replace-vs-extend. Large design space → remind the user to enter plan mode.
-Locked specs go in the commit + the Feature issue body. "I assumed you wanted X"
-is not acceptable.
+- **Spec-interview** any non-trivial feature (UI shape, IPC surface, file layout, user-visible behavior) with `ask_user` (structured form, not free-form chat) until scope (one shape vs many), defaults, keyboard shape, empty/edge/error states, and replace-vs-extend are certain. Large design space → remind the user to enter plan mode. The locked spec goes in the commit + the Feature issue body. "I assumed you wanted X" is not acceptable.
+- **Ownership model first for cross-surface features** (composer ↔ terminal ↔ chat ↔ attachments ↔ settings): which component owns the live resource; can two mount it at once; what's persisted and where; the wire shape; what's rendered in the transcript and in what order; what's sent to the SDK. Don't build controls on an unclear model; if an answer changes mid-flight, update the plan first.
 
-**10. Ship a manual-test list with every feature.** Anything `bun run check`
-can't confirm (hover, keyboard flows, OS dialogs, drag-drop, multi-window
-timing, focus, a11y) → append a checklist to the DEVLOG entry, each item with
-**Steps** / **Expected result** / **Why not automated**. The user runs it;
-passes get promoted to verified, fails get re-filed with a repro.
+### 4. Test-first; the bug I showed you is the test. [JUDGMENT] (tests themselves [GATE])
 
-**11. Convert every complaint into tracked acceptance items before coding.** I
-report multiple misses → make one tracked item per sentence before editing
-(don't code from memory). Keep visible; mark done only after verifying the exact
-behavior; UI/focus/scroll/layout items → `MANUAL_TESTS.md` or an E2E test. If a
-later fix reshapes approved UI, re-check every prior item for regressions.
+- Bug fix → a test that fails on current code and passes after the fix (or a DEVLOG note why a direct test was disproportionately expensive — then dig deeper, the hard-to-test surface usually means the bug isn't understood yet).
+- A concrete broken sample I paste (raw ANSI/OSC like `ESC[31;1m…ESC]633;P;Cwd=…BEL`, wrong token limits, stale-result re-invocation) becomes a fixture **before** the fix — don't substitute a nearby happy path.
+- New behavior → test alongside the code; add/update tests for code you change even if nobody asked. (Renderer: `tools/bun-vue-loader.ts`; Lexical: `src/lexical/__tests__/`; store invariants: `src/stores/__tests__/`.)
 
-**12. Integration features need an ownership model before UI work.** For
-cross-surface features (composer ↔ terminal ↔ chat ↔ attachments ↔ settings)
-write it down first: which component owns the live resource; can two mount it at
-once; what's persisted and where; the wire shape; what's rendered in the
-transcript and in what order; what's sent to the SDK. Don't build controls until
-these are explicit; if an answer changes mid-flight, update the plan first.
+### 5. No silent swaps; turn complaints into tracked items. [JUDGMENT]
 
-**13. Focus, scroll, responsiveness are first-class acceptance criteria.** For
-composer / terminal / dockview / settings work, assert the actual interaction,
-not DOM existence: focus lands on the intended input after click/switch; scroll
-is at the expected end after load/resume (unless the user scrolled away);
-narrow-pane matrix has no overflow/overlap (pin exact affordance positions when
-asked); two renderers never drive the same live PTY/editor/session. "Element is
-visible" is not enough.
+- Deviating from the agreed plan mid-task (scope, library, approach) → stop and tell the user first ("thinking of X instead of Y because Z — OK?"). Don't bury it in a commit message.
+- I report multiple misses → make one tracked acceptance item per sentence **before** editing (don't code from memory). Keep them visible; mark done only after verifying the exact behavior (UI / focus / scroll / layout → `MANUAL_TESTS.md` or an E2E test). If a later fix reshapes approved UI, re-check every prior item for regressions.
 
-**14. Prove attachment semantics end-to-end.** For any attachment pill / derived
-context: the pill is represented in the editor; deleting it removes it from the
-outgoing payload; keeping it sends the intended shape; the SDK receives what the
-UI shows; prefer a real file attachment when I asked for a file. Add a unit test
-at the `SessionRegistry.send` / IPC boundary — a renderer-only pill test is
-insufficient.
+### 6. Keep the running docs and the handoff honest. [JUDGMENT]
 
-**15. Reproduce my bug before improving around it.** A concrete broken sample
-(raw ANSI/OSC like `ESC[31;1m…ESC]633;P;Cwd=…BEL`, wrong token limits,
-stale-result re-invocation) becomes a fixture/test before the fix. Don't
-substitute a nearby happy path — the bug I saw is the test.
+- Every substantive session: `STATUS.md` (move open→done, **never delete an item** — preserve history), `DEVLOG.md` (new top H2, lead with the takeaway, cite receipts — paths / line numbers / SHAs — and capture dead ends), `CHANGELOG.md` (`## [Unreleased]`, user-visible), `ARCHITECTURE.md` (if a module / invariant / IPC surface changed), `plans/DONE.md` (when a GH issue closes — record the capability + receipt; **no new `plans/plan-*` files**).
+- When a refactor changes a tracked metric (file size, ESLint count, event-bus dispatch count, complexity hotspots, `as unknown as` count), update the row in the same commit — STATUS / DEVLOG / audit tables go stale within weeks.
+- Commit messages explain **why**, not just what; stored memories cite their source so the next agent can re-verify. Don't be terse where it costs the next agent.
 
-**16. Build vs Buy — search before writing infrastructure.** Before any "small
-helper" (event bus, debounce/throttle, localStorage persistence, ANSI/log
-parsing, extension/MIME maps, contrast, clipboard, focus, resize/intersection
-observers, fuzzy search, virtual scroll, path manipulation, id gen, deep-equal,
-URL/date parsing, keybinding parsing): check `package.json`, then `@vueuse/core`,
-then PrimeVue, then npm (`strip-ansi`, `mitt`, …) — only then hand-roll. A
-50-line helper today is a 300-line god-helper in six months.
+### 7. Respect the structure. [GATE: complexity · JUDGMENT: file size — gate planned #150]
 
-**17. Install the proper dep instead of a workaround table.** Library does 90%
-and the gap is niche extensions/dialects/shapes → install the official
-sub-package (e.g. `@codemirror/lang-vue`, `@codemirror/lang-sass`), or open an
-upstream issue/PR; a workaround table is the last resort and a smell past 3
-entries (precedent: `42be1a6`→`032d06d`, a 4-entry vue/scss/jsonc/pyi table the
-user caught on review).
+- **God objects** — check the line count before adding: >500 → new file in the same folder; >800 → split first, don't add to it; >1,200 → fix the structure before anything new. Applies to `.vue` SFCs, Pinia stores, and backend modules equally (`sessions.ts`, `MessageComposer.vue`, `ChatWindow.vue` all started under 400 lines).
+- **Complexity > 15 is the design talking** — ESLint `complexity` fires at 15; don't bump the threshold, don't extract a cosmetic 3-line helper. Find the real seam (validation vs orchestration vs side effects). Genuinely irreducible (state machine, deep schema) → justify with `// eslint-disable-next-line complexity` (per-line, never global).
+- **`SessionRecord` is the runtime source of truth** — never duplicate a session's title / status / liveness into a second store or the dockview layout JSON (owner-store ESLint guard planned, #151). This is the seam most propagation bugs live on (#129/#133/#134).
 
-**18. Never `window.dispatchEvent(new CustomEvent('app:…'))`.** Untyped global
-coupling — listeners receive `any`, dispatches are untraceable, listeners leak
-across HMR, it turns the renderer into a ball-of-mud message hub. Use the typed
-bus (`src/lib/bus.ts`) or a store. To avoid plumbing, add a store field, not
-another global event.
+### 8. Dependency & SDK/TS bumps are not silent. [JUDGMENT]
 
-**19. Watch for god objects on every change.** Check line count before adding:
->500 → new file in the same folder; >800 → split first, don't add to it; >1,200
-→ fix the structure before anything new. Applies to `.vue` SFCs, Pinia stores,
-and backend modules equally (the worst offenders — `sessions.ts`,
-`MessageComposer.vue`, `ChatWindow.vue` — all started under 400 lines).
-
-**20. Cyclomatic complexity > 15 is the design talking.** ESLint `complexity`
-fires at 15 — don't bump the threshold, don't extract a cosmetic 3-line helper.
-Find the real seam (validation vs orchestration vs side effects; type-A vs
-type-B handling) and split there. If the complexity is genuinely irreducible
-(state machine, deep schema), justify with a comment +
-`// eslint-disable-next-line complexity` (per-line, never global).
-
-**21. Audit / STATUS / DEVLOG tables go stale within weeks.** When a refactor
-changes a tracked metric (file size, ESLint count, event-bus dispatch count,
-jscpd duplication, complexity hotspots, `as unknown as` count), update the row
-in the same commit. Quick checks:
-```pwsh
-(Get-Content src/components/Foo.vue).Count          # file size after a split
-rg "new CustomEvent\('dafman:" src                  # event-bus dispatch sites
-rg -t vue "invokeCommand\(" src                     # direct IPC from .vue
-rg "as unknown as" src/stores/shell/layoutStore.ts | Measure-Object | %{ $_.Count }
-bun run lint:tsc-bun                                 # backend TS errors
-```
-
-**22. Backend TypeScript gate is active — no new errors.** `tsc -p
-tsconfig.bun.json --noEmit` runs as `bun run lint:tsc-bun`, wired into
-`bun run check`. Touch any `src-bun/` file → run it first and keep the error
-count from rising; treat a Bun/Node/SDK-upgrade regression like any other gate
-failure.
-
-**23. SDK bumps are not silent — analyze + update plans.** `@github/copilot` /
-`@github/copilot-sdk` ship fast and each patch/beta/minor commonly adds events,
-tools, or hooks. On every bump: read the release notes for the **whole version
-range**; classify into **breaking** (wire/event/RPC/hook we use — migrate before
-merge), **new surfaces** (file one GH issue per useful event/tool/hook with a
-`node_modules/@github/copilot/…` source citation, labelled `area:*`), and
-**internal** (commit-message note only); update `ARCHITECTURE.md` §SDK gotchas
-if a new gotcha appears. **Don't auto-merge even on green CI** — there are zero
-tests for surfaces we haven't built.
-
-**24. TypeScript majors are routine — read the changelog, don't panic.** 5.x →
-6.0 is the same shape as 5.8 → 5.9; the major number is marketing. On any TS
-bump: read the release notes (~5 min), run `bun run lint`, fix surfaced errors
-(deprecated option → remove; newly-caught unsafe pattern → narrow; new strict
-check → opt in/out). Don't hand-wave with `@ts-ignore` / `_`-prefix / suppressed
-rules. `bun run check` is the gate.
-
-**25. Conflict markers are a build break, not a prose reminder.** CI's
-lint/test globs only see `src/**` + `src-bun/**`, so a stray Git conflict
-marker in a Markdown doc (CHANGELOG/DEVLOG/STATUS) used to merge silently —
-it bit us twice on the 2026-06-01 merge trains (#139, #142). `bun run
-lint:markers` (`tools/check-conflict-markers.ts`, wired into `bun run check`
-and the CI `Hygiene` job) scans every *tracked* file for `<<<<<<<` /
-`|||||||` / `>>>>>>>`. After any rebase/merge resolution, it must be green
-before you continue — don't eyeball the diff for markers, run the gate.
+- **SDK bumps** (`@github/copilot` / `@github/copilot-sdk`) — each patch/beta/minor commonly adds events, tools, or hooks. Read the release notes for the **whole version range**; classify: **breaking** (wire/event/RPC/hook we use → migrate before merge), **new surfaces** (one GH issue per useful event/tool/hook with a `node_modules/@github/copilot/…` source citation, labelled `area:*`), **internal** (commit-message note). Update `ARCHITECTURE.md` §SDK gotchas on a new gotcha. **Don't auto-merge even on green CI** — there are zero tests for surfaces we haven't built.
+- **TS majors** are routine — 5.x→6.0 is 5.8→5.9 in disguise. Read the notes (~5 min), run `bun run lint`, fix surfaced errors (deprecated option → remove; newly-caught unsafe pattern → narrow). No `@ts-ignore` / `_`-prefix / suppressed rules.
 
 ---
 
-## Hard rules (do not violate)
+## Non-negotiables (no machine to stop you)
 
-In addition to the anti-laziness rules above:
-
-- Never invent direction — a feature not in a GitHub Issue (or `STATUS.md`) → ask first.
-- Never commit secrets, tokens, or raw prompt content.
-- `src-bun/app/` never imports `electrobun/bun`.
-- Never throw raw `Error` from an RPC handler — use `rpcGuard`.
-- `bun run check` must stay green (includes `lint:markers` — no conflict markers in any tracked file, rule 25).
-- Never delete a `STATUS.md` item — move it (open → done), preserve history.
-- Never let `plans/DONE.md` drift — ship something matching an issue → close the issue AND record the capability + receipt; no new `plans/plan-*` files.
-- Never use `window.dispatchEvent` / `addEventListener('app:…')` for in-app messaging (rule 18).
-- Never silence ESLint `complexity` globally (rule 20) — per-line with justification, or fix the design.
-- Never add new `src-bun/` TS errors (rule 22) — run `bun run lint:tsc-bun` first and verify the count doesn't rise.
-- Never start a non-trivial change without the pre-flight check (rule 0).
-- Never merge an SDK bump without analysis (rule 23).
+- **Never invent direction** — a feature not in a GitHub Issue (or `STATUS.md`) → ask first (rule 3).
+- **Never commit secrets**, tokens, or raw prompt content (see Security; logs redact via `src-bun/app/redact.ts`).
+- **Never throw raw `Error` from an RPC handler** — wrap with `rpcGuard` (`src-bun/app/errors.ts`); failures serialize as `AppErrorPayload`.
+- **Never use `window.dispatchEvent` / `addEventListener('app:…')`** for in-app messaging — use the typed bus (`src/lib/bus.ts`) or a store field. Untyped global coupling hands listeners `any`, leaks across HMR, and turns the renderer into a ball-of-mud message hub.
 
 ## Monorepo / nested AGENTS.md
 
-Single Bun project: `src-bun/` (main process) + `src/` (Vue renderer) +
-`tools/` (Bun plugins) + `e2e/` (Playwright). No nested `AGENTS.md` files. If we
-split into multiple Bun workspaces, add `AGENTS.md` next to each package with
-package-specific guidance.
+Single Bun project: `src-bun/` (main process) + `src/` (Vue renderer) + `tools/` (Bun plugins) + `e2e/` (Playwright). No nested `AGENTS.md` files. If we split into multiple Bun workspaces, add `AGENTS.md` next to each package with package-specific guidance.
