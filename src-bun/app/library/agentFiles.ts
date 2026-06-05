@@ -306,6 +306,84 @@ const KNOWN_FRONTMATTER_KEYS = new Set<string>([
   'user-invocable',
 ]);
 
+/// Top-level YAML key matcher: `^[a-zA-Z][\w-]*:`. Indented lines belong
+/// to the previous key's block.
+function readTopLevelKey(line: string): string | null {
+  const m = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*:/.exec(line);
+
+  return m ? m[1] : null;
+}
+
+/// Strip matching surrounding quotes. Double-quoted strings round-trip
+/// through `JSON.parse` (what `serializeFrontmatter` emits); single-quoted
+/// are stripped literally (sufficient for hand-written files).
+function unquoteFrontmatterValue(raw: string): string {
+  const trimmed = raw.trim();
+  const quoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"));
+
+  if (!quoted) return trimmed;
+
+  if (trimmed.startsWith('"')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+
+  return trimmed.slice(1, -1);
+}
+
+/// Parse a `tools:` / `skills:` value — inline `[]`, flow-style `[a, b]`,
+/// or block form with `- item` continuation lines.
+function parseFrontmatterArray(blockLines: string[]): string[] {
+  const head = blockLines[0];
+  const inline = head.slice(head.indexOf(':') + 1).trim();
+  const items: string[] = [];
+
+  if (inline === '[]') return items;
+
+  if (inline.startsWith('[') && inline.endsWith(']')) {
+    const inner = inline.slice(1, -1).trim();
+
+    if (inner.length > 0) {
+      for (const part of inner.split(',')) items.push(unquoteFrontmatterValue(part));
+    }
+
+    return items;
+  }
+
+  for (const cont of blockLines.slice(1)) {
+    const m = /^\s*-\s*(.*)$/.exec(cont);
+
+    if (m) items.push(unquoteFrontmatterValue(m[1]));
+  }
+
+  return items;
+}
+
+/// Assign one known front-matter key's value(s) onto the spec.
+function assignKnownKey(spec: Partial<AgentFileSpec>, key: string, blockLines: string[]): void {
+  if (key === 'tools' || key === 'skills') {
+    spec[key] = parseFrontmatterArray(blockLines);
+
+    return;
+  }
+
+  const head = blockLines[0];
+  const valueRaw = head.slice(head.indexOf(':') + 1);
+
+  if (key === 'user-invocable') {
+    spec.userInvocable = unquoteFrontmatterValue(valueRaw).toLowerCase() === 'true';
+  } else if (key === 'displayName') {
+    spec.displayName = unquoteFrontmatterValue(valueRaw);
+  } else if (key === 'name' || key === 'description' || key === 'model') {
+    spec[key] = unquoteFrontmatterValue(valueRaw);
+  }
+}
+
 /// Parses raw agent front-matter into a known-keys subset (returned
 /// as a partial `AgentFileSpec`) and a raw-preserved tail of any
 /// keys we don't model. The tail is the original source lines, not
@@ -321,122 +399,39 @@ export function parseAgentFrontmatter(frontmatter: string): {
 } {
   const spec: Partial<AgentFileSpec> = {};
   const preservedLines: string[] = [];
-
-  // Walk lines top-down; for each, decide if it starts a known key
-  // (drop until next top-level key or block end) or is part of an
-  // unknown key block (push to preservedLines).
   const lines = frontmatter.split('\n');
   let i = 0;
 
-  function readTopLevelKey(line: string): string | null {
-    // Top-level YAML key: `^[a-zA-Z_-]+:`. Indented lines belong to
-    // the previous key's block.
-    const m = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*:/.exec(line);
-
-    return m ? m[1] : null;
-  }
-
-  function unquote(raw: string): string {
-    const trimmed = raw.trim();
-
-    if (
-      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'"))
-    ) {
-      // Both JSON.parse and a manual single-quote strip would work;
-      // double-quoted strings are what `serializeFrontmatter` emits
-      // so JSON.parse round-trips them exactly. Single-quoted is
-      // handled as a literal strip — sufficient for hand-written files.
-      if (trimmed.startsWith('"')) {
-        try {
-          return JSON.parse(trimmed);
-        } catch {
-          return trimmed.slice(1, -1);
-        }
-      }
-
-      return trimmed.slice(1, -1);
-    }
-
-    return trimmed;
-  }
-
+  // Walk lines top-down; a known top-level key's block is parsed onto the
+  // spec, everything else (unknown keys, comments, stray lines) is preserved
+  // verbatim so the Edit path round-trips it byte-for-byte.
   while (i < lines.length) {
-    const line = lines[i];
-    const key = readTopLevelKey(line);
+    const key = readTopLevelKey(lines[i]);
 
     if (key === null) {
-      // Stray indented line or blank line at top level; preserve.
-      preservedLines.push(line);
+      preservedLines.push(lines[i]);
       i++;
       continue;
     }
 
-    // Collect the key's block: this line + any indented continuation.
+    // Collect this line + any indented / blank continuation lines.
     const blockStart = i;
 
     i++;
 
-    while (i < lines.length) {
-      const peek = lines[i];
-
-      if (peek === '' || /^\s/.test(peek)) {
-        i++;
-        continue;
-      }
-
-      // Next top-level key (or end-of-front-matter sentinel) → stop.
-      break;
-    }
+    while (i < lines.length && (lines[i] === '' || /^\s/.test(lines[i]))) i++;
 
     const blockLines = lines.slice(blockStart, i);
 
-    if (!KNOWN_FRONTMATTER_KEYS.has(key)) {
+    if (KNOWN_FRONTMATTER_KEYS.has(key)) {
+      assignKnownKey(spec, key, blockLines);
+    } else {
       preservedLines.push(...blockLines);
-      continue;
-    }
-
-    // Known key: extract value(s).
-    const head = blockLines[0];
-    const valueRaw = head.slice(head.indexOf(':') + 1);
-
-    if (key === 'tools' || key === 'skills') {
-      // Array — either `tools: []` or block form:
-      //   tools:
-      //     - "read"
-      //     - "shell"
-      const items: string[] = [];
-      const inline = valueRaw.trim();
-
-      if (inline === '[]') {
-        // empty
-      } else if (inline.startsWith('[') && inline.endsWith(']')) {
-        // Flow-style array. Best-effort split on commas, then unquote.
-        const inner = inline.slice(1, -1).trim();
-
-        if (inner.length > 0) {
-          for (const part of inner.split(',')) items.push(unquote(part));
-        }
-      } else {
-        for (const cont of blockLines.slice(1)) {
-          const m = /^\s*-\s*(.*)$/.exec(cont);
-
-          if (m) items.push(unquote(m[1]));
-        }
-      }
-
-      spec[key] = items;
-    } else if (key === 'user-invocable') {
-      spec.userInvocable = unquote(valueRaw).toLowerCase() === 'true';
-    } else if (key === 'displayName') {
-      spec.displayName = unquote(valueRaw);
-    } else if (key === 'name' || key === 'description' || key === 'model') {
-      spec[key] = unquote(valueRaw);
     }
   }
 
-  // Trim leading/trailing blank lines from preserved tail so the
-  // joined output doesn't accumulate them across edits.
+  // Trim leading/trailing blank lines so the joined tail doesn't accumulate
+  // them across edits.
   while (preservedLines.length > 0 && preservedLines[0].trim() === '') {
     preservedLines.shift();
   }

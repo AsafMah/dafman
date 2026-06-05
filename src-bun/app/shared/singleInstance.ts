@@ -121,6 +121,7 @@ export function acquireSingleInstanceLock(
 
     return () => {
       if (released) return;
+
       released = true;
 
       const current = readLock(lockPath);
@@ -135,48 +136,67 @@ export function acquireSingleInstanceLock(
     };
   };
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  // One claim attempt. Returns a resolved lock, or `null` to retry the
+  // loop (our fresh lock was stolen, or we just reclaimed a stale file).
+  const claimFreshLock = (): SingleInstanceLock | null => {
+    const fd = openSync(lockPath, 'wx');
+
     try {
-      const fd = openSync(lockPath, 'wx');
+      writeSync(fd, content);
+    } finally {
+      closeSync(fd);
+    }
 
-      try {
-        writeSync(fd, content);
-      } finally {
-        closeSync(fd);
+    // Read-back verify: if a lagging starter removed our fresh lock and
+    // wrote its own, our token is gone and we must defer to the new owner.
+    const confirmed = readLock(lockPath);
+
+    if (!confirmed || confirmed.token !== token) {
+      if (confirmed && confirmed.pid !== pid && isProcessAlive(confirmed.pid)) {
+        return { acquired: false, existingPid: confirmed.pid, release: noop };
       }
 
-      // Read-back verify: if a lagging starter removed our fresh lock and
-      // wrote its own, our token is gone and we must defer to the new owner.
-      const confirmed = readLock(lockPath);
+      return null;
+    }
 
-      if (!confirmed || confirmed.token !== token) {
-        if (confirmed && confirmed.pid !== pid && isProcessAlive(confirmed.pid)) {
-          return { acquired: false, existingPid: confirmed.pid, release: noop };
-        }
+    return { acquired: true, release: makeRelease() };
+  };
 
-        continue;
-      }
+  // EEXIST path: a lock already exists. Defer to a live foreign owner,
+  // otherwise reclaim a stale/corrupt/own-leftover file and retry.
+  const reclaimOrDefer = (): SingleInstanceLock | null => {
+    const existing = readLock(lockPath);
 
-      return { acquired: true, release: makeRelease() };
+    if (existing && existing.pid !== pid && isProcessAlive(existing.pid)) {
+      return { acquired: false, existingPid: existing.pid, release: noop };
+    }
+
+    try {
+      rmSync(lockPath, { force: true });
+    } catch {
+      // Ignore; the loop retries.
+    }
+
+    return null;
+  };
+
+  const attemptClaim = (): SingleInstanceLock | null => {
+    try {
+      return claimFreshLock();
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
         // Unwritable lock dir / unexpected error — fail open.
         return { acquired: true, release: noop };
       }
 
-      const existing = readLock(lockPath);
-
-      if (existing && existing.pid !== pid && isProcessAlive(existing.pid)) {
-        return { acquired: false, existingPid: existing.pid, release: noop };
-      }
-
-      // Stale (dead PID), corrupt, or our own leftover — reclaim and retry.
-      try {
-        rmSync(lockPath, { force: true });
-      } catch {
-        // Ignore; the loop retries.
-      }
+      return reclaimOrDefer();
     }
+  };
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const lock = attemptClaim();
+
+    if (lock) return lock;
   }
 
   // Persistent race (should be unreachable in practice) — fail open.
