@@ -13,9 +13,9 @@ function captureToasts() {
   const calls: Array<{ severity: string; title: string }> = [];
   const toasts = useToastStore();
   for (const severity of ['info', 'success', 'warn', 'error'] as const) {
-    toasts[severity] = (title: string) => {
-      calls.push({ severity, title });
-      return 'id';
+    toasts[severity] = (summary: string, detail?: string) => {
+      calls.push({ severity, title: summary });
+      return { id: 0, severity, summary, detail, life: 0 };
     };
   }
   return calls;
