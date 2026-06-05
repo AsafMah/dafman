@@ -1266,6 +1266,17 @@ export type DafmanRPC = {
   }>;
 };
 
+/// Typed view of the bun→webview message channel. Electrobun's
+/// `webview.rpc` isn't surfaced with `.send` typed to the webview
+/// messages, so `src-bun/index.ts` needs a single cast to this — but it is
+/// derived from the schema above, so the channel names + payload types
+/// can't drift from `DafmanRPC['webview']['messages']`.
+export type WebviewSendChannels = {
+  [K in keyof DafmanRPC['webview']['messages']]: (
+    payload: DafmanRPC['webview']['messages'][K],
+  ) => void;
+};
+
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
 export interface LogRecord {
   ts: string;

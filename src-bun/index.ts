@@ -26,13 +26,7 @@ import {
 } from './app/observability/logging';
 import { exportDiagnostics } from './app/observability/diagnostics';
 import { saveExportFile } from './app/config/exports';
-import {
-  initAudit,
-  recentAudit,
-  recordUrl,
-  subscribeAudit,
-  type AuditEntry,
-} from './app/observability/audit';
+import { initAudit, recentAudit, recordUrl, subscribeAudit } from './app/observability/audit';
 import { toModelSummary } from './app/library/models';
 import { SessionRegistry } from './app/chat/sessions';
 import { SessionMetadataStore } from './app/chat/sessionMetadataStore';
@@ -46,9 +40,9 @@ import { installStderrFilter } from './app/observability/stderrFilter';
 import type {
   CommandResultEvent,
   DafmanRPC,
-  LogRecord,
   SessionEventPayload,
   TerminalEventPayload,
+  WebviewSendChannels,
 } from './rpc';
 import { toErrorMessage } from './app/shared/errorMessage';
 
@@ -613,54 +607,24 @@ for (const delay of [200, 600, 1500]) {
   setTimeout(nudgeWindow, delay);
 }
 
-emitEvent = (payload) => {
-  (
-    mainWindow.webview.rpc as unknown as {
-      send: { sessionEvent: (p: SessionEventPayload) => void };
-    }
-  ).send.sessionEvent(payload);
-};
-emitPending = (payload) => {
-  (
-    mainWindow.webview.rpc as unknown as {
-      send: { pendingRequest: (p: import('./rpc').PendingRequestPayload) => void };
-    }
-  ).send.pendingRequest(payload);
-};
-emitTerminal = (payload) => {
-  (
-    mainWindow.webview.rpc as unknown as {
-      send: { terminalEvent: (p: TerminalEventPayload) => void };
-    }
-  ).send.terminalEvent(payload);
-};
-emitCommandResult = (payload) => {
-  (
-    mainWindow.webview.rpc as unknown as {
-      send: { commandResultEvent: (p: CommandResultEvent) => void };
-    }
-  ).send.commandResultEvent(payload);
-};
+// Electrobun doesn't surface `webview.rpc.send` typed to the webview
+// message schema, so this is the one place we cast — to the schema-derived
+// `WebviewSendChannels`. Every call below is then compiler-checked against
+// `DafmanRPC['webview']['messages']`; a renamed channel fails to build.
+const send = (mainWindow.webview.rpc as unknown as { send: WebviewSendChannels }).send;
+
+emitEvent = (payload) => send.sessionEvent(payload);
+emitPending = (payload) => send.pendingRequest(payload);
+emitTerminal = (payload) => send.terminalEvent(payload);
+emitCommandResult = (payload) => send.commandResultEvent(payload);
 
 // Live log fan-out to the renderer. The in-app log viewer subscribes
 // via the `logEvent` webview message and applies its own level filter
 // so users can flip verbosity without losing history.
-subscribeLogs((record) => {
-  (
-    mainWindow.webview.rpc as unknown as {
-      send: { logEvent: (p: LogRecord) => void };
-    }
-  ).send.logEvent(record);
-});
+subscribeLogs((record) => send.logEvent(record));
 
 // Live audit fan-out — same fire-and-forget pattern as logs.
-subscribeAudit((entry) => {
-  (
-    mainWindow.webview.rpc as unknown as {
-      send: { auditEvent: (p: AuditEntry) => void };
-    }
-  ).send.auditEvent(entry);
-});
+subscribeAudit((entry) => send.auditEvent(entry));
 
 log.info('dafman started', { version: '0.1.0' });
 

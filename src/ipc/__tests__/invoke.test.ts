@@ -13,7 +13,14 @@
 /// `AppError`. This test exercises BOTH halves of that contract.
 
 import { describe, expect, test, beforeEach } from 'bun:test';
-import { AppError, invokeCommand, setRpcBridge, type RpcBridge } from '@/ipc/invoke';
+import {
+  AppError,
+  invokeCommand,
+  onAuditEvent,
+  onLogEvent,
+  setRpcBridge,
+  type RpcBridge,
+} from '@/ipc/invoke';
 
 const APP_ERROR_PREFIX = 'AppErrorPayload:';
 
@@ -111,5 +118,30 @@ describe('invokeCommand AppErrorPayload decoding', () => {
       expect(err).not.toBeInstanceOf(AppError);
       expect((err as Error).message).toBe('totally unrelated failure');
     }
+  });
+});
+
+describe('optional observability channels', () => {
+  beforeEach(() => {
+    setRpcBridge(null);
+  });
+
+  // The boot smoke harness (and any minimal bridge) legitimately omits the
+  // log/audit channels; subscribing must degrade to a no-op, not crash with
+  // `b.onLogEvent is not a function` (#158).
+  test('subscribing to log/audit against a bridge that omits them does not throw', () => {
+    const minimal: RpcBridge = {
+      request: (async () => undefined) as RpcBridge['request'],
+      onSessionEvent: () => () => {},
+      onPendingRequest: () => () => {},
+    };
+    setRpcBridge(minimal);
+
+    expect(() => {
+      const offLog = onLogEvent(() => {});
+      const offAudit = onAuditEvent(() => {});
+      offLog();
+      offAudit();
+    }).not.toThrow();
   });
 });
