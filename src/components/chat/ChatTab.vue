@@ -210,6 +210,7 @@ function groupColorOf(item: MenuItem): string | undefined {
     <span
       v-else
       class="chat-tab-title"
+      @dblclick.stop="startRename"
       >{{ displayTitle }}</span
     >
     <button

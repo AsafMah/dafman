@@ -60,22 +60,6 @@ mock.module('primevue/useconfirm', () => ({
 
 let GroupTab: Component;
 
-function fakePanelApi(overrides: Partial<DockviewPanelApi> = {}): DockviewPanelApi {
-  return {
-    id: 'g1',
-    title: 'Group 1',
-    isActive: true,
-    isMaximized: () => false,
-    maximize: () => {},
-    exitMaximized: () => {},
-    close: () => {},
-    onDidTitleChange: () => ({ dispose: () => {} }),
-    onDidActiveChange: () => ({ dispose: () => {} }),
-    onDidDimensionsChange: () => ({ dispose: () => {} }),
-    ...overrides,
-  } as unknown as DockviewPanelApi;
-}
-
 function renderGroupTab(groupId = 'g1', api?: DockviewPanelApi) {
   return render(GroupTab, {
     props: {
@@ -171,35 +155,5 @@ describe('GroupTab close confirmation', () => {
       defaultFocus: 'reject',
     });
     expect(confirm[0]?.accept).toBeTypeOf('function');
-  });
-
-  test('renders a maximize action and toggles the dockview panel', async () => {
-    hydrateGroups();
-    let maximized = false;
-    let maximizeCalls = 0;
-    let restoreCalls = 0;
-    const api = fakePanelApi({
-      isMaximized: () => maximized,
-      maximize: () => {
-        maximizeCalls++;
-        maximized = true;
-      },
-      exitMaximized: () => {
-        restoreCalls++;
-        maximized = false;
-      },
-    });
-
-    const utils = renderGroupTab('g1', api);
-
-    await fireEvent.click(utils.getByLabelText('Maximize group'));
-
-    expect(maximizeCalls).toBe(1);
-    expect(restoreCalls).toBe(0);
-
-    await fireEvent.click(utils.getByLabelText('Restore group'));
-
-    expect(maximizeCalls).toBe(1);
-    expect(restoreCalls).toBe(1);
   });
 });

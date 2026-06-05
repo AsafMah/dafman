@@ -33,7 +33,7 @@ const props = defineProps<{
   api?: import('dockview-core').DockviewPanelApi;
 }>();
 
-const { panelApi, isActive, maximized, toggleMaximized } = usePanelLifecycle(props);
+const { panelApi, isActive } = usePanelLifecycle(props);
 const groupsStore = useGroupsStore();
 const groupsActions = useGroupsActions();
 const confirm = useConfirm();
@@ -258,21 +258,6 @@ function onClose(event: MouseEvent): void {
       :aria-label="`${sessionCount} session${sessionCount === 1 ? '' : 's'}`"
       >{{ sessionCount }}</span
     >
-    <button
-      v-if="!isRenaming"
-      type="button"
-      class="group-tab-action"
-      :aria-label="maximized ? 'Restore group' : 'Maximize group'"
-      :title="maximized ? 'Restore group' : 'Maximize group'"
-      @pointerdown.stop
-      @click="toggleMaximized"
-    >
-      <i
-        class="pi"
-        :class="maximized ? 'pi-window-minimize' : 'pi-window-maximize'"
-        aria-hidden="true"
-      />
-    </button>
     <button
       v-if="groupsStore.groups.length > 1 && !isRenaming"
       type="button"

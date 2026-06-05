@@ -175,4 +175,19 @@ describe('ChatTab inline rename', () => {
 
     expect(utils.queryByLabelText('Session name')).toBeNull();
   });
+
+  test('double-clicking the tab title starts the inline editor', async () => {
+    const { bridge } = makeBridge();
+    setRpcBridge(bridge);
+    useSessionsStore().sessions.push(makeSession());
+
+    const utils = renderTab();
+
+    const title = utils.container.querySelector('.chat-tab-title');
+    expect(title).not.toBeNull();
+
+    await fireEvent.dblClick(title as Element);
+
+    await waitFor(() => utils.getByLabelText('Session name'));
+  });
 });
