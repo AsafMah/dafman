@@ -3,6 +3,20 @@
 # `core.autocrlf=true` checkout-converts-to-CRLF trap on Windows.
 * text=auto eol=lf
 
+# Append-only logs: every PR adds entries at the TOP, so concurrent PRs
+# collide on the same lines and the second-to-merge has to hand-resolve a
+# semantically-empty conflict (the entries never truly conflict — they just
+# both want the top). The built-in `union` merge driver auto-resolves by
+# keeping BOTH sides' added lines instead of emitting conflict markers.
+# GitHub honors it server-side (built-in driver, no config needed). After a
+# busy merge train, eyeball chronology once; it never *blocks* a merge.
+CHANGELOG.md            merge=union
+DEVLOG.md               merge=union
+STATUS.md               merge=union
+MANUAL_TESTS.md         merge=union
+MANUAL_TESTS_archive.md merge=union
+plans/DONE.md           merge=union
+
 # Lockfiles must not be touched by line-ending normalization — bun's
 # install consistency check is sensitive to byte-exact content. Mark
 # binary so git ships the bytes through unchanged.
