@@ -22,9 +22,29 @@ flows, real CLI/SDK side-effects, restart persistence). This skill walks that
 queue with the user in a live `bun run dev` instance, records results inline,
 and converts every miss into a tracked issue with a verified root cause.
 
-The agent **drives**; the user is the hands+eyes. You cannot click in the live
-electrobun app yourself — you present batched checks, the user reports, you
-record + investigate + file.
+**First, triage: is this even still a *manual* test?** Many rows claim "needs a
+real WebView" but assert a measurable DOM/store fact — those should become
+`e2e/full` flows, not hand-walks. Run that lens before booting anything
+(`skill://manual-test-review`).
+
+**Two drive modes — pick per check, default to the cheapest:**
+
+- **Agent-driven (harness).** For any check whose `Expected` is a measurable
+  DOM / store / geometry / persistence fact, YOU drive it solo — no user. Boot
+  the prod renderer against the real `test-server` backend (the `e2e/full`
+  harness, `/?testBridge=ws://…&autosession=1`) and click/assert via the
+  browser tool or a Playwright flow — read `getBoundingClientRect`,
+  `document.activeElement`, `localStorage`, store state. If the check is worth
+  keeping it usually should just *become* a flow. Precedent (2026-06-04): the
+  popup-flip, deleted-session, and rename-propagation rows were all walked this
+  way solo and committed as flows 26/27/28.
+- **User-driven (real electrobun app).** ONLY for what the headless harness
+  genuinely can't do — native OS surfaces (dialogs, keyring, installer), IME,
+  visual *perception* (flicker / smoothness / paint), multi-window timing. Here
+  the user is the hands+eyes: you cannot click the native WebView2 window
+  yourself, so you present batched checks, the user reports, you record +
+  investigate + file. **The Setup, `ask_user`-form, and restart workflow below
+  are for THIS mode.**
 
 ## Hard rules (do not skip)
 
@@ -48,7 +68,7 @@ record + investigate + file.
    `area:*`, `prio:p0/p1/p2`, and `manual-test-fail` when a pending row failed.
    Cite code receipts (path:line) and SDK source in the body — the next agent
    must be able to re-verify without re-spelunking.
-4. **Structured `ask_user` forms only.** Present each batch as an `ask_user`
+4. **Structured `ask_user` forms only (user-driven mode).** Present each batch
    form with one enum field per check (`pass`/`fail`/`skip`) + a free-text
    `notes` field. Never ask for results in plain prose — it loses structure and
    the mapping to checklist ids.
@@ -61,7 +81,11 @@ record + investigate + file.
    repro (drop one valid fixture, click Refresh, try select) before filing —
    confirm the exact mechanism, don't infer it from an adjacent failure.
 
-## Setup (run once per session)
+## Setup — user-driven mode (run once per session)
+
+> For agent-driven checks, skip this and boot the `e2e/full` harness instead
+> (`spawnBunHarness` + browser tool, or a Playwright flow) — see
+> `skill://manual-test-review` for the harness facts.
 
 ```pwsh
 # 1. Boot the app detached (npm wrapper exits 0; the app stays running).
@@ -167,6 +191,9 @@ CREATE TABLE dogfood (id TEXT PRIMARY KEY, batch TEXT, needs TEXT,
 
 ## References
 
+- Review the checklist before walking it: `skill://manual-test-review`.
+- Real-backend harness (agent-driven mode): `e2e/full/harness/{bunHarness,pageHarness}.ts`,
+  `e2e/full/flows/*.pwtest.ts`, `src-bun/test-server.ts`.
 - Queue + format: `MANUAL_TESTS.md` (header `## Pending verification` workflow).
 - Archive: `MANUAL_TESTS_archive.md`.
 - Issue workflow + labels: `AGENTS.md` `## Workflow — GitHub Issues + PRs`.
