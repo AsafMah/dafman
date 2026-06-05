@@ -1,15 +1,22 @@
 import { execFileSync } from "node:child_process";
 
-/// One-time developer setup: register the `mergiraf` syntax-aware merge
-/// driver in the user's GLOBAL git config so the `merge=mergiraf` mappings
-/// in `.gitattributes` take effect across every clone. Idempotent — safe to
-/// re-run. `union` (used for the Markdown logs) is a built-in git driver and
-/// needs nothing here.
+/// One-time developer setup: register the `weave` entity-level merge driver
+/// in the user's GLOBAL git config so the `merge=weave` mappings in
+/// `.gitattributes` take effect across clones. Idempotent — safe to re-run.
+/// `union` (used for the Markdown logs) is a built-in git driver and needs
+/// nothing here.
 ///
-/// Requires the `mergiraf` binary: https://mergiraf.org
-///   cargo install mergiraf   (or a prebuilt release / package manager)
+/// Requires the `weave` + `weave-driver` binaries on PATH:
+/// https://github.com/Ataraxy-Labs/weave
+///   brew install weave            (macOS / Linux)
+///   # or grab a prebuilt release (incl. Windows) and put both binaries on PATH
+///
+/// weave parses .vue / .ts / .json / .yaml / … via tree-sitter and merges at
+/// the entity (function / block / key) level, so independent edits to the
+/// same file auto-resolve instead of false-conflicting. LOCAL only — GitHub's
+/// server-side merge is unaffected.
 
-const DRIVER = "mergiraf merge --git %O %A %B -s %S -x %X -y %Y -p %P -l %L";
+const DRIVER = "weave-driver %O %A %B %L %P";
 
 function git(args: string[]): void {
 	execFileSync("git", args, { stdio: "inherit" });
@@ -24,22 +31,23 @@ function isInstalled(cmd: string): boolean {
 	}
 }
 
-if (!isInstalled("mergiraf")) {
+if (!isInstalled("weave-driver")) {
 	console.error(
-		"mergiraf not found on PATH. Install it (https://mergiraf.org):\n" +
-			"  cargo install mergiraf\n" +
-			"or grab a prebuilt release, then re-run `bun run setup:merge`.",
+		"weave-driver not found on PATH. Install weave\n" +
+			"(https://github.com/Ataraxy-Labs/weave): `brew install weave`, or grab a\n" +
+			"prebuilt release and put `weave` + `weave-driver` on PATH, then re-run\n" +
+			"`bun run setup:merge`.",
 	);
 	process.exit(1);
 }
 
-git(["config", "--global", "merge.mergiraf.name", "mergiraf"]);
-git(["config", "--global", "merge.mergiraf.driver", DRIVER]);
-// mergiraf reconstructs base/ours/theirs, so it needs the base shown.
+git(["config", "--global", "merge.weave.name", "weave entity-level merge"]);
+git(["config", "--global", "merge.weave.driver", DRIVER]);
+// Show the base revision so 3-way reconstruction is unambiguous.
 git(["config", "--global", "merge.conflictStyle", "diff3"]);
 
 console.log(
-	"Registered the mergiraf merge driver globally. Code conflicts (.ts/.json/…)\n" +
-		"now resolve syntax-aware on local merges/rebases; the Markdown logs use the\n" +
-		"built-in `union` driver. Nothing runs server-side — this is a local-only win.",
+	"Registered the weave merge driver globally. Code + .vue conflicts now resolve\n" +
+		"entity-aware on local merges/rebases; the Markdown logs use the built-in\n" +
+		"`union` driver. Nothing runs server-side — this is a local-only win.",
 );
