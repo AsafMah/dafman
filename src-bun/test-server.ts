@@ -274,6 +274,16 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
 
     return sessions.deleteCliSession(sessionId);
   }),
+  getSessionName: rpcGuard(async (args) => {
+    const { sessionId } = args as { sessionId: string };
+
+    return sessions.getName(sessionId);
+  }),
+  setSessionName: rpcGuard(async (args) => {
+    const { sessionId, name } = args as { sessionId: string; name: string };
+
+    return sessions.setName(sessionId, name);
+  }),
   getSessionMetadata: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
     // Mirror index.ts: SessionRegistry exposes getCwd (which itself
