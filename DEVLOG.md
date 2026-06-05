@@ -8,6 +8,42 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-05 — #166 WAS real: rename dead since #144; now inline-in-place on the tab
+
+**Takeaway:** I was wrong earlier today (entry below) to close #166 as a
+"chromium-harness artifact." `/rename` genuinely no-opped in **every real build**.
+Root cause via `git log -S`: #144 (`eda123d`) gated the `rename-session` bus
+listener + the rename `<Dialog>` to `area='all'` on `SessionHeaderControls`. But
+`area='all'` only ever mounts inside `ChatTabActions`, dockview's
+**right-header-actions** host — and that wiring was deleted in `8216dc7` when
+session controls moved back to the composer toolbar. So the rename UI was
+orphaned the moment #144 shipped: gated to a host that no longer exists. The
+harness *also* can't mount it, which is what fooled me; but the real WebView2
+couldn't either. The user caught it ("we didn't do the rename, it failed").
+
+**Fix (PR for #166):** don't resurrect the deleted tab-strip header. Instead host
+rename where the title actually lives — **inline-in-place on the dockview tab**
+(`ChatTab.vue`). Bare `/rename` emits `rename-session`; `ChatTab` (mounted once
+per panel) swaps its title `<span>` for an `<input>`: Enter/blur commit, Escape
+cancels (an `renameCancelled` guard stops the Escape-blur from committing). Per
+the user's two asks: **(1)** `/rename <title>` now sets the name directly via
+`setSessionName` with no UI; **(2)** no more blocking modal — the edit is inline
+and non-blocking. Deleted the entire modal (`Dialog`/`InputText`, `hostsRename`,
+`openRenameDialog`/`submitRename`/`focusRenameInput`, rename refs + CSS) from
+`SessionHeaderControls.vue` — clean cutover, no dead code.
+
+**Gate:** `ChatTab.rename.test.ts` (bus → inline input → Enter saves; Escape
+discards; ignores other sessionIds) and two `sessionCommands.test.ts` cases
+(`/rename <title>` → direct RPC, no bus; bare `/rename` → bus, no RPC). The old
+`SessionHeaderControls.rename.test.ts` rendered `area='all'` and so never caught
+the orphaned host — deleted. All 287 component/lib tests pass; vue-tsc + eslint
+clean. Verified live in the HMR app: both behaviors PASS.
+
+**Lesson:** a feature gated to a render area is only as alive as that area's mount
+site. When you move/remove a host slot, grep for `props.area === '<slot>'`
+listeners that silently lose their home. "Unit test passes" meant nothing here
+because the unit test rendered the dead host directly.
+
 ## 2026-06-05 — dogfood: #166 was a stale-instance false alarm; rename + restore verified
 
 **Takeaway:** before trusting *any* live dogfood result, confirm the running app

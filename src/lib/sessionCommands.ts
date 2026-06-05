@@ -252,13 +252,22 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   {
     slash: '/rename',
     label: 'Rename session',
-    description: 'Set a custom title for this session.',
+    description: 'Rename inline, or set it directly with /rename <title>.',
     icon: 'pi-pencil',
     group: 'Session',
     keywords: ['title', 'name'],
-    run: (sessionId) => {
-      // Surface the rename popover via the typed app bus that
-      // SessionHeaderControls listens for.
+    run: async (sessionId, args = '') => {
+      const trimmed = args.trim();
+
+      // `/rename <title>` sets the name directly — no UI.
+      if (trimmed) {
+        await useSessionsStore().setSessionName(sessionId, trimmed);
+
+        return;
+      }
+
+      // Bare `/rename` starts inline rename-in-place on the session tab
+      // (ChatTab listens for this and swaps its title for an input).
       busEmit('rename-session', { sessionId });
     },
   },

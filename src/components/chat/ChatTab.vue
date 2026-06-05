@@ -3,7 +3,7 @@
 // dockview's default tab so each tab can carry its session's accent
 // colour and match the chat tile's rounded design language.
 
-import { computed, useTemplateRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import ContextMenu from 'primevue/contextmenu';
 import type { MenuItem } from 'primevue/menuitem';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
@@ -12,6 +12,7 @@ import { useGroupsActions } from '@/composables/useGroupsActions';
 import { indicatorStyle } from '@/lib/notificationStyles';
 import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
 import { useSessionSelectors } from '@/stores/chat/sessionSelectors';
+import { on as busOn } from '@/lib/bus';
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {
@@ -47,6 +48,66 @@ const displayTitle = computed(() => {
   const base = resolveTitle(sessionId.value);
 
   return record.value?.isDeleted ? `${base} (deleted)` : base;
+});
+
+// ─── Inline rename ────────────────────────────────────────────────────
+// Bare `/rename` emits `rename-session`; we swap the title for an inline
+// input right here in the tab — the title's actual home — instead of a
+// blocking modal. Enter/blur commit, Escape cancels. ChatTab is mounted
+// once per panel, so it's the natural (and only-needed) host.
+const renaming = ref(false);
+const renameDraft = ref('');
+const renameInputRef = useTemplateRef<HTMLInputElement>('renameInputRef');
+// Set by Escape so the resulting blur doesn't commit the edit.
+let renameCancelled = false;
+let offRename: (() => void) | null = null;
+
+function startRename(): void {
+  if (record.value?.isDeleted) return;
+
+  renameDraft.value = record.value?.title ?? '';
+  renameCancelled = false;
+  renaming.value = true;
+  void nextTick(() => {
+    renameInputRef.value?.focus();
+    renameInputRef.value?.select();
+  });
+}
+
+async function commitRename(): Promise<void> {
+  if (!renaming.value) return;
+
+  renaming.value = false;
+
+  if (renameCancelled) {
+    renameCancelled = false;
+
+    return;
+  }
+
+  const trimmed = renameDraft.value.trim();
+
+  if (trimmed && trimmed !== record.value?.title) {
+    await sessionsStore.setSessionName(sessionId.value, trimmed);
+  }
+}
+
+function cancelRename(): void {
+  renameCancelled = true;
+  renaming.value = false;
+}
+
+onMounted(() => {
+  offRename = busOn('rename-session', ({ sessionId: sid }) => {
+    if (sid !== sessionId.value) return;
+
+    startRename();
+  });
+});
+
+onBeforeUnmount(() => {
+  offRename?.();
+  offRename = null;
 });
 
 /// Status indicator for this session. Maps the record's
@@ -129,7 +190,28 @@ function groupColorOf(item: MenuItem): string | undefined {
       :aria-label="indicator.label"
       :title="indicator.label"
     />
-    <span class="chat-tab-title">{{ displayTitle }}</span>
+    <input
+      v-if="renaming"
+      ref="renameInputRef"
+      v-model="renameDraft"
+      class="chat-tab-title-input"
+      type="text"
+      spellcheck="false"
+      aria-label="Session name"
+      @keydown.enter.prevent="commitRename"
+      @keydown.esc.prevent="cancelRename"
+      @keydown.stop
+      @blur="commitRename"
+      @pointerdown.stop
+      @mousedown.stop
+      @click.stop
+      @dblclick.stop
+    />
+    <span
+      v-else
+      class="chat-tab-title"
+      >{{ displayTitle }}</span
+    >
     <button
       type="button"
       class="chat-tab-action"
@@ -255,6 +337,19 @@ function groupColorOf(item: MenuItem): string | undefined {
   white-space: nowrap;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.chat-tab-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: var(--p-text-color);
+  background: var(--p-content-background);
+  border: 1px solid var(--accent);
+  border-radius: var(--p-border-radius-sm);
+  padding: 0 0.25rem;
+  margin: 0;
+  outline: none;
 }
 
 .chat-tab-action {

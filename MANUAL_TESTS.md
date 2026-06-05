@@ -78,7 +78,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SN.1 - Rename and auto-title update the tab AND sidebar together
 
-- [x] result: ✅ PASS (2026-06-04 live + E2E flow 28; `/rename` UI confirmed 2026-06-05): a real `setSessionName` updates the dockview tab AND the Sessions sidebar from the one owner, and `/rename` drives it correctly in the real app.
+- [x] result: ✅ PASS (2026-06-04 live + E2E flow 28; inline `/rename` confirmed 2026-06-05): a real `setSessionName` updates the dockview tab AND the Sessions sidebar from the one owner, and inline `/rename` drives it correctly in the real app.
 - **Steps:** Run `bun run dev`. Open a session with the Sessions sidebar visible. Send a first prompt so the model auto-titles it, then `/rename` it to something else.
 - **Expected:** On both the auto-title and the manual rename, the dockview tab label and the sidebar row update to the same new title immediately, with no Refresh and no stale label on either surface.
 - **Why not automated:** Cross-surface reactive propagation through the real dockview tab + edge-panel sidebar in the live WebView; unit tests cover the selector resolution but not the live two-surface render.
@@ -94,21 +94,21 @@ section is verified) or get a GitHub issue filed (with label
 
 #### RP.1 - `/rename` opens a focused rename dialog and saves.
 
-- [x] result: ✅ PASS — confirmed in the real `bun run dev` app on current main (2026-06-05): `/rename` opens the focused Rename dialog, Save persists the trimmed name, Escape cancels. (An earlier "FAIL" was a STALE June-1 instance kept alive by the single-instance lock — re-tested on a clean boot. #166 was a chromium-harness artifact: the e2e WS-bridge harness doesn't mount the dockview header-actions slot the real WebView2 does. Closed.)
-- **Steps:** Run `bun run dev`; open a session, type `/rename` in the composer, enter a new name, press **Enter** or click **Save**, then repeat and press **Escape** to cancel.
-- **Expected:** The Rename session dialog appears once, the input is focused/selected, Save persists the trimmed name, and Escape/cancel closes without changing the current name.
-- **Why not automated:** Unit coverage verifies the bus listener and save RPC, but live WebView focus, dialog stacking, and Escape behavior need the real PrimeVue/Dialog runtime.
+- [x] result: ✅ PASS — real regression, fixed and verified live (HMR) 2026-06-05. Rename had been dead since #144: the `rename-session` listener + modal were gated to `area='all'`, whose only host (`ChatTabActions`, dockview's right-header slot) was removed in `8216dc7` when controls moved to the composer toolbar — so `/rename` silently no-opped in every real build. Replaced the blocking modal with **inline rename-in-place on the session tab** (`ChatTab`), and `/rename <title>` now sets the name directly with no UI. (My earlier "chromium-harness artifact" call was wrong; #166 reopened and fixed by PR.)
+- **Steps:** Run the app; open a session. (a) Type `/rename A New Name` in the composer → the tab title changes directly, no popup. (b) Type bare `/rename` → the tab title becomes an inline input; type, press **Enter** to save, repeat and press **Escape** to cancel, and try clicking away to commit.
+- **Expected:** `/rename <title>` renames with no UI. Bare `/rename` swaps the tab title for an inline, non-blocking input (no modal); Enter commits the trimmed name, Escape reverts, blur commits.
+- **Why not automated:** Unit tests cover the inline editor (`ChatTab.rename.test.ts`) and the command arg/bus split (`sessionCommands.test.ts`); live dogfood confirms tab-input focus, Enter/Escape, and blur-commit in the real WebView.
 
 #### RP.2 - Session tab titles update after auto-title and manual rename.
 
-- [x] result: ✅ PASS (2026-06-04) — E2E flow 28 + live: the tab repaints short-GUID → new title on a real rename, no tab reopen. (The `/rename` trigger itself is blocked by #166; the auto-title / store path works.)
+- [x] result: ✅ PASS (2026-06-04) — E2E flow 28 + live: the tab repaints short-GUID → new title on a real rename, no tab reopen. Manual `/rename` now drives this inline as of 2026-06-05.
 - **Steps:** In `bun run dev`, create a session, send a first prompt that causes an auto-title, then rename it again from Session Details or `/rename`.
 - **Expected:** The dockview session tab changes from the short GUID to the generated title, then to the manual title, without reopening the tab or switching groups.
 - **Why not automated:** Store tests cover the inner dockview API call; live dogfood confirms dockview tab repaint/active-group behavior in the real nested layout.
 
 #### RP.3 - Sidebar session list updates on create and rename.
 
-- [x] result: ✅ PASS (2026-06-04) — E2E flow 28 + live: the sidebar row derives the new title with no Refresh. (`/rename` trigger blocked by #166.)
+- [x] result: ✅ PASS (2026-06-04) — E2E flow 28 + live: the sidebar row derives the new title with no Refresh. `/rename` now triggers inline rename as of 2026-06-05.
 - **Steps:** Keep the Sessions sidebar open. Create a new session from the sidebar, rename it with `/rename`, then rename it from Session Details.
 - **Expected:** The new row appears immediately and its label changes after each rename without pressing Refresh.
 - **Why not automated:** Store tests cover the catalog upsert, but the live sidebar needs WebView rendering, grouping, and relative-time ordering verification.

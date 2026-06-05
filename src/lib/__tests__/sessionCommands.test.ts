@@ -5,6 +5,58 @@ import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import { on as busOn } from '@/lib/bus';
 
+function pushS1(): void {
+  useSessionsStore().sessions.push({
+    id: 's1',
+    accent: '#000',
+    events: [],
+    droppedEventCount: 0,
+    model: null,
+    reasoningEffort: null,
+    mode: null,
+    approveAll: true,
+    title: null,
+    reasoningVisibilityOverride: 'default',
+    workingDirectory: 'C:\\repo\\dafman',
+    defaultSendMode: 'steer',
+    pendingRequests: [],
+    unseenTurns: 0,
+    isThinking: false,
+    sawTurnBoundary: false,
+    currentAgent: null,
+    tasksRefreshCounter: 0,
+    planRefreshCounter: 0,
+    touchedFiles: [],
+    commandsRun: 0,
+    isDeleted: false,
+    deletedAt: null,
+    _toastedOauthRequests: new Set<string>(),
+    _toastedNeedsAuth: new Set<string>(),
+    _artifactToolCallIds: new Set<string>(),
+  });
+}
+
+function recordingBridge(calls: Array<{ name: string; args: unknown }>): RpcBridge {
+  return {
+    async request(name, args) {
+      calls.push({ name, args });
+      return undefined;
+    },
+    onSessionEvent() {
+      return () => {};
+    },
+    onPendingRequest() {
+      return () => {};
+    },
+    onLogEvent() {
+      return () => {};
+    },
+    onAuditEvent() {
+      return () => {};
+    },
+  } as RpcBridge;
+}
+
 describe('sessionCommands', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -38,8 +90,8 @@ describe('sessionCommands', () => {
       planRefreshCounter: 0,
       touchedFiles: [],
       commandsRun: 0,
-    isDeleted: false,
-    deletedAt: null,
+      isDeleted: false,
+      deletedAt: null,
       _toastedOauthRequests: new Set<string>(),
       _toastedNeedsAuth: new Set<string>(),
       _artifactToolCallIds: new Set<string>(),
@@ -100,8 +152,8 @@ describe('sessionCommands', () => {
       planRefreshCounter: 0,
       touchedFiles: [],
       commandsRun: 0,
-    isDeleted: false,
-    deletedAt: null,
+      isDeleted: false,
+      deletedAt: null,
       _toastedOauthRequests: new Set<string>(),
       _toastedNeedsAuth: new Set<string>(),
       _artifactToolCallIds: new Set<string>(),
@@ -173,8 +225,8 @@ describe('sessionCommands', () => {
       planRefreshCounter: 0,
       touchedFiles: [],
       commandsRun: 0,
-    isDeleted: false,
-    deletedAt: null,
+      isDeleted: false,
+      deletedAt: null,
       _toastedOauthRequests: new Set<string>(),
       _toastedNeedsAuth: new Set<string>(),
       _artifactToolCallIds: new Set<string>(),
@@ -251,8 +303,8 @@ describe('sessionCommands', () => {
       planRefreshCounter: 0,
       touchedFiles: [],
       commandsRun: 0,
-    isDeleted: false,
-    deletedAt: null,
+      isDeleted: false,
+      deletedAt: null,
       _toastedOauthRequests: new Set<string>(),
       _toastedNeedsAuth: new Set<string>(),
       _artifactToolCallIds: new Set<string>(),
@@ -321,5 +373,41 @@ describe('sessionCommands', () => {
     expect(await runLocalSlashCommand('s1', '/agent broken')).toBe(true);
     expect(calls.some((c) => c.name === 'selectAgent')).toBe(false);
     expect(calls.some((c) => c.name === 'listAgentFiles')).toBe(true);
+  });
+
+  test('/rename <title> sets the name directly via RPC, no inline editor', async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    setRpcBridge(recordingBridge(calls));
+    pushS1();
+
+    let busHits = 0;
+    const off = busOn('rename-session', () => {
+      busHits++;
+    });
+    const handled = await runLocalSlashCommand('s1', '/rename  My title ');
+    off();
+
+    expect(handled).toBe(true);
+    expect(calls).toEqual([
+      { name: 'setSessionName', args: { sessionId: 's1', name: 'My title' } },
+    ]);
+    expect(busHits).toBe(0);
+  });
+
+  test('bare /rename emits rename-session to start the inline editor, no RPC', async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    setRpcBridge(recordingBridge(calls));
+    pushS1();
+
+    const events: Array<{ sessionId: string }> = [];
+    const off = busOn('rename-session', (e) => {
+      events.push(e);
+    });
+    const handled = await runLocalSlashCommand('s1', '/rename');
+    off();
+
+    expect(handled).toBe(true);
+    expect(events).toEqual([{ sessionId: 's1' }]);
+    expect(calls.find((c) => c.name === 'setSessionName')).toBeUndefined();
   });
 });
