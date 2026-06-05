@@ -62,6 +62,22 @@ bun install
 bun run dev          # or `bun run dev:hmr` for frontend HMR
 ```
 
+### Syntax-aware merge drivers (recommended, one-time)
+
+The repo's `.gitattributes` routes code + `.vue` files through the
+[`weave`](https://github.com/Ataraxy-Labs/weave) entity-level merge driver
+(and the Markdown logs through git's built-in `union` driver) so concurrent
+PRs stop false-conflicting. To activate `weave` on your machine:
+
+```pwsh
+brew install weave       # or a prebuilt release (incl. Windows) — see the repo
+bun run setup:merge      # registers the driver in your GLOBAL git config
+```
+
+It's optional and safe to skip — without it git just uses its normal text
+merge (the attribute falls back). It runs locally only; GitHub's
+server-side merges are unaffected.
+
 ## Build / test / lint
 
 | Want to… | Run |

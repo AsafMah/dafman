@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "setup:merge": "bun run tools/setup-merge-drivers.ts",
     "dev": "electrobun dev --watch",
     "predev": "bun run prep:dist",
     "dev:hmr": "bun run prep:dist && concurrently \"bun run hmr\" \"bun run dev\"",
@@ -23,13 +24,14 @@
     "lint": "vue-tsc --noEmit",
     "lint:bun": "bun run tools/check-bun-entry.ts",
     "lint:markers": "bun run tools/check-conflict-markers.ts",
+    "lint:sizes": "bun run tools/check-file-sizes.ts",
     "lint:tsc-bun": "tsc -p tsconfig.bun.json --noEmit",
     "lint:eslint": "eslint --no-error-on-unmatched-pattern 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "format": "prettier --write 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.{ts,vue}' 'src-bun/**/*.ts'",
     "inspect": "node --experimental-strip-types --no-warnings tools/inspect.ts",
     "pr:review": "bun run tools/pr-review.ts",
-    "check": "bun run lint:markers && bun run lint && bun run lint:bun && bun run lint:tsc-bun && bun run lint:eslint && bun run test && bun run build && bun run smoke:run"
+    "check": "bun run lint:markers && bun run lint:sizes && bun run lint && bun run lint:bun && bun run lint:tsc-bun && bun run lint:eslint && bun run test && bun run build && bun run smoke:run"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -107,7 +109,7 @@
     "@types/prismjs": "^1.26.6",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vue/compiler-sfc": "3.5.35",
-    "concurrently": "9.2.1",
+    "concurrently": "10.0.3",
     "eslint": "^10.4.0",
     "eslint-plugin-vue": "^10.9.1",
     "globals": "^17.6.0",

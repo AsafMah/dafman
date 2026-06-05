@@ -6,10 +6,29 @@
 // events.
 
 import type { SessionEventPayload } from '@/ipc/types';
-import { useLayoutStore } from '@/stores/shell/layoutStore';
-import { useNotificationsStore } from '@/stores/app/notificationsStore';
-import { useToastStore } from '@/stores/app/toastStore';
 import type { PendingRecordRequest, SessionRecord } from './sessionsStore';
+
+/// A side-effect for the single effects consumer (`sessionEffects.ts`) to
+/// run. The reducer stays pure — it mutates the `SessionRecord` (the state
+/// transition) and *returns* these instead of touching the toast /
+/// notification stores itself (#157).
+export type SessionEffect =
+  | { kind: 'toast'; severity: 'info' | 'success' | 'warn' | 'error'; title: string; body: string }
+  | {
+      kind: 'notify';
+      notifyKind: 'turnEnd' | 'waitingForInput';
+      sessionId: string;
+      title: string;
+      body: string;
+      tag: string;
+    };
+
+/// What the reducer needs to know about the rest of the app without
+/// importing its stores. Supplied by the caller per event.
+export interface ReduceContext {
+  /// The dockview panel the user is currently focused on, if any.
+  activeSessionId: string | null;
+}
 
 /// Per-session live-events cap. Every push above this trims the
 /// FRONT of `record.events` and bumps `record.droppedEventCount` by
@@ -37,23 +56,6 @@ export function appendEvent(record: SessionRecord, payload: SessionEventPayload)
     record.events.splice(0, overflow);
     record.droppedEventCount += overflow;
   }
-}
-
-/// True when the user can't see this session right now — either
-/// because their dockview focus is elsewhere, OR because the app
-/// window is hidden / blurred. The OS-notification call sites
-/// gate on this so notifications never fire for the session the
-/// user is actively watching.
-export function shouldFireForRecord(record: SessionRecord): boolean {
-  const layoutStore = useLayoutStore();
-
-  if (layoutStore.activeSessionId !== record.id) return true;
-
-  if (typeof document !== 'undefined' && document.hidden) return true;
-
-  if (typeof document !== 'undefined' && !document.hasFocus()) return true;
-
-  return false;
 }
 
 const SHELL_TOOL_NAMES = new Set(['shell', 'bash', 'exec', 'execute']);
@@ -119,7 +121,12 @@ function trackSessionArtifact(record: SessionRecord, payload: SessionEventPayloa
 // The dispatch table at the bottom maps event types to handlers,
 // replacing the original CC-60 if/else chain with O(1) lookup.
 
-type EventHandler = (record: SessionRecord, payload: SessionEventPayload) => void;
+type EventHandler = (
+  record: SessionRecord,
+  payload: SessionEventPayload,
+  ctx: ReduceContext,
+  effects: SessionEffect[],
+) => void;
 
 // Keep model + reasoning effort in sync with backend-initiated
 // changes (rate-limit auto-switch, /model commands, etc.).
@@ -210,7 +217,12 @@ function handlePlanChanged(record: SessionRecord): void {
 
 // MCP OAuth lifecycle toasts — nudge the user on `_required`,
 // confirm on `_completed`, de-dup by requestId.
-function handleOauthRequired(record: SessionRecord, payload: SessionEventPayload): void {
+function handleOauthRequired(
+  record: SessionRecord,
+  payload: SessionEventPayload,
+  _ctx: ReduceContext,
+  effects: SessionEffect[],
+): void {
   const d = (payload.data ?? {}) as {
     serverName?: unknown;
     requestId?: unknown;
@@ -218,27 +230,39 @@ function handleOauthRequired(record: SessionRecord, payload: SessionEventPayload
 
   if (typeof d.serverName !== 'string') return;
 
-  const toasts = useToastStore();
   const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
 
-  if (!key || !record._toastedOauthRequests.has(key)) {
-    if (key) record._toastedOauthRequests.add(key);
+  if (key && record._toastedOauthRequests.has(key)) return;
 
-    toasts.info(
-      'MCP server needs sign-in',
-      `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
-    );
-  }
+  if (key) record._toastedOauthRequests.add(key);
+
+  effects.push({
+    kind: 'toast',
+    severity: 'info',
+    title: 'MCP server needs sign-in',
+    body: `${d.serverName}: open the Library panel and click the auth link to complete OAuth.`,
+  });
 }
 
-function handleOauthCompleted(record: SessionRecord, payload: SessionEventPayload): void {
+function handleOauthCompleted(
+  record: SessionRecord,
+  payload: SessionEventPayload,
+  _ctx: ReduceContext,
+  effects: SessionEffect[],
+): void {
   const d = (payload.data ?? {}) as { requestId?: unknown };
   const key = typeof d.requestId === 'string' ? `${record.id}:oauth:${d.requestId}` : null;
 
-  if (key && record._toastedOauthRequests.has(key)) {
-    record._toastedOauthRequests.delete(key);
-    useToastStore().success('MCP signed in', 'Connection established');
-  }
+  if (!key || !record._toastedOauthRequests.has(key)) return;
+
+  record._toastedOauthRequests.delete(key);
+
+  effects.push({
+    kind: 'toast',
+    severity: 'success',
+    title: 'MCP signed in',
+    body: 'Connection established',
+  });
 }
 
 // #69: agent-driven OAuth nudge. We deliberately do NOT call
@@ -253,7 +277,12 @@ function handleOauthCompleted(record: SessionRecord, payload: SessionEventPayloa
 // `session.mcp_server_status_changed`. We toast a sign-in prompt (the user
 // completes it via the Library Sign-in button, which drives `mcp.oauth.login`
 // → system browser) and confirm once the server reconnects.
-function handleMcpServerStatusChanged(record: SessionRecord, payload: SessionEventPayload): void {
+function handleMcpServerStatusChanged(
+  record: SessionRecord,
+  payload: SessionEventPayload,
+  _ctx: ReduceContext,
+  effects: SessionEffect[],
+): void {
   const d = (payload.data ?? {}) as { serverName?: unknown; status?: unknown };
 
   if (typeof d.serverName !== 'string') return;
@@ -265,10 +294,13 @@ function handleMcpServerStatusChanged(record: SessionRecord, payload: SessionEve
     if (record._toastedNeedsAuth.has(name)) return;
 
     record._toastedNeedsAuth.add(name);
-    useToastStore().warn(
-      'MCP server needs sign-in',
-      `${name} requires authorization. Open the Library panel and click Sign-in to authenticate.`,
-    );
+
+    effects.push({
+      kind: 'toast',
+      severity: 'warn',
+      title: 'MCP server needs sign-in',
+      body: `${name} requires authorization. Open the Library panel and click Sign-in to authenticate.`,
+    });
 
     return;
   }
@@ -277,7 +309,12 @@ function handleMcpServerStatusChanged(record: SessionRecord, payload: SessionEve
   // re-auth re-prompts; a transition straight to `connected` after we
   // prompted confirms the recovery.
   if (record._toastedNeedsAuth.delete(name) && status === 'connected') {
-    useToastStore().success('MCP signed in', `${name} connection established`);
+    effects.push({
+      kind: 'toast',
+      severity: 'success',
+      title: 'MCP signed in',
+      body: `${name} connection established`,
+    });
   }
 }
 
@@ -299,24 +336,26 @@ function handleTurnStart(record: SessionRecord): void {
 
 // Turn end: clear thinking, fire unseen-activity dot + OS notification
 // when the session isn't the dock's active panel.
-function handleTurnEnd(record: SessionRecord): void {
+function handleTurnEnd(
+  record: SessionRecord,
+  _payload: SessionEventPayload,
+  ctx: ReduceContext,
+  effects: SessionEffect[],
+): void {
   record.isThinking = false;
 
-  const layoutStore = useLayoutStore();
-
-  if (layoutStore.activeSessionId === record.id) return;
+  if (ctx.activeSessionId === record.id) return;
 
   record.unseenTurns += 1;
 
-  if (shouldFireForRecord(record)) {
-    useNotificationsStore().notify({
-      kind: 'turnEnd',
-      title: record.title ?? `Session ${record.id.slice(0, 8)}`,
-      body: 'Turn complete.',
-      sessionId: record.id,
-      tag: `${record.id}:turnEnd`,
-    });
-  }
+  effects.push({
+    kind: 'notify',
+    notifyKind: 'turnEnd',
+    sessionId: record.id,
+    title: record.title ?? `Session ${record.id.slice(0, 8)}`,
+    body: 'Turn complete.',
+    tag: `${record.id}:turnEnd`,
+  });
 }
 
 function handleThinkingOff(record: SessionRecord): void {
@@ -388,7 +427,11 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
 /// Main event reducer. Dispatches a single SessionEventPayload to
 /// the appropriate SessionRecord fields. Called from the store's
 /// `handleEvent` and from `drainPending` during session create/resume.
-export function applyToRecord(record: SessionRecord, payload: SessionEventPayload): void {
+export function applyToRecord(
+  record: SessionRecord,
+  payload: SessionEventPayload,
+  ctx: ReduceContext,
+): SessionEffect[] {
   appendEvent(record, payload);
 
   if (import.meta.env.DEV) {
@@ -397,9 +440,9 @@ export function applyToRecord(record: SessionRecord, payload: SessionEventPayloa
 
   trackSessionArtifact(record, payload);
 
-  const handler = EVENT_HANDLERS[payload.eventType];
+  const effects: SessionEffect[] = [];
 
-  if (handler) {
-    handler(record, payload);
-  }
+  EVENT_HANDLERS[payload.eventType]?.(record, payload, ctx, effects);
+
+  return effects;
 }

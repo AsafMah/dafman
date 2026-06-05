@@ -25,12 +25,12 @@ import type {
 } from '@/ipc/types';
 import { accentForIndex } from '@/lib/color';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
-import { useNotificationsStore } from '@/stores/app/notificationsStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { toErrorMessage } from '@/lib/errorMessage';
-import { appendEvent, applyToRecord, shouldFireForRecord } from './sessionReducer';
+import { appendEvent, applyToRecord } from './sessionReducer';
+import { runSessionEffects } from './sessionEffects';
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -284,6 +284,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     record.isThinking = false;
     record.sawTurnBoundary = true;
   }
+
   const isCreating = ref(false);
   let creationCount = 0;
 
@@ -310,13 +311,9 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     if (record.isDeleted) return;
 
-    const previousTitle = record.title;
-
-    applyToRecord(record, payload);
-
-    if (payload.eventType === 'session.title_changed' && record.title !== previousTitle) {
-      syncSidebarCatalog(record);
-    }
+    runSessionEffects(
+      applyToRecord(record, payload, { activeSessionId: useLayoutStore().activeSessionId }),
+    );
   }
 
   /// Bun-side `pendingRequest` push handler. Appends to the matching
@@ -410,17 +407,16 @@ export const useSessionsStore = defineStore('sessions', () => {
       data: payload,
     });
 
-    if (shouldFireForRecord(record)) {
-      const notifications = useNotificationsStore();
-
-      notifications.notify({
-        kind: 'waitingForInput',
+    runSessionEffects([
+      {
+        kind: 'notify',
+        notifyKind: 'waitingForInput',
+        sessionId: record.id,
         title: record.title ?? `Session ${record.id.slice(0, 8)}`,
         body: entry.message,
-        sessionId: record.id,
         tag: `${record.id}:pendingRequest:${entry.requestId}`,
-      });
-    }
+      },
+    ]);
   }
 
   function drainPending(sessionId: string, record: SessionRecord): number {
@@ -429,7 +425,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     if (list) {
       pendingEvents.delete(sessionId);
 
-      for (const event of list) applyToRecord(record, event);
+      const ctx = { activeSessionId: useLayoutStore().activeSessionId };
+
+      for (const event of list) runSessionEffects(applyToRecord(record, event, ctx));
     }
 
     const pendingList = pendingRequestBuffer.get(sessionId);
@@ -1117,7 +1115,6 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       if (record) {
         record.title = trimmed;
-        syncSidebarCatalog(record);
       }
     } catch (err) {
       const message = toErrorMessage(err);

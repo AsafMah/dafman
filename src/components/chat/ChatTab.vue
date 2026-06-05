@@ -11,6 +11,7 @@ import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useGroupsActions } from '@/composables/useGroupsActions';
 import { indicatorStyle } from '@/lib/notificationStyles';
 import { usePanelLifecycle } from '@/composables/usePanelLifecycle';
+import { useSessionSelectors } from '@/stores/chat/sessionSelectors';
 
 type UserParams = { sessionId?: string };
 type WrappedParams = {
@@ -24,14 +25,7 @@ const props = defineProps<{
   api?: import('dockview-core').DockviewPanelApi;
 }>();
 
-const {
-  panelApi,
-  title,
-  isActive,
-  maximized,
-  close: onClose,
-  toggleMaximized,
-} = usePanelLifecycle(props);
+const { panelApi, isActive, maximized, close: onClose, toggleMaximized } = usePanelLifecycle(props);
 
 const sessionsStore = useSessionsStore();
 const groupsStore = useGroupsStore();
@@ -47,14 +41,12 @@ const record = computed(() => sessionsStore.getSession(sessionId.value));
 
 const accent = computed(() => record.value?.accent ?? 'var(--p-primary-color)');
 
+const { displayTitle: resolveTitle } = useSessionSelectors();
+
 const displayTitle = computed(() => {
-  if (record.value?.isDeleted) {
-    return `${record.value.title ?? sessionId.value.slice(0, 8)} (deleted)`;
-  }
+  const base = resolveTitle(sessionId.value);
 
-  if (title.value) return title.value;
-
-  return record.value?.title ?? sessionId.value.slice(0, 8);
+  return record.value?.isDeleted ? `${base} (deleted)` : base;
 });
 
 /// Status indicator for this session. Maps the record's

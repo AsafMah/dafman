@@ -3,6 +3,46 @@
 # `core.autocrlf=true` checkout-converts-to-CRLF trap on Windows.
 * text=auto eol=lf
 
+# Append-only logs: every PR adds entries at the TOP, so concurrent PRs
+# collide on the same lines and the second-to-merge has to hand-resolve a
+# semantically-empty conflict (the entries never truly conflict — they just
+# both want the top). The built-in `union` merge driver auto-resolves by
+# keeping BOTH sides' added lines instead of emitting conflict markers.
+# GitHub honors it server-side (built-in driver, no config needed). After a
+# busy merge train, eyeball chronology once; it never *blocks* a merge.
+CHANGELOG.md            merge=union
+DEVLOG.md               merge=union
+STATUS.md               merge=union
+MANUAL_TESTS.md         merge=union
+MANUAL_TESTS_archive.md merge=union
+plans/DONE.md           merge=union
+
+# Syntax-aware merging for code: route the repo's languages through the
+# `weave` entity-level (tree-sitter) merge driver so independent edits to
+# the same file (two PRs adding different functions / object keys / array
+# items / `.vue` blocks) auto-resolve instead of false-conflicting — the
+# class that bit the first merge train. Unlike mergiraf, weave parses
+# `.vue` (the repo's biggest files). Requires the driver registered in git
+# config (one-time: `bun run setup:merge`) + the `weave`/`weave-driver`
+# binaries; a clone without them falls back to git's normal text merge, so
+# committing these mappings is safe. LOCAL only — GitHub's server-side
+# merge uses text (hence `union` above for the markdown logs).
+*.ts    merge=weave
+*.mts   merge=weave
+*.cts   merge=weave
+*.tsx   merge=weave
+*.js    merge=weave
+*.mjs   merge=weave
+*.cjs   merge=weave
+*.vue   merge=weave
+*.json  merge=weave
+*.yml   merge=weave
+*.yaml  merge=weave
+*.toml  merge=weave
+*.html  merge=weave
+*.xml   merge=weave
+*.css   merge=weave
+
 # Lockfiles must not be touched by line-ending normalization — bun's
 # install consistency check is sensitive to byte-exact content. Mark
 # binary so git ships the bytes through unchanged.

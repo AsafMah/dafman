@@ -91,8 +91,8 @@ export interface RpcBridge {
   request<N extends CommandName>(name: N, args: CommandMap[N]['args']): Promise<InvokeResult<N>>;
   onSessionEvent(listener: SessionEventListener): () => void;
   onPendingRequest(listener: PendingRequestListener): () => void;
-  onLogEvent(listener: LogEventListener): () => void;
-  onAuditEvent(listener: AuditEventListener): () => void;
+  onLogEvent?(listener: LogEventListener): () => void;
+  onAuditEvent?(listener: AuditEventListener): () => void;
   onTerminalEvent?(listener: TerminalEventListener): () => void;
   onCommandResultEvent?(listener: CommandResultEventListener): () => void;
 }
@@ -138,8 +138,8 @@ const sessionChannel = createDeferredChannel<SessionEventListener>((b, l) => b.o
 const pendingRequestChannel = createDeferredChannel<PendingRequestListener>((b, l) =>
   b.onPendingRequest(l),
 );
-const logChannel = createDeferredChannel<LogEventListener>((b, l) => b.onLogEvent(l));
-const auditChannel = createDeferredChannel<AuditEventListener>((b, l) => b.onAuditEvent(l));
+const logChannel = createDeferredChannel<LogEventListener>((b, l) => b.onLogEvent?.(l));
+const auditChannel = createDeferredChannel<AuditEventListener>((b, l) => b.onAuditEvent?.(l));
 const terminalChannel = createDeferredChannel<TerminalEventListener>((b, l) =>
   b.onTerminalEvent?.(l),
 );

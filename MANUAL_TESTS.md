@@ -70,25 +70,45 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### Issue #149 — session title derives from one owner (2026-06-04)
+
+> Refactor: tab + sidebar now derive the title from the `SessionRecord`
+> via a selector instead of pushed copies. Confirm no propagation regressed
+> and restore re-derives cleanly. (RP.1–RP.3 still apply for the rename UI.)
+
+#### SN.1 - Rename and auto-title update the tab AND sidebar together
+
+- [x] result: ✅ PASS (2026-06-04) — propagation verified live + E2E flow 28: a real `setSessionName` updates the dockview tab AND the Sessions sidebar from the one owner. NOTE: the `/rename` dialog itself does not open in the current layout (filed #166); the store action + auto-title both propagate correctly.
+- **Steps:** Run `bun run dev`. Open a session with the Sessions sidebar visible. Send a first prompt so the model auto-titles it, then `/rename` it to something else.
+- **Expected:** On both the auto-title and the manual rename, the dockview tab label and the sidebar row update to the same new title immediately, with no Refresh and no stale label on either surface.
+- **Why not automated:** Cross-surface reactive propagation through the real dockview tab + edge-panel sidebar in the live WebView; unit tests cover the selector resolution but not the live two-surface render.
+
+#### SN.2 - Restored layout re-derives titles (no stale persisted title)
+
+- [ ] result: ⏳ not yet dogfooded — the restart→restore re-derive path still needs a manual pass.
+- **Steps:** With one or more auto-titled/renamed sessions open, fully restart the app so the layout restores from disk.
+- **Expected:** Each restored tab and sidebar row shows the correct current title once the session record hydrates (brief short-GUID flash during hydration is fine); no permanently stale title from the old persisted dockview title.
+- **Why not automated:** Requires a real persist→restart→restore cycle and record hydration timing the smoke harness doesn't model.
+
 ### Issues #131/#133/#134 — session rename propagation (2026-06-02)
 
 #### RP.1 - `/rename` opens a focused rename dialog and saves.
 
-- [ ] result:
+- [ ] result: ❌ FAIL (2026-06-04) — `/rename` opens no dialog in the autosession layout (the `area='all'` SessionHeaderControls host isn't mounted). Filed #166; please confirm in the real `bun run dev` app.
 - **Steps:** Run `bun run dev`; open a session, type `/rename` in the composer, enter a new name, press **Enter** or click **Save**, then repeat and press **Escape** to cancel.
 - **Expected:** The Rename session dialog appears once, the input is focused/selected, Save persists the trimmed name, and Escape/cancel closes without changing the current name.
 - **Why not automated:** Unit coverage verifies the bus listener and save RPC, but live WebView focus, dialog stacking, and Escape behavior need the real PrimeVue/Dialog runtime.
 
 #### RP.2 - Session tab titles update after auto-title and manual rename.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-04) — E2E flow 28 + live: the tab repaints short-GUID → new title on a real rename, no tab reopen. (The `/rename` trigger itself is blocked by #166; the auto-title / store path works.)
 - **Steps:** In `bun run dev`, create a session, send a first prompt that causes an auto-title, then rename it again from Session Details or `/rename`.
 - **Expected:** The dockview session tab changes from the short GUID to the generated title, then to the manual title, without reopening the tab or switching groups.
 - **Why not automated:** Store tests cover the inner dockview API call; live dogfood confirms dockview tab repaint/active-group behavior in the real nested layout.
 
 #### RP.3 - Sidebar session list updates on create and rename.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-04) — E2E flow 28 + live: the sidebar row derives the new title with no Refresh. (`/rename` trigger blocked by #166.)
 - **Steps:** Keep the Sessions sidebar open. Create a new session from the sidebar, rename it with `/rename`, then rename it from Session Details.
 - **Expected:** The new row appears immediately and its label changes after each rename without pressing Refresh.
 - **Why not automated:** Store tests cover the catalog upsert, but the live sidebar needs WebView rendering, grouping, and relative-time ordering verification.
@@ -97,7 +117,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### DSP.1 - Deleting an open session makes its panel read-only
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-04) — verified live + E2E flow 27: deleting the open session from SessionsManager gives the read-only banner, disabled composer, and "(deleted)" tab, full RPC round-trip.
 - **Steps:** Run `bun run dev`; open a saved session from the Sessions Manager so its chat panel/tab is visible. In the Sessions Manager, permanently delete that same session and accept the confirmation. Try typing/sending in the still-open panel, and inspect the tab label/icon.
 - **Expected:** The panel remains open but clearly says the session was deleted, the composer is disabled/read-only, no new message is accepted or sent, and the tab indicates the deleted state.
 - **Why not automated:** Requires the real Sessions Manager confirmation flow, dockview tab rendering, and Lexical disabled/editability behavior inside the live Electrobun WebView.
@@ -106,7 +126,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### TF.1 - @ and / popups flip or shift instead of clipping
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-04) — verified live + E2E flow 26: the `@` picker stays fully on-screen in a 430px-tall window (no top/bottom clip); `/` menu also bounded.
 - **Steps:** Run `bun run dev`. In a normal bottom-docked composer, type `/` and `@` and confirm both menus open above the caret. Then make the window short or otherwise place the composer/caret high in the viewport and repeat `/` and `@`.
 - **Expected:** The menus stay fully on-screen in both layouts. When there is not enough room above the caret they flip below; near side edges they shift horizontally rather than clipping.
 - **Why not automated:** Requires real WebView caret geometry, viewport clipping, and visual confirmation of flip/shift placement that happy-dom cannot model.
