@@ -7,9 +7,7 @@
 // remain on `SessionRegistry` because they need entries Map lookup.
 
 import type { CopilotClient } from '../client/copilotSdk';
-import { tryGetClient } from '../client/client';
-import { AppError } from '../shared/errors';
-import { toErrorMessage } from '../shared/errorMessage';
+import { tryGetClient, withSdkClient } from '../client/client';
 
 export interface DiscoveredSkill {
   name: string;
@@ -31,16 +29,8 @@ export class SkillsRegistry {
   /// Centralizes SDK error-wrapping. Mirrors `McpRegistry.withClient`
   /// — `ClientNotStarted` escapes unwrapped so the renderer's error
   /// UX stays predictable; everything else becomes `AppError.sdk`.
-  private async withClient<T>(fn: (client: CopilotClient) => Promise<T>): Promise<T> {
-    const client = this.getClient();
-
-    try {
-      return await fn(client);
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-
-      throw AppError.sdk(toErrorMessage(err));
-    }
+  private withClient<T>(fn: (client: CopilotClient) => Promise<T>): Promise<T> {
+    return withSdkClient(this.getClient, fn);
   }
 
   /// Workspace skill discovery — walks

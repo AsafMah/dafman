@@ -115,6 +115,26 @@ export function tryGetClient(): CopilotClient {
   return instance;
 }
 
+/// Resolve the SDK client and run `fn`, letting `ClientNotStarted` (and
+/// any other `AppError`) escape unwrapped while wrapping everything else as
+/// `AppError.sdk` — so the renderer's error UX stays predictable. Shared by
+/// the singleton registries (`McpRegistry`, `SkillsRegistry`), which inject
+/// `getClient` for test fakes.
+export async function withSdkClient<T>(
+  getClient: () => CopilotClient,
+  fn: (client: CopilotClient) => Promise<T>,
+): Promise<T> {
+  const client = getClient();
+
+  try {
+    return await fn(client);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+
+    throw AppError.sdk(toErrorMessage(err));
+  }
+}
+
 export async function shutdownClient(): Promise<void> {
   if (!instance) return;
 
