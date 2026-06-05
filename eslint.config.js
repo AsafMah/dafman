@@ -187,6 +187,32 @@ export default tseslint.config(
     },
   },
 
+  // ── Single-owner guard: session liveness/tombstone (#149/#151) ──
+  //
+  // A session's deleted/unseen state lives on the SessionRecord, owned by
+  // sessionsStore (+ its reducer). Writing these fields anywhere else
+  // re-introduces the parallel-state drift #149/#146 removed. The three
+  // below are SessionRecord-exclusive — unlike `title`, which the
+  // chatEvents `ambient` object and DOM nodes also carry — so a name-based
+  // ban is false-positive free. `title` itself is guarded structurally:
+  // every surface DERIVES it via the displayTitle selector (#149), pinned
+  // by e2e flow 28.
+  {
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/stores/chat/sessionsStore.ts', 'src/stores/chat/sessionReducer.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "AssignmentExpression[left.type='MemberExpression'][left.property.name=/^(isDeleted|deletedAt|unseenTurns)$/]",
+          message:
+            "A session's deleted/unseen state is owned by sessionsStore — change it through markSessionDeleted / the store actions, not a direct field write (keeps the #149/#146 single-owner invariant).",
+        },
+      ],
+    },
+  },
+
   // ── max-lines-per-function overrides ──────────────────────────
   //
   // Pinia `defineStore` callbacks ARE the whole store body — splitting
