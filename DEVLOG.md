@@ -8,6 +8,37 @@
 > Entries are top-down newest first. One H2 (`## YYYY-MM-DD ...`) per session.
 > Inside each entry, lead with the takeaway, then the receipts.
 
+## 2026-06-05 — dogfood: #166 was a stale-instance false alarm; rename + restore verified
+
+**Takeaway:** before trusting *any* live dogfood result, confirm the running app
+is the *current* build. A `bun run dev` from **2026-06-01** was still alive; its
+single-instance lock **deferred** every new `bun run dev` launch back to the old
+window, so the dogfood (and my earlier harness run) were exercising **June-1
+code**. The newest dev log being `dafman-2026-06-01.log` (no entry for today) +
+`electrobun` PIDs with a 6/1 `StartTime` were the tell. After a clean
+kill-all-electrobun + relaunch (fresh PIDs + a `dafman-2026-06-05.log`), the real
+current build behaved completely differently.
+
+**Findings (all on a verified-fresh build):**
+- **#166 closed — NOT a bug.** `/rename` opens the focused Rename dialog, Save
+  persists, Escape cancels — works in the real WebView2 app. The "opens nothing"
+  was the stale instance. The e2e/full **chromium harness** still can't open it,
+  but that's a harness limit: the WS-bridge/autosession layout doesn't mount
+  dockview's right header-actions slot (`ChatTabActions` → `area='all'`
+  `SessionHeaderControls`) the way real dockview does. Flow `28-rename-propagation`
+  drives `setSessionName` directly for exactly this reason — still valid.
+- **SN.2 PASS** — after a real restart, every restored tab + sidebar row showed
+  the correct title (incl. a just-renamed session); no stale persisted title.
+  Confirms the #149 derive-on-restore path.
+- **#108** — no garbled glyphs seen on the current build. (PR #169 also fixed a
+  real latent surrogate-split in `clampOutput`.) Stays open pending more use.
+- **#112** — still blocked on a concrete sample; nothing to test.
+
+**Process note:** ran this via `skill://manual-tests` (user-driven mode, structured
+`ask_user` forms, recorded inline in `MANUAL_TESTS.md`). The user's "are you sure
+the version up is correct?" is what surfaced the stale instance — worth a hard
+rule: `Get-Process electrobun | Select StartTime` before dogfooding.
+
 ## 2026-06-04 — normalize session title onto one owner (#149)
 
 **Takeaway:** the recurring "rename/title didn't update surface X" bug class
