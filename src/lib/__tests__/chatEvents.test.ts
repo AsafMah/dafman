@@ -6,6 +6,7 @@ import {
   type IdCounter,
 } from '@/lib/chatEvents';
 import type { SessionEventPayload } from '@/ipc/types';
+import { clampOutput } from '@/lib/chatEvents/helpers';
 
 function event(data: Record<string, unknown>): SessionEventPayload {
   return {
@@ -513,6 +514,113 @@ describe('processEvents — reasoning carried on assistant.message', () => {
       expect(second.items[1].text).toBe('v2');
     }
   });
+
+  test('identical reasoning under DIFFERENT messageIds in one turn renders once (#111)', () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm1', content: 'A', reasoningText: 'same thought' },
+          eventId: 'e1',
+        },
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm2', content: 'B', reasoningText: 'same thought' },
+          eventId: 'e2',
+        },
+      ],
+      counter,
+    );
+    const reasonings = result.items.filter((i) => i.kind === 'reasoning');
+    expect(reasonings).toHaveLength(1);
+    const first = reasonings[0];
+    if (first?.kind === 'reasoning') expect(first.text).toBe('same thought');
+    // Both assistant messages still render — only the duplicate reasoning is dropped.
+    expect(result.items.filter((i) => i.kind === 'assistant')).toHaveLength(2);
+  });
+
+  test('identical OPAQUE reasoning repeated under different messageIds renders one placeholder (#111)', () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm1', content: 'A', encryptedContent: 'blob-XYZ' },
+          eventId: 'e1',
+        },
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm2', content: 'B', encryptedContent: 'blob-XYZ' },
+          eventId: 'e2',
+        },
+      ],
+      counter,
+    );
+    expect(result.items.filter((i) => i.kind === 'reasoning')).toHaveLength(1);
+  });
+
+  test('distinct reasoning under different messageIds still renders separately (#111 not over-eager)', () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm1', content: 'A', reasoningText: 'thought one' },
+          eventId: 'e1',
+        },
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm2', content: 'B', reasoningText: 'thought two' },
+          eventId: 'e2',
+        },
+      ],
+      counter,
+    );
+    expect(result.items.filter((i) => i.kind === 'reasoning')).toHaveLength(2);
+  });
+
+  test('identical reasoning in different turns (user message between) is NOT coalesced (#111)', () => {
+    const counter: IdCounter = { next: 1 };
+    const result = processEvents(
+      [],
+      defaultAmbient(),
+      [
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm1', content: 'A', reasoningText: 'recurring' },
+          eventId: 'e1',
+        },
+        {
+          sessionId: 's1',
+          eventType: 'user.message',
+          data: { messageId: 'u1', content: 'next question' },
+          eventId: 'eu',
+        },
+        {
+          sessionId: 's1',
+          eventType: 'assistant.message',
+          data: { messageId: 'm2', content: 'B', reasoningText: 'recurring' },
+          eventId: 'e2',
+        },
+      ],
+      counter,
+    );
+    expect(result.items.filter((i) => i.kind === 'reasoning')).toHaveLength(2);
+  });
 });
 
 describe('processEvents — fork notices', () => {
@@ -819,5 +927,17 @@ describe('processEvents — tool calls', () => {
     if (tool.kind !== 'tool') throw new Error('expected tool item');
     expect(tool.partialOutput.length).toBeLessThan(huge.length);
     expect(tool.partialOutput).toContain('output truncated');
+  });
+
+  test('clampOutput does not split a surrogate pair at the cap boundary (#108)', () => {
+    // A 📷 (U+1F4F7, surrogate pair) straddling the cap: a naive
+    // slice(0, CAP) would keep the lone high surrogate → mojibake.
+    const text = `${'a'.repeat(TOOL_OUTPUT_CAP_BYTES - 1)}📷${'b'.repeat(100)}`;
+    const out = clampOutput(text);
+
+    // encodeURIComponent throws URIError on a lone surrogate — a clean
+    // "no mojibake survived the truncation" assertion.
+    expect(() => encodeURIComponent(out)).not.toThrow();
+    expect(out).toContain('output truncated');
   });
 });

@@ -77,6 +77,11 @@ export type ChatItem =
       /// payload, but we render a placeholder so the user sees that
       /// reasoning DID happen, just privately.
       opaque?: boolean;
+      /// The opaque payload (when `opaque`), retained ONLY so a duplicate
+      /// emit of the SAME encrypted reasoning under a different `messageId`
+      /// in one turn can be coalesced instead of rendering a second
+      /// placeholder (#111). Never rendered.
+      opaqueKey?: string;
     }
   | {
       id: number;

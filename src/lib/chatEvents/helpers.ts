@@ -3,9 +3,17 @@ export const TOOL_OUTPUT_CAP_BYTES = 64 * 1024;
 export function clampOutput(text: string): string {
   if (text.length <= TOOL_OUTPUT_CAP_BYTES) return text;
 
-  const head = text.slice(0, TOOL_OUTPUT_CAP_BYTES);
+  let end = TOOL_OUTPUT_CAP_BYTES;
+  // Don't cut in the middle of a surrogate pair (emoji / astral chars):
+  // a lone high surrogate renders as mojibake (#108). If the last kept
+  // code unit is a high surrogate, drop it into the truncated remainder.
+  const lastUnit = text.charCodeAt(end - 1);
 
-  return `${head}\n... [output truncated: ${text.length - TOOL_OUTPUT_CAP_BYTES} more bytes]`;
+  if (lastUnit >= 0xd800 && lastUnit <= 0xdbff) end -= 1;
+
+  const head = text.slice(0, end);
+
+  return `${head}\n... [output truncated: ${text.length - end} more chars]`;
 }
 
 export function pickString(data: unknown, keys: readonly string[]): string {

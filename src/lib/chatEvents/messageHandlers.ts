@@ -10,7 +10,66 @@
 //   double-bubble the live send.
 
 import { pickString } from '@/lib/chatEvents/helpers';
-import type { Handler } from '@/lib/chatEvents/context';
+import type { Handler, ReducerContext } from '@/lib/chatEvents/context';
+import type { ChatItem } from '@/lib/chatEvents';
+
+/// The most recent reasoning block in the CURRENT turn — searching back
+/// only to the last user message (the turn boundary), so identical
+/// reasoning in *different* turns is never coalesced. An assistant message
+/// in between is fine: the duplicate can be split by one (#111).
+function lastTurnReasoning(
+  items: readonly ChatItem[],
+): (ChatItem & { kind: 'reasoning' }) | undefined {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+
+    if (it.kind === 'user') return undefined;
+
+    if (it.kind === 'reasoning') return it;
+  }
+
+  return undefined;
+}
+
+/// Harvest reasoning carried on an `assistant.message` into a synthetic
+/// reasoning ChatItem, keyed to the messageId and deduped within the turn.
+function harvestReasoning(
+  ctx: ReducerContext,
+  messageId: string,
+  reasoningText: string,
+  reasoningOpaque: string,
+  eventId?: string,
+): void {
+  if (!reasoningText && !reasoningOpaque) return;
+
+  // #111: the same reasoning can arrive twice in one turn under DIFFERENT
+  // messageIds (a tool round-trip, or GPT-5.x opaque `encryptedContent`
+  // repeated across messages). The per-messageId key can't catch that, so
+  // coalesce onto the turn's most-recent reasoning block when its content
+  // is byte-identical.
+  const prev = lastTurnReasoning(ctx.items);
+  const isDuplicate =
+    prev !== undefined &&
+    (reasoningText
+      ? prev.text === reasoningText
+      : prev.opaque === true && prev.opaqueKey === reasoningOpaque);
+
+  if (isDuplicate) return;
+
+  // Stable id so repeated same-id emits coalesce and history replay dedups.
+  const reasoning = ctx.upsertReasoning(`msg:${messageId}`, eventId);
+
+  if (reasoning.kind !== 'reasoning') return;
+
+  if (reasoningText) {
+    reasoning.text = reasoningText;
+
+    if (reasoning.opaque) reasoning.opaque = false;
+  } else if (reasoningOpaque && !reasoning.text) {
+    reasoning.opaque = true;
+    reasoning.opaqueKey = reasoningOpaque;
+  }
+}
 
 export const messageHandlers: Record<string, Handler> = {
   'assistant.message_start': (ctx, data, payload) => {
@@ -55,22 +114,7 @@ export const messageHandlers: Record<string, Handler> = {
       'encrypted_content',
     ]);
 
-    if (reasoningText || reasoningOpaque) {
-      // Tie reasoning to its assistant message with a stable id so
-      // repeated emits don't dupe and history replay coalesces.
-      const reasoningKey = `msg:${messageId}`;
-      const reasoningMsg = ctx.upsertReasoning(reasoningKey, payload.eventId);
-
-      if (reasoningMsg.kind === 'reasoning') {
-        if (reasoningText) {
-          reasoningMsg.text = reasoningText;
-
-          if (reasoningMsg.opaque) reasoningMsg.opaque = false;
-        } else if (reasoningOpaque && !reasoningMsg.text) {
-          reasoningMsg.opaque = true;
-        }
-      }
-    }
+    harvestReasoning(ctx, messageId, reasoningText, reasoningOpaque, payload.eventId);
 
     const msg = ctx.upsertAssistant(messageId, payload.eventId);
 
