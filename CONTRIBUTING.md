@@ -62,6 +62,22 @@ bun install
 bun run dev          # or `bun run dev:hmr` for frontend HMR
 ```
 
+### Syntax-aware merge drivers (recommended, one-time)
+
+The repo's `.gitattributes` routes code files through the
+[`mergiraf`](https://mergiraf.org) AST merge driver (and the Markdown logs
+through git's built-in `union` driver) so concurrent PRs stop
+false-conflicting. To activate `mergiraf` on your machine:
+
+```pwsh
+cargo install mergiraf   # or a prebuilt release — see mergiraf.org
+bun run setup:merge      # registers the driver in your GLOBAL git config
+```
+
+It's optional and safe to skip — without it git just uses its normal text
+merge (the attribute falls back). It runs locally only; GitHub's
+server-side merges are unaffected.
+
 ## Build / test / lint
 
 | Want to… | Run |

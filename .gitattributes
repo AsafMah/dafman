@@ -17,6 +17,28 @@ MANUAL_TESTS.md         merge=union
 MANUAL_TESTS_archive.md merge=union
 plans/DONE.md           merge=union
 
+# Syntax-aware merging for code: route the repo's languages through the
+# `mergiraf` AST merge driver so independent edits to the same file (two
+# PRs adding different functions / object keys / array items) auto-resolve
+# instead of false-conflicting. Requires the driver registered in git
+# config (one-time, see CONTRIBUTING) + the `mergiraf` binary; a clone
+# without it falls back to git's normal text merge, so this is safe to
+# commit. LOCAL only — GitHub's server-side merge uses text (hence `union`
+# above for the markdown logs, which mergiraf doesn't cover here).
+*.ts   merge=mergiraf
+*.mts  merge=mergiraf
+*.cts  merge=mergiraf
+*.tsx  merge=mergiraf
+*.js   merge=mergiraf
+*.mjs  merge=mergiraf
+*.cjs  merge=mergiraf
+*.json merge=mergiraf
+*.yml  merge=mergiraf
+*.yaml merge=mergiraf
+*.toml merge=mergiraf
+*.html merge=mergiraf
+*.xml  merge=mergiraf
+
 # Lockfiles must not be touched by line-ending normalization — bun's
 # install consistency check is sensitive to byte-exact content. Mark
 # binary so git ships the bytes through unchanged.

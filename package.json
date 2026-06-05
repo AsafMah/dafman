@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "setup:merge": "bun run tools/setup-merge-drivers.ts",
     "dev": "electrobun dev --watch",
     "predev": "bun run prep:dist",
     "dev:hmr": "bun run prep:dist && concurrently \"bun run hmr\" \"bun run dev\"",
