@@ -1,13 +1,13 @@
 {
 	"src/components/session/SessionDetailsPanel.vue": 2261,
 	"src/dev/Playground.vue": 1638,
-	"src-bun/app/chat/sessions.ts": 1371,
-	"src-bun/rpc.ts": 1340,
+	"src-bun/app/chat/sessions.ts": 1397,
+	"src-bun/rpc.ts": 1348,
 	"src/stores/shell/layoutStore.ts": 1261,
 	"src/stores/chat/sessionsStore.ts": 1251,
-	"src/components/chat/ChatWindow.vue": 1095,
+	"src/components/chat/ChatWindow.vue": 1117,
 	"src/components/session/SessionsManager.vue": 1039,
 	"src/components/session/SessionHeaderControls.vue": 1016,
-	"src/components/chat/MessageComposer.vue": 1013,
-	"src/ipc/types.ts": 1007
+	"src/components/chat/MessageComposer.vue": 1085,
+	"src/ipc/types.ts": 1011
 }

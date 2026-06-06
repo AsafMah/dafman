@@ -34,7 +34,10 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useCommandTerminal } from '@/composables/useCommandTerminal';
 import { useChatScroll } from '@/composables/useChatScroll';
-import { useChatSubmit } from '@/composables/useChatSubmit';
+import {
+  useChatSubmit,
+  type ComposerSubmitPayloadWithAttachments,
+} from '@/composables/useChatSubmit';
 import { useChatTimelineState } from '@/composables/useChatTimelineState';
 import { useMessageActions } from '@/composables/useMessageActions';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
@@ -303,11 +306,29 @@ const { sendMessage } = useChatSubmit({
   },
 });
 
-async function submitMessage(payload: Parameters<typeof sendMessage>[0]): Promise<void> {
+/// Local count of messages sent in queue mode while a turn was in
+/// flight. Cleared when `isSending` goes false (the turn ended, so
+/// any queued message has been picked up or dropped). Drives the
+/// `queued` badge on the composer send area.
+const queuedMessageCount = ref(0);
+
+watch(isSending, (sending) => {
+  if (!sending) queuedMessageCount.value = 0;
+});
+
+async function submitMessage(payload: ComposerSubmitPayloadWithAttachments): Promise<void> {
   if (props.deleted) {
     toasts.warn('Session deleted', 'This session is read-only. Start or resume another session.');
 
     return;
+  }
+
+  // Track messages queued behind a running turn.
+  const isQueueMode =
+    payload.mode === 'queue' || (payload.mode === 'default' && props.defaultSendMode === 'queue');
+
+  if (isQueueMode && isSending.value) {
+    queuedMessageCount.value++;
   }
 
   await sendMessage(payload);
@@ -711,6 +732,7 @@ const commandsRun = computed(() => {
         :default-mode="props.defaultSendMode"
         :session-id="props.sendHandler ? undefined : props.sessionId"
         :command-terminal-id="commandTerminalId"
+        :queued="queuedMessageCount > 0"
         @submit="submitMessage"
         @request-command-terminal="onRequestCommandTerminal"
         @open-full-terminal="openFullSessionTerminal"

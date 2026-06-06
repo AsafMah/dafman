@@ -74,15 +74,17 @@ export function useMcpLibrary() {
     discovered.value.filter((d) => !knownNames.value.has(d.name)),
   );
 
-  /// Whether an HTTP server should surface the Sign-in button. True when
-  /// the live status is `needs-auth`, or when status is unknown (no
-  /// session-live data to rule it out). A `connected` / `disabled` /
-  /// `pending` server does NOT show Sign-in — it's already usable or not
-  /// gated on auth, which is the #8-era over-show this fixes.
+  /// Whether an HTTP server should surface the Sign-in button.
+  /// True for any server that is NOT actively connected. This covers
+  /// `needs-auth` (explicit auth request), `failed`/`disabled` (connection
+  /// couldn't start — often because no OAuth token exists yet), and
+  /// `undefined` (no session-live data — don't hide the affordance when
+  /// we simply lack information). Only `connected` is unambiguously
+  /// working and doesn't need sign-in.
   function needsSignIn(name: string): boolean {
     const status = serverStatus.value.get(name);
 
-    return status === undefined || status === 'needs-auth';
+    return status !== 'connected';
   }
 
   function getLibrarySession() {
@@ -175,6 +177,25 @@ export function useMcpLibrary() {
     }
   }
 
+  /// After writing a new or updated MCP config globally, reload the MCP
+  /// runtime on every open session so the session's live McpHost picks up
+  /// the new server immediately. Without this, signing in immediately
+  /// after adding an HTTP MCP server errors with "MCP server does not
+  /// exist" because the session was created before the config entry
+  /// existed (Symptom A fix). Errors are silently swallowed — a session
+  /// may already be disconnecting or the SDK call may not be available.
+  async function syncReloadToActiveSessions(): Promise<void> {
+    const sessionsStore = useSessionsStore();
+
+    for (const session of sessionsStore.sessions) {
+      try {
+        await invokeCommand('reloadSessionMcpServers', { sessionId: session.id });
+      } catch {
+        // Session may not be in a state to reload — ignore.
+      }
+    }
+  }
+
   /// Toggle a server's global allowlist state + sync to active sessions.
   /// `currentlyEnabled` is the caller's view of state (today's enabled).
   /// Returns the new desired state on success, null on failure (toasted).
@@ -237,6 +258,11 @@ export function useMcpLibrary() {
         await invokeCommand('addMcpConfig', payload);
       }
 
+      // Reload the MCP runtime on every open session so the new/updated
+      // server config is immediately visible to the live McpHost. Without
+      // this reload, clicking Sign-in right after adding an HTTP MCP
+      // server fails with "MCP server does not exist" (Symptom A fix).
+      await syncReloadToActiveSessions();
       await loadAll();
 
       return true;

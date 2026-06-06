@@ -1,5 +1,5 @@
 :root {
-  font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 *,
@@ -101,4 +101,13 @@ body.app-dark {
   /* Make sure dockview's vertical strip renders. The PrimeIcons
    * sit inside; sizing rules live in ActivityBarTab.vue. */
   display: flex;
+}
+
+/* Container context for SessionHeaderControls' @container queries when
+ * hosted in the dockview tab-header actions slot (area="all"). The
+ * tabs-and-actions bar spans the full pane width, so its inline size
+ * is a stable reference — hiding controls inside it doesn't narrow the
+ * container and can't trigger a cascade of queries (#176). */
+.dv-tabs-and-actions-container {
+  container-type: inline-size;
 }

@@ -46,7 +46,7 @@ class SlashOption extends MenuOption {
   }
 }
 
-const props = defineProps<{
+defineProps<{
   sessionId: string;
 }>();
 
@@ -178,30 +178,30 @@ function onQueryChange(q: string | null) {
   setComposerMenuActive(editor, 'slash', menuOpen.value && filteredOptions.value.length > 0);
 }
 
-async function onSelectOption(payload: {
+function onSelectOption(payload: {
   option: SlashOption;
   textNodeContainingQuery: TextNode | null;
   closeMenu: () => void;
 }) {
   const { option, textNodeContainingQuery, closeMenu } = payload;
 
+  // Mirror the Tab-completion path: insert `/command ` (with trailing
+  // space) so the user can add arguments. Do NOT execute the command.
+  // Executing on Enter was bug #175 — pressing Enter in the slash menu
+  // should complete the command text, not run it immediately.
   editor.update(() => {
-    if (textNodeContainingQuery && $isTextNode(textNodeContainingQuery)) {
-      textNodeContainingQuery.remove();
+    if (textNodeContainingQuery !== null && $isTextNode(textNodeContainingQuery)) {
+      const insert = option.cmd.slash + ' ';
+
+      textNodeContainingQuery.setTextContent(insert);
+      textNodeContainingQuery.select(insert.length, insert.length);
     }
   });
+
   closeMenu();
   menuOpen.value = false;
   highlightedIndex.value = null;
   setComposerMenuActive(editor, 'slash', false);
-
-  try {
-    await option.cmd.run(props.sessionId);
-  } catch {
-    // Each command surfaces its own toast on failure via the store
-    // actions it calls; swallow here so a transient error doesn't
-    // crash the composer.
-  }
 }
 </script>
 

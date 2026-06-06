@@ -117,13 +117,18 @@ void (async () => {
 })();
 
 // `emitEvent` is rebound once the BrowserWindow's webview RPC is up.
-// Until then we buffer events (in practice none should fire before the
-// window is ready, but the indirection keeps the registry decoupled).
+// Until then events are buffered so they survive the brief gap
+// between the BrowserWindow creation and the renderer's first
+// `sessionEvent` listener being attached.  The buffer also covers
+// HMR / dev-server reconnects where `dom-ready` fires again and we
+// need to ensure the channel still points at the live `send`.
+const _preWebviewEventBuffer: SessionEventPayload[] = [];
 let emitEvent: (payload: SessionEventPayload) => void = (payload) => {
-  log.debug('dropped session event before webview ready', {
+  log.debug('buffering session event before webview ready', {
     sessionId: payload.sessionId,
     eventType: payload.eventType,
   });
+  _preWebviewEventBuffer.push(payload);
 };
 let emitPending: (payload: import('./rpc').PendingRequestPayload) => void = (payload) => {
   log.warn('dropped pending request before webview ready', {
@@ -325,6 +330,10 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       setSessionMcpEnabled: rpcGuard(async ({ sessionId, serverName, enabled }) =>
         sessions.setSessionMcpEnabled(sessionId, serverName, enabled),
       ),
+      reloadSessionMcpServers: rpcGuard(async ({ sessionId }) => {
+        await sessions.reloadSessionMcpServers(sessionId);
+        return true;
+      }),
       getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
       readSessionPlan: rpcGuard(async ({ sessionId }) => sessions.readPlan(sessionId)),
       writeSessionPlan: rpcGuard(async ({ sessionId, content }) =>
@@ -595,6 +604,11 @@ function nudgeWindow(): void {
 }
 
 mainWindow.webview.on('dom-ready', () => {
+  // #172: rebind emit channels on every renderer navigation so HMR
+  // reloads and dev-server reconnects see the live send, not a stale
+  // closure from a prior page load. bindEmitChannels is safe to call
+  // here because `send` is already resolved at this point.
+  bindEmitChannels();
   for (const delay of [0, 150, 400, 900]) {
     setTimeout(nudgeWindow, delay);
   }
@@ -613,10 +627,30 @@ for (const delay of [200, 600, 1500]) {
 // `DafmanRPC['webview']['messages']`; a renamed channel fails to build.
 const send = (mainWindow.webview.rpc as unknown as { send: WebviewSendChannels }).send;
 
-emitEvent = (payload) => send.sessionEvent(payload);
-emitPending = (payload) => send.pendingRequest(payload);
-emitTerminal = (payload) => send.terminalEvent(payload);
-emitCommandResult = (payload) => send.commandResultEvent(payload);
+// Bind emitEvent to the live send channel and drain any events that
+// were buffered before the window was created (belt-and-suspenders;
+// in practice the queue is empty on cold boot, but covers the HMR /
+// reconnect path where dom-ready fires after a page reload).
+function bindEmitChannels(): void {
+  emitEvent = (payload) => send.sessionEvent(payload);
+  emitPending = (payload) => send.pendingRequest(payload);
+  emitTerminal = (payload) => send.terminalEvent(payload);
+  emitCommandResult = (payload) => send.commandResultEvent(payload);
+  // Drain any events that accumulated while the webview was loading.
+  for (const buffered of _preWebviewEventBuffer.splice(0)) {
+    try {
+      send.sessionEvent(buffered);
+    } catch (err) {
+      log.warn('failed to drain pre-webview event buffer', {
+        sessionId: buffered.sessionId,
+        eventType: buffered.eventType,
+        error: toErrorMessage(err),
+      });
+    }
+  }
+}
+
+bindEmitChannels();
 
 // Live log fan-out to the renderer. The in-app log viewer subscribes
 // via the `logEvent` webview message and applies its own level filter

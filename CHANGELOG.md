@@ -2,6 +2,18 @@
 All notable changes to Dafman are documented here. Format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Fixed (2026-06-06 dogfood batch — 10 issues)
+- **Restored sessions no longer come back empty (#172).** A cold-boot race ran `restoreFromLayout()` before the Copilot CLI finished opening its DB, so `resumeSession` got empty history (silently swallowed). Boot now warms up the CLI (`listSessions` probe) before resuming, `hydrateHistory` retries an empty `getEvents()` once (with a warning), and pre-webview session events are buffered + drained on bind so none are dropped.
+- **MCP OAuth sign-in works for freshly-added HTTP servers (#7).** Adding a server now reloads the active session's MCP runtime (`reloadSessionMcpServers` → SDK `session.mcp.reload`) so Sign-in can find it (was: "MCP server does not exist"), and the Sign-in button now stays visible for any non-`connected` HTTP server (was: hidden once status became `disabled`/`failed` after reopen).
+- **"Go to session" navigates instead of duplicating (#173).** Reveal now scans inner per-group dockviews before opening, activating the existing panel in its group rather than recreating the session in the current group.
+- **Closing a panel no longer kills a running job (#174).** `GroupPanel` skips the destructive session close when the session still has active background jobs, so the job survives and "Go to session" can reopen it.
+- **Autopilot tool failures show on the job row (#36).** A `hadToolFailureThisTurn` guard stops the turn-complete watcher from clobbering the `⚠ <tool> failed` message with "Turn complete".
+- **Slash commands complete instead of firing on Enter (#175).** Enter (and click) on a highlighted `/command` now inserts `/command ` for arguments (mirrors Tab), instead of executing immediately.
+- **Send-mode is now visible (#177).** A Steer/Queue chip shows the active send-mode next to the send button, with a queued indicator when messages are waiting behind a running turn.
+- **Enter on an emptied composer is a no-op (#178).** Deleting all text then pressing Enter no longer inserts a stray newline.
+- **Header controls stay reachable when narrow (#176).** "Allow all" and the workspace/directory control collapse to compact icons instead of disappearing; the dockview tab bar got `container-type` so the `@container` queries actually fire.
+- **Selecting one agent no longer flashes the whole list (#127).** The Library agents list scoped its disabled state to the acting row instead of a list-wide busy flag.
+
 
 ### Fixed (#166 — `/rename` did nothing; rename is now inline — 2026-06-05)
 - **`/rename` works again, and renaming is now inline instead of a blocking modal.** The rename dialog and its `rename-session` listener had been gated to the `area='all'` `SessionHeaderControls`, whose only host (`ChatTabActions`, dockview's right-header-actions slot) was removed when session controls moved to the composer toolbar — so `/rename` silently no-opped in every real build since #144. Rename now happens **in place on the session tab**: `ChatTab.vue` swaps its title for an inline input (Enter/blur commit, Escape cancels), with no modal. **`/rename <title>` now sets the name directly** via `setSessionName` with no UI at all. Deleted the orphaned PrimeVue rename modal from `SessionHeaderControls.vue`. Regression coverage in `src/components/chat/__tests__/ChatTab.rename.test.ts` and `/rename` arg/bus cases in `src/lib/__tests__/sessionCommands.test.ts`; live-dogfooded per `MANUAL_TESTS.md` RP.1.

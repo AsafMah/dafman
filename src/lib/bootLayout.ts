@@ -20,6 +20,7 @@
  */
 
 import { ref } from 'vue';
+import { invokeCommand } from '@/ipc/invoke';
 import { useBootStore } from '@/stores/app/bootStore';
 import { extractPanelIdsFromBody, useGroupsStore } from '@/stores/shell/groupsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
@@ -74,6 +75,18 @@ export function useBootLayout(): BootLayout {
     );
 
     if (sessionIds.size > 0) {
+      // #172: Warm up the CLI's SQLite DB before fanning out parallel
+      // resumeSession calls. `client.start()` establishes the JSON-RPC
+      // connection but doesn't guarantee the first DB access is ready.
+      // A `listSessions` round-trip here serialises the DB-open against
+      // the resume fan-out so `session.getEvents()` returns real data
+      // rather than an empty result from a still-initialising DB.
+      // Best-effort: if the probe itself fails we proceed anyway and
+      // rely on the per-session retry in `hydrateHistory`.
+      await invokeCommand('listSessions', {}).catch((e: unknown) => {
+        console.warn('[boot] CLI DB probe (listSessions) failed — proceeding anyway', e);
+      });
+
       bootStore.beginSessions(sessionIds.size);
       // Parallel resumes — safe because rpcGuard throws a real Error
       // (encoded AppErrorPayload) so the bridge doesn't swallow it.
