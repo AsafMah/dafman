@@ -2,7 +2,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from '
 import { setActivePinia, createPinia } from 'pinia';
 import { cleanup, fireEvent, render } from '@testing-library/vue';
 import { defineComponent, type Component } from 'vue';
-import type { DockviewPanelApi } from 'dockview-core';
+import type { DockviewApi, DockviewPanelApi } from 'dockview-core';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
 
 const ContextMenuStub = defineComponent({
   name: 'ContextMenu',
@@ -37,6 +38,13 @@ function fakePanelApi(overrides: Partial<DockviewPanelApi> = {}): DockviewPanelA
   } as unknown as DockviewPanelApi;
 }
 
+function fakeInnerApi(panelIds: string[]): DockviewApi {
+  return {
+    getPanel: (id: string) => (panelIds.includes(id) ? { id } : undefined),
+    panels: panelIds.map((id) => ({ id })),
+  } as unknown as DockviewApi;
+}
+
 describe('ChatTab maximize action', () => {
   beforeAll(async () => {
     ChatTab = (await import('@/components/chat/ChatTab.vue')).default as Component;
@@ -66,6 +74,8 @@ describe('ChatTab maximize action', () => {
       },
     });
 
+    useGroupsStore().registerInnerApi('g1', fakeInnerApi(['s1', 's2']));
+
     const utils = render(ChatTab, {
       props: {
         params: { sessionId: 's1' },
@@ -82,5 +92,17 @@ describe('ChatTab maximize action', () => {
 
     expect(maximizeCalls).toBe(1);
     expect(restoreCalls).toBe(1);
+  });
+
+  test('hides the maximize action for a single-session group', async () => {
+    useGroupsStore().registerInnerApi('g1', fakeInnerApi(['s1']));
+
+    const utils = render(ChatTab, {
+      props: { params: { sessionId: 's1' }, api: fakePanelApi() },
+    });
+
+    expect(utils.queryByLabelText('Maximize session')).toBeNull();
+    // Close stays available regardless of group size.
+    expect(utils.queryByLabelText('Close session')).not.toBeNull();
   });
 });

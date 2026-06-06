@@ -50,6 +50,20 @@ const displayTitle = computed(() => {
   return record.value?.isDeleted ? `${base} (deleted)` : base;
 });
 
+// Maximize only makes sense when this session shares its group with
+// other sessions — a lone session already fills its group. Mirror
+// GroupTab's session-count source (live innerApis, plus innerBodiesCache
+// touched for reactivity) so the button hides for a single-session group.
+const groupSessionCount = computed(() => {
+  void groupsStore.innerBodiesCache;
+
+  for (const api of Object.values(groupsStore.innerApis)) {
+    if (api.getPanel(sessionId.value)) return api.panels.length;
+  }
+
+  return 1;
+});
+
 // ─── Inline rename ────────────────────────────────────────────────────
 // Bare `/rename` emits `rename-session`; we swap the title for an inline
 // input right here in the tab — the title's actual home — instead of a
@@ -214,6 +228,7 @@ function groupColorOf(item: MenuItem): string | undefined {
       >{{ displayTitle }}</span
     >
     <button
+      v-if="groupSessionCount > 1 || maximized"
       type="button"
       class="chat-tab-action"
       :aria-label="maximized ? 'Restore session' : 'Maximize session'"
