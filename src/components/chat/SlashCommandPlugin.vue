@@ -46,7 +46,7 @@ class SlashOption extends MenuOption {
   }
 }
 
-defineProps<{
+const props = defineProps<{
   sessionId: string;
 }>();
 
@@ -185,18 +185,27 @@ function onSelectOption(payload: {
 }) {
   const { option, textNodeContainingQuery, closeMenu } = payload;
 
-  // Mirror the Tab-completion path: insert `/command ` (with trailing
-  // space) so the user can add arguments. Do NOT execute the command.
-  // Executing on Enter was bug #175 — pressing Enter in the slash menu
-  // should complete the command text, not run it immediately.
-  editor.update(() => {
-    if (textNodeContainingQuery !== null && $isTextNode(textNodeContainingQuery)) {
-      const insert = option.cmd.slash + ' ';
+  // Arg-taking commands (acceptsArgs) complete `/command ` so the user can
+  // type arguments — mirrors the Tab path (bug #175: Enter must not fire an
+  // arg-taking command before the user supplies args). No-arg/action
+  // commands execute immediately on select (e.g. /model opens the picker).
+  if (option.cmd.acceptsArgs) {
+    editor.update(() => {
+      if (textNodeContainingQuery !== null && $isTextNode(textNodeContainingQuery)) {
+        const insert = option.cmd.slash + ' ';
 
-      textNodeContainingQuery.setTextContent(insert);
-      textNodeContainingQuery.select(insert.length, insert.length);
-    }
-  });
+        textNodeContainingQuery.setTextContent(insert);
+        textNodeContainingQuery.select(insert.length, insert.length);
+      }
+    });
+  } else {
+    editor.update(() => {
+      if (textNodeContainingQuery !== null && $isTextNode(textNodeContainingQuery)) {
+        textNodeContainingQuery.remove();
+      }
+    });
+    void option.cmd.run(props.sessionId);
+  }
 
   closeMenu();
   menuOpen.value = false;

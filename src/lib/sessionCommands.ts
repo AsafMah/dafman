@@ -40,6 +40,12 @@ export interface SessionCommand {
   /// Execute the command against `sessionId`. May return a promise;
   /// the palette closes optimistically.
   run(sessionId: string, args?: string): void | Promise<void>;
+  /// When true, selecting this command in the slash menu inserts
+  /// `/slash ` (trailing space) so the user can add arguments, rather
+  /// than executing immediately. The no-arg behaviour still runs when
+  /// the user presses Enter on the inserted `/slash ` (empty args).
+  /// No-arg/action commands (e.g. /model) omit this and execute on select.
+  acceptsArgs?: boolean;
 }
 
 function parseSlashCommand(text: string): { slash: string; args: string } | null {
@@ -134,6 +140,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   },
   {
     slash: '/agent',
+    acceptsArgs: true,
     label: 'Select or open agent',
     description:
       'With no argument: open Library Agents tab. With a name: select that agent for the current session.',
@@ -251,6 +258,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   },
   {
     slash: '/rename',
+    acceptsArgs: true,
     label: 'Rename session',
     description: 'Rename inline, or set it directly with /rename <title>.',
     icon: 'pi-pencil',
@@ -273,6 +281,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   },
   {
     slash: '/cd',
+    acceptsArgs: true,
     label: 'Change working directory',
     description: "Display this session's cwd. Type /cd <path> to change it.",
     icon: 'pi-folder-open',
@@ -313,6 +322,7 @@ export const SESSION_COMMANDS: SessionCommand[] = [
   },
   {
     slash: '/fleet',
+    acceptsArgs: true,
     label: 'Start a fleet of sub-agents',
     description: 'Spawn parallel sub-agents to work on a problem (optional prompt).',
     icon: 'pi-users',
