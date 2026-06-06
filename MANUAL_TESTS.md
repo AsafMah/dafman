@@ -137,7 +137,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### AST.1 - Selecting one agent does not flash the whole list
 
-- [x] result: ❌ FAIL (2026-06-06) — selecting one agent still flashes the WHOLE list: **all rows' Select/Deselect buttons briefly disable/dim** then return, instead of only the clicked row. The #127 fix scoped the spinner but not the global busy/disabled state across rows. Issue to file (intent-gap, reopen-class of #127).
+- [x] result: ❌ FAIL (2026-06-06) — selecting one agent still flashes the WHOLE list: **all rows' Select/Deselect buttons briefly disable/dim** then return, instead of only the clicked row. The #127 fix scoped the spinner but not the global busy/disabled state across rows. **Reopened #127** (intent-gap).
 - **Steps:** Open Session Details → Agents with at least two agents visible. Click **Select** on a non-active agent, then click **Deselect** on the active agent.
 - **Expected:** Only the clicked row shows the pending disabled state; the other rows' Select/Deselect buttons do not visibly flash. The active row's Select ↔ Deselect change fades smoothly without a hard flicker.
 - **Why not automated:** The unit test covers disabled-state scoping and the concurrency guard, but visual transition timing and perceived flicker require a live WebView render.
@@ -146,7 +146,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### MX.1 - Session tabs maximize/restore; double-click renames; group tabs have no maximize.
 
-- [x] result: ✅ PASS + 1 finding (2026-06-06, live HMR) — (a) session maximize/restore works, layout/active/order intact; (b) double-click rename works inline (Enter saves, Escape reverts); (c) group tabs have no maximize button (#171). **Finding:** the session maximize button shows even when its group holds only one session, where maximize is a no-op — should hide for single-session groups. Issue to file.
+- [x] result: ✅ PASS + 1 finding (2026-06-06, live HMR) — (a) session maximize/restore works, layout/active/order intact; (b) double-click rename works inline (Enter saves, Escape reverts); (c) group tabs have no maximize button (#171). **Finding:** the session maximize button shows even when its group holds only one session, where maximize is a no-op — should hide for single-session groups. **Fixed in PR #179.**
 - **Steps:** Run the app; open at least two groups and two sessions in one group. (a) Hover a session tab and click its maximize button, then click Restore. (b) Double-click a session tab's title, type a name, press **Enter** (then try again and press **Escape**). (c) Look at a **group** tab.
 - **Expected:** (a) the session panel maximizes via dockview and restores without losing tab order / active session / group state, icon flips Maximize↔Restore. (b) the title becomes an inline input; Enter saves the trimmed name, Escape reverts. (c) the group tab has **no** maximize button — only double-click rename, color, and close (when >1 group). Group maximize was removed in #171 as meaningless.
 - **Why not automated:** Requires visually confirming dockview's real maximize/restore geometry, the inline tab-input focus/keys, and the absence of the group affordance in the live Electrobun webview.
@@ -193,7 +193,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### KB.1 - Plain Enter sends at the current mode
 
-- [x] result: ⚠️ INCONCLUSIVE (2026-06-06) — couldn't tell steer vs queue apart: **no visible cue for which send-mode is active**, and no indication that a message was queued behind a running turn. Behavior may be correct but is unobservable. Candidate issue (mode/queue affordance).
+- [x] result: ⚠️ INCONCLUSIVE (2026-06-06) — couldn't tell steer vs queue apart: **no visible cue for which send-mode is active**, and no indication that a message was queued behind a running turn. Behavior may be correct but is unobservable. **Filed #177.**
 - **Steps:** In an empty chat, set the send-mode toggle to **Steer**, type `hello`, press **Enter**. Then set the toggle to **Queue**, type `world`, press **Enter** while a turn is running.
 - **Expected:** First message sends immediately (steer). Second is queued behind the running turn (queue) — not interrupting.
 - **Why not automated:** Mode-toggle + live-turn timing; the e2e fake doesn't model steer-vs-queue scheduling visibly.
@@ -207,7 +207,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### KB.3 - Enter selects a slash/mention menu item instead of sending
 
-- [x] result: ❌ FAIL (slash) / ✅ PASS (@) (2026-06-06) — `@file` mentions insert the highlighted pill with no send (good). **Slash commands fail:** Enter on a highlighted `/command` **executes/sends it immediately** instead of inserting `/command ` into the composer, so you can't add arguments (e.g. `/rename <title>`, `/cd <path>`, `/agent <name>`). Tab does insert (KB.7 PASS), but Enter should too (or at least not fire the no-arg command). Issue to file.
+- [x] result: ❌ FAIL (slash) / ✅ PASS (@) (2026-06-06) — `@file` mentions insert the highlighted pill with no send (good). **Slash commands fail:** Enter on a highlighted `/command` **executes/sends it immediately** instead of inserting `/command ` into the composer, so you can't add arguments (e.g. `/rename <title>`, `/cd <path>`, `/agent <name>`). Tab does insert (KB.7 PASS), but Enter should too. **Filed #175.**
 - **Steps:** Type `/` and wait for the slash menu; arrow to a **non-first** command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
 - **Expected:** Enter runs the highlighted slash command (not the first row; no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
 - **Why not automated:** Flow 02 covers the @-pill case; the slash-run case and the "no accidental send" assertion are worth an eyeball.
@@ -235,7 +235,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### KB.6 - Enter on an empty composer does nothing; IME commit doesn't send
 
-- [x] result: ⚠️ MOSTLY PASS (2026-06-06) — empty Enter does nothing initially; but **after deleting all composer content, Enter inserts a newline** instead of a no-op. Minor. Candidate issue.
+- [x] result: ⚠️ MOSTLY PASS (2026-06-06) — empty Enter does nothing initially; but **after deleting all composer content, Enter inserts a newline** instead of a no-op. Minor. **Filed #178.**
 - **Steps:** With an empty composer, press **Enter** a few times. Then (if you have an IME) type with composition and press Enter to COMMIT a candidate.
 - **Expected:** Empty Enter does nothing (no stray newline, no send). The IME-commit Enter commits the candidate and does NOT send the message.
 - **Why not automated:** Native IME composition can't be driven reliably in CI.
@@ -371,7 +371,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 109.1 - "Allow all" and run mode persist across app restart.
 
-- [x] result: ✅ PASS (persistence) + ⚠️ finding (2026-06-06, full restart) — each restored session kept **Allow-all ON** and its **per-session run mode** (not the global default). **Finding (potentially serious):** after the restart **every** restored session showed an **empty transcript** and the message history **never** loaded. Needs root-cause (resume failed vs render gap — check boot-log resume/historyCount). Issue to file.
+- [x] result: ✅ PASS (persistence) + ⚠️ finding (2026-06-06, full restart) — each restored session kept **Allow-all ON** and its **per-session run mode** (not the global default). **Finding (serious):** after the restart **every** restored session showed an **empty transcript** and the message history **never** loaded. Root cause: cold-boot resume race (resume hits CLI before DB ready → empty `getEvents()` swallowed). **Filed #172.**
 
 - **Steps:** open a session, toggle **"Allow all"** ON in the header and switch
   the run mode (e.g. to **autopilot** or **plan**). Fully quit and relaunch the
@@ -431,7 +431,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 36.2 - A tool failure during an Autopilot run surfaces on the Jobs panel.
 
-- [x] result: ❌ FAIL (2026-06-06) — a tool failure during an Autopilot run **never surfaced on the active job row** in the Jobs panel (no transient `⚠ <tool> failed` text). **Isolated:** the same run DID produce the red TOOLFAILURE row in Activity (36.1), so the failure fired — only the Jobs-panel job-row path (`postToolUseFailure` → active-job latest-response line) is broken. Issue to file.
+- [x] result: ❌ FAIL (2026-06-06) — a tool failure during an Autopilot run **never surfaced on the active job row** in the Jobs panel (no transient `⚠ <tool> failed` text). **Isolated:** the same run DID produce the red TOOLFAILURE row in Activity (36.1), so the failure fired — only the Jobs-panel job-row path is broken (turn-complete watcher clobbers `latestResponse`). **Reopened #36.**
 - **Steps:** open the Jobs panel, Start Autopilot with a goal that will make the
   agent run a tool that fails. Watch the active Autopilot job row while the tool
   fails.
@@ -537,7 +537,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 7.1 - Sign-in opens the system browser and completes OAuth end-to-end.
 
-- [x] result: ❌ FAIL (2026-06-06) — added the GitHub remote HTTP MCP (`https://api.githubcopilot.com/mcp/`); clicking **Sign in** errored **"MCP server does not exist."** After reopening the session the server is **still listed under Configured (http badge)** but the **Sign in button is gone**. So the config persists — dafman's sign-in path can't resolve the freshly-added server (registration timing), and the Sign-in affordance isn't re-derived on reload. Likely dafman bug (not SDK). Issue to file.
+- [x] result: ❌ FAIL (2026-06-06) — added the GitHub remote HTTP MCP (`https://api.githubcopilot.com/mcp/`); clicking **Sign in** errored **"MCP server does not exist."** After reopening the session the server is **still listed under Configured (http badge)** but the **Sign in button is gone**. Root cause: config-add doesn't reload the session MCP runtime + `needsSignIn` gating. **Commented on #7.**
 
 - **Steps:** add a real HTTP MCP server that requires OAuth (e.g. the GitHub
   remote MCP `{ type: 'http', url: … }`). With at least one session open, go to
@@ -665,7 +665,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 16.1 - Reveal scrolls to the spawning tool-call card (cross-session).
 
-- [x] result: ⚠️ PARTIAL/FAIL (2026-06-06) — within the SAME group, "Go to session" switches to the session. **Cross-group is broken:** if the job's session lives in a DIFFERENT group, instead of switching to that group and selecting the existing panel, it **recreates the session as a new panel in the current group** (duplicate). Issue to file.
+- [x] result: ⚠️ PARTIAL/FAIL (2026-06-06) — within the SAME group, "Go to session" switches to the session. **Cross-group is broken:** if the job's session lives in a DIFFERENT group, instead of switching to that group and selecting the existing panel, it **recreates the session as a new panel in the current group** (duplicate). **Filed #173.**
 
 - **Steps:** in session A with a long transcript, spawn a background task (a tool call early in the history that runs in the background). Switch to session B. Open the Jobs panel and click "Go to session" (the up-right arrow) on A's job.
 - **Expected:** the app switches to session A and scrolls so the tool-call card that spawned the job is centered in view (not the top of the transcript), with a brief highlight flash on the card.
@@ -673,7 +673,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 16.2 - Freshly-opened panel still reveals (timing path).
 
-- [x] result: ❌ FAIL (2026-06-06) — closing A's panel mid-run made A's **job disappear from the Jobs panel** while it was still running. After the job finished, clicking "Go to session" errored **"session doesn't exist"** instead of reopening A's panel and revealing the card. Issue to file.
+- [x] result: ❌ FAIL (2026-06-06) — closing A's panel mid-run made A's **job disappear from the Jobs panel** while it was still running. After the job finished, clicking "Go to session" errored **"session doesn't exist"** instead of reopening A's panel and revealing the card. **Filed #174.**
 
 - **Steps:** close session A's panel entirely (leave only B open). Spawn-and-track a job for A beforehand. From the Jobs panel click "Go to session" so A's panel opens fresh.
 - **Expected:** A opens AND scrolls to the spawning card — the reveal is not lost to the async panel mount.
