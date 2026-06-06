@@ -34,7 +34,7 @@ Introduce a unified slash-command registry that merges dafman's local `SESSION_C
 |---|---|---|
 | `src/lib/sessionCommands.ts:22-48` | `SessionCommand` interface | Local command model: `slash`, `label`, `description`, `icon?`, `keywords?`, `group`, `run(sessionId, args?)`, `acceptsArgs?` |
 | `src/lib/sessionCommands.ts:99-111` | `runLocalSlashCommand` | Linear scan of `SESSION_COMMANDS`; case-insensitive match on `slash`; returns `true` if handled. Called from the composer submit path. |
-| `src/lib/sessionCommands.ts:113-426` | `SESSION_COMMANDS` | 15 static entries: `/mcp`, `/skill`, `/skills`, `/agent`, `/model`, `/autopilot`, `/compact`, `/fork`, `/rename`, `/cd`, `/close`, `/fleet`, `/library`, `/plan`, `/?`, `/help` |
+| `src/lib/sessionCommands.ts:113-426` | `SESSION_COMMANDS` | **16** static entries — see the catalog below. |
 | `src/lib/sessionCommands.ts:142-201` | `/agent` entry | Has `acceptsArgs: true`; calls `invokeCommand('listAgents')`, matches by name, calls `invokeCommand('selectAgent')`, toasts warn-on-miss. |
 | `src/components/chat/SlashCommandPlugin.vue:122` | `allOptions` | `computed(() => SESSION_COMMANDS.map(c => new SlashOption(c)))` — static, no SDK source. |
 | `src/components/chat/SlashCommandPlugin.vue:124-136` | `filteredOptions` | Filters by `slash`, `label`, `description`, `keywords`. No provenance concept. |
@@ -49,6 +49,29 @@ Introduce a unified slash-command registry that merges dafman's local `SESSION_C
 | `node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts:2413-2427` | `SlashCommandInput` | `{ hint, required?, completion?: "directory", preserveMultilineInput? }` — type-safe arg hints |
 | `node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts:2482-2495` | `CommandsListRequest` | `{ includeBuiltins?, includeSkills?, includeClientCommands? }` — per-source filter flags |
 | `node_modules/@github/copilot-sdk/dist/types.d.ts:406-413` | `CommandDefinition` | SDK-side registration: `{ name, description?, handler: CommandHandler }` |
+
+### Local command catalog (current `SESSION_COMMANDS`, 16 entries)
+
+| Slash | Group | Action (`run`) | Args | `acceptsArgs` today | Notes |
+|---|---|---|---|---|---|
+| `/mcp` | Library | open Library → MCP tab | none | – | |
+| `/skill` | Library | open Library → Skills tab | none | – | dup of `/skills` |
+| `/skills` | Library | open Library → Skills tab | none | – | dup of `/skill`; collides with CLI builtin (OQ 3) |
+| `/agent` | Library | no-arg: open Agents tab; `<name>`: select agent | optional | ✅ | the bespoke lookup pattern (Motivation 2) |
+| `/model` | Session | open model selector (right rail) | none | – | |
+| `/autopilot` | Session | toggle autopilot↔interactive | none | – | |
+| `/compact` | Session | compact history | none | – | collides with CLI builtin (same semantic) |
+| `/fork` | Session | fork → new panel | none | – | |
+| `/rename` | Session | no-arg: inline rename; `<title>`: set directly | optional | ✅ | |
+| `/cd` | Session | no-arg: show cwd; `<path>`: change | optional | ✅ | |
+| `/close` | Session | close panel (keeps history) | none | – | |
+| `/fleet` | Session | spawn sub-agent fleet | optional prompt | ✅ | |
+| `/library` | Navigation | open Library (`<tab>`, default mcp) | optional tab | ❌ **wrong** | takes an arg but executes on select |
+| `/plan` | Session | plan mode (+ `<prompt>` → planning turn) | optional prompt | ❌ **wrong** | takes an arg but executes on select |
+| `/?` | Session | help toast (static local list) | none | – | dup of `/help` |
+| `/help` | Session | help toast (static local list) | none | – | dup of `/?`; collides with CLI builtin (OQ 6) |
+
+The per-command `acceptsArgs` boolean is hand-set and **already inconsistent** (`/plan`, `/library` take args but omit it). Under unified routing this hand-tuning should go away entirely — see **OQ 9**.
 
 **Key gap:** `session.rpc.commands.list()` is `@experimental` but present in the installed `1.0.0-beta.9` types. The `copilot-sdk-update.md` spec (row #2 in the feature table) already recommends calling it on session create/resume. This spec is the consumer of that capability.
 
@@ -346,6 +369,10 @@ Skills and agents are per-session (they depend on `cwd`, enabled/disabled state,
 When the SDK's `commands.invoke` returns a `SlashCommandAgentPromptResult` (the command wants to send a message to the agent), should dafman (a) emit it as a user turn directly, (b) insert it into the composer text for the user to review and send, or (c) emit as a system.notification?  
 **Recommended default:** (a) emit as a user turn directly — this matches what the CLI TUI does when a skill produces a prompt. (b) would be confusing (looks like the user typed it). (c) loses the agent dispatch.
 
+**OQ 9 — The local `acceptsArgs` boolean is interim and should be derived, not hand-set.**  
+Each `SESSION_COMMANDS` entry carries a hand-set `acceptsArgs` (#175). The catalog above shows it is already wrong for `/plan` and `/library`, and **most** commands will need to accept args once SDK/CLI commands (which advertise typed `SlashCommandInput` hints) flow through the same typeahead. Patching individual booleans now is throwaway work. The unified resolver should decide insert-vs-execute uniformly: SDK entries derive it from `SlashCommandInput` (§3); local entries should carry an optional `argHint?` and the typeahead inserts-to-`/cmd ` whenever an `argHint` is present (SDK or local), executing only truly no-arg actions.  
+**Recommended default:** stop hand-setting `acceptsArgs` per command — give every entry an optional `argHint?`, drive insert-vs-execute off its presence, and fold the current 4 `acceptsArgs: true` flags + the `/plan`/`/library` fix into this migration rather than before it. **Decision needed:** adopt `argHint`-driven arg acceptance vs keep explicit booleans.
+
 ---
 
 ## Alternatives / Options
@@ -419,7 +446,7 @@ When the SDK's `commands.invoke` returns a `SlashCommandAgentPromptResult` (the 
 
 - [Issue #34](https://github.com/AsafMah/dafman/issues/34) — source issue
 - [Issue #33](https://github.com/AsafMah/dafman/issues/33) — closed; bespoke `/skill` that was rejected in favor of this general solution
-- `src/lib/sessionCommands.ts` — current `SessionCommand` model and 15-entry `SESSION_COMMANDS`
+- `src/lib/sessionCommands.ts` — current `SessionCommand` model and 16-entry `SESSION_COMMANDS` (full catalog in Current State)
 - `src/components/chat/SlashCommandPlugin.vue` — Lexical typeahead + `acceptsArgs` execution logic
 - `src-bun/app/chat/sessionConfigBuilder.ts:329-348` — `buildRegisteredCommands`, currently only `/library`
 - `src-bun/rpc.ts:848-858` — `listSessionSkills` response shape
