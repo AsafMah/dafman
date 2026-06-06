@@ -11,13 +11,15 @@ become actionable. None of this is implemented yet.
 
 | Spec | What it covers | Tracking issue |
 |---|---|---|
-| [`keyboard-shortcuts.md`](keyboard-shortcuts.md) | Unified shortcut system: central registry binding chords/sequences → command ids, scope/focus resolution, conflict detection, default keymap, user customization + Settings editor. Full inventory of today's scattered handlers. | — |
 | [`keyboard-shortcuts.md`](keyboard-shortcuts.md) | Unified shortcut system: central registry binding chords/sequences → command ids, scope/focus resolution, conflict detection, default keymap, user customization + Settings editor. Full inventory of today's scattered handlers. | [#183](https://github.com/AsafMah/dafman/issues/183) |
 | [`session-pane.md`](session-pane.md) | Session list pane: grouping modes (workspace / dockview group / date / flat), sort, search/filter, color-by-group for open sessions, persisted view prefs. | [#184](https://github.com/AsafMah/dafman/issues/184) |
 | [`palette-session-jump.md`](palette-session-jump.md) | Jump to (open) and resume (on-disk) sessions from the command palette; reuses the cross-group reveal path (#173). | [#185](https://github.com/AsafMah/dafman/issues/185) |
 | [`copilot-sdk-update.md`](copilot-sdk-update.md) | Bump `@github/copilot-sdk` beta.9 → 1.0.0 stable + audit of SDK/CLI features dafman doesn't yet surface (CLI slash commands, session config/model selectors, custom-agent registration, hooks, metadata persistence). | [#186](https://github.com/AsafMah/dafman/issues/186) |
 | [`backend-abstraction-acp.md`](backend-abstraction-acp.md) | Abstract the agent backend behind a thin `Provider` interface; Copilot SDK stays first-class, add an **ACP** (Agent Client Protocol) provider to plug in Claude Code / Gemini / Codex / etc. "for free." Capability negotiation, per-provider auth, RPC↔ACP mapping. | [#187](https://github.com/AsafMah/dafman/issues/187) |
+| [`unified-slash-routing.md`](unified-slash-routing.md) | Unified slash registry merging dafman-local commands, SDK-advertised builtins/skills, and `/agent`/`/mcp` namespaces; one typeahead with provenance badges; execution routing (local vs SDK invoke vs send); precedence + conflict rules. | [#34](https://github.com/AsafMah/dafman/issues/34) |
+| [`library-source-of-truth.md`](library-source-of-truth.md) | Make the Library the single source of truth for config; per-session views derive global defaults + per-session overrides; migration path for each `SessionDetailsPanel` section. | [#28](https://github.com/AsafMah/dafman/issues/28) |
+| [`per-message-agent-mode.md`](per-message-agent-mode.md) | Per-message agent mode (interactive/plan/autopilot) from the composer — the SDK already supports one-shot `agentMode`; gap is the IPC wire + renderer pipeline. Distinct from the send-mode (steer/queue) chip. | [#41](https://github.com/AsafMah/dafman/issues/41) |
 
 > Convention note: `plans/README.md` says open work lives in GitHub issues (the
-> old `TODO.md` was retired). These specs are the long-form design behind issues;
-> link each spec from its tracking issue once filed.
+> old `TODO.md` was retired). These specs are the long-form design behind those
+> issues; each row links its tracking issue.
