@@ -13,92 +13,22 @@
 import { defineStore } from 'pinia';
 import { computed, ref, shallowRef } from 'vue';
 import type { DockviewApi, EdgeGroupPosition } from 'dockview-core';
-import {
-  asRemovePanelArg,
-  dockApiHeight,
-  dockApiWidth,
-  groupId,
-  groupPanels,
-} from '@/stores/shell/dockviewTypes';
+import { asRemovePanelArg, dockApiHeight, dockApiWidth } from '@/stores/shell/dockviewTypes';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
+import { LEFT_ACTIVITY_TABS, PANEL_IDS, RIGHT_ACTIVITY_TABS } from '@/constants/panels';
+import { buildPanelCrud } from './layoutPanelCrud';
+import { buildEdgePanels } from './layoutEdgePanels';
+import { buildLayoutSeeds } from './layoutSeeds';
+
+// Re-export pure utilities so existing callers keep their import paths.
+export { basename, composePanelTitle, shortPanelTitle } from './layoutUtils';
+export type { EdgePanelOptions } from './layoutUtils';
 
 /// Singleton id for the right-edge session details rail. One rail at
 /// a time, bound to `activeSessionId` so switching chat tabs swaps the
 /// rail's content rather than spawning a new panel per session.
-import {
-  findActivityTabSeed,
-  LEFT_ACTIVITY_TABS,
-  PANEL_IDS,
-  RIGHT_ACTIVITY_TABS,
-  TAB_COMPONENTS,
-} from '@/constants/panels';
-
 const SESSION_DETAILS_PANEL_ID = PANEL_IDS.sessionDetails;
 const SETTINGS_PANEL_ID = PANEL_IDS.settings;
-
-/// Short panel title from a session id. The CLI emits `session.title_changed`
-/// when the model summarizes the conversation; until then the tab shows
-/// the first 8 chars of the session id so each pane is identifiable.
-export function shortPanelTitle(sessionId: string): string {
-  return sessionId.length > 12 ? `${sessionId.slice(0, 8)}…` : sessionId;
-}
-
-/// Returns the last path segment of a Unix or Windows absolute path.
-/// Empty / whitespace input → "". Trailing slashes are tolerated so
-/// "C:\\repo\\dafman\\" and "C:\\repo\\dafman" produce the same result.
-export function basename(path: string | null | undefined): string {
-  if (!path) return '';
-
-  const trimmed = path.trim().replace(/[\\/]+$/, '');
-
-  if (!trimmed) return '';
-
-  const match = trimmed.match(/[\\/]([^\\/]+)$/);
-
-  return match ? match[1] : trimmed;
-}
-
-/// Composes the dockview tab title. We deliberately keep tabs short
-/// — workspace shows up in the per-session controls (chat tab strip
-/// right actions), so duplicating it in the tab title makes the label
-/// very long for no extra info. SDK-supplied title preferred; fall
-/// back to a shortened session id.
-///
-/// (Used to also take a `workingDirectory` so an earlier design could
-/// prefix the folder; that approach was dropped — the param is gone
-/// now. If we re-introduce folder-prefixed titles, add an options bag
-/// rather than a positional arg.)
-export function composePanelTitle(sessionId: string, title: string | null): string {
-  if (title) return title;
-
-  return shortPanelTitle(sessionId);
-}
-
-export interface EdgePanelOptions {
-  /// Unique panel id (used by `getPanel` for toggle behaviour).
-  id: string;
-  /// Registered component name (named template slot in App.vue).
-  component: string;
-  /// Optional dockview tab-component name. Sidebar / edge-group panels
-  /// usually want the slimmer `sidebarTab` instead of the session-styled
-  /// `chatTab` default.
-  tabComponent?: string;
-  /// Tab title (visible on the panel's tab).
-  title?: string;
-  /// Arbitrary panel params forwarded to the component slot.
-  params?: Record<string, unknown>;
-  /// Initial size of the edge group along its main axis (px). Only
-  /// applied when the edge group is being created for the first time.
-  initialSize?: number;
-  /// Minimum size of the edge group along its main axis (px). Below
-  /// this, the user-drag sash bottoms out. Defaults to dockview's
-  /// own fallback (`collapsedSize + 50`) when omitted.
-  minimumSize?: number;
-  /// When true, closes sibling panels in the same edge group before
-  /// opening this one. Used by the activity-bar left rail so only one
-  /// sidebar button can be active at a time.
-  exclusive?: boolean;
-}
 
 export const useLayoutStore = defineStore('layout', () => {
   /// Outer DockviewApi. `shallowRef` (not `ref`) because DockviewApi is
@@ -222,6 +152,8 @@ export const useLayoutStore = defineStore('layout', () => {
   const detailsOpen = ref<boolean>(false);
   let activeUnsubs: Array<() => void> = [];
 
+  // ---------- Constraints & edge minimums ----------
+
   /// Apply the active-tab's `minimumSize` (from the seed metadata)
   /// to the edge group's splitview constraints. v2 semantics: dockview
   /// doesn't expose a clean public API for mutating an edge group's
@@ -312,6 +244,8 @@ export const useLayoutStore = defineStore('layout', () => {
     applyActiveTabConstraints('left');
     applyActiveTabConstraints('right');
   }
+
+  // ---------- Active session tracking ----------
 
   function recomputeActiveSession(dock: DockviewApi): void {
     const panel = dock.activeGroup?.activePanel;
@@ -420,6 +354,14 @@ export const useLayoutStore = defineStore('layout', () => {
     if (detailsOpen.value !== found) detailsOpen.value = found;
   }
 
+  // ---------- Sub-module builders ----------
+
+  const edges = buildEdgePanels({ api, groupsStore, applyEdgeMinimum });
+  const crud = buildPanelCrud({ api, bodyApi, sessionTitleResolver, groupsStore });
+  const seeds = buildLayoutSeeds({ api, enforceKnownEdgeMinimums });
+
+  // ---------- Outer API lifecycle ----------
+
   function setApi(next: DockviewApi | null): void {
     for (const unsub of activeUnsubs) unsub();
 
@@ -525,146 +467,19 @@ export const useLayoutStore = defineStore('layout', () => {
     ];
   }
 
-  // ---------- Chat panels (one per session) ----------
+  // ---------- Thin delegates ----------
 
-  function addPanel(
-    sessionId: string,
-    opts: { title?: string; targetGroupId?: string } = {},
-  ): void {
-    const dock = bodyApi.value;
-
-    if (!dock) return;
-
-    // One-only invariant: if this session lives in a different group
-    // (mounted or cached), strip it from there first. No-op when it's
-    // already in the active group.
-    groupsStore.pruneSessionFromAllGroups(sessionId, groupsStore.activeGroupId ?? undefined);
-
-    if (dock.getPanel(sessionId)) return;
-
-    // Resolve the best available title: explicit `opts.title` first,
-    // then fall back to the title resolver (typically registered at
-    // boot to look up session titles from `sessionsStore`), then the
-    // short GUID prefix. Using a callback rather than importing the
-    // sessions store avoids the circular-import problem that the
-    // require()-hack previously worked around.
-    let resolvedTitle = opts.title;
-
-    if (!resolvedTitle && sessionTitleResolver.value) {
-      const title = sessionTitleResolver.value(sessionId);
-
-      if (title) resolvedTitle = composePanelTitle(sessionId, title);
-    }
-
-    resolvedTitle ??= shortPanelTitle(sessionId);
-    // Three placement cases:
-    //
-    // 1. `targetGroupId` supplied (orphan replacement) → drop the panel
-    //    as a tab inside that specific group (`direction: "within"`).
-    // 2. A body (grid-located) group already exists → tile a new group
-    //    to the right of it so two sessions read as side-by-side panes
-    //    (the documented "new sessions tile by default" behaviour).
-    // 3. No body group exists yet (very first session, or every session
-    //    closed and only edge sidebars remain) → create a body group
-    //    ourselves and drop the panel `direction: "within"` it.
-    //
-    // Earlier "fix" tried calling `dock.addPanel` with no `position`
-    // when no body group existed, on the theory that dockview's default
-    // placement would land it in the body. It does NOT — when the only
-    // groups are edges, dockview's default places the panel inside the
-    // active group (the Sessions sidebar). The result was chat panels
-    // tabbed into the 240 px sidebar with the tab strip hidden by the
-    // `.dv-edge-group .dv-tabs-and-actions-container` rule in
-    // style.css — exactly the "sessions open at tiny percentage / no
-    // tab bar / lands in sidebar" cluster. Covered by tests now.
-    // v3 nested-dockview: `dock === bodyApi` is the active group's INNER
-    // dockview which has no edge groups. Use the location-aware helper
-    // so both v3 inner AND the legacy outer code path produce a
-    // grid-located reference (never an edge group). Using the outer's
-    // firstBodyGroupId() here would return an id that doesn't exist on
-    // the inner and dockview throws `referenceGroup '<id>' does not
-    // exist`. (Caught when the user reported "sessions go nowhere
-    // after creating".)
-    let referenceGroup = opts.targetGroupId ?? firstBodyGroupIdOf(dock);
-    let createdBodyGroup = false;
-
-    if (!referenceGroup) {
-      const body = dock.addGroup();
-
-      referenceGroup = body.id;
-      createdBodyGroup = true;
-    }
-
-    const direction = opts.targetGroupId || createdBodyGroup ? 'within' : 'right';
-
-    dock.addPanel({
-      id: sessionId,
-      component: 'chat',
-      title: resolvedTitle,
-      params: { sessionId },
-      position: { referenceGroup, direction },
-    });
-
-    // Note: do NOT auto-open the session-details right-rail here.
-    // The previous behavior popped the rail open every time a session
-    // was created, which surprised users — they had to close it
-    // themselves on every new session. The rail is still openable on
-    // demand via the activity-bar toggle / `toggleSessionDetailsPanel`.
-    // (Issue: problems.md "Remove the thing that a session
-    // automatically opens its settings".)
+  /// Opens or toggles the Settings panel in the left-edge activity bar.
+  function toggleSettings(): void {
+    edges.activateEdgePanel(SETTINGS_PANEL_ID, 'left');
   }
-
-  function addTerminalPanel(terminalId: string, title = 'Terminal'): void {
-    const dock = bodyApi.value;
-
-    if (!dock) return;
-
-    const panelId = `terminal-${terminalId}`;
-    const existing = dock.getPanel(panelId);
-
-    if (existing) {
-      existing.api.setActive();
-
-      return;
-    }
-
-    // See addPanel above for why we use firstBodyGroupIdOf(dock)
-    // instead of the outer-only firstBodyGroupId().
-    let referenceGroup = firstBodyGroupIdOf(dock);
-    let createdBodyGroup = false;
-
-    if (!referenceGroup) {
-      const body = dock.addGroup();
-
-      referenceGroup = body.id;
-      createdBodyGroup = true;
-    }
-
-    dock.addPanel({
-      id: panelId,
-      component: 'terminal',
-      title,
-      params: { terminalId },
-      position: {
-        referenceGroup,
-        direction: createdBodyGroup ? 'within' : 'right',
-      },
-    });
-  }
-
-  // ---------- Session details right-rail (singleton) ----------
-  //
-  // Single rail panel mounted in a right-edge dockview group. Its
-  // content reads from `activeSessionId` so switching chat tabs
-  // re-renders the rail for the new session rather than spawning
-  // a per-session panel.
 
   /// Toggles the details rail. Goes through `activateEdgePanel` which
   /// already implements the toggle (click active → collapse; otherwise
   /// activate + expand). Per-tab `minimumSize` is enforced by
   /// `applyActiveTabConstraints` reacting to the active-panel change.
   function toggleSessionDetailsPanel(): void {
-    activateEdgePanel(SESSION_DETAILS_PANEL_ID, 'right');
+    edges.activateEdgePanel(SESSION_DETAILS_PANEL_ID, 'right');
   }
 
   /// Returns true if the rail singleton is currently open. Reactive
@@ -674,108 +489,7 @@ export const useLayoutStore = defineStore('layout', () => {
     return detailsOpen.value;
   }
 
-  /// Returns the id of the active group when it lives inside the grid
-  /// body, or — if the active group is an edge / floating / popout —
-  /// the first body group we find. Returns undefined when no body
-  /// group exists yet (first panel ever; dockview will use default
-  /// placement).
-  function firstBodyGroupId(): string | undefined {
-    const dock = api.value;
-
-    if (!dock) return undefined;
-
-    return firstBodyGroupIdOf(dock);
-  }
-
-  /// Variant of `firstBodyGroupId` that operates on an arbitrary
-  /// DockviewApi (used by addPanel when it's routing through bodyApi
-  /// — the active group's INNER dockview). Inner dockviews have no
-  /// edge groups so all their groups are body groups, but the filter
-  /// is still semantically correct (and protects the legacy path).
-  function firstBodyGroupIdOf(dock: DockviewApi): string | undefined {
-    const active = dock.activeGroup;
-
-    if (active && active.model.location.type === 'grid') return active.id;
-
-    for (const group of dock.groups) {
-      if (group.model.location.type === 'grid') return group.id;
-    }
-
-    return undefined;
-  }
-
-  /// One-shot cleanup: scans every panel and moves any chat panels
-  /// (component === "chat") that are stuck inside an edge group out
-  /// to the body. Runs once after layout restore to recover from
-  /// older bugs that let chat panels land in the Sessions sidebar.
-  ///
-  /// Uses `panel.api.moveTo({ group })` so the panel keeps its state;
-  /// creates a fresh body group when none exists.
-  function rescueChatPanelsFromEdgeGroups(): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const stuck: Array<{ panelId: string }> = [];
-
-    for (const group of dock.groups) {
-      if (group.model.location.type === 'grid') continue;
-
-      for (const panel of group.panels) {
-        if (panel.api.component === 'chat') {
-          stuck.push({ panelId: panel.api.id });
-        }
-      }
-    }
-
-    if (stuck.length === 0) return;
-
-    let bodyGroupId = firstBodyGroupId();
-
-    if (!bodyGroupId) {
-      const body = dock.addGroup();
-
-      bodyGroupId = body.id;
-    }
-
-    const target = dock.getGroup(bodyGroupId);
-
-    if (!target) return;
-
-    for (const { panelId } of stuck) {
-      const panel = dock.getPanel(panelId);
-
-      // `moveTo` takes the concrete DockviewGroupPanel class but
-      // `dock.getGroup()` is typed as IDockviewGroupPanel here. The
-      // runtime value is the same instance; cast through unknown.
-      if (panel) {
-        panel.api.moveTo({
-          group: target as unknown as Parameters<typeof panel.api.moveTo>[0]['group'],
-        });
-      }
-    }
-  }
-
-  /// Swaps an orphan panel (a session that failed to resume on
-  /// restore) for a freshly-created session, in-place: the new panel
-  /// lands in the same group as the orphan and the orphan is removed.
-  /// Returns `true` if the swap happened (orphan was found).
-  function replaceMissingPanel(orphanId: string, newSessionId: string): boolean {
-    const dock = api.value;
-
-    if (!dock) return false;
-
-    const orphan = dock.getPanel(orphanId);
-
-    if (!orphan) return false;
-
-    const groupId = orphan.api.group.id;
-
-    addPanel(newSessionId, { targetGroupId: groupId });
-    dock.removePanel(orphan);
-
-    return true;
-  }
+  // ---------- Reset ----------
 
   /// Resets the layout to "factory default": closes every panel
   /// (chat tabs, settings, dev playground, sidebars), then re-opens
@@ -822,403 +536,10 @@ export const useLayoutStore = defineStore('layout', () => {
 
     // Re-seed the activity-bar tabs.
     try {
-      seedDefaultLayout();
+      seeds.seedDefaultLayout();
     } catch (err) {
       console.error('[layoutStore.resetToDefault] seedDefaultLayout threw', err);
     }
-  }
-
-  /// Opens the Settings panel in the main body grid (it stopped being
-  /// an activity-bar tab in v2; the status-bar cog and the command
-  /// palette both go through here so the panel lands in the same
-  /// place from every surface).
-  /// Opens or toggles the Settings panel. In v2 Settings lives as a
-  /// left-edge activity-bar tab (per `LEFT_ACTIVITY_TABS`). This is
-  /// just a typed shortcut to `activateEdgePanel(SETTINGS_PANEL_ID,
-  /// 'left')` — clicking when closed expands the strip + activates
-  /// Settings; clicking when already active+expanded collapses.
-  function toggleSettings(): void {
-    activateEdgePanel(SETTINGS_PANEL_ID, 'left');
-  }
-
-  function removePanel(sessionId: string): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const panel = dock.getPanel(sessionId);
-
-    if (panel) dock.removePanel(panel);
-    // The session-details rail is a singleton bound to the active
-    // session — closing one chat panel doesn't close the rail. It
-    // re-binds to whatever chat becomes active next.
-  }
-
-  /// Brings a panel forward in its group + activates it. Used by
-  /// the global PendingRequestModal to surface the owning session
-  /// when a pending request fires for a non-active panel.
-  function activatePanel(sessionId: string): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const panel = dock.getPanel(sessionId);
-
-    if (panel) panel.api.setActive();
-  }
-
-  // ---------- Edge-group panels (sidebars / status bars) ----------
-  //
-  // Future side surfaces (Recent Sessions, Permission queue, Log viewer,
-  // MCP status, …) plug in here. Each registered component (template
-  // slot on `<DockviewVue>`) becomes openable at left/right/top/bottom.
-
-  /// Opens (or focuses) a panel inside an edge group at the given
-  /// position. The edge group is created lazily on first call.
-  ///
-  /// If an existing edge group at this position is below `initialSize`
-  /// (e.g. the user dragged it to a sliver, or a previous close left
-  /// it collapsed), we tear it down and recreate at the requested size.
-  /// Without this, "close → reopen" produces a tiny strip.
-  /// Toggle/activate a panel that lives in an edge group. Intended
-  /// for command palette, keyboard shortcuts, and programmatic
-  /// callers — UI clicks on dockview tabs already go through
-  /// dockview's native handler which does the same thing.
-  ///
-  /// Semantics:
-  ///   - panel inactive  → activate it + expand the strip if collapsed
-  ///   - panel active + expanded → collapse the strip
-  ///   - panel active + collapsed → expand the strip (rare; happens
-  ///     if external code activated the panel programmatically while
-  ///     the strip is collapsed)
-  ///
-  /// No-ops if the panel or its edge group is not seeded yet.
-  function activateEdgePanel(id: string, edge: 'left' | 'right'): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const group = dock.getEdgeGroup(edge);
-    const panel = dock.getPanel(id);
-
-    if (!group || !panel) return;
-
-    const isCollapsed = group.isCollapsed();
-    // "Shown" = the edge is expanded AND this panel is the one currently
-    // displayed in it. Deliberately NOT `panel.api.isActive`: that is also false
-    // whenever the panel's group isn't dockview's globally-active group, which it
-    // stops being the moment the user clicks any control inside the rail — making
-    // the cog need two clicks to collapse (#54). `group.activePanel` tracks the
-    // displayed panel regardless of global focus.
-    const isShown = !isCollapsed && panel.group.activePanel?.id === id;
-
-    if (isShown) {
-      group.collapse();
-
-      return;
-    }
-
-    if (!panel.api.isActive) panel.api.setActive();
-
-    if (isCollapsed) group.expand();
-  }
-
-  /// Reveals and focuses an edge panel without toggling it closed.
-  /// Use for programmatic navigation where the intent is always "show this
-  /// panel" (for example slash commands), not activity-bar click toggles.
-  function revealEdgePanel(id: string, edge: 'left' | 'right'): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const group = dock.getEdgeGroup(edge);
-    const panel = dock.getPanel(id);
-
-    if (!group || !panel) return;
-
-    if (!panel.api.isActive || panel.group.activePanel?.id !== id) panel.api.setActive();
-
-    if (group.isCollapsed()) group.expand();
-  }
-
-  /// v1 entry point retained for back-compat with callers that still
-  /// pass `EdgePanelOptions`. In v2 every activity-bar panel is
-  /// seeded at boot via `seedDefaultLayout`, so this just delegates
-  /// to `activateEdgePanel` for the known activity-tab ids. The
-  /// `initialSize` / `minimumSize` fields in the options are IGNORED
-  /// here — per-tab constraints come from the seed metadata via
-  /// `applyActiveTabConstraints` instead. Kept as a function so we
-  /// don't have to migrate every caller in one commit.
-  ///
-  /// New callers should use `activateEdgePanel(id, position)` directly.
-  function openEdgePanel(position: EdgeGroupPosition, options: EdgePanelOptions): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    // If the panel is one of our seeded activity-bar tabs, the seed
-    // already created it. Just activate + expand.
-    if (findActivityTabSeed(options.id)) {
-      if (position === 'left' || position === 'right') {
-        activateEdgePanel(options.id, position);
-      }
-
-      return;
-    }
-
-    // Unknown panel id — fall back to the v1 path (add the panel
-    // into the existing edge group, or create the group if absent).
-    // No callers exercise this today; if a new caller appears,
-    // consider whether the panel should be added to the seed table
-    // instead.
-    const edge =
-      dock.getEdgeGroup(position) ??
-      dock.addEdgeGroup(position, {
-        id: `edge-${position}`,
-        ...(options.initialSize !== undefined ? { initialSize: options.initialSize } : {}),
-        ...(options.minimumSize !== undefined ? { minimumSize: options.minimumSize } : {}),
-      });
-
-    if (!dock.getPanel(options.id)) {
-      dock.addPanel({
-        id: options.id,
-        component: options.component,
-        title: options.title ?? options.id,
-        params: options.params ?? {},
-        ...(options.tabComponent ? { tabComponent: options.tabComponent } : {}),
-        position: { referenceGroup: edge.id },
-      });
-    } else {
-      dock.getPanel(options.id)?.api.setActive();
-    }
-
-    if (edge.isCollapsed()) edge.expand();
-
-    applyEdgeMinimum(position, options.minimumSize);
-  }
-
-  /// Removes the edge group at `position` if the given group id matches
-  /// and the group is now empty. Returns true if we cleaned up. Used by
-  /// `onDidRemovePanel` handlers so closing a sidebar panel via
-  /// dockview's own X (which doesn't go through `closePanel`) still
-  /// tears down the parent shell so the next open gets a fresh
-  /// `initialSize`.
-  function pruneEmptyEdgeGroup(targetGroupId: string): boolean {
-    const dock = api.value;
-
-    if (!dock) return false;
-
-    for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
-      const edge = dock.getEdgeGroup(pos);
-
-      if (!edge) continue;
-
-      if (groupId(edge) !== targetGroupId) continue;
-
-      const panels = groupPanels(edge);
-
-      if (panels.length === 0) {
-        dock.removeEdgeGroup(pos);
-
-        return true;
-      }
-
-      return false;
-    }
-
-    return false;
-  }
-
-  /// Returns `true` if a panel with the given id is currently in the
-  /// dockview tree. Used by toggle-style toolbar buttons (Sessions
-  /// Manager, Library, …) to decide between open/close.
-  function isPanelOpen(id: string): boolean {
-    const dock = api.value;
-
-    if (!dock) return false;
-
-    return !!dock.getPanel(id);
-  }
-
-  /// Closes (removes) a panel by id, and also tears down the parent
-  /// edge group if removing this panel leaves it empty. Removing the
-  /// empty group means the *next* `openEdgePanel` call recreates at
-  /// the configured `initialSize` instead of inheriting a residual
-  /// collapsed size. Idempotent for unknown ids.
-  ///
-  /// v3: chat / terminal panels live in inner dockviews. We try the
-  /// outer api first (covers edge tabs, settings, playground, group
-  /// panels themselves). If the panel isn't there, walk the registered
-  /// inner apis and remove from whichever inner owns it.
-  function closePanel(id: string): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const panel = dock.getPanel(id);
-
-    if (panel) {
-      const group = panel.api.group;
-      const wasLastInGroup = group.panels.length <= 1;
-
-      dock.removePanel(panel);
-
-      // If the group it lived in is now empty *and* it's an edge group,
-      // remove it so size persistence resets. Body groups are left for
-      // dockview to clean up on its own — body layout is the user's
-      // grid and we don't want to collapse adjacent panels.
-      if (wasLastInGroup) {
-        for (const pos of ['left', 'right', 'top', 'bottom'] as const) {
-          const edge = dock.getEdgeGroup(pos);
-
-          if (edge && groupId(edge) === group.id) {
-            dock.removeEdgeGroup(pos);
-            break;
-          }
-        }
-      }
-
-      return;
-    }
-
-    // Not on outer — walk inner apis (chat / terminal panels live there
-    // in v3). innerApis is now a shallowRef so values keep their
-    // DockviewApi identity (no `as unknown as DockviewApi` needed).
-    for (const innerApi of Object.values(groupsStore.innerApis)) {
-      const innerPanel = innerApi.getPanel(id);
-
-      if (innerPanel) {
-        innerApi.removePanel(innerPanel);
-
-        // No edge-group cleanup inside inner dockviews (they don't have edges).
-        // The group-meta cache will pick up the new toJSON on next layout-change.
-        return;
-      }
-    }
-  }
-
-  /// Toggles edge-group visibility (e.g. collapse/expand a sidebar
-  /// without destroying its contents).
-  function toggleEdgeGroup(position: EdgeGroupPosition): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    if (!dock.getEdgeGroup(position)) return;
-
-    dock.setEdgeGroupVisible(position, !dock.isEdgeGroupVisible(position));
-  }
-
-  // ---------- Layout serialization (persistence) ----------
-
-  /// Returns dockview's full serialized layout, or null when the api
-  /// isn't ready yet. Callers (settingsStore writers) treat this as an
-  /// opaque blob — only dockview interprets it.
-  function snapshot(): unknown {
-    return api.value?.toJSON() ?? null;
-  }
-
-  /// Restores a previously-snapshotted layout. Caller is responsible
-  /// for ensuring any session-backed panels referenced by the layout
-  /// have been resumed first (so the slot can find their record).
-  ///
-  /// Wrapped in try/catch because a malformed persisted JSON
-  /// (legacy panel ids, dangling group refs, schema drift across
-  /// dockview versions) makes `fromJSON` throw — and an unhandled
-  /// throw here propagates up through `App.vue`'s async `onMounted`,
-  /// preventing `bootStore.markReady()` from ever firing and leaving
-  /// the splash stuck on "Applying layout…" / "Restoring sessions…".
-  /// Returns true on success, false on a swallowed failure (caller
-  /// can fall back to opening the Sessions sidebar at default size).
-  function restore(layout: unknown): boolean {
-    const dock = api.value;
-
-    if (!dock || !layout || typeof layout !== 'object') return false;
-
-    try {
-      dock.fromJSON(layout as Parameters<DockviewApi['fromJSON']>[0]);
-      enforceKnownEdgeMinimums();
-
-      return true;
-    } catch (err) {
-      console.error('[layoutStore.restore] dockview.fromJSON threw — clearing layout', err);
-
-      return false;
-    }
-  }
-
-  /// Seeds the canonical v2 edge-group layout: a left edge group with
-  /// the activity-bar tabs and a right edge group with the right-side
-  /// tabs (session details + library). Both groups start collapsed —
-  /// the user opens one by clicking its tab in the strip.
-  ///
-  /// Idempotent: skips work that's already in place. Safe to call
-  /// during boot before any chat panel resumes happen.
-  ///
-  /// Logs total wall time so we can keep the boot-cost gate honest
-  /// per plan §4 (>50 ms regression triggers a lazy-mount detour).
-  function seedDefaultLayout(): void {
-    const dock = api.value;
-
-    if (!dock) return;
-
-    const startedAt = performance.now();
-
-    for (const [position, seeds] of [
-      ['left', LEFT_ACTIVITY_TABS],
-      ['right', RIGHT_ACTIVITY_TABS],
-    ] as const) {
-      // Edge group min = max(all tabs' minimums) because dockview's
-      // splitview enforces ONE static minimumSize per edge group
-      // and there's no clean public API to mutate it after creation
-      // (the splitview's view.minimumSize getter reads from a
-      // private `_expandedMinimumSize` field set only at addEdgeGroup
-      // time). Setting it to the max keeps the most-demanding tab
-      // (Logs needs 420 on the left; SessionDetails needs 380 on
-      // the right) from ever being clipped. Sessions/Library can
-      // technically tolerate a narrower strip, but pay a small
-      // strip-width cost in exchange for never breaking.
-      //
-      // Initial size = the FIRST seeded tab's preferred initial
-      // (Sessions's 260 on left, SessionDetails's 380 on right),
-      // clamped up to the max-min floor if necessary.
-      const firstSeed = seeds[0];
-      const maxMin = seeds.reduce((acc, s) => Math.max(acc, s.minimumSize), 0);
-      const initialSize = Math.max(firstSeed?.initialSize ?? 280, maxMin);
-      const minimumSize = maxMin;
-
-      const edge =
-        dock.getEdgeGroup(position) ??
-        dock.addEdgeGroup(position, {
-          id: `edge-${position}`,
-          initialSize,
-          minimumSize,
-          // Explicit collapsedSize: dockview's default is 35px which
-          // crowds our 28x28 icons. 44px matches most dockview themes
-          // and leaves comfortable padding.
-          collapsedSize: 44,
-          collapsed: true,
-        });
-
-      for (const seed of seeds) {
-        if (dock.getPanel(seed.id)) continue;
-
-        dock.addPanel({
-          id: seed.id,
-          component: seed.component,
-          tabComponent: TAB_COMPONENTS.activityTab,
-          title: seed.title,
-          params: { icon: seed.icon, title: seed.title },
-          position: { referenceGroup: edge.id },
-        });
-      }
-
-      if (!edge.isCollapsed()) edge.collapse();
-    }
-
-    const elapsedMs = Math.round(performance.now() - startedAt);
-
-    console.info(`[layoutStore.seedDefaultLayout] seeded edge tabs in ${elapsedMs}ms`);
   }
 
   return {
@@ -1236,26 +557,18 @@ export const useLayoutStore = defineStore('layout', () => {
     enforceKnownEdgeMinimums,
     setApi,
     setSessionTitleResolver,
-    addPanel,
-    addTerminalPanel,
-    removePanel,
-    activatePanel,
-    replaceMissingPanel,
-    openEdgePanel,
-    activateEdgePanel,
-    revealEdgePanel,
+    // panel CRUD (addPanel, addTerminalPanel, removePanel, activatePanel,
+    // replaceMissingPanel, firstBodyGroupId, rescueChatPanelsFromEdgeGroups)
+    ...crud,
+    // edge panels (activateEdgePanel, revealEdgePanel, openEdgePanel,
+    // pruneEmptyEdgeGroup, isPanelOpen, closePanel, toggleEdgeGroup,
+    // removePanel, activatePanel)
+    ...edges,
+    // serialization (snapshot, restore, seedDefaultLayout)
+    ...seeds,
     toggleSettings,
     toggleSessionDetailsPanel,
     isSessionDetailsOpen,
-    isPanelOpen,
-    closePanel,
-    pruneEmptyEdgeGroup,
-    rescueChatPanelsFromEdgeGroups,
-    toggleEdgeGroup,
     resetToDefault,
-    seedDefaultLayout,
-    firstBodyGroupId,
-    snapshot,
-    restore,
   };
 });

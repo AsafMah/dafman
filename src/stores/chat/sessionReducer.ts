@@ -5,7 +5,7 @@
 // side-effects (toasts, OS notifications) for MCP OAuth and turn-end
 // events.
 
-import type { SessionEventPayload } from '@/ipc/types';
+import type { PendingRequestPayload, SessionEventPayload } from '@/ipc/types';
 import type { PendingRecordRequest, SessionRecord } from './sessionsStore';
 
 /// A side-effect for the single effects consumer (`sessionEffects.ts`) to
@@ -445,4 +445,93 @@ export function applyToRecord(
   EVENT_HANDLERS[payload.eventType]?.(record, payload, ctx, effects);
 
   return effects;
+}
+
+/// Parses an incoming bun-side `pendingRequest` push into a
+/// `PendingRecordRequest` entry, appends it to the record's queue,
+/// pushes a synthetic `dafman.pending_request` event into the event
+/// log, and returns the `SessionEffect[]` the caller should run.
+///
+/// Idempotent: duplicate requestIds for the same record are dropped.
+///
+/// Extracted from `sessionsStore.ts` to keep the store thin. Returns
+/// effects instead of calling `runSessionEffects` directly so this
+/// module stays free of the `sessionEffects` import (which imports
+/// from here — avoiding the cycle).
+export function applyPendingToRecord(
+  record: SessionRecord,
+  payload: PendingRequestPayload,
+): SessionEffect[] {
+  // Idempotency: drop duplicate pushes of the same requestId.
+  if (record.pendingRequests.some((p) => p.requestId === payload.requestId)) {
+    return [];
+  }
+
+  let entry: PendingRecordRequest;
+
+  switch (payload.kind) {
+    case 'permission':
+      entry = {
+        kind: 'permission',
+        requestId: payload.requestId,
+        message: payload.request.summary,
+        request: payload.request,
+      };
+      break;
+    case 'userInput':
+      entry = {
+        kind: 'userInput',
+        requestId: payload.requestId,
+        message: payload.request.question,
+        request: payload.request,
+      };
+      break;
+    case 'elicitation':
+      entry = {
+        kind: 'elicitation',
+        requestId: payload.requestId,
+        message: payload.request.message,
+        request: payload.request,
+      };
+      break;
+    case 'exitPlanMode':
+      entry = {
+        kind: 'exitPlanMode',
+        requestId: payload.requestId,
+        message: payload.request.summary || 'Plan ready for approval',
+        request: payload.request,
+      };
+      break;
+    case 'autoModeSwitch':
+      entry = {
+        kind: 'autoModeSwitch',
+        requestId: payload.requestId,
+        message: payload.request.errorCode
+          ? `Switch to auto mode after rate limit: ${payload.request.errorCode}`
+          : 'Switch to auto mode?',
+        request: payload.request,
+      };
+      break;
+  }
+
+  record.pendingRequests.push(entry);
+  // Also push a synthetic `dafman.pending_request` event into the
+  // record's event buffer so the reducer (which only sees the
+  // event stream) builds the same queue inside `ChatAmbient`.
+  appendEvent(record, {
+    sessionId: record.id,
+    eventType: 'dafman.pending_request',
+    data: payload,
+  });
+
+  return [
+    {
+      kind: 'notify',
+      notifyKind: 'waitingForInput',
+      sessionId: record.id,
+      title: record.title ?? `Session ${record.id.slice(0, 8)}`,
+      body: entry.message,
+      tag: `${record.id}:pendingRequest:${entry.requestId}`,
+    },
+  ];
 }
