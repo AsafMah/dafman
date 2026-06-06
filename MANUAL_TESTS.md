@@ -142,14 +142,14 @@ section is verified) or get a GitHub issue filed (with label
 - **Expected:** Only the clicked row shows the pending disabled state; the other rows' Select/Deselect buttons do not visibly flash. The active row's Select ↔ Deselect change fades smoothly without a hard flicker.
 - **Why not automated:** The unit test covers disabled-state scoping and the concurrency guard, but visual transition timing and perceived flicker require a live WebView render.
 
-### Issue #128 — tab-bar maximize/restore button (2026-06-01)
+### Issue #128 / #171 — session-tab maximize + tab rename affordances (2026-06-01, updated 2026-06-05)
 
-#### MX.1 - Session and group tabs maximize and restore from the tab bar.
+#### MX.1 - Session tabs maximize/restore; double-click renames; group tabs have no maximize.
 
 - [ ] result:
-- **Steps:** Run `bun run dev`; open at least two groups and two sessions in one group. Hover a session tab and click its maximize button, then click Restore. Repeat on a group tab.
-- **Expected:** The clicked tab's panel maximizes using dockview's layout behavior, the icon/label flips to Restore, and clicking Restore returns the previous layout without losing tab order, active session, or group state.
-- **Why not automated:** Requires visually confirming dockview's real maximize layout, hover affordance, and restore geometry in the live Electrobun webview; unit tests only prove the tab calls the API.
+- **Steps:** Run the app; open at least two groups and two sessions in one group. (a) Hover a session tab and click its maximize button, then click Restore. (b) Double-click a session tab's title, type a name, press **Enter** (then try again and press **Escape**). (c) Look at a **group** tab.
+- **Expected:** (a) the session panel maximizes via dockview and restores without losing tab order / active session / group state, icon flips Maximize↔Restore. (b) the title becomes an inline input; Enter saves the trimmed name, Escape reverts. (c) the group tab has **no** maximize button — only double-click rename, color, and close (when >1 group). Group maximize was removed in #171 as meaningless.
+- **Why not automated:** Requires visually confirming dockview's real maximize/restore geometry, the inline tab-input focus/keys, and the absence of the group affordance in the live Electrobun webview.
 
 ### Issue #137 — chat transcript scroll anchoring (2026-06-01)
 
