@@ -29,8 +29,22 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { toErrorMessage } from '@/lib/errorMessage';
-import { appendEvent, applyToRecord } from './sessionReducer';
+import { appendEvent, applyPendingToRecord, applyToRecord } from './sessionReducer';
 import { runSessionEffects } from './sessionEffects';
+import {
+  PLAYGROUND_PENDING_SESSION_ID,
+  compactSessionHistoryAction,
+  editUserMessageAction,
+  forkSessionAction,
+  resetSessionApprovalsAction,
+  respondToPendingAction,
+  setSessionApproveAllAction,
+  setSessionModelAction,
+  setSessionModeAction,
+  setSessionNameAction,
+  setSessionWorkingDirectoryAction,
+} from './sessionActions';
+import { findSessionByName as findSessionByNameHelper } from './sessionSelectors';
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -209,13 +223,8 @@ const MAX_PENDING_PER_SESSION = 5000;
 // Re-export for consumers that import from this module.
 export { MAX_EVENTS_PER_SESSION } from './sessionReducer';
 
-/// Sentinel session id used by `src/dev/Playground.vue` to exercise
-/// the PendingRequestModal without a real bun-side handler. The
-/// store's `respondToPending` short-circuits the RPC call when the
-/// `sessionId` matches this constant so the modal can be tested in
-/// isolation. Not exported — the playground constructs the same
-/// string literal.
-const PLAYGROUND_PENDING_SESSION_ID = 'playground-pending';
+/// Sentinel session id: re-exported from `./sessionActions` for the
+/// store-local usages (setSessionApproveAll delegate's writable check).
 
 /// Test-only seam: clears module-level state (subscription, buffered
 /// events) so each unit test starts from a clean slate. Production
@@ -341,82 +350,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     if (record.isDeleted) return;
 
-    applyPendingToRecord(record, payload);
-  }
-
-  function applyPendingToRecord(record: SessionRecord, payload: PendingRequestPayload): void {
-    // Idempotency: drop duplicate pushes of the same requestId.
-    if (record.pendingRequests.some((p) => p.requestId === payload.requestId)) {
-      return;
-    }
-
-    let entry: PendingRecordRequest;
-
-    switch (payload.kind) {
-      case 'permission':
-        entry = {
-          kind: 'permission',
-          requestId: payload.requestId,
-          message: payload.request.summary,
-          request: payload.request,
-        };
-        break;
-      case 'userInput':
-        entry = {
-          kind: 'userInput',
-          requestId: payload.requestId,
-          message: payload.request.question,
-          request: payload.request,
-        };
-        break;
-      case 'elicitation':
-        entry = {
-          kind: 'elicitation',
-          requestId: payload.requestId,
-          message: payload.request.message,
-          request: payload.request,
-        };
-        break;
-      case 'exitPlanMode':
-        entry = {
-          kind: 'exitPlanMode',
-          requestId: payload.requestId,
-          message: payload.request.summary || 'Plan ready for approval',
-          request: payload.request,
-        };
-        break;
-      case 'autoModeSwitch':
-        entry = {
-          kind: 'autoModeSwitch',
-          requestId: payload.requestId,
-          message: payload.request.errorCode
-            ? `Switch to auto mode after rate limit: ${payload.request.errorCode}`
-            : 'Switch to auto mode?',
-          request: payload.request,
-        };
-        break;
-    }
-
-    record.pendingRequests.push(entry);
-    // Also push a synthetic `dafman.pending_request` event into the
-    // record's event buffer so the reducer (which only sees the
-    // event stream) builds the same queue inside `ChatAmbient`.
-    appendEvent(record, {
-      sessionId: record.id,
-      eventType: 'dafman.pending_request',
-      data: payload,
-    });
-
-    runSessionEffects([
-      {
-        kind: 'notify',
-        notifyKind: 'waitingForInput',
-        sessionId: record.id,
-        title: record.title ?? `Session ${record.id.slice(0, 8)}`,
-        body: entry.message,
-        tag: `${record.id}:pendingRequest:${entry.requestId}`,
-      },
-    ]);
+    runSessionEffects(applyPendingToRecord(record, payload));
   }
 
   function drainPending(sessionId: string, record: SessionRecord): number {
@@ -435,7 +369,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     if (pendingList) {
       pendingRequestBuffer.delete(sessionId);
 
-      for (const p of pendingList) applyPendingToRecord(record, p);
+      for (const p of pendingList) runSessionEffects(applyPendingToRecord(record, p));
     }
 
     return (list?.length ?? 0) + (pendingList?.length ?? 0);
@@ -818,168 +752,46 @@ export const useSessionsStore = defineStore('sessions', () => {
     model: string,
     reasoningEffort: string | null,
   ): Promise<void> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
 
-    try {
-      await invokeCommand('setSessionModel', {
-        sessionId,
-        model,
-        reasoningEffort,
-      });
-      const record = getSession(sessionId);
-
-      if (record) {
-        record.model = model;
-        record.reasoningEffort = reasoningEffort;
-      }
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to switch model', message);
-      throw err;
-    }
+    return setSessionModelAction({ getSession }, sessionId, model, reasoningEffort);
   }
 
   async function setSessionMode(sessionId: string, mode: SessionMode): Promise<void> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
 
-    try {
-      await invokeCommand('setSessionMode', { sessionId, mode });
-      const record = getSession(sessionId);
-
-      if (record) record.mode = mode;
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to change run mode', message);
-      throw err;
-    }
+    return setSessionModeAction({ getSession }, sessionId, mode);
   }
 
   async function setSessionApproveAll(sessionId: string, enabled: boolean): Promise<void> {
-    // Playground sentinel: skip the RPC (no real bun session) but
-    // still mirror the flag onto the in-memory record so the UI
-    // reflects the toggle for inline testing.
-    if (sessionId === PLAYGROUND_PENDING_SESSION_ID) {
-      const record = getSession(sessionId);
+    // Playground sentinel skips the writable check (no real bun session).
+    if (sessionId !== PLAYGROUND_PENDING_SESSION_ID) assertSessionWritable(sessionId);
 
-      if (record) record.approveAll = enabled;
-
-      return;
-    }
-
-    const toasts = useToastStore();
-
-    assertSessionWritable(sessionId);
-
-    try {
-      await invokeCommand('setSessionApproveAll', { sessionId, enabled });
-      const record = getSession(sessionId);
-
-      if (record) record.approveAll = enabled;
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to update auto-approval', message);
-      throw err;
-    }
+    return setSessionApproveAllAction({ getSession }, sessionId, enabled);
   }
 
   async function resetSessionApprovals(sessionId: string): Promise<void> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
 
-    try {
-      await invokeCommand('resetSessionApprovals', { sessionId });
-      toasts.success('Session approvals cleared', sessionId);
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to reset approvals', message);
-      throw err;
-    }
+    return resetSessionApprovalsAction(sessionId);
   }
 
   async function setSessionWorkingDirectory(
     sessionId: string,
     workingDirectory: string,
   ): Promise<string> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
-    // Capture the baseWorkingDirectory read-only BEFORE the await
-    // (so the RPC has it for relative-path resolution), but DO NOT
-    // capture the record reference itself — it may be unmounted by
-    // the time the RPC resolves. Re-lookup after.
+    // Capture baseWd before the await so the RPC has it for relative-path
+    // resolution. DO NOT capture the record ref — re-look up post-await.
     const baseWd = getSession(sessionId)?.workingDirectory;
 
-    try {
-      const next = await invokeCommand('setSessionWorkingDirectory', {
-        sessionId,
-        workingDirectory,
-        ...(baseWd ? { baseWorkingDirectory: baseWd } : {}),
-      });
-      // Re-lookup the record post-await — it may have been closed
-      // mid-RPC, in which case there's nothing to update locally
-      // (the SDK side already committed the change).
-      const record = getSession(sessionId);
-
-      if (record) {
-        record.workingDirectory = next;
-        appendEvent(record, {
-          sessionId,
-          eventType: 'system.notification',
-          data: { content: `Working directory changed to ${next}` },
-        });
-      }
-
-      toasts.success('Working directory changed', next);
-
-      return next;
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to change working directory', message);
-      throw err;
-    }
+    return setSessionWorkingDirectoryAction({ getSession }, sessionId, workingDirectory, baseWd);
   }
 
   async function compactSessionHistory(sessionId: string): Promise<void> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
 
-    try {
-      const result = await invokeCommand('compactSessionHistory', {
-        sessionId,
-      });
-
-      if (result.success) {
-        const parts: string[] = [];
-
-        if (result.tokensFreed !== null) {
-          parts.push(`${result.tokensFreed.toLocaleString()} tokens freed`);
-        }
-
-        if (result.messagesRemoved !== null) {
-          parts.push(`${result.messagesRemoved} messages removed`);
-        }
-
-        toasts.success('History compacted', parts.length > 0 ? parts.join(', ') : undefined);
-      } else {
-        toasts.warn('Compaction did not complete', sessionId);
-      }
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to compact history', message);
-      throw err;
-    }
+    return compactSessionHistoryAction(sessionId);
   }
 
   /// Truncate the session's history to (and including) `eventId`,
@@ -992,29 +804,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     eventId: string,
     newText: string,
   ): Promise<void> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
 
-    try {
-      await invokeCommand('truncateSessionHistory', { sessionId, eventId });
-      // Drop local items at the truncation point too — otherwise we
-      // double-render the edited message until the SDK echoes it.
-      const record = getSession(sessionId);
-
-      if (record) {
-        const idx = record.events.findIndex((e) => e.eventId === eventId);
-
-        if (idx >= 0) record.events.splice(idx);
-      }
-
-      await invokeCommand('sendMessage', { sessionId, text: newText });
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to edit message', message);
-      throw err;
-    }
+    return editUserMessageAction({ getSession }, sessionId, eventId, newText);
   }
 
   /// Truncate to `eventId` (typically the preceding user message)
@@ -1033,25 +825,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   /// session id resolves, restoreSession opens it as a panel. Returns
   /// the new session id so the caller can route to it / focus it.
   async function forkSession(sessionId: string, toEventId?: string): Promise<string> {
-    const toasts = useToastStore();
-
     assertSessionWritable(sessionId);
 
-    try {
-      const result = await invokeCommand('forkSession', {
-        sessionId,
-        ...(toEventId ? { toEventId } : {}),
-      });
-
-      await restoreSession(result.sessionId);
-
-      return result.sessionId;
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to fork session', message);
-      throw err;
-    }
+    return forkSessionAction({ getSession, restoreSession }, sessionId, toEventId);
   }
 
   /// Fork-and-send: fork the session at the given event boundary,
@@ -1070,58 +846,18 @@ export const useSessionsStore = defineStore('sessions', () => {
     return newId;
   }
 
-  /// Best-effort lookup for the loaded session that matches a
-  /// free-form name. Used by the fork-notice chip to resolve a
-  /// CLI-supplied "name" to a sessionId we can activate. Matches
-  /// exact title, then title-startsWith, then short-id prefix
-  /// (CLI's default fork name format is `Session <8 hex>...`).
+  /// Best-effort lookup for the loaded session that matches a free-form
+  /// name. Delegates to the pure helper in `sessionSelectors.ts`.
   function findSessionByName(name: string): SessionRecord | undefined {
-    if (!name) return undefined;
-
-    const trimmed = name.trim();
-    const lower = trimmed.toLowerCase();
-    const records = sessions.value;
-    const exact = records.find((s) => (s.title ?? '').toLowerCase() === lower);
-
-    if (exact) return exact;
-
-    const titleStarts = records.find((s) => (s.title ?? '').toLowerCase().startsWith(lower));
-
-    if (titleStarts) return titleStarts;
-
-    const m = trimmed.match(/([0-9a-f]{4,})/i);
-
-    if (m && m[1]) {
-      const prefix = m[1].toLowerCase();
-      const byId = records.find((s) => s.id.toLowerCase().startsWith(prefix));
-
-      if (byId) return byId;
-    }
-
-    return undefined;
+    return findSessionByNameHelper(sessions.value, name);
   }
 
   async function setSessionName(sessionId: string, name: string): Promise<void> {
-    const toasts = useToastStore();
-    const trimmed = name.trim();
-
-    if (!trimmed) return;
+    if (!name.trim()) return;
 
     assertSessionWritable(sessionId);
 
-    try {
-      await invokeCommand('setSessionName', { sessionId, name: trimmed });
-      const record = getSession(sessionId);
-
-      if (record) {
-        record.title = trimmed;
-      }
-    } catch (err) {
-      const message = toErrorMessage(err);
-
-      toasts.error('Failed to rename session', message);
-      throw err;
-    }
+    return setSessionNameAction({ getSession }, sessionId, name);
   }
 
   /// Per-session UI override for reasoning visibility. `"default"`
@@ -1136,80 +872,16 @@ export const useSessionsStore = defineStore('sessions', () => {
     if (record && !record.isDeleted) record.reasoningVisibilityOverride = value;
   }
 
-  /// Sends the user's answer to a pending SDK callback. The bun
-  /// side resolves the awaiting Promise; the matching queue entry
-  /// is removed locally immediately (don't wait for the SDK
-  /// `_completed` echo, which can lag), and we also push a
-  /// synthetic `dafman.pending_response` into the record's event
-  /// buffer so the reducer's `ambient.pendingRequests` queue +
-  /// in-stream card both clear in the same tick.
-  ///
-  /// The `PLAYGROUND_PENDING_SESSION_ID` sentinel short-circuits
-  /// the RPC call so the dev playground can exercise the card
-  /// without a real bun-side handler (which would reject with
-  /// `Session ${id} not found`).
+  /// Sends the user's answer to a pending SDK callback. Delegates to
+  /// `respondToPendingAction` which handles optimistic mutation, RPC,
+  /// rollback, and the playground sentinel short-circuit.
   async function respondToPending(params: RespondToRequestParams): Promise<void> {
-    const record = getSession(params.sessionId);
-
-    assertSessionWritable(params.sessionId);
-
-    // Snapshot + remove the pending entry optimistically so the UI's
-    // pending card disappears immediately on click. The
-    // `dafman.pending_response` event is NOT appended until the RPC
-    // succeeds — otherwise a failed response would leave a phantom
-    // response event in the transcript that the chat reducer would
-    // dutifully render.
-    let restoredEntry: PendingRecordRequest | null = null;
-    let restoredIdx = -1;
-
-    if (record) {
-      restoredIdx = record.pendingRequests.findIndex((p) => p.requestId === params.requestId);
-
-      if (restoredIdx >= 0) {
-        restoredEntry = record.pendingRequests[restoredIdx] ?? null;
-        record.pendingRequests.splice(restoredIdx, 1);
-      }
+    // Skip writable check for playground sentinel (no real bun session).
+    if (params.sessionId !== PLAYGROUND_PENDING_SESSION_ID) {
+      assertSessionWritable(params.sessionId);
     }
 
-    if (params.sessionId === PLAYGROUND_PENDING_SESSION_ID) {
-      // Playground: synthesise the response event locally so the demo
-      // UI can show the closed-out card without a real RPC.
-      if (record) {
-        appendEvent(record, {
-          sessionId: record.id,
-          eventType: 'dafman.pending_response',
-          data: { requestId: params.requestId, kind: params.response.kind },
-        });
-      }
-
-      return;
-    }
-
-    try {
-      await invokeCommand('respondToRequest', params);
-
-      // Only emit the response event after the RPC succeeds — the
-      // chat reducer uses it to clear the pending card from the
-      // transcript view.
-      if (record) {
-        appendEvent(record, {
-          sessionId: record.id,
-          eventType: 'dafman.pending_response',
-          data: { requestId: params.requestId, kind: params.response.kind },
-        });
-      }
-    } catch (err) {
-      // Roll back the optimistic pending-list mutation so the user
-      // can retry. No response event was appended yet, so nothing
-      // else to undo.
-      if (record && restoredEntry) {
-        record.pendingRequests.splice(restoredIdx, 0, restoredEntry);
-      }
-
-      const toasts = useToastStore();
-
-      toasts.error('Failed to send response', toErrorMessage(err));
-    }
+    return respondToPendingAction({ getSession }, params);
   }
 
   return {
