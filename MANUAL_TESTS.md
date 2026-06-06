@@ -137,7 +137,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### AST.1 - Selecting one agent does not flash the whole list
 
-- [ ] result:
+- [x] result: ❌ FAIL (2026-06-06) — selecting one agent still flashes the WHOLE list: **all rows' Select/Deselect buttons briefly disable/dim** then return, instead of only the clicked row. The #127 fix scoped the spinner but not the global busy/disabled state across rows. Issue to file (intent-gap, reopen-class of #127).
 - **Steps:** Open Session Details → Agents with at least two agents visible. Click **Select** on a non-active agent, then click **Deselect** on the active agent.
 - **Expected:** Only the clicked row shows the pending disabled state; the other rows' Select/Deselect buttons do not visibly flash. The active row's Select ↔ Deselect change fades smoothly without a hard flicker.
 - **Why not automated:** The unit test covers disabled-state scoping and the concurrency guard, but visual transition timing and perceived flicker require a live WebView render.
@@ -146,7 +146,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### MX.1 - Session tabs maximize/restore; double-click renames; group tabs have no maximize.
 
-- [ ] result:
+- [x] result: ✅ PASS + 1 finding (2026-06-06, live HMR) — (a) session maximize/restore works, layout/active/order intact; (b) double-click rename works inline (Enter saves, Escape reverts); (c) group tabs have no maximize button (#171). **Finding:** the session maximize button shows even when its group holds only one session, where maximize is a no-op — should hide for single-session groups. Issue to file.
 - **Steps:** Run the app; open at least two groups and two sessions in one group. (a) Hover a session tab and click its maximize button, then click Restore. (b) Double-click a session tab's title, type a name, press **Enter** (then try again and press **Escape**). (c) Look at a **group** tab.
 - **Expected:** (a) the session panel maximizes via dockview and restores without losing tab order / active session / group state, icon flips Maximize↔Restore. (b) the title becomes an inline input; Enter saves the trimmed name, Escape reverts. (c) the group tab has **no** maximize button — only double-click rename, color, and close (when >1 group). Group maximize was removed in #171 as meaningless.
 - **Why not automated:** Requires visually confirming dockview's real maximize/restore geometry, the inline tab-input focus/keys, and the absence of the group affordance in the live Electrobun webview.
@@ -193,49 +193,49 @@ section is verified) or get a GitHub issue filed (with label
 
 #### KB.1 - Plain Enter sends at the current mode
 
-- [ ] result:
+- [x] result: ⚠️ INCONCLUSIVE (2026-06-06) — couldn't tell steer vs queue apart: **no visible cue for which send-mode is active**, and no indication that a message was queued behind a running turn. Behavior may be correct but is unobservable. Candidate issue (mode/queue affordance).
 - **Steps:** In an empty chat, set the send-mode toggle to **Steer**, type `hello`, press **Enter**. Then set the toggle to **Queue**, type `world`, press **Enter** while a turn is running.
 - **Expected:** First message sends immediately (steer). Second is queued behind the running turn (queue) — not interrupting.
 - **Why not automated:** Mode-toggle + live-turn timing; the e2e fake doesn't model steer-vs-queue scheduling visibly.
 
 #### KB.2 - Ctrl+Enter inserts a hard newline; Shift+Enter a soft one
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — Ctrl+Enter inserts a hard newline, Shift+Enter a soft break; nothing sent; three visible lines.
 - **Steps:** Type `line one`, press **Ctrl+Enter**, type `line two`. Then press **Shift+Enter** and type `line three`. Do NOT send.
 - **Expected:** Nothing sends. You see three visible lines in the composer (Ctrl+Enter = block/paragraph break, Shift+Enter = soft break within). Caret stays in the editor.
 - **Why not automated:** Visual caret/line rendering inside Lexical.
 
 #### KB.3 - Enter selects a slash/mention menu item instead of sending
 
-- [ ] result:
+- [x] result: ❌ FAIL (slash) / ✅ PASS (@) (2026-06-06) — `@file` mentions insert the highlighted pill with no send (good). **Slash commands fail:** Enter on a highlighted `/command` **executes/sends it immediately** instead of inserting `/command ` into the composer, so you can't add arguments (e.g. `/rename <title>`, `/cd <path>`, `/agent <name>`). Tab does insert (KB.7 PASS), but Enter should too (or at least not fire the no-arg command). Issue to file.
 - **Steps:** Type `/` and wait for the slash menu; arrow to a **non-first** command; press **Enter**. Separately type `@READ`, wait for the file picker, press **Enter**.
 - **Expected:** Enter runs the highlighted slash command (not the first row; no message sent) / inserts the highlighted file pill (no message sent). The message is NOT sent in either case.
 - **Why not automated:** Flow 02 covers the @-pill case; the slash-run case and the "no accidental send" assertion are worth an eyeball.
 
 #### KB.7 - Tab completes the highlighted slash command, not the first row
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — Tab completes the highlighted (non-first) slash command with a trailing space, not executed.
 - **Steps:** Type `/` and wait for multiple slash-command results. Arrow to a **non-first** command and press **Tab**.
 - **Expected:** The typed slash query is replaced with the highlighted command plus a trailing space so you can add args; the first row is not chosen unless it is highlighted, and the command is not executed until you explicitly send/select.
 - **Why not automated:** The pure selection resolver is unit-tested, but the real keyboard highlight → Lexical command dispatch → rendered composer replacement path depends on live WebView2/Lexical focus timing.
 
 #### KB.4 - Enter on a zero-match `/` or `@` SENDS the raw text
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — zero-match `/` and `@` both send the raw text on Enter.
 - **Steps:** Type `/notacommand` (no menu match), press **Enter**. Then type `@zzzznomatch`, wait for the picker to settle empty, press **Enter**.
 - **Expected:** Each sends the raw text as a normal message (no menu was active to capture Enter).
 - **Why not automated:** Depends on the async file-search settling to empty before the keystroke — timing-sensitive.
 
 #### KB.5 - Modifier sends ignore the menu; Shift+Enter in a menu is a soft break
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — Alt+Enter / Ctrl+Shift+Enter / Ctrl+Alt+Enter all send through an open menu; Shift+Enter in a menu inserts a soft break without selecting.
 - **Steps:** With a `/` or `@` menu open: press **Alt+Enter** (steer), and in another attempt **Ctrl+Shift+Enter** (queue) and **Ctrl+Alt+Enter** (interrupt). Separately, with a menu open, press **Shift+Enter**.
 - **Expected:** The three modifier chords send immediately (menu does not capture them). Shift+Enter inserts a soft newline (does NOT select the highlighted menu item).
 - **Why not automated:** Menu-open + modifier-chord timing; the "Shift+Enter doesn't select" guard is the subtle one.
 
 #### KB.6 - Enter on an empty composer does nothing; IME commit doesn't send
 
-- [ ] result:
+- [x] result: ⚠️ MOSTLY PASS (2026-06-06) — empty Enter does nothing initially; but **after deleting all composer content, Enter inserts a newline** instead of a no-op. Minor. Candidate issue.
 - **Steps:** With an empty composer, press **Enter** a few times. Then (if you have an IME) type with composition and press Enter to COMMIT a candidate.
 - **Expected:** Empty Enter does nothing (no stray newline, no send). The IME-commit Enter commits the candidate and does NOT send the message.
 - **Why not automated:** Native IME composition can't be driven reliably in CI.
@@ -312,7 +312,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### CI.1 - Non-stable channel pill shows in the StatusBar, tinted per channel.
 
-- [ ] result:
+- [x] result: ✅ PASS (dev, 2026-06-06) — the StatusBar shows a violet `DEV` pill next to the dafman brand with a build/version tooltip. (Canary amber tint still pending the canary build — SI.3.)
 
 - **Steps:** launch the `dev` build (`bun run dev`) and, separately, the
   installed `canary` build.
@@ -329,7 +329,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### CI.2 - OS window title is suffixed on non-stable channels.
 
-- [ ] result:
+- [x] result: ✅ PASS (dev, 2026-06-06) — the OS window title reads "Dafman — dev". (Canary suffix still pending the canary build.)
 
 - **Steps:** look at the native OS window title bar (and the taskbar entry) for
   the dev and canary builds.
@@ -344,7 +344,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 99.1 - Instant agent Select/Deselect stays visually steady.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — instant Select/Deselect stays steady: buttons disable briefly, no spinner flash on instant/cached resolves.
 - **Steps:** in `bun run dev`, open a chat session with the Session Details right rail visible. Click **Select** on an agent that resolves quickly, then click **Deselect**.
 - **Expected:** the buttons disable immediately while the IPC call is pending, but the spinner only appears if the operation is still pending after a short delay; instant/cached resolves do not flash a spinner.
 - **Why not automated:** the composable timing is unit-tested, but the remaining claim is the visible PrimeVue button affordance in the live rail.
@@ -353,7 +353,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 103.1 - Tall sub-agent cards can be collapsed after scrolling to the bottom.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — the tall sub-agent card collapses in place (footer, no scroll jump), the header row toggles it, and clicking nested inner controls does not collapse the parent card.
 
 - **Steps:** in `bun run dev`, open a chat transcript with a long sub-agent card,
   scroll to the bottom of that card, click **Collapse sub-agent**, reopen it from
@@ -371,7 +371,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 109.1 - "Allow all" and run mode persist across app restart.
 
-- [ ] result: 
+- [x] result: ✅ PASS (persistence) + ⚠️ finding (2026-06-06, full restart) — each restored session kept **Allow-all ON** and its **per-session run mode** (not the global default). **Finding (potentially serious):** after the restart **every** restored session showed an **empty transcript** and the message history **never** loaded. Needs root-cause (resume failed vs render gap — check boot-log resume/historyCount). Issue to file.
 
 - **Steps:** open a session, toggle **"Allow all"** ON in the header and switch
   the run mode (e.g. to **autopilot** or **plan**). Fully quit and relaunch the
@@ -385,7 +385,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 109.2 - Permanently deleting a session clears its persisted flags.
 
-- [ ] result: 
+- [x] result: ✅ PASS (2026-06-06) — after permanently deleting an Allow-all session and creating a new one, the new session starts at the global default posture (not Allow-all).
 
 - **Steps:** enable "Allow all" on a session, then **delete** it from the CLI
   sidebar (permanent delete, not just close). Create a brand-new session.
@@ -398,7 +398,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 81.1 - Bad `.agent.md` is visibly rejected and `/agent` reports the validation error.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — the SDK-invalid `broken-agent.agent.md` (its `mcp-servers.github` is missing `tools:`) appears flagged as **SDK-rejected** with the validation message; selecting it surfaces the message, and `/agent broken-agent` reports the load/validation failure (not "No agent named"). Verifies #81.
 
 - **Steps:**
   1. In `bun run dev`, open a session in any workspace.
@@ -418,7 +418,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 36.1 - A failed tool execution appears in the Activity log with the SDK error.
 
-- [ ] result: 
+- [x] result: ✅ PASS (2026-06-06) — a failed tool shows a red TOOLFAILURE row in Diagnostics → Activity with the SDK error message; no raw argument values leak.
 - **Steps:** `bun run dev`, open a session, and trigger a tool that fails (e.g.
   ask the agent to `str_replace` text that does not exist in a file, or run a
   shell command that exits non-zero). Open Diagnostics → Activity (the LogViewer
@@ -431,7 +431,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 36.2 - A tool failure during an Autopilot run surfaces on the Jobs panel.
 
-- [ ] result: 
+- [x] result: ❌ FAIL (2026-06-06) — a tool failure during an Autopilot run **never surfaced on the active job row** in the Jobs panel (no transient `⚠ <tool> failed` text). **Isolated:** the same run DID produce the red TOOLFAILURE row in Activity (36.1), so the failure fired — only the Jobs-panel job-row path (`postToolUseFailure` → active-job latest-response line) is broken. Issue to file.
 - **Steps:** open the Jobs panel, Start Autopilot with a goal that will make the
   agent run a tool that fails. Watch the active Autopilot job row while the tool
   fails.
@@ -446,7 +446,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 76.1 - Transcript fenced code blocks switch between light and dark CodeMirror themes.
 
-- [ ] result: 
+- [x] result: ✅ PASS (2026-06-06) — a transcript fenced code block switches between light and dark CodeMirror themes live (no reload), legible both ways. Confirms the #76 fix.
 
 - **Steps:** set the app to light mode, open a session containing a top-level
   fenced code block in the transcript, then toggle the app to dark mode and back
@@ -463,7 +463,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 85.1 - Empty groups close directly; non-empty close confirmation looks destructive.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — empty groups close immediately with no dialog; closing a non-empty group shows the "Close group" dialog with a danger-styled confirm, secondary Cancel, and focus defaulting to Cancel.
 
 - **Steps:**
   1. In `bun run dev`, create at least two groups.
@@ -537,7 +537,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 7.1 - Sign-in opens the system browser and completes OAuth end-to-end.
 
-- [ ] result: 
+- [x] result: ❌ FAIL (2026-06-06) — added the GitHub remote HTTP MCP (`https://api.githubcopilot.com/mcp/`); clicking **Sign in** errored **"MCP server does not exist."** After reopening the session the server is **still listed under Configured (http badge)** but the **Sign in button is gone**. So the config persists — dafman's sign-in path can't resolve the freshly-added server (registration timing), and the Sign-in affordance isn't re-derived on reload. Likely dafman bug (not SDK). Issue to file.
 
 - **Steps:** add a real HTTP MCP server that requires OAuth (e.g. the GitHub
   remote MCP `{ type: 'http', url: … }`). With at least one session open, go to
@@ -553,7 +553,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 7.2 - The OAuth consent screen names the app "Dafman".
 
-- [ ] result: 
+- [x] result: ⏸ N/A (2026-06-06) — blocked: 7.1 failed before any consent screen, and the client was already registered (no fresh dynamic-client branding to observe). Retest with a fresh server once 7.1 is fixed.
 
 - **Steps:** trigger 7.1 against a server that registers a **fresh** dynamic
   OAuth client (one that hasn't been authenticated from this machine before).
@@ -665,7 +665,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 16.1 - Reveal scrolls to the spawning tool-call card (cross-session).
 
-- [ ] result: 
+- [x] result: ⚠️ PARTIAL/FAIL (2026-06-06) — within the SAME group, "Go to session" switches to the session. **Cross-group is broken:** if the job's session lives in a DIFFERENT group, instead of switching to that group and selecting the existing panel, it **recreates the session as a new panel in the current group** (duplicate). Issue to file.
 
 - **Steps:** in session A with a long transcript, spawn a background task (a tool call early in the history that runs in the background). Switch to session B. Open the Jobs panel and click "Go to session" (the up-right arrow) on A's job.
 - **Expected:** the app switches to session A and scrolls so the tool-call card that spawned the job is centered in view (not the top of the transcript), with a brief highlight flash on the card.
@@ -673,7 +673,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 16.2 - Freshly-opened panel still reveals (timing path).
 
-- [ ] result: 
+- [x] result: ❌ FAIL (2026-06-06) — closing A's panel mid-run made A's **job disappear from the Jobs panel** while it was still running. After the job finished, clicking "Go to session" errored **"session doesn't exist"** instead of reopening A's panel and revealing the card. Issue to file.
 
 - **Steps:** close session A's panel entirely (leave only B open). Spawn-and-track a job for A beforehand. From the Jobs panel click "Go to session" so A's panel opens fresh.
 - **Expected:** A opens AND scrolls to the spawning card — the reveal is not lost to the async panel mount.
@@ -681,7 +681,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 16.3 - Autopilot job falls back to bottom.
 
-- [ ] result: 
+- [x] result: ✅ PASS (2026-06-06) — an autopilot job (no spawning card) switches to its session and scrolls to the bottom, no error.
 
 - **Steps:** start an autopilot session (no spawning tool call → job has no `toolCallId`). From another session, click "Go to session" on that autopilot job.
 - **Expected:** switches to the session and scrolls to the bottom (latest work), no error.
@@ -756,7 +756,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### D15.1 - Running job spinner rotates in place.
 
-- [ ] result: 
+- [x] result: ✅ PASS (2026-06-06) — the running-job spinner rotates around its own center, no off-center orbit.
 
 - **Steps:** run `bun run dev`, start a chat session, ask the agent to spawn a background task, then open the Jobs panel while the job is `starting` or `running`.
 - **Expected:** the spinner beside the active job rotates around its own center without orbiting an off-center point.
@@ -873,7 +873,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 110.1 - Drag-and-drop an out-of-cwd `.ts`/`.md` file, agent reads its content.
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — dragged an out-of-cwd `notes.ts` onto the composer; the agent quoted the sentinel `// SENTINEL-ABC789-manualtest` (really read the staged file).
 
 - **Steps:** start a session whose working directory is some folder A. Create a
   text/code file (e.g. `notes.ts` with a unique sentinel line like
@@ -889,9 +889,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 110.2 - "Attach command result" pill content reaches the agent (#136).
 
-- [ ] result: pending re-check after #136 fix — backend send-path regression now
-  proves the command result is inlined into the SDK prompt, not staged as a temp
-  file.
+- [x] result: ✅ PASS (2026-06-06) — attached an integrated-terminal command result; the agent quoted `SENTINEL-CMD-555`, confirming the result is inlined into the SDK prompt (#136 fix).
 
 - **Steps:** run a command in the integrated terminal that prints a unique
   sentinel, use the "attach result" affordance to add it to the composer, then
@@ -905,7 +903,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### 110.3 - Dropped image still inlines (regression guard).
 
-- [ ] result:
+- [x] result: ✅ PASS (2026-06-06) — dropped a PNG; the agent described the blue image (images stay inline blobs).
 
 - **Steps:** drag a `.png`/`.jpg` onto the composer and ask the agent to
   describe it.
