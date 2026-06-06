@@ -92,7 +92,6 @@ describe('useMcpLibrary removeConfig (#10 — stays out of Discovered)', () => {
   });
 });
 
-
 describe('useMcpLibrary workspace discovery cwd (#96)', () => {
   function seedSession(id: string, workingDirectory: string): void {
     const store = useSessionsStore();
@@ -193,6 +192,41 @@ describe('useMcpLibrary needsSignIn (#7 follow-up — gate Sign-in on needs-auth
     expect(lib.needsSignIn('auth-srv')).toBe(true);
   });
 
+  test('shows Sign-in for a disabled server (e.g. never authenticated, session reopened)', async () => {
+    // Symptom B: after reopening a session, an HTTP server that was never
+    // authenticated resolves to `disabled` (SDK couldn't start it), not
+    // `needs-auth`. We must still show the button so the user can sign in.
+    const { bridge } = makeBridge({
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [{ name: 'github-mcp', status: 'disabled' }],
+    });
+    setRpcBridge(bridge);
+    useSessionsStore().sessions.push({ id: 'sess-1' } as unknown as SessionRecord);
+    useLayoutStore().activeSessionId = 'sess-1';
+
+    const lib = useMcpLibrary();
+    await lib.loadAll();
+
+    expect(lib.needsSignIn('github-mcp')).toBe(true);
+  });
+
+  test('shows Sign-in for a failed server', async () => {
+    const { bridge } = makeBridge({
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [{ name: 'github-mcp', status: 'failed' }],
+    });
+    setRpcBridge(bridge);
+    useSessionsStore().sessions.push({ id: 'sess-1' } as unknown as SessionRecord);
+    useLayoutStore().activeSessionId = 'sess-1';
+
+    const lib = useMcpLibrary();
+    await lib.loadAll();
+
+    expect(lib.needsSignIn('github-mcp')).toBe(true);
+  });
+
   test('treats unknown status (no live data for the server) as "might need auth"', async () => {
     const { bridge } = makeBridge({
       listMcpConfigs: async () => ({}),
@@ -206,5 +240,79 @@ describe('useMcpLibrary needsSignIn (#7 follow-up — gate Sign-in on needs-auth
 
     // No active session / no live status → don't hide the affordance.
     expect(lib.needsSignIn('anything')).toBe(true);
+  });
+});
+
+describe('useMcpLibrary upsertConfig — triggers session MCP reload (Symptom A fix)', () => {
+  function seedSession(id: string): void {
+    useSessionsStore().sessions.push({ id } as unknown as SessionRecord);
+  }
+
+  test('calls reloadSessionMcpServers for every active session after addMcpConfig', async () => {
+    const { bridge, calls } = makeBridge({
+      addMcpConfig: async () => true,
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+      reloadSessionMcpServers: async () => true,
+    });
+    setRpcBridge(bridge);
+    seedSession('sess-1');
+    seedSession('sess-2');
+
+    const lib = useMcpLibrary();
+    const ok = await lib.upsertConfig('add', {
+      name: 'github-remote',
+      config: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    });
+
+    expect(ok).toBe(true);
+    const reloads = calls.filter((c) => c.name === 'reloadSessionMcpServers');
+    // One reload call per active session.
+    expect(reloads).toHaveLength(2);
+    expect(reloads.map((c) => (c.args as { sessionId: string }).sessionId)).toEqual([
+      'sess-1',
+      'sess-2',
+    ]);
+  });
+
+  test('calls reloadSessionMcpServers after updateMcpConfig too', async () => {
+    const { bridge, calls } = makeBridge({
+      updateMcpConfig: async () => true,
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+      reloadSessionMcpServers: async () => true,
+    });
+    setRpcBridge(bridge);
+    seedSession('sess-1');
+
+    const lib = useMcpLibrary();
+    await lib.upsertConfig('edit', {
+      name: 'github-remote',
+      config: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    });
+
+    expect(calls.some((c) => c.name === 'reloadSessionMcpServers')).toBe(true);
+  });
+
+  test('skips reload when no sessions are open (no error thrown)', async () => {
+    const { bridge, calls } = makeBridge({
+      addMcpConfig: async () => true,
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+    });
+    setRpcBridge(bridge);
+    // No sessions seeded — sessions list is empty.
+
+    const lib = useMcpLibrary();
+    const ok = await lib.upsertConfig('add', {
+      name: 'my-server',
+      config: { type: 'http', url: 'https://example.com/mcp/' },
+    });
+
+    expect(ok).toBe(true);
+    expect(calls.some((c) => c.name === 'reloadSessionMcpServers')).toBe(false);
   });
 });

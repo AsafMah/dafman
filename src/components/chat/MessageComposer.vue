@@ -92,6 +92,9 @@ const props = withDefaults(
     /// shouldn't fire real session commands.
     sessionId?: string;
     commandTerminalId?: string;
+    /// When true, shows a "queued" badge indicating a message is
+    /// waiting behind the current running turn.
+    queued?: boolean;
   }>(),
   {
     disabled: false,
@@ -100,6 +103,7 @@ const props = withDefaults(
     defaultMode: 'steer',
     sessionId: undefined,
     commandTerminalId: undefined,
+    queued: false,
   },
 );
 
@@ -488,6 +492,34 @@ const primaryTooltip = computed(() =>
             <AutoFocusPlugin />
           </div>
           <div class="lex-composer-send">
+            <span
+              class="send-mode-chip"
+              :class="`send-mode-${props.defaultMode}`"
+              :title="
+                props.defaultMode === 'queue'
+                  ? 'Send mode: Queue (wait behind current turn)'
+                  : 'Send mode: Steer (inject into current turn)'
+              "
+              aria-label="Send mode"
+            >
+              <i
+                class="pi"
+                :class="props.defaultMode === 'queue' ? 'pi-clock' : 'pi-bolt'"
+                aria-hidden="true"
+              />{{ props.defaultMode === 'queue' ? 'Queue' : 'Steer' }}</span
+            >
+            <span
+              v-if="props.queued"
+              class="send-queued-chip"
+              title="Message queued — will send after the current turn"
+              role="status"
+              aria-live="polite"
+            >
+              <i
+                class="pi pi-hourglass"
+                aria-hidden="true"
+              />Queued</span
+            >
             <ComposerSubmitButton
               :disabled="props.disabled || commandMode"
               :label="primaryLabel"
@@ -869,6 +901,45 @@ const primaryTooltip = computed(() =>
   font-weight: 700;
 }
 
+/* Send-mode chip (Steer / Queue) and queued indicator shown in the
+ * send area. Intentionally small and muted — these are ambient cues,
+ * not primary affordances. The mode chip uses accent-tinted background
+ * when queue is active to distinguish it from the default steer mode. */
+.send-mode-chip,
+.send-queued-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+
+.send-mode-chip {
+  color: var(--p-text-muted-color);
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+}
+
+.send-mode-chip.send-mode-queue {
+  color: var(--p-orange-500, #f97316);
+  background: color-mix(in srgb, var(--p-orange-500, #f97316) 14%, transparent);
+}
+
+.send-queued-chip {
+  color: var(--p-orange-500, #f97316);
+  background: color-mix(in srgb, var(--p-orange-500, #f97316) 14%, transparent);
+}
+
+.send-mode-chip .pi,
+.send-queued-chip .pi {
+  font-size: 0.7rem;
+}
+
 /* Send button inside the editor row: icon-only, taller + narrower
  * pill that vertically centers in the input shell. */
 .lex-submit-button :deep(.p-button) {
@@ -988,12 +1059,13 @@ const primaryTooltip = computed(() =>
   }
 }
 
-/* Below 390px: hide approve-all, workspace, model select; compact everything */
+/* Below 390px: hide model/effort selects; compact everything.
+ * approve-all and workspace-chip intentionally NOT hidden here —
+ * their labels were already dropped at wider breakpoints (760px and
+ * 500px respectively), so they're already icon-only. Keeping them
+ * visible at ≤ 390px ensures they remain reachable at very narrow
+ * pane widths instead of silently disappearing (#176). */
 @container (max-width: 390px) {
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .approve-all-button),
-  .lex-composer-toolbar :deep(.session-header-controls.area-composer-left .workspace-chip) {
-    display: none;
-  }
   .lex-composer-toolbar :deep(.session-header-controls.area-composer-right .compact-select) {
     display: none;
   }

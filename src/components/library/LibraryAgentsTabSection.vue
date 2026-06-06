@@ -67,7 +67,9 @@
             size="small"
             severity="secondary"
             :loading="visibleAgentBusyName === '__deselect__'"
-            :disabled="!activeSession || !!agentBusyName"
+            :disabled="
+              !activeSession || agentBusyName === '__deselect__' || agentBusyName === entry.name
+            "
             label="Deselect"
             :aria-label="`Deselect agent ${entry.name}`"
             @click="$emit('deselect')"
@@ -76,7 +78,7 @@
             v-else
             size="small"
             :loading="visibleAgentBusyName === entry.name"
-            :disabled="!activeSession || !!agentBusyName"
+            :disabled="!activeSession || agentBusyName === entry.name"
             :severity="entry.loadStatus === 'rejected' ? 'danger' : undefined"
             :label="entry.loadStatus === 'rejected' ? 'Fix' : 'Select'"
             :aria-label="

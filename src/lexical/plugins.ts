@@ -251,6 +251,25 @@ export function registerSubmitOnEnter(
 
       if (e.isComposing || e.key === 'Process') return false;
 
+      // Early empty-guard: when the composer has no meaningful content,
+      // consume every Enter as a no-op regardless of the menu-active
+      // state. This prevents a stale `isComposerMenuActive` value (which
+      // can occur when the TypeaheadMenuPlugin closes the menu via a path
+      // that does not fire `queryChange`) from falling through to
+      // Lexical's default Enter handler and inserting a phantom newline
+      // into an otherwise empty editor. Ctrl/Cmd+Enter ("insert
+      // paragraph") and modifier-submit chords are intentionally included
+      // — inserting structure into an empty editor is also a no-op.
+      {
+        const plain = editor.getEditorState().read(() => $getRoot().getTextContent());
+
+        if (plain.trim().length === 0) {
+          e.preventDefault();
+
+          return true;
+        }
+      }
+
       const action = resolveEnterAction(e, isComposerMenuActive(editor));
 
       if (action.type === 'passthrough') return false;

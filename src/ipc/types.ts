@@ -784,6 +784,10 @@ export type CommandMap = {
     args: { sessionId: string; serverName: string; enabled: boolean };
     result: boolean;
   };
+  reloadSessionMcpServers: {
+    args: { sessionId: string };
+    result: boolean;
+  };
   getAccountQuota: {
     args: Record<string, never>;
     result: Record<

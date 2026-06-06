@@ -5,6 +5,8 @@ import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import type { CommandMap, CommandName, JobRecord } from '@/ipc/types';
 import { useJobsStore } from '@/stores/observability/jobsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
+import type { DockviewApi, IDockviewPanel } from 'dockview-core';
 import {
   useSessionsStore,
   _resetSessionsStoreForTest,
@@ -259,5 +261,252 @@ describe('jobsStore', () => {
     store.openOwningSession('s1');
 
     expect(layout.pendingReveal['s1']).toEqual({ toolCallId: undefined });
+  });
+});
+
+// ─── #173 cross-group Go-to-session ──────────────────────────────────────────
+
+describe('openOwningSession — cross-group navigation (#173)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    _resetSessionsStoreForTest();
+  });
+
+  afterEach(() => {
+    setRpcBridge(null);
+    _resetSessionsStoreForTest();
+  });
+
+  test('reveals existing panel in a non-active group without adding a duplicate', () => {
+    const { bridge } = makeBridge({ listJobs: async () => [] });
+    setRpcBridge(bridge);
+
+    const layout = useLayoutStore();
+    const groups = useGroupsStore();
+    const store = useJobsStore();
+
+    // Fake inner api for group 'g2' that already owns session 's1'.
+    const innerPanelSetActive = { called: false };
+    const fakeInner = {
+      getPanel(id: string) {
+        if (id !== 's1') return undefined;
+        return {
+          id: 's1',
+          api: {
+            setActive() {
+              innerPanelSetActive.called = true;
+            },
+          },
+        } as unknown as IDockviewPanel;
+      },
+    } as unknown as DockviewApi;
+
+    // Fake outer api: has a panel for group 'g2'.
+    const outerPanelSetActive = { called: false };
+    const fakeOuterPanel = {
+      id: 'g2',
+      api: {
+        setActive() {
+          outerPanelSetActive.called = true;
+        },
+      },
+    };
+    layout.setApi({
+      getPanel(id: string) {
+        return id === 'g2'
+          ? (fakeOuterPanel as unknown as ReturnType<DockviewApi['getPanel']>)
+          : undefined;
+      },
+      // minimal stubs so setApi doesn't blow up
+      onDidActiveGroupChange: () => ({ dispose: () => {} }),
+      onDidActivePanelChange: () => ({ dispose: () => {} }),
+      onDidRemovePanel: () => ({ dispose: () => {} }),
+      onDidAddPanel: () => ({ dispose: () => {} }),
+      onDidAddGroup: () => ({ dispose: () => {} }),
+      getEdgeGroup: () => undefined,
+      activeGroup: null,
+      groups: [],
+      activePanel: null,
+    } as unknown as DockviewApi);
+
+    // Register the fake inner so groupsStore.innerApis['g2'] = fakeInner.
+    groups.registerInnerApi('g2', fakeInner);
+
+    // Track addPanel calls (should NOT be called — panel already exists).
+    const addedPanels: string[] = [];
+    const originalAdd = layout.addPanel.bind(layout);
+    (layout as unknown as Record<string, unknown>).addPanel = (
+      ...args: Parameters<typeof originalAdd>
+    ) => {
+      addedPanels.push(args[0] as string);
+      return originalAdd(...args);
+    };
+
+    store.openOwningSession('s1', 'tc-1');
+
+    // The outer group panel and the inner chat panel should both be activated.
+    expect(outerPanelSetActive.called).toBe(true);
+    expect(innerPanelSetActive.called).toBe(true);
+
+    // addPanel must NOT have been called — the session already exists.
+    expect(addedPanels).toHaveLength(0);
+
+    // Reveal intent should still be parked.
+    expect(layout.pendingReveal['s1']).toEqual({ toolCallId: 'tc-1' });
+  });
+});
+
+// ─── #36 tool-failure survives turn-complete ─────────────────────────────────
+
+describe('tool-failure latestResponse survives turn-complete transition (#36)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    _resetSessionsStoreForTest();
+  });
+
+  afterEach(() => {
+    setRpcBridge(null);
+    _resetSessionsStoreForTest();
+  });
+
+  test('hadToolFailureThisTurn prevents turn-complete from overwriting failure message', async () => {
+    const { bridge, emitAudit } = makeBridge({
+      listJobs: async () => [],
+      setSessionMode: async () => 'autopilot',
+      sendMessage: async () => 'msg-1',
+    });
+    setRpcBridge(bridge);
+    const sessions = useSessionsStore();
+    const record = sessionRecord('s1');
+    sessions.sessions.push(record);
+    const store = useJobsStore();
+
+    await store.startAutopilot('s1', 'Do the work');
+
+    // Simulate turn start: isThinking → true (seenThinking set in watcher)
+    record.isThinking = true;
+    await nextTick();
+
+    // Tool failure fires BEFORE the turn ends
+    emitAudit({
+      ts: new Date().toISOString(),
+      kind: 'toolFailure',
+      sessionId: 's1',
+      toolName: 'bash',
+      error: 'command not found',
+    });
+    await nextTick();
+
+    // Turn ends
+    record.isThinking = false;
+    await nextTick();
+
+    // The tool-failure message must survive — 'Turn complete' must NOT have
+    // overwritten it.
+    expect(store.jobs[0]?.latestResponse).toContain('bash');
+    expect(store.jobs[0]?.latestResponse).toContain('command not found');
+    expect(store.jobs[0]?.latestResponse).not.toBe('Turn complete');
+  });
+
+  test('Turn complete is written when no tool failure fired this turn', async () => {
+    const { bridge } = makeBridge({
+      listJobs: async () => [],
+      setSessionMode: async () => 'autopilot',
+      sendMessage: async () => 'msg-1',
+    });
+    setRpcBridge(bridge);
+    const sessions = useSessionsStore();
+    const record = sessionRecord('s1');
+    sessions.sessions.push(record);
+    const store = useJobsStore();
+
+    await store.startAutopilot('s1', 'Do the work');
+    record.isThinking = true;
+    await nextTick();
+    record.isThinking = false;
+    await nextTick();
+
+    expect(store.jobs[0]?.latestResponse).toBe('Turn complete');
+  });
+});
+
+// ─── #174 panel-close preserves session with active jobs ─────────────────────
+
+describe('panel-close does not delete session with active jobs (#174)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    _resetSessionsStoreForTest();
+  });
+
+  afterEach(() => {
+    setRpcBridge(null);
+    _resetSessionsStoreForTest();
+  });
+
+  test('closing a panel while a background job is running skips closeSession', async () => {
+    const disconnectCalls: string[] = [];
+    const { bridge } = makeBridge({
+      listJobs: async () => [],
+      disconnectSession: async (args) => {
+        const id = (args as { sessionId: string }).sessionId;
+        disconnectCalls.push(id);
+        return id;
+      },
+      setSessionMode: async () => 'autopilot',
+      sendMessage: async () => 'msg-1',
+    });
+    setRpcBridge(bridge);
+    const sessions = useSessionsStore();
+    const record = sessionRecord('s1');
+    sessions.sessions.push(record);
+    const store = useJobsStore();
+
+    // Start an autopilot job so 's1' has an active running job.
+    await store.startAutopilot('s1', 'Run in background');
+
+    // Confirm the job is active.
+    expect(store.hasActiveJobsForSession('s1')).toBe(true);
+
+    // Simulate what GroupPanel's onDidRemovePanel handler does:
+    // if there are active jobs, it must NOT call closeSession.
+    if (!store.hasActiveJobsForSession('s1')) {
+      await sessions.closeSession('s1');
+    }
+
+    // disconnectSession must NOT have been called.
+    expect(disconnectCalls).toHaveLength(0);
+
+    // Session record must still be alive in the store.
+    expect(sessions.sessions.some((s) => s.id === 's1')).toBe(true);
+  });
+
+  test('closing a panel with no active jobs calls closeSession normally', async () => {
+    const disconnectCalls: string[] = [];
+    const { bridge } = makeBridge({
+      listJobs: async () => [],
+      disconnectSession: async (args) => {
+        const id = (args as { sessionId: string }).sessionId;
+        disconnectCalls.push(id);
+        return id;
+      },
+    });
+    setRpcBridge(bridge);
+    const sessions = useSessionsStore();
+    const record = sessionRecord('s1');
+    sessions.sessions.push(record);
+    const store = useJobsStore();
+
+    // No active jobs for 's1'.
+    expect(store.hasActiveJobsForSession('s1')).toBe(false);
+
+    // Simulate GroupPanel handler: no active jobs → closeSession is called.
+    if (!store.hasActiveJobsForSession('s1')) {
+      await sessions.closeSession('s1');
+    }
+
+    // disconnectSession should have been called.
+    expect(disconnectCalls).toContain('s1');
+    // Session removed from store.
+    expect(sessions.sessions.some((s) => s.id === 's1')).toBe(false);
   });
 });

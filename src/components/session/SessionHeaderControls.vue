@@ -440,20 +440,20 @@ async function openSessionTerminal() {
   gap: 0.35rem;
   padding: 0 0.4rem;
   height: 100%;
-  /* Layout shrinks gracefully on narrow widths: model/effort selects
-   * collapse first (flex-shrink); workspace chip drops out below a
-   * certain width via a container query; the options gear is the
-   * last thing standing because it's the only entry point to mode,
-   * rename, compact, etc.
+  /* Layout shrinks gracefully on narrow widths: selects collapse first
+   * (flex-shrink); workspace chip and approve-all go icon-only via
+   * container queries; the options gear is always reachable.
    *
    * NOTE: do NOT set `container-type: inline-size` on this element —
    * it's a shrink-to-fit flex child, so its width is determined by
    * its visible content. Putting the container context here creates a
    * feedback loop: hide a child → container narrows → next breakpoint
-   * fires → hide more, until only the gear survives. The container
-   * context lives on the host instead (`.chat-tile-header` in
-   * ChatWindow.vue), which has a stable width derived from the
-   * dockview tile. Queries below resolve against that ancestor. */
+   * fires → hide more. The container context lives on the host
+   * ancestor instead:
+   *  - area="all": `.dv-tabs-and-actions-container` in style.css
+   *  - area="composer-*": `.lex-composer-toolbar` in MessageComposer.vue
+   * Both have stable widths derived from the dockview tile width, so
+   * queries resolve correctly and the loop can't occur. (#176) */
   min-width: 0;
   flex: 1 1 auto;
   justify-content: flex-end;
@@ -471,16 +471,18 @@ async function openSessionTerminal() {
   max-width: 7rem;
 }
 
-/* Progressive collapse as the tile narrows. Order of removal (least-
+/* Progressive collapse as the tile narrows. Order of collapse (least-
  * essential first). Mode used to live here too — it's now in the
- * composer row at the bottom of the chat, leaving more room for the
- * remaining controls so the workspace chip survives much longer.
+ * composer row at the bottom of the chat, leaving more room here.
  *
- *   wide        →  workspace + model + effort + reasoning + gear
- *   < 26rem     →  drop "reasoning"
- *   < 18rem     →  drop workspace chip
+ *   wide        →  workspace + allow-all + model + effort + reasoning + gear
+ *   < 26rem     →  drop "reasoning"; terminal → icon-only
+ *   < 18rem     →  workspace → icon-only; drop agent chip
  *   < 14rem     →  drop "effort"
- *   < 10rem     →  drop "model"         (gear only) */
+ *   < 10rem     →  drop "model"
+ *
+ * approve-all and workspace-chip are NEVER fully hidden here — they
+ * collapse to icon-only and remain reachable at all narrowest widths. */
 @container (max-width: 26rem) {
   .compact-select-reasoning {
     display: none;
@@ -610,6 +612,19 @@ async function openSessionTerminal() {
     display: none;
   }
   .session-header-controls.area-composer-left :deep(.approve-all-button) {
+    width: 1.75rem;
+    padding-inline: 0;
+  }
+}
+
+/* For area-all, collapse approve-all to icon-only at the same breakpoint
+ * as the workspace chip — keeps both reachable at very narrow pane
+ * widths (#176). */
+@container (max-width: 18rem) {
+  .session-header-controls.area-all :deep(.approve-all-button .p-button-label) {
+    display: none;
+  }
+  .session-header-controls.area-all :deep(.approve-all-button) {
     width: 1.75rem;
     padding-inline: 0;
   }

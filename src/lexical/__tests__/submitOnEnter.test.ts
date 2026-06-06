@@ -48,7 +48,9 @@ describe('resolveEnterAction', () => {
   });
 
   test('Ctrl+Enter inserts a paragraph (hard newline), never submits', () => {
-    expect(resolveEnterAction(chord({ ctrlKey: true }), false)).toEqual({ type: 'insertParagraph' });
+    expect(resolveEnterAction(chord({ ctrlKey: true }), false)).toEqual({
+      type: 'insertParagraph',
+    });
   });
 
   test('Cmd+Enter (metaKey) inserts a paragraph, even with a menu open', () => {
@@ -60,7 +62,9 @@ describe('resolveEnterAction', () => {
   });
 
   test('Shift+Enter inserts a soft line break when a menu is active', () => {
-    expect(resolveEnterAction(chord({ shiftKey: true }), true)).toEqual({ type: 'insertLineBreak' });
+    expect(resolveEnterAction(chord({ shiftKey: true }), true)).toEqual({
+      type: 'insertLineBreak',
+    });
   });
 
   test('Ctrl+Shift+Enter submits queue', () => {
@@ -298,5 +302,58 @@ describe('registerSubmitOnEnter', () => {
 
     expect(handled).toBe(false);
     expect(submissions).toHaveLength(0);
+  });
+
+  test('#178 — Enter on empty-after-delete composer is a no-op even with stale menu-active state', () => {
+    // Scenario: user typed "/model", slash menu opened (menuActive=true),
+    // then deleted ALL text without the TypeaheadMenuPlugin firing
+    // queryChange(null) (e.g. via select-all+delete path that emits
+    // 'close' instead). The editor is empty but isComposerMenuActive
+    // still returns true. Without the empty-guard, plain Enter falls
+    // through to Lexical's default handler and inserts a stray newline.
+    editor = makeEditor();
+    register();
+    // Editor is empty (simulates post-delete-all state).
+    seedText(editor, '');
+    // Simulate stale menu-active registry.
+    setComposerMenuActive(editor, 'slash', true);
+
+    const handled = editor.dispatchCommand(KEY_ENTER_COMMAND, makeEnterEvent());
+
+    // Should be consumed (no passthrough to default handler).
+    expect(handled).toBe(true);
+    // Should NOT submit (nothing to send).
+    expect(submissions).toHaveLength(0);
+
+    // Clean up menu state so it doesn't leak into other tests.
+    setComposerMenuActive(editor, 'slash', false);
+  });
+
+  test('#178 — whitespace-only composer with stale menu state is also a no-op', () => {
+    editor = makeEditor();
+    register();
+    seedText(editor, '   ');
+    setComposerMenuActive(editor, 'mention', true);
+
+    const handled = editor.dispatchCommand(KEY_ENTER_COMMAND, makeEnterEvent());
+
+    expect(handled).toBe(true);
+    expect(submissions).toHaveLength(0);
+
+    setComposerMenuActive(editor, 'mention', false);
+  });
+
+  test('#178 — Ctrl+Enter on empty composer is also a no-op (no paragraph inserted)', () => {
+    editor = makeEditor();
+    register();
+    seedText(editor, '');
+    setComposerMenuActive(editor, 'slash', true);
+
+    const handled = editor.dispatchCommand(KEY_ENTER_COMMAND, makeEnterEvent({ ctrlKey: true }));
+
+    expect(handled).toBe(true);
+    expect(submissions).toHaveLength(0);
+
+    setComposerMenuActive(editor, 'slash', false);
   });
 });

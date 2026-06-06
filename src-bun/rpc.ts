@@ -987,6 +987,14 @@ export type DafmanRPC = {
         params: { sessionId: string; serverName: string; enabled: boolean };
         response: boolean;
       };
+      /// Reload MCP server connections for a live session.
+      /// Wraps `session.mcp.reload` (@experimental). Must be called
+      /// after adding or updating a global MCP config so the session's
+      /// live McpHost picks up the new server before sign-in.
+      reloadSessionMcpServers: {
+        params: { sessionId: string };
+        response: boolean;
+      };
       /// Server-scoped account quota snapshot. Returns the SDK
       /// `quotaSnapshots` map verbatim — the renderer cherry-
       /// picks fields for display + warning thresholds.

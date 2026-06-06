@@ -104,3 +104,71 @@ describe('LibraryAgentsTabSection select loading affordance (#78)', () => {
     ).toBeTruthy();
   });
 });
+
+const multiEntries = [
+  {
+    name: 'builder',
+    path: 'C:\\repo\\.github\\agents\\builder.agent.md',
+    scope: 'project',
+    canonical: true,
+    loadStatus: 'loaded',
+  },
+  {
+    name: 'writer',
+    path: 'C:\\repo\\.github\\agents\\writer.agent.md',
+    scope: 'project',
+    canonical: true,
+    loadStatus: 'loaded',
+  },
+  {
+    name: 'reviewer',
+    path: 'C:\\repo\\.github\\agents\\reviewer.agent.md',
+    scope: 'project',
+    canonical: true,
+    loadStatus: 'loaded',
+  },
+] satisfies AgentFileEntry[];
+
+function mountMulti(opts: { currentAgentName: string | null; agentBusyName: string | null }) {
+  return render(LibraryAgentsTabSection, {
+    props: {
+      title: 'Project',
+      keyPrefix: 'project',
+      entries: multiEntries,
+      currentAgentName: opts.currentAgentName,
+      agentBusyName: opts.agentBusyName,
+      activeSession: true,
+    },
+    global: { plugins: [PrimeVue] },
+  });
+}
+
+describe('LibraryAgentsTabSection per-row disabled state (#127)', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  test('selecting agent A disables only that row — other rows stay enabled', async () => {
+    const utils = mountMulti({ currentAgentName: null, agentBusyName: 'builder' });
+
+    const builderSelect = utils.getByRole('button', { name: 'Select agent builder' });
+    const writerSelect = utils.getByRole('button', { name: 'Select agent writer' });
+    const reviewerSelect = utils.getByRole('button', { name: 'Select agent reviewer' });
+
+    expect(builderSelect).toHaveProperty('disabled', true);
+    expect(writerSelect).toHaveProperty('disabled', false);
+    expect(reviewerSelect).toHaveProperty('disabled', false);
+  });
+
+  test('deselecting does not disable unrelated rows', async () => {
+    const utils = mountMulti({ currentAgentName: 'reviewer', agentBusyName: '__deselect__' });
+
+    const reviewerDeselect = utils.getByRole('button', { name: 'Deselect agent reviewer' });
+    const builderSelect = utils.getByRole('button', { name: 'Select agent builder' });
+    const writerSelect = utils.getByRole('button', { name: 'Select agent writer' });
+
+    expect(reviewerDeselect).toHaveProperty('disabled', true);
+    expect(builderSelect).toHaveProperty('disabled', false);
+    expect(writerSelect).toHaveProperty('disabled', false);
+  });
+});

@@ -531,6 +531,12 @@ export class SessionRegistry {
   /// `isThinking`. A NEW array is built — `capped` may alias the
   /// original history (when total <= cap), which must not be mutated.
   ///
+  /// #172: if `getEvents()` returns empty on the first call, the CLI's
+  /// SQLite DB may not have finished initialising — retry once after a
+  /// short delay before giving up. An empty result on a resumed session
+  /// is almost never legitimate (newly-created sessions with no turns
+  /// would not be in the persisted layout), so the retry is always safe.
+  ///
   /// Non-fatal: a failure just means no scrollback (the live session is
   /// already connected and will receive new events).
   private async hydrateHistory(
@@ -539,7 +545,23 @@ export class SessionRegistry {
     effectiveCwd: string | undefined,
   ): Promise<void> {
     try {
-      const history = await session.getEvents();
+      let history = await session.getEvents();
+
+      // #172: an empty result on a resumed session is a strong signal
+      // that the CLI's SQLite DB hadn't finished loading when
+      // `resumeSession` arrived.  Retry once after a short pause
+      // rather than silently yielding an empty transcript.
+      if (history.length === 0) {
+        log.warn(
+          'hydrateHistory: getEvents() returned empty on first call — retrying (CLI DB race?)',
+          {
+            sessionId: actualId,
+          },
+        );
+        await new Promise<void>((r) => setTimeout(r, 400));
+        history = await session.getEvents();
+      }
+
       const total = history.length;
       const capped =
         total > HISTORY_REPLAY_CAP ? history.slice(total - HISTORY_REPLAY_CAP) : history;
@@ -1272,10 +1294,14 @@ export class SessionRegistry {
   //
   // Moved to `./mcpRegistry.ts` (21a.2). Server-scoped MCP methods
   // don't touch the entries Map and shouldn't live on the session
-  // registry. RPC layer calls `mcpRegistry.X` directly. The 3
+  // registry. RPC layer calls `mcpRegistry.X` directly. The 4
   // session-scoped MCP methods (listSessionMcpServers,
-  // setSessionMcpEnabled, loginToMcpServer) remain below because
-  // they need entry lookup.
+  // setSessionMcpEnabled, reloadSessionMcpServers, loginToMcpServer)
+  // remain below because they need entry lookup.
+
+  async reloadSessionMcpServers(sessionId: string): Promise<void> {
+    return this.mcp.reloadServers(sessionId);
+  }
 
   async loginToMcpServer(
     sessionId: string,

@@ -62,6 +62,20 @@ export class SessionMcpService {
     });
   }
 
+  /// Reload MCP server connections for the session via the SDK's
+  /// @experimental `session.mcp.reload` RPC. Called after a global
+  /// config write (add/update) so the live McpHost spawns the new
+  /// server — without this, `session.mcp.oauth.login` throws "MCP
+  /// server does not exist" because the session was created before
+  /// the config entry existed (Symptom A fix).
+  async reloadServers(sessionId: string): Promise<void> {
+    const entry = this.ctx.getEntry(sessionId);
+
+    return this.ctx.wrapSdk(async () => {
+      await (entry.session.rpc.mcp.reload as () => Promise<unknown>)();
+    });
+  }
+
   async loginToServer(
     sessionId: string,
     serverName: string,

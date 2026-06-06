@@ -193,16 +193,24 @@ onMounted(async () => {
   });
 
   // Restore previously-open sessions. The resume calls fan out in
-  // parallel (`Promise.all`); we report per-session completion to
-  // the boot store so the splash can show "Restoring 3 of 5…"
-  // without us threading progress through every layer.
+  // parallel (`Promise.all` inside `restoreFromLayout`); we report
+  // per-session completion to the boot store so the splash can show
+  // "Restoring 3 of 5…" without us threading progress through every
+  // layer.
+  //
+  // #172: `restoreFromLayout` first calls `listSessions` as a CLI
+  // DB warm-up probe (see bootLayout.ts) so that `resumeSession`
+  // calls don't race the CLI's internal SQLite initialisation.
+  // This is safe because we already `await`-ed `clientCreate` above,
+  // which blocks until `client.start()` has completed the JSON-RPC
+  // handshake — the probe just ensures the DB layer is also ready.
   //
   // Wrapped in try/catch so a malformed persisted layout / SDK
   // rejection / dockview throw doesn't strand the splash on
   // "Restoring sessions…" / "Applying layout…" forever. We log,
   // toast, and continue to `markReady` — better to surface a
   // half-restored app the user can fix than to lock them out.
-  console.info('[boot] starting restoreFromLayout');
+  console.info('[boot] starting restoreFromLayout (CLI client ready)');
 
   try {
     await restoreFromLayout();

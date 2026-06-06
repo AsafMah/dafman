@@ -32,6 +32,7 @@ import type { IDockviewPanel } from 'dockview-core';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useJobsStore } from '@/stores/observability/jobsStore';
 import { useGroupsActions } from '@/composables/useGroupsActions';
 import { useDockviewTheme } from '@/composables/useDockviewTheme';
 import { schedulePersist } from '@/lib/persistScheduler';
@@ -61,6 +62,7 @@ const groupId = computed(() => userParams.value.groupId ?? '');
 const groupsStore = useGroupsStore();
 const layoutStore = useLayoutStore();
 const sessionsStore = useSessionsStore();
+const jobsStore = useJobsStore();
 const groupsActions = useGroupsActions();
 const { dockviewTheme } = useDockviewTheme();
 
@@ -100,11 +102,21 @@ function onInnerReady(event: DockviewReadyEvent): void {
   // removed by user action (X button, programmatic close via
   // layoutStore.closePanel). Programmatic moves wrap the remove call in
   // `groupsStore.withMovingSession` so this handler skips them.
+  //
+  // #174: Do NOT disconnect/delete the backend session while a background
+  // job is still running. The session record must stay alive so:
+  //  - the Jobs panel keeps listing the job (listJobs includes it)
+  //  - 'Go to session' can re-open the panel rather than erroring
+  // When the panel is closed with no active jobs, proceed normally.
   removeSub = inner.onDidRemovePanel((panel: IDockviewPanel) => {
     if (groupsStore.isMovingSession(panel.id)) return;
 
     if (sessionsStore.sessions.some((s) => s.id === panel.id)) {
-      void sessionsStore.closeSession(panel.id);
+      if (!jobsStore.hasActiveJobsForSession(panel.id)) {
+        void sessionsStore.closeSession(panel.id);
+      }
+      // else: panel is gone from the UI but session stays connected
+      // and alive for the duration of the background job.
     }
   });
 

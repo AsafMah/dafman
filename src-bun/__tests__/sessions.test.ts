@@ -1199,6 +1199,82 @@ describe('SessionRegistry', () => {
     expect((last?.data as { messageId?: string }).messageId).toBe('m-1499');
   });
 
+  test('#172: resume retries getEvents() once when first call returns empty', async () => {
+    // Simulates the CLI DB race: first `getEvents()` call returns []
+    // (DB still initialising), second call returns the real history.
+    class DelayedHistoryClient extends FakeClient {
+      override async resumeSession(
+        sessionId: string,
+        config: Record<string, unknown> = {},
+      ): Promise<FakeSession> {
+        this.resumedConfigs.push(config);
+        let callCount = 0;
+        const history = [
+          { type: 'user.message', data: { content: 'hello' } },
+          { type: 'assistant.message', data: { content: 'world' } },
+        ];
+        const s: FakeSession = {
+          ...makeFakeSession(sessionId),
+          // First call returns empty (CLI DB not yet ready);
+          // subsequent calls return the real history.
+          async getEvents() {
+            return callCount++ === 0 ? [] : history;
+          },
+        };
+        this.resumedSessions.push(s);
+        return s;
+      }
+    }
+
+    const client = new DelayedHistoryClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+
+    const id = await reg.resume('sess-172');
+    expect(id).toBe('sess-172');
+    // History must have been replayed despite the first getEvents() returning [].
+    const types = emitted.map((p) => p.eventType);
+    expect(types).toContain('user.message');
+    expect(types).toContain('assistant.message');
+  }, 3000);
+
+  test('#172: resume emits events via the injected emit callback (not dropped) after history retry', async () => {
+    // Belt-and-suspenders: verify the emitted events are tagged with
+    // the correct sessionId and the retry path still uses forward().
+    class EmptyFirstClient extends FakeClient {
+      override async resumeSession(
+        sessionId: string,
+        config: Record<string, unknown> = {},
+      ): Promise<FakeSession> {
+        this.resumedConfigs.push(config);
+        let calls = 0;
+        const realHistory = [
+          { type: 'assistant.turn_start', data: { turnId: 't1' } },
+          { type: 'assistant.turn_end', data: { turnId: 't1' } },
+        ];
+        const s: FakeSession = {
+          ...makeFakeSession(sessionId),
+          async getEvents() {
+            return calls++ === 0 ? [] : realHistory;
+          },
+        };
+        this.resumedSessions.push(s);
+        return s;
+      }
+    }
+
+    const client = new EmptyFirstClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const collected: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => collected.push(p));
+
+    await reg.resume('sess-172b');
+    expect(collected.every((e) => e.sessionId === 'sess-172b')).toBe(true);
+    expect(collected.map((e) => e.eventType)).toContain('assistant.turn_start');
+    expect(collected.map((e) => e.eventType)).toContain('assistant.turn_end');
+  }, 3000);
+
   test('19a: listAgents returns the SDK shape normalized', async () => {
     const client = new FakeClient();
     _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);

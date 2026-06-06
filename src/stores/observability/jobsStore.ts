@@ -3,12 +3,17 @@ import { defineStore } from 'pinia';
 import { invokeCommand, onAuditEvent } from '@/ipc/invoke';
 import type { AuditEntry, JobRecord } from '@/ipc/types';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 type LocalAutopilotMeta = {
   seenThinking: boolean;
+  /// Set when a tool-failure audit fires during this turn. Prevents the
+  /// turn-complete watcher from overwriting a freshly-written failure
+  /// message with the generic 'Turn complete' string (#36).
+  hadToolFailureThisTurn: boolean;
 };
 
 function isActiveStatus(status: JobRecord['status']): boolean {
@@ -144,9 +149,36 @@ export const useJobsStore = defineStore('jobs', () => {
   /// the bottom so the user lands on the live work. The intent is
   /// stored (not bus-emitted) so it survives a freshly-opened panel
   /// that hasn't mounted its ChatWindow yet — mitt has no replay.
+  /// Open + activate the owning session's panel, navigating to its
+  /// existing group+panel when the session lives in a non-active group
+  /// (#173). Algorithm:
+  ///   1. Scan every registered inner api for one whose getPanel(sessionId)
+  ///      exists — that is the session's current group.
+  ///   2. If found: activate the OUTER group panel so the group becomes
+  ///      the active group, then activate the inner chat panel.
+  ///   3. If not found anywhere: open a brand-new panel via addPanel.
   function openOwningSession(sessionId: string, toolCallId?: string): void {
     const layout = useLayoutStore();
+    const groups = useGroupsStore();
 
+    // Step 1: look for the session in any mounted inner dockview.
+    for (const [gid, innerApi] of Object.entries(groups.innerApis)) {
+      const innerPanel = innerApi.getPanel(sessionId);
+
+      if (innerPanel) {
+        // Step 2: bring the outer group panel into focus, then the inner panel.
+        const outerPanel = layout.api?.getPanel(gid);
+
+        if (outerPanel) outerPanel.api.setActive();
+
+        innerPanel.api.setActive();
+        layout.requestReveal(sessionId, { toolCallId });
+
+        return;
+      }
+    }
+
+    // Step 3: session has no open panel — create one in the active group.
     if (!layout.isPanelOpen(sessionId)) layout.addPanel(sessionId);
 
     layout.activatePanel(sessionId);
@@ -184,7 +216,7 @@ export const useJobsStore = defineStore('jobs', () => {
     };
 
     localJobs.value = [job, ...localJobs.value];
-    localMeta.set(id, { seenThinking: false });
+    localMeta.set(id, { seenThinking: false, hadToolFailureThisTurn: false });
 
     try {
       const sessions = useSessionsStore();
@@ -237,6 +269,12 @@ export const useJobsStore = defineStore('jobs', () => {
       ) {
         continue;
       }
+
+      // Mark the meta BEFORE updating the job so the turn-complete watcher
+      // (which also runs synchronously on the same tick) can see the flag.
+      const meta = localMeta.get(job.id);
+
+      if (meta) meta.hadToolFailureThisTurn = true;
 
       updateLocalJob(job.id, {
         latestResponse: `⚠ ${entry.toolName} failed: ${entry.error}`,
@@ -305,7 +343,12 @@ export const useJobsStore = defineStore('jobs', () => {
           continue;
         }
 
-        if (session.isThinking) meta.seenThinking = true;
+        if (session.isThinking) {
+          meta.seenThinking = true;
+          // New turn starting — reset the failure guard so the NEXT
+          // turn-complete can write 'Turn complete' if it passes cleanly.
+          meta.hadToolFailureThisTurn = false;
+        }
 
         if (meta.seenThinking && !session.isThinking) {
           updateLocalJob(job.id, {
@@ -313,7 +356,10 @@ export const useJobsStore = defineStore('jobs', () => {
             completedAt: nowIso(),
             canCancel: false,
             canRemove: true,
-            latestResponse: 'Turn complete',
+            // #36: don't overwrite a freshly-written tool-failure message.
+            // hadToolFailureThisTurn stays set so subsequent re-runs of this
+            // watcher on the same tick still see the guard.
+            ...(meta.hadToolFailureThisTurn ? {} : { latestResponse: 'Turn complete' }),
           });
         }
       }
