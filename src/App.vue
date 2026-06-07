@@ -28,6 +28,8 @@ import { isActivityBarPanel } from '@/constants/panels';
 import { useBootLayout } from '@/lib/bootLayout';
 import { schedulePersist, cancelPendingPersist } from '@/lib/persistScheduler';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { useCommandPaletteStore } from '@/stores/shell/commandPaletteStore';
+import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts';
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -37,6 +39,7 @@ const layoutStore = useLayoutStore();
 const groupsStore = useGroupsStore();
 const modelsStore = useModelsStore();
 const bootStore = useBootStore();
+const commandPaletteStore = useCommandPaletteStore();
 const primeToast = useToast();
 const primeConfirm = useConfirm();
 
@@ -110,6 +113,8 @@ onBeforeUnmount(() => {
   // HMR + test scenarios — code-review finding 2026-05-27).
   cancelPendingPersist();
 });
+
+useGlobalShortcuts();
 
 onMounted(async () => {
   // Splash watchdog. Whatever happens below — uncaught rejection,
@@ -185,6 +190,7 @@ onMounted(async () => {
   // before sessions restore — none of the commands run at register
   // time.
   registerBuiltinCommands({ confirm: primeConfirm });
+  commandPaletteStore.registerCommands();
   // Lazy model catalog warm-up so palette commands have entries to
   // surface without the user opening the per-session model picker
   // first. Failures are toasted by modelsStore itself.

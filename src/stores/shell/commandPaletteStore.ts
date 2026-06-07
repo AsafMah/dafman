@@ -4,13 +4,11 @@
  * Extracted from CommandPalette.vue so that `commandPalette.toggle`,
  * `commandPalette.open`, and `commandPalette.close` can be registered as
  * commandRegistry commands and fired via shortcut bindings.
- *
- * Migration note: CommandPalette.vue still owns its own hardcoded Ctrl/Cmd+K
- * listener for now. The Phase 4 cutover will remove that listener and wire
- * the shortcutRegistry global dispatch to call `toggle()` instead. Until
- * then, both paths co-exist without conflict because toggling is idempotent.
+ * Phase 4 cutover complete: CommandPalette.vue now drives visibility from
+ * this store; the old hardcoded Ctrl/Cmd+K listener in that component has
+ * been removed. Global dispatch goes through `useGlobalShortcuts` →
+ * `shortcutRegistry.match` → `commandRegistry.runCommand`.
  */
-
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useCommandRegistry } from './commandRegistry';
@@ -19,6 +17,7 @@ export const useCommandPaletteStore = defineStore('commandPalette', () => {
   const isOpen = ref(false);
 
   function open(): void {
+    if (document.querySelector('.p-confirmpopup, .p-dialog-mask')) return;
     isOpen.value = true;
   }
 
@@ -27,7 +26,11 @@ export const useCommandPaletteStore = defineStore('commandPalette', () => {
   }
 
   function toggle(): void {
-    isOpen.value = !isOpen.value;
+    if (isOpen.value) {
+      close();
+    } else {
+      open(); // guard is inside open()
+    }
   }
 
   /**
