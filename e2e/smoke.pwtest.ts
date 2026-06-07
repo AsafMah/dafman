@@ -20,7 +20,7 @@
 // load-order regression, the boot splash freeze, the dockview
 // placement bugs, the command palette CSS regressions.
 
-import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
+import { test, expect, type Page, type ConsoleMessage } from '@playwright/test';
 
 test.beforeAll(async ({}, _testInfo) => {
   // Sanity: this test relies on `dist/` being built, which the
@@ -50,26 +50,26 @@ async function installRpcStub(page: Page): Promise<void> {
       // settings tree on mount. Keep this fixture in sync with
       // `defaultSettings()` in src/stores/app/settingsStore.ts.
       getSettings: () => ({
-        version: 14,
+        version: 15,
         appearance: {
-          theme: "system",
-          reasoningVisibility: "compact",
-          defaultModelId: "auto",
+          theme: 'system',
+          reasoningVisibility: 'compact',
+          defaultModelId: 'auto',
           defaultReasoningEffort: null,
           streaming: false,
           enableMermaid: false,
         },
         layout: { dockview: null, schemaVersion: 2 },
-        workspaces: { recent: [], defaultWorkspace: "" },
+        workspaces: { recent: [], defaultWorkspace: '' },
         notifications: { turnEnd: false, waitingForInput: true },
         tools: { defaultExcluded: [], defaultAllowed: [] },
         permissions: { defaultApproveAll: false },
         terminal: {
-          defaultProfileId: "platform-default",
-          fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
+          defaultProfileId: 'platform-default',
+          fontFamily: 'Cascadia Mono, Consolas, ui-monospace, monospace',
           fontSize: 13,
           scrollback: 10_000,
-          theme: { background: "#111827", foreground: "#d1d5db" },
+          theme: { background: '#111827', foreground: '#d1d5db' },
           addons: {
             search: true,
             webLinks: true,
@@ -84,9 +84,10 @@ async function installRpcStub(page: Page): Promise<void> {
             serialize: true,
           },
         },
+        keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
       }),
       updateSettings: ({ next }: { next: unknown }) => next,
-      createClient: () => ({ status: "ready" }),
+      createClient: () => ({ status: 'ready' }),
       listModels: () => [],
       listSessions: () => [],
       rendererLog: () => null,
@@ -112,7 +113,10 @@ async function installRpcStub(page: Page): Promise<void> {
         workingDirectory: 'C:\\smoke',
         accent: '#3b82f6',
       }),
-      getSessionMetadata: () => ({ summary: 'Smoke session', context: { workingDirectory: 'C:\\smoke' } }),
+      getSessionMetadata: () => ({
+        summary: 'Smoke session',
+        context: { workingDirectory: 'C:\\smoke' },
+      }),
       listSessionEvents: () => [],
       listSessionHistory: () => [],
       getSession: () => ({
@@ -161,36 +165,37 @@ async function installRpcStub(page: Page): Promise<void> {
   });
 }
 
-test("renderer bundle boots to ready without console errors", async ({ page }, testInfo) => {
+test('renderer bundle boots to ready without console errors', async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
 
   // Capture every error-level console call + uncaught page exceptions.
   // The boot path logs at info/warn freely; only `console.error` and
   // truly uncaught exceptions are smoke-failures.
-  page.on("console", (msg: ConsoleMessage) => {
+  page.on('console', (msg: ConsoleMessage) => {
     // Echo to test stdout for live diagnostics. Playwright's reporter
     // captures these alongside the failure context.
     // eslint-disable-next-line no-console
     console.log(`[page:${msg.type()}]`, msg.text());
-    if (msg.type() === "error") {
+    if (msg.type() === 'error') {
       consoleErrors.push(msg.text());
     }
   });
-  page.on("pageerror", (err: Error) => {
+  page.on('pageerror', (err: Error) => {
     // eslint-disable-next-line no-console
-    console.log("[page:exception]", err.message);
+    console.log('[page:exception]', err.message);
     pageErrors.push(err.stack ?? err.message);
   });
 
   await installRpcStub(page);
-  await page.goto("/");
+  await page.goto('/');
 
   // BootSplash mounts on first paint; if the bundle eval'd cleanly
   // and Vue mounted, we see it within a fraction of a second.
-  const splash = page.locator(".boot-splash");
-  await expect(splash, "BootSplash never mounted — bundle likely failed to evaluate")
-    .toBeVisible({ timeout: 10_000 });
+  const splash = page.locator('.boot-splash');
+  await expect(splash, 'BootSplash never mounted — bundle likely failed to evaluate').toBeVisible({
+    timeout: 10_000,
+  });
 
   // G5c: boot-cost regression gate. The original Groups v3 plan
   // documented a 130 ms boot budget. Measure from
@@ -214,16 +219,17 @@ test("renderer bundle boots to ready without console errors", async ({ page }, t
   });
   // eslint-disable-next-line no-console
   console.log(`[smoke:boot-cost] (${testInfo.project.name}) DOMContentLoaded = ${bootCostMs}ms`);
-  if (testInfo.project.name === "prod") {
+  if (testInfo.project.name === 'prod') {
     expect(bootCostMs, `boot cost ${bootCostMs}ms exceeded 1000 ms gate`).toBeLessThan(1000);
   }
 
   // The dockview body is mounted exactly once, when bootStore.phase
   // flips to "ready". So waiting for the dockview root is equivalent
   // to waiting for boot completion.
-  const dockview = page.locator(".dv-dockview").first();
-  await expect(dockview, "Dockview body never mounted — boot did not reach ready")
-    .toBeVisible({ timeout: 15_000 });
+  const dockview = page.locator('.dv-dockview').first();
+  await expect(dockview, 'Dockview body never mounted — boot did not reach ready').toBeVisible({
+    timeout: 15_000,
+  });
 
   // v3 nested-dockview check: the outer body should have a `group` panel
   // for the Default group, rendering inside a `.group-panel-root`. The
@@ -236,12 +242,12 @@ test("renderer bundle boots to ready without console errors", async ({ page }, t
   // add, and the 0×0 transient lasts long enough to fail toBeVisible
   // in headless chromium. Inner dockview mounting (= 2 total
   // .dv-dockview nodes) is the real proof of nesting.
-  const groupRoot = page.locator(".group-panel-root").first();
-  await expect(groupRoot, "GroupPanel never mounted — outer body has no group panel")
-    .toBeAttached({ timeout: 5_000 });
-  const allDockviews = page.locator(".dv-dockview");
-  await expect(allDockviews, "Inner DockviewVue never mounted")
-    .toHaveCount(2, { timeout: 5_000 });
+  const groupRoot = page.locator('.group-panel-root').first();
+  await expect(groupRoot, 'GroupPanel never mounted — outer body has no group panel').toBeAttached({
+    timeout: 5_000,
+  });
+  const allDockviews = page.locator('.dv-dockview');
+  await expect(allDockviews, 'Inner DockviewVue never mounted').toHaveCount(2, { timeout: 5_000 });
 
   // Wait for boot to fully settle then capture a screenshot for
   // human-eye verification (rule 4a). The structural assertions only
@@ -292,7 +298,8 @@ test("renderer bundle boots to ready without console errors", async ({ page }, t
     return {
       dockviewCount: dockviews.length,
       groupTabCount: document.querySelectorAll('.group-tab').length,
-      activeTabName: document.querySelector('.group-tab.group-tab-active .group-tab-title')?.textContent ?? null,
+      activeTabName:
+        document.querySelector('.group-tab.group-tab-active .group-tab-title')?.textContent ?? null,
       innerWidth: Math.round(
         (dockviews[1] as HTMLElement | undefined)?.getBoundingClientRect().width ?? 0,
       ),
@@ -317,16 +324,12 @@ test("renderer bundle boots to ready without console errors", async ({ page }, t
   // visual sizing of the group panel.
 
   // The splash should auto-dismiss once boot is ready.
-  await expect(splash, "BootSplash did not dismiss after boot")
-    .toBeHidden({ timeout: 5_000 });
+  await expect(splash, 'BootSplash did not dismiss after boot').toBeHidden({ timeout: 5_000 });
 
   // No errors anywhere in the boot trace.
   expect(
     consoleErrors,
-    `Unexpected console.error during boot:\n${consoleErrors.join("\n")}`,
+    `Unexpected console.error during boot:\n${consoleErrors.join('\n')}`,
   ).toEqual([]);
-  expect(
-    pageErrors,
-    `Unhandled page exception during boot:\n${pageErrors.join("\n")}`,
-  ).toEqual([]);
+  expect(pageErrors, `Unhandled page exception during boot:\n${pageErrors.join('\n')}`).toEqual([]);
 });
