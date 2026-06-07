@@ -267,7 +267,6 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       },
     },
     {
-      // Stub: opens Settings until a dedicated Keyboard Shortcuts section exists.
       id: 'keyboardShortcuts.open',
       label: 'Open Keyboard Shortcuts',
       group: 'Settings',
@@ -275,6 +274,13 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       keywords: ['shortcuts', 'keybindings', 'hotkeys', 'keyboard'],
       run: () => {
         layoutStore.toggleSettings();
+        // Give the panel time to become visible, then scroll to the section.
+        setTimeout(() => {
+          document.getElementById('keyboard-shortcuts-section')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 200);
       },
     },
   ];
