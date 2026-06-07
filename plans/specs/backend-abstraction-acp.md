@@ -6,7 +6,7 @@
 
 Dafman should add a thin backend `Provider` layer that keeps the current GitHub Copilot SDK integration first-class while allowing sessions to be backed by any ACP-compatible agent process. ACP is close enough to Dafman's current session/RPC model to make a generic ACP provider worthwhile, but not close enough to become the internal abstraction directly without either leaking protocol details into the renderer or flattening Copilot-specific features that already ship.
 
-Recommended default: **thin internal Provider interface + adapters**. Keep Copilot native as provider `copilot` and add an `acp` provider that spawns configured ACP agents via `@agentclientprotocol/sdk`.
+Recommended default: **thin internal Provider interface + adapters**. Keep Copilot native (on its richer `@github/copilot-sdk` transport) as provider `copilot` and add an `acp` provider that spawns configured ACP agents via `@agentclientprotocol/sdk`. **Don't reinvent:** the protocol is `@agentclientprotocol/sdk`; the multi-agent host pattern is the `formulahendry/vscode-acp` reference client; the capability vocabulary is ACP's own + Copilot's published per-session capability matrix (see ACP research notes). The only bespoke piece is a thin adapter — and §"Decisive finding" shows why it's irreducible.
 
 ## Motivation
 
@@ -72,6 +72,33 @@ At the same time, ACP is explicitly designed to avoid one-off agent/editor integ
 - The official TypeScript package is `@agentclientprotocol/sdk`, with `ClientSideConnection` for clients and `AgentSideConnection` for agents (https://agentclientprotocol.com/libraries/typescript.md). The protocol repo reports Apache-2.0 licensing and stable wire protocol version `1` (https://github.com/agentclientprotocol/agent-client-protocol).
 - ACP-compatible agents are already broad: the ACP docs list Claude Agent, Codex CLI, Gemini CLI, GitHub Copilot public preview, OpenCode, Qwen Code, Cursor, Kiro, Goose, and many more (https://agentclientprotocol.com/get-started/agents.md). A VS Code ACP client repo ships defaults for Copilot, Claude, Gemini, Qwen, Codex, OpenCode, Kiro, Hermes, and others, and demonstrates per-agent session list, config options, filesystem, terminals, permissions, slash commands, and traffic logging (https://github.com/formulahendry/vscode-acp).
 - `@mcpc-tech/acp-ai-provider` bridges ACP agents into Vercel AI SDK `LanguageModelV3`/`LanguageModelV2` and can spawn agents, but it exposes a language-model abstraction rather than Dafman's full agent/session/client protocol surface (https://www.npmjs.com/package/@mcpc-tech/acp-ai-provider, https://github.com/mcpc-tech/mcpc/tree/main/packages/acp-ai-provider).
+- **The Copilot CLI you already spawn (`@github/copilot` 1.0.60) is itself an ACP server.** `sdk/index.d.ts` documents "the CLI is driven by another editor over ACP", lists `ACP server` as a top-level entry point, and treats `SessionClientKind = "cli" | "acp" | "sdk"` as a first-class behavior gate (`sdk/index.d.ts:503, 1856, 22778`). So Copilot could in principle be driven as "just another ACP agent."
+
+## Decisive finding: don't reinvent — but Copilot-over-ACP is a regression vs Copilot-over-SDK
+
+Because Copilot ships an ACP server, the maximal "one wheel" play would be to go **pure ACP** (drop `@github/copilot-sdk`, talk to Copilot over ACP like Claude/Gemini). The CLI's own **session-capability matrix** (`sdk/index.d.ts:22705`) proves that loses capability — and that the SDK and ACP surfaces are **not even subsets of each other**:
+
+| Session capability | CLI TUI | SDK | ACP |
+|---|:--:|:--:|:--:|
+| `ask-user` (user-input prompts Dafman relies on) | ✓ | ✓ | **✗** |
+| `plan-mode` | ✓ | ✗ | ✓ |
+| `session-store` | ✓ | ✗ | ✓ |
+| `interactive-mode` | ✓ | ✓ | ✓ |
+| `system-notifications` | ✓ | ✓ | ✓ |
+| `memory`, `cli-documentation`, `elicitation`, `tui-hints` | ✓ | ✗ | ✗ |
+
+And that is only *session* capabilities. The rich **RPC surface** Dafman depends on (skills, custom agents, MCP config/discovery, quota, approval rules, fork, compact/truncate, task/fleet) is `@github/copilot-sdk`-specific and **not standardized in ACP**, so it does not ride the ACP transport at all. Driving Copilot over ACP would therefore *lose* `ask-user`/elicitation **plus** skills/agents/MCP-config/quota/approval-rules — a downgrade of the product's strongest backend. No library can paper over that gap because it is a product decision (keep Copilot's richness), which is exactly what the thin adapter encodes.
+
+### What to reuse vs build
+
+| Layer | Reuse (don't reinvent) | Build |
+|---|---|---|
+| Wire protocol | `@agentclientprotocol/sdk` (`ClientSideConnection`) for ACP; `@github/copilot-sdk` for Copilot | — |
+| Multi-agent host architecture + agent presets | mirror `formulahendry/vscode-acp` (Copilot/Claude/Gemini/Qwen/Codex/OpenCode/Kiro defaults; session list/config/fs/terminal/permissions/logging); Zed as canonical reference | — |
+| Capability vocabulary | ACP `agentCapabilities`/`clientCapabilities` + Copilot's published per-session capability matrix | a thin Dafman mapping onto UI gates |
+| Provider adapter glue | — | the only bespoke layer: §1–§9 (keeps Copilot on SDK, ACP agents on ACP, normalizes events, gates UI) |
+
+This *strengthens* Option B (below) and makes Option A provably wrong **even for Copilot itself**.
 
 ## Design
 
