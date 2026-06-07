@@ -365,25 +365,41 @@ Recommended migration:
 
 ## Open questions
 
-1. **Build vs library:** Should Dafman depend on a small keybinding parser/matcher such as `tinykeys`, use older `mousetrap`, or hand-roll the parser? Recommended default: use `tinykeys` behind a Dafman adapter for parsing/matching/sequences, but keep scopes, conflict detection, settings persistence, and command execution in Dafman-owned code.
+1. **Build vs library:** ✅ **RESOLVED (2026-06-07): use `tinykeys`** behind a Dafman adapter for parsing/matching/sequences; keep scopes, conflict detection, settings persistence, and command execution Dafman-owned. Chosen for **architecture fit** — a tiny primitive that slots under the registry, not a framework that fights `commandRegistry` (see the expanded comparison below). Caveat to track in OQ 10.
 2. **Persistence field name:** Store prefs as `settings.keyboardShortcuts` (explicit) or `settings.keyboard` (broader future input prefs)? Recommended default: `keyboardShortcuts` because it is precise and mirrors the Settings section.
 3. **Scope shadow policy:** Should users be allowed to assign the same chord in a specific scope and global scope? Recommended default: allow intentional shadowing with a warning; block exact same-scope conflicts.
 4. **Global shortcuts inside terminal:** Should global pane shortcuts like `Mod+K` fire while Xterm has focus? Recommended default: allow only a small allowlist (`commandPalette.toggle`, maybe `settings.open`) and otherwise let terminal input win.
-5. **Composer Enter customization:** Should the core Enter send/newline behavior be fully reassignable, or only display/documented? Recommended default: make force-send variants reassignable after the Lexical adapter exists, but keep plain Enter and Shift+Enter locked until there is strong test coverage because they are core typing semantics.
+5. **Composer Enter customization:** ✅ **RESOLVED (2026-06-07): keep the entire composer scope LOCKED for v1.** Plain Enter, Shift+Enter, and the force-send variants are **display-only** in Keyboard Settings (not reassignable). Reassignability is **deferred to a future iteration** once the Lexical adapter is proven with strong test coverage. Rationale: core typing semantics, highest regression risk, no current demand.
 6. **Mac parity for current Ctrl-only bindings:** Pending request submit is currently `Ctrl+Enter` in Vue template, not `Cmd+Enter`. Should the migration add `Mod+Enter` and keep `Ctrl+Enter` as an alias? Recommended default: yes.
 7. **Presentation in command palette:** Should every shortcutable local editor action appear in Ctrl/Cmd+K? Recommended default: no; show them in Keyboard Settings by default and expose only user-facing commands in the palette unless the action is safe and understandable outside its pane.
 8. **Sequence timeout:** Use tinykeys’ 1000 ms default, keep command terminal’s current 400 ms double-Escape, or use one global timeout? Recommended default: global 1000 ms, with per-binding override for `Escape Escape` if user testing shows 1000 ms accidentally exits terminals.
 9. **Per-workspace keymaps:** Should shortcuts be global app settings only or per workspace/project? Recommended default: app-global only for the first version; per-workspace adds synchronization and surprise without a current requirement.
+10. **macOS international-layout Shift normalization:** tinykeys does not normalize the macOS `Meta+Shift` → lowercase-key quirk outside US layouts (its README admits this); `@github/hotkey` does (`macos-uppercase-layer.ts`). Should v1 port that normalization into the Dafman adapter, or accept the gap until a Mac-international user reports it? Recommended default: **accept the gap for v1**, document it, and port the ~30-line normalization only if it surfaces.
 
 ## Alternatives / options
 
 ### Matcher/parser library
 
-| Option | Pros | Cons | Recommendation |
-|---|---|---|---|
-| `tinykeys` | Tiny TypeScript library; supports `$mod`, sequences, matching against `KeyboardEvent.key` and `code`, parsing for display, and documents sequence conflicts. | Scope/conflict/persistence still need custom code; another dependency. | **Recommended default** behind a Dafman adapter. |
-| `mousetrap` | Mature, no dependency, supports combinations and Gmail-style sequences; handles international layouts. | Older JavaScript API, global-binding model does not map cleanly to Dafman scoped panes, plugin ecosystem is extra surface. | Acceptable fallback, not preferred. |
-| Hand-rolled | Full control, no dependency, can optimize for Dafman’s exact model. | Easy to get layout/modifier/sequence edge cases wrong; duplicates library work. | Only choose if dependency policy rejects tinykeys. |
+The decisive lens: Dafman **owns the framework** (registry, scopes, conflict
+detection, persistence, command execution) and only **rents a primitive** for
+parse + match + sequences. So a library that owns binding/scope/dispatch state
+is a *negative* — it competes with `commandRegistry` and the focus/scope stack.
+Evaluated as primitives:
+
+| Lib | gzip | Model | Sequences | `$mod` | `key`+`code` | macOS Shift quirk | Owns scopes/dispatch? | TS | Maintenance |
+|---|---|---|---|---|---|---|---|---|---|
+| **`tinykeys`** | **~0.8 kB** | handler-over-map (`createKeybindingsHandler`, BYO listener) | ✅ | ✅ + AltGraph | ✅ both | ❌ US-only | ❌ **you own it** | ✅ native | ✅ active (v2.1 2025) |
+| `is-hotkey` | ~1 kB | **pure matcher** `isHotkey(str,ev)` | ❌ | ✅ `mod` | one | ❌ | ❌ you own it | ✅ | ⚠️ stale (2024) |
+| `mousetrap` | ~1.5 kB | global callback manager | ✅ | ❌ manual | `key`-ish | ❌ | ⚠️ global bind state | ❌ community | ⚠️ stale (2023) |
+| `hotkeys-js` | ~3.8 kB | manager w/ built-in scopes | ✅ | ✅ | ✅ | partial | ⚠️ scopes duplicate yours | ✅ | ✅ active |
+| `@github/hotkey` | ~2–3 kB | **DOM-attribute** (`data-hotkey` → focus/click) | ✅ (radix-trie) | ✅ `Mod` | `key` only | ✅ explicit layer | ⚠️ dispatches DOM events, not commands | ✅ | ✅ active |
+
+**Why `tinykeys` (recommended, now resolved):**
+- **Primitive, not framework** — slots under the registry instead of competing with it. `mousetrap`/`hotkeys-js` want to own bind/scope state; `@github/hotkey` dispatches `focus()`/`click()` on DOM elements (great for server templates, wrong for `runCommand(id)`).
+- **Covers the needs the only other primitive can't** — `is-hotkey` is the cleanest pure matcher but has **no sequences** (kills `Mod+K Mod+S` and `g i`) and is stale. tinykeys does sequences, `$mod`, dual `key`+`code`, AltGraph aliasing.
+- **Smallest + native TS + maintained**; `createKeybindingsHandler` maps 1:1 onto the §6 per-scope handler design.
+
+**Caveats:** tinykeys is handler-over-a-map, not a pure `match(): boolean` — the adapter either reuses its parse + a tiny match or wraps a handler per scope. And it skips the macOS non-US `Meta+Shift` normalization that `@github/hotkey` solves (OQ 10). The sleeper is `is-hotkey` *only if* sequences were dropped from v1 — they aren't.
 
 ### Persistence location
 
