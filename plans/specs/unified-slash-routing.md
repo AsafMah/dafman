@@ -215,7 +215,7 @@ text starts with "/" ?
   YES → resolveSlashCommand(sessionId, text)
         returns:
           { kind: 'local',   run }    → run(sessionId, args); don't send
-          { kind: 'sdk-invoke', name, input } → session.rpc.commands.invoke({ name, input })
+          { kind: 'sdk-invoke', name, input } → session.rpc.commands.enqueue({ command })
           { kind: 'sdk-send' }        → send verbatim (unknown; let SDK error)
           null                        → not a slash command; send normally
 ```
@@ -247,13 +247,13 @@ export function resolveSlashCommand(
 }
 ```
 
-The `sdk-invoke` path calls `invokeCommand('invokeSessionCommand', { sessionId, name, input })` — a new bun-side RPC handler that calls `session.rpc.commands.invoke({ name, input })` and emits the result as a system message.
+The `sdk-invoke` path calls `invokeCommand('invokeSessionCommand', { sessionId, name, input })` — a new bun-side RPC handler that invokes the CLI command via `session.rpc.commands.enqueue({ command: '/name args' })` (or `.execute` for a synchronous result; `rpc.d.ts:10847`/`10839`) and emits any output as a system message. (There is no `commands.invoke` — the SDK exposes `enqueue`/`execute`.)
 
-**`/agent`, `/skill`, `/mcp` without args:** These remain `source: 'dafman'` and their existing `run` handlers open library tabs when `args` is empty — no change to that behavior.
+**`/agent`, `/mcp` without args:** These remain `source: 'dafman'` and their existing `run` handlers open library tabs when `args` is empty — no change. (`/skill`/`/skills` are dropped — OQ3; use `/library` or the `/skill:<name>` activation namespace.)
 
 **`/agent <name>` with args:** The existing `/agent` entry's `run` handler is preserved exactly (it already does lookup → `selectAgent`). The dynamic per-agent entries (`/agent codex`, `/agent summarize`) added by the agent namespace are *additional* entries that call `selectAgent` directly — they are convenience shortcuts to the same underlying action.
 
-**`/skill <name>` dynamic entries:** Add a new `source: 'agent'` (or `'sdk-skill'`) entry per user-invocable skill. The `run` handler calls `session.rpc.commands.invoke({ name, input: args })` via the new `invokeSessionCommand` RPC. The bare `/skill` or `/skills` entries remain as dafman-local library-openers.
+**`/skill:<name>` skill activation (OQ2):** the `/skill:` prefix opens an autocomplete of the session's user-invocable skills (`commands.list` `kind="skill"`) — the pattern most harnesses use. Each is a `UnifiedSlashEntry` with `slash: '/skill:<name>'`, `source: 'sdk-skill'`; selecting it activates the skill via `invokeSessionCommand` (→ `commands.enqueue`/`execute`). Skills are NOT exposed as bare `/<skillname>` (avoids builtin collisions). The old dafman `/skill`/`/skills` library-openers are **dropped** (OQ3) — use `/library`.
 
 ---
 
@@ -273,8 +273,8 @@ When two entries share the same `slash` value, the **first** survives in `dedupe
 | Slash | dafman source | SDK source | Winner |
 |---|---|---|---|
 | `/compact` | `sessionCommands.ts:231` (calls `compactSessionHistory`) | CLI builtin | dafman (acceptable: same semantic) |
-| `/skills` | `sessionCommands.ts:133` (opens library tab) | CLI builtin (user-invocable skills list) | dafman — **decision needed (OQ #3)** |
-| `/help` | `sessionCommands.ts:414` (local list) | CLI builtin | dafman — **decision needed (OQ #6)** |
+| `/skills` | `sessionCommands.ts:133` (opens library tab) | CLI builtin (user-invocable skills) | **SDK wins** — dafman's dropped; `/library` opens the tab, skills activate via `/skill:<name>` (OQ3) |
+| `/help` | `sessionCommands.ts:414` (local list) | CLI builtin (CLI-TUI shortcuts) | **dafman wins** — CLI's `/help`/`/?` excluded as GUI-irrelevant (OQ6) |
 
 ---
 
@@ -313,7 +313,7 @@ invokeSessionCommand: {
 
 The `listSessionCommands` bun-side handler calls `session.rpc.commands.list({ includeBuiltins: true, includeSkills: true, includeClientCommands: false })` and maps `SlashCommandInfo[]` to the response shape.
 
-The `invokeSessionCommand` handler calls `session.rpc.commands.invoke({ name, input })` and returns the `SlashCommandInvocationResult` discriminated union mapped to the simpler response type. Text results are also emitted as `system.notification` events so they appear in the chat timeline.
+The `invokeSessionCommand` handler invokes the command via `session.rpc.commands.enqueue({ command: "/" + name + (input ? " " + input : "") })` (or `.execute` for a synchronous `SlashCommandInvocationResult`; `rpc.d.ts:10847`/`10839`). Text results are emitted as `system.notification` events so they appear in the chat timeline. (No `commands.invoke` exists.)
 
 ---
 
@@ -334,17 +334,9 @@ Once `slashRegistryStore` is populated, the `/help` and `/?` run handlers should
 **OQ 1 — Does `session.rpc.commands.list()` actually work in beta.9?**  
 It is `@experimental` and present in the installed types (`rpc.d.ts:10815`). The `copilot-sdk-update.md` spec notes it but hasn't tested it. The bun-side handler needs a try/catch fallback: if `commands.list` throws or returns an empty list, degrade gracefully (show only `SESSION_COMMANDS`). **Decision: proceed with `@experimental` call; wrap in try/catch; log but don't crash if unavailable.**
 
-**OQ 2 — Bare `/agent`, `/skill`, `/mcp` vs. `/<name>` direct invocation?**  
-The issue asks whether `/cmd <name>` form coexists with `/<name>` direct form (where `<name>` is a skill/agent/mcp-server name). Adding `/<skillname>` directly creates a namespace collision risk if a skill is named `compact`, `fork`, `help`, etc.  
-**Recommended default:** Keep `/agent <name>`, `/skill <name>`, `/mcp <name>` as the authoritative forms for dafman-dispatch. Direct `/<skillname>` is routed through the SDK (sdk-invoke path) for skills that appear in `commands.list`. The dynamic per-agent shortcut entries in §2 are supplementary — they don't create a new command syntax, they just pre-populate the typeahead so users can type `/codex` and see it resolved.
+**OQ 2 — Skill activation syntax** — ✅ **RESOLVED (2026-06-07): skills activate via a `/skill:<name>` namespace with autocomplete** (the pattern most harnesses use). Typing `/skill:` opens an autocomplete of the session's user-invocable skills (`commands.list` `kind="skill"`); selecting `/skill:<name>` activates it via the SDK (`commands.enqueue`/`execute`). Skills are NOT surfaced as bare `/<skillname>` (avoids collisions with builtins). `/agent <name>` and `/mcp <name>` keep their space-arg forms; the dynamic per-name entries in §2 are typeahead conveniences.
 
-**OQ 3 — `/skills` collision with CLI builtin.**  
-Today `/skills` opens the Library tab. The CLI also has a `/skills` builtin that lists user skills inline. Both behaviors are reasonable; they diverge in where output appears (dafman panel vs. chat timeline).  
-**Options:**
-- A) dafman wins (current); CLI behavior invisible.
-- B) Rename dafman's entry to `/skill-library` or fold it into `/library skills`.
-- C) Detect ambiguity and prompt user.
-**Recommended default:** A (preserve backward compat). Add a note in the typeahead description: "Opens Library. To see skills inline, run /skill in CLI."
+**OQ 3 — `/skills` collision** — ✅ **RESOLVED (2026-06-07): defer `/skills` to the SDK.** Drop dafman's local `/skill`+`/skills` Library-openers — `/library` (or `/library skills`) already opens the Skills tab, so dafman doesn't need its own. `/skills` is the CLI builtin (lists user skills inline); skill *activation* is the `/skill:<name>` namespace (OQ2).
 
 **OQ 4 — Caching lifetime for `listSessionCommands`.**  
 Skills and agents can change mid-session (user enables a skill in the Library panel, user drops a new agent file). How stale can the cached entries be?  
@@ -357,9 +349,7 @@ If the user types `/unknownthing` and it isn't in any source, the current fallth
 - C) Forward to SDK with a toast: "Sending /unknownthing to Copilot CLI…" (informational).
 **Recommended default:** B (preserve current implicit behavior; avoids false positives when `commands.list` is incomplete or stale).
 
-**OQ 6 — `/help` collision with CLI builtin.**  
-Similar to `/skills`. CLI's `/help` is a live listing of all commands; dafman's `/help` is a toast with the static local list.  
-**Recommended default:** If we implement §7 (enriched help), dafman's `/help` becomes a superset of the CLI's — keep dafman winning. After §7 ships, the help content will be accurate.
+**OQ 6 — `/help` collision** — ✅ **RESOLVED (2026-06-07): dafman's `/help` wins; do NOT surface the CLI's `/help`/`/?`.** The CLI's help lists CLI-TUI keyboard shortcuts and commands that are irrelevant in a GUI. dafman's `/help` (enriched per §7 to enumerate the session's effective dafman + invocable SDK commands) is the relevant surface. Exclude `kind="builtin"` `/help` and `/?` from the merged list.
 
 **OQ 7 — Per-session vs. global command sets.**  
 Skills and agents are per-session (they depend on `cwd`, enabled/disabled state, loaded agent files). SDK builtins are per-session-type (may differ between plan-mode and interactive sessions). `SESSION_COMMANDS` are global (same for all sessions).  
