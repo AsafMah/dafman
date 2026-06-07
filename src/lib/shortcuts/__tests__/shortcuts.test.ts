@@ -150,7 +150,7 @@ describe('detectConflicts — exact same-scope', () => {
       makeBinding({ id: 'a', commandId: 'cmd.a', keys: 'Enter', scope: 'global' }),
       makeBinding({ id: 'b', commandId: 'cmd.b', keys: 'Enter', scope: 'composer' }),
     ];
-    const exact = detectConflicts(bindings).filter(c => c.kind === 'exact');
+    const exact = detectConflicts(bindings).filter((c) => c.kind === 'exact');
     expect(exact).toHaveLength(0);
   });
 
@@ -160,7 +160,7 @@ describe('detectConflicts — exact same-scope', () => {
       makeBinding({ id: 'b', commandId: 'cmd.b', keys: '$mod+K', scope: 'global' }),
     ];
     const conflicts = detectConflicts(bindings);
-    expect(conflicts.some(c => c.kind === 'exact')).toBe(true);
+    expect(conflicts.some((c) => c.kind === 'exact')).toBe(true);
   });
 });
 
@@ -168,9 +168,14 @@ describe('detectConflicts — scope shadow', () => {
   test('composer Enter shadows global Enter → scope-shadow warning', () => {
     const bindings = [
       makeBinding({ id: 'global.enter', commandId: 'cmd.global', keys: 'Enter', scope: 'global' }),
-      makeBinding({ id: 'composer.enter', commandId: 'cmd.composer', keys: 'Enter', scope: 'composer' }),
+      makeBinding({
+        id: 'composer.enter',
+        commandId: 'cmd.composer',
+        keys: 'Enter',
+        scope: 'composer',
+      }),
     ];
-    const shadows = detectConflicts(bindings).filter(c => c.kind === 'scope-shadow');
+    const shadows = detectConflicts(bindings).filter((c) => c.kind === 'scope-shadow');
     expect(shadows).toHaveLength(1);
     // composer (priority 5) shadows global (priority 8) → composer binding reported
     expect(shadows[0]!.bindingId).toBe('composer.enter');
@@ -183,7 +188,7 @@ describe('detectConflicts — scope shadow', () => {
       makeBinding({ id: 'a', commandId: 'cmd.a', keys: 'Enter', scope: 'composerTypeahead' }),
       makeBinding({ id: 'b', commandId: 'cmd.b', keys: 'Enter', scope: 'filePicker' }),
     ];
-    const shadows = detectConflicts(bindings).filter(c => c.kind === 'scope-shadow');
+    const shadows = detectConflicts(bindings).filter((c) => c.kind === 'scope-shadow');
     expect(shadows).toHaveLength(0);
   });
 });
@@ -194,7 +199,7 @@ describe('detectConflicts — prefix conflicts', () => {
       makeBinding({ id: 'a', commandId: 'cmd.a', keys: 'G', scope: 'global' }),
       makeBinding({ id: 'b', commandId: 'cmd.b', keys: 'G I', scope: 'global' }),
     ];
-    const conflicts = detectConflicts(bindings).filter(c => c.kind === 'prefix');
+    const conflicts = detectConflicts(bindings).filter((c) => c.kind === 'prefix');
     expect(conflicts).toHaveLength(1);
     expect(conflicts[0]!.bindingId).toBe('a');
   });
@@ -204,7 +209,7 @@ describe('detectConflicts — prefix conflicts', () => {
       makeBinding({ id: 'a', commandId: 'cmd.a', keys: 'Escape', scope: 'commandPalette' }),
       makeBinding({ id: 'b', commandId: 'cmd.b', keys: 'Escape Escape', scope: 'commandPalette' }),
     ];
-    const conflicts = detectConflicts(bindings).filter(c => c.kind === 'prefix');
+    const conflicts = detectConflicts(bindings).filter((c) => c.kind === 'prefix');
     expect(conflicts).toHaveLength(1);
   });
 
@@ -213,16 +218,14 @@ describe('detectConflicts — prefix conflicts', () => {
       makeBinding({ id: 'a', commandId: 'cmd.a', keys: 'G', scope: 'global' }),
       makeBinding({ id: 'b', commandId: 'cmd.b', keys: 'G I', scope: 'composer' }),
     ];
-    const conflicts = detectConflicts(bindings).filter(c => c.kind === 'prefix');
+    const conflicts = detectConflicts(bindings).filter((c) => c.kind === 'prefix');
     expect(conflicts).toHaveLength(0);
   });
 });
 
 describe('detectConflicts — unknown-command', () => {
   test('empty commandId → unknown-command', () => {
-    const bindings = [
-      makeBinding({ id: 'bad', commandId: '', keys: '$mod+K' }),
-    ];
+    const bindings = [makeBinding({ id: 'bad', commandId: '', keys: '$mod+K' })];
     const conflicts = detectConflicts(bindings);
     expect(conflicts).toHaveLength(1);
     expect(conflicts[0]!.kind).toBe('unknown-command');
@@ -235,23 +238,23 @@ describe('detectConflicts — unknown-command', () => {
 
 describe('defaultKeymap integrity', () => {
   test('no duplicate binding ids', () => {
-    const ids = defaultKeymap.map(b => b.id);
+    const ids = defaultKeymap.map((b) => b.id);
     const unique = new Set(ids);
     expect(unique.size).toBe(ids.length);
   });
 
   test('no intra-scope exact conflicts', () => {
-    const hardConflicts = detectHardConflicts(defaultKeymap).filter(c => c.kind === 'exact');
+    const hardConflicts = detectHardConflicts(defaultKeymap).filter((c) => c.kind === 'exact');
     expect(hardConflicts).toHaveLength(0);
   });
 
   test('all commandIds are non-empty', () => {
-    const empty = defaultKeymap.filter(b => !b.commandId.trim());
+    const empty = defaultKeymap.filter((b) => !b.commandId.trim());
     expect(empty).toHaveLength(0);
   });
 
   test('composer bindings are all non-reassignable', () => {
-    const composerBindings = defaultKeymap.filter(b => b.scope === 'composer');
+    const composerBindings = defaultKeymap.filter((b) => b.scope === 'composer');
     expect(composerBindings.length).toBeGreaterThan(0);
     for (const b of composerBindings) {
       expect(b.reassignable).toBe(false);
@@ -260,9 +263,17 @@ describe('defaultKeymap integrity', () => {
 
   test('all scopes used are valid ShortcutScope values', () => {
     const validScopes = new Set([
-      'global', 'commandPalette', 'composer', 'composerTypeahead',
-      'terminal', 'filePicker', 'messageEditor', 'pendingRequest',
-      'composerCommandTerminal', 'dockviewTabRename', 'accessibility',
+      'global',
+      'commandPalette',
+      'composer',
+      'composerTypeahead',
+      'terminal',
+      'filePicker',
+      'messageEditor',
+      'pendingRequest',
+      'composerCommandTerminal',
+      'dockviewTabRename',
+      'accessibility',
     ]);
     for (const b of defaultKeymap) {
       expect(validScopes.has(b.scope)).toBe(true);
@@ -295,7 +306,7 @@ describe('shortcutRegistry — effective bindings merge', () => {
       customBindings: [],
       disabledDefaultBindingIds: [target.id],
     });
-    const found = registry.effectiveBindings.find(b => b.id === target.id);
+    const found = registry.effectiveBindings.find((b) => b.id === target.id);
     expect(found).toBeUndefined();
     expect(registry.effectiveBindings.length).toBe(defaultKeymap.length - 1);
   });
@@ -303,12 +314,10 @@ describe('shortcutRegistry — effective bindings merge', () => {
   test('custom binding is added on top of defaults', () => {
     const registry = useShortcutRegistry();
     registry.setPrefs({
-      customBindings: [
-        { commandId: 'session.new', scope: 'global', keys: '$mod+Shift+N' },
-      ],
+      customBindings: [{ commandId: 'session.new', scope: 'global', keys: '$mod+Shift+N' }],
       disabledDefaultBindingIds: [],
     });
-    const custom = registry.effectiveBindings.find(b => b.source === 'user');
+    const custom = registry.effectiveBindings.find((b) => b.source === 'user');
     expect(custom).toBeDefined();
     expect(custom!.commandId).toBe('session.new');
     expect(custom!.keys).toBe('$mod+Shift+N');
@@ -317,13 +326,11 @@ describe('shortcutRegistry — effective bindings merge', () => {
   test('disabled default + custom replacement → one effective binding for command', () => {
     const registry = useShortcutRegistry();
     // Find the default binding for session.new
-    const original = defaultKeymap.find(b => b.commandId === 'session.new')!;
+    const original = defaultKeymap.find((b) => b.commandId === 'session.new')!;
     expect(original).toBeDefined();
 
     registry.setPrefs({
-      customBindings: [
-        { commandId: 'session.new', scope: 'global', keys: '$mod+Shift+N' },
-      ],
+      customBindings: [{ commandId: 'session.new', scope: 'global', keys: '$mod+Shift+N' }],
       disabledDefaultBindingIds: [original.id],
     });
 
@@ -342,8 +349,8 @@ describe('shortcutRegistry — effective bindings merge', () => {
     const registry = useShortcutRegistry();
     const global = registry.bindingsForScope('global');
     const composer = registry.bindingsForScope('composer');
-    expect(global.every(b => b.scope === 'global')).toBe(true);
-    expect(composer.every(b => b.scope === 'composer')).toBe(true);
+    expect(global.every((b) => b.scope === 'global')).toBe(true);
+    expect(composer.every((b) => b.scope === 'composer')).toBe(true);
     expect(global.length).toBeGreaterThan(0);
     expect(composer.length).toBeGreaterThan(0);
   });
@@ -351,12 +358,10 @@ describe('shortcutRegistry — effective bindings merge', () => {
   test('custom binding keys are normalised on merge', () => {
     const registry = useShortcutRegistry();
     registry.setPrefs({
-      customBindings: [
-        { commandId: 'session.new', scope: 'global', keys: 'shift+$mod+n' },
-      ],
+      customBindings: [{ commandId: 'session.new', scope: 'global', keys: 'shift+$mod+n' }],
       disabledDefaultBindingIds: [],
     });
-    const custom = registry.effectiveBindings.find(b => b.source === 'user');
+    const custom = registry.effectiveBindings.find((b) => b.source === 'user');
     expect(custom!.keys).toBe('$mod+Shift+N');
   });
 

@@ -719,6 +719,10 @@ export type DafmanRPC = {
           /// in-flight turn; `"immediate"` injects into the
           /// running turn (steer). Omitted → SDK default.
           mode?: 'enqueue' | 'immediate';
+          /// Per-message agent mode override. When set, overrides the
+          /// session-wide `mode` for this send only (one-shot); the
+          /// session-level mode is not mutated.
+          agentMode?: SessionMode;
           /// Optional SDK attachments — files / directories /
           /// selections / blobs (base64 data + mimeType for
           /// pasted images). Mirrors `MessageOptions.attachments`

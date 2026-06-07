@@ -683,6 +683,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     text: string,
     mode: SendMode = 'steer',
     attachments?: import('@/ipc/types').SendMessageAttachment[],
+    agentMode?: SessionMode,
   ): Promise<void> {
     assertSessionWritable(sessionId);
 
@@ -707,6 +708,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       await invokeCommand('sendMessage', {
         sessionId,
         text,
+        ...(agentMode ? { agentMode } : {}),
         ...(atts ? { attachments: atts } : {}),
       });
 
@@ -719,6 +721,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       sessionId,
       text,
       mode: sdkMode,
+      ...(agentMode ? { agentMode } : {}),
       ...(atts ? { attachments: atts } : {}),
     });
   }

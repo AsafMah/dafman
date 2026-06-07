@@ -278,5 +278,4 @@ describe('layoutStore.addPanel placement', () => {
     expect(dock.addPanelCalls).toHaveLength(0);
     expect(dock.addGroupCalls).toHaveLength(0);
   });
-
 });

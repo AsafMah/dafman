@@ -21,7 +21,7 @@
 // SDK reconciles it with the eventual `user.message` echo.
 
 import type { ComposerSubmitPayload } from '@/lexical/plugins';
-import type { SendMessageAttachment } from '@/ipc/types';
+import type { SendMessageAttachment, SessionMode } from '@/ipc/types';
 import type { SendMode } from '@/stores/chat/sessionsStore';
 import { toErrorMessage } from '@/lib/errorMessage';
 
@@ -37,6 +37,7 @@ export interface ChatSubmitTransport {
     text: string,
     mode: SendMode,
     attachments?: SendMessageAttachment[],
+    agentMode?: SessionMode,
   ): Promise<void>;
 }
 
@@ -90,6 +91,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions): UseChatSubmitReturn {
           payload.text,
           concreteMode,
           payload.attachments,
+          payload.agentMode,
         );
       }
     } catch (error) {

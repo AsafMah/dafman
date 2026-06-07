@@ -34,13 +34,21 @@ const DiffEditorStub = defineComponent({
 mock.module('@/components/details/PathChip.vue', () => ({ default: PathChipStub }));
 mock.module('@/components/details/CommandBlock.vue', () => ({ default: CommandBlockStub }));
 mock.module('@/components/details/DiffEditor.vue', () => ({ default: DiffEditorStub }));
-mock.module('@/components/details/UrlChip.vue', () => ({ default: defineComponent({ template: '<span />' }) }));
-mock.module('@/components/details/ToolChip.vue', () => ({ default: defineComponent({ template: '<span />' }) }));
+mock.module('@/components/details/UrlChip.vue', () => ({
+  default: defineComponent({ template: '<span />' }),
+}));
+mock.module('@/components/details/ToolChip.vue', () => ({
+  default: defineComponent({ template: '<span />' }),
+}));
 mock.module('@/components/details/ApplyPatchView.vue', () => ({
   default: defineComponent({ template: '<section data-testid="apply-patch" />' }),
 }));
-mock.module('@/components/details/GrepResults.vue', () => ({ default: defineComponent({ template: '<span />' }) }));
-mock.module('@/components/details/GlobResults.vue', () => ({ default: defineComponent({ template: '<span />' }) }));
+mock.module('@/components/details/GrepResults.vue', () => ({
+  default: defineComponent({ template: '<span />' }),
+}));
+mock.module('@/components/details/GlobResults.vue', () => ({
+  default: defineComponent({ template: '<span />' }),
+}));
 
 let ToolDetails: Component;
 
@@ -90,7 +98,8 @@ describe('ToolDetails tool rendering', () => {
     const { container, queryByTestId } = mountToolDetails({
       toolName: 'str_replace_editor',
       args: { path: 'src/example.ts', old_str: 'const answer = 1;', new_str: 'const answer = 42;' },
-      resultContent: 'diff --git a/src/example.ts b/src/example.ts\n-const answer = 1;\n+const answer = 42;',
+      resultContent:
+        'diff --git a/src/example.ts b/src/example.ts\n-const answer = 1;\n+const answer = 42;',
     });
 
     const diff = queryByTestId('diff-editor');

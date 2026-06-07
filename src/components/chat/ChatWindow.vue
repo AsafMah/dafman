@@ -40,6 +40,8 @@ import {
 } from '@/composables/useChatSubmit';
 import { useChatTimelineState } from '@/composables/useChatTimelineState';
 import { useMessageActions } from '@/composables/useMessageActions';
+import { useComposerAgentMode } from '@/composables/useComposerAgentMode';
+import AgentModeOverrideButton from '@/components/chat/AgentModeOverrideButton.vue';
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue';
 import { styleFor } from '@/lib/notificationStyles';
 import { on as busOn } from '@/lib/bus';
@@ -301,10 +303,15 @@ const { sendMessage } = useChatSubmit({
   scrollToBottom,
   toasts,
   transport: {
-    sendMessage: (sessionId, text, mode, attachments) =>
-      sessionsStore.sendMessage(sessionId, text, mode, attachments),
+    sendMessage: (sessionId, text, mode, attachments, agentMode) =>
+      sessionsStore.sendMessage(sessionId, text, mode, attachments, agentMode),
   },
 });
+
+/// Per-message agent mode override state. Scoped to this ChatWindow instance.
+/// `nextMessageMode` drives the badge on AgentModeOverrideButton; `resolveForSubmit`
+/// is consumed (and resets to null) once per submit.
+const { nextMessageMode, setNextMessageMode, resolveForSubmit } = useComposerAgentMode();
 
 /// Local count of messages sent in queue mode while a turn was in
 /// flight. Cleared when `isSending` goes false (the turn ended, so
@@ -331,7 +338,12 @@ async function submitMessage(payload: ComposerSubmitPayloadWithAttachments): Pro
     queuedMessageCount.value++;
   }
 
-  await sendMessage(payload);
+  // Resolve and consume the per-message agent-mode override (one-shot).
+  // `resolveForSubmit` resets `nextMessageMode` to null immediately so
+  // the badge clears after the send regardless of success/failure.
+  const agentMode = resolveForSubmit();
+
+  await sendMessage({ ...payload, agentMode });
 }
 
 function onUpdateDefaultMode(next: DefaultSendMode) {
@@ -739,6 +751,11 @@ const commandsRun = computed(() => {
         @update:default-mode="onUpdateDefaultMode"
       >
         <template #session-left-controls>
+          <AgentModeOverrideButton
+            :next-message-mode="nextMessageMode"
+            :disabled="props.deleted"
+            @update:next-message-mode="setNextMessageMode"
+          />
           <SessionHeaderControls
             :session-id="props.sessionId"
             area="composer-left"

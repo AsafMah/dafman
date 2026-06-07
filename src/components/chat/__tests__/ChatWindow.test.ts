@@ -853,7 +853,11 @@ describe('ChatWindow', () => {
 
       // New content streams in.
       await utils.rerender(
-        rerenderProps([toolEvent('tc-1'), assistantEvent('hi', 'e2'), assistantEvent('more', 'e3')]),
+        rerenderProps([
+          toolEvent('tc-1'),
+          assistantEvent('hi', 'e2'),
+          assistantEvent('more', 'e3'),
+        ]),
       );
       await flushFrames();
 

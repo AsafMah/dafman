@@ -16,7 +16,11 @@ interface FakePanel {
   isActive: boolean;
 }
 
-function makeLibraryDock(collapsed = false): { api: DockviewApi; edge: FakeEdgeGroup; panel: FakePanel } {
+function makeLibraryDock(collapsed = false): {
+  api: DockviewApi;
+  edge: FakeEdgeGroup;
+  panel: FakePanel;
+} {
   const edge: FakeEdgeGroup = {
     id: 'edge-right',
     collapsed,
