@@ -111,3 +111,10 @@ body.app-dark {
 .dv-tabs-and-actions-container {
   container-type: inline-size;
 }
+
+/* Toast text must be selectable so error messages can be copied. */
+.p-toast-summary,
+.p-toast-detail {
+  user-select: text;
+  cursor: text;
+}

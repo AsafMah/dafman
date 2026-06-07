@@ -279,23 +279,24 @@ const { restoreFromLayout, flushPendingLayout } = useBootLayout();
 
 watch(isDarkMode, (next) => applyThemeClass(next), { immediate: true });
 
-// Drain queued toasts into PrimeVue's service. Stores can `push` without a
-// component context; this watcher is the only place that talks to PrimeVue.
-watch(
-  () => toastStore.pending.length,
-  (len) => {
-    if (len === 0) return;
+// Stores can `push` toasts without a component context; the store buffers
+// them until this root registers the PrimeVue sink — the only place that
+// talks to PrimeVue's toast service.
+onMounted(() => {
+  toastStore.register((msg) => {
+    primeToast.add({
+      severity: msg.severity,
+      summary: msg.summary,
+      detail: msg.detail,
+      // life 0 → omit so PrimeVue keeps the toast until manually closed.
+      ...(msg.life > 0 ? { life: msg.life } : {}),
+    });
+  });
+});
 
-    for (const msg of toastStore.consume()) {
-      primeToast.add({
-        severity: msg.severity,
-        summary: msg.summary,
-        detail: msg.detail,
-        life: msg.life,
-      });
-    }
-  },
-);
+onBeforeUnmount(() => {
+  toastStore.unregister();
+});
 
 function closeToast({ message }: { message: ToastMessageOptions }) {
   primeToast.remove(message);
