@@ -1,6 +1,6 @@
 # Palette Session Jump
 
-**Status:** Draft  
+**Status:** OQs resolved as recommended (2026-06-07) — implementation in progress (#185).
 **Date:** 2026-06-06
 
 ---
@@ -219,6 +219,8 @@ Option 2 requires wiring into `CommandPalette.vue`'s `openPalette` — a one-lin
 ---
 
 ## Open questions
+
+> ✅ **All resolved as the recommended defaults (2026-06-07):** (1) flat entries, parent+children only when >12 sessions; (2) cap closed sessions at 20 + an optional `session.browseAll` entry (Phase 5); (3) no confirm-before-resume (mirror SessionsManager); (4) two-tier ordering (open first, then closed by mtime); (5) **replace** `session.switch` with the flat `session.jump.*`/`session.resume.*` entries; (6) implement palette entries independently of any session-picker pane; (7) `refresh()` on palette open is fine (fire-and-forget). The phases below proceed on these defaults.
 
 1. **Flat vs. parent+children for the session list?**  
    Flat entries (one row per session) match the pattern for "Switch to Session." A `"Jump to Session…"` parent reduces clutter when there are many sessions but adds a drill-down step. Recommended default: flat. If the combined count exceeds 12, switch to a parent+children arrangement (session count rarely exceeds 12 in practice). Needs a decision on whether a dynamic threshold or a static parent is more maintainable.
