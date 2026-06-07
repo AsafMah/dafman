@@ -1,6 +1,6 @@
 # Backend abstraction around ACP
 
-**Status:** Draft, 2026-06-06
+**Status:** Researched — **implementation DEFERRED (2026-06-07).** The design + "don't reinvent the wheel" question are settled (reuse `@agentclientprotocol/sdk` + `vscode-acp` pattern; keep Copilot on its SDK; build only a thin adapter — see Decisive finding). Not on the near-term roadmap; tracked by #187. Revisit when a second provider is actually wanted.
 
 ## Summary
 
