@@ -44,7 +44,10 @@ function makeFakeOuter(): DockviewApi & { _addStub: (id: string) => void } {
   // rescanOpenDetails, applyActiveTabConstraints (reads
   // dock.getEdgeGroup). Pin the minimum surface so any future store
   // call that needs more shows up as a clear test failure.
-  const panels = new Map<string, { id: string; api: { setActive: () => void; group: { id: string } } }>();
+  const panels = new Map<
+    string,
+    { id: string; api: { setActive: () => void; group: { id: string } } }
+  >();
   const fakeGroup = {
     id: 'outer-body-group',
     model: { location: { type: 'grid' as const } },
@@ -139,7 +142,10 @@ describe('useGroupsActions.moveSessionToGroup — inner-api timing', () => {
     // sess-1 was pruned from g1 (via withMovingSession) AND added to g2.
     expect(i1.panelIds).toEqual([]);
     expect(i2.added).toEqual([
-      { id: 'sess-1', component: 'chat', params: { sessionId: 'sess-1' } } as unknown as { id: string; component: string },
+      { id: 'sess-1', component: 'chat', params: { sessionId: 'sess-1' } } as unknown as {
+        id: string;
+        component: string;
+      },
     ]);
   });
 
@@ -230,7 +236,9 @@ describe('useGroupsActions.deleteGroup', () => {
     const closeCalls: string[] = [];
     // sessionsStore is real; stub only the closeSession call by
     // intercepting via a spy. Simpler: replace the method.
-    (sessions as unknown as { closeSession: (id: string) => Promise<void> }).closeSession = async (id) => {
+    (sessions as unknown as { closeSession: (id: string) => Promise<void> }).closeSession = async (
+      id,
+    ) => {
       closeCalls.push(id);
     };
 

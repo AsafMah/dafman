@@ -515,7 +515,12 @@ describe('SettingsService', () => {
     // empty defaults so the built-in keymap is fully active.
     const settings = migrate({
       version: 14,
-      appearance: { theme: 'dark', reasoningVisibility: 'compact', streaming: false, enableMermaid: false },
+      appearance: {
+        theme: 'dark',
+        reasoningVisibility: 'compact',
+        streaming: false,
+        enableMermaid: false,
+      },
       layout: { dockview: null },
       workspaces: { recent: [], defaultWorkspace: '' },
       notifications: { turnEnd: false, waitingForInput: true },
@@ -535,7 +540,12 @@ describe('SettingsService', () => {
     // throw — it must silently produce an empty binding list.
     const settings = migrate({
       version: SETTINGS_VERSION,
-      appearance: { theme: 'light', reasoningVisibility: 'compact', streaming: true, enableMermaid: false },
+      appearance: {
+        theme: 'light',
+        reasoningVisibility: 'compact',
+        streaming: true,
+        enableMermaid: false,
+      },
       layout: { dockview: null },
       workspaces: { recent: ['/my/project'], defaultWorkspace: '/my/project' },
       notifications: { turnEnd: false, waitingForInput: true },
@@ -558,7 +568,13 @@ describe('SettingsService', () => {
           // array entry
           ['commandId', 'scope', 'keys'],
         ],
-        disabledDefaultBindingIds: ['global.commandPalette.toggle', null, 42, '  ', 'global.session.new'],
+        disabledDefaultBindingIds: [
+          'global.commandPalette.toggle',
+          null,
+          42,
+          '  ',
+          'global.session.new',
+        ],
       },
     });
     // Only the valid binding survives.

@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { ref } from 'vue';
-import {
-  BUSY_AFFORDANCE_DELAY_MS,
-  useDelayedBusyValue,
-} from '@/composables/useDelayedBusyValue';
+import { BUSY_AFFORDANCE_DELAY_MS, useDelayedBusyValue } from '@/composables/useDelayedBusyValue';
 
 const DELAY_MS = BUSY_AFFORDANCE_DELAY_MS + 40;
 

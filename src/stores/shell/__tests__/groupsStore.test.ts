@@ -67,7 +67,12 @@ describe('groupsStore — hydrate', () => {
     const v2: Layout = {
       schemaVersion: 2,
       dockview: {
-        grid: { root: { type: 'branch', data: [] }, height: 1, width: 1, orientation: 'HORIZONTAL' },
+        grid: {
+          root: { type: 'branch', data: [] },
+          height: 1,
+          width: 1,
+          orientation: 'HORIZONTAL',
+        },
         panels: { 'sess-1': { id: 'sess-1', contentComponent: 'chat' } },
         activeGroup: 'g-old',
         edgeGroups: { left: { size: 200, visible: true } },

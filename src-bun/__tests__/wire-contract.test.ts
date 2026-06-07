@@ -392,6 +392,25 @@ describe('IPC wire contracts', () => {
     expect(sample).toMatchSnapshot();
   });
 
+  test('sendMessage request — explicit agentMode plan', () => {
+    const sample = {
+      sessionId: 'sess-1',
+      text: 'plan this feature',
+      agentMode: 'plan' as const,
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('sendMessage request — agentMode with explicit delivery mode', () => {
+    const sample = {
+      sessionId: 'sess-1',
+      text: 'run immediately in autopilot',
+      mode: 'immediate' as const,
+      agentMode: 'autopilot' as const,
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
   test('createSession request — model defaults', () => {
     const sample = {
       workingDirectory: 'D:\\repo\\dafman',

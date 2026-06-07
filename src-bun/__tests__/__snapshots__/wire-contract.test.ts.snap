@@ -137,6 +137,13 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
 }
 `;
 
+exports[`IPC wire contracts AppInfo shape 1`] = `
+{
+  "channel": "canary",
+  "version": "0.1.0",
+}
+`;
+
 exports[`IPC wire contracts Settings with v3 groups layout 1`] = `
 {
   "appearance": {
@@ -492,6 +499,23 @@ exports[`IPC wire contracts sendMessage request — explicit immediate mode 1`] 
   "mode": "immediate",
   "sessionId": "sess-1",
   "text": "steer this",
+}
+`;
+
+exports[`IPC wire contracts sendMessage request — explicit agentMode plan 1`] = `
+{
+  "agentMode": "plan",
+  "sessionId": "sess-1",
+  "text": "plan this feature",
+}
+`;
+
+exports[`IPC wire contracts sendMessage request — agentMode with explicit delivery mode 1`] = `
+{
+  "agentMode": "autopilot",
+  "mode": "immediate",
+  "sessionId": "sess-1",
+  "text": "run immediately in autopilot",
 }
 `;
 
@@ -949,12 +973,5 @@ exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
     "kind": "file",
     "path": "C:/abs/foo.txt",
   },
-}
-`;
-
-exports[`IPC wire contracts AppInfo shape 1`] = `
-{
-  "channel": "canary",
-  "version": "0.1.0",
 }
 `;

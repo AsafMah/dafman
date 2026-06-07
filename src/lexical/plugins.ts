@@ -29,7 +29,7 @@ import { useLexicalComposer } from 'lexical-vue/LexicalComposer';
 import { rendererLog } from '@/ipc/rendererLog';
 import { $isAttachmentNode } from '@/lexical/AttachmentNode';
 import { isComposerMenuActive } from '@/lexical/composerMenuState';
-import type { SendMessageAttachment } from '@/ipc/types';
+import type { SendMessageAttachment, SessionMode } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
 
 /// Extract the editor content as a markdown string, trim it, clear the
@@ -150,6 +150,8 @@ export type ComposerSubmitMode = 'default' | 'steer' | 'queue' | 'interrupt';
 export interface ComposerSubmitPayload {
   text: string;
   mode: ComposerSubmitMode;
+  /// Per-message agent mode override. `undefined` = follow session default.
+  agentMode?: SessionMode;
   attachments?: SendMessageAttachment[];
 }
 

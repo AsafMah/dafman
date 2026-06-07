@@ -4,6 +4,13 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (2026-06-07 per-message agent mode — issue #41)
+
+- **Per-message agent-mode override.** A new one-shot control (`AgentModeOverrideButton.vue`) sits beside `ModeButtonGroup` in the composer toolbar; selecting Interactive/Plan/Autopilot arms the _next_ message only — it does NOT mutate the session mode. The override clears automatically after submit (one-shot), tinted by the mode color while pending. State lives in a per-`ChatWindow` composable `useComposerAgentMode` (`nextMessageMode` / `setNextMessageMode` / `resolveForSubmit`); ephemeral UI state, not session data.
+- **`agentMode` threaded through the send pipeline.** New optional `agentMode?: SessionMode` on the `sendMessage` RPC (`rpc.ts`, forwarded in `index.ts` to the already-one-shot-correct backend `sessions.send`), plus `ComposerSubmitPayload` → `ChatSubmitTransport` → `sessionsStore.sendMessage` → `ChatWindow` transport closure. Backend semantics were already in place (`sessions.ts:906`); this wires the renderer to reach them. The SDK's `"shell"` agentMode is intentionally excluded.
+- Deferred: the `Ctrl+Shift+P` plan-send chord (to the keyboard-shortcuts wave, configurable via #31) and `onAutoModeSwitchRequest` override-clearance (to #40).
+- Coverage: 2 new `wire-contract.test.ts` snapshots (explicit `agentMode`, with explicit delivery mode); 7 `useComposerAgentMode` tests (arm/resolve/one-shot reset/independence). `sessions.test.ts:#35` one-shot test unchanged.
+
 ### Added (2026-06-07 keyboard Phase 4 — global cutover)
 
 - **Global keyboard dispatcher (`src/composables/useGlobalShortcuts.ts`).** Single capture-phase `keydown` listener wired from `App.vue`. Resolves scope: if focus is inside an editable surface (`input`, `textarea`, `[contenteditable]`, Lexical composer, Xterm textarea), only the allowlist (`commandPalette.toggle`, `settings.open`) fires; otherwise scope is `global`. Delegates matching to `shortcutRegistry.match()`/`bindingsForScope()` via `tinykeys` `matchKeybindingPress` + `parseKeybinding`. Tracks multi-chord sequences (`$mod+K $mod+S`) with a 1 s timeout. Does NOT `preventDefault` when no binding matches — editors keep all their native keys.

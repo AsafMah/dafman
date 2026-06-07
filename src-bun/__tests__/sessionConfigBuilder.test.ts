@@ -92,7 +92,9 @@ describe('sessionConfigBuilder onPreMcpToolCall (#37)', () => {
 
 /// Minimal PostToolUseFailureInput-shaped object. The real SDK type is
 /// structural; we build the fields the hook reads and cast.
-function failureInput(over: Record<string, unknown>): import('../app/client/copilotSdk').PostToolUseFailureInput {
+function failureInput(
+  over: Record<string, unknown>,
+): import('../app/client/copilotSdk').PostToolUseFailureInput {
   return {
     sessionId: 'sdk-sess',
     timestamp: Date.now(),
