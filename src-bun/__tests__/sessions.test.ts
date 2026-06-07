@@ -35,6 +35,9 @@ interface FakeSession {
         messagesRemoved?: number;
       }>;
     };
+    eventLog: {
+      read: (params: { waitMs?: number; max?: number }) => Promise<{ events: unknown[] }>;
+    };
     permissions: {
       setApproveAll: (params: { enabled: boolean }) => Promise<{
         success: boolean;
@@ -180,6 +183,11 @@ function makeFakeSession(
         async resetSessionApprovals() {
           session.approvalsReset++;
           return { success: true };
+        },
+      },
+      eventLog: {
+        async read() {
+          return { events: [] };
         },
       },
       agent: {
@@ -1199,9 +1207,10 @@ describe('SessionRegistry', () => {
     expect((last?.data as { messageId?: string }).messageId).toBe('m-1499');
   });
 
-  test('#172: resume retries getEvents() once when first call returns empty', async () => {
+  test('#172: resume re-reads getEvents() after the readiness gate when first call is empty', async () => {
     // Simulates the CLI DB race: first `getEvents()` call returns []
-    // (DB still initialising), second call returns the real history.
+    // (DB still initialising). hydrateHistory blocks on the eventLog
+    // long-poll readiness gate, then re-reads — second call returns history.
     class DelayedHistoryClient extends FakeClient {
       override async resumeSession(
         sessionId: string,
@@ -1239,9 +1248,9 @@ describe('SessionRegistry', () => {
     expect(types).toContain('assistant.message');
   }, 3000);
 
-  test('#172: resume emits events via the injected emit callback (not dropped) after history retry', async () => {
+  test('#172: resume emits events via the injected emit callback (not dropped) after the readiness gate', async () => {
     // Belt-and-suspenders: verify the emitted events are tagged with
-    // the correct sessionId and the retry path still uses forward().
+    // the correct sessionId and the gate path still uses forward().
     class EmptyFirstClient extends FakeClient {
       override async resumeSession(
         sessionId: string,

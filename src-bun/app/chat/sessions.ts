@@ -70,6 +70,13 @@ import type {
 /// if needed.
 const HISTORY_REPLAY_CAP = 500;
 
+/// #172: getEvents() returns immediately and can race the CLI's per-session
+/// SQLite load on resume, yielding an empty transcript. Before giving up,
+/// block on the SDK's server-side long-poll (`eventLog.read({ waitMs })`),
+/// which returns as soon as events become available rather than after a
+/// fixed client-side delay. Well under the SDK's 30s waitMs ceiling.
+const HISTORY_READY_WAIT_MS = 10_000;
+
 /// S5: yield to the event loop between batches of this size while
 /// replaying. Avoids blocking IPC and lets the renderer paint between
 /// chunks.
@@ -547,18 +554,17 @@ export class SessionRegistry {
     try {
       let history = await session.getEvents();
 
-      // #172: an empty result on a resumed session is a strong signal
-      // that the CLI's SQLite DB hadn't finished loading when
-      // `resumeSession` arrived.  Retry once after a short pause
-      // rather than silently yielding an empty transcript.
+      // #172: an empty result on a resumed session is a strong signal that
+      // the CLI's SQLite DB hadn't finished loading when `resumeSession`
+      // arrived (newly-created sessions with no turns aren't in the persisted
+      // layout, so empty is almost never legitimate). Block on the SDK's
+      // server-side long-poll until events are available, then re-read the
+      // full transcript — no client-side retry/backoff guessing.
       if (history.length === 0) {
-        log.warn(
-          'hydrateHistory: getEvents() returned empty on first call — retrying (CLI DB race?)',
-          {
-            sessionId: actualId,
-          },
-        );
-        await new Promise<void>((r) => setTimeout(r, 400));
+        log.warn('hydrateHistory: getEvents() empty — waiting for events (CLI DB race?)', {
+          sessionId: actualId,
+        });
+        await this.waitForSessionEvents(session);
         history = await session.getEvents();
       }
 
@@ -580,6 +586,25 @@ export class SessionRegistry {
         sessionId: actualId,
         error: toErrorMessage(err),
       });
+    }
+  }
+
+  /// #172 readiness gate: block until the resumed session has at least one
+  /// event available, using the SDK's @experimental server-side long-poll
+  /// (`eventLog.read({ waitMs })`) instead of fixed client-side delays. The
+  /// peeked event is discarded — `getEvents()` re-reads the full transcript
+  /// from the start once events are ready. Best-effort: if the experimental
+  /// RPC isn't wired, return and let the caller re-read getEvents().
+  private async waitForSessionEvents(session: CopilotSession): Promise<void> {
+    const eventLog = (session.rpc as { eventLog?: { read?: (p: unknown) => Promise<unknown> } })
+      .eventLog;
+
+    if (!eventLog?.read) return;
+
+    try {
+      await eventLog.read({ waitMs: HISTORY_READY_WAIT_MS, max: 1 });
+    } catch {
+      // Best-effort; fall through to a plain getEvents() re-read.
     }
   }
 
