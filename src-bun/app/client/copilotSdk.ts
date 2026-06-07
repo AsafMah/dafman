@@ -5,12 +5,12 @@
 //    because it lagged the bundled SDK and lacked mode-lifecycle callbacks.
 // 2. Switched to deep imports inside `@github/copilot/copilot-sdk/`. Worked
 //    but reached through `node_modules/` (AGENTS.md rule 17).
-// 3. (current) Use `@github/copilot-sdk@1.0.0-beta.7` — the standalone
-//    GitHub-published SDK package. Type/runtime surface matches the
-//    bundled SDK at beta.7 (earlier beta.4 was behind on
-//    SessionContext.workingDirectory / getEvents — verify any future
-//    pin against `node_modules/@github/copilot-sdk/dist/*.d.ts` before
-//    downgrading).
+// 3. (current) Use `@github/copilot-sdk@^1.0.0` — the standalone
+//    GitHub-published SDK package. Type/runtime surface is stable (1.0.0
+//    is a promotion of beta.9 with no structural breaks; bump from beta.7
+//    added SessionHooks, PostToolUseFailureHookInput, and
+//    ReasoningEffort). Verify any future pin against
+//    `node_modules/@github/copilot-sdk/dist/*.d.ts` before downgrading.
 //
 // Notes for any future re-evaluation:
 // - `UserInputRequest`/`Response` are exported from `dist/types.js` but
