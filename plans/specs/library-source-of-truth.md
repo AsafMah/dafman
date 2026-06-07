@@ -1,12 +1,35 @@
 # Library as Source of Truth for Per-Session Config
 
-**Status:** Draft — 2026-06-06
+**Status:** Direction DECIDED (2026-06-07) — full Library-merge model (OQ1 → B). Sections below from "Design" onward are the original analysis; the decision block supersedes the spec's earlier "keep a thin rail" recommendation.
 
 ---
 
 ## Summary
 
 Today's `SessionDetailsPanel.vue` and `LibraryPanel.vue` manage overlapping configuration domains independently: Library owns global definitions (MCP configs, skill discovery, tool defaults, agent files) while the session rail duplicates the same entities with per-session toggles, creating two independent UIs for the same conceptual objects. This spec proposes making Library the **single definition surface** — global existence, discovery, and lifecycle — while per-session config becomes a pure **scoping layer** on top: which globally-defined items are active for this session, and what session-local overrides apply.
+
+## Direction — DECIDED (2026-06-07)
+
+User decision: **everything is configured through Library; the session details panel displays none of it.** This selects the spec's Alternative A / OQ1 **Option B (full merge)** over the originally-recommended "keep a thinned rail" — the analysis in §Design / §Open Questions / §Alternatives below is retained as background, but the resolutions here are authoritative.
+
+**Model:**
+
+1. **Library is the single surface** for MCP servers, skills, tools, and agents (definition + global default + per-session scoping all in one place).
+2. **Each Library entity row gains a per-session control** alongside its existing global toggle. Concretely, **inline two-column** per row: a **"Default"** column (global, existing behavior — applies to all new sessions) and a **"This session"** column (the per-session override for the focused session: inherit / on / off). The two columns make "differs from global" self-evident, replacing the originally-proposed badge (resolves OQ2).
+3. **The session details panel drops the MCP / skills / tools / agents sections entirely** and instead points to Library ("Configure in Library →"). It keeps only the genuinely session-only items: name, run mode, reasoning visibility, workspace (read-only), auto-approve, background tasks, files touched, plan, usage/quota, fork/export/compact.
+4. **Active-agent selection also moves into Library** (Agents tab gets a per-session "use in this session" control), since under "everything through Library" the rail owns none of it. Source the list from `listAgentFiles(sessionId)` + `reloadAgents` to sync the SDK registry (resolves OQ7).
+
+**Resolved OQs:** OQ1 → **B** (merge into Library, remove rail sections). OQ2 → two-column design (no separate badge). OQ3 → keep tool overrides with "restart required" caveat. OQ4 → per-session override **persistence is out of scope; tracked in #198** (overrides remain ephemeral as today). OQ5 → #12 stays independent (becomes Library-internal). OQ6 → per-session column follows `lastFocusedSessionId`; **disabled/hidden when no session is focused** (Library stays fully usable for global config). OQ7 → agent list from `listAgentFiles`.
+
+**Open sub-decision (defaulted):** inline-two-column vs. a dedicated "This session" sub-pane inside Library. **Default: inline two-column** (matches "just add an extra toggle"); revisit only if rows get too dense.
+
+**Revised phasing under this model:**
+
+1. **Shared data layer + #7 fix** — per-domain reactive stores both surfaces read from; `reloadSessionMcpServers` after `addMcpConfig`. (Unchanged from original Phase 1; still the prerequisite, ship first.)
+2. **Library per-session column** — add the "This session" override column to MCP / Skills / Tools tabs, wired to the existing `setSessionMcpEnabled` / `setSessionSkillEnabled` / tool-tristate RPCs, scoped to `lastFocusedSessionId`.
+3. **Agent selection into Library** — Agents tab gains the per-session "use in this session" control sourced from `listAgentFiles`.
+4. **Remove rail sections** — delete MCP / skills / tools / agent sections from `SessionDetailsPanel.vue`; add the "Configure in Library →" pointer; rail shrinks past the original ~⅓ estimate (agents removed too).
+5. **Follow-up:** per-session override persistence — tracked in **#198**.
 
 ---
 
@@ -30,45 +53,50 @@ Today's `SessionDetailsPanel.vue` and `LibraryPanel.vue` manage overlapping conf
 
 ### Per-session config today
 
-| Section | SessionDetailsPanel symbol | RPC(s) | Storage |
-|---------|---------------------------|--------|---------|
-| Session name | `onRenameSubmit` (`SessionDetailsPanel.vue:155-164`) | `setSessionName` (`rpc.ts:802`) | CLI-side session metadata |
-| Run mode | `modeChoice` (`SessionDetailsPanel.vue:167-175`) | `setSessionMode` (`rpc.ts:794`) | CLI-side session state, re-applied on resume (`rpc.ts:770`) |
-| Reasoning override | `reasoningChoice` (`SessionDetailsPanel.vue:184-197`) | (frontend-only override on `SessionRecord`) | Pinia, not persisted |
-| Workspace | display-only (`SessionDetailsPanel.vue:199-210`) | `setSessionWorkingDirectory` (`rpc.ts:806`) | CLI-side |
-| Auto-approve all | `approveAll` (`SessionDetailsPanel.vue:213-219`) | `setSessionApproveAll` (`rpc.ts:836`) | dafman-persisted per session, re-applied on resume (`rpc.ts:770`) |
-| Agents | `useSessionAgents` (`details/useSessionAgents.ts`) | `listAgents`, `selectAgent`, `deselectAgent` (`rpc.ts:866-884`) | Session-scoped SDK agent registry |
-| Skills | `useSessionSkills` (`details/useSessionSkills.ts:18-85`) | `listSessionSkills`, `setSessionSkillEnabled` (`rpc.ts:848-862`) | Per-session SDK disabled-skill overlay |
-| Tools | `useSessionTools` (`details/useSessionTools.ts:32-192`) | `listBuiltinTools`, `setSessionMcpEnabled` (`rpc.ts:963-989`) + `settings.tools` | Global `settings.tools.{defaultExcluded,defaultAllowed}` — applied at session create only |
-| MCP servers | `useSessionTools.mcpServers` (`details/useSessionTools.ts:59-75`) | `listSessionMcpServers`, `setSessionMcpEnabled` (`rpc.ts:975-989`) | Per-session SDK MCP runtime enable/disable |
-| Plan | `useSessionPlan` (`details/useSessionPlan.ts`) | (not yet in rpc.ts — CLI-side file) | Session-local plan file |
-| Usage / Quota | `useSessionUsage` | `getSessionUsageMetrics`, `getAccountQuota` (`rpc.ts:955,1001`) | Read-only from SDK |
+| Section            | SessionDetailsPanel symbol                                        | RPC(s)                                                                           | Storage                                                                                   |
+| ------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Session name       | `onRenameSubmit` (`SessionDetailsPanel.vue:155-164`)              | `setSessionName` (`rpc.ts:802`)                                                  | CLI-side session metadata                                                                 |
+| Run mode           | `modeChoice` (`SessionDetailsPanel.vue:167-175`)                  | `setSessionMode` (`rpc.ts:794`)                                                  | CLI-side session state, re-applied on resume (`rpc.ts:770`)                               |
+| Reasoning override | `reasoningChoice` (`SessionDetailsPanel.vue:184-197`)             | (frontend-only override on `SessionRecord`)                                      | Pinia, not persisted                                                                      |
+| Workspace          | display-only (`SessionDetailsPanel.vue:199-210`)                  | `setSessionWorkingDirectory` (`rpc.ts:806`)                                      | CLI-side                                                                                  |
+| Auto-approve all   | `approveAll` (`SessionDetailsPanel.vue:213-219`)                  | `setSessionApproveAll` (`rpc.ts:836`)                                            | dafman-persisted per session, re-applied on resume (`rpc.ts:770`)                         |
+| Agents             | `useSessionAgents` (`details/useSessionAgents.ts`)                | `listAgents`, `selectAgent`, `deselectAgent` (`rpc.ts:866-884`)                  | Session-scoped SDK agent registry                                                         |
+| Skills             | `useSessionSkills` (`details/useSessionSkills.ts:18-85`)          | `listSessionSkills`, `setSessionSkillEnabled` (`rpc.ts:848-862`)                 | Per-session SDK disabled-skill overlay                                                    |
+| Tools              | `useSessionTools` (`details/useSessionTools.ts:32-192`)           | `listBuiltinTools`, `setSessionMcpEnabled` (`rpc.ts:963-989`) + `settings.tools` | Global `settings.tools.{defaultExcluded,defaultAllowed}` — applied at session create only |
+| MCP servers        | `useSessionTools.mcpServers` (`details/useSessionTools.ts:59-75`) | `listSessionMcpServers`, `setSessionMcpEnabled` (`rpc.ts:975-989`)               | Per-session SDK MCP runtime enable/disable                                                |
+| Plan               | `useSessionPlan` (`details/useSessionPlan.ts`)                    | (not yet in rpc.ts — CLI-side file)                                              | Session-local plan file                                                                   |
+| Usage / Quota      | `useSessionUsage`                                                 | `getSessionUsageMetrics`, `getAccountQuota` (`rpc.ts:955,1001`)                  | Read-only from SDK                                                                        |
 
 ### Global/Library today
 
-| Tab | Component | What it manages | RPC(s) |
-|-----|-----------|-----------------|--------|
-| MCP | `LibraryMcpTab.vue` | Configured + discovered server definitions, global enable/disable | `listMcpConfigs`, `addMcpConfig`, `updateMcpConfig`, `removeMcpConfig`, `enableMcpServers`, `disableMcpServers`, `discoverMcpServers` |
-| Skills | `LibrarySkillsTab.vue` | Discovery across workspace/user dirs, global disabled-set | `discoverSkills`, `setGloballyDisabledSkills` |
-| Tools | `LibraryToolsTab.vue` | Default-excluded/default-allowed tool list | `updateSettings` (mutates `settings.tools`) |
-| Agents | `LibraryAgentsTab.vue` | Filesystem agent CRUD (`listAgentFiles`, `writeAgentFile`, `deleteAgentFile`) | `listAgentFiles`, `writeAgentFile`, `deleteAgentFile`, `listAgentFilesGlobal` |
-| Instructions | `LibraryInstructionsTab.vue` | Read-only project/user instruction discovery | `listInstructions` |
+| Tab          | Component                    | What it manages                                                               | RPC(s)                                                                                                                                |
+| ------------ | ---------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP          | `LibraryMcpTab.vue`          | Configured + discovered server definitions, global enable/disable             | `listMcpConfigs`, `addMcpConfig`, `updateMcpConfig`, `removeMcpConfig`, `enableMcpServers`, `disableMcpServers`, `discoverMcpServers` |
+| Skills       | `LibrarySkillsTab.vue`       | Discovery across workspace/user dirs, global disabled-set                     | `discoverSkills`, `setGloballyDisabledSkills`                                                                                         |
+| Tools        | `LibraryToolsTab.vue`        | Default-excluded/default-allowed tool list                                    | `updateSettings` (mutates `settings.tools`)                                                                                           |
+| Agents       | `LibraryAgentsTab.vue`       | Filesystem agent CRUD (`listAgentFiles`, `writeAgentFile`, `deleteAgentFile`) | `listAgentFiles`, `writeAgentFile`, `deleteAgentFile`, `listAgentFilesGlobal`                                                         |
+| Instructions | `LibraryInstructionsTab.vue` | Read-only project/user instruction discovery                                  | `listInstructions`                                                                                                                    |
 
 ### The global/session boundary today
 
 **Fully split (correct model, partially broken UX):**
+
 - **MCP:** `McpRegistry` (`src-bun/app/library/mcpRegistry.ts`) speaks to the singleton CLI client (`client.rpc.mcp.config.*`). Session runtime enable/disable is `session.rpc.mcp.list` / `setSessionMcpEnabled`. Library owns definitions; session owns runtime state. This is the right model but the UX doesn't communicate it — and adding a new server does not reload the session runtime (root cause of #7 `"MCP server does not exist"` bug at `src/composables/library/useMcpLibrary.ts:229-242`).
 
 **Partially split (leaky):**
+
 - **Skills:** `SkillsRegistry.setGloballyDisabled()` (`src-bun/app/library/skillsRegistry.ts:74-80`) writes the global disabled-skill list. But the session rail's `setSessionSkillEnabled` (`useSessionSkills.ts:40-54`) calls `invokeCommand('setSessionSkillEnabled', ...)` — a _session-scoped_ path. The Library tab and session rail thus write to different scopes of the same entity, with no indication to the user which toggle overrides which.
 
 **Not split (global only, session-create-time only):**
+
 - **Tools:** `settings.tools.defaultExcluded/defaultAllowed` is written by Library → Tools tab (`LibraryToolsTab.vue:68-99`) and applied at session create only. The session rail comment explicitly says `"Per-tool restriction applies to NEW sessions only"` (`SessionDetailsPanel.vue:952-956`). There is no live per-session tool override mechanism; the session rail shows stale creation-time state.
 
 **Session-only (no global concept):**
+
 - **Name, mode, reasoning override, workspace, auto-approve, plan, usage/quota** — these are inherently per-session; no global definition exists or is needed.
 
 **Session-owned but globally defined:**
+
 - **Agents:** files exist globally (`LibraryAgentsTab`), but "current agent for session" is pure session state. The gap: the session rail does not "select from Library"; it discovers agents independently via `listAgents(sessionId)` (a session-scoped SDK call). Library Agents tab cannot show which sessions are using which agent.
 
 ---
@@ -80,6 +108,7 @@ Today's `SessionDetailsPanel.vue` and `LibraryPanel.vue` manage overlapping conf
 Library = **definition surface**: the set of configured entities, their properties, and their _global defaults_. A global default is the behavior for a freshly-created session with no overrides.
 
 Per-session config = **scoping layer**: for each Library entity, a session records one of three states:
+
 - `inherit` — use the global default (implicit, no per-session record needed)
 - `enabled` — explicitly activated for this session, even if globally disabled
 - `disabled` — explicitly deactivated for this session, even if globally enabled
@@ -110,12 +139,12 @@ effective(S, E) =
 
 **Target:** Library MCP tab becomes the _only_ place to define, configure, and globally enable/disable servers. The session rail shows a lightweight **per-session override list**: servers whose session-local state differs from their global state.
 
-| What | Where after | Change |
-|------|-------------|--------|
-| Configured server list, add/edit/remove | Library → MCP only | No change to Library; remove redundant session-rail "MCP servers" section (`SessionDetailsPanel.vue:1037-1088`) |
-| Global enable/disable toggle | Library → MCP (`LibraryMcpTab.vue:56-63`) | No change; already correct |
-| Per-session enable/disable override | Session config panel (thin view) | Keep only when a session has at least one server with state differing from global default |
-| Sign-in | Library → MCP (`LibraryMcpTab.vue:113-129`) | Already there; fix: session reload after `addMcpConfig` (see #7) |
+| What                                    | Where after                                 | Change                                                                                                          |
+| --------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Configured server list, add/edit/remove | Library → MCP only                          | No change to Library; remove redundant session-rail "MCP servers" section (`SessionDetailsPanel.vue:1037-1088`) |
+| Global enable/disable toggle            | Library → MCP (`LibraryMcpTab.vue:56-63`)   | No change; already correct                                                                                      |
+| Per-session enable/disable override     | Session config panel (thin view)            | Keep only when a session has at least one server with state differing from global default                       |
+| Sign-in                                 | Library → MCP (`LibraryMcpTab.vue:113-129`) | Already there; fix: session reload after `addMcpConfig` (see #7)                                                |
 
 **Immediate fix needed** (pre-full-migration, tracked in #7): after `addMcpConfig` call `reloadSessionMcpServers(sessionId)` so the live session runtime knows about the new server before sign-in.
 
@@ -123,11 +152,11 @@ effective(S, E) =
 
 **Target:** Library → Skills is the primary enable/disable surface. Session rail shows only per-session overrides (skills whose session-local state differs from global).
 
-| What | Where after | Change |
-|------|-------------|--------|
-| Skill discovery + global enable/disable | Library → Skills only | No change; already correct |
-| Per-session override toggle | Session config panel (thin view) | Re-model: show only skills with a non-inherit session override; add "reset to global" action |
-| "Manage globally →" link | Session rail → Library | Already exists (`useSessionSkills.ts:56-68`); keep |
+| What                                    | Where after                      | Change                                                                                       |
+| --------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- |
+| Skill discovery + global enable/disable | Library → Skills only            | No change; already correct                                                                   |
+| Per-session override toggle             | Session config panel (thin view) | Re-model: show only skills with a non-inherit session override; add "reset to global" action |
+| "Manage globally →" link                | Session rail → Library           | Already exists (`useSessionSkills.ts:56-68`); keep                                           |
 
 **Data model clarification needed** (see §Open Questions #2): `setSessionSkillEnabled` and `setGloballyDisabledSkills` write to different SDK scopes (`session.rpc.skills.setSkillEnabled` vs `client.rpc.skills.config.setDisabledSkills`). The current UI does not distinguish them.
 
@@ -135,21 +164,21 @@ effective(S, E) =
 
 **Target:** Library → Tools sets the global default. Session rail shows per-session overrides (tools whose tristate state is not `default`). The "applies to new sessions only" restriction is a current SDK constraint, not a design goal; if the SDK gains live tool mutation, the session rail override should become live too.
 
-| What | Where after | Change |
-|------|-------------|--------|
-| Global default-excluded / default-allowed | Library → Tools only | No change |
-| Per-session tristate override | Session config panel (thin view) | Keep; show only tools with non-`default` state; add "reset all" action |
-| Allowlist-active warning banner | Session config panel | Keep; mirrors global state for this session |
+| What                                      | Where after                      | Change                                                                 |
+| ----------------------------------------- | -------------------------------- | ---------------------------------------------------------------------- |
+| Global default-excluded / default-allowed | Library → Tools only             | No change                                                              |
+| Per-session tristate override             | Session config panel (thin view) | Keep; show only tools with non-`default` state; add "reset all" action |
+| Allowlist-active warning banner           | Session config panel             | Keep; mirrors global state for this session                            |
 
 #### 3d. Agents
 
 **Target:** Library → Agents is the file management surface (create, edit, delete, view path). Session rail shows current-agent selection, browsing the Library's discovered list.
 
-| What | Where after | Change |
-|------|-------------|--------|
-| Agent file list (filesystem CRUD) | Library → Agents only | No change |
-| Current agent selection | Session config panel | Keep `select`/`deselect` buttons; but source the agent list from the Library's data, not an independent `listAgents(sessionId)` call |
-| Reload trigger | Library → Agents (Refresh) | `reloadAgents(sessionId)` promoted to Library-level action |
+| What                              | Where after                | Change                                                                                                                               |
+| --------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Agent file list (filesystem CRUD) | Library → Agents only      | No change                                                                                                                            |
+| Current agent selection           | Session config panel       | Keep `select`/`deselect` buttons; but source the agent list from the Library's data, not an independent `listAgents(sessionId)` call |
+| Reload trigger                    | Library → Agents (Refresh) | `reloadAgents(sessionId)` promoted to Library-level action                                                                           |
 
 The key shift: session rail does not maintain an independent agent list; it reads from a shared Library-level computed list (potentially derived from `listAgentFiles` + `listAgentFilesGlobal`) and passes only the selection state.
 
@@ -157,18 +186,18 @@ The key shift: session rail does not maintain an independent agent list; it read
 
 These sections stay in the session rail and have no Library equivalent:
 
-| Section | Reason |
-|---------|--------|
-| Session name | Unique per session by definition |
-| Run mode (interactive/plan/autopilot) | Per-session runtime state |
-| Reasoning visibility override | Per-session display preference |
-| Workspace (cwd) | Per-session path; read-only display in rail |
-| Auto-approve all | Per-session permission shortcut |
-| Background tasks | Runtime-only, no global concept |
-| Files touched | Derived from session events |
-| Plan | Session-local markdown artifact |
-| Usage / Quota | Read-only metrics, no config |
-| Fork / Export / Compact | Session lifecycle actions |
+| Section                               | Reason                                      |
+| ------------------------------------- | ------------------------------------------- |
+| Session name                          | Unique per session by definition            |
+| Run mode (interactive/plan/autopilot) | Per-session runtime state                   |
+| Reasoning visibility override         | Per-session display preference              |
+| Workspace (cwd)                       | Per-session path; read-only display in rail |
+| Auto-approve all                      | Per-session permission shortcut             |
+| Background tasks                      | Runtime-only, no global concept             |
+| Files touched                         | Derived from session events                 |
+| Plan                                  | Session-local markdown artifact             |
+| Usage / Quota                         | Read-only metrics, no config                |
+| Fork / Export / Compact               | Session lifecycle actions                   |
 
 #### 3f. Instructions
 
@@ -179,6 +208,7 @@ Instructions (`LibraryInstructionsTab.vue`) are already read-only project/user d
 Two options (see §Open Questions #1). Recommended: **keep it, thin it out into a per-session scoping view**.
 
 After migration, the session rail contains:
+
 1. **Session settings** (name, mode, reasoning, workspace, approve-all) — unchanged
 2. **Active agent** (select/deselect from Library's list) — simplified; no independent list management
 3. **Per-session overrides** (MCP, skills, tools) — only entries that differ from global defaults; empty-state hint links to Library for global config
@@ -189,6 +219,7 @@ After migration, the session rail contains:
 8. **Fork / Export / Compact** — unchanged
 
 The sections eliminated from the session rail:
+
 - Full MCP server list (definition-level, moved to Library only)
 - Full skills list (global enable/disable, moved to Library only)
 - Full tools list (global defaults, moved to Library only)
@@ -197,32 +228,33 @@ The rail shrinks from ~2253 lines to roughly one-third that size.
 
 ### 5. Global-vs-session boundary table
 
-| Config item | Global only | Session only | Overridable (global default + per-session override) |
-|-------------|-------------|--------------|----------------------------------------------|
-| MCP server definitions (add/edit/remove) | ✓ | | |
-| MCP server global enable/disable | ✓ | | |
-| MCP server per-session runtime enable | | | ✓ |
-| MCP server sign-in | | ✓ (OAuth runs via active session) | |
-| Skill discovery | ✓ | | |
-| Skill global enable/disable | ✓ | | |
-| Skill per-session enable/disable | | | ✓ |
-| Tool global default excluded/allowed | ✓ | | |
-| Tool per-session tristate override | | | ✓ |
-| Agent file CRUD (create/edit/delete) | ✓ | | |
-| Agent global availability | ✓ (file presence) | | |
-| Current agent selection | | ✓ | |
-| Instructions discovery | ✓ | | |
-| Session name | | ✓ | |
-| Run mode | | ✓ | |
-| Reasoning visibility | | ✓ (overrides global Settings appearance) | |
-| Workspace (cwd) | | ✓ | |
-| Auto-approve all | ✓ (default in Settings) | ✓ (per-session toggle) | |
-| Plan | | ✓ | |
-| Usage / Quota | | ✓ (read-only) | |
+| Config item                              | Global only             | Session only                             | Overridable (global default + per-session override) |
+| ---------------------------------------- | ----------------------- | ---------------------------------------- | --------------------------------------------------- |
+| MCP server definitions (add/edit/remove) | ✓                       |                                          |                                                     |
+| MCP server global enable/disable         | ✓                       |                                          |                                                     |
+| MCP server per-session runtime enable    |                         |                                          | ✓                                                   |
+| MCP server sign-in                       |                         | ✓ (OAuth runs via active session)        |                                                     |
+| Skill discovery                          | ✓                       |                                          |                                                     |
+| Skill global enable/disable              | ✓                       |                                          |                                                     |
+| Skill per-session enable/disable         |                         |                                          | ✓                                                   |
+| Tool global default excluded/allowed     | ✓                       |                                          |                                                     |
+| Tool per-session tristate override       |                         |                                          | ✓                                                   |
+| Agent file CRUD (create/edit/delete)     | ✓                       |                                          |                                                     |
+| Agent global availability                | ✓ (file presence)       |                                          |                                                     |
+| Current agent selection                  |                         | ✓                                        |                                                     |
+| Instructions discovery                   | ✓                       |                                          |                                                     |
+| Session name                             |                         | ✓                                        |                                                     |
+| Run mode                                 |                         | ✓                                        |                                                     |
+| Reasoning visibility                     |                         | ✓ (overrides global Settings appearance) |                                                     |
+| Workspace (cwd)                          |                         | ✓                                        |                                                     |
+| Auto-approve all                         | ✓ (default in Settings) | ✓ (per-session toggle)                   |                                                     |
+| Plan                                     |                         | ✓                                        |                                                     |
+| Usage / Quota                            |                         | ✓ (read-only)                            |                                                     |
 
 ### 6. Per-session override persistence
 
 **Current mechanisms (no change proposed):**
+
 - MCP: `setSessionMcpEnabled` → `session.rpc.mcp.enable/disable` (session-scoped SDK, not persisted by dafman; lost on session close + reopen)
 - Skills: `setSessionSkillEnabled` → `session.rpc.skills.setSkillEnabled` (same: SDK session-scoped)
 - Tools: `settings.tools.defaultExcluded` at create time; per-session tristate held only in frontend `SessionRecord` (lost on reload)
@@ -233,7 +265,7 @@ The rail shrinks from ~2253 lines to roughly one-third that size.
 
 ## Open Questions
 
-1. **Keep session rail or remove it?**  
+1. **Keep session rail or remove it?**
    - Option A (recommended): Keep `SessionDetailsPanel.vue` as a thinned-out per-session scoping view. The right-edge panel is useful real estate for per-session context while the active session is focused. Remove only the global-definition sections.
    - Option B: Remove the session rail entirely; embed per-session override controls inline in the Library tab (e.g. a "Session overrides" secondary pane or column). Risk: Library panel is already left-edge; combining global + per-session config in one surface increases cognitive load.
    - Option C: Remove the session rail; promote per-session config into the session tab header (similar to `SessionHeaderControls.vue`). Risky for complex controls (tasks, plan, usage).
