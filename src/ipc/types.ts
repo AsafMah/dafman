@@ -4,6 +4,7 @@
 // payload-only types here so the Vue tree never imports from
 // `electrobun/bun` (which is a Bun-only module).
 
+import type { KeyboardShortcutPrefs } from '@/lib/shortcuts/types';
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 export type ReasoningVisibility = 'hidden' | 'compact' | 'expanded';
@@ -53,7 +54,10 @@ export interface Settings {
   tools: ToolsPrefs;
   permissions: PermissionsPrefs;
   terminal: TerminalPrefs;
+  keyboardShortcuts: KeyboardShortcutPrefs;
 }
+
+export type { KeyboardShortcutPrefs };
 
 export interface ToolsPrefs {
   defaultExcluded: string[];

@@ -45,14 +45,11 @@ export interface Command {
   keywords?: string[];
   /// Optional keyboard shortcut, rendered as `<kbd>` pills in the
   /// palette row. Pass the chord segments as an array, e.g.
-  /// `["Ctrl", "K"]`. The library also wires this to fire `perform`
-  /// when the chord is pressed globally — we leave that wiring on
-  /// for free.
+  /// `["Ctrl", "K"]`. Transitional display field — long-term this
+  /// will be derived from shortcutRegistry.displayKeysForCommand().
   shortcut?: string[];
   /// Optional accent color (CSS color string) that overrides the
-  /// category accent on this specific row. Used for "Switch to:
-  /// `<session>`" so each session's command picks up its own per-
-  /// session palette accent.
+  /// category accent on this specific row.
   accent?: string;
   /// Visibility predicate. Hidden commands are excluded from the list
   /// (we don't render greyed-out rows — `when()` failure means the
@@ -76,6 +73,15 @@ export interface Command {
   ///     `data-value` when the parent is expanded, so children
   ///     participate independently in fuse filtering and selection.
   children?: Command[];
+  /// Palette presentation hints. `visible: false` suppresses the
+  /// command from Ctrl/Cmd+K while still listing it in Keyboard Settings.
+  palette?: {
+    visible?: boolean; // default true
+    group?: string;
+  };
+  /// Scopes in which this command's shortcut is active (display/filter
+  /// hint only — shortcutRegistry owns the actual binding).
+  shortcutContext?: import('@/lib/shortcuts/types').ShortcutScope[];
 }
 
 export const useCommandRegistry = defineStore('commandRegistry', () => {
@@ -105,5 +111,85 @@ export const useCommandRegistry = defineStore('commandRegistry', () => {
     Array.from(commands.value.values()).filter(safeWhen),
   );
 
-  return { commands, register, unregister, visibleCommands };
+  /**
+   * Looks up a command by id — searches top-level commands AND their
+   * visible children. Returns `null` when nothing matches.
+   */
+  function getCommand(id: string): Command | null {
+    const top = commands.value.get(id);
+
+    if (top) return top;
+
+    for (const cmd of commands.value.values()) {
+      if (cmd.children) {
+        const child = cmd.children.find((c) => c.id === id);
+
+        if (child) return child;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Flat list of all commands + their children whose `when()` returns true.
+   * Useful for palette search, settings search, and shortcut resolution.
+   */
+  const visibleFlattenedCommands = computed<Command[]>(() => {
+    const result: Command[] = [];
+
+    for (const cmd of commands.value.values()) {
+      if (!safeWhen(cmd)) continue;
+
+      result.push(cmd);
+
+      if (cmd.children) {
+        for (const child of cmd.children) {
+          if (safeWhen(child)) result.push(child);
+        }
+      }
+    }
+
+    return result;
+  });
+
+  /**
+   * Runs the command with the given id if it is currently visible (i.e.
+   * `when()` returns true). Parent commands with children are skipped —
+   * they are structural, not executable.
+   *
+   * Returns `true` when the command ran, `false` otherwise (not found,
+   * invisible, or has children). Errors thrown by `run()` are caught and
+   * logged to the console so they do not bubble up to callers.
+   */
+  async function runCommand(id: string): Promise<boolean> {
+    const cmd = getCommand(id);
+
+    if (!cmd) return false;
+
+    // Parent commands that own children are structural — not directly runnable.
+    if (cmd.children && cmd.children.length > 0) return false;
+
+    if (!safeWhen(cmd)) return false;
+
+    try {
+      await cmd.run();
+
+      return true;
+    } catch (err) {
+      console.error(`[commandRegistry] runCommand("${id}") threw:`, err);
+
+      return false;
+    }
+  }
+
+  return {
+    commands,
+    register,
+    unregister,
+    visibleCommands,
+    getCommand,
+    visibleFlattenedCommands,
+    runCommand,
+  };
 });

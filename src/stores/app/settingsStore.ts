@@ -7,6 +7,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { invokeCommand } from '@/ipc/invoke';
 import type {
+  KeyboardShortcutPrefs,
   NotificationPrefs,
   ReasoningVisibility,
   Settings,
@@ -19,7 +20,7 @@ import { toErrorMessage } from '@/lib/errorMessage';
 
 function defaultSettings(): Settings {
   return {
-    version: 14,
+    version: 15,
     appearance: {
       theme: 'system',
       reasoningVisibility: 'compact',
@@ -53,6 +54,7 @@ function defaultSettings(): Settings {
         serialize: true,
       },
     },
+    keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
   };
 }
 
@@ -288,6 +290,17 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setKeyboardShortcuts(prefs: KeyboardShortcutPrefs): Promise<void> {
+    try {
+      await update({
+        ...settings.value,
+        keyboardShortcuts: prefs,
+      });
+    } catch {
+      /* toast already shown by `update()` */
+    }
+  }
+
   return {
     settings,
     loaded,
@@ -306,5 +319,6 @@ export const useSettingsStore = defineStore('settings', () => {
     setDefaultApproveAll,
     setDefaultTerminalProfile,
     setTerminalPrefs,
+    setKeyboardShortcuts,
   };
 });

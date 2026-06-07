@@ -58,6 +58,7 @@ describe('SettingsService', () => {
       tools: { defaultExcluded: [], defaultAllowed: [] },
       permissions: { defaultApproveAll: false },
       terminal: defaultSettings().terminal,
+      keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
     };
     const written = await svc.update(next);
     expect(written).toEqual(next);
@@ -114,6 +115,7 @@ describe('SettingsService', () => {
           serialize: true,
         },
       },
+      keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
     });
     const reloaded = SettingsService.loadOrDefault(path);
     expect(reloaded.get().layout.dockview).toEqual(blob);
@@ -506,5 +508,96 @@ describe('SettingsService', () => {
     });
     expect(settings.appearance.theme).toBe('system');
     expect(settings.appearance.reasoningVisibility).toBe('compact');
+  });
+
+  test('missing keyboardShortcuts field migrates to defaults', () => {
+    // Any document lacking the field (e.g. v14 or older) must get the
+    // empty defaults so the built-in keymap is fully active.
+    const settings = migrate({
+      version: 14,
+      appearance: { theme: 'dark', reasoningVisibility: 'compact', streaming: false, enableMermaid: false },
+      layout: { dockview: null },
+      workspaces: { recent: [], defaultWorkspace: '' },
+      notifications: { turnEnd: false, waitingForInput: true },
+    });
+    expect(settings.version).toBe(SETTINGS_VERSION);
+    expect(settings.keyboardShortcuts).toEqual({
+      customBindings: [],
+      disabledDefaultBindingIds: [],
+    });
+    // Other settings must survive the migration untouched.
+    expect(settings.appearance.theme).toBe('dark');
+  });
+
+  test('malformed customBindings are dropped without losing other settings', () => {
+    // Regression guard: a corrupt customBindings array must not
+    // wipe other fields (appearance, terminal, etc.) or cause a
+    // throw — it must silently produce an empty binding list.
+    const settings = migrate({
+      version: SETTINGS_VERSION,
+      appearance: { theme: 'light', reasoningVisibility: 'compact', streaming: true, enableMermaid: false },
+      layout: { dockview: null },
+      workspaces: { recent: ['/my/project'], defaultWorkspace: '/my/project' },
+      notifications: { turnEnd: false, waitingForInput: true },
+      tools: { defaultExcluded: ['bash'], defaultAllowed: [] },
+      permissions: { defaultApproveAll: false },
+      keyboardShortcuts: {
+        customBindings: [
+          // valid entry — must survive
+          { commandId: 'commandPalette.toggle', scope: 'global', keys: 'Ctrl+P' },
+          // missing commandId
+          { scope: 'global', keys: 'Ctrl+X' },
+          // unknown scope
+          { commandId: 'session.new', scope: 'invalid-scope', keys: 'Mod+N' },
+          // missing keys
+          { commandId: 'session.new', scope: 'global' },
+          // null entry
+          null,
+          // non-object entry
+          'bad-string',
+          // array entry
+          ['commandId', 'scope', 'keys'],
+        ],
+        disabledDefaultBindingIds: ['global.commandPalette.toggle', null, 42, '  ', 'global.session.new'],
+      },
+    });
+    // Only the valid binding survives.
+    expect(settings.keyboardShortcuts.customBindings).toEqual([
+      { commandId: 'commandPalette.toggle', scope: 'global', keys: 'Ctrl+P' },
+    ]);
+    // null, non-string, and blank entries are dropped; duplicates would
+    // be collapsed — here we just verify non-strings are removed.
+    expect(settings.keyboardShortcuts.disabledDefaultBindingIds).toEqual([
+      'global.commandPalette.toggle',
+      'global.session.new',
+    ]);
+    // Other settings must be preserved.
+    expect(settings.appearance.theme).toBe('light');
+    expect(settings.appearance.streaming).toBe(true);
+    expect(settings.tools.defaultExcluded).toEqual(['bash']);
+    expect(settings.workspaces.defaultWorkspace).toBe('/my/project');
+  });
+
+  test('keyboardShortcuts update round-trip preserves bindings and other settings', async () => {
+    const dir = newTempDir();
+    const path = join(dir, 'settings.json');
+    const svc = SettingsService.loadOrDefault(path);
+    const customPrefs = {
+      customBindings: [
+        { commandId: 'commandPalette.toggle', scope: 'global' as const, keys: 'Mod+P' },
+      ],
+      disabledDefaultBindingIds: ['global.commandPalette.toggle'],
+    };
+    // Write settings with a non-default keyboard pref.
+    await svc.update({
+      ...svc.get(),
+      appearance: { ...svc.get().appearance, theme: 'dark' },
+      keyboardShortcuts: customPrefs,
+    });
+    // Reload from disk and verify both the keyboard prefs AND other settings survive.
+    const reloaded = SettingsService.loadOrDefault(path);
+    expect(reloaded.get().keyboardShortcuts).toEqual(customPrefs);
+    expect(reloaded.get().appearance.theme).toBe('dark');
+    expect(reloaded.get().version).toBe(SETTINGS_VERSION);
   });
 });
