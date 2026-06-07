@@ -96,6 +96,36 @@ export interface Settings {
   /// what's been remembered; this is the only knob we can surface.
   permissions: PermissionsPrefs;
   terminal: TerminalPrefs;
+  /// User-customized keyboard shortcuts. Stores only differences from
+  /// the built-in default keymap (custom bindings + disabled defaults).
+  /// Empty defaults mean the built-in keymap is fully active.
+  keyboardShortcuts: KeyboardShortcutPrefs;
+}
+
+/// Scope union for keyboard shortcuts. Mirrors `ShortcutScope` in
+/// `src/lib/shortcuts/types.ts` (the renderer canonical copy is owned
+/// by TaskA and imported directly in the renderer). Kept in sync here
+/// so the bun-side settings coercion can validate on write.
+export type ShortcutScope =
+  | 'global'
+  | 'commandPalette'
+  | 'composer'
+  | 'composerTypeahead'
+  | 'terminal'
+  | 'filePicker'
+  | 'messageEditor'
+  | 'pendingRequest'
+  | 'composerCommandTerminal'
+  | 'dockviewTabRename'
+  | 'accessibility';
+
+/// User-persisted keyboard-shortcut preferences. Stores only deltas
+/// from the built-in default keymap — custom bindings added by the
+/// user and default bindings the user has disabled. Mirrors
+/// `KeyboardShortcutPrefs` in `src/lib/shortcuts/types.ts`.
+export interface KeyboardShortcutPrefs {
+  customBindings: Array<{ commandId: string; scope: ShortcutScope; keys: string }>;
+  disabledDefaultBindingIds: string[];
 }
 
 export interface PermissionsPrefs {

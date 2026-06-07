@@ -15,11 +15,13 @@ import { homedir } from 'node:os';
 import { mkdir } from 'node:fs/promises';
 import type {
   Appearance,
+  KeyboardShortcutPrefs,
   Layout,
   NotificationPrefs,
   PermissionsPrefs,
   ReasoningVisibility,
   Settings,
+  ShortcutScope,
   TerminalPrefs,
   ThemeChoice,
   ToolsPrefs,
@@ -29,7 +31,7 @@ import { AppError } from '../shared/errors';
 import { log } from '../observability/logging';
 import { toErrorMessage } from '../shared/errorMessage';
 
-export const SETTINGS_VERSION = 14;
+export const SETTINGS_VERSION = 15;
 
 /// One-time backfill: returns `<homedir>/dafman` (created on demand),
 /// or `""` on failure. Used by `src-bun/index.ts` to populate the
@@ -109,6 +111,7 @@ export function defaultSettings(): Settings {
         serialize: true,
       },
     },
+    keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
   };
 }
 
@@ -331,6 +334,77 @@ function coerceTerminal(raw: unknown): TerminalPrefs {
   };
 }
 
+/// Valid ShortcutScope values — kept in sync with the union in rpc.ts.
+const VALID_SHORTCUT_SCOPES: ReadonlySet<string> = new Set<ShortcutScope>([
+  'global',
+  'commandPalette',
+  'composer',
+  'composerTypeahead',
+  'terminal',
+  'filePicker',
+  'messageEditor',
+  'pendingRequest',
+  'composerCommandTerminal',
+  'dockviewTabRename',
+  'accessibility',
+]);
+
+/// Coerces the `keyboardShortcuts` blob. Malformed `customBindings`
+/// entries are silently dropped (bad commandId, unknown scope, or
+/// missing/non-string keys) without discarding other settings. An
+/// entirely malformed blob returns the empty defaults.
+function coerceKeyboardShortcuts(raw: unknown): KeyboardShortcutPrefs {
+  const defaults: KeyboardShortcutPrefs = {
+    customBindings: [],
+    disabledDefaultBindingIds: [],
+  };
+
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
+
+  const obj = raw as Record<string, unknown>;
+
+  // coerce customBindings: drop any entry that isn't a valid { commandId, scope, keys } triple
+  const customBindings: KeyboardShortcutPrefs['customBindings'] = [];
+
+  if (Array.isArray(obj.customBindings)) {
+    for (const entry of obj.customBindings) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+
+      const e = entry as Record<string, unknown>;
+      const commandId = typeof e.commandId === 'string' ? e.commandId.trim() : '';
+      const keys = typeof e.keys === 'string' ? e.keys.trim() : '';
+      const scope =
+        typeof e.scope === 'string' && VALID_SHORTCUT_SCOPES.has(e.scope)
+          ? (e.scope as ShortcutScope)
+          : null;
+
+      if (!commandId || !keys || !scope) continue;
+
+      customBindings.push({ commandId, scope, keys });
+    }
+  }
+
+  // coerce disabledDefaultBindingIds: drop non-strings, trim, dedupe
+  const disabledDefaultBindingIds: string[] = [];
+
+  if (Array.isArray(obj.disabledDefaultBindingIds)) {
+    const seen = new Set<string>();
+
+    for (const entry of obj.disabledDefaultBindingIds) {
+      if (typeof entry !== 'string') continue;
+
+      const trimmed = entry.trim();
+
+      if (!trimmed || seen.has(trimmed)) continue;
+
+      seen.add(trimmed);
+      disabledDefaultBindingIds.push(trimmed);
+    }
+  }
+
+  return { customBindings, disabledDefaultBindingIds };
+}
+
 export function migrate(input: unknown): Settings {
   const defaults = defaultSettings();
 
@@ -347,6 +421,7 @@ export function migrate(input: unknown): Settings {
     tools: coerceTools(raw.tools),
     permissions: coercePermissions(raw.permissions),
     terminal: coerceTerminal(raw.terminal),
+    keyboardShortcuts: coerceKeyboardShortcuts(raw.keyboardShortcuts),
   };
 }
 

@@ -10,6 +10,10 @@ exports[`IPC wire contracts Settings shape 1`] = `
     "streaming": false,
     "theme": "dark",
   },
+  "keyboardShortcuts": {
+    "customBindings": [],
+    "disabledDefaultBindingIds": [],
+  },
   "layout": {
     "dockview": null,
   },
@@ -67,6 +71,10 @@ exports[`IPC wire contracts Settings with persisted layout 1`] = `
     "reasoningVisibility": "compact",
     "streaming": true,
     "theme": "dark",
+  },
+  "keyboardShortcuts": {
+    "customBindings": [],
+    "disabledDefaultBindingIds": [],
   },
   "layout": {
     "dockview": {
@@ -138,6 +146,10 @@ exports[`IPC wire contracts Settings with v3 groups layout 1`] = `
     "reasoningVisibility": "compact",
     "streaming": true,
     "theme": "dark",
+  },
+  "keyboardShortcuts": {
+    "customBindings": [],
+    "disabledDefaultBindingIds": [],
   },
   "layout": {
     "groups": [

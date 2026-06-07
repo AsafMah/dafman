@@ -72,6 +72,7 @@ describe('IPC wire contracts', () => {
       tools: { defaultExcluded: [], defaultAllowed: [] },
       permissions: { defaultApproveAll: false },
       terminal: makeTerminalPrefs('platform-default'),
+      keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
     };
     expect(sample).toMatchSnapshot();
   });
@@ -104,6 +105,7 @@ describe('IPC wire contracts', () => {
       tools: { defaultExcluded: ['bash'], defaultAllowed: [] },
       permissions: { defaultApproveAll: true },
       terminal: makeTerminalPrefs('pwsh'),
+      keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
     };
     expect(sample).toMatchSnapshot();
   });
@@ -159,6 +161,7 @@ describe('IPC wire contracts', () => {
       tools: { defaultExcluded: [], defaultAllowed: [] },
       permissions: { defaultApproveAll: false },
       terminal: makeTerminalPrefs('platform-default'),
+      keyboardShortcuts: { customBindings: [], disabledDefaultBindingIds: [] },
     };
     expect(sample).toMatchSnapshot();
   });
