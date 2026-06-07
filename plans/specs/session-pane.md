@@ -322,24 +322,9 @@ stale/corrupt entry falls back cleanly.
    - (c) Keep it always-on but only for `sortField !== 'activity'`.
    *Recommended: (a). Decision needed.*
 
-3. **Does "group by dockview group" mean the existing `GroupMeta` concept, or should
-   we introduce a NEW user-defined "session group" concept?** The current `GroupMeta`
-   ties to the dockview outer group (the tab-at-top-of-body), which the user already
-   names and colors. Reusing it costs nothing and avoids a new entity. A new concept
-   would decouple session organization from the layout. *Recommended: reuse `GroupMeta`
-   for v1. Decision needed before any backend work.*
+3. **"Group by dockview group" = existing `GroupMeta`?** — ✅ **RESOLVED (2026-06-07): reuse the existing `GroupMeta`** (the dockview outer group the user already names + colors). No new "session group" concept — groups are just the dockview grouping.
 
-4. **How to color/group CLOSED sessions by dockview group?** `innerBodiesCache` only
-   reflects panels that were ever opened in the current runtime. A session that exists
-   in the `listSessions` catalog but was never opened this session has no group
-   assignment. Options:
-   - (a) Accept the limitation: closed/never-seen sessions are "Unassigned". Simplest.
-   - (b) Persist a `sessionId → groupId` index alongside the layout (append to `Layout`
-     type). Written whenever a panel joins a group; read at boot.
-   - (c) Walk the serialized `innerBodies` at catalog load time to reconstruct the map.
-     Avoids new schema; works off existing persisted data.
-   *Recommended: (c) as a best-effort fallback with (a) for truly unmapped sessions.
-   Decision needed — (b) is the most correct but adds schema churn.*
+4. **Closed / unseen sessions' dockview-group membership** — ✅ **RESOLVED (2026-06-07): (a) leave them gray / "Unassigned".** No durable `sessionId → groupId` index and no body reconstruction — groups are just a visual grouping, so a session with no known current-runtime group renders **untinted under "Unassigned"**. Membership comes only from `innerBodiesCache` / `innerApis` for sessions opened this runtime; closed/catalog-only sessions stay gray.
 
 5. **Color-by-group with per-session accent: which wins in contexts beyond the sidebar?**
    This spec proposes group color → sidebar left-border, session accent → chat tab dot.
