@@ -91,11 +91,13 @@ function openEditDialog(entry: ConfiguredEntry) {
 }
 
 async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
-  if (await upsertConfig(dialogMode.value, payload)) {
-    toasts.success(
-      dialogMode.value === 'edit' ? 'MCP server updated' : 'MCP server added',
-      payload.name,
-    );
+  const { ok, wasUpdate } = await upsertConfig(dialogMode.value, payload);
+
+  if (ok) {
+    // `wasUpdate` is set when `add` mode auto-upgraded to `update` because
+    // the server already existed in the global config (#1 fix).
+    const verb = wasUpdate ? 'updated' : dialogMode.value === 'edit' ? 'updated' : 'added';
+    toasts.success(`MCP server ${verb}`, payload.name);
     dialogOpen.value = false;
   }
 }
@@ -110,7 +112,9 @@ async function setDiscoveredEnabled(entry: DiscoveredEntry, enabled: boolean) {
 }
 
 // ---------- OAuth sign-in ----------
-async function onSignIn(entry: ConfiguredEntry) {
+/// Accepts any named entry so we can drive sign-in from both the
+/// Configured and Discovered sections (#3 fix).
+async function onSignIn(entry: { name: string }) {
   const { state } = await signIn(entry.name);
 
   if (state === 'no-session') {
@@ -245,6 +249,18 @@ function onHeaderAction(action: string) {
                 :model-value="entry.enabled"
                 :aria-label="`Enable discovered MCP server ${entry.name}`"
                 @update:model-value="(enabled: boolean) => setDiscoveredEnabled(entry, enabled)"
+              />
+              <!-- #3: discovered HTTP/SSE servers may need OAuth just like
+                   configured ones. The `type` field comes from the SDK's
+                   DiscoveredMcpServer shape (stdio | http). -->
+              <Button
+                v-if="(entry.type === 'http' || entry.type === 'sse') && needsSignIn(entry.name)"
+                icon="pi pi-sign-in"
+                label="Sign in"
+                size="small"
+                severity="secondary"
+                text
+                @click="onSignIn(entry)"
               />
             </div>
           </li>

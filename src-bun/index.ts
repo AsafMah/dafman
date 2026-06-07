@@ -178,13 +178,22 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
 
         return 'Copilot client created';
       }),
-      createSession: rpcGuard(async ({ workingDirectory, model, reasoningEffort }) =>
-        sessions.create({
+      createSession: rpcGuard(async ({ workingDirectory, model, reasoningEffort }) => {
+        // Pre-fetch globally-configured MCP servers and pass them to the new
+        // session. `enableConfigDiscovery` handles workspace-level .mcp.json
+        // files but does NOT re-read servers added to the CLI global config
+        // after the CLI started — passing them explicitly here ensures every
+        // new session sees all user-configured servers immediately, so
+        // `session.mcp.oauth.login` never throws "MCP server does not exist".
+        const mcpServers = await mcp.listConfigs().catch(() => ({}));
+
+        return sessions.create({
           ...(workingDirectory ? { workingDirectory } : {}),
           ...(model ? { model } : {}),
           ...(reasoningEffort ? { reasoningEffort } : {}),
-        }),
-      ),
+          ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
+        });
+      }),
       pickFolder: rpcGuard(async ({ startingFolder }) => {
         const paths = await Utils.openFileDialog({
           canChooseFiles: false,
@@ -250,9 +259,13 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
         sessions.setModel(sessionId, model, reasoningEffort),
       ),
       resumeSession: rpcGuard(async ({ sessionId, model, reasoningEffort }) => {
+        // Same rationale as createSession: pass global MCP servers so the
+        // resumed session has the full list and oauth.login doesn't fail.
+        const mcpServers = await mcp.listConfigs().catch(() => ({}));
         const actualId = await sessions.resume(sessionId, {
           ...(model ? { model } : {}),
           ...(reasoningEffort ? { reasoningEffort } : {}),
+          ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
         });
         // Authoritative cwd via SessionRegistry.getCwd — reads
         // entry first, then getSessionMetadata, then catalog.

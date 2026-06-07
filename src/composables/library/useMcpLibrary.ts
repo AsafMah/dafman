@@ -250,12 +250,31 @@ export function useMcpLibrary() {
   async function upsertConfig(
     mode: 'add' | 'edit',
     payload: { name: string; config: McpConfig },
-  ): Promise<boolean> {
+  ): Promise<{ ok: boolean; wasUpdate?: boolean }> {
     try {
       if (mode === 'edit') {
         await invokeCommand('updateMcpConfig', payload);
       } else {
-        await invokeCommand('addMcpConfig', payload);
+        try {
+          await invokeCommand('addMcpConfig', payload);
+        } catch (addErr) {
+          // The CLI throws when a server with this name already exists in the
+          // global config (typical when re-adding after a prior session). Auto-
+          // upgrade to an update so the user isn't dead-ended by the error.
+          const msg = toErrorMessage(addErr).toLowerCase();
+
+          if (msg.includes('already exist') || msg.includes('already configured')) {
+            await invokeCommand('updateMcpConfig', payload);
+
+            // Reload + refresh, then signal the caller it was an update.
+            await syncReloadToActiveSessions();
+            await loadAll();
+
+            return { ok: true, wasUpdate: true };
+          }
+
+          throw addErr;
+        }
       }
 
       // Reload the MCP runtime on every open session so the new/updated
@@ -265,11 +284,11 @@ export function useMcpLibrary() {
       await syncReloadToActiveSessions();
       await loadAll();
 
-      return true;
+      return { ok: true };
     } catch (err) {
       useToastStore().error('Save failed', toErrorMessage(err));
 
-      return false;
+      return { ok: false };
     }
   }
 

@@ -261,12 +261,13 @@ describe('useMcpLibrary upsertConfig — triggers session MCP reload (Symptom A 
     seedSession('sess-2');
 
     const lib = useMcpLibrary();
-    const ok = await lib.upsertConfig('add', {
+    const result = await lib.upsertConfig('add', {
       name: 'github-remote',
       config: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
     });
 
-    expect(ok).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.wasUpdate).toBeUndefined();
     const reloads = calls.filter((c) => c.name === 'reloadSessionMcpServers');
     // One reload call per active session.
     expect(reloads).toHaveLength(2);
@@ -307,12 +308,67 @@ describe('useMcpLibrary upsertConfig — triggers session MCP reload (Symptom A 
     // No sessions seeded — sessions list is empty.
 
     const lib = useMcpLibrary();
-    const ok = await lib.upsertConfig('add', {
+    const result = await lib.upsertConfig('add', {
       name: 'my-server',
       config: { type: 'http', url: 'https://example.com/mcp/' },
     });
 
-    expect(ok).toBe(true);
+    expect(result.ok).toBe(true);
     expect(calls.some((c) => c.name === 'reloadSessionMcpServers')).toBe(false);
+  });
+});
+
+describe('useMcpLibrary upsertConfig — auto-update on "already exists" (#1 fix)', () => {
+  function seedSession(id: string): void {
+    useSessionsStore().sessions.push({ id } as unknown as SessionRecord);
+  }
+
+  test('falls back to updateMcpConfig when addMcpConfig throws "already exist"', async () => {
+    const { bridge, calls } = makeBridge({
+      addMcpConfig: async () => {
+        throw new Error('server already exists');
+      },
+      updateMcpConfig: async () => true,
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+      reloadSessionMcpServers: async () => true,
+    });
+    setRpcBridge(bridge);
+    seedSession('sess-1');
+
+    const lib = useMcpLibrary();
+    const result = await lib.upsertConfig('add', {
+      name: 'github-remote',
+      config: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.wasUpdate).toBe(true);
+    // updateMcpConfig was called instead of erroring
+    expect(calls.some((c) => c.name === 'updateMcpConfig')).toBe(true);
+    // reload was triggered after the fallback update
+    expect(calls.some((c) => c.name === 'reloadSessionMcpServers')).toBe(true);
+  });
+
+  test('propagates addMcpConfig error when not "already exists"', async () => {
+    const { bridge } = makeBridge({
+      addMcpConfig: async () => {
+        throw new Error('permission denied');
+      },
+      listMcpConfigs: async () => ({}),
+      discoverMcpServers: async () => [],
+      listSessionMcpServers: async () => [],
+    });
+    setRpcBridge(bridge);
+
+    const lib = useMcpLibrary();
+    const result = await lib.upsertConfig('add', {
+      name: 'blocked',
+      config: { type: 'http', url: 'https://example.com/mcp/' },
+    });
+
+    // The unrecognised error should surface as ok=false (toasted).
+    expect(result.ok).toBe(false);
   });
 });
