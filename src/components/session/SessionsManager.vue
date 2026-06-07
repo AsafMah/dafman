@@ -7,14 +7,16 @@
 // the primary control surface for sessions; the activity-bar item just
 // toggles its visibility.
 
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete';
 import Button from 'primevue/button';
+import Select from 'primevue/select';
 import { useConfirm } from 'primevue/useconfirm';
 import ConfirmPopup from 'primevue/confirmpopup';
-import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
+import { useSessionsListStore, type GroupingMode } from '@/stores/chat/sessionsListStore';
 import { useSessionsStore } from '@/stores/chat/sessionsStore';
+import { useGroupsStore, extractPanelIdsFromBody } from '@/stores/shell/groupsStore';
 import { useSessionSelectors } from '@/stores/chat/sessionSelectors';
 import { indicatorStyle, type NotificationStyle } from '@/lib/notificationStyles';
 import { emit as busEmit } from '@/lib/bus';
@@ -28,6 +30,7 @@ import type { SessionMetadataSummary } from '@/ipc/types';
 
 const sessionsList = useSessionsListStore();
 const sessionsStore = useSessionsStore();
+const groupsStore = useGroupsStore();
 const settingsStore = useSettingsStore();
 const clientStore = useClientStore();
 const layoutStore = useLayoutStore();
@@ -35,7 +38,7 @@ const toasts = useToastStore();
 const confirm = useConfirm();
 const { displayTitle } = useSessionSelectors();
 
-const { grouped, isLoading, hasLoaded, error } = storeToRefs(sessionsList);
+const { grouped, isLoading, hasLoaded, error, viewState } = storeToRefs(sessionsList);
 const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
 const { isCreating: isCreatingSession } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
@@ -113,21 +116,6 @@ function extraPendingCount(sessionId: string): number {
   if (!r) return 0;
 
   return Math.max(0, r.pendingRequests.length - 1);
-}
-
-/// Within a workspace group, push currently-open sessions to the top
-/// so the user can jump back to live conversations without scrolling
-/// past closed ones. Inside each subgroup, keep the existing MRU
-/// order (modifiedTime DESC). Stable sort across all browsers.
-function sortedGroupSessions(group: { sessions: SessionMetadataSummary[] }) {
-  const open: SessionMetadataSummary[] = [];
-  const closed: SessionMetadataSummary[] = [];
-
-  for (const s of group.sessions) {
-    (openSessionIds.value.has(s.sessionId) ? open : closed).push(s);
-  }
-
-  return [...open, ...closed];
 }
 
 // ---------- New-session form ----------
@@ -293,6 +281,53 @@ async function onNewInWorkspace(workspacePath: string) {
   }
 }
 
+// ---------- View-state toolbar options ----------
+
+const GROUPING_OPTIONS = [
+  { label: 'By workspace', value: 'workspace' },
+  { label: 'By dockview group', value: 'dockview-group' },
+  { label: 'By date', value: 'date-bucket' },
+  { label: 'Flat', value: 'flat' },
+] as const;
+
+const SORT_OPTIONS = [
+  { label: 'Modified', value: 'modified' },
+  { label: 'Created', value: 'created' },
+  { label: 'Name', value: 'name' },
+  { label: 'Activity', value: 'activity' },
+] as const;
+
+function toggleSortDir() {
+  viewState.value.sortDir = viewState.value.sortDir === 'desc' ? 'asc' : 'desc';
+}
+
+function toggleColorByGroup() {
+  viewState.value.colorByGroup = !viewState.value.colorByGroup;
+}
+
+// ---------- Search ----------
+
+const searchOpen = ref(false);
+const searchInputEl = ref<HTMLInputElement | null>(null);
+
+function openSearch() {
+  searchOpen.value = true;
+  void nextTick(() => {
+    searchInputEl.value?.focus();
+  });
+}
+
+function closeSearch() {
+  viewState.value.searchQuery = '';
+  searchOpen.value = false;
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    closeSearch();
+  }
+}
+
 // ---------- Groups (collapse / latest preview / resume / delete) ----------
 
 const collapsedGroups = reactive<Record<string, boolean>>({});
@@ -301,7 +336,26 @@ function toggleGroup(key: string) {
   collapsedGroups[key] = !collapsedGroups[key];
 }
 
+/// A group is expanded if explicitly not-collapsed AND no search query
+/// (a non-empty query forces all groups open so matches are visible).
+function isGroupExpanded(key: string): boolean {
+  if (viewState.value.searchQuery.trim()) return true;
+
+  return !collapsedGroups[key];
+}
+
+/// PrimeIcon class for the group header icon (workspace / date-bucket /
+/// fallback). dockview-group uses a color dot instead of an icon.
+function groupFolderIcon(kind: GroupingMode): string {
+  if (kind === 'date-bucket') return 'pi-calendar';
+
+  return 'pi-folder';
+}
+
+// searchQuery is intentionally ephemeral — not persisted across reloads
+// (OQ1). Reset on mount even if a stale value slipped into localStorage.
 onMounted(() => {
+  viewState.value.searchQuery = '';
   void sessionsList.refresh();
 });
 
@@ -425,6 +479,35 @@ function sessionLabel(session: SessionMetadataSummary): string {
   return displayTitle(session.sessionId);
 }
 
+// ---------- Color-by-group ----------
+
+/// sessionId → dockview group hex color, built from innerBodiesCache
+/// and live innerApis. Null when colorByGroup is disabled.
+const sessionGroupColor = computed((): Map<string, string> | null => {
+  if (!viewState.value.colorByGroup) return null;
+
+  const map = new Map<string, string>();
+
+  for (const g of groupsStore.groups) {
+    const body = groupsStore.innerBodiesCache[g.id] ?? groupsStore.innerApis[g.id]?.toJSON();
+
+    for (const sid of extractPanelIdsFromBody(body)) {
+      map.set(sid, g.color);
+    }
+  }
+
+  return map;
+});
+
+/// Inline border-left style for a session row when colorByGroup is on.
+function rowGroupColorStyle(sessionId: string): { borderLeft: string } | undefined {
+  const color = sessionGroupColor.value?.get(sessionId);
+
+  if (!color) return undefined;
+
+  return { borderLeft: `3px solid ${color}` };
+}
+
 void toasts; // referenced inside async handlers
 </script>
 
@@ -474,18 +557,106 @@ void toasts; // referenced inside async handlers
       </form>
     </section>
 
-    <!-- Sessions list -->
+    <!-- Sessions list toolbar -->
     <div class="manager-toolbar">
       <span class="manager-toolbar-label">Sessions</span>
+      <div class="toolbar-controls">
+        <Select
+          v-model="viewState.grouping"
+          :options="[...GROUPING_OPTIONS]"
+          option-label="label"
+          option-value="value"
+          aria-label="Grouping mode"
+          title="Grouping mode"
+          class="toolbar-select toolbar-select-group"
+          size="small"
+          unstyled
+        />
+        <Select
+          v-model="viewState.sortField"
+          :options="[...SORT_OPTIONS]"
+          option-label="label"
+          option-value="value"
+          aria-label="Sort by"
+          title="Sort by"
+          class="toolbar-select toolbar-select-sort"
+          size="small"
+          unstyled
+        />
+        <Button
+          :icon="
+            viewState.sortDir === 'desc' ? 'pi pi-sort-amount-down' : 'pi pi-sort-amount-up-alt'
+          "
+          text
+          rounded
+          size="small"
+          :aria-label="
+            viewState.sortDir === 'desc'
+              ? 'Descending — click to reverse'
+              : 'Ascending — click to reverse'
+          "
+          :title="viewState.sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'"
+          @click="toggleSortDir"
+        />
+        <Button
+          icon="pi pi-palette"
+          text
+          rounded
+          size="small"
+          :class="{ 'toolbar-btn-active': viewState.colorByGroup }"
+          aria-label="Color rows by dockview group"
+          title="Color by group"
+          @click="toggleColorByGroup"
+        />
+        <Button
+          icon="pi pi-search"
+          text
+          rounded
+          size="small"
+          :class="{ 'toolbar-btn-active': searchOpen || !!viewState.searchQuery.trim() }"
+          aria-label="Toggle search"
+          title="Search sessions"
+          @click="searchOpen ? closeSearch() : openSearch()"
+        />
+        <Button
+          icon="pi pi-refresh"
+          text
+          rounded
+          size="small"
+          :loading="isLoading"
+          aria-label="Refresh sessions list"
+          title="Refresh"
+          @click="onRefresh"
+        />
+      </div>
+    </div>
+
+    <!-- Inline search bar (visible when searchOpen) -->
+    <div
+      v-if="searchOpen"
+      class="search-bar"
+    >
+      <i
+        class="pi pi-search search-bar-icon"
+        aria-hidden="true"
+      />
+      <input
+        ref="searchInputEl"
+        v-model="viewState.searchQuery"
+        class="search-bar-input"
+        type="search"
+        placeholder="Filter sessions…"
+        aria-label="Filter sessions"
+        @keydown="onSearchKeydown"
+      />
       <Button
-        icon="pi pi-refresh"
+        icon="pi pi-times"
         text
         rounded
         size="small"
-        :loading="isLoading"
-        aria-label="Refresh sessions list"
-        title="Refresh"
-        @click="onRefresh"
+        aria-label="Clear search"
+        title="Clear search"
+        @click="closeSearch"
       />
     </div>
 
@@ -513,73 +684,95 @@ void toasts; // referenced inside async handlers
       >
         No sessions yet.
       </p>
+      <p
+        v-else-if="hasLoaded && grouped.every((g) => g.sessions.length === 0)"
+        class="state-message"
+      >
+        No sessions match the current filter.
+      </p>
 
       <section
         v-for="group in grouped"
         :key="group.key"
         class="workspace-group"
-        :class="{ 'is-collapsed': collapsedGroups[group.key] }"
+        :class="{ 'is-collapsed': !isGroupExpanded(group.key) }"
       >
-        <div class="group-header-row">
-          <button
-            type="button"
-            class="group-header"
-            :title="group.path || 'Sessions without a workspace'"
-            :aria-expanded="!collapsedGroups[group.key]"
-            @click="toggleGroup(group.key)"
-          >
-            <i
-              class="pi group-chevron"
-              :class="collapsedGroups[group.key] ? 'pi-chevron-right' : 'pi-chevron-down'"
-              aria-hidden="true"
+        <!-- Group header — hidden in flat mode -->
+        <template v-if="group.kind !== 'flat'">
+          <div class="group-header-row">
+            <button
+              type="button"
+              class="group-header"
+              :title="group.path || group.label"
+              :aria-expanded="isGroupExpanded(group.key)"
+              @click="toggleGroup(group.key)"
+            >
+              <i
+                class="pi group-chevron"
+                :class="isGroupExpanded(group.key) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                aria-hidden="true"
+              />
+              <!-- dockview-group: show color dot instead of folder icon -->
+              <span
+                v-if="group.kind === 'dockview-group' && group.color"
+                class="group-color-dot"
+                :style="{ background: group.color }"
+                aria-hidden="true"
+              />
+              <i
+                v-else
+                class="pi group-folder"
+                :class="groupFolderIcon(group.kind)"
+                aria-hidden="true"
+              />
+              <span class="group-label">{{ group.label }}</span>
+              <span class="group-count">{{ group.sessions.length }}</span>
+            </button>
+            <!-- New session in workspace — workspace groups only -->
+            <Button
+              v-if="group.kind === 'workspace'"
+              icon="pi pi-plus"
+              text
+              rounded
+              size="small"
+              class="group-new"
+              :aria-label="
+                group.path ? `New session in ${group.label}` : 'New session (no workspace)'
+              "
+              :title="group.path ? `New session in ${group.path}` : 'New session (no workspace)'"
+              :disabled="!clientReady"
+              @click.stop="onNewInWorkspace(group.path ?? '')"
             />
-            <i
-              class="pi pi-folder group-folder"
-              aria-hidden="true"
-            />
-            <span class="group-label">{{ group.label }}</span>
-            <span class="group-count">{{ group.sessions.length }}</span>
-          </button>
-          <Button
-            icon="pi pi-plus"
-            text
-            rounded
-            size="small"
-            class="group-new"
-            :aria-label="
-              group.path ? `New session in ${group.label}` : 'New session (no workspace)'
-            "
-            :title="group.path ? `New session in ${group.path}` : 'New session (no workspace)'"
-            :disabled="!clientReady"
-            @click.stop="onNewInWorkspace(group.path)"
-          />
-        </div>
+          </div>
 
-        <div
-          v-if="collapsedGroups[group.key] && group.sessions.length > 0"
-          class="group-preview"
-          :title="group.sessions[0]?.sessionId"
-        >
-          <span class="group-preview-label">
-            {{ sessionLabel(group.sessions[0]!) }}
-          </span>
-          <span class="group-preview-time">
-            {{ relativeTime(group.sessions[0]!.modifiedTime) }}
-          </span>
-        </div>
+          <div
+            v-if="!isGroupExpanded(group.key) && group.sessions.length > 0"
+            class="group-preview"
+            :title="group.sessions[0]?.sessionId"
+          >
+            <span class="group-preview-label">
+              {{ sessionLabel(group.sessions[0]!) }}
+            </span>
+            <span class="group-preview-time">
+              {{ relativeTime(group.sessions[0]!.modifiedTime) }}
+            </span>
+          </div>
+        </template>
 
         <ul
-          v-show="!collapsedGroups[group.key]"
+          v-show="isGroupExpanded(group.key)"
           class="session-list"
+          :class="{ 'session-list-flat': group.kind === 'flat' }"
         >
           <li
-            v-for="session in sortedGroupSessions(group)"
+            v-for="session in group.sessions"
             :key="session.sessionId"
             class="session-row"
             :class="{
               'is-open': openSessionIds.has(session.sessionId),
               'is-resuming': resumingIds.has(session.sessionId),
             }"
+            :style="rowGroupColorStyle(session.sessionId)"
           >
             <button
               type="button"
@@ -738,8 +931,9 @@ void toasts; // referenced inside async handlers
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.2rem 0.4rem 0.2rem 0.55rem;
+  padding: 0.2rem 0.1rem 0.2rem 0.55rem;
   border-bottom: 1px solid var(--p-content-border-color);
+  gap: 0.25rem;
 }
 
 .manager-toolbar-label {
@@ -748,6 +942,95 @@ void toasts; // referenced inside async handlers
   font-weight: 600;
   text-transform: uppercase;
   color: var(--p-text-muted-color);
+  flex: 0 0 auto;
+}
+
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Unstyled Select rendered as a compact text button. */
+.toolbar-select {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  padding: 0.25rem 0.35rem;
+  border-radius: var(--p-border-radius-sm);
+  border: none;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.toolbar-select:hover {
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
+  color: var(--p-text-color);
+}
+
+/* PrimeVue Select unstyled — hide the internal chevron on narrow widths */
+.toolbar-select-group {
+  max-width: 7rem;
+}
+
+.toolbar-select-sort {
+  max-width: 5.5rem;
+}
+
+@container (max-width: 230px) {
+  .toolbar-select-group,
+  .toolbar-select-sort {
+    max-width: 4rem;
+  }
+}
+
+/* Active-state tint for icon-toggle buttons (color-by-group, search) */
+.toolbar-btn-active :deep(.p-button-icon) {
+  color: var(--p-primary-color);
+}
+
+/* ---- Inline search bar ---- */
+
+.search-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, transparent);
+}
+
+.search-bar-icon {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.search-bar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--p-text-color);
+}
+
+.search-bar-input::placeholder {
+  color: var(--p-text-muted-color);
+}
+
+/* Hide the native clear button that some browsers add to type="search" */
+.search-bar-input::-webkit-search-cancel-button {
+  display: none;
 }
 
 .manager-body {
@@ -844,6 +1127,15 @@ void toasts; // referenced inside async handlers
   flex: 0 0 auto;
 }
 
+/* Color dot for dockview-group headers */
+.group-color-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
 .group-label {
   flex: 1 1 auto;
   overflow: hidden;
@@ -868,6 +1160,13 @@ void toasts; // referenced inside async handlers
   margin: 0;
   border-left: 1px dotted color-mix(in srgb, var(--p-text-color) 15%, transparent);
   margin-left: 0.85rem;
+}
+
+/* Flat mode list has no group indent */
+.session-list-flat {
+  padding: 0;
+  margin: 0;
+  border-left: none;
 }
 
 .group-preview {
@@ -901,6 +1200,8 @@ void toasts; // referenced inside async handlers
   align-items: stretch;
   border-radius: var(--p-border-radius-md);
   margin: 0 0.4rem;
+  /* border-left applied inline when colorByGroup is on */
+  box-sizing: border-box;
 }
 
 .session-row:hover {
