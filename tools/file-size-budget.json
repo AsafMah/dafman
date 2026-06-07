@@ -5,10 +5,10 @@
   "src-bun/rpc.ts": 1382,
   "src/stores/chat/sessionsStore.ts": 1251,
   "src/components/chat/ChatWindow.vue": 1134,
-	"src/components/session/SessionsManager.vue": 1340,
+  "src/components/session/SessionsManager.vue": 1340,
   "src/components/session/SessionHeaderControls.vue": 1016,
   "src/components/chat/MessageComposer.vue": 1085,
   "src/ipc/types.ts": 1015,
-	"src/components/settings/KeyboardShortcutsSection.vue": 859,
-	"src/lib/registerBuiltinCommands.ts": 819
+  "src/components/settings/KeyboardShortcutsSection.vue": 859,
+  "src/lib/registerBuiltinCommands.ts": 819
 }
