@@ -36,6 +36,7 @@ import { SESSION_COMMANDS } from '@/lib/sessionCommands';
 import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
 import { toErrorMessage } from '@/lib/errorMessage';
 import type { ReasoningVisibility } from '@/ipc/types';
+import { PANEL_IDS } from '@/constants/panels';
 
 const SESSIONS_PANEL_ID = 'sessions-manager';
 
@@ -233,6 +234,47 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         const prev = groups[(idx - 1 + groups.length) % groups.length];
 
         if (prev) groupsActions.activateGroup(prev.id);
+      },
+    },
+    {
+      id: 'library.open',
+      label: 'Open Library',
+      group: 'Navigation',
+      icon: 'pi pi-book',
+      keywords: ['library', 'prompts', 'templates', 'resources'],
+      run: () => {
+        layoutStore.activateEdgePanel(PANEL_IDS.library, 'right');
+      },
+    },
+    {
+      id: 'logs.open',
+      label: 'Open Logs',
+      group: 'Diagnostics',
+      icon: 'pi pi-bars',
+      keywords: ['logging', 'debug', 'diagnostics', 'console'],
+      run: () => {
+        layoutStore.activateEdgePanel(PANEL_IDS.logs, 'left');
+      },
+    },
+    {
+      id: 'sessionDetails.toggle',
+      label: 'Toggle Session Details',
+      group: 'Navigation',
+      icon: 'pi pi-info-circle',
+      keywords: ['details', 'session', 'info', 'rail'],
+      run: () => {
+        layoutStore.toggleSessionDetailsPanel();
+      },
+    },
+    {
+      // Stub: opens Settings until a dedicated Keyboard Shortcuts section exists.
+      id: 'keyboardShortcuts.open',
+      label: 'Open Keyboard Shortcuts',
+      group: 'Settings',
+      icon: 'pi pi-key',
+      keywords: ['shortcuts', 'keybindings', 'hotkeys', 'keyboard'],
+      run: () => {
+        layoutStore.toggleSettings();
       },
     },
   ];

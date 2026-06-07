@@ -4,6 +4,25 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (2026-06-07 keyboard Phase 4 — global cutover)
+
+- **Global keyboard dispatcher (`src/composables/useGlobalShortcuts.ts`).** Single capture-phase `keydown` listener wired from `App.vue`. Resolves scope: if focus is inside an editable surface (`input`, `textarea`, `[contenteditable]`, Lexical composer, Xterm textarea), only the allowlist (`commandPalette.toggle`, `settings.open`) fires; otherwise scope is `global`. Delegates matching to `shortcutRegistry.match()`/`bindingsForScope()` via `tinykeys` `matchKeybindingPress` + `parseKeybinding`. Tracks multi-chord sequences (`$mod+K $mod+S`) with a 1 s timeout. Does NOT `preventDefault` when no binding matches — editors keep all their native keys.
+- **Registered 4 previously-unbound commands** in `registerBuiltinCommands.ts`: `library.open` (Mod+Shift+L → right Library panel), `logs.open` (Mod+Shift+O → left Logs panel), `sessionDetails.toggle` (Mod+I → right Session Details rail), `keyboardShortcuts.open` (Mod+K Mod+S → stub → opens Settings until the Keyboard Shortcuts section is built).
+- **`commandPaletteStore` Phase 4 cutover complete.** `open()` now guards against PrimeVue overlays (`.p-confirmpopup`, `.p-dialog-mask`) before setting `isOpen`. `toggle()` delegates to `open()`/`close()` so the guard applies on all code paths. `registerCommands()` called from `App.vue` alongside `registerBuiltinCommands`.
+
+### Changed (2026-06-07 keyboard Phase 4 — global cutover)
+
+- **`CommandPalette.vue` hardcoded `Ctrl/Cmd+K` listener removed.** Visibility is now driven entirely from `commandPaletteStore.isOpen`. `prevFocus` is captured via a `flush: 'pre'` watcher that fires before Vue patches the DOM so `document.activeElement` is still the original element. The dead `openPalette()` / `isOtherOverlayOpen()` functions are removed.
+- **`CommandPalette.test.ts`** updated: `mountOpenPalette` now calls `commandPaletteStore.open()` directly (no Ctrl+K dispatch); the end-to-end shortcut dispatch path is covered by `useGlobalShortcuts.test.ts`.
+
+### Tested (2026-06-07 keyboard Phase 4)
+
+- `src/composables/__tests__/useGlobalShortcuts.test.ts` (7 tests): Ctrl+K opens palette; does not open over dialog; global pane shortcut runs command; scope guard blocks non-allowlisted shortcuts while contenteditable/input focused; allowlist (Ctrl+K) fires regardless of focus.
+
+### Changed (2026-06-07 SDK bump — chore/deps)
+
+- **Bumped `@github/copilot-sdk` from `1.0.0-beta.9` to `^1.0.0` (stable) and `@github/copilot` from `^1.0.54` to `^1.0.55`.** Installed: `copilot-sdk@1.0.0`, `copilot@1.0.60`. No type breaks (1.0.0 is a direct promotion of beta.9 with the same surface). All 112 backend tests and both lint passes clean.
+
 ### Fixed (2026-06-07 MCP OAuth — issue #7)
 
 - **MCP OAuth sign-in now works reliably for all HTTP server types (#7).** Four distinct bugs fixed:

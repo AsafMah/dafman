@@ -42,6 +42,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { searchValueFor } from '@/lib/palette';
 import { emit as busEmit } from '@/lib/bus';
 import { useEventListener } from '@vueuse/core';
+import { useCommandPaletteStore } from '@/stores/shell/commandPaletteStore';
 
 const registry = useCommandRegistry();
 const layoutStore = useLayoutStore();
@@ -52,8 +53,8 @@ const layoutStore = useLayoutStore();
 /// library filtered — caught 2026-05-27 by user feedback "It doesn't
 /// find either, even before").
 const commandState = useCommandState();
+const paletteStore = useCommandPaletteStore();
 
-const open = ref(false);
 let prevFocus: HTMLElement | null = null;
 
 const visibleCommands = computed(() => registry.visibleCommands);
@@ -62,11 +63,21 @@ const visibleCommands = computed(() => registry.visibleCommands);
 /// so each palette session starts collapsed.
 const expanded = ref(new Set<string>());
 
-watch(open, (next) => {
-  if (!next) {
-    expanded.value = new Set();
-  }
-});
+watch(
+  () => paletteStore.isOpen,
+  (next, prev) => {
+    if (next && !prev) {
+      // Capture the active element before the palette steals focus, so we can
+      // restore it when the palette closes. flush:'pre' runs before Vue patches
+      // the DOM, so document.activeElement is still the original focused element.
+      prevFocus = (document.activeElement as HTMLElement | null) ?? null;
+    }
+    if (!next) {
+      expanded.value = new Set();
+    }
+  },
+  { flush: 'pre' },
+);
 
 function isParent(cmd: CommandDef): boolean {
   return Array.isArray(cmd.children) && cmd.children.length > 0;
@@ -146,33 +157,8 @@ const grouped = computed(() => {
   return { sections: Array.from(sections.entries()), ungrouped };
 });
 
-function isOtherOverlayOpen(): boolean {
-  return Boolean(document.querySelector('.p-confirmpopup, .p-dialog-mask'));
-}
-
-function onHotkey(e: KeyboardEvent): void {
-  if (e.repeat) return;
-
-  if (e.key !== 'k' && e.key !== 'K') return;
-
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const cmdChord = isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
-
-  if (!cmdChord) return;
-
-  if (e.altKey || e.shiftKey) return;
-
-  if (!open.value && isOtherOverlayOpen()) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  if (open.value) closePalette();
-  else openPalette();
-}
-
 function onEscape(e: KeyboardEvent): void {
-  if (!open.value) return;
+  if (!paletteStore.isOpen) return;
 
   if (e.key !== 'Escape') return;
 
@@ -181,13 +167,8 @@ function onEscape(e: KeyboardEvent): void {
   closePalette();
 }
 
-function openPalette(): void {
-  prevFocus = (document.activeElement as HTMLElement | null) ?? null;
-  open.value = true;
-}
-
 function closePalette(): void {
-  open.value = false;
+  paletteStore.close();
   void nextTick(() => {
     if (prevFocus && document.contains(prevFocus)) {
       prevFocus.focus();
@@ -237,7 +218,7 @@ function onSelectItem(item: { key: string; value: string }): void {
 }
 
 function onWindowClick(e: MouseEvent): void {
-  if (!open.value) return;
+  if (!paletteStore.isOpen) return;
 
   const target = e.target as HTMLElement | null;
 
@@ -248,14 +229,13 @@ function onWindowClick(e: MouseEvent): void {
   }
 }
 
-useEventListener(window, 'keydown', onHotkey, true);
 useEventListener(window, 'keydown', onEscape, true);
 useEventListener(window, 'click', onWindowClick, true);
 </script>
 
 <template>
   <Command.Dialog
-    :visible="open"
+    :visible="paletteStore.isOpen"
     theme="dafman"
     @select-item="onSelectItem"
   >

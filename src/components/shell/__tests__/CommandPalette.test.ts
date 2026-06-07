@@ -5,25 +5,16 @@ import { nextTick } from 'vue';
 import CommandPalette from '@/components/shell/CommandPalette.vue';
 import { searchValueFor, childMatchTokens, parentSelfTokens } from '@/lib/palette';
 import { useCommandRegistry } from '@/stores/shell/commandRegistry';
+import { useCommandPaletteStore } from '@/stores/shell/commandPaletteStore';
 
-/// Mounts the palette and pops it open via the test-only `__testOpen`
-/// expose. Returns the test-library handle + the dialog root element
-/// (queried via the body, since the library teleports the dialog out
-/// of the component subtree).
+/// Mounts the palette and opens it via the commandPaletteStore.
+/// The palette is now driven by the store (Phase 4 cutover removed the
+/// hardcoded Ctrl/Cmd+K listener). End-to-end shortcut dispatch is tested
+/// separately in useGlobalShortcuts.test.ts.
 async function mountOpenPalette() {
+  const paletteStore = useCommandPaletteStore();
   const utils = render(CommandPalette);
-  // expose() returns are surfaced via the component instance —
-  // @testing-library/vue doesn't give it back directly, so reach in
-  // through the rendered root's __vueParentComponent.
-  // Easier path: open via the global Ctrl+K hotkey which is what the
-  // user would do anyway.
-  window.dispatchEvent(
-    new KeyboardEvent('keydown', {
-      key: 'k',
-      ctrlKey: true,
-      bubbles: true,
-    }),
-  );
+  paletteStore.open();
   await nextTick();
   await nextTick();
   return utils;
@@ -144,7 +135,7 @@ describe('CommandPalette', () => {
     document.body.innerHTML = '';
   });
 
-  test('Ctrl+K opens the dialog; Escape closes it', async () => {
+  test('palette opens via store; Escape closes it', async () => {
     const registry = useCommandRegistry();
     registry.register({ id: 'x.demo', label: 'Demo', run: () => {} });
 
@@ -327,7 +318,7 @@ describe('CommandPalette', () => {
     expect(parent!.getAttribute('data-expanded')).toBe('false');
   });
 
-  test('selecting a child fires its run() (not the parent\'s)', async () => {
+  test("selecting a child fires its run() (not the parent's)", async () => {
     const registry = useCommandRegistry();
     let parentRan = false;
     let childRan: string | null = null as string | null;
@@ -370,11 +361,9 @@ describe('CommandPalette', () => {
     await nextTick();
 
     // Click the Beta child.
-    const beta = Array.from(
-      document.querySelectorAll('[command-item][data-child="true"]'),
-    ).find((el) => (el.getAttribute('data-value') ?? '').includes('p3.parent.beta')) as
-      | HTMLElement
-      | undefined;
+    const beta = Array.from(document.querySelectorAll('[command-item][data-child="true"]')).find(
+      (el) => (el.getAttribute('data-value') ?? '').includes('p3.parent.beta'),
+    ) as HTMLElement | undefined;
     expect(beta).toBeTruthy();
     await fireEvent.click(beta!);
     await nextTick();
