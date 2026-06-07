@@ -13,7 +13,12 @@
 // shutdown) settle every outstanding entry with a typed
 // "user-not-available" / "cancel" so the SDK never hangs.
 
-import { type CopilotSession, type ReasoningEffort, type SessionEvent } from '../client/copilotSdk';
+import {
+  type CopilotSession,
+  type MCPServerConfig,
+  type ReasoningEffort,
+  type SessionEvent,
+} from '../client/copilotSdk';
 import { stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { tryGetClient } from '../client/client';
@@ -282,6 +287,14 @@ export class SessionRegistry {
       workingDirectory?: string;
       model?: string;
       reasoningEffort?: string;
+      /// Globally-configured MCP servers to inject into the session at
+      /// creation time. `enableConfigDiscovery` reads workspace-level
+      /// `.mcp.json` files but does NOT re-read servers added to the
+      /// global CLI config (via `mcp.config.add`) after the CLI started.
+      /// Passing them explicitly here ensures every new session knows
+      /// about all user-configured servers so `session.mcp.oauth.login`
+      /// works without requiring a separate reload step.
+      mcpServers?: Record<string, unknown>;
     } = {},
   ): Promise<string> {
     const client = tryGetClient();
@@ -309,6 +322,9 @@ export class SessionRegistry {
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.reasoningEffort
           ? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
+          : {}),
+        ...(opts.mcpServers && Object.keys(opts.mcpServers).length > 0
+          ? { mcpServers: opts.mcpServers as Record<string, MCPServerConfig> }
           : {}),
       });
     } catch (err) {
@@ -358,7 +374,14 @@ export class SessionRegistry {
   /// no-op (returns the same id).
   async resume(
     sessionId: string,
-    opts: { model?: string; reasoningEffort?: string; workingDirectory?: string } = {},
+    opts: {
+      model?: string;
+      reasoningEffort?: string;
+      workingDirectory?: string;
+      /// See `create()` — same rationale for passing global MCP servers
+      /// explicitly so a resumed session has the full server list.
+      mcpServers?: Record<string, unknown>;
+    } = {},
   ): Promise<string> {
     if (this.entries.has(sessionId)) {
       log.debug('resume on already-registered session, returning id', {
@@ -394,6 +417,9 @@ export class SessionRegistry {
           ? { reasoningEffort: opts.reasoningEffort as ReasoningEffort }
           : {}),
         ...(effectiveCwd ? { workingDirectory: effectiveCwd } : {}),
+        ...(opts.mcpServers && Object.keys(opts.mcpServers).length > 0
+          ? { mcpServers: opts.mcpServers as Record<string, MCPServerConfig> }
+          : {}),
       });
     } catch (err) {
       configEventSink = null;

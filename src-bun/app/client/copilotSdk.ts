@@ -48,6 +48,7 @@ export type {
   ExitPlanModeRequest,
   ExitPlanModeResult,
   ForegroundSessionInfo,
+  MCPServerConfig,
   MessageOptions,
   ModelInfo,
   PermissionHandler,

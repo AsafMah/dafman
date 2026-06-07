@@ -830,6 +830,45 @@ describe('SessionRegistry', () => {
     expect(client.createdConfigs[2]).not.toHaveProperty('workingDirectory');
   });
 
+  test('create forwards mcpServers to the SDK when provided (#7 fix)', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+    const servers = {
+      'github-remote': { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    };
+
+    await reg.create({ mcpServers: servers });
+
+    expect(client.createdConfigs[0]).toMatchObject({ mcpServers: servers });
+  });
+
+  test('create omits mcpServers from the SDK config when none provided (#7 fix)', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+
+    await reg.create();
+
+    expect(client.createdConfigs[0]).not.toHaveProperty('mcpServers');
+  });
+
+  test('resume forwards mcpServers to the SDK when provided (#7 fix)', async () => {
+    const client = new FakeClient();
+    _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
+    const reg = new SessionRegistry(() => {});
+    const id = await reg.create();
+    const servers = {
+      'github-remote': { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    };
+
+    // Disconnect so resume won't short-circuit (idempotent early-return).
+    await reg.disconnect(id);
+    await reg.resume(id, { mcpServers: servers });
+
+    expect(client.resumedConfigs[0]).toMatchObject({ mcpServers: servers });
+  });
+
   test('setWorkingDirectory resumes the same session with a validated directory', async () => {
     const client = new FakeClient();
     _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);

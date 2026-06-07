@@ -100,8 +100,8 @@ Source grounding: `node_modules/@github/copilot-sdk/dist/types.d.ts`, `client.d.
 
 | # | SDK/CLI Capability | Dafman today | Opportunity / Gap |
 |---|---|---|---|
-| 1 | **SDK slash-command registration** (`CommandDefinition[]` in `SessionConfig`) — commands registered here appear as `/commandName` in CLI TUI | Only `/library` registered (`sessionConfigBuilder.ts:329`) | Register all 15 local session commands so CLI TUI users see them. Handlers already exist in `sessionCommands.ts`; just wire `name`/`description`/`handler` into `buildRegisteredCommands()`. |
-| 2 | **`session.rpc.commands.list()`** — returns `SlashCommandInfo[]` with `kind: "builtin" \| "skill" \| "client"` for ALL live commands (including CLI built-ins like `/compact`, `/usage`, `/restart`, `/skills`, `/statusline`) | Never called | Enumerate on session create/resume; feed CLI-native commands into the composer typeahead as a second source alongside `SESSION_COMMANDS`. Lets dafman surface `/compact`, `/usage`, `/restart` etc. in typeahead without hardcoding them. |
+| 1 | **SDK slash-command registration** (`CommandDefinition[]` in `SessionConfig`) | Only `/library` registered (`sessionConfigBuilder.ts:329`) | ❌ **Rejected (see OQ3).** dafman's local commands are *renderer-side UI actions*; the SDK handler runs bun-side with no renderer access, so registering them would mean re-implementing each command bun-side for no value. The useful direction is the reverse (#2). |
+| 2 | **`session.rpc.commands.list()`** — returns `SlashCommandInfo[]` (`kind: builtin\|skill\|client`) for ALL live commands incl. CLI built-ins (`/compact`, `/usage`, `/restart`, `/skills`, `/statusline`) | Never called | Enumerate on session create/resume; feed CLI-native commands into the composer typeahead as a second source. **Execution exists** — invoke a selected built-in via `session.rpc.commands.enqueue({ command: '/compact' })` or `.execute(...)` (`rpc.d.ts:10847`/`10839`). This is the *reverse* of #1 (we trigger the CLI's own commands, not register ours). Belongs to #34. |
 | 3 | **`hooks.onPreToolUse`** — fires before every built-in tool execution; can allow/deny/modify args | Not registered | Add observe-only audit hook (log `toolName` + `argKeys`); complements the existing MCP-only audit. Can also inject `additionalContext` or deny specific commands without a permission prompt (e.g. pattern-match `rm -rf`). |
 | 4 | **`hooks.onPostToolUse`** — fires after successful tool executions | Not registered | Audit hook to capture tool result summaries in the observability panel. |
 | 5 | **`hooks.onSessionStart`** — fires on `"startup" \| "resume" \| "new"` with `source` and optional `initialPrompt` | Not registered | Telemetry; also opportunity to inject `additionalContext` (e.g. workspace-level custom instructions that go beyond AGENTS.md). |
@@ -130,7 +130,7 @@ Source grounding: `node_modules/@github/copilot-sdk/dist/types.d.ts`, `client.d.
 **Phase A — Immediate (low risk, high value, can ship together):**
 
 - **[#17] `ToolSet` refactor** in `sessionConfigBuilder.ts`: pure type refactor, zero behavioral change. Verifiable in one `bun run lint:tsc-bun`.
-- **[#1] Register all local slash commands** with SDK: extend `buildRegisteredCommands()` in `sessionConfigBuilder.ts` to include the 15 commands from `SESSION_COMMANDS`. The handlers in the SDK context call through IPC rather than running in the renderer, so they need bun-side shims (emit events, delegate to `session.rpc`). Straightforward for pure-navigation commands (`/model`, `/mcp`, `/skills`); more complex for UI-affecting ones (`/fork`, `/rename`).
+- ~~**[#1] Register all local slash commands**~~ — **dropped** (OQ3): they're renderer-UI actions, pointless to register SDK-side. The slash value is #2 (surface CLI built-ins) + the unified-slash-routing spec (#34).
 - **[#15] `getSessionMetadata(id)`** for single-session title polling: replace the `listSessions()` call in `SessionEventForwarder.pollTitleFromMetadata` with a targeted lookup. One-line change per callsite.
 
 **Phase B — Medium term (moderate complexity, clear value):**
@@ -156,13 +156,13 @@ Source grounding: `node_modules/@github/copilot-sdk/dist/types.d.ts`, `client.d.
 
 1. **Which CLI version to target for the bump?** The installed beta.9 SDK declares a peer requirement of `@github/copilot: "^1.0.55-5"`, but the repo pins `1.0.54`. The CLI must be bumped to satisfy the SDK. **Decision needed**: exact lower bound (`^1.0.55` vs `^1.0.55-5` vs `^1.0.56`). Recommend `^1.0.55` for stability.
 
-2. **Pin `@github/copilot-sdk` as exact or caret?** The spec recommends `^1.0.0` (caret). Risk: a future `1.1.0` may introduce breaking changes. Counter: the SDK README removed the "breaking changes" caveat on stable; semver applies. If the team wants to gate upgrades, keep exact pin and update deliberately. **Decision needed.**
+2. **Pin strategy** — ✅ **RESOLVED (2026-06-07): caret `^1.0.0`** for the SDK (+ `@github/copilot ^1.0.55`). The stable series commits to semver; gate deliberately only if churn bites.
 
-3. **SDK-registered slash commands (Phase A #1):** Should ALL 15 `SESSION_COMMANDS` be registered with the SDK, or only the subset that are meaningful from the CLI TUI? Commands like `/close` (closes a dafman panel), `/model` (opens model selector in dafman UI) have no equivalent action from the CLI TUI. The handler could emit a `system.notification` saying "run from dafman UI", similar to the current `/library` stub. **Decision needed**: which commands to register vs stub vs skip.
+3. **SDK-registered slash commands** — ✅ **RESOLVED (2026-06-07): do NOT register dafman's local slash commands with the SDK.** They are renderer-side UI actions; the SDK handler runs bun-side with no renderer access, so making them *do* anything means re-implementing each command bun-side — pointless. CLI-TUI parity isn't worth it. The valuable slash work is the **reverse** and is genuinely feasible: `commands.list()` discovers the CLI's *own* built-ins and `commands.enqueue`/`execute` invokes them (`rpc.d.ts:10847`/`10839`) — i.e. surface + trigger the CLI's commands in dafman's typeahead. Tracked by the unified-slash-routing spec (#34).
 
-4. **`onUserPromptSubmitted` hook use cases:** The hook fires before every user message and can rewrite the prompt. This is powerful but risky (could silently change user intent). Possible uses: auto-prepend repo context on first message, expand `@shorthand` references, inject session-level instructions. **Decision needed**: opt-in (per-session toggle in settings) or always-on? What's the first use case worth implementing?
+4. **`onUserPromptSubmitted` hook** — ⏸ **DEFERRED → #192** (2026-06-07): no use case. Fires before each user message and can silently rewrite it; risky, no concrete need. Revisit only if a real use case emerges.
 
-5. **`onErrorOccurred` retry policy:** Returning `{ errorHandling: "retry", retryCount: N }` will cause the SDK to automatically retry failed model calls. Risk: runaway retries on billing errors or rate limits. The `recoverable: boolean` field in the hook input should gate this (only retry when `recoverable: true`). **Decision needed**: enable auto-retry by default, or only when explicitly enabled in settings?
+5. **`onErrorOccurred` auto-retry** — ⏸ **DEFERRED → #193** (2026-06-07): runaway-retry risk on billing/rate-limit errors, no demand. Revisit behind an explicit setting + the `recoverable` gate.
 
 6. **`onSessionEnd` + `sessionSummary`:** The hook's output allows returning a `sessionSummary` string. This could power automatic tab title generation (without waiting for the next `session.idle` poll). However, it fires on every session end — including on `/compact` clears. **Decision needed**: pipe the summary to dafman's title-polling mechanism or handle separately?
 
@@ -217,7 +217,7 @@ Recommended: Register navigation/session commands that have meaningful CLI-side 
 
 - `ToolSet` refactor in `sessionConfigBuilder.ts` (open question #2 resolved as caret).
 - `getSessionMetadata(id)` for title polling in `SessionEventForwarder`.
-- Register core session commands with SDK (`/compact`, `/fork`, `/agent`, `/cd`, `/plan`, `/rename`).
+- (`/compact` etc. are CLI built-ins surfaced via #2 — not dafman registering its own; see OQ3.)
 
 **Phase 2 — Typeahead enrichment**
 
