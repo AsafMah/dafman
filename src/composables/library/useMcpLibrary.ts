@@ -100,6 +100,9 @@ export function useMcpLibrary() {
     );
   }
 
+  const librarySession = computed(() => getLibrarySession());
+  const hasLibrarySession = computed(() => librarySession.value !== null);
+
   async function loadAll(): Promise<void> {
     const finishLoading = beginLoading();
 
@@ -227,6 +230,39 @@ export function useMcpLibrary() {
     return hit ? hit.enabled : true;
   }
 
+  /// Per-session enabled state for the focused session, derived from
+  /// `serverStatus` (the live MCP list from `listSessionMcpServers`).
+  ///
+  /// Rule (from sessionMcpService.ts:51-63 / session.rpc.mcp.disable):
+  /// - status === 'disabled' → explicitly session-disabled → false
+  /// - any other status value (connected, needs-auth, failed, …) → true
+  /// - no entry in serverStatus (server not in this session's list) →
+  ///   fall back to the global isEnabled (treat as inheriting the default)
+  function sessionEnabled(name: string): boolean {
+    const status = serverStatus.value.get(name);
+    if (status === undefined) return isEnabled(name);
+    return status !== 'disabled';
+  }
+
+  /// Toggle MCP enabled state for the FOCUSED session only.
+  /// Does NOT sync to other sessions — that is `syncToggleToActiveSessions`,
+  /// which is the global-toggle path. Refreshes serverStatus via loadAll.
+  async function setSessionEnabled(name: string, enabled: boolean): Promise<void> {
+    const session = librarySession.value;
+    if (!session) return;
+
+    try {
+      await invokeCommand('setSessionMcpEnabled', {
+        sessionId: session.id,
+        serverName: name,
+        enabled,
+      });
+      await loadAll();
+    } catch (err) {
+      useToastStore().error('Failed to set session MCP state', toErrorMessage(err));
+    }
+  }
+
   async function removeConfig(name: string): Promise<boolean> {
     try {
       await invokeCommand('removeMcpConfig', { name });
@@ -347,5 +383,9 @@ export function useMcpLibrary() {
     upsertConfig,
     signIn,
     needsSignIn,
+    librarySession,
+    hasLibrarySession,
+    sessionEnabled,
+    setSessionEnabled,
   };
 }

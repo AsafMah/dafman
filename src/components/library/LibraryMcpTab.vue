@@ -51,6 +51,9 @@ const {
   upsertConfig,
   signIn,
   needsSignIn,
+  hasLibrarySession,
+  sessionEnabled,
+  setSessionEnabled,
 } = useMcpLibrary();
 
 async function toggleEnable(entry: ConfiguredEntry) {
@@ -192,11 +195,26 @@ function onHeaderAction(action: string) {
               <span class="mcp-tag">{{ entry.transport }}</span>
             </div>
             <div class="mcp-row-actions">
-              <ToggleSwitch
-                :model-value="isEnabled(entry.name)"
-                :aria-label="`Enable MCP server ${entry.name}`"
-                @update:model-value="() => toggleEnable(entry)"
-              />
+              <div class="mcp-toggle-group">
+                <span class="mcp-toggle-label">Default</span>
+                <ToggleSwitch
+                  :model-value="isEnabled(entry.name)"
+                  :aria-label="`Enable MCP server ${entry.name}`"
+                  @update:model-value="() => toggleEnable(entry)"
+                />
+              </div>
+              <div
+                class="mcp-toggle-group"
+                :title="!hasLibrarySession ? 'No active session' : undefined"
+              >
+                <span class="mcp-toggle-label">This session</span>
+                <ToggleSwitch
+                  :model-value="sessionEnabled(entry.name)"
+                  :disabled="!hasLibrarySession"
+                  :aria-label="`Enable MCP server ${entry.name} for this session`"
+                  @update:model-value="(v: boolean) => setSessionEnabled(entry.name, v)"
+                />
+              </div>
               <Button
                 v-if="entry.transport === 'http' && needsSignIn(entry.name)"
                 icon="pi pi-sign-in"
@@ -359,6 +377,22 @@ function onHeaderAction(action: string) {
   align-items: center;
   gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+.mcp-toggle-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.mcp-toggle-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .empty-hint {

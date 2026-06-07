@@ -4,6 +4,13 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (2026-06-07 Library MCP two-column — issue #28)
+
+- **Library → MCP tab: per-session override toggle.** Each Configured server row now shows two clearly-labelled toggles — **"Default"** (the existing global allowlist, applies to all new sessions) and **"This session"** (a per-session override for the focused session, driven by `setSessionMcpEnabled`). The "This session" toggle is disabled with a "No active session" hint when no session is focused (follows `lastFocusedSessionId` via the existing `getLibrarySession()`). First slice of the decided #28 Library-merge model; validates the two-column pattern before it rolls to Skills/Tools and the session rail's sections are removed.
+- New composable surface on `useMcpLibrary`: `librarySession` / `hasLibrarySession` (reactive focused-session context), `sessionEnabled(name)` (per-session enabled state — a server is session-disabled iff its session status is `'disabled'`, otherwise enabled; inherits the global default when the session has no status for it), and `setSessionEnabled(name, enabled)` (focused session only — does not touch the global all-sessions sync).
+- Known follow-up: flipping the global "Default" toggle still pushes to all sessions and can stomp a per-session override (tracked in **#199**).
+- Coverage: 7 new `LibraryMcpTab.twoColumn.test.ts` tests (both toggles render; disabled with no session; "This session" calls `setSessionMcpEnabled` for the focused session only and not the global RPC; the `sessionEnabled` status rule for disabled/connected/no-status).
+
 ### Added (2026-06-07 per-message agent mode — issue #41)
 
 - **Per-message agent-mode override.** A new one-shot control (`AgentModeOverrideButton.vue`) sits beside `ModeButtonGroup` in the composer toolbar; selecting Interactive/Plan/Autopilot arms the _next_ message only — it does NOT mutate the session mode. The override clears automatically after submit (one-shot), tinted by the mode color while pending. State lives in a per-`ChatWindow` composable `useComposerAgentMode` (`nextMessageMode` / `setNextMessageMode` / `resolveForSubmit`); ephemeral UI state, not session data.
