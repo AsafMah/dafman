@@ -1,6 +1,6 @@
 # Per-Message Agent Mode — Composer Mode Picker
 
-**Status:** Draft  
+**Status:** OQs resolved as recommended — implementing Phase 1 (wire) + Phase 3 (UI) in background; Phase 2 (keyboard chord) deferred to keyboard wave per OQ6, Phase 4 deferred to #40.
 **Date:** 2026-06-06
 
 ---
@@ -251,6 +251,17 @@ Cross-reference `plans/specs/keyboard-shortcuts.md` — the shortcut should be r
 ---
 
 ## Open Questions
+### Resolutions (2026-06-06)
+
+1. **shell mode** → exclude; keep `agentMode: SessionMode` (no `"shell"`).
+2. **one-shot** → clears after submit.
+3. **UI placement** → Option A: an always-visible, low-prominence one-shot override control adjacent to `ModeButtonGroup` (a small "Send next as…" popover trigger); a badge/dot on the group indicates a pending override. Reuses existing toolbar region; no second chip.
+4. **default visibility** → always visible, low prominence (zero cost when unset).
+5. **ownership** → local composable `useComposerAgentMode` scoped to `ChatWindow` (ephemeral UI state).
+6. **keyboard chord** → DEFERRED to the keyboard-adapter wave (configurable via #31); NOT in this PR (keeps it disjoint from #196/#185 command-registry edits).
+7. **onAutoModeSwitch** → DEFERRED to #40; clear silently + toast when integrated.
+
+**This PR scope:** Phase 1 (wire) + Phase 3 (composer UI). Phase 2 (keyboard) and Phase 4 (#40) are deferred as above.
 
 1. **`"shell"` agentMode**: The SDK's `SendAgentMode` includes `"shell"` (`rpc.d.ts:888`) which is absent from dafman's `SessionMode` union (`rpc.ts:21`). Should dafman expose it? It appears to be a "shell-focused UI mode" for the CLI TUI's terminal pane, which may be meaningless in dafman's context. **Recommended default**: exclude `"shell"` from the per-message picker for now; add only if a use case is identified. If excluded, the `agentMode` type in `rpc.ts:sendMessage.params` should remain `SessionMode` (not `SendAgentMode`) to avoid carrying a value dafman can't display.
 
