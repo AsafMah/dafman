@@ -4,6 +4,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (2026-06-08 keyboard editor chord — issue #202)
+
+- **Rebound the keyboard-shortcuts editor to `Mod+Shift+K`** (was `Mod+K Mod+S`). The original sequence was unreachable: `Mod+K` (command palette) is a single chord that fires on the first press, so any sequence sharing that prefix never resolved. Found dogfooding the keyboard system; `Mod+Shift+K` is a free global chord (`useGlobalShortcuts` dispatch unchanged). The `e2e/full` keyboard flow's previously-`fixme` editor test is now active.
+
 ### Added (2026-06-07 Library MCP two-column — issue #28)
 
 - **Library → MCP tab: per-session override toggle.** Each Configured server row now shows two clearly-labelled toggles — **"Default"** (the existing global allowlist, applies to all new sessions) and **"This session"** (a per-session override for the focused session, driven by `setSessionMcpEnabled`). The "This session" toggle is disabled with a "No active session" hint when no session is focused (follows `lastFocusedSessionId` via the existing `getLibrarySession()`). First slice of the decided #28 Library-merge model; validates the two-column pattern before it rolls to Skills/Tools and the session rail's sections are removed.

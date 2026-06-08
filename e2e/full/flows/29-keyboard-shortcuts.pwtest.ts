@@ -150,25 +150,22 @@ test('scope guard blocks non-allowlisted chords while a text surface is focused'
   await expect.poll(() => paletteOpen(page), { timeout: 5_000 }).toBe(true);
 });
 
-/// Blocked by #202: `Mod+K` (command palette, single chord) is resolved and
-/// fired immediately, so the `Mod+K Mod+S` sequence sharing that prefix is
-/// never reachable. Remove `.fixme` once the prefix-deferral fix lands.
-test.fixme('Mod+K Mod+S opens the keyboard-shortcuts editor', async ({ page }) => {
+/// `Mod+Shift+K` opens the keyboard-shortcuts editor (Settings panel scrolled
+/// to the section). Rebound off the original `Mod+K Mod+S` in #202 — that
+/// sequence was unreachable because `Mod+K` (palette) fires on the first
+/// press, shadowing any sequence sharing the prefix.
+test('Mod+Shift+K opens the keyboard-shortcuts editor', async ({ page }) => {
   await boot(page);
   await blurToBody(page);
 
-  await chord(page, 'KeyK');
-  await chord(page, 'KeyS');
+  await chord(page, 'KeyK', { shift: true });
 
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        Boolean(
-          document
-            .querySelector('.activity-bar-tab[aria-label="Settings"]')
-            ?.className.includes('active'),
-        ),
-      ),
+      page.evaluate(() => {
+        const section = document.getElementById('keyboard-shortcuts-section');
+        return Boolean(section && section.offsetParent !== null);
+      }),
     )
     .toBe(true);
 });
