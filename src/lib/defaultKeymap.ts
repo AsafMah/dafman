@@ -105,7 +105,7 @@ export const defaultKeymap: DefaultKeyBinding[] = [
     id: 'global.keyboardShortcuts.open',
     commandId: 'keyboardShortcuts.open',
     scope: 'global',
-    keys: '$mod+K $mod+S',
+    keys: '$mod+Shift+K',
     reassignable: true,
   },
 
