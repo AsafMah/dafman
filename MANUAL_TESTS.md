@@ -70,6 +70,45 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### 2026-06-08 — keyboard system, per-message mode, MCP two-column, session pane
+
+> Shipped this session: per-message agent-mode override (#41), Library MCP
+> two-column toggle (#200), keyboard-shortcut editor + global dispatch
+> (#183/#195) with the editor chord rebound to `Mod+Shift+K` (#202), and the
+> session-pane grouping controls (#184). The keyboard global **dispatch +
+> scope guard** is already covered by `e2e/full/flows/29-keyboard-shortcuts`
+> (5 tests) and the grouping/wire logic by unit tests — the rows below are
+> only the residue those can't reach (real SDK behavior, real MCP servers,
+> restart persistence, visual rendering).
+
+#### PM.1 - A per-message override runs ONE message in the chosen mode, then reverts (#41)
+
+- [ ] result: 
+- **Steps:** In a session whose mode is **Interactive**, click the override button beside the mode group and pick **Plan**. Send a message that would normally act (e.g. "delete the README"). Watch that turn complete, then send a second message.
+- **Expected:** the first message runs in **Plan** (the agent plans / asks before acting, does not execute); after it sends, the override button reverts to its idle "Override agent mode for next message only" label, the session's own mode is still Interactive, and the second message runs Interactive.
+- **Why not automated:** the fake-SDK harness doesn't run a real agent, so it can't prove the overridden mode actually changes the agent's behavior for exactly one turn — needs the real Copilot SDK.
+
+#### MC.1 - Library MCP "This session" toggle scopes a real server to the focused session (#200)
+
+- [ ] result: 
+- **Steps:** With at least one **configured** MCP server (Library → MCP → Configured) and an open session, toggle that row's **"This session"** off while leaving **"Default"** on. Check the server's tools in the focused session, then open a **new** session and check again.
+- **Expected:** "This session" off removes the server only from the focused session; "Default" stays on; a brand-new session still gets the server; the "This session" toggle is disabled with a "No active session" hint when no session is focused.
+- **Why not automated:** the fake-SDK test-server exposes no configured MCP servers and no real per-session MCP runtime, so the two-column scoping only exercises against a real backend with a real server.
+
+#### KS.1 - A reassigned keyboard shortcut survives an app restart (#183)
+
+- [ ] result: 
+- **Steps:** Settings → Keyboard Shortcuts. Reassign a binding (e.g. Open Library) to a custom chord via **Record → Save**. Fully restart the app. Reopen Settings → Keyboard Shortcuts and press the custom chord.
+- **Expected:** the custom chord is still shown in the editor after the restart and still fires its command; the old default chord no longer does.
+- **Why not automated:** flow 29 covers live dispatch + scope guard in headless chromium, but settings-v15 persistence across a real process restart (electrobun + on-disk `settings.json`) is outside the ephemeral fake-backend harness.
+
+#### SP.1 - Session-pane color-by-group + grouping reflow render correctly (#184)
+
+- [ ] result: 
+- **Steps:** With several sessions across **≥2 groups**, open the Sessions Manager. Cycle the grouping modes, toggle sort, type in search, then enable **color-by-group**.
+- **Expected:** grouping re-buckets the list with correct headers, sort reorders within buckets, search filters live, and color-by-group tints each session row by its group's color (matching the group tab colors).
+- **Why not automated:** the grouping/sort/search logic is unit-tested (`sessionsListStore.grouped`), but the per-group color tint + header rendering is a visual-perception check the harness can't assert with confidence.
+
 ### Issue #149 — session title derives from one owner (2026-06-04)
 
 > Refactor: tab + sidebar now derive the title from the `SessionRecord`
