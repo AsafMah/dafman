@@ -14,6 +14,7 @@
 // the handler modules can reuse them without circular imports.
 
 import type { SessionEventPayload } from '@/ipc/types';
+import type { SessionPendingRequest } from '@/lib/sessionStatus';
 import { calloutHandlers } from '@/lib/chatEvents/calloutHandlers';
 import type { Handler, ReducerContext } from '@/lib/chatEvents/context';
 import { lifecycleHandlers } from '@/lib/chatEvents/lifecycleHandlers';
@@ -223,49 +224,12 @@ export type ChatAmbient = {
   /// sessions (preferring the active one). Multiple in flight is
   /// rare in practice but the SDK is allowed to re-enter — we don't
   /// drop later requests just because we're showing an earlier one.
-  pendingRequests: PendingRequest[];
+  pendingRequests: SessionPendingRequest[];
   /// Currently-selected custom agent for the session, or null when the
   /// default agent is in use. Driven by `subagent.selected` /
   /// `.deselected` events; reflected in the header chip + rail.
   currentAgent: import('@/ipc/types').AgentInfo | null;
 };
-
-/// A single SDK-blocking pending callback. `requestId` is generated
-/// on the bun side (NOT by the SDK — the SDK passes a Promise) so the
-/// renderer can correlate the response via `respondToRequest`. The
-/// `request` payload is the typed per-kind shape mirrored from
-/// `src/ipc/types.ts`.
-export type PendingRequest =
-  | {
-      kind: 'permission';
-      requestId: string;
-      message: string;
-      request: import('@/ipc/types').PermissionRequestData;
-    }
-  | {
-      kind: 'userInput';
-      requestId: string;
-      message: string;
-      request: import('@/ipc/types').UserInputRequestData;
-    }
-  | {
-      kind: 'elicitation';
-      requestId: string;
-      message: string;
-      request: import('@/ipc/types').ElicitationRequestData;
-    }
-  | {
-      kind: 'exitPlanMode';
-      requestId: string;
-      message: string;
-      request: import('@/ipc/types').ExitPlanModeRequestData;
-    }
-  | {
-      kind: 'autoModeSwitch';
-      requestId: string;
-      message: string;
-      request: import('@/ipc/types').AutoModeSwitchRequestData;
-    };
 
 export function defaultAmbient(): ChatAmbient {
   return {
