@@ -4,6 +4,11 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (2026-06-08 context-usage pill — issues #219, #220)
+
+- **Context-usage pill no longer corrupted by per-call usage events (#219).** `assistant.usage` carries only per-API-call `inputTokens`/`outputTokens` (verified against the SDK types), not the cumulative `currentTokens`; `mergeUsage` was misreading `inputTokens` as `currentTokens`, so any sub-agent/mcp-sampling call (which shares the session's ambient) would drop the pill to that call's small token count. The pill now sources `currentTokens`/`tokenLimit` solely from `session.usage_info`.
+- **1M-context models report usage correctly (#220).** Raised the context-limit plausibility cap from 500k to 4M so GPT-4.1 / Gemini 2.5 Pro (1M windows) are no longer rejected as implausible (which left the pill unable to compute a percentage).
+
 ### Fixed (2026-06-08 keyboard editor chord — issue #202)
 
 - **Rebound the keyboard-shortcuts editor to `Mod+Shift+K`** (was `Mod+K Mod+S`). The original sequence was unreachable: `Mod+K` (command palette) is a single chord that fires on the first press, so any sequence sharing that prefix never resolved. Found dogfooding the keyboard system; `Mod+Shift+K` is a free global chord (`useGlobalShortcuts` dispatch unchanged). The `e2e/full` keyboard flow's previously-`fixme` editor test is now active.

@@ -11,7 +11,7 @@
 import { pickNumber, pickString } from '@/lib/chatEvents/helpers';
 import type { Handler } from '@/lib/chatEvents/context';
 
-const MAX_PLAUSIBLE_CONTEXT_TOKENS = 500_000;
+const MAX_PLAUSIBLE_CONTEXT_TOKENS = 4_000_000;
 
 function normalizeContextLimit(value: number): number | null {
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -61,9 +61,13 @@ export const sessionMetaHandlers: Record<string, Handler> = {
     ctx.ambient.lastModelChangeToastKey = key;
   },
 
-  // Both events ship the same useful fields for us. `assistant.usage`
-  // is the end-of-turn breakdown; `session.usage_info` is the
-  // pre-turn / status snapshot. We merge both into `ambient.usage`.
+  // `session.usage_info` is the cumulative context-window snapshot and is the
+  // sole source for the usage pill. `assistant.usage` fires for every LLM API
+  // call (including sub-agent / mcp-sampling calls) and carries only per-call
+  // `inputTokens`/`outputTokens` — NOT the cumulative `currentTokens`.
+  // Wiring `assistant.usage` through `mergeUsage` used to overwrite the pill
+  // with a single call's `inputTokens` (bug #219); it is now a no-op because
+  // `mergeUsage` only reads `currentTokens`.
   'session.usage_info': (ctx, data) => mergeUsage(ctx, data),
   'assistant.usage': (ctx, data) => mergeUsage(ctx, data),
 
@@ -112,7 +116,7 @@ export const sessionMetaHandlers: Record<string, Handler> = {
 };
 
 function mergeUsage(ctx: Parameters<Handler>[0], data: unknown): void {
-  const current = pickNumber(data, ['currentTokens', 'inputTokens']);
+  const current = pickNumber(data, ['currentTokens']);
   const rawLimit = pickNumber(data, ['tokenLimit']);
   const limit = rawLimit === null ? null : normalizeContextLimit(rawLimit);
 
