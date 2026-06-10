@@ -941,3 +941,63 @@ describe('processEvents — tool calls', () => {
     expect(out).toContain('output truncated');
   });
 });
+
+describe('processEvents — usage pill (#219 / #220)', () => {
+  function makeCounter(): IdCounter {
+    return { next: 1 };
+  }
+
+  // #219 — assistant.usage carrying only inputTokens must NOT touch the pill
+  test('assistant.usage with inputTokens only does not overwrite currentTokens', () => {
+    const ambient = defaultAmbient();
+    // Prime the pill via session.usage_info
+    const primed = processEvents(
+      [],
+      ambient,
+      [
+        toolEvent('session.usage_info', {
+          currentTokens: 12_000,
+          tokenLimit: 128_000,
+        }),
+      ],
+      makeCounter(),
+    );
+    expect(primed.ambient.usage?.currentTokens).toBe(12_000);
+
+    // Now fire assistant.usage with inputTokens — pill must remain unchanged
+    const after = processEvents(
+      primed.items,
+      primed.ambient,
+      [
+        toolEvent('assistant.usage', {
+          inputTokens: 999,
+          outputTokens: 42,
+          model: 'gpt-4.1',
+        }),
+      ],
+      makeCounter(),
+    );
+    expect(after.ambient.usage?.currentTokens).toBe(12_000);
+    expect(after.ambient.usage?.tokenLimit).toBe(128_000);
+  });
+
+  // #220 — 1M-token context limit must not be nulled by the upper clamp
+  test('session.usage_info with tokenLimit 1_000_000 is accepted', () => {
+    const ambient = defaultAmbient();
+    const result = processEvents(
+      [],
+      ambient,
+      [
+        toolEvent('session.usage_info', {
+          currentTokens: 50_000,
+          tokenLimit: 1_000_000,
+        }),
+      ],
+      makeCounter(),
+    );
+    expect(result.ambient.usage).toEqual({
+      currentTokens: 50_000,
+      tokenLimit: 1_000_000,
+    });
+  });
+});
