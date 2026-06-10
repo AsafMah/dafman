@@ -16,6 +16,7 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 - **Restored the full-E2E tier (test infra).** The strict renderer CSP added in #205 (`connect-src 'self' ws://localhost:*`) silently broke every `e2e/full` flow: the harness connected the browser to `ws://127.0.0.1:<port>`, which CSP treats as a distinct origin from `localhost` and blocks — so the renderer never reached the backend and every flow timed out on boot. The harness now connects via `localhost` to match production (Electrobun RPC) and the CSP. Caught while adding the cross-session-search E2E flow; the tier is not in required CI, so the regression went unnoticed.
 - **Fixed the `19-library-skills` E2E flow broken by #253 (test infra).** The Skills two-column work (#28/#253) added a second per-row toggle ("This session"), so the flow's `.skill-row … .p-toggleswitch` selector matched 2 elements (strict-mode violation). The flow now targets the first ("Default"/global) toggle, which is what it asserts.
+- **Stabilized a flaky `bun test` failure (test infra).** The unit job intermittently aborted with `Export named 'PrimeVueConfirmSymbol' not found in primevue/useconfirm` — a Bun ESM-linker concurrency bug (the export is statically present) triggered when many `.vue` test files race to import `primevue/confirmationservice` under the custom SFC preload. The preload now warms that module graph once, single-threaded, before tests fan out.
 
 ### Added (2026-06-10 palette session jump — issue #185)
 

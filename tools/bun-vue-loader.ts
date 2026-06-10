@@ -31,6 +31,18 @@ import {
 // on first mount. Each test gets a fresh body via `beforeEach` below.
 GlobalRegistrator.register();
 
+// Warm the PrimeVue confirm module graph once, single-threaded, before any
+// test file fans out. Bun's ESM linker intermittently reports
+// `Export named 'PrimeVueConfirmSymbol' not found in primevue/useconfirm`
+// when many `.vue` test files race to import `primevue/confirmationservice`
+// under this custom SFC loader (the export is statically present — it's a
+// concurrency bug in the linker, not a missing symbol). Eagerly resolving
+// the chain here turns those later imports into cache hits instead of link
+// races. Dynamic import (not top-level static) so it runs AFTER happy-dom is
+// registered above — primevue pulls in vue, which captures `document` at load.
+await import("primevue/useconfirm");
+await import("primevue/confirmationservice");
+
 beforeEach(() => {
 	if (typeof document !== "undefined") {
 		document.body.innerHTML = "";
