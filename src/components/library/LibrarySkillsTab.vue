@@ -2,9 +2,10 @@
 /// Phase 19b — Library → Skills tab.
 ///
 /// Group skills by source (builtin / project / personal-copilot /
-/// plugin / …), per-row toggle that writes the global disabled-list
-/// via `setGloballyDisabledSkills`. Reveal-in-folder when `path` is
-/// set so users can jump into the skill file.
+/// plugin / …), per-row two-column toggle that writes globally via
+/// `setGloballyDisabledSkills` ("Default") and per-session via
+/// `setSessionSkillEnabled` ("This session"). Reveal-in-folder when
+/// `path` is set so users can jump into the skill file. (#28)
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -17,8 +18,17 @@ import { useSkillsLibrary, type Skill } from '@/composables/library/useSkillsLib
 import LibraryTabHeader from '@/components/library/LibraryTabHeader.vue';
 import type { LibraryTabHeaderAction } from '@/components/library/libraryTabHeader';
 
-const { skills, loaded, error, load, setEnabled } = useSkillsLibrary();
-const { activeSessionId } = storeToRefs(useLayoutStore());
+const {
+  skills,
+  loaded,
+  error,
+  load,
+  setEnabled,
+  hasLibrarySession,
+  sessionEnabled,
+  setSessionEnabled,
+} = useSkillsLibrary();
+const { activeSessionId, lastFocusedSessionId } = storeToRefs(useLayoutStore());
 const expandedItems = ref<Set<string>>(new Set());
 const headerActions: LibraryTabHeaderAction[] = [
   {
@@ -71,9 +81,9 @@ onMounted(() => {
 });
 /// Auto-reload when the user switches to a different session — skills
 /// are session-scoped (per-cwd `.github/skills/` discovery + session
-/// disabled-skill overlay). Watching `activeSessionId` is the canonical
-/// trigger (the composable's `load()` reads it internally). Per #51.
-watch(activeSessionId, () => {
+/// disabled-skill overlay). Watch both activeSessionId and
+/// lastFocusedSessionId to keep the "This session" column current. (#28)
+watch([activeSessionId, lastFocusedSessionId], () => {
   void load();
 });
 
@@ -150,11 +160,26 @@ function onHeaderAction(action: string) {
                 :aria-label="`Reveal ${skill.name}`"
                 @click="revealSkillFile(skill.path)"
               />
-              <ToggleSwitch
-                :model-value="skill.enabled"
-                :aria-label="`Enable skill ${skill.name}`"
-                @update:model-value="() => toggleSkill(skill)"
-              />
+              <div class="skill-toggle-group">
+                <span class="skill-toggle-label">Default</span>
+                <ToggleSwitch
+                  :model-value="skill.enabled"
+                  :aria-label="`Enable skill ${skill.name}`"
+                  @update:model-value="() => toggleSkill(skill)"
+                />
+              </div>
+              <div
+                class="skill-toggle-group"
+                :title="!hasLibrarySession ? 'No active session' : undefined"
+              >
+                <span class="skill-toggle-label">This session</span>
+                <ToggleSwitch
+                  :model-value="sessionEnabled(skill.name)"
+                  :disabled="!hasLibrarySession"
+                  :aria-label="`Enable skill ${skill.name} for this session`"
+                  @update:model-value="(v: boolean) => setSessionEnabled(skill.name, v)"
+                />
+              </div>
             </div>
             <div
               v-if="skill.description && isExpanded(skill.name)"
@@ -262,6 +287,22 @@ function onHeaderAction(action: string) {
 
 .skill-actions :deep(.p-toggleswitch) {
   flex-shrink: 0;
+}
+
+.skill-toggle-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.skill-toggle-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .skill-desc {
