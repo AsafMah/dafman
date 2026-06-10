@@ -4,6 +4,14 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (2026-06-10 session config templates — issue #243)
+
+- **Session config templates.** Save a session's configuration (agent, enabled MCP servers, disabled skills, run mode) as a named, reusable template, then apply it to a running session or spin up a new session from it. The session details panel gains **Save as template…** (captures the live config) and **Apply template…** (applies a saved one, toasting any servers/skills that no longer exist). The command palette gets a dynamic **Templates** group — **New session from template** entries (`template.new.<id>`). Templates are delta-encoded (explicit MCP-enable + skill-disable lists, so a new global server isn't silently force-disabled) and persisted to `<userData>/session-templates.json` via a new Bun `TemplateService` (atomic writes). Backed by `listTemplates`/`saveTemplate`/`deleteTemplate`/`applyTemplate`/`captureTemplate` RPCs (wired into both the app and the test backend). Phase 1 scope: storage + palette + details-panel actions (the Library Templates tab is Phase 2).
+
+### Fixed (2026-06-10 fake-client session-mode shape — test infra)
+
+- **Fixed the fake SDK client's `mode.get()` return shape.** It resolved a `{ mode: 'interactive' }` envelope, but the real SDK (and `sessionMetadataService.getMode`'s validation) expects a bare mode string — so any code path reading the session mode in the full-E2E harness threw `unexpected session mode from SDK`. Surfaced by the new `captureTemplate` flow; the fake now returns the bare string.
+
 ### Added (2026-06-10 prompt snippet library — issue #242)
 
 - **Reusable prompt snippets (Library → Snippets).** A new Snippets tab in the Library lets you create, edit, tag, and delete reusable prompt fragments (title + markdown body + tags + optional slash shortcut), persisted to `<userData>/snippets.json` via a new Bun `SnippetService` (atomic temp+rename writes). Insert a snippet into the active session's composer from the row's Insert action or the command palette's **Insert Snippet…** group — the body lands at the cursor (never replacing existing content) via an `insert-composer-text` bus event the composer consumes for its session. Backed by `listSnippets`/`saveSnippet`/`deleteSnippet` RPCs (wired into both the app and the test backend). Phase 1 scope: CRUD + palette + insert (slash-typeahead and a composer toolbar button are deferred to phases 2/3).

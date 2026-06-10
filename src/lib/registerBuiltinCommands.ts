@@ -43,6 +43,7 @@ import { PANEL_IDS } from '@/constants/panels';
 import { emit } from '@/lib/bus';
 import { useSnippetsStore } from '@/stores/snippetsStore';
 import { insertSnippetIntoComposer } from '@/lib/insertSnippetIntoComposer';
+import { useTemplatesStore } from '@/stores/templatesStore';
 
 const SESSIONS_PANEL_ID = 'sessions-manager';
 
@@ -728,6 +729,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
             for (const innerApi of Object.values(groupsStore.innerApis)) {
               if (innerApi.getPanel(r.id)) return true;
             }
+
             return false;
           })
           .map((r) => r.id),
@@ -738,6 +740,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       // Jump entries — open sessions with a panel in any group.
       for (const r of open) {
         if (!openPanelIds.has(r.id)) continue;
+
         const { label, hint } = sessionDisplayLabel({
           sessionId: r.id,
           summary: r.title ?? undefined,
@@ -747,6 +750,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           isRemote: false,
         });
         const entryId = `session.jump.${r.id}`;
+
         nextIds.add(entryId);
         registry.register({
           id: entryId,
@@ -766,9 +770,11 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       const closed = sessionsListStore.sessions
         .filter((s) => !openIds.has(s.sessionId))
         .slice(0, 20);
+
       for (const s of closed) {
         const { label, hint } = sessionDisplayLabel(s);
         const entryId = `session.resume.${s.sessionId}`;
+
         nextIds.add(entryId);
         registry.register({
           id: entryId,
@@ -779,7 +785,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
           keywords: [s.sessionId, s.sessionId.slice(0, 8), label, s.cwd ?? ''],
           run: async () => {
             const record = await sessionsStore.restoreSession(s.sessionId);
+
             if (!record) return;
+
             layoutStore.addPanel(record.id);
             layoutStore.activatePanel(record.id);
             layoutStore.requestReveal(record.id, {});
@@ -789,6 +797,7 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
 
       // Browse all — shown when on-disk catalog exceeds the 20-entry cap.
       const browseId = 'session.browseAll';
+
       if (sessionsListStore.sessions.filter((s) => !openIds.has(s.sessionId)).length > 20) {
         nextIds.add(browseId);
         registry.register({
@@ -807,7 +816,9 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       for (const id of registeredSessionIds) {
         if (!nextIds.has(id)) registry.unregister(id);
       }
+
       registeredSessionIds.clear();
+
       for (const id of nextIds) registeredSessionIds.add(id);
     },
     { immediate: true, deep: false },
@@ -945,6 +956,75 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
         icon: 'pi pi-bookmark',
         keywords: ['snippet', 'insert', 'prompt', 'template'],
         when: () => layoutStore.activeSessionId !== null && children.length > 0,
+        children,
+        run: () => {
+          /* parent — palette toggles expansion */
+        },
+      });
+    },
+    { immediate: true, deep: false },
+  );
+
+  // ---------- Dynamic parent: New Session from Template ----------
+  // One child per template in useTemplatesStore. Triggers a loadAll() on
+  // first watch invocation so the palette has data without waiting for the
+  // Library tab to mount.
+  // Running a child: newSession → applyTemplate → reveal panel.
+  const templatesStore = useTemplatesStore();
+
+  if (!templatesStore.loaded) void templatesStore.loadAll();
+
+  const registeredTemplateIds = new Set<string>();
+
+  watch(
+    () => templatesStore.templates.map((t) => t.id + t.name + t.updatedAt),
+    () => {
+      const tmpl = templatesStore.templates;
+      const children: Command[] = tmpl.map((t) => ({
+        id: `template.new.${t.id}`,
+        label: t.name,
+        hint: t.agentName ?? 'no agent',
+        icon: 'pi pi-bookmark',
+        group: 'Templates',
+        keywords: ['template', 'new', 'session', t.name, t.agentName ?? ''],
+        run: async () => {
+          const defaultWd = settingsStore.settings.workspaces.defaultWorkspace;
+          const record = await sessionsStore.createSession({
+            ...(defaultWd ? { workingDirectory: defaultWd } : {}),
+          });
+
+          if (!record) return;
+
+          const result = await invokeCommand('applyTemplate', {
+            sessionId: record.id,
+            templateId: t.id,
+          });
+
+          layoutStore.addPanel(record.id);
+
+          if (result.warnings.length > 0) {
+            toasts.warn('Template applied with warnings', result.warnings.join('\n'));
+          }
+        },
+      }));
+
+      // Unregister stale entries (templates deleted or renamed with new id).
+      const nextIds = new Set(children.map((c) => c.id));
+
+      for (const staleId of registeredTemplateIds) {
+        if (!nextIds.has(staleId)) registry.unregister(staleId);
+      }
+
+      registeredTemplateIds.clear();
+      children.forEach((c) => registeredTemplateIds.add(c.id));
+
+      registry.register({
+        id: 'template.new',
+        label: 'New Session from Template\u2026',
+        group: 'Templates',
+        icon: 'pi pi-bookmark',
+        keywords: ['template', 'new', 'session', 'preset'],
+        when: () => clientStore.ready && children.length > 0,
         children,
         run: () => {
           /* parent — palette toggles expansion */
