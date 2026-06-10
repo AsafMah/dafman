@@ -26,6 +26,8 @@ import type {
   TerminalPrefs,
   TerminalSummary,
   WorkspaceFileMatch,
+  TranscriptMatch,
+  TranscriptSearchResult,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -833,5 +835,32 @@ describe('IPC wire contracts — diagnostics', () => {
     const file = { path: 'C:/abs/foo.txt', kind: 'file' as const };
     const dir = { path: 'C:/abs/repo', kind: 'directory' as const };
     expect({ cancel, file, dir }).toMatchSnapshot();
+  });
+});
+
+describe('IPC wire contracts — transcript search', () => {
+  test('TranscriptSearchResult + TranscriptMatch shape', () => {
+    const match: TranscriptMatch = {
+      eventIndex: 42,
+      role: 'user',
+      snippet: 'Tell me about \u2026<<retry logic>>...',
+    };
+    const matchWithTimestamp: TranscriptMatch = {
+      eventIndex: 100,
+      role: 'assistant',
+      snippet: '...to handle failures you can <<retry>>...',
+      timestamp: '2026-06-10T12:00:00.000Z',
+    };
+    const result: TranscriptSearchResult = {
+      sessionId: 'sess-abc123',
+      sessionSummary: 'Retry logic discussion',
+      matches: [match, matchWithTimestamp],
+    };
+    const noSummary: TranscriptSearchResult = {
+      sessionId: 'sess-xyz789',
+      sessionSummary: undefined,
+      matches: [{ eventIndex: 0, role: 'system', snippet: '<<system>> notification' }],
+    };
+    expect([result, noSummary]).toMatchSnapshot();
   });
 });

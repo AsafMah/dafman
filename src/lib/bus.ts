@@ -24,6 +24,7 @@ export type AppEvents = {
   'open-model-selector': { sessionId: string };
   'rename-session': { sessionId: string };
   'library-activate-tab': { tab: string };
+  'focus-search-panel': Record<string, never>;
 };
 
 type EventKey = keyof AppEvents;

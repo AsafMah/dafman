@@ -7,6 +7,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Changed (2026-06-10 dual-reduction slice 1 — issue #209)
 
 - **Unified the duplicated pending-request shape between the two session-state reducers (internal).** `SessionRecord.pendingRequests` (sessionsStore) and `ChatAmbient.pendingRequests` (chatEvents) were byte-identical discriminated unions built by two separate hand-written switches. Both now share one `SessionPendingRequest` type + `pendingRequestEntryFromPayload`/`pendingRequestEntryFromData` builders in a new no-Pinia `src/lib/sessionStatus.ts`. A table-driven convergence test asserts the record-side and ambient-side projections produce the identical entry. No behavior change — the first, lowest-risk slice of #209 (status-delta unification deferred).
+### Added (2026-06-10 cross-session search — issue #241)
+
+- **Search across all open session transcripts (`Mod+Shift+F`).** A new left-edge **Search** panel runs a debounced substring query against every open session's transcript (user messages, assistant replies, system notifications), grouping matches by session with `<<…>>` context snippets. Clicking a match focuses the owning session and scrolls to the exact message via reveal-by-event-index. Backed by a `searchSessionTranscripts` RPC + `SessionRegistry.searchTranscripts`; the per-event matching/snippet logic lives in a focused, unit-tested `src-bun/app/chat/transcriptSearch.ts` helper. Phase 1 scope: open sessions only (closed/on-disk search is deferred); long-transcript event-index precision is tail-bounded.
 
 ### Added (2026-06-10 palette session jump — issue #185)
 

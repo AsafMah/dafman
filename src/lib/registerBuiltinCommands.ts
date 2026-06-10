@@ -40,6 +40,7 @@ import { toErrorMessage } from '@/lib/errorMessage';
 import { sessionDisplayLabel } from '@/lib/palette';
 import type { ReasoningVisibility } from '@/ipc/types';
 import { PANEL_IDS } from '@/constants/panels';
+import { emit } from '@/lib/bus';
 
 const SESSIONS_PANEL_ID = 'sessions-manager';
 
@@ -835,6 +836,20 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     children: runModeChildren,
     run: () => {
       /* parent */
+    },
+  });
+
+  // ---------- Static: Search all sessions ----------
+  registry.register({
+    id: 'search.global',
+    label: 'Search all sessions\u2026',
+    group: 'Search',
+    icon: 'pi pi-search',
+    keywords: ['find', 'search', 'transcript', 'cross-session', 'messages'],
+    shortcut: ['Ctrl+Shift+F', 'Cmd+Shift+F'],
+    run: () => {
+      layoutStore.activateEdgePanel(PANEL_IDS.search, 'left');
+      emit('focus-search-panel', {});
     },
   });
 

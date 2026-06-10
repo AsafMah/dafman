@@ -23,6 +23,7 @@ export const PANEL_COMPONENTS = {
   jobsPanel: 'jobsPanel',
   terminalsPanel: 'terminalsPanel',
   logViewer: 'logViewer',
+  searchPanel: 'searchPanel',
 } as const;
 
 export type PanelComponentName = (typeof PANEL_COMPONENTS)[keyof typeof PANEL_COMPONENTS];
@@ -50,6 +51,7 @@ export const PANEL_IDS = {
   jobs: 'jobs-panel',
   terminals: 'terminals-panel',
   logs: 'log-viewer',
+  search: 'search-panel',
 } as const;
 
 export type PanelId = (typeof PANEL_IDS)[keyof typeof PANEL_IDS];
@@ -118,6 +120,14 @@ export const LEFT_ACTIVITY_TABS: readonly ActivityTabSeed[] = [
     title: 'Logs',
     initialSize: 480,
     minimumSize: 420,
+  },
+  {
+    id: PANEL_IDS.search,
+    component: PANEL_COMPONENTS.searchPanel,
+    icon: 'pi-search',
+    title: 'Search',
+    initialSize: 360,
+    minimumSize: 280,
   },
   {
     id: PANEL_IDS.settings,

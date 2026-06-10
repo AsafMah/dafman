@@ -197,6 +197,32 @@ export interface SessionMetadataSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Transcript search (Phase 1 — open sessions)
+// ---------------------------------------------------------------------------
+
+/// One matching message within a session transcript. `eventIndex` is the
+/// ordinal of the matched event within `session.getEvents()` — used as a
+/// scroll anchor by `requestReveal`.
+export interface TranscriptMatch {
+  /// Ordinal index of the event within getEvents() result — used as a
+  /// scroll anchor by the frontend (requestReveal extension).
+  eventIndex: number;
+  /// 'user' | 'assistant' | 'system' — derived from eventType prefix.
+  role: 'user' | 'assistant' | 'system';
+  /// Up to 300 chars of surrounding context with the match highlighted
+  /// via <<match>> delimiters (simple to parse on the frontend).
+  snippet: string;
+  timestamp?: string;
+}
+
+/// Grouped search results for one session.
+export interface TranscriptSearchResult {
+  sessionId: string;
+  sessionSummary: string | undefined;
+  matches: TranscriptMatch[];
+}
+
+// ---------------------------------------------------------------------------
 // Agents & tasks
 // ---------------------------------------------------------------------------
 
@@ -924,5 +950,12 @@ export type CommandMap = {
   getAuditState: {
     args: { recentLimit?: number };
     result: { recent: AuditEntry[] };
+  };
+  searchSessionTranscripts: {
+    args: {
+      query: string;
+      options?: { sessionIds?: string[]; limit?: number };
+    };
+    result: TranscriptSearchResult[];
   };
 };

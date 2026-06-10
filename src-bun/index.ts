@@ -549,6 +549,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       getAuditState: rpcGuard(async ({ recentLimit }) => ({
         recent: recentAudit(recentLimit),
       })),
+      searchSessionTranscripts: rpcGuard(async ({ query, options }) =>
+        sessions.searchTranscripts(query, options),
+      ),
     },
     messages: {},
   },
