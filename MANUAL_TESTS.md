@@ -79,14 +79,14 @@ section is verified) or get a GitHub issue filed (with label
 
 #### WH.1 - Webview navigation guard routes external links out, keeps in-app nav (#205/#230)
 
-- [ ] result: 
+- [x] result: v PASS (security goal) 2026-06-10 (after fix) — external links no longer navigate the main bridge-bearing webview (no RCE). Found + fixed two bugs in #230 (nav-handler mis-parsed the JSON `{url,allowed}` detail → Ctrl+R opened a browser; same-origin check added). Residual UX: plain-click opens a bridge-less embedded window vs OS browser (Ctrl+click works) → **#236**. Reload-blanks-transcripts surfaced separately → **#235**.
 - **Steps:** Boot the real app. Render a message containing an external link (e.g. `[GitHub](https://github.com)`) and click it. Separately exercise in-app navigation (open/close panels, switch tabs) and trigger a dev HMR reload.
 - **Expected:** the external link opens in the **OS default browser**, NOT inside the app webview; the app window stays on its own page; in-app panel/tab navigation and dev HMR continue to work.
 - **Why not automated:** the native `setNavigationRules` block only runs in the real Electrobun WebView2 (undocumented C++ match semantics); the headless harness never applies it.
 
 #### WH.2 - CSP renders rich content with no console violations (#205/#230)
 
-- [ ] result: 
+- [x] result: v PASS 2026-06-10 (after fix) — initial CSP `img-src` blocked remote `https:` images; fixed in #230 (added `https: http:`). Remote image, KaTeX, and code blocks all render; no CSP console errors.
 - **Steps:** Boot the real app with devtools console open. Render a message with KaTeX math, a syntax-highlighted code block, and an image (and a mermaid diagram if mermaid is enabled).
 - **Expected:** math, code highlighting, and images all render; **no Content-Security-Policy violation errors** in the console.
 - **Why not automated:** `bun run smoke` validates the CSP against the built bundle headlessly (passed 4/4), but the real `views://mainview` origin + production RPC transport are only exercised in the live app.
@@ -107,7 +107,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### EO.1 - Changing run mode/model never throws an unhandled rejection (#212)
 
-- [ ] result: 
+- [x] result: v PASS 2026-06-10 — toggled mode/model rapidly against the real backend; no `unhandledrejection` in console (the #212 fix holds).
 - **Steps:** With a real session and devtools console open, rapidly toggle run mode (Interactive/Plan/Autopilot) and switch models; if you can, force a failure (toggle while the backend is briefly unavailable).
 - **Expected:** changes apply; on any failure you get a single error **toast** and **no `unhandledrejection`** in the console.
 - **Why not automated:** the symptom is an unhandled promise rejection surfaced only against the real RPC backend's error paths.
@@ -132,7 +132,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### PM.1 - A per-message override runs ONE message in the chosen mode, then reverts (#41)
 
-- [ ] result: 
+- [x] result: v PASS 2026-06-10 — armed Plan override, the one message ran in Plan, reverted to idle after send, session mode stayed Interactive.
 - **Steps:** In a session whose mode is **Interactive**, click the override button beside the mode group and pick **Plan**. Send a message that would normally act (e.g. "delete the README"). Watch that turn complete, then send a second message.
 - **Expected:** the first message runs in **Plan** (the agent plans / asks before acting, does not execute); after it sends, the override button reverts to its idle "Override agent mode for next message only" label, the session's own mode is still Interactive, and the second message runs Interactive.
 - **Why not automated:** the fake-SDK harness doesn't run a real agent, so it can't prove the overridden mode actually changes the agent's behavior for exactly one turn — needs the real Copilot SDK.
@@ -153,7 +153,7 @@ section is verified) or get a GitHub issue filed (with label
 
 #### SP.1 - Session-pane color-by-group + grouping reflow render correctly (#184)
 
-- [ ] result: 
+- [x] result: v PASS (functional) 2026-06-10 — grouping/sort/search/color-by-group all work live. Filed 4 UX-polish follow-ups as **#232** (color-by-group should be always-on + tint whole row; grouping menu unstyled; search should be inline-not-a-button; add show-only-open toggle).
 - **Steps:** With several sessions across **≥2 groups**, open the Sessions Manager. Cycle the grouping modes, toggle sort, type in search, then enable **color-by-group**.
 - **Expected:** grouping re-buckets the list with correct headers, sort reorders within buckets, search filters live, and color-by-group tints each session row by its group's color (matching the group tab colors).
 - **Why not automated:** the grouping/sort/search logic is unit-tested (`sessionsListStore.grouped`), but the per-group color tint + header rendering is a visual-perception check the harness can't assert with confidence.
