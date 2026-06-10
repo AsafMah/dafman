@@ -7,6 +7,7 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Changed (2026-06-10 dual-reduction slice 1 — issue #209)
 
 - **Unified the duplicated pending-request shape between the two session-state reducers (internal).** `SessionRecord.pendingRequests` (sessionsStore) and `ChatAmbient.pendingRequests` (chatEvents) were byte-identical discriminated unions built by two separate hand-written switches. Both now share one `SessionPendingRequest` type + `pendingRequestEntryFromPayload`/`pendingRequestEntryFromData` builders in a new no-Pinia `src/lib/sessionStatus.ts`. A table-driven convergence test asserts the record-side and ambient-side projections produce the identical entry. No behavior change — the first, lowest-risk slice of #209 (status-delta unification deferred).
+
 ### Added (2026-06-10 cross-session search — issue #241)
 
 - **Search across all open session transcripts (`Mod+Shift+F`).** A new left-edge **Search** panel runs a debounced substring query against every open session's transcript (user messages, assistant replies, system notifications), grouping matches by session with `<<…>>` context snippets. Clicking a match focuses the owning session and scrolls to the exact message via reveal-by-event-index. Backed by a `searchSessionTranscripts` RPC + `SessionRegistry.searchTranscripts`; the per-event matching/snippet logic lives in a focused, unit-tested `src-bun/app/chat/transcriptSearch.ts` helper. Phase 1 scope: open sessions only (closed/on-disk search is deferred); long-transcript event-index precision is tail-bounded.
@@ -14,10 +15,12 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Fixed (2026-06-10 full-E2E harness CSP regression)
 
 - **Restored the full-E2E tier (test infra).** The strict renderer CSP added in #205 (`connect-src 'self' ws://localhost:*`) silently broke every `e2e/full` flow: the harness connected the browser to `ws://127.0.0.1:<port>`, which CSP treats as a distinct origin from `localhost` and blocks — so the renderer never reached the backend and every flow timed out on boot. The harness now connects via `localhost` to match production (Electrobun RPC) and the CSP. Caught while adding the cross-session-search E2E flow; the tier is not in required CI, so the regression went unnoticed.
+- **Fixed the `19-library-skills` E2E flow broken by #253 (test infra).** The Skills two-column work (#28/#253) added a second per-row toggle ("This session"), so the flow's `.skill-row … .p-toggleswitch` selector matched 2 elements (strict-mode violation). The flow now targets the first ("Default"/global) toggle, which is what it asserts.
 
 ### Added (2026-06-10 palette session jump — issue #185)
 
 - **Jump to / resume sessions from the command palette (`Mod+K`).** Open sessions appear as `Jump` entries (focus/reveal via the cross-group path from #173); closed, on-disk sessions appear as `Resume` entries (reopen + reveal), capped at 20 with a "browse all" entry beyond that. Open sessions are listed before closed ones; the list refreshes when the palette opens. Replaces the old `session.switch` command.
+
 ### Added (2026-06-10 Library Skills two-column — issue #28)
 
 - **Library → Skills tab: per-session override toggle.** Each skill row now shows a **"Default"** (global) + **"This session"** (per-session override, via `setSessionSkillEnabled` for the focused session) toggle pair, disabled with a "No active session" hint when none is focused — mirroring the MCP two-column (#200). Continues the #28 Library-as-source-of-truth model. (Tools stay global-only for now — they have no per-session runtime/persistence; tracked in #252.)
