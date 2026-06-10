@@ -7,7 +7,9 @@
 
 import {
   pendingRequestEntryFromPayload,
+  reduceSessionStatusEvent,
   type SessionPendingRequestKind,
+  type SessionStatusDelta,
 } from '@/lib/sessionStatus';
 import type { PendingRequestPayload, SessionEventPayload } from '@/ipc/types';
 import type { SessionRecord } from './sessionsStore';
@@ -132,21 +134,40 @@ type EventHandler = (
   effects: SessionEffect[],
 ) => void;
 
-// Keep model + reasoning effort in sync with backend-initiated
-// changes (rate-limit auto-switch, /model commands, etc.).
-function handleModelChange(record: SessionRecord, payload: SessionEventPayload): void {
-  const data = payload.data as {
-    newModel?: unknown;
-    reasoningEffort?: unknown;
-  };
-
-  if (typeof data.newModel === 'string') {
-    record.model = data.newModel;
+// ── Shared status delta application ────────────────────────────
+// Apply a normalized SessionStatusDelta to the record's shared status
+// fields.  Target-only logic (unseenTurns, OS notifications, OAuth
+// toasts) lives in the individual handlers below that call this first.
+function applyStatusDeltaToRecord(record: SessionRecord, delta: SessionStatusDelta): void {
+  switch (delta.kind) {
+    case 'titleChanged':
+      record.title = delta.title;
+      break;
+    case 'modelChanged':
+      record.model = delta.newModel;
+      if (delta.reasoningEffort !== null) record.reasoningEffort = delta.reasoningEffort;
+      break;
+    case 'currentAgentChanged':
+      record.currentAgent = delta.agent;
+      break;
+    case 'turnStarted':
+      record.isThinking = true;
+      record.sawTurnBoundary = true;
+      break;
+    case 'turnEnded':
+    case 'thinkingCleared':
+      record.isThinking = false;
+      break;
   }
+}
 
-  if (typeof data.reasoningEffort === 'string') {
-    record.reasoningEffort = data.reasoningEffort;
-  }
+// Single handler for events whose full effect is covered by the
+// shared status delta (title, model, agent, turn-start, all
+// thinking-clear terminals except turn_end).
+function handleStatusDelta(record: SessionRecord, payload: SessionEventPayload): void {
+  const delta = reduceSessionStatusEvent(payload);
+
+  if (delta) applyStatusDeltaToRecord(record, delta);
 }
 
 // Backend may auto-switch the agent run mode (e.g. /plan command).
@@ -172,42 +193,6 @@ function handleModeChanged(record: SessionRecord, payload: SessionEventPayload):
       });
     }
   }
-}
-
-// Track the SDK's auto-summarised title for the dockview tab.
-function handleTitleChanged(record: SessionRecord, payload: SessionEventPayload): void {
-  const title = (payload.data as { title?: unknown }).title;
-
-  if (typeof title === 'string' && title.length > 0) {
-    record.title = title;
-  }
-}
-
-// Session-level custom agent selection for header chip + rail.
-function handleSubagentSelected(record: SessionRecord, payload: SessionEventPayload): void {
-  const d = (payload.data ?? {}) as {
-    agentName?: unknown;
-    agentDisplayName?: unknown;
-    agentDescription?: unknown;
-    agentPath?: unknown;
-    parentToolCallId?: unknown;
-  };
-
-  if (
-    typeof d.agentName === 'string' &&
-    (typeof d.parentToolCallId !== 'string' || d.parentToolCallId.length === 0)
-  ) {
-    record.currentAgent = {
-      name: d.agentName,
-      displayName: typeof d.agentDisplayName === 'string' ? d.agentDisplayName : d.agentName,
-      description: typeof d.agentDescription === 'string' ? d.agentDescription : '',
-      ...(typeof d.agentPath === 'string' ? { path: d.agentPath } : {}),
-    };
-  }
-}
-
-function handleSubagentDeselected(record: SessionRecord): void {
-  record.currentAgent = null;
 }
 
 // Bump the tasks refresh counter so the rail re-reads via `listTasks`.
@@ -332,14 +317,8 @@ function handleSessionCwd(record: SessionRecord, payload: SessionEventPayload): 
   }
 }
 
-// Mid-turn indicator: flips on at turn_start.
-function handleTurnStart(record: SessionRecord): void {
-  record.isThinking = true;
-  record.sawTurnBoundary = true;
-}
-
-// Turn end: clear thinking, fire unseen-activity dot + OS notification
-// when the session isn't the dock's active panel.
+// Turn end: clear thinking via shared delta, then fire unseen-activity
+// dot + OS notification when the session isn't the dock's active panel.
 // Skips the side effects (unseenTurns, notify) for replayed historical
 // events — isThinking still resolves so a resumed session isn't stuck.
 function handleTurnEnd(
@@ -348,7 +327,9 @@ function handleTurnEnd(
   ctx: ReduceContext,
   effects: SessionEffect[],
 ): void {
-  record.isThinking = false;
+  const delta = reduceSessionStatusEvent(payload);
+
+  if (delta) applyStatusDeltaToRecord(record, delta);
 
   // Historical replay events must not inflate the unseen-turn counter
   // or fire OS notifications — those effects were irrelevant before
@@ -367,10 +348,6 @@ function handleTurnEnd(
     body: 'Turn complete.',
     tag: `${record.id}:turnEnd`,
   });
-}
-
-function handleThinkingOff(record: SessionRecord): void {
-  record.isThinking = false;
 }
 
 // Stale-state cleanup for SDK-emitted `*.completed` events.
@@ -397,11 +374,29 @@ function handlePendingCompleted(record: SessionRecord, payload: SessionEventPayl
 // share the same handler (e.g. session.start/resume → handleSessionCwd).
 
 const EVENT_HANDLERS: Record<string, EventHandler> = {
-  'session.model_change': handleModelChange,
+  // Shared status deltas — all field extraction now lives in
+  // reduceSessionStatusEvent (src/lib/sessionStatus.ts).
+  'session.model_change': handleStatusDelta,
+  'session.title_changed': handleStatusDelta,
+  'subagent.selected': handleStatusDelta,
+  'subagent.deselected': handleStatusDelta,
+  'assistant.turn_start': handleStatusDelta,
+  'session.idle': handleStatusDelta,
+  'session.error': handleStatusDelta,
+  // Turn terminators that aren't turn_end/idle: a `session.abort()` (stop
+  // button / interrupt-send) emits `abort`, and the agent can signal
+  // `session.task_complete`. Both end the turn, so clear the spinner.
+  // Mapped to handleStatusDelta (not handleTurnEnd) to avoid firing OS
+  // notifications + unseenTurns bumps for a turn the user themselves stopped.
+  abort: handleStatusDelta,
+  'session.task_complete': handleStatusDelta,
+  // #20: synthetic terminator appended by the bun resume path when the
+  // persisted history ends mid-turn (app killed while the agent was
+  // thinking). Clears the stuck spinner. Deliberately NOT mapped to
+  // handleTurnEnd — that fires OS notifications + unseenTurns bumps.
+  'dafman.resume_settled': handleStatusDelta,
+  // Record-only event with additional side effects beyond shared delta.
   'session.mode_changed': handleModeChanged,
-  'session.title_changed': handleTitleChanged,
-  'subagent.selected': handleSubagentSelected,
-  'subagent.deselected': handleSubagentDeselected,
   'subagent.started': handleTasksRefresh,
   'subagent.completed': handleTasksRefresh,
   'subagent.failed': handleTasksRefresh,
@@ -412,22 +407,8 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   'session.mcp_server_status_changed': handleMcpServerStatusChanged,
   'session.start': handleSessionCwd,
   'session.resume': handleSessionCwd,
-  'assistant.turn_start': handleTurnStart,
+  // turn_end uses shared delta + record-only unseen/notify effects.
   'assistant.turn_end': handleTurnEnd,
-  'session.idle': handleThinkingOff,
-  'session.error': handleThinkingOff,
-  // Turn terminators that aren't turn_end/idle: a `session.abort()` (stop
-  // button / interrupt-send) emits `abort`, and the agent can signal
-  // `session.task_complete`. Both end the turn, so clear the spinner.
-  // Mapped to handleThinkingOff (not handleTurnEnd) to avoid firing OS
-  // notifications + unseenTurns bumps for a turn the user themselves stopped.
-  abort: handleThinkingOff,
-  'session.task_complete': handleThinkingOff,
-  // #20: synthetic terminator appended by the bun resume path when the
-  // persisted history ends mid-turn (app killed while the agent was
-  // thinking). Clears the stuck spinner. Deliberately NOT mapped to
-  // handleTurnEnd — that fires OS notifications + unseenTurns bumps.
-  'dafman.resume_settled': handleThinkingOff,
   'permission.completed': handlePendingCompleted,
   'user_input.completed': handlePendingCompleted,
   'elicitation.completed': handlePendingCompleted,

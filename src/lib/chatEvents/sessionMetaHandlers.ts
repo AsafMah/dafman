@@ -8,7 +8,8 @@
 //   - identical model+effort signature as the last toasted change
 //     → no toast (the SDK can emit duplicate events on resume)
 
-import { pickNumber, pickString } from '@/lib/chatEvents/helpers';
+import { pickNumber } from '@/lib/chatEvents/helpers';
+import { reduceSessionStatusEvent } from '@/lib/sessionStatus';
 import type { Handler } from '@/lib/chatEvents/context';
 
 const MAX_PLAUSIBLE_CONTEXT_TOKENS = 4_000_000;
@@ -22,35 +23,37 @@ function normalizeContextLimit(value: number): number | null {
 }
 
 export const sessionMetaHandlers: Record<string, Handler> = {
-  'session.title_changed': (ctx, data) => {
-    const title = pickString(data, ['title']);
+  'session.title_changed': (ctx, _data, payload) => {
+    const delta = reduceSessionStatusEvent(payload);
 
-    if (title) ctx.ambient.title = title;
+    if (delta?.kind === 'titleChanged') ctx.ambient.title = delta.title;
   },
 
-  'session.model_change': (ctx, data) => {
-    const newModel = pickString(data, ['newModel']);
-    const prev = pickString(data, ['previousModel']);
-    const effort = pickString(data, ['reasoningEffort']);
-    const prevEffort = pickString(data, ['previousReasoningEffort']);
+  'session.model_change': (ctx, _data, payload) => {
+    const delta = reduceSessionStatusEvent(payload);
 
-    if (!newModel) return;
+    if (!delta || delta.kind !== 'modelChanged') return;
 
-    ctx.ambient.model = newModel;
+    ctx.ambient.model = delta.newModel;
 
-    if (effort) ctx.ambient.reasoningEffort = effort;
+    if (delta.reasoningEffort !== null) ctx.ambient.reasoningEffort = delta.reasoningEffort;
 
-    if (!prev || !ctx.isLive) return;
+    if (!delta.previousModel || !ctx.isLive) return;
 
-    const key = [prev, newModel, prevEffort, effort].join('\0');
+    const key = [
+      delta.previousModel,
+      delta.newModel,
+      delta.previousReasoningEffort,
+      delta.reasoningEffort,
+    ].join('\0');
 
     if (ctx.ambient.lastModelChangeToastKey === key) return;
 
-    const modelDetail = `${prev} → ${newModel}`;
-    const detail = effort
-      ? prevEffort && prevEffort !== effort
-        ? `${modelDetail} (${prevEffort} → ${effort} effort)`
-        : `${modelDetail} (${effort} effort)`
+    const modelDetail = `${delta.previousModel} → ${delta.newModel}`;
+    const detail = delta.reasoningEffort
+      ? delta.previousReasoningEffort && delta.previousReasoningEffort !== delta.reasoningEffort
+        ? `${modelDetail} (${delta.previousReasoningEffort} → ${delta.reasoningEffort} effort)`
+        : `${modelDetail} (${delta.reasoningEffort} effort)`
       : modelDetail;
 
     ctx.toasts.push({
@@ -85,33 +88,18 @@ export const sessionMetaHandlers: Record<string, Handler> = {
   // an instance id (parentToolCallId, agentInstanceId). When
   // agentName is missing we leave currentAgent unchanged — the
   // running-subagent concept is rendered separately in 19c.
-  'subagent.selected': (ctx, data) => {
-    const d = (data ?? {}) as {
-      agentName?: unknown;
-      agentDisplayName?: unknown;
-      agentDescription?: unknown;
-      agentPath?: unknown;
-      parentToolCallId?: unknown;
-    };
+  'subagent.selected': (ctx, _data, payload) => {
+    const delta = reduceSessionStatusEvent(payload);
 
-    if (typeof d.agentName !== 'string') return;
-
-    // Transient delegation events carry a parentToolCallId; session
-    // selection does not. Skip the transient ones for the header chip.
-    if (typeof d.parentToolCallId === 'string' && d.parentToolCallId.length > 0) {
-      return;
-    }
-
-    ctx.ambient.currentAgent = {
-      name: d.agentName,
-      displayName: typeof d.agentDisplayName === 'string' ? d.agentDisplayName : d.agentName,
-      description: typeof d.agentDescription === 'string' ? d.agentDescription : '',
-      ...(typeof d.agentPath === 'string' ? { path: d.agentPath } : {}),
-    };
+    // delta is null for transient delegations (parentToolCallId present)
+    // or events missing agentName — no-op in both cases.
+    if (delta?.kind === 'currentAgentChanged') ctx.ambient.currentAgent = delta.agent;
   },
 
-  'subagent.deselected': (ctx, _data) => {
-    ctx.ambient.currentAgent = null;
+  'subagent.deselected': (ctx, _data, payload) => {
+    const delta = reduceSessionStatusEvent(payload);
+
+    if (delta?.kind === 'currentAgentChanged') ctx.ambient.currentAgent = delta.agent;
   },
 };
 

@@ -10,23 +10,36 @@
 // handles its own retry / disconnect lifecycle.
 
 import { pickString } from '@/lib/chatEvents/helpers';
+import { reduceSessionStatusEvent } from '@/lib/sessionStatus';
 import type { Handler } from '@/lib/chatEvents/context';
 
 export const lifecycleHandlers: Record<string, Handler> = {
-  'session.idle': (ctx) => {
+  'session.idle': (ctx, _data, payload) => {
     ctx.setIdle();
 
-    if (ctx.ambient.sawTurnBoundary) ctx.ambient.turnActive = false;
+    const delta = reduceSessionStatusEvent(payload);
+
+    // sawTurnBoundary guard: only clear turnActive when the session has
+    // ever emitted turn boundaries (older SDKs / non-streaming models that
+    // never emit turn_start fall back to the caller's optimistic flag and
+    // must not have it silently cleared here).
+    if (delta?.kind === 'thinkingCleared' && ctx.ambient.sawTurnBoundary) {
+      ctx.ambient.turnActive = false;
+    }
 
     ctx.ambient.intent = null;
   },
 
-  'session.error': (ctx, data) => {
+  'session.error': (ctx, data, payload) => {
     const message = pickString(data, ['message']) || 'Unknown session error';
 
     ctx.pushSystem(`Session error: ${message}`, 'error');
     ctx.setError();
-    ctx.ambient.turnActive = false;
+
+    const delta = reduceSessionStatusEvent(payload);
+
+    if (delta?.kind === 'thinkingCleared') ctx.ambient.turnActive = false;
+
     ctx.ambient.intent = null;
   },
 };
