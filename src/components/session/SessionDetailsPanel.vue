@@ -17,6 +17,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { invokeCommand } from '@/ipc/invoke';
+import { useTemplatesStore } from '@/stores/templatesStore';
 import MessageContent from '@/components/chat/MessageContent.vue';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { revealPath } from '@/lib/pathActions';
@@ -41,6 +42,90 @@ import {
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
 const toasts = useToastStore();
+const templatesStore = useTemplatesStore();
+
+// ---------- Template actions ----------
+const showSaveTemplateForm = ref(false);
+const saveTemplateName = ref('');
+const saveTemplateBusy = ref(false);
+const showApplyTemplateForm = ref(false);
+const selectedTemplateId = ref<string | null>(null);
+const applyTemplateBusy = ref(false);
+
+async function onSaveAsTemplate(): Promise<void> {
+  const name = saveTemplateName.value.trim();
+
+  if (!name || isDeleted.value || !sessionId.value) return;
+
+  saveTemplateBusy.value = true;
+
+  try {
+    if (!templatesStore.loaded) await templatesStore.loadAll();
+
+    const result = await invokeCommand('captureTemplate', {
+      sessionId: sessionId.value,
+      name,
+    });
+
+    // Keep local store in sync
+    const idx = templatesStore.templates.findIndex((t) => t.id === result.id);
+
+    if (idx >= 0) {
+      templatesStore.templates[idx] = result;
+    } else {
+      templatesStore.templates.push(result);
+    }
+
+    toasts.success('Template saved', `"${result.name}" is ready in the palette.`);
+    showSaveTemplateForm.value = false;
+    saveTemplateName.value = '';
+  } catch (err) {
+    toasts.error('Save template failed', toErrorMessage(err));
+  } finally {
+    saveTemplateBusy.value = false;
+  }
+}
+
+async function onApplyTemplate(): Promise<void> {
+  const tid = selectedTemplateId.value;
+
+  if (!tid || isDeleted.value || !sessionId.value) return;
+
+  applyTemplateBusy.value = true;
+
+  try {
+    const result = await invokeCommand('applyTemplate', {
+      sessionId: sessionId.value,
+      templateId: tid,
+    });
+
+    if (result.warnings.length > 0) {
+      toasts.warn('Template applied with warnings', result.warnings.join('\n'));
+    } else {
+      toasts.success('Template applied', 'Session configuration updated.');
+    }
+
+    showApplyTemplateForm.value = false;
+    selectedTemplateId.value = null;
+  } catch (err) {
+    toasts.error('Apply template failed', toErrorMessage(err));
+  } finally {
+    applyTemplateBusy.value = false;
+  }
+}
+
+function openApplyTemplateForm(): void {
+  if (!templatesStore.loaded) void templatesStore.loadAll();
+
+  showApplyTemplateForm.value = true;
+  showSaveTemplateForm.value = false;
+}
+
+function openSaveTemplateForm(): void {
+  showSaveTemplateForm.value = true;
+  showApplyTemplateForm.value = false;
+  saveTemplateName.value = '';
+}
 
 // Singleton rail: bind to whichever chat panel is active.
 const sessionId = computed<string>(() => layoutStore.activeSessionId ?? '');
@@ -336,6 +421,26 @@ async function onForkSession() {
     <header class="section-header section-header-top">
       <span class="section-title">Session</span>
       <Button
+        icon="pi pi-download"
+        size="small"
+        severity="secondary"
+        text
+        label="Save as template…"
+        title="Capture the current session configuration as a reusable template"
+        :disabled="isDeleted || !sessionId"
+        @click="openSaveTemplateForm"
+      />
+      <Button
+        icon="pi pi-bolt"
+        size="small"
+        severity="secondary"
+        text
+        label="Apply template…"
+        title="Apply a saved template to this session"
+        :disabled="isDeleted || !sessionId"
+        @click="openApplyTemplateForm"
+      />
+      <Button
         icon="pi pi-clone"
         size="small"
         severity="secondary"
@@ -346,6 +451,71 @@ async function onForkSession() {
         @click="onForkSession"
       />
     </header>
+
+    <!-- Inline: Save as template form -->
+    <form
+      v-if="showSaveTemplateForm"
+      class="template-inline-form"
+      @submit.prevent="onSaveAsTemplate"
+    >
+      <InputText
+        v-model="saveTemplateName"
+        size="small"
+        placeholder="Template name…"
+        class="template-name-input"
+        :disabled="saveTemplateBusy"
+        autofocus
+      />
+      <Button
+        type="submit"
+        label="Save"
+        size="small"
+        :disabled="!saveTemplateName.trim() || saveTemplateBusy"
+      />
+      <Button
+        type="button"
+        label="Cancel"
+        size="small"
+        severity="secondary"
+        text
+        :disabled="saveTemplateBusy"
+        @click="showSaveTemplateForm = false"
+      />
+    </form>
+
+    <!-- Inline: Apply template form -->
+    <form
+      v-if="showApplyTemplateForm"
+      class="template-inline-form"
+      @submit.prevent="onApplyTemplate"
+    >
+      <Select
+        v-model="selectedTemplateId"
+        :options="templatesStore.templates"
+        option-label="name"
+        option-value="id"
+        placeholder="Pick a template…"
+        size="small"
+        class="template-name-input"
+        :disabled="applyTemplateBusy"
+      />
+      <Button
+        type="submit"
+        label="Apply"
+        size="small"
+        :disabled="!selectedTemplateId || applyTemplateBusy"
+      />
+      <Button
+        type="button"
+        label="Cancel"
+        size="small"
+        severity="secondary"
+        text
+        :disabled="applyTemplateBusy"
+        @click="showApplyTemplateForm = false"
+      />
+    </form>
+
     <div
       v-if="isDeleted"
       class="deleted-details-banner"

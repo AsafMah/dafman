@@ -37,6 +37,11 @@ import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { listInstructionSources } from './app/library/instructions';
 import { SettingsService, ensureDefaultWorkspace } from './app/config/settings';
 import { SnippetService } from './app/config/snippetService';
+import { TemplateService } from './app/config/templateService';
+import {
+  applyTemplate as applySessionTemplate,
+  captureTemplate as captureSessionTemplate,
+} from './app/config/templateOps';
 import { installStderrFilter } from './app/observability/stderrFilter';
 import type {
   CommandResultEvent,
@@ -155,6 +160,9 @@ const sessionMetadataStore = SessionMetadataStore.loadOrDefault(
   join(Utils.paths.userData, 'session-metadata.json'),
 );
 const snippetService = SnippetService.loadOrDefault(join(Utils.paths.userData, 'snippets.json'));
+const templateService = TemplateService.loadOrDefault(
+  join(Utils.paths.userData, 'session-templates.json'),
+);
 const sessions = new SessionRegistry(
   (payload) => emitEvent(payload),
   (payload) => emitPending(payload),
@@ -347,6 +355,7 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       ),
       reloadSessionMcpServers: rpcGuard(async ({ sessionId }) => {
         await sessions.reloadSessionMcpServers(sessionId);
+
         return true;
       }),
       getAccountQuota: rpcGuard(async () => sessions.getAccountQuota()),
@@ -557,6 +566,16 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       listSnippets: rpcGuard(async () => snippetService.list()),
       saveSnippet: rpcGuard(async ({ snippet }) => snippetService.save(snippet)),
       deleteSnippet: rpcGuard(async ({ id }) => snippetService.delete(id)),
+      // ---------- Phase 243: Session Config Templates ----------
+      listTemplates: rpcGuard(async () => templateService.list()),
+      saveTemplate: rpcGuard(async ({ template }) => templateService.save(template)),
+      deleteTemplate: rpcGuard(async ({ id }) => templateService.delete(id)),
+      applyTemplate: rpcGuard(async ({ sessionId, templateId }) =>
+        applySessionTemplate(sessionId, templateId, templateService, sessions),
+      ),
+      captureTemplate: rpcGuard(async ({ sessionId, name }) =>
+        captureSessionTemplate(sessionId, name, templateService, sessions),
+      ),
     },
     messages: {},
   },
@@ -646,6 +665,7 @@ function openExternalUrl(targetUrl: string, source: string): void {
       url: targetUrl,
       source,
     });
+
     try {
       Utils.openExternal(targetUrl);
     } catch (err) {
@@ -669,9 +689,12 @@ function openExternalUrl(targetUrl: string, source: string): void {
 // bare URL string. Extract the URL robustly from either shape.
 function extractNavTarget(detail: unknown): { url: string; allowed?: boolean } | null {
   let value: unknown = detail;
+
   if (typeof value === 'string') {
     const s = value.trim();
+
     if (!s) return null;
+
     if (s.startsWith('{')) {
       try {
         value = JSON.parse(s) as unknown;
@@ -682,8 +705,10 @@ function extractNavTarget(detail: unknown): { url: string; allowed?: boolean } |
       return { url: s };
     }
   }
+
   if (value && typeof value === 'object' && 'url' in value) {
     const obj = value as { url: unknown; allowed?: unknown };
+
     if (typeof obj.url === 'string' && obj.url.trim()) {
       return {
         url: obj.url.trim(),
@@ -691,14 +716,18 @@ function extractNavTarget(detail: unknown): { url: string; allowed?: boolean } |
       };
     }
   }
+
   return null;
 }
 
 // Route any non-same-origin navigation/window-open to the OS browser.
 function handleNavAttempt(detail: unknown, source: string): void {
   const target = extractNavTarget(detail);
+
   if (!target) return;
+
   if (target.url.startsWith(appOrigin)) return; // same-origin — allow it
+
   // If the native side flagged it `allowed` (setNavigationRules did NOT block
   // it in-webview), warn — the in-webview load may proceed and the rule format
   // needs revisiting.
@@ -708,6 +737,7 @@ function handleNavAttempt(detail: unknown, source: string): void {
       source,
     });
   }
+
   openExternalUrl(target.url, source);
 }
 
@@ -754,6 +784,7 @@ mainWindow.webview.on('dom-ready', () => {
   // closure from a prior page load. bindEmitChannels is safe to call
   // here because `send` is already resolved at this point.
   bindEmitChannels();
+
   for (const delay of [0, 150, 400, 900]) {
     setTimeout(nudgeWindow, delay);
   }
@@ -781,6 +812,7 @@ function bindEmitChannels(): void {
   emitPending = (payload) => send.pendingRequest(payload);
   emitTerminal = (payload) => send.terminalEvent(payload);
   emitCommandResult = (payload) => send.commandResultEvent(payload);
+
   // Drain any events that accumulated while the webview was loading.
   for (const buffered of _preWebviewEventBuffer.splice(0)) {
     try {

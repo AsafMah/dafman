@@ -29,6 +29,8 @@ import type {
   TranscriptMatch,
   TranscriptSearchResult,
   Snippet,
+  SessionTemplate,
+  ApplyTemplateResult,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -916,6 +918,100 @@ describe('IPC wire contracts — snippets', () => {
     type DeleteArgs = CommandMap['deleteSnippet']['args'];
     const sample: DeleteArgs = { id: '550e8400-e29b-41d4-a716-446655440000' };
 
+    expect(sample).toMatchSnapshot();
+  });
+});
+
+describe('IPC wire contracts — session config templates', () => {
+  test('SessionTemplate shape — full', () => {
+    const full: SessionTemplate = {
+      id: '550e8400-e29b-41d4-a716-446655440001',
+      name: 'Prod debug – autopilot',
+      agentName: 'prod-agent',
+      agentScope: 'user',
+      mcpEnabled: ['github', 'jira'],
+      skillsDisabled: ['summarize'],
+      runMode: 'autopilot',
+      createdAt: '2026-06-10T00:00:00.000Z',
+      updatedAt: '2026-06-10T12:00:00.000Z',
+    };
+    expect(full).toMatchSnapshot();
+  });
+
+  test('SessionTemplate shape — minimal', () => {
+    const minimal: SessionTemplate = {
+      id: '6ba7b810-9dad-11d1-80b4-00c04fd430c9',
+      name: 'Bare template',
+      mcpEnabled: [],
+      skillsDisabled: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect(minimal).toMatchSnapshot();
+  });
+
+  test('ApplyTemplateResult shape — applied with warnings', () => {
+    const withWarnings: ApplyTemplateResult = {
+      applied: true,
+      warnings: [
+        'Agent "ghost" not found: agent not found',
+        'MCP server "missing" could not be enabled: not found',
+      ],
+    };
+    expect(withWarnings).toMatchSnapshot();
+  });
+
+  test('ApplyTemplateResult shape — clean apply', () => {
+    const clean: ApplyTemplateResult = { applied: true, warnings: [] };
+    expect(clean).toMatchSnapshot();
+  });
+
+  test('listTemplates result type satisfies SessionTemplate[]', () => {
+    type ListResult = CommandMap['listTemplates']['result'];
+    type _Check = ListResult extends SessionTemplate[] ? true : never;
+    const _check: _Check = true;
+
+    expect(_check).toBe(true);
+  });
+
+  test('saveTemplate args shape', () => {
+    type SaveArgs = CommandMap['saveTemplate']['args'];
+    const sample: SaveArgs = {
+      template: {
+        id: 'aaa',
+        name: 'My template',
+        mcpEnabled: ['github'],
+        skillsDisabled: [],
+        runMode: 'plan',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('deleteTemplate args shape', () => {
+    type DeleteArgs = CommandMap['deleteTemplate']['args'];
+    const sample: DeleteArgs = { id: '550e8400-e29b-41d4-a716-446655440002' };
+
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('applyTemplate args shape', () => {
+    type ApplyArgs = CommandMap['applyTemplate']['args'];
+    const sample: ApplyArgs = {
+      sessionId: 'sess-abc123',
+      templateId: '550e8400-e29b-41d4-a716-446655440001',
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('captureTemplate args shape', () => {
+    type CaptureArgs = CommandMap['captureTemplate']['args'];
+    const sample: CaptureArgs = {
+      sessionId: 'sess-abc123',
+      name: 'My captured template',
+    };
     expect(sample).toMatchSnapshot();
   });
 });

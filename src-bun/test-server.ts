@@ -42,6 +42,11 @@ import { TerminalRegistry } from './app/terminal/terminalRegistry';
 import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { SettingsService } from './app/config/settings';
 import { SnippetService } from './app/config/snippetService';
+import { TemplateService } from './app/config/templateService';
+import {
+  applyTemplate as applySessionTemplate,
+  captureTemplate as captureSessionTemplate,
+} from './app/config/templateOps';
 import { listInstructionSources } from './app/library/instructions';
 import { toModelSummary } from './app/library/models';
 import { FakeCopilotClient } from './app/client/fakeClient';
@@ -110,6 +115,9 @@ setClientForTest(fakeClient);
 const settingsPath = join(flags.userData, 'settings.json');
 const settings = SettingsService.loadOrDefault(settingsPath);
 const snippetService = SnippetService.loadOrDefault(join(flags.userData, 'snippets.json'));
+const templateService = TemplateService.loadOrDefault(
+  join(flags.userData, 'session-templates.json'),
+);
 
 // Hold open sockets so we can broadcast events to all connected
 // renderers. Practically there's only ever one Playwright page, but
@@ -607,6 +615,28 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
     const { id } = args as { id: string };
 
     return snippetService.delete(id);
+  }),
+  // ---------- Phase 243: Session Config Templates ----------
+  listTemplates: rpcGuard(async () => templateService.list()),
+  saveTemplate: rpcGuard(async (args) => {
+    const { template } = args as { template: import('./rpc').SessionTemplate };
+
+    return templateService.save(template);
+  }),
+  deleteTemplate: rpcGuard(async (args) => {
+    const { id } = args as { id: string };
+
+    return templateService.delete(id);
+  }),
+  applyTemplate: rpcGuard(async (args) => {
+    const { sessionId, templateId } = args as { sessionId: string; templateId: string };
+
+    return applySessionTemplate(sessionId, templateId, templateService, sessions);
+  }),
+  captureTemplate: rpcGuard(async (args) => {
+    const { sessionId, name } = args as { sessionId: string; name: string };
+
+    return captureSessionTemplate(sessionId, name, templateService, sessions);
   }),
 };
 

@@ -62,6 +62,8 @@ export type {
   TranscriptMatch,
   TranscriptSearchResult,
   Snippet,
+  SessionTemplate,
+  ApplyTemplateResult,
   WorkspaceFileMatch,
   Workspaces,
 } from '@/shared/wireTypes';

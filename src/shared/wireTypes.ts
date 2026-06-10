@@ -246,6 +246,45 @@ export interface Snippet {
 }
 
 // ---------------------------------------------------------------------------
+// Session config templates (#243)
+// ---------------------------------------------------------------------------
+
+/// Named snapshot of a session's configuration. Stored as
+/// `{ version: 1, templates: SessionTemplate[] }` in
+/// `<userData>/session-templates.json`.
+export interface SessionTemplate {
+  /// UUID v4 — stable identifier across renames.
+  id: string;
+  /// Human display name, e.g. "Prod debug – autopilot".
+  name: string;
+  /// Agent name to pass to `selectAgent`; absent = no agent.
+  agentName?: string;
+  /// Scope of the agent file ('user' | 'project'). Stored as metadata;
+  /// `applyTemplate` still calls `selectAgent` by name only since the
+  /// registry API does not accept a scope discriminator.
+  agentScope?: string;
+  /// MCP server names to enable. Servers not listed use session defaults.
+  mcpEnabled: string[];
+  /// Skill names explicitly disabled for the session.
+  skillsDisabled: string[];
+  /// Run mode override. Absent = keep session default (interactive).
+  runMode?: SessionMode;
+  /// ISO 8601 timestamp.
+  createdAt: string;
+  /// ISO 8601 timestamp.
+  updatedAt: string;
+}
+
+/// Return value from `applyTemplate`. `warnings` lists any server/skill
+/// names that no longer exist or could not be applied; they are human-
+/// readable strings suitable for a toast. `applied` is always `true`
+/// unless the template itself was not found (which throws instead).
+export interface ApplyTemplateResult {
+  applied: boolean;
+  warnings: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Agents & tasks
 // ---------------------------------------------------------------------------
 
@@ -992,5 +1031,26 @@ export type CommandMap = {
   deleteSnippet: {
     args: { id: string };
     result: void;
+  };
+  // ---------- Phase 243: Session Config Templates ----------
+  listTemplates: {
+    args: Record<string, never>;
+    result: SessionTemplate[];
+  };
+  saveTemplate: {
+    args: { template: SessionTemplate };
+    result: void;
+  };
+  deleteTemplate: {
+    args: { id: string };
+    result: void;
+  };
+  applyTemplate: {
+    args: { sessionId: string; templateId: string };
+    result: ApplyTemplateResult;
+  };
+  captureTemplate: {
+    args: { sessionId: string; name: string };
+    result: SessionTemplate;
   };
 };
