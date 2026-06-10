@@ -10,9 +10,10 @@
 // `Utils.paths.userData` and hands it to `SettingsService.loadOrDefault`.
 
 import { existsSync, readFileSync } from 'node:fs';
+import { copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
-import { mkdir } from 'node:fs/promises';
+import { atomicWrite } from '../shared/atomicWrite';
 import type {
   Appearance,
   KeyboardShortcutPrefs,
@@ -428,6 +429,10 @@ export function migrate(input: unknown): Settings {
 export class SettingsService {
   private cache: Settings;
 
+  /// Serializes writes so concurrent `update()` calls can't interleave
+  /// a half-written file. Mirrors the pattern in `SessionMetadataStore`.
+  private writeChain: Promise<void> = Promise.resolve();
+
   private constructor(
     public readonly path: string,
     initial: Settings,
@@ -442,18 +447,37 @@ export class SettingsService {
       return new SettingsService(path, defaultSettings());
     }
 
+    // Try primary file first.
+    const primary = SettingsService.tryParse(path);
+    if (primary !== null) return new SettingsService(path, primary);
+
+    // Primary parse failed — attempt recovery from .bak.
+    const bakPath = `${path}.bak`;
+
+    if (existsSync(bakPath)) {
+      const bak = SettingsService.tryParse(bakPath);
+
+      if (bak !== null) {
+        log.warn('settings primary corrupt; recovered from .bak', { path, bakPath });
+
+        return new SettingsService(path, bak);
+      }
+    }
+
+    log.warn('failed to read settings, falling back to defaults', { path });
+
+    return new SettingsService(path, defaultSettings());
+  }
+
+  /// Returns the parsed+migrated settings, or `null` on any parse/IO error.
+  private static tryParse(path: string): Settings | null {
     try {
       const raw = readFileSync(path, 'utf-8');
       const parsed = JSON.parse(raw) as unknown;
 
-      return new SettingsService(path, migrate(parsed));
-    } catch (err) {
-      log.warn('failed to read settings, falling back to defaults', {
-        path,
-        error: toErrorMessage(err),
-      });
-
-      return new SettingsService(path, defaultSettings());
+      return migrate(parsed);
+    } catch {
+      return null;
     }
   }
 
@@ -464,15 +488,45 @@ export class SettingsService {
   async update(next: Settings): Promise<Settings> {
     const stamped: Settings = { ...migrate(next), version: SETTINGS_VERSION };
 
+    // Snapshot in cache immediately so concurrent reads see the latest value.
     this.cache = stamped;
 
-    try {
-      await mkdir(dirname(this.path), { recursive: true });
-      await Bun.write(this.path, JSON.stringify(stamped, null, 2));
-    } catch (err) {
-      const message = toErrorMessage(err);
+    const snapshot = JSON.stringify(stamped, null, 2);
+    const path = this.path;
+    const bakPath = `${path}.bak`;
 
-      throw AppError.settings(message);
+    // Run this write after all previous writes complete OR fail (second
+    // arg to `.then` handles prior failures so the chain never stalls).
+    const doWrite = async () => {
+      await mkdir(dirname(path), { recursive: true });
+
+      // Back up the current primary BEFORE overwriting, but only when
+      // it currently holds valid JSON — we never write a corrupt .bak.
+      if (existsSync(path) && SettingsService.tryParse(path) !== null) {
+        try {
+          await copyFile(path, bakPath);
+        } catch (copyErr) {
+          log.warn('settings backup copy failed (non-fatal)', {
+            path,
+            bakPath,
+            error: toErrorMessage(copyErr),
+          });
+        }
+      }
+
+      await atomicWrite(path, snapshot);
+    };
+
+    const thisWrite = this.writeChain.then(doWrite, doWrite);
+
+    // Always keep the chain resolved so future writes are not blocked by
+    // a prior failure.
+    this.writeChain = thisWrite.catch(() => {});
+
+    try {
+      await thisWrite;
+    } catch (err) {
+      throw AppError.settings(toErrorMessage(err));
     }
 
     return structuredClone(stamped);

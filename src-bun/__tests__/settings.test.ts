@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -615,5 +615,143 @@ describe('SettingsService', () => {
     expect(reloaded.get().keyboardShortcuts).toEqual(customPrefs);
     expect(reloaded.get().appearance.theme).toBe('dark');
     expect(reloaded.get().version).toBe(SETTINGS_VERSION);
+  });
+});
+
+describe('SettingsService — atomic persistence', () => {
+  const tempDirsAtomic: string[] = [];
+
+  afterEach(() => {
+    while (tempDirsAtomic.length) {
+      const dir = tempDirsAtomic.pop();
+      if (dir) rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function tmpDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'dafman-settings-atomic-'));
+    tempDirsAtomic.push(dir);
+    return dir;
+  }
+
+  test('corrupt primary with valid .bak recovers from .bak, not defaults', async () => {
+    const dir = tmpDir();
+    const path = join(dir, 'settings.json');
+    const bakPath = `${path}.bak`;
+
+    // Write a valid settings file and let update() create a .bak of it.
+    const svc = SettingsService.loadOrDefault(path);
+    const saved = await svc.update({
+      ...defaultSettings(),
+      appearance: { ...defaultSettings().appearance, theme: 'dark' },
+    });
+    // Manually copy the primary to .bak (simulating a previously-good backup).
+    writeFileSync(bakPath, readFileSync(path, 'utf-8'), 'utf-8');
+    // Corrupt the primary.
+    writeFileSync(path, 'not valid json {{{');
+
+    const recovered = SettingsService.loadOrDefault(path);
+    expect(recovered.get().appearance.theme).toBe('dark');
+    expect(recovered.get().version).toBe(saved.version);
+  });
+
+  test('corrupt primary AND corrupt/absent .bak falls back to defaults', () => {
+    const dir = tmpDir();
+    const path = join(dir, 'settings.json');
+    const bakPath = `${path}.bak`;
+
+    writeFileSync(path, '{{invalid json}}');
+    writeFileSync(bakPath, 'also garbage');
+
+    const svc = SettingsService.loadOrDefault(path);
+    expect(svc.get()).toEqual(defaultSettings());
+  });
+
+  test('corrupt primary with no .bak falls back to defaults', () => {
+    const dir = tmpDir();
+    const path = join(dir, 'settings.json');
+
+    writeFileSync(path, 'broken');
+
+    const svc = SettingsService.loadOrDefault(path);
+    expect(svc.get()).toEqual(defaultSettings());
+  });
+
+  test('concurrent update() calls serialize; final file is valid JSON matching last call', async () => {
+    const dir = tmpDir();
+    const path = join(dir, 'settings.json');
+    const svc = SettingsService.loadOrDefault(path);
+
+    const themes = ['dark', 'light', 'dark', 'light', 'dark'] as const;
+    const lastTheme = themes[themes.length - 1];
+
+    await Promise.all(
+      themes.map((theme) =>
+        svc.update({
+          ...defaultSettings(),
+          appearance: { ...defaultSettings().appearance, theme },
+        }),
+      ),
+    );
+
+    // File must be parseable valid JSON.
+    const raw = readFileSync(path, 'utf-8');
+    expect(() => JSON.parse(raw)).not.toThrow();
+
+    // In-memory cache must match the last value set.
+    expect(svc.get().appearance.theme).toBe(lastTheme);
+  });
+
+  test('.bak is not overwritten when primary is currently unparseable', async () => {
+    const dir = tmpDir();
+    const path = join(dir, 'settings.json');
+    const bakPath = `${path}.bak`;
+
+    // Establish a known-good .bak by hand.
+    const goodContent = JSON.stringify(
+      { ...defaultSettings(), appearance: { ...defaultSettings().appearance, theme: 'light' } },
+      null,
+      2,
+    );
+    writeFileSync(bakPath, goodContent, 'utf-8');
+    // Primary is corrupt.
+    writeFileSync(path, '{{corrupt}}');
+
+    // update() on a service loaded from a corrupt primary:
+    // the corrupt primary must NOT replace the .bak.
+    const svc = SettingsService.loadOrDefault(path);
+    await svc.update({
+      ...defaultSettings(),
+      appearance: { ...defaultSettings().appearance, theme: 'dark' },
+    });
+
+    // .bak should still contain the original good content.
+    const bakAfter = readFileSync(bakPath, 'utf-8');
+    expect(bakAfter).toBe(goodContent);
+  });
+
+  test('update() creates a .bak of the previously-valid primary', async () => {
+    const dir = tmpDir();
+    const path = join(dir, 'settings.json');
+    const bakPath = `${path}.bak`;
+
+    const svc = SettingsService.loadOrDefault(path);
+    // First write — no existing primary, so no .bak yet.
+    await svc.update({
+      ...defaultSettings(),
+      appearance: { ...defaultSettings().appearance, theme: 'dark' },
+    });
+    expect(existsSync(bakPath)).toBe(false);
+
+    // Second write — primary exists and is valid, so .bak is created.
+    await svc.update({
+      ...defaultSettings(),
+      appearance: { ...defaultSettings().appearance, theme: 'light' },
+    });
+    expect(existsSync(bakPath)).toBe(true);
+
+    // .bak holds the intermediate (dark) state.
+    const bak = JSON.parse(readFileSync(bakPath, 'utf-8')) as { appearance: { theme: string } };
+    expect(bak.appearance.theme).toBe('dark');
   });
 });
