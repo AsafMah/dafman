@@ -9,6 +9,6 @@
   "src/components/session/SessionHeaderControls.vue": 930,
   "src/components/chat/MessageComposer.vue": 1085,
   "src/components/settings/KeyboardShortcutsSection.vue": 859,
-  "src/lib/registerBuiltinCommands.ts": 819,
+  "src/lib/registerBuiltinCommands.ts": 897,
   "src-bun/index.ts": 856
 }

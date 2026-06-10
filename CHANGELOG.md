@@ -4,6 +4,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (2026-06-10 palette session jump — issue #185)
+
+- **Jump to / resume sessions from the command palette (`Mod+K`).** Open sessions appear as `Jump` entries (focus/reveal via the cross-group path from #173); closed, on-disk sessions appear as `Resume` entries (reopen + reveal), capped at 20 with a "browse all" entry beyond that. Open sessions are listed before closed ones; the list refreshes when the palette opens. Replaces the old `session.switch` command.
+
 ### Fixed (2026-06-10 reload transcripts — issue #235)
 
 - **Reloading the renderer (Ctrl+R / HMR) no longer blanks open transcripts.** The backend session resume short-circuited for an already-live session and skipped replaying its history, so a reload restored the tabs/sidebar but left the message panes empty (a full restart was needed to get them back). `SessionRegistry.resume()` now re-runs the same hydrate/replay path for already-registered sessions (reusing the live SDK session), and the renderer guards against double-appending into a record that already has events. Cold boot, the #172 readiness gate, and the #208 replay hydration-guard are all preserved.

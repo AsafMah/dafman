@@ -14,6 +14,8 @@
 //      unique by construction).
 
 import type { Command } from '@/stores/shell/commandRegistry';
+import type { SessionMetadataSummary } from '@/ipc/types';
+import { basename } from '@/stores/shell/layoutUtils';
 
 /// Tokens for a child command that participate in `shouldExpand`'s
 /// auto-expand check. When the live palette query matches any of
@@ -61,4 +63,17 @@ export function searchValueFor(cmd: Command): string {
   // fires) — not by folding child tokens into the parent corpus.
   // See `childMatchTokens` for the history of this decision.
   return parentSelfTokens(cmd).join(' ');
+}
+
+/// Build the display label and hint for a session palette entry.
+/// `label` goes in the left column; `hint` goes in the right column
+/// (small grey text, same slot as keyboard shortcuts).
+/// `hint` always carries at least the short GUID prefix so two
+/// sessions with identical summaries are still visually distinct.
+export function sessionDisplayLabel(s: SessionMetadataSummary): { label: string; hint: string } {
+  const name = s.summary?.trim() || `Session ${s.sessionId.slice(0, 8)}`;
+  const wsBase = s.cwd ? basename(s.cwd) : null;
+  const idSuffix = s.sessionId.slice(0, 6);
+  const hint = wsBase ? `${wsBase}  ·  ${idSuffix}` : idSuffix;
+  return { label: name, hint };
 }
