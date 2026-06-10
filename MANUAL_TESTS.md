@@ -70,6 +70,55 @@ walked by the user. After dogfooding, items move to verified (then to
 section is verified) or get a GitHub issue filed (with label
 `manual-test-fail`) and removed from this file.
 
+### 2026-06-10 — production-readiness review fixes (#205-225)
+
+> Live/real-backend residue from the review-fix PRs (#226-230 + #231). The
+> logic is unit-tested (atomic write, usage merge, resume reducer, error
+> ownership); the rows below are only what needs the real Electrobun app +
+> real SDK + a real restart/filesystem cycle.
+
+#### WH.1 - Webview navigation guard routes external links out, keeps in-app nav (#205/#230)
+
+- [ ] result: 
+- **Steps:** Boot the real app. Render a message containing an external link (e.g. `[GitHub](https://github.com)`) and click it. Separately exercise in-app navigation (open/close panels, switch tabs) and trigger a dev HMR reload.
+- **Expected:** the external link opens in the **OS default browser**, NOT inside the app webview; the app window stays on its own page; in-app panel/tab navigation and dev HMR continue to work.
+- **Why not automated:** the native `setNavigationRules` block only runs in the real Electrobun WebView2 (undocumented C++ match semantics); the headless harness never applies it.
+
+#### WH.2 - CSP renders rich content with no console violations (#205/#230)
+
+- [ ] result: 
+- **Steps:** Boot the real app with devtools console open. Render a message with KaTeX math, a syntax-highlighted code block, and an image (and a mermaid diagram if mermaid is enabled).
+- **Expected:** math, code highlighting, and images all render; **no Content-Security-Policy violation errors** in the console.
+- **Why not automated:** `bun run smoke` validates the CSP against the built bundle headlessly (passed 4/4), but the real `views://mainview` origin + production RPC transport are only exercised in the live app.
+
+#### PRS.1 - Settings + layout recover from a corrupt settings.json via .bak (#207)
+
+- [ ] result: 
+- **Steps:** Boot, change a setting (e.g. theme) so `settings.json` + `settings.json.bak` exist, then quit. With the app closed, corrupt `settings.json` (truncate it / write garbage). Reboot.
+- **Expected:** the app boots with your **last-good settings + layout recovered from `settings.json.bak`** (NOT reset to defaults), and rewrites a fresh valid `settings.json`.
+- **Why not automated:** unit tests cover the recovery logic, but the end-to-end "corrupt the real on-disk file → reboot the real app" cycle needs the live app + filesystem.
+
+#### RH.1 - Multi-session restart shows no phantom unseen-activity counts (#208)
+
+- [ ] result: 
+- **Steps:** Open **≥2 sessions**, run a few turns in each so they have history; leave one NOT the active tab and "read" it. Fully restart the app.
+- **Expected:** after restore, no already-read session shows an "unseen activity" dot/count it didn't earn; the sidebar order isn't churned by phantom counts. With turn-end notifications enabled, the restart fires **no** notifications for historical turns.
+- **Why not automated:** needs a real persist → restart → replay cycle against persisted SDK history; the unit test covers the reducer path, not the live restart.
+
+#### EO.1 - Changing run mode/model never throws an unhandled rejection (#212)
+
+- [ ] result: 
+- **Steps:** With a real session and devtools console open, rapidly toggle run mode (Interactive/Plan/Autopilot) and switch models; if you can, force a failure (toggle while the backend is briefly unavailable).
+- **Expected:** changes apply; on any failure you get a single error **toast** and **no `unhandledrejection`** in the console.
+- **Why not automated:** the symptom is an unhandled promise rejection surfaced only against the real RPC backend's error paths.
+
+#### UP.1 - Context-usage pill stays correct across sub-agent turns + on a 1M-context model (#219/#220)
+
+- [ ] result: 
+- **Steps:** Run a turn that spawns a sub-agent (or uses MCP sampling) on a normal model and watch the context-usage pill. Then run a session on a **1M-context** model (e.g. GPT-4.1 / Gemini 2.5 Pro) and check the pill.
+- **Expected:** the pill reflects **cumulative** context (does NOT drop to a tiny number when a sub-agent makes a small call); on the 1M model it shows a sensible percentage (not blank/0%).
+- **Why not automated:** needs the real SDK emitting `assistant.usage` (sub-agent) + `session.usage_info` with a real 1M `tokenLimit`.
+
 ### 2026-06-08 — keyboard system, per-message mode, MCP two-column, session pane
 
 > Shipped this session: per-message agent-mode override (#41), Library MCP
