@@ -73,3 +73,6 @@ e2e/.cache/
 # JetBrains Inspections HTML export (Tools > Export > HTML File)
 report/
 
+# Compound Engineering local config (machine-local prefs)
+.compound-engineering/*.local.yaml
+
