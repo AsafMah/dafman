@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /// Phase 19a — Library → MCP tab.
 ///
-/// Configured + Discovered server lists. Add via dialog.
+/// Configured + Discovered server lists. Add/edit via inline form
+/// (Dialog replaced with inline form region — same pattern as
+/// LibraryAgentsTab / LibrarySnippetsTab).
 /// Per-row enable/disable (global allowlist), edit, remove,
 /// sign-in (for http transports; OAuth is negotiated by the SDK at
 /// sign-in time, so the button shows for every http server). Discovered servers
@@ -12,7 +14,6 @@ import { onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
-import Dialog from 'primevue/dialog';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
 import McpServerForm from '@/components/library/McpServerForm.vue';
@@ -28,7 +29,13 @@ import {
 const toasts = useToastStore();
 const { activeSessionId, lastFocusedSessionId } = storeToRefs(useLayoutStore());
 const headerActions: LibraryTabHeaderAction[] = [
-  { key: 'add', label: 'Add', icon: 'pi pi-plus', title: 'Add MCP server', variant: 'primary' },
+  {
+    key: 'add',
+    label: 'New server',
+    icon: 'pi pi-plus',
+    title: 'Add MCP server',
+    variant: 'primary',
+  },
   {
     key: 'refresh',
     label: 'Refresh',
@@ -73,35 +80,35 @@ async function removeEntry(entry: ConfiguredEntry) {
   }
 }
 
-// ---------- Add / edit dialog ----------
-const dialogOpen = ref(false);
-const dialogMode = ref<'add' | 'edit'>('add');
-const dialogInitialName = ref<string>('');
-const dialogInitialConfig = ref<McpConfig>({});
+// ---------- Add / edit inline form ----------
+const showForm = ref(false);
+const formMode = ref<'add' | 'edit'>('add');
+const formInitialName = ref<string>('');
+const formInitialConfig = ref<McpConfig>({});
 
-function openAddDialog() {
-  dialogMode.value = 'add';
-  dialogInitialName.value = '';
-  dialogInitialConfig.value = {};
-  dialogOpen.value = true;
+function openForm() {
+  formMode.value = 'add';
+  formInitialName.value = '';
+  formInitialConfig.value = {};
+  showForm.value = true;
 }
 
-function openEditDialog(entry: ConfiguredEntry) {
-  dialogMode.value = 'edit';
-  dialogInitialName.value = entry.name;
-  dialogInitialConfig.value = JSON.parse(JSON.stringify(entry.config));
-  dialogOpen.value = true;
+function openEditForm(entry: ConfiguredEntry) {
+  formMode.value = 'edit';
+  formInitialName.value = entry.name;
+  formInitialConfig.value = JSON.parse(JSON.stringify(entry.config)) as McpConfig;
+  showForm.value = true;
 }
 
-async function onDialogSubmit(payload: { name: string; config: McpConfig }) {
-  const { ok, wasUpdate } = await upsertConfig(dialogMode.value, payload);
+async function onFormSubmit(payload: { name: string; config: McpConfig }) {
+  const { ok, wasUpdate } = await upsertConfig(formMode.value, payload);
 
   if (ok) {
     // `wasUpdate` is set when `add` mode auto-upgraded to `update` because
     // the server already existed in the global config (#1 fix).
-    const verb = wasUpdate ? 'updated' : dialogMode.value === 'edit' ? 'updated' : 'added';
+    const verb = wasUpdate ? 'updated' : formMode.value === 'edit' ? 'updated' : 'added';
     toasts.success(`MCP server ${verb}`, payload.name);
-    dialogOpen.value = false;
+    showForm.value = false;
   }
 }
 
@@ -147,7 +154,7 @@ watch([activeSessionId, lastFocusedSessionId], () => {
 
 function onHeaderAction(action: string) {
   if (action === 'add') {
-    openAddDialog();
+    openForm();
   } else if (action === 'refresh') {
     void loadAll();
   }
@@ -160,6 +167,33 @@ function onHeaderAction(action: string) {
       :actions="headerActions"
       @action="onHeaderAction"
     />
+
+    <!-- Inline add / edit form -->
+    <div
+      v-if="showForm"
+      class="mcp-inline-form"
+    >
+      <header class="mcp-inline-form__header">
+        <h3 class="mcp-inline-form__title">
+          {{ formMode === 'edit' ? `Edit ${formInitialName}` : 'New MCP server' }}
+        </h3>
+        <Button
+          size="small"
+          text
+          icon="pi pi-times"
+          aria-label="Close form"
+          @click="showForm = false"
+        />
+      </header>
+      <McpServerForm
+        :initial-name="formInitialName"
+        :initial-config="formInitialConfig"
+        :name-locked="formMode === 'edit'"
+        @submit="onFormSubmit"
+        @cancel="showForm = false"
+      />
+    </div>
+
     <div
       v-if="!loaded"
       class="empty-hint"
@@ -188,7 +222,7 @@ function onHeaderAction(action: string) {
           <li
             v-for="entry in configured"
             :key="entry.name"
-            class="mcp-row"
+            class="mcp-row mcp-server-row"
           >
             <div class="mcp-row-head">
               <span class="mcp-name">{{ entry.name }}</span>
@@ -231,7 +265,7 @@ function onHeaderAction(action: string) {
                 text
                 :title="`Edit ${entry.name}`"
                 :aria-label="`Edit ${entry.name}`"
-                @click="openEditDialog(entry)"
+                @click="openEditForm(entry)"
               />
               <Button
                 icon="pi pi-trash"
@@ -256,7 +290,7 @@ function onHeaderAction(action: string) {
           <li
             v-for="entry in newlyDiscovered"
             :key="entry.name"
-            class="mcp-row"
+            class="mcp-row mcp-server-row"
           >
             <div class="mcp-row-head">
               <span class="mcp-name">{{ entry.name }}</span>
@@ -285,21 +319,6 @@ function onHeaderAction(action: string) {
         </ul>
       </section>
     </template>
-
-    <Dialog
-      v-model:visible="dialogOpen"
-      modal
-      :header="dialogMode === 'edit' ? `Edit ${dialogInitialName}` : 'Add MCP server'"
-      :style="{ width: 'min(560px, 92vw)' }"
-    >
-      <McpServerForm
-        :initial-name="dialogInitialName"
-        :initial-config="dialogInitialConfig"
-        :name-locked="dialogMode === 'edit'"
-        @submit="onDialogSubmit"
-        @cancel="dialogOpen = false"
-      />
-    </Dialog>
   </div>
 </template>
 
@@ -309,6 +328,28 @@ function onHeaderAction(action: string) {
   flex-direction: column;
   gap: 0.7rem;
   min-width: 0;
+}
+
+.mcp-inline-form {
+  border: 1px solid var(--p-surface-border);
+  border-radius: var(--p-border-radius-sm);
+  padding: 0.6rem 0.75rem 0.75rem;
+  background: var(--p-content-background);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mcp-inline-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mcp-inline-form__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .mcp-section {
