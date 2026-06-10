@@ -17,14 +17,21 @@ interface PendingMatch {
 
 function focusIsEditable(): boolean {
   const el = document.activeElement;
+
   if (!el) return false;
+
   const tag = el.tagName.toLowerCase();
+
   if (tag === 'input' || tag === 'textarea') return true;
+
   let node: Element | null = el;
+
   while (node && node !== document.body) {
     if ((node as HTMLElement).isContentEditable) return true;
+
     node = node.parentElement;
   }
+
   return false;
 }
 
@@ -37,6 +44,7 @@ export function useGlobalShortcuts(): void {
 
   function clearPending(): void {
     pending = [];
+
     if (sequenceTimer !== null) {
       clearTimeout(sequenceTimer);
       sequenceTimer = null;
@@ -45,6 +53,7 @@ export function useGlobalShortcuts(): void {
 
   function scheduleReset(): void {
     if (sequenceTimer !== null) clearTimeout(sequenceTimer);
+
     sequenceTimer = setTimeout(() => {
       pending = [];
       sequenceTimer = null;
@@ -53,10 +62,12 @@ export function useGlobalShortcuts(): void {
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.isComposing || event.key === 'Process') return;
+
     if (event.repeat) return;
 
     const inEditable = focusIsEditable();
     let bindingsToCheck = shortcutRegistry.bindingsForScope('global');
+
     if (inEditable) {
       bindingsToCheck = bindingsToCheck.filter((b) => EDITABLE_ALLOWLIST.has(b.commandId));
     }
@@ -83,6 +94,7 @@ export function useGlobalShortcuts(): void {
         event.preventDefault();
         event.stopPropagation();
         void commandRegistry.runCommand(completed.commandId);
+
         return;
       }
 
@@ -90,6 +102,7 @@ export function useGlobalShortcuts(): void {
         pending = advancing;
         scheduleReset();
         event.preventDefault();
+
         return;
       }
 
@@ -101,8 +114,10 @@ export function useGlobalShortcuts(): void {
     const newPending: PendingMatch[] = [];
 
     for (const binding of bindingsToCheck) {
-      const presses = parseKeybinding(binding.keys) as KeybindingPress[];
+      const presses = parseKeybinding(binding.keys);
+
       if (presses.length === 0) continue;
+
       if (matchKeybindingPress(event, presses[0])) {
         if (presses.length === 1) {
           directMatch = binding;
@@ -117,6 +132,7 @@ export function useGlobalShortcuts(): void {
       event.preventDefault();
       event.stopPropagation();
       void commandRegistry.runCommand(directMatch.commandId);
+
       return;
     }
 
@@ -124,6 +140,7 @@ export function useGlobalShortcuts(): void {
       pending = newPending;
       scheduleReset();
       event.preventDefault();
+
       return;
     }
   }
