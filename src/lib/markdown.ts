@@ -262,10 +262,18 @@ const PURIFY_CONFIG = {
   ALLOW_DATA_ATTR: false,
 };
 
-// DOMPurify uAfterSanitizeAttributes hook: tighten the `style`
-// allowlist to the small subset KaTeX uses for inline math sizing.
-// Anything else (color, position, transform, font-family, etc.) is
-// stripped. This is run once at module load.
+// DOMPurify hook bundle (installed once at module load via ensurePurifyHook).
+//
+// Hook 1 — uponSanitizeAttribute: tighten the `style` allowlist to the small
+// subset KaTeX uses for inline math sizing. Anything else (color, position,
+// transform, font-family, etc.) is stripped.
+//
+// Hook 2 — afterSanitizeAttributes: force target="_blank" + rel="noopener
+// noreferrer" on every <a> element so no anchor — whether from a markdown-it
+// token or raw HTML that passed DOMPurify's tag allowlist — can ever navigate
+// the top-level document. This supersedes the existing link_open renderer rule
+// for markdown tokens (same values, no conflict) and fills the gap for raw
+// HTML anchors that the renderer rule never visits.
 let purifyHookInstalled = false;
 
 function ensurePurifyHook(): void {
@@ -273,6 +281,7 @@ function ensurePurifyHook(): void {
 
   if (typeof DOMPurify.addHook !== 'function') return;
 
+  // Hook 1: KaTeX style allowlist.
   DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
     if (data.attrName !== 'style') return;
 
@@ -287,6 +296,19 @@ function ensurePurifyHook(): void {
       data.keepAttr = false;
     }
   });
+
+  // Hook 2: anchor hardening — prevent any <a> from navigating the top-level
+  // document by forcing target="_blank" + rel="noopener noreferrer".
+  // Runs after DOMPurify has finished processing all attributes on each node,
+  // so it overrides anything a raw-HTML author supplied.
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (!(node instanceof HTMLElement)) return;
+    if (node.tagName !== 'A') return;
+
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer');
+  });
+
   purifyHookInstalled = true;
 }
 

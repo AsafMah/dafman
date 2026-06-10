@@ -594,6 +594,130 @@ const mainWindow = new BrowserWindow({
   rpc,
   frame: { width: 1200, height: 800, x: 100, y: 100 },
 });
+// ─── Webview navigation guard ─────────────────────────────────────────────────
+//
+// The renderer must never load external URLs inside the webview process; doing
+// so would give remote content full access to the Electrobun RPC bridge.
+//
+// Two-layer defence:
+//   1. `setNavigationRules` — native, synchronous: only same-origin navigations
+//      are allowed in the webview. All others are blocked before they load.
+//   2. `will-navigate` / `new-window-open` listeners — detect blocked attempts
+//      and route http(s) URLs to the external OS browser (same logic as the
+//      `openUrl` RPC handler), logging every interception for audit.
+//
+// NOTE: `setNavigationRules` passes an array of allowed URL prefixes to the
+// Electrobun native side. The exact format is determined by the C++ WebView2
+// implementation and needs a live-boot smoke test (the format is not documented
+// in the TypeScript API). If navigations are blocked more aggressively than
+// expected (e.g. HMR reloads blocked in dev), widen the rules array to include
+// additional allowed prefixes.
+
+// Derive the app origin so any same-origin path is still allowed.
+// `url` is already resolved: "http://localhost:5173/…" (dev) or
+// "views://mainview/index.html" (prod).
+const appOrigin = (() => {
+  try {
+    return new URL(url).origin; // "http://localhost:5173" | "views://mainview"
+  } catch {
+    return url; // malformed — use as-is (should never happen)
+  }
+})();
+
+// Layer 1: native block — restrict the webview to the app origin only.
+mainWindow.webview.setNavigationRules([appOrigin]);
+
+// Layer 2: event listeners — intercept attempts and route http(s) externally.
+
+// Helper: open an external http(s) URL via the OS browser.
+// Mirrors the `openUrl` RPC handler's logic (recordUrl omitted here since
+// the webview nav interception is a different audit path).
+function openExternalUrl(targetUrl: string, source: string): void {
+  if (/^https?:\/\//i.test(targetUrl)) {
+    log.info('webview navigation intercepted, opening externally', {
+      url: targetUrl,
+      source,
+    });
+    try {
+      Utils.openExternal(targetUrl);
+    } catch (err) {
+      log.warn('openExternal threw during webview navigation intercept', {
+        url: targetUrl,
+        source,
+        error: toErrorMessage(err),
+      });
+    }
+  } else {
+    log.warn('webview navigation blocked: non-http(s) scheme', {
+      url: targetUrl,
+      source,
+    });
+  }
+}
+
+// `will-navigate` / `new-window-open` payloads: the native side delivers
+// `detail` as a JSON-encoded object (e.g. `{"url":"…","allowed":true}` for
+// will-navigate, `{"url":"…","isCmdClick":…}` for new-window-open) — NOT a
+// bare URL string. Extract the URL robustly from either shape.
+function extractNavTarget(detail: unknown): { url: string; allowed?: boolean } | null {
+  let value: unknown = detail;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (!s) return null;
+    if (s.startsWith('{')) {
+      try {
+        value = JSON.parse(s) as unknown;
+      } catch {
+        return { url: s }; // not JSON — the string itself is the URL
+      }
+    } else {
+      return { url: s };
+    }
+  }
+  if (value && typeof value === 'object' && 'url' in value) {
+    const obj = value as { url: unknown; allowed?: unknown };
+    if (typeof obj.url === 'string' && obj.url.trim()) {
+      return {
+        url: obj.url.trim(),
+        allowed: typeof obj.allowed === 'boolean' ? obj.allowed : undefined,
+      };
+    }
+  }
+  return null;
+}
+
+// Route any non-same-origin navigation/window-open to the OS browser.
+function handleNavAttempt(detail: unknown, source: string): void {
+  const target = extractNavTarget(detail);
+  if (!target) return;
+  if (target.url.startsWith(appOrigin)) return; // same-origin — allow it
+  // If the native side flagged it `allowed` (setNavigationRules did NOT block
+  // it in-webview), warn — the in-webview load may proceed and the rule format
+  // needs revisiting.
+  if (target.allowed === true) {
+    log.warn('webview: external navigation was NOT blocked natively', {
+      url: target.url,
+      source,
+    });
+  }
+  openExternalUrl(target.url, source);
+}
+
+mainWindow.webview.on('will-navigate', (event: unknown) => {
+  handleNavAttempt((event as { data?: { detail?: unknown } })?.data?.detail, 'will-navigate');
+});
+
+// `new-window-open` (target=_blank / window.open / cmd+click) — BrowserView.on()
+// doesn't type this event, but it dispatches through the same emitter; cast to
+// subscribe at runtime.
+(mainWindow.webview.on as (name: string, handler: (event: unknown) => void) => void)(
+  'new-window-open',
+  (event: unknown) => {
+    handleNavAttempt((event as { data?: { detail?: unknown } })?.data?.detail, 'new-window-open');
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Initial-paint clipping workaround for the Electrobun BrowserWindow on
 /// Windows: the WebView2 surface is created at the *outer* window size,
