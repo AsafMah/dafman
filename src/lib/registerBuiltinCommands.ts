@@ -32,9 +32,12 @@ import { useToastStore } from '@/stores/app/toastStore';
 import { useTerminalStore } from '@/stores/terminal/terminalStore';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useGroupsActions } from '@/composables/useGroupsActions';
+import { useJobsStore } from '@/stores/observability/jobsStore';
+import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { SESSION_COMMANDS } from '@/lib/sessionCommands';
 import { MODE_OPTIONS } from '@/lib/sessionModeOptions';
 import { toErrorMessage } from '@/lib/errorMessage';
+import { sessionDisplayLabel } from '@/lib/palette';
 import type { ReasoningVisibility } from '@/ipc/types';
 import { PANEL_IDS } from '@/constants/panels';
 
@@ -62,6 +65,8 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
   const modelsStore = useModelsStore();
   const groupsStore = useGroupsStore();
   const groupsActions = useGroupsActions();
+  const jobsStore = useJobsStore();
+  const sessionsListStore = useSessionsListStore();
   const toasts = useToastStore();
   const confirm = opts.confirm;
 
@@ -683,53 +688,126 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
     { immediate: true, deep: true },
   );
 
-  // ---------- Dynamic parent: Switch to Session ----------
-  // Watcher source includes layoutRev so opening/closing a panel
-  // without mutating sessionsStore.sessions still re-fires the
-  // children rebuild. (Caught by rubber-duck 2026-05-27: filter inside
-  // the children map reads layoutStore.api?.getPanel, but the watcher
-  // had only sessionsStore as its source — stale parent on panel
-  // open/close was possible.)
+  // ---------- Flat jump/resume entries — replaces session.switch ----------
+  // Two families of flat entries (no parent/children drill-down):
+  //   session.jump.<id>   — session is open in any inner dockview → openOwningSession
+  //   session.resume.<id> — session is on-disk only (not in any panel) → restoreSession
+  //
+  // Watcher sources: open sessions array, catalog modifiedTimes, and
+  // layoutRev — so any panel open/close, new session, or catalog refresh
+  // triggers re-registration. Option A stale-entry cleanup: we track all
+  // registered ids in `registeredSessionIds` and unregister the entries
+  // that are no longer needed on each watcher fire.
+  //
+  // Trigger an initial catalog load so the palette has data on first open
+  // without waiting for the Sessions Manager to mount.
+  if (!sessionsListStore.hasLoaded) void sessionsListStore.refresh();
+
+  const registeredSessionIds = new Set<string>();
+
   watch(
     () => ({
-      sessions: sessionsStore.sessions.map((s) => ({ id: s.id, title: s.title, accent: s.accent })),
+      open: sessionsStore.sessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        accent: s.accent,
+        cwd: s.workingDirectory,
+      })),
+      catalog: sessionsListStore.sessions.map((s) => s.sessionId + s.modifiedTime),
       rev: layoutStore.layoutRev,
     }),
-    ({ sessions }) => {
-      const children: Command[] = sessions
-        .filter((r) => Boolean(layoutStore.api?.getPanel(r.id)))
-        .map((r) => {
-          const label = r.title ?? `Session ${r.id.slice(0, 8)}…`;
+    ({ open }) => {
+      // Determine which sessions are open in any inner dockview (cross-group).
+      const openIds = new Set(open.map((s) => s.id));
+      const openPanelIds = new Set(
+        open
+          .filter((r) => {
+            for (const innerApi of Object.values(groupsStore.innerApis)) {
+              if (innerApi.getPanel(r.id)) return true;
+            }
+            return false;
+          })
+          .map((r) => r.id),
+      );
 
-          return {
-            id: `session.switch.${r.id}`,
-            label,
-            hint: r.id.slice(0, 8),
-            icon: 'pi pi-comments',
-            accent: r.accent,
-            keywords: [r.id, r.id.slice(0, 8), label],
-            run: () => {
-              const panel = layoutStore.api?.getPanel(r.id);
+      const nextIds = new Set<string>();
 
-              panel?.api.setActive();
-            },
-          };
+      // Jump entries — open sessions with a panel in any group.
+      for (const r of open) {
+        if (!openPanelIds.has(r.id)) continue;
+        const { label, hint } = sessionDisplayLabel({
+          sessionId: r.id,
+          summary: r.title ?? undefined,
+          cwd: r.cwd ?? undefined,
+          startTime: '',
+          modifiedTime: '',
+          isRemote: false,
         });
+        const entryId = `session.jump.${r.id}`;
+        nextIds.add(entryId);
+        registry.register({
+          id: entryId,
+          label: `Go to: ${label}`,
+          hint,
+          group: 'Sessions',
+          icon: 'pi pi-arrow-right',
+          accent: r.accent,
+          keywords: [r.id, r.id.slice(0, 8), label, r.cwd ?? ''],
+          run: () => {
+            jobsStore.openOwningSession(r.id);
+          },
+        });
+      }
 
-      registry.register({
-        id: 'session.switch',
-        label: 'Switch to Session',
-        group: 'Sessions',
-        icon: 'pi pi-arrow-right-arrow-left',
-        keywords: ['switch', 'jump', 'session'],
-        when: () => children.length > 0,
-        children,
-        run: () => {
-          /* parent */
-        },
-      });
+      // Resume entries — catalog-only (not open), capped at 20 most-recent.
+      const closed = sessionsListStore.sessions
+        .filter((s) => !openIds.has(s.sessionId))
+        .slice(0, 20);
+      for (const s of closed) {
+        const { label, hint } = sessionDisplayLabel(s);
+        const entryId = `session.resume.${s.sessionId}`;
+        nextIds.add(entryId);
+        registry.register({
+          id: entryId,
+          label: `Resume: ${label}`,
+          hint,
+          group: 'Sessions',
+          icon: 'pi pi-history',
+          keywords: [s.sessionId, s.sessionId.slice(0, 8), label, s.cwd ?? ''],
+          run: async () => {
+            const record = await sessionsStore.restoreSession(s.sessionId);
+            if (!record) return;
+            layoutStore.addPanel(record.id);
+            layoutStore.activatePanel(record.id);
+            layoutStore.requestReveal(record.id, {});
+          },
+        });
+      }
+
+      // Browse all — shown when on-disk catalog exceeds the 20-entry cap.
+      const browseId = 'session.browseAll';
+      if (sessionsListStore.sessions.filter((s) => !openIds.has(s.sessionId)).length > 20) {
+        nextIds.add(browseId);
+        registry.register({
+          id: browseId,
+          label: 'Browse All Sessions…',
+          group: 'Sessions',
+          icon: 'pi pi-list',
+          keywords: ['sessions', 'browse', 'all', 'manager'],
+          run: () => {
+            layoutStore.activateEdgePanel(SESSIONS_PANEL_ID, 'left');
+          },
+        });
+      }
+
+      // Unregister stale entries from the previous fire.
+      for (const id of registeredSessionIds) {
+        if (!nextIds.has(id)) registry.unregister(id);
+      }
+      registeredSessionIds.clear();
+      for (const id of nextIds) registeredSessionIds.add(id);
     },
-    { immediate: true, deep: true },
+    { immediate: true, deep: false },
   );
 
   // ---------- Static parent: Run Mode (active session) ----------

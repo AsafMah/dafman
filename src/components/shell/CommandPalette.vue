@@ -43,6 +43,7 @@ import { searchValueFor } from '@/lib/palette';
 import { emit as busEmit } from '@/lib/bus';
 import { useEventListener } from '@vueuse/core';
 import { useCommandPaletteStore } from '@/stores/shell/commandPaletteStore';
+import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 
 const registry = useCommandRegistry();
 const layoutStore = useLayoutStore();
@@ -54,6 +55,7 @@ const layoutStore = useLayoutStore();
 /// find either, even before").
 const commandState = useCommandState();
 const paletteStore = useCommandPaletteStore();
+const sessionsListStore = useSessionsListStore();
 
 let prevFocus: HTMLElement | null = null;
 
@@ -67,6 +69,10 @@ watch(
   () => paletteStore.isOpen,
   (next, prev) => {
     if (next && !prev) {
+      // Refresh the on-disk session catalog so resume entries reflect
+      // reality as of palette open (fire-and-forget — palette renders
+      // with stale data first, then updates reactively).
+      void sessionsListStore.refresh();
       // Capture the active element before the palette steals focus, so we can
       // restore it when the palette closes. flush:'pre' runs before Vue patches
       // the DOM, so document.activeElement is still the original focused element.
