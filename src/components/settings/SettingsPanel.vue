@@ -31,6 +31,7 @@ import TerminalSettingsSection from '@/components/settings/TerminalSettingsSecti
 import WorkspaceSettingsSection from '@/components/settings/WorkspaceSettingsSection.vue';
 import NotificationSettingsSection from '@/components/settings/NotificationSettingsSection.vue';
 import KeyboardShortcutsSection from '@/components/settings/KeyboardShortcutsSection.vue';
+import UpdateSettingsSection from '@/components/settings/UpdateSettingsSection.vue';
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelsStore();
@@ -55,6 +56,7 @@ const collapsed = reactive<Record<string, boolean>>({
   terminal: false,
   notifications: false,
   keyboardShortcuts: false,
+  updates: false,
   permissions: false,
   diagnostics: false,
   about: false,
@@ -87,6 +89,8 @@ const defaultApproveAll = computed<boolean>({
     <NotificationSettingsSection v-model:collapsed="collapsed.notifications" />
 
     <KeyboardShortcutsSection v-model:collapsed="collapsed.keyboardShortcuts" />
+
+    <UpdateSettingsSection v-model:collapsed="collapsed.updates" />
 
     <!-- Permissions (Phase 22c) -->
     <SettingsGroup

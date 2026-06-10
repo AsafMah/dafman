@@ -54,4 +54,16 @@ export default {
     linux: { bundleCEF: false },
     win: { bundleCEF: false },
   },
+  release: {
+    // Base URL for hosted build artifacts used by the auto-updater.
+    // Must be set to the public URL of the release bucket/host before
+    // building for distribution. Leave empty for local dev builds.
+    // Example: 'https://releases.example.com/dafman'
+    // See plans/specs/auto-update.md for the required directory layout.
+    baseUrl: '',
+    // Generate bsdiff delta patches between consecutive releases so
+    // updates can be applied incrementally instead of downloading the
+    // full bundle each time.
+    generatePatch: true,
+  },
 } satisfies ElectrobunConfig;

@@ -42,6 +42,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 - **Library → Skills tab: per-session override toggle.** Each skill row now shows a **"Default"** (global) + **"This session"** (per-session override, via `setSessionSkillEnabled` for the focused session) toggle pair, disabled with a "No active session" hint when none is focused — mirroring the MCP two-column (#200). Continues the #28 Library-as-source-of-truth model. (Tools stay global-only for now — they have no per-session runtime/persistence; tracked in #252.)
 
+### Added (2026-06-10 in-app auto-update — issue #123)
+
+- **In-app auto-update via Electrobun delta patches.** A background check (30s after boot) and a manual "Check for updates" in Settings → Updates query the configured release `baseUrl` via Electrobun's `Updater` API; when a newer version exists, the user gets an "update available" status and can download + apply it (the app relaunches into the new version). Auto-update is automatically a no-op on the `dev` channel. New `src-bun/updateService.ts` (the Electrobun-touching boundary), `updateStore` + `UpdateSettingsSection.vue`, update RPCs + a status event channel on the wire. **Publishing releases to the `baseUrl` is a separate maintainer step** documented in `plans/specs/auto-update.md`; the update flow itself can only be exercised against a published non-dev release.
+
 ### Fixed (2026-06-10 reload transcripts — issue #235)
 
 - **Reloading the renderer (Ctrl+R / HMR) no longer blanks open transcripts.** The backend session resume short-circuited for an already-live session and skipped replaying its history, so a reload restored the tabs/sidebar but left the message panes empty (a full restart was needed to get them back). `SessionRegistry.resume()` now re-runs the same hydrate/replay path for already-registered sessions (reusing the live SDK session), and the renderer guards against double-appending into a record that already has events. Cold boot, the #172 readiness gate, and the #208 replay hydration-guard are all preserved.

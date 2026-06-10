@@ -118,6 +118,7 @@ export function createWebSocketBridge(url: string): RpcBridge {
       auditEvent: registry.dispatchAuditEvent,
       terminalEvent: registry.dispatchTerminalEvent,
       commandResultEvent: registry.dispatchCommandResultEvent,
+      updateEvent: registry.dispatchUpdateEvent,
     };
 
     dispatchers[name]?.(payload as never);
@@ -160,5 +161,6 @@ export function createWebSocketBridge(url: string): RpcBridge {
     onAuditEvent: registry.onAuditEvent,
     onTerminalEvent: registry.onTerminalEvent,
     onCommandResultEvent: registry.onCommandResultEvent,
+    onUpdateEvent: registry.onUpdateEvent,
   };
 }

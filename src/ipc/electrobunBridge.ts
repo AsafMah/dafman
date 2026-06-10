@@ -15,6 +15,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
+  UpdateEventPayload,
 } from '@/ipc/types';
 import type { RpcBridge } from '@/ipc/invoke';
 import { createListenerRegistry } from '@/ipc/listenerRegistry';
@@ -38,6 +39,7 @@ interface ElectrobunRpcType {
       auditEvent: AuditEntry;
       terminalEvent: TerminalEventPayload;
       commandResultEvent: CommandResultEvent;
+      updateEvent: UpdateEventPayload;
     };
   };
 }
@@ -59,6 +61,7 @@ export function createElectrobunBridge(): {
         auditEvent: (payload) => registry.dispatchAuditEvent(payload),
         terminalEvent: (payload) => registry.dispatchTerminalEvent(payload),
         commandResultEvent: (payload) => registry.dispatchCommandResultEvent(payload),
+        updateEvent: (payload) => registry.dispatchUpdateEvent(payload),
       },
     },
   });
@@ -79,6 +82,7 @@ export function createElectrobunBridge(): {
     onAuditEvent: registry.onAuditEvent,
     onTerminalEvent: registry.onTerminalEvent,
     onCommandResultEvent: registry.onCommandResultEvent,
+    onUpdateEvent: registry.onUpdateEvent,
   };
 
   return { bridge, electroview };

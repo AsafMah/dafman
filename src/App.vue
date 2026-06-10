@@ -14,6 +14,7 @@ import { useLayoutStore } from '@/stores/shell/layoutStore';
 import { useGroupsStore } from '@/stores/shell/groupsStore';
 import { useModelsStore } from '@/stores/library/modelsStore';
 import { useBootStore } from '@/stores/app/bootStore';
+import { useUpdateStore } from '@/stores/app/updateStore';
 // jobsStore was used by the outer onDidRemovePanel session-busy check;
 // in v3 chat panels live in inner dockviews so that handler moved to
 // GroupPanel and the busy-toast UX is currently disabled. Re-add the
@@ -30,6 +31,7 @@ import { schedulePersist, cancelPendingPersist } from '@/lib/persistScheduler';
 import { toErrorMessage } from '@/lib/errorMessage';
 import { useCommandPaletteStore } from '@/stores/shell/commandPaletteStore';
 import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts';
+import { onUpdateEvent } from '@/ipc/invoke';
 
 const clientStore = useClientStore();
 const sessionsStore = useSessionsStore();
@@ -182,6 +184,25 @@ onMounted(async () => {
   // error + reload button. They can't do anything useful without
   // the client anyway.
   if (!clientStore.ready) return;
+
+  // Subscribe to background update events so a toast appears when the
+  // boot-time check (deferred +30 s in the bun process) or a manual
+  // check finds a new version.
+  const updateStore = useUpdateStore();
+  onUpdateEvent((payload) => {
+    if (payload.status === 'update-available') {
+      toastStore.info(
+        'Update available',
+        'Open Settings \u2192 Software Updates to download and apply.',
+      );
+    }
+  });
+  // Fire-and-forget: hydrate the update store with any status the bun
+  // side already knows about (e.g. if the 30 s check ran before we
+  // mounted, we'd otherwise show stale "idle" state in Settings).
+  void updateStore.loadInitialStatus().catch(() => {
+    /* non-fatal */
+  });
 
   // Seed the command palette catalog. Static commands land
   // immediately; "Switch Model: …" entries fill in when

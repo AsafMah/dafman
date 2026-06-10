@@ -14,6 +14,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
+  UpdateEventPayload,
 } from '@/ipc/types';
 import type {
   AuditEventListener,
@@ -22,6 +23,7 @@ import type {
   PendingRequestListener,
   SessionEventListener,
   TerminalEventListener,
+  UpdateEventListener,
 } from '@/ipc/invoke';
 
 export interface ListenerMethods {
@@ -31,6 +33,7 @@ export interface ListenerMethods {
   onAuditEvent: (listener: AuditEventListener) => () => void;
   onTerminalEvent: (listener: TerminalEventListener) => () => void;
   onCommandResultEvent: (listener: CommandResultEventListener) => () => void;
+  onUpdateEvent: (listener: UpdateEventListener) => () => void;
 }
 
 export interface ListenerDispatchers {
@@ -40,6 +43,7 @@ export interface ListenerDispatchers {
   dispatchAuditEvent: (payload: AuditEntry) => void;
   dispatchTerminalEvent: (payload: TerminalEventPayload) => void;
   dispatchCommandResultEvent: (payload: CommandResultEvent) => void;
+  dispatchUpdateEvent: (payload: UpdateEventPayload) => void;
 }
 
 function subscribe<T>(set: Set<T>): (listener: T) => () => void {
@@ -76,6 +80,7 @@ export function createListenerRegistry(): ListenerMethods & ListenerDispatchers 
   const auditListeners = new Set<AuditEventListener>();
   const terminalListeners = new Set<TerminalEventListener>();
   const commandResultListeners = new Set<CommandResultEventListener>();
+  const updateListeners = new Set<UpdateEventListener>();
 
   return {
     onSessionEvent: subscribe(sessionListeners),
@@ -84,6 +89,7 @@ export function createListenerRegistry(): ListenerMethods & ListenerDispatchers 
     onAuditEvent: subscribe(auditListeners),
     onTerminalEvent: subscribe(terminalListeners),
     onCommandResultEvent: subscribe(commandResultListeners),
+    onUpdateEvent: subscribe(updateListeners),
 
     dispatchSessionEvent: fanOut(sessionListeners, 'sessionEvent'),
     dispatchPendingRequest: fanOut(pendingListeners, 'pendingRequest'),
@@ -91,5 +97,6 @@ export function createListenerRegistry(): ListenerMethods & ListenerDispatchers 
     dispatchAuditEvent: fanOut(auditListeners, 'auditEvent'),
     dispatchTerminalEvent: fanOut(terminalListeners, 'terminalEvent'),
     dispatchCommandResultEvent: fanOut(commandResultListeners, 'commandResultEvent'),
+    dispatchUpdateEvent: fanOut(updateListeners, 'updateEvent'),
   };
 }
