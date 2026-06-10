@@ -11,6 +11,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 - **Search across all open session transcripts (`Mod+Shift+F`).** A new left-edge **Search** panel runs a debounced substring query against every open session's transcript (user messages, assistant replies, system notifications), grouping matches by session with `<<…>>` context snippets. Clicking a match focuses the owning session and scrolls to the exact message via reveal-by-event-index. Backed by a `searchSessionTranscripts` RPC + `SessionRegistry.searchTranscripts`; the per-event matching/snippet logic lives in a focused, unit-tested `src-bun/app/chat/transcriptSearch.ts` helper. Phase 1 scope: open sessions only (closed/on-disk search is deferred); long-transcript event-index precision is tail-bounded.
 
+### Fixed (2026-06-10 full-E2E harness CSP regression)
+
+- **Restored the full-E2E tier (test infra).** The strict renderer CSP added in #205 (`connect-src 'self' ws://localhost:*`) silently broke every `e2e/full` flow: the harness connected the browser to `ws://127.0.0.1:<port>`, which CSP treats as a distinct origin from `localhost` and blocks — so the renderer never reached the backend and every flow timed out on boot. The harness now connects via `localhost` to match production (Electrobun RPC) and the CSP. Caught while adding the cross-session-search E2E flow; the tier is not in required CI, so the regression went unnoticed.
+
 ### Added (2026-06-10 palette session jump — issue #185)
 
 - **Jump to / resume sessions from the command palette (`Mod+K`).** Open sessions appear as `Jump` entries (focus/reveal via the cross-group path from #173); closed, on-disk sessions appear as `Resume` entries (reopen + reveal), capped at 20 with a "browse all" entry beyond that. Open sessions are listed before closed ones; the list refreshes when the palette opens. Replaces the old `session.switch` command.

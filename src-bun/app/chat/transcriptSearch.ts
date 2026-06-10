@@ -16,29 +16,41 @@ const CONTEXT_CHARS = 150;
 
 type Searchable = { role: TranscriptMatch['role']; text: string };
 
-/// The transcript event types we index, mapped to the role we surface
-/// and the `data` field that holds the searchable text. Collapses what
-/// were three near-identical `if` branches into one table.
-const SEARCHABLE_EVENTS: Record<string, { role: TranscriptMatch['role']; key: string }> = {
-  'user.message': { role: 'user', key: 'message' },
-  'assistant.message_complete': { role: 'assistant', key: 'text' },
-  'system.notification': { role: 'system', key: 'message' },
+/// The transcript event types we index, mapped to the role we surface.
+/// These are the canonical SDK/CLI type strings (the non-streaming
+/// `assistant.message`, not a `*_complete` variant) — verified against
+/// `src/lib/chatEvents/messageHandlers.ts` + the fake client.
+const SEARCHABLE_ROLES: Record<string, TranscriptMatch['role']> = {
+  'user.message': 'user',
+  'assistant.message': 'assistant',
+  'system.notification': 'system',
 };
+
+/// Where the searchable text lives on `data`, in priority order. Mirrors
+/// the renderer's `pickString(data, ['content', 'text', 'message'])` — the
+/// CLI puts message bodies on `data.content`; the others are fallbacks.
+const TEXT_FIELDS = ['content', 'text', 'message'] as const;
 
 /// Pull the {role, text} out of one raw transcript event, or null when
 /// the event is not a searchable kind / carries no string text.
 function extractSearchable(raw: { type?: string; data?: unknown }): Searchable | null {
-  const field = SEARCHABLE_EVENTS[typeof raw.type === 'string' ? raw.type : ''];
+  const role = SEARCHABLE_ROLES[typeof raw.type === 'string' ? raw.type : ''];
 
-  if (!field) return null;
+  if (!role) return null;
 
   const data = raw.data;
 
   if (data === null || typeof data !== 'object' || Array.isArray(data)) return null;
 
-  const value = (data as Record<string, unknown>)[field.key];
+  const record = data as Record<string, unknown>;
 
-  return typeof value === 'string' && value ? { role: field.role, text: value } : null;
+  for (const field of TEXT_FIELDS) {
+    const value = record[field];
+
+    if (typeof value === 'string' && value) return { role, text: value };
+  }
+
+  return null;
 }
 
 /// Build the `<<match>>`-delimited context snippet for the first

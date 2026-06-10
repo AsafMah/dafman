@@ -10,11 +10,11 @@
 /// isolated. Cheap because the test-server uses the fake SDK — no
 /// real CLI spawn.
 
-import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface BunHarness {
   readonly port: number;
@@ -36,7 +36,7 @@ export interface BunHarness {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const REPO_ROOT = resolve(__dirname, "..", "..", "..");
+const REPO_ROOT = resolve(__dirname, '..', '..', '..');
 const CONTROL_CONNECT_RETRIES = 10;
 const CONTROL_CONNECT_RETRY_DELAY_MS = 100;
 
@@ -47,38 +47,44 @@ function pickPort(): number {
 /// Seed a temp workspace with a tiny set of files so fileSearch has
 /// something to return. Returns the workspace path.
 export function seedWorkspace(extra: Record<string, string> = {}): string {
-  const ws = mkdtempSync(join(tmpdir(), "dafman-e2e-"));
-  writeFileSync(join(ws, "README.md"), "# Hello\n");
-  writeFileSync(join(ws, "package.json"), '{"name":"fixture"}\n');
-  mkdirSync(join(ws, "src"));
-  writeFileSync(join(ws, "src", "main.ts"), "// main\n");
-  writeFileSync(join(ws, "src", "app.ts"), "// app\n");
+  const ws = mkdtempSync(join(tmpdir(), 'dafman-e2e-'));
+  writeFileSync(join(ws, 'README.md'), '# Hello\n');
+  writeFileSync(join(ws, 'package.json'), '{"name":"fixture"}\n');
+  mkdirSync(join(ws, 'src'));
+  writeFileSync(join(ws, 'src', 'main.ts'), '// main\n');
+  writeFileSync(join(ws, 'src', 'app.ts'), '// app\n');
   for (const [rel, content] of Object.entries(extra)) {
     const target = join(ws, rel);
-    mkdirSync(join(target, ".."), { recursive: true });
+    mkdirSync(join(target, '..'), { recursive: true });
     writeFileSync(target, content);
   }
   return ws;
 }
 
-export async function spawnBunHarness(options: {
-  workspace?: string;
-  /// Override the default `<workspace>/.dafman-userdata` location.
-  /// Used by the cwd-persistence E2E so two bun subprocesses can
-  /// share a catalog even though they point at different workspaces.
-  userData?: string;
-  stubPickerPath?: string;
-} = {}): Promise<BunHarness> {
+export async function spawnBunHarness(
+  options: {
+    workspace?: string;
+    /// Override the default `<workspace>/.dafman-userdata` location.
+    /// Used by the cwd-persistence E2E so two bun subprocesses can
+    /// share a catalog even though they point at different workspaces.
+    userData?: string;
+    stubPickerPath?: string;
+  } = {},
+): Promise<BunHarness> {
   const workspace = options.workspace ?? seedWorkspace();
-  const userData = options.userData ?? join(workspace, ".dafman-userdata");
+  const userData = options.userData ?? join(workspace, '.dafman-userdata');
 
   // Mutable child + control-client refs so `restart()` can swap them
   // in-place while the returned harness object keeps the same identity.
   let active = await spawnChild({ workspace, userData, stubPickerPath: options.stubPickerPath });
 
   const harness: BunHarness = {
-    get port() { return active.port; },
-    get wsUrl() { return active.wsUrl; },
+    get port() {
+      return active.port;
+    },
+    get wsUrl() {
+      return active.wsUrl;
+    },
     workspace,
     userData,
     invokeControl: async <T = unknown>(name: string, args: Record<string, unknown>): Promise<T> => {
@@ -128,7 +134,7 @@ async function spawnChild(opts: {
 }): Promise<ActiveChild> {
   const port = pickPort();
   const args = [
-    "src-bun/test-server.ts",
+    'src-bun/test-server.ts',
     `--port=${port}`,
     `--workspace=${opts.workspace}`,
     `--user-data=${opts.userData}`,
@@ -136,20 +142,24 @@ async function spawnChild(opts: {
   if (opts.stubPickerPath) {
     args.push(`--stub-picker=${opts.stubPickerPath}`);
   }
-  const child = spawn("bun", args, {
+  const child = spawn('bun', args, {
     cwd: REPO_ROOT,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env },
   });
-  child.stderr?.on("data", (b) => {
+  child.stderr?.on('data', (b) => {
     process.stderr.write(`[bun] ${String(b)}`);
   });
   await waitForReadyMarker(child, port);
   return {
     child,
     port,
-    wsUrl: `ws://127.0.0.1:${port}`,
-    invokeControl: makeControlClient(`ws://127.0.0.1:${port}`),
+    // Browser connects via `localhost` to match production (Electrobun RPC
+    // uses ws://localhost) and the renderer CSP `connect-src ws://localhost:*`.
+    // `127.0.0.1` is a distinct origin to CSP and gets blocked. The Node-side
+    // control client is not CSP-bound but uses the same host for parity.
+    wsUrl: `ws://localhost:${port}`,
+    invokeControl: makeControlClient(`ws://localhost:${port}`),
   };
 }
 
@@ -158,11 +168,11 @@ async function killChild(child: ChildProcess): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return;
 
   const exited = new Promise<void>((resolve) => {
-    child.once("exit", () => resolve());
-    child.once("close", () => resolve());
+    child.once('exit', () => resolve());
+    child.once('close', () => resolve());
   });
   try {
-    child.kill("SIGTERM");
+    child.kill('SIGTERM');
   } catch {
     /* ignore — process may already be gone */
   }
@@ -177,7 +187,7 @@ async function killChild(child: ChildProcess): Promise<void> {
   await Promise.race([exited, timeout]);
   if (child.exitCode === null && child.signalCode === null) {
     try {
-      child.kill("SIGKILL");
+      child.kill('SIGKILL');
     } catch {
       /* ignore */
     }
@@ -186,19 +196,19 @@ async function killChild(child: ChildProcess): Promise<void> {
 
 function waitForReadyMarker(child: ChildProcess, port: number): Promise<void> {
   return new Promise((resolveFn, reject) => {
-    let buf = "";
+    let buf = '';
     const onData = (b: Buffer | string) => {
       buf += String(b);
       if (buf.includes(`__TEST_SERVER_READY__::port=${port}`)) {
-        child.stdout?.off("data", onData);
+        child.stdout?.off('data', onData);
         resolveFn();
       }
     };
-    child.stdout?.on("data", onData);
-    child.once("exit", (code) =>
+    child.stdout?.on('data', onData);
+    child.once('exit', (code) =>
       reject(new Error(`test-server exited before ready (code=${code})`)),
     );
-    setTimeout(() => reject(new Error("test-server ready timeout (10s)")), 10_000);
+    setTimeout(() => reject(new Error('test-server ready timeout (10s)')), 10_000);
   });
 }
 
@@ -219,8 +229,8 @@ function makeControlClient(
     if (openPromise) return openPromise;
     openPromise = new Promise((resolveFn, reject) => {
       ws = new WebSocket(wsUrl);
-      ws.addEventListener("open", () => resolveFn());
-      ws.addEventListener("error", () => {
+      ws.addEventListener('open', () => resolveFn());
+      ws.addEventListener('error', () => {
         const socket = ws;
         ws = null;
         openPromise = null;
@@ -229,17 +239,17 @@ function makeControlClient(
         } catch {
           /* ignore */
         }
-        reject(new Error("control ws connect failed"));
+        reject(new Error('control ws connect failed'));
       });
-      ws.addEventListener("close", () => {
+      ws.addEventListener('close', () => {
         ws = null;
         openPromise = null;
         for (const slot of pending.values()) {
-          slot.reject(new Error("control ws closed"));
+          slot.reject(new Error('control ws closed'));
         }
         pending.clear();
       });
-      ws.addEventListener("message", (e) => {
+      ws.addEventListener('message', (e) => {
         try {
           const p = JSON.parse(String(e.data)) as {
             type: string;
@@ -247,12 +257,12 @@ function makeControlClient(
             result?: unknown;
             error?: { message?: string };
           };
-          if ((p.type === "response" || p.type === "error") && typeof p.id === "number") {
+          if ((p.type === 'response' || p.type === 'error') && typeof p.id === 'number') {
             const slot = pending.get(p.id);
             if (!slot) return;
             pending.delete(p.id);
-            if (p.type === "response") slot.resolve(p.result);
-            else slot.reject(new Error(p.error?.message ?? "rpc error"));
+            if (p.type === 'response') slot.resolve(p.result);
+            else slot.reject(new Error(p.error?.message ?? 'rpc error'));
           }
         } catch {
           /* ignore */
@@ -274,7 +284,7 @@ function makeControlClient(
         await sleep(CONTROL_CONNECT_RETRY_DELAY_MS);
       }
     }
-    throw lastError ?? new Error("control ws connect failed");
+    throw lastError ?? new Error('control ws connect failed');
   }
 
   return async function invokeControl<T>(name: string, args: Record<string, unknown>): Promise<T> {
@@ -282,7 +292,7 @@ function makeControlClient(
     const id = nextId++;
     return new Promise<T>((resolveFn, reject) => {
       pending.set(id, { resolve: resolveFn as (v: unknown) => void, reject });
-      ws!.send(JSON.stringify({ type: "request", id, name, args }));
+      ws!.send(JSON.stringify({ type: 'request', id, name, args }));
     });
   };
 }
