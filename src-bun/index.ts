@@ -36,6 +36,7 @@ import { TerminalRegistry } from './app/terminal/terminalRegistry';
 import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { listInstructionSources } from './app/library/instructions';
 import { SettingsService, ensureDefaultWorkspace } from './app/config/settings';
+import { SnippetService } from './app/config/snippetService';
 import { installStderrFilter } from './app/observability/stderrFilter';
 import type {
   CommandResultEvent,
@@ -153,6 +154,7 @@ let emitCommandResult: (payload: CommandResultEvent) => void = (payload) => {
 const sessionMetadataStore = SessionMetadataStore.loadOrDefault(
   join(Utils.paths.userData, 'session-metadata.json'),
 );
+const snippetService = SnippetService.loadOrDefault(join(Utils.paths.userData, 'snippets.json'));
 const sessions = new SessionRegistry(
   (payload) => emitEvent(payload),
   (payload) => emitPending(payload),
@@ -552,6 +554,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       searchSessionTranscripts: rpcGuard(async ({ query, options }) =>
         sessions.searchTranscripts(query, options),
       ),
+      listSnippets: rpcGuard(async () => snippetService.list()),
+      saveSnippet: rpcGuard(async ({ snippet }) => snippetService.save(snippet)),
+      deleteSnippet: rpcGuard(async ({ id }) => snippetService.delete(id)),
     },
     messages: {},
   },

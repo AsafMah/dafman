@@ -65,6 +65,7 @@ export type {
   ToolsPrefs,
   TranscriptMatch,
   TranscriptSearchResult,
+  Snippet,
   WorkspaceFileMatch,
   Workspaces,
 } from '../src/shared/wireTypes';

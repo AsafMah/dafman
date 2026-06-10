@@ -24,7 +24,7 @@
 // shortcuts; when off we use plain text. Either way the same Enter +
 // SubmitButton path applies.
 
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import Popover from 'primevue/popover';
 import type { MenuItem } from 'primevue/menuitem';
 import { LexicalComposer } from 'lexical-vue/LexicalComposer';
@@ -78,6 +78,7 @@ import {
 import { useComposerToolbarLayout } from '@/composables/useComposerToolbarLayout';
 import { useComposerAttachments } from '@/composables/useComposerAttachments';
 import { useComposerCommandMode } from '@/composables/useComposerCommandMode';
+import { on as busOn } from '@/lib/bus';
 
 const props = withDefaults(
   defineProps<{
@@ -308,6 +309,69 @@ defineExpose({
   addAttachment,
   enterCommandMode,
   exitCommandMode,
+});
+
+/// Insert text at the current cursor position, or at the root end when the
+/// editor is empty. Called by the `insert-composer-text` bus event — emitted
+/// by `insertSnippetIntoComposer`. Never replaces existing content.
+function insertText(text: string): void {
+  const editor = editorRef.value as LexicalEditor | null;
+
+  if (!editor) return;
+
+  editor.update(() => {
+    const sel = $getSelection();
+
+    if ($isRangeSelection(sel)) {
+      // Insert multi-line snippet as paragraphs split on newline, then
+      // inline text for the last (or only) segment.
+      const lines = text.split('\n');
+
+      if (lines.length === 1) {
+        sel.insertNodes([$createTextNode(text)]);
+      } else {
+        for (const line of lines) {
+          const para = $createParagraphNode();
+
+          if (line.length > 0) para.append($createTextNode(line));
+
+          sel.insertNodes([para]);
+        }
+      }
+    } else {
+      // No active selection — append to root.
+      const root = $getRoot();
+      const lines = text.split('\n');
+
+      for (const line of lines) {
+        const para = $createParagraphNode();
+
+        if (line.length > 0) para.append($createTextNode(line));
+
+        root.append(para);
+      }
+    }
+  });
+  setTimeout(() => editor.focus(), 0);
+}
+
+let offInsertText: (() => void) | null = null;
+
+onMounted(() => {
+  // Subscribe only when this composer has a session id — sessionless
+  // (playground) composers should not intercept snippet inserts.
+  if (!props.sessionId) return;
+
+  offInsertText = busOn('insert-composer-text', ({ sessionId, text }) => {
+    if (sessionId !== props.sessionId) return;
+
+    insertText(text);
+  });
+});
+
+onBeforeUnmount(() => {
+  offInsertText?.();
+  offInsertText = null;
 });
 
 const editable = computed(() => !props.disabled);

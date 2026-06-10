@@ -41,6 +41,7 @@ import { SkillsRegistry } from './app/library/skillsRegistry';
 import { TerminalRegistry } from './app/terminal/terminalRegistry';
 import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { SettingsService } from './app/config/settings';
+import { SnippetService } from './app/config/snippetService';
 import { listInstructionSources } from './app/library/instructions';
 import { toModelSummary } from './app/library/models';
 import { FakeCopilotClient } from './app/client/fakeClient';
@@ -108,6 +109,7 @@ setClientForTest(fakeClient);
 
 const settingsPath = join(flags.userData, 'settings.json');
 const settings = SettingsService.loadOrDefault(settingsPath);
+const snippetService = SnippetService.loadOrDefault(join(flags.userData, 'snippets.json'));
 
 // Hold open sockets so we can broadcast events to all connected
 // renderers. Practically there's only ever one Playwright page, but
@@ -594,6 +596,17 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
     const { sessionId } = args as { sessionId: string };
 
     return commandResults.list(sessionId);
+  }),
+  listSnippets: rpcGuard(async () => snippetService.list()),
+  saveSnippet: rpcGuard(async (args) => {
+    const { snippet } = args as { snippet: import('./rpc').Snippet };
+
+    return snippetService.save(snippet);
+  }),
+  deleteSnippet: rpcGuard(async (args) => {
+    const { id } = args as { id: string };
+
+    return snippetService.delete(id);
   }),
 };
 

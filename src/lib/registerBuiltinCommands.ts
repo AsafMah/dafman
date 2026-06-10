@@ -41,6 +41,8 @@ import { sessionDisplayLabel } from '@/lib/palette';
 import type { ReasoningVisibility } from '@/ipc/types';
 import { PANEL_IDS } from '@/constants/panels';
 import { emit } from '@/lib/bus';
+import { useSnippetsStore } from '@/stores/snippetsStore';
+import { insertSnippetIntoComposer } from '@/lib/insertSnippetIntoComposer';
 
 const SESSIONS_PANEL_ID = 'sessions-manager';
 
@@ -895,6 +897,62 @@ export function registerBuiltinCommands(opts: RegisterOptions = {}): void {
       }
     },
   });
+
+  // ---------- Dynamic parent: Insert Snippet ----------
+  // One child per snippet in useSnippetsStore. Triggers a loadAll() on first
+  // watch invocation so the palette has data without waiting for the Library
+  // tab to mount.
+  const snippetsStore = useSnippetsStore();
+
+  if (!snippetsStore.loaded) void snippetsStore.loadAll();
+
+  const registeredSnippetIds = new Set<string>();
+
+  watch(
+    () => snippetsStore.snippets.map((s) => s.id + s.title + s.updatedAt),
+    () => {
+      const snips = snippetsStore.snippets;
+      const children: Command[] = snips.map((s) => ({
+        id: `snippet.insert.${s.id}`,
+        label: s.title,
+        hint: s.tags.join(', '),
+        icon: 'pi pi-bookmark',
+        group: 'Snippets',
+        keywords: ['snippet', 'insert', s.title, ...s.tags],
+        run: () => {
+          const sessionId = layoutStore.activeSessionId;
+
+          if (!sessionId) return;
+
+          insertSnippetIntoComposer(s.id, sessionId);
+        },
+      }));
+
+      // Unregister stale entries (snippets deleted or renamed with new id).
+      const nextIds = new Set(children.map((c) => c.id));
+
+      for (const staleId of registeredSnippetIds) {
+        if (!nextIds.has(staleId)) registry.unregister(staleId);
+      }
+
+      registeredSnippetIds.clear();
+      children.forEach((c) => registeredSnippetIds.add(c.id));
+
+      registry.register({
+        id: 'snippet.insert',
+        label: 'Insert Snippet\u2026',
+        group: 'Snippets',
+        icon: 'pi pi-bookmark',
+        keywords: ['snippet', 'insert', 'prompt', 'template'],
+        when: () => layoutStore.activeSessionId !== null && children.length > 0,
+        children,
+        run: () => {
+          /* parent — palette toggles expansion */
+        },
+      });
+    },
+    { immediate: true, deep: false },
+  );
 }
 
 /// Compact a workspace path for the command label. `C:\Users\…\dafman`
