@@ -4,6 +4,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (2026-06-10 dual-reduction slice 2 — issue #209)
+
+- **Unified the duplicated session status-delta derivation between the two reducers (internal).** Following slice 1 (pending-requests), the per-event derivation of title, model + reasoning-effort, current sub-agent, and turn/thinking state was still duplicated between the record-side reducer (`sessionReducer.ts`) and the ambient-side chat-event handlers. Both now route through one pure, no-Pinia `reduceSessionStatusEvent` + `SessionStatusDelta` union in `src/lib/sessionStatus.ts`; the record side applies it via `applyStatusDeltaToRecord` and the ambient handlers apply the same delta. Removed 6 duplicate record-side handlers. A 32-case convergence test asserts both projections agree (and documents the intentional divergences — e.g. abort/task-complete clear the record's turn state but deliberately not the ambient's). No behavior change.
+
 ### Added (2026-06-10 session config templates — issue #243)
 
 - **Session config templates.** Save a session's configuration (agent, enabled MCP servers, disabled skills, run mode) as a named, reusable template, then apply it to a running session or spin up a new session from it. The session details panel gains **Save as template…** (captures the live config) and **Apply template…** (applies a saved one, toasting any servers/skills that no longer exist). The command palette gets a dynamic **Templates** group — **New session from template** entries (`template.new.<id>`). Templates are delta-encoded (explicit MCP-enable + skill-disable lists, so a new global server isn't silently force-disabled) and persisted to `<userData>/session-templates.json` via a new Bun `TemplateService` (atomic writes). Backed by `listTemplates`/`saveTemplate`/`deleteTemplate`/`applyTemplate`/`captureTemplate` RPCs (wired into both the app and the test backend). Phase 1 scope: storage + palette + details-panel actions (the Library Templates tab is Phase 2).

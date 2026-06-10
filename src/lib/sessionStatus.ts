@@ -1,8 +1,10 @@
 import type {
+  AgentInfo,
   AutoModeSwitchRequestData,
   ElicitationRequestData,
   ExitPlanModeRequestData,
   PermissionRequestData,
+  SessionEventPayload,
   UserInputRequestData,
 } from '@/ipc/types';
 
@@ -211,6 +213,113 @@ export function pendingRequestEntryFromData(data: unknown): SessionPendingReques
         requestId: record.requestId,
         request: record.request as AutoModeSwitchRequestData,
       });
+    default:
+      return null;
+  }
+}
+
+// ── Status delta ─────────────────────────────────────────────────
+// Normalized description of what changed in the session status on a
+// single SDK event. Pure value — no mutation, no Pinia.
+//
+// Consumers:
+//   - sessionReducer.ts applies deltas to SessionRecord fields.
+//   - chatEvents/ handlers apply deltas to ChatAmbient fields.
+//   Both sides own their additional non-shared logic (e.g. record
+//   keeps unseenTurns / OS notify; ambient keeps toast de-dup).
+
+export type SessionStatusDelta =
+  | { kind: 'titleChanged'; title: string }
+  | {
+      kind: 'modelChanged';
+      newModel: string;
+      reasoningEffort: string | null;
+      previousModel: string | null;
+      previousReasoningEffort: string | null;
+    }
+  | { kind: 'currentAgentChanged'; agent: AgentInfo | null }
+  | { kind: 'turnStarted' }
+  | { kind: 'turnEnded' }
+  | { kind: 'thinkingCleared' };
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/// Derive a normalized status delta from a single SDK event payload.
+/// Returns `null` for events that don't affect shared status fields.
+///
+/// Pure: no mutation, no Pinia, no side effects.
+///
+/// Both `sessionReducer.ts` (record projection) and `chatEvents/`
+/// handlers (ambient projection) call this instead of duplicating
+/// the field-extraction logic.
+export function reduceSessionStatusEvent(payload: SessionEventPayload): SessionStatusDelta | null {
+  const data = payload.data;
+
+  switch (payload.eventType) {
+    case 'session.title_changed': {
+      const title = nonEmptyString(data.title);
+
+      return title ? { kind: 'titleChanged', title } : null;
+    }
+
+    case 'session.model_change': {
+      const newModel = nonEmptyString(data.newModel);
+
+      if (!newModel) return null;
+
+      return {
+        kind: 'modelChanged',
+        newModel,
+        reasoningEffort: nonEmptyString(data.reasoningEffort),
+        previousModel: nonEmptyString(data.previousModel),
+        previousReasoningEffort: nonEmptyString(data.previousReasoningEffort),
+      };
+    }
+
+    case 'subagent.selected': {
+      const agentName = nonEmptyString(data.agentName);
+
+      // No name → informational / transient event; leave currentAgent unchanged.
+      if (!agentName) return null;
+
+      // parentToolCallId present → transient sub-agent delegation during a fleet
+      // turn, NOT a session-level agent switch. Ignore for header chip / rail.
+      const parentToolCallId = nonEmptyString(data.parentToolCallId);
+
+      if (parentToolCallId) return null;
+
+      const agent: AgentInfo = {
+        name: agentName,
+        displayName: typeof data.agentDisplayName === 'string' ? data.agentDisplayName : agentName,
+        description: typeof data.agentDescription === 'string' ? data.agentDescription : '',
+        ...(typeof data.agentPath === 'string' ? { path: data.agentPath } : {}),
+      };
+
+      return { kind: 'currentAgentChanged', agent };
+    }
+
+    case 'subagent.deselected':
+      return { kind: 'currentAgentChanged', agent: null };
+
+    case 'assistant.turn_start':
+      return { kind: 'turnStarted' };
+
+    case 'assistant.turn_end':
+      return { kind: 'turnEnded' };
+
+    // Terminal events: clear thinking without emitting turn-end side effects.
+    // Record side uses thinkingCleared for all five; ambient side only has
+    // handlers for session.idle and session.error (the others remain record-only
+    // to avoid adding new ambient state changes).
+    case 'session.idle':
+    case 'session.error':
+    case 'abort':
+    case 'session.task_complete':
+    case 'dafman.resume_settled':
+      return { kind: 'thinkingCleared' };
+
     default:
       return null;
   }

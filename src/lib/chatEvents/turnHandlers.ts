@@ -10,18 +10,31 @@
 // above the streaming bubble; cleared on turn_end.
 
 import { pickString } from '@/lib/chatEvents/helpers';
+import { reduceSessionStatusEvent } from '@/lib/sessionStatus';
 import type { Handler } from '@/lib/chatEvents/context';
 
 export const turnHandlers: Record<string, Handler> = {
-  'assistant.turn_start': (ctx) => {
-    ctx.ambient.turnActive = true;
-    ctx.ambient.sawTurnBoundary = true;
+  'assistant.turn_start': (ctx, _data, payload) => {
+    const delta = reduceSessionStatusEvent(payload);
+
+    if (delta?.kind === 'turnStarted') {
+      ctx.ambient.turnActive = true;
+      ctx.ambient.sawTurnBoundary = true;
+    }
+
+    // Ambient-only: clear the intent hint at each turn boundary.
     ctx.ambient.intent = null;
   },
 
-  'assistant.turn_end': (ctx) => {
-    ctx.ambient.turnActive = false;
-    ctx.ambient.sawTurnBoundary = true;
+  'assistant.turn_end': (ctx, _data, payload) => {
+    const delta = reduceSessionStatusEvent(payload);
+
+    if (delta?.kind === 'turnEnded') {
+      ctx.ambient.turnActive = false;
+      ctx.ambient.sawTurnBoundary = true;
+    }
+
+    // Ambient-only: clear the intent hint at each turn boundary.
     ctx.ambient.intent = null;
   },
 
