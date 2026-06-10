@@ -18,6 +18,5 @@
     "declaration": true,
     "outDir": "node_modules/.cache/tsc-bun"
   },
-  "include": ["src-bun/**/*.ts", "tools/**/*.ts", "tools/**/*.vue"]
+  "include": ["src-bun/**/*.ts", "src/shared/**/*.ts", "tools/**/*.ts", "tools/**/*.vue"]
 }
-

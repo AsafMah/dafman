@@ -21,7 +21,7 @@
     "smoke:run": "playwright test --config=e2e/playwright.config.ts",
     "e2e": "vite build && playwright test --config=e2e/full/playwright.config.ts",
     "e2e:run": "playwright test --config=e2e/full/playwright.config.ts",
-    "lint": "vue-tsc --noEmit",
+    "lint": "tsc -p tsconfig.bun.json && vue-tsc --noEmit",
     "lint:bun": "bun run tools/check-bun-entry.ts",
     "lint:markers": "bun run tools/check-conflict-markers.ts",
     "lint:sizes": "bun run tools/check-file-sizes.ts",

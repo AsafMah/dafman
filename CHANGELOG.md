@@ -8,6 +8,11 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 - **Reloading the renderer (Ctrl+R / HMR) no longer blanks open transcripts.** The backend session resume short-circuited for an already-live session and skipped replaying its history, so a reload restored the tabs/sidebar but left the message panes empty (a full restart was needed to get them back). `SessionRegistry.resume()` now re-runs the same hydrate/replay path for already-registered sessions (reusing the live SDK session), and the renderer guards against double-appending into a record that already has events. Cold boot, the #172 readiness gate, and the #208 replay hydration-guard are all preserved.
 
+### Changed (2026-06-10 wire contract single-source — issue #210/#158)
+
+- **The IPC wire contract is now single-source.** The payload/request types were hand-mirrored between `src-bun/rpc.ts` and `src/ipc/types.ts` (the repo's largest duplication — ~597 cloned lines). They now live in one no-`electrobun` module `src/shared/wireTypes.ts` that both sides import: `src-bun/rpc.ts` (1390→213) derives the Electrobun `RPCSchema` from the shared `CommandMap` via a mapped type and stays the only file that imports `electrobun/bun`; `src/ipc/types.ts` (1019→218) is now a thin renderer barrel. Net −1,978 lines of duplicated declarations; every wire change is now one edit.
+- **Fixed a latent wire drift:** the renderer's `CommandMap['sendMessage']` was missing the `agentMode` arg the backend already accepted (#41). The `wire-contract.test.ts` request samples now use `satisfies CommandMap[...]['args']` so this class of drift fails at compile time.
+
 ### Fixed (2026-06-08 context-usage pill — issues #219, #220)
 
 - **Context-usage pill no longer corrupted by per-call usage events (#219).** `assistant.usage` carries only per-API-call `inputTokens`/`outputTokens` (verified against the SDK types), not the cumulative `currentTokens`; `mergeUsage` was misreading `inputTokens` as `currentTokens`, so any sub-agent/mcp-sampling call (which shares the session's ambient) would drop the pill to that call's small token count. The pill now sources `currentTokens`/`tokenLimit` solely from `session.usage_info`.

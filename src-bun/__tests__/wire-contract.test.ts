@@ -1,23 +1,31 @@
 import { describe, expect, test } from 'bun:test';
 import type {
-  ModelSummary,
+  AgentFileEntry,
+  AppInfo,
+  AuditEntry,
+  CommandMap,
+  CommandResultEvent,
+  CommandResultRecord,
+  InstructionSource,
   JobRecord,
+  LogLevel,
+  LogRecord,
+  ModelSummary,
   PendingRequestPayload,
   PermissionRequestData,
   RespondToRequestParams,
-  SessionHistoryCompactionResult,
-  SessionMode,
-  Settings,
   SessionEventPayload,
-  InstructionSource,
+  SessionHistoryCompactionResult,
+  SessionMetadataSummary,
+  SessionMode,
+  SendMessageAttachment,
+  Settings,
   TaskInfo,
   TerminalCreateParams,
   TerminalEventPayload,
+  TerminalPrefs,
   TerminalSummary,
-  CommandResultEvent,
-  CommandResultRecord,
-  SendMessageAttachment,
-  AgentFileEntry,
+  WorkspaceFileMatch,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -40,7 +48,7 @@ const DEFAULT_TERMINAL_ADDONS = {
   serialize: true,
 } as const;
 
-function makeTerminalPrefs(defaultProfileId: string): import('../rpc').TerminalPrefs {
+function makeTerminalPrefs(defaultProfileId: string): TerminalPrefs {
   return {
     defaultProfileId,
     fontFamily: 'Cascadia Mono, Consolas, ui-monospace, monospace',
@@ -111,7 +119,7 @@ describe('IPC wire contracts', () => {
   });
 
   test('AppInfo shape', () => {
-    const sample: import('../rpc').AppInfo = {
+    const sample: AppInfo = {
       channel: 'canary',
       version: '0.1.0',
     };
@@ -203,7 +211,7 @@ describe('IPC wire contracts', () => {
   });
 
   test('SessionMetadataSummary shape', () => {
-    const sample: import('../rpc').SessionMetadataSummary = {
+    const sample: SessionMetadataSummary = {
       sessionId: 's-1',
       startTime: '2026-05-17T10:00:00.000Z',
       modifiedTime: '2026-05-17T11:30:00.000Z',
@@ -370,7 +378,10 @@ describe('IPC wire contracts', () => {
   });
 
   test('sendMessage request — default mode (omitted)', () => {
-    const sample = { sessionId: 'sess-1', text: 'hello' };
+    const sample = {
+      sessionId: 'sess-1',
+      text: 'hello',
+    } satisfies CommandMap['sendMessage']['args'];
     expect(sample).toMatchSnapshot();
   });
 
@@ -379,7 +390,7 @@ describe('IPC wire contracts', () => {
       sessionId: 'sess-1',
       text: 'queue this',
       mode: 'enqueue' as const,
-    };
+    } satisfies CommandMap['sendMessage']['args'];
     expect(sample).toMatchSnapshot();
   });
 
@@ -388,7 +399,7 @@ describe('IPC wire contracts', () => {
       sessionId: 'sess-1',
       text: 'steer this',
       mode: 'immediate' as const,
-    };
+    } satisfies CommandMap['sendMessage']['args'];
     expect(sample).toMatchSnapshot();
   });
 
@@ -397,7 +408,7 @@ describe('IPC wire contracts', () => {
       sessionId: 'sess-1',
       text: 'plan this feature',
       agentMode: 'plan' as const,
-    };
+    } satisfies CommandMap['sendMessage']['args'];
     expect(sample).toMatchSnapshot();
   });
 
@@ -407,7 +418,7 @@ describe('IPC wire contracts', () => {
       text: 'run immediately in autopilot',
       mode: 'immediate' as const,
       agentMode: 'autopilot' as const,
-    };
+    } satisfies CommandMap['sendMessage']['args'];
     expect(sample).toMatchSnapshot();
   });
 
@@ -680,7 +691,7 @@ describe('IPC wire contracts', () => {
 
 describe('IPC wire contracts — diagnostics', () => {
   test('LogRecord shape (info + warn + error variants)', () => {
-    const samples: import('../rpc').LogRecord[] = [
+    const samples: LogRecord[] = [
       {
         ts: '2026-05-21T20:00:00.000Z',
         level: 'info',
@@ -700,11 +711,11 @@ describe('IPC wire contracts — diagnostics', () => {
 
   test('getLogState response shape', () => {
     const sample = {
-      level: 'info' as import('../rpc').LogLevel,
+      level: 'info' as LogLevel,
       recent: [
         {
           ts: '2026-05-21T20:00:00.000Z',
-          level: 'info' as import('../rpc').LogLevel,
+          level: 'info' as LogLevel,
           message: 'ready',
         },
       ],
@@ -730,7 +741,7 @@ describe('IPC wire contracts — diagnostics', () => {
   });
 
   test('AuditEntry permission + url + mcp + toolFailure shapes', () => {
-    const samples: import('../rpc').AuditEntry[] = [
+    const samples: AuditEntry[] = [
       {
         ts: '2026-05-22T00:00:00.000Z',
         kind: 'permission',
@@ -780,7 +791,7 @@ describe('IPC wire contracts — diagnostics', () => {
   });
 
   test('WorkspaceFileMatch carries kind', () => {
-    const samples: import('../rpc').WorkspaceFileMatch[] = [
+    const samples: WorkspaceFileMatch[] = [
       { path: 'README.md', absolutePath: '/r/README.md', name: 'README.md', kind: 'file' },
       { path: 'src', absolutePath: '/r/src', name: 'src', kind: 'directory' },
       {
