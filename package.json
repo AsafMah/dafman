@@ -99,7 +99,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@happy-dom/global-registrator": "20.9.0",
+    "@happy-dom/global-registrator": "20.10.2",
     "@playwright/test": "^1.60.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@testing-library/vue": "^8.1.0",
