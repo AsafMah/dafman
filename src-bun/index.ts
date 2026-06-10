@@ -594,6 +594,105 @@ const mainWindow = new BrowserWindow({
   rpc,
   frame: { width: 1200, height: 800, x: 100, y: 100 },
 });
+// ─── Webview navigation guard ─────────────────────────────────────────────────
+//
+// The renderer must never load external URLs inside the webview process; doing
+// so would give remote content full access to the Electrobun RPC bridge.
+//
+// Two-layer defence:
+//   1. `setNavigationRules` — native, synchronous: only same-origin navigations
+//      are allowed in the webview. All others are blocked before they load.
+//   2. `will-navigate` / `new-window-open` listeners — detect blocked attempts
+//      and route http(s) URLs to the external OS browser (same logic as the
+//      `openUrl` RPC handler), logging every interception for audit.
+//
+// NOTE: `setNavigationRules` passes an array of allowed URL prefixes to the
+// Electrobun native side. The exact format is determined by the C++ WebView2
+// implementation and needs a live-boot smoke test (the format is not documented
+// in the TypeScript API). If navigations are blocked more aggressively than
+// expected (e.g. HMR reloads blocked in dev), widen the rules array to include
+// additional allowed prefixes.
+
+// Derive the app origin so any same-origin path is still allowed.
+// `url` is already resolved: "http://localhost:5173/…" (dev) or
+// "views://mainview/index.html" (prod).
+const appOrigin = (() => {
+  try {
+    return new URL(url).origin; // "http://localhost:5173" | "views://mainview"
+  } catch {
+    return url; // malformed — use as-is (should never happen)
+  }
+})();
+
+// Layer 1: native block — restrict the webview to the app origin only.
+mainWindow.webview.setNavigationRules([appOrigin]);
+
+// Layer 2: event listeners — intercept attempts and route http(s) externally.
+
+// Helper: open an external http(s) URL via the OS browser.
+// Mirrors the `openUrl` RPC handler's logic (recordUrl omitted here since
+// the webview nav interception is a different audit path).
+function openExternalUrl(targetUrl: string, source: string): void {
+  if (/^https?:\/\//i.test(targetUrl)) {
+    log.info('webview navigation intercepted, opening externally', {
+      url: targetUrl,
+      source,
+    });
+    try {
+      Utils.openExternal(targetUrl);
+    } catch (err) {
+      log.warn('openExternal threw during webview navigation intercept', {
+        url: targetUrl,
+        source,
+        error: toErrorMessage(err),
+      });
+    }
+  } else {
+    log.warn('webview navigation blocked: non-http(s) scheme', {
+      url: targetUrl,
+      source,
+    });
+  }
+}
+
+// `will-navigate` fires for in-webview navigations (top-level frame).
+// Payload: ElectrobunEvent<{ detail: string }, {}> where detail is the target URL.
+// Event name exact match: "will-navigate" (see webviewEvents.ts).
+mainWindow.webview.on('will-navigate', (event: unknown) => {
+  const ev = event as { data: { detail: string } };
+  const targetUrl = typeof ev?.data?.detail === 'string' ? ev.data.detail.trim() : '';
+
+  if (!targetUrl || targetUrl.startsWith(appOrigin)) return;
+
+  openExternalUrl(targetUrl, 'will-navigate');
+});
+
+// `new-window-open` fires when the page tries to open a new window/tab
+// (e.g. `<a target="_blank">`, `window.open()`, or cmd+click).
+// Payload: ElectrobunEvent<{ detail: string | { url: string, ... } }, {}>.
+// BrowserView.on() does not include "new-window-open" in its type union, but
+// the event IS dispatched through the same electrobunEventEmitter path — cast
+// to allow it at runtime.
+(mainWindow.webview.on as (name: string, handler: (event: unknown) => void) => void)(
+  'new-window-open',
+  (event: unknown) => {
+    const ev = event as { data: { detail: string | { url: string } } };
+    const detail = ev?.data?.detail;
+    const targetUrl = (
+      typeof detail === 'string'
+        ? detail
+        : typeof detail === 'object' && detail !== null && typeof detail.url === 'string'
+          ? detail.url
+          : ''
+    ).trim();
+
+    if (!targetUrl) return;
+
+    openExternalUrl(targetUrl, 'new-window-open');
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Initial-paint clipping workaround for the Electrobun BrowserWindow on
 /// Windows: the WebView2 surface is created at the *outer* window size,

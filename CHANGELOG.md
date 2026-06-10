@@ -18,6 +18,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 - **Changing run mode / model / approve-all no longer emits an unhandled promise rejection (#212).** These fire-and-forget setters toasted the error **and** re-threw it; the `void`-called UI sites had no `.catch`, so the rejection surfaced as `unhandledrejection` (e.g. `unknown rpc: setSessionMode`). They now own the error via the toast and return `Promise<boolean>` (false on failure) instead of re-throwing; `startAutopilot` and the auto-approve toast key off that boolean so nothing double-reports or falsely confirms.
 
+### Security (2026-06-08 webview hardening — issue #205)
+
+- **Hardened the privileged webview against navigation to attacker-controlled content (#205).** Agent/tool/MCP output is untrusted, and the renderer holds privileged IPC, so a navigation to external content is an RCE/phishing risk. Three layers added: (1) a native navigation guard — `setNavigationRules([appOrigin])` plus `will-navigate`/`new-window-open` handlers that keep the main webview on its own origin and route external `http(s)` links through the existing `openUrl` RPC (external browser, https allowlist); (2) a DOMPurify `afterSanitizeAttributes` hook forcing `target="_blank"` + `rel="noopener noreferrer"` on **all** anchors (previously only markdown-token links got this, so raw HTML `<a>` could navigate the top document); (3) a strict Content-Security-Policy `<meta>` (`default-src 'self'`, `script-src 'self'`, `object-src 'none'`, etc.) as defense-in-depth behind the DOMPurify sanitizer.
+
 ### Fixed (2026-06-08 keyboard editor chord — issue #202)
 
 - **Rebound the keyboard-shortcuts editor to `Mod+Shift+K`** (was `Mod+K Mod+S`). The original sequence was unreachable: `Mod+K` (command palette) is a single chord that fires on the first press, so any sequence sharing that prefix never resolved. Found dogfooding the keyboard system; `Mod+Shift+K` is a free global chord (`useGlobalShortcuts` dispatch unchanged). The `e2e/full` keyboard flow's previously-`fixme` editor test is now active.

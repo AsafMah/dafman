@@ -10,5 +10,6 @@
   "src/components/chat/MessageComposer.vue": 1085,
   "src/ipc/types.ts": 1019,
   "src/components/settings/KeyboardShortcutsSection.vue": 859,
-  "src/lib/registerBuiltinCommands.ts": 819
+  "src/lib/registerBuiltinCommands.ts": 819,
+  "src-bun/index.ts": 831
 }

@@ -2,13 +2,44 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/dafman.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/dafman.svg"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <!--
+      Content Security Policy.
+      Notes for smoke-tester:
+        - style-src 'unsafe-inline': required for KaTeX, Prism token spans, mermaid
+          (if added), and Vue scoped-style injection. Removing it WILL break math rendering.
+        - connect-src ws://localhost:*: required for the Electrobun RPC WebSocket
+          transport (Bun server on a random port 50000-65535). Without it the renderer
+          cannot talk to the main process in production (views://mainview origin).
+        - img-src data: blob:: data URIs appear in KaTeX; blob: may appear in
+          generated SVG / canvas output.
+        - font-src data:: KaTeX bundles some fonts as data URIs.
+        - script-src 'self': compiled bundles only; no eval / inline scripts.
+          If mermaid is added later, verify it does not require 'unsafe-eval'.
+        - SMOKE TEST: boot the app and verify KaTeX math, Prism code blocks,
+          images, and the RPC bridge all work. Also verify external links open
+          in the OS browser, not inside the webview.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:*; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
     <title>Dafman</title>
   </head>
 
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script
+      type="module"
+      src="/src/main.ts"
+    ></script>
   </body>
 </html>
