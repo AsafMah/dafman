@@ -33,7 +33,7 @@ export async function setSessionModelAction(
   sessionId: string,
   model: string,
   reasoningEffort: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const toasts = useToastStore();
 
   try {
@@ -44,11 +44,14 @@ export async function setSessionModelAction(
       record.model = model;
       record.reasoningEffort = reasoningEffort;
     }
+
+    return true;
   } catch (err) {
     const message = toErrorMessage(err);
 
     toasts.error('Failed to switch model', message);
-    throw err;
+
+    return false;
   }
 }
 
@@ -56,7 +59,7 @@ export async function setSessionModeAction(
   ctx: SessionActionCtx,
   sessionId: string,
   mode: SessionMode,
-): Promise<void> {
+): Promise<boolean> {
   const toasts = useToastStore();
 
   try {
@@ -64,11 +67,14 @@ export async function setSessionModeAction(
     const record = ctx.getSession(sessionId);
 
     if (record) record.mode = mode;
+
+    return true;
   } catch (err) {
     const message = toErrorMessage(err);
 
     toasts.error('Failed to change run mode', message);
-    throw err;
+
+    return false;
   }
 }
 
@@ -76,7 +82,7 @@ export async function setSessionApproveAllAction(
   ctx: SessionActionCtx,
   sessionId: string,
   enabled: boolean,
-): Promise<void> {
+): Promise<boolean> {
   // Playground sentinel: skip the RPC (no real bun session) but still
   // mirror the flag onto the in-memory record so the UI reflects the
   // toggle for inline testing. assertSessionWritable was already skipped
@@ -86,7 +92,7 @@ export async function setSessionApproveAllAction(
 
     if (record) record.approveAll = enabled;
 
-    return;
+    return true;
   }
 
   const toasts = useToastStore();
@@ -96,25 +102,31 @@ export async function setSessionApproveAllAction(
     const record = ctx.getSession(sessionId);
 
     if (record) record.approveAll = enabled;
+
+    return true;
   } catch (err) {
     const message = toErrorMessage(err);
 
     toasts.error('Failed to update auto-approval', message);
-    throw err;
+
+    return false;
   }
 }
 
-export async function resetSessionApprovalsAction(sessionId: string): Promise<void> {
+export async function resetSessionApprovalsAction(sessionId: string): Promise<boolean> {
   const toasts = useToastStore();
 
   try {
     await invokeCommand('resetSessionApprovals', { sessionId });
     toasts.success('Session approvals cleared', sessionId);
+
+    return true;
   } catch (err) {
     const message = toErrorMessage(err);
 
     toasts.error('Failed to reset approvals', message);
-    throw err;
+
+    return false;
   }
 }
 

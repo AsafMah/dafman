@@ -14,6 +14,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Fixed (2026-06-08 resume hydration — issue #208)
 
 - **Resuming sessions no longer shows phantom "unseen activity" counts (#208).** On resume the backend replays a session's historical events; replayed `assistant.turn_end` events were run through the side-effectful session reducer, so every past turn bumped `unseenTurns` (and fired a turn-end OS notification when enabled) for each non-active restored session — a multi-session restart lit up bogus unread dots and reordered the sidebar. Replayed events are now wire-tagged (`replay: true`) and `handleTurnEnd` skips the unseen-count bump + notify on replay while still clearing the thinking state.
+### Fixed (2026-06-08 error ownership — issue #212)
+
+- **Changing run mode / model / approve-all no longer emits an unhandled promise rejection (#212).** These fire-and-forget setters toasted the error **and** re-threw it; the `void`-called UI sites had no `.catch`, so the rejection surfaced as `unhandledrejection` (e.g. `unknown rpc: setSessionMode`). They now own the error via the toast and return `Promise<boolean>` (false on failure) instead of re-throwing; `startAutopilot` and the auto-approve toast key off that boolean so nothing double-reports or falsely confirms.
 
 ### Fixed (2026-06-08 keyboard editor chord — issue #202)
 
