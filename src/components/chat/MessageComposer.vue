@@ -493,22 +493,6 @@ const primaryTooltip = computed(() =>
           </div>
           <div class="lex-composer-send">
             <span
-              class="send-mode-chip"
-              :class="`send-mode-${props.defaultMode}`"
-              :title="
-                props.defaultMode === 'queue'
-                  ? 'Send mode: Queue (wait behind current turn)'
-                  : 'Send mode: Steer (inject into current turn)'
-              "
-              aria-label="Send mode"
-            >
-              <i
-                class="pi"
-                :class="props.defaultMode === 'queue' ? 'pi-clock' : 'pi-bolt'"
-                aria-hidden="true"
-              />{{ props.defaultMode === 'queue' ? 'Queue' : 'Steer' }}</span
-            >
-            <span
               v-if="props.queued"
               class="send-queued-chip"
               title="Message queued — will send after the current turn"
@@ -901,11 +885,8 @@ const primaryTooltip = computed(() =>
   font-weight: 700;
 }
 
-/* Send-mode chip (Steer / Queue) and queued indicator shown in the
- * send area. Intentionally small and muted — these are ambient cues,
- * not primary affordances. The mode chip uses accent-tinted background
- * when queue is active to distinguish it from the default steer mode. */
-.send-mode-chip,
+/* Queued indicator shown in the send area when a message is waiting
+ * behind the current running turn. */
 .send-queued-chip {
   display: inline-flex;
   align-items: center;
@@ -918,24 +899,10 @@ const primaryTooltip = computed(() =>
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
-}
-
-.send-mode-chip {
-  color: var(--p-text-muted-color);
-  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
-}
-
-.send-mode-chip.send-mode-queue {
   color: var(--p-orange-500, #f97316);
   background: color-mix(in srgb, var(--p-orange-500, #f97316) 14%, transparent);
 }
 
-.send-queued-chip {
-  color: var(--p-orange-500, #f97316);
-  background: color-mix(in srgb, var(--p-orange-500, #f97316) 14%, transparent);
-}
-
-.send-mode-chip .pi,
 .send-queued-chip .pi {
   font-size: 0.7rem;
 }

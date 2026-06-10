@@ -1,0 +1,41 @@
+diff --git a/dist/LexicalContentEditable.vine.js b/dist/LexicalContentEditable.vine.js
+index ca441ab857ed7f275279688a180628abb4668837..b852c1dd39a4a57156aed4975cfeb6a9a186077e 100644
+--- a/dist/LexicalContentEditable.vine.js
++++ b/dist/LexicalContentEditable.vine.js
+@@ -148,9 +148,7 @@ const ContentEditable = (()=>{
+             onTransitionstart: {},
+             innerHTML: {},
+             class: {},
+-            style: {
+-                type: Boolean
+-            },
++            style: {},
+             accesskey: {},
+             contenteditable: {
+                 type: Boolean
+diff --git a/dist/shared/LexicalContentEditableElement.vine.js b/dist/shared/LexicalContentEditableElement.vine.js
+index 594048b93bbd91cd33c27813ed8e875abc500a27..2dd5b37996b2d0348bfba7719426f1db2afd3f43 100644
+--- a/dist/shared/LexicalContentEditableElement.vine.js
++++ b/dist/shared/LexicalContentEditableElement.vine.js
+@@ -166,9 +166,7 @@ const ContentEditableElement = (()=>{
+             onTransitionstart: {},
+             innerHTML: {},
+             class: {},
+-            style: {
+-                type: Boolean
+-            },
++            style: {},
+             accesskey: {},
+             contenteditable: {
+                 type: Boolean
+@@ -308,8 +306,8 @@ const ContentEditableElement = (()=>{
+             const root = useTemplateRef('root');
+             const isEditable = ref(props.editor.isEditable());
+             const otherAttrs = computed(()=>{
+-                const { editor: _ } = props, rest = _object_without_properties(props, [
+-                    "editor"
++                const { editor: _, prefix: _prefix } = props, rest = _object_without_properties(props, [
++                    "editor", "prefix"
+                 ]);
+                 return rest;
+             });
