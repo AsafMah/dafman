@@ -11,6 +11,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Added (2026-06-10 palette session jump — issue #185)
 
 - **Jump to / resume sessions from the command palette (`Mod+K`).** Open sessions appear as `Jump` entries (focus/reveal via the cross-group path from #173); closed, on-disk sessions appear as `Resume` entries (reopen + reveal), capped at 20 with a "browse all" entry beyond that. Open sessions are listed before closed ones; the list refreshes when the palette opens. Replaces the old `session.switch` command.
+### Added (2026-06-10 Library Skills two-column — issue #28)
+
+- **Library → Skills tab: per-session override toggle.** Each skill row now shows a **"Default"** (global) + **"This session"** (per-session override, via `setSessionSkillEnabled` for the focused session) toggle pair, disabled with a "No active session" hint when none is focused — mirroring the MCP two-column (#200). Continues the #28 Library-as-source-of-truth model. (Tools stay global-only for now — they have no per-session runtime/persistence; tracked in #252.)
 
 ### Fixed (2026-06-10 reload transcripts — issue #235)
 
