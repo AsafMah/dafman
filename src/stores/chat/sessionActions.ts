@@ -7,9 +7,10 @@
 import { invokeCommand } from '@/ipc/invoke';
 import type { RespondToRequestParams, SessionMode } from '@/ipc/types';
 import { toErrorMessage } from '@/lib/errorMessage';
+import type { SessionPendingRequest } from '@/lib/sessionStatus';
 import { useToastStore } from '@/stores/app/toastStore';
 import { appendEvent } from './sessionReducer';
-import type { PendingRecordRequest, SessionRecord } from './sessionsStore';
+import type { SessionRecord } from './sessionsStore';
 
 /// Sentinel session id used by `src/dev/Playground.vue` to exercise
 /// the PendingRequestModal without a real bun-side handler. Exported
@@ -288,7 +289,7 @@ export async function respondToPendingAction(
   // succeeds — otherwise a failed response would leave a phantom
   // response event in the transcript that the chat reducer would
   // dutifully render.
-  let restoredEntry: PendingRecordRequest | null = null;
+  let restoredEntry: SessionPendingRequest | null = null;
   let restoredIdx = -1;
 
   if (record) {

@@ -21,85 +21,9 @@
 // `*.completed` (out-of-band, stale-cleanup). SDK `*.requested` are
 // informational no-ops.
 
-import { pickString } from '@/lib/chatEvents/helpers';
-import type { ChatItem, PendingRequest } from '@/lib/chatEvents';
-import type {
-  AutoModeSwitchRequestData,
-  ElicitationRequestData,
-  ExitPlanModeRequestData,
-  PermissionRequestData,
-  UserInputRequestData,
-} from '@/ipc/types';
+import { pendingRequestEntryFromData, type SessionPendingRequestKind } from '@/lib/sessionStatus';
+import type { ChatItem } from '@/lib/chatEvents';
 import type { Handler, ReducerContext } from '@/lib/chatEvents/context';
-
-function describePermission(data: unknown): string {
-  if (
-    data &&
-    typeof data === 'object' &&
-    typeof (data as PermissionRequestData).summary === 'string'
-  ) {
-    return (data as PermissionRequestData).summary;
-  }
-
-  return (
-    pickString(data, ['summary', 'description', 'message']) ||
-    pickString(data, ['tool', 'toolName']) ||
-    'Tool wants permission'
-  );
-}
-
-function describeInput(data: unknown): string {
-  if (
-    data &&
-    typeof data === 'object' &&
-    typeof (data as UserInputRequestData).question === 'string'
-  ) {
-    return (data as UserInputRequestData).question;
-  }
-
-  return (
-    pickString(data, ['question', 'prompt', 'summary', 'message', 'description']) ||
-    'Awaiting input'
-  );
-}
-
-function describeElicitation(data: unknown): string {
-  if (
-    data &&
-    typeof data === 'object' &&
-    typeof (data as ElicitationRequestData).message === 'string'
-  ) {
-    return (data as ElicitationRequestData).message;
-  }
-
-  return (
-    pickString(data, ['message', 'prompt', 'summary', 'description', 'url']) || 'Awaiting input'
-  );
-}
-
-function describeExitPlan(data: unknown): string {
-  if (
-    data &&
-    typeof data === 'object' &&
-    typeof (data as ExitPlanModeRequestData).summary === 'string'
-  ) {
-    return (data as ExitPlanModeRequestData).summary;
-  }
-
-  return 'Plan ready for approval';
-}
-
-function describeAutoModeSwitch(data: unknown): string {
-  if (
-    data &&
-    typeof data === 'object' &&
-    typeof (data as AutoModeSwitchRequestData).errorCode === 'string'
-  ) {
-    return `Switch to auto mode after rate limit: ${(data as AutoModeSwitchRequestData).errorCode}`;
-  }
-
-  return 'Switch to auto mode?';
-}
 
 /// Removes entries from BOTH the ambient queue and the chat-stream
 /// items list. `requestId` removes exactly one matching entry;
@@ -107,7 +31,7 @@ function describeAutoModeSwitch(data: unknown): string {
 /// entry since the SDK echoes don't carry our generated id.
 function removePending(
   ctx: ReducerContext,
-  kind: PendingRequest['kind'],
+  kind: SessionPendingRequestKind,
   requestId?: string,
 ): void {
   // U7: resolve the target requestId up front. If the caller already
@@ -141,110 +65,26 @@ export const notificationHandlers: Record<string, Handler> = {
   /// (drives dots + banner counter) AND a card item (renders inline
   /// in the chat stream).
   'dafman.pending_request': (ctx, data) => {
-    const d = data as
-      | {
-          requestId?: unknown;
-          kind?: unknown;
-          request?: unknown;
-        }
-      | undefined;
+    const entry = pendingRequestEntryFromData(data);
 
-    if (!d || typeof d.requestId !== 'string' || typeof d.kind !== 'string') {
-      return;
-    }
+    if (!entry) return;
 
     // Idempotency: ignore re-pushes of the same requestId.
-    if (ctx.ambient.pendingRequests.some((p) => p.requestId === d.requestId)) {
+    if (ctx.ambient.pendingRequests.some((p) => p.requestId === entry.requestId)) {
       return;
     }
 
-    let ambientEntry: PendingRequest | null = null;
-    let cardItem: ChatItem | null = null;
-    const requestId = d.requestId;
-    const id = ctx.counter.next++;
+    const cardItem: ChatItem = {
+      id: ctx.counter.next++,
+      kind: 'pendingRequest',
+      requestId: entry.requestId,
+      pendingKind: entry.kind,
+      message: entry.message,
+      request: entry.request,
+    };
 
-    switch (d.kind) {
-      case 'permission': {
-        const req = d.request as PermissionRequestData;
-        const message = describePermission(req);
-
-        ambientEntry = { kind: 'permission', requestId, message, request: req };
-        cardItem = {
-          id,
-          kind: 'pendingRequest',
-          requestId,
-          pendingKind: 'permission',
-          message,
-          request: req,
-        };
-        break;
-      }
-      case 'userInput': {
-        const req = d.request as UserInputRequestData;
-        const message = describeInput(req);
-
-        ambientEntry = { kind: 'userInput', requestId, message, request: req };
-        cardItem = {
-          id,
-          kind: 'pendingRequest',
-          requestId,
-          pendingKind: 'userInput',
-          message,
-          request: req,
-        };
-        break;
-      }
-      case 'elicitation': {
-        const req = d.request as ElicitationRequestData;
-        const message = describeElicitation(req);
-
-        ambientEntry = { kind: 'elicitation', requestId, message, request: req };
-        cardItem = {
-          id,
-          kind: 'pendingRequest',
-          requestId,
-          pendingKind: 'elicitation',
-          message,
-          request: req,
-        };
-        break;
-      }
-      case 'exitPlanMode': {
-        const req = d.request as ExitPlanModeRequestData;
-        const message = describeExitPlan(req);
-
-        ambientEntry = { kind: 'exitPlanMode', requestId, message, request: req };
-        cardItem = {
-          id,
-          kind: 'pendingRequest',
-          requestId,
-          pendingKind: 'exitPlanMode',
-          message,
-          request: req,
-        };
-        break;
-      }
-      case 'autoModeSwitch': {
-        const req = d.request as AutoModeSwitchRequestData;
-        const message = describeAutoModeSwitch(req);
-
-        ambientEntry = { kind: 'autoModeSwitch', requestId, message, request: req };
-        cardItem = {
-          id,
-          kind: 'pendingRequest',
-          requestId,
-          pendingKind: 'autoModeSwitch',
-          message,
-          request: req,
-        };
-        break;
-      }
-    }
-
-    if (ambientEntry && cardItem) {
-      ctx.ambient.pendingRequests.push(ambientEntry);
-      ctx.items.push(cardItem);
-    }
+    ctx.ambient.pendingRequests.push(entry);
+    ctx.items.push(cardItem);
   },
 
   /// Synthetic event fired by sessionsStore when the user responds.

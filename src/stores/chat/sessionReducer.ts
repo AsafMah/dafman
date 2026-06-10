@@ -5,8 +5,12 @@
 // side-effects (toasts, OS notifications) for MCP OAuth and turn-end
 // events.
 
+import {
+  pendingRequestEntryFromPayload,
+  type SessionPendingRequestKind,
+} from '@/lib/sessionStatus';
 import type { PendingRequestPayload, SessionEventPayload } from '@/ipc/types';
-import type { PendingRecordRequest, SessionRecord } from './sessionsStore';
+import type { SessionRecord } from './sessionsStore';
 
 /// A side-effect for the single effects consumer (`sessionEffects.ts`) to
 /// run. The reducer stays pure — it mutates the `SessionRecord` (the state
@@ -370,7 +374,7 @@ function handleThinkingOff(record: SessionRecord): void {
 }
 
 // Stale-state cleanup for SDK-emitted `*.completed` events.
-const COMPLETED_KIND_MAP: Record<string, PendingRecordRequest['kind']> = {
+const COMPLETED_KIND_MAP: Record<string, SessionPendingRequestKind> = {
   'permission.completed': 'permission',
   'user_input.completed': 'userInput',
   'elicitation.completed': 'elicitation',
@@ -455,7 +459,7 @@ export function applyToRecord(
 }
 
 /// Parses an incoming bun-side `pendingRequest` push into a
-/// `PendingRecordRequest` entry, appends it to the record's queue,
+/// `SessionPendingRequest` entry, appends it to the record's queue,
 /// pushes a synthetic `dafman.pending_request` event into the event
 /// log, and returns the `SessionEffect[]` the caller should run.
 ///
@@ -474,52 +478,7 @@ export function applyPendingToRecord(
     return [];
   }
 
-  let entry: PendingRecordRequest;
-
-  switch (payload.kind) {
-    case 'permission':
-      entry = {
-        kind: 'permission',
-        requestId: payload.requestId,
-        message: payload.request.summary,
-        request: payload.request,
-      };
-      break;
-    case 'userInput':
-      entry = {
-        kind: 'userInput',
-        requestId: payload.requestId,
-        message: payload.request.question,
-        request: payload.request,
-      };
-      break;
-    case 'elicitation':
-      entry = {
-        kind: 'elicitation',
-        requestId: payload.requestId,
-        message: payload.request.message,
-        request: payload.request,
-      };
-      break;
-    case 'exitPlanMode':
-      entry = {
-        kind: 'exitPlanMode',
-        requestId: payload.requestId,
-        message: payload.request.summary || 'Plan ready for approval',
-        request: payload.request,
-      };
-      break;
-    case 'autoModeSwitch':
-      entry = {
-        kind: 'autoModeSwitch',
-        requestId: payload.requestId,
-        message: payload.request.errorCode
-          ? `Switch to auto mode after rate limit: ${payload.request.errorCode}`
-          : 'Switch to auto mode?',
-        request: payload.request,
-      };
-      break;
-  }
+  const entry = pendingRequestEntryFromPayload(payload);
 
   record.pendingRequests.push(entry);
   // Also push a synthetic `dafman.pending_request` event into the

@@ -4,6 +4,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Changed (2026-06-10 dual-reduction slice 1 — issue #209)
+
+- **Unified the duplicated pending-request shape between the two session-state reducers (internal).** `SessionRecord.pendingRequests` (sessionsStore) and `ChatAmbient.pendingRequests` (chatEvents) were byte-identical discriminated unions built by two separate hand-written switches. Both now share one `SessionPendingRequest` type + `pendingRequestEntryFromPayload`/`pendingRequestEntryFromData` builders in a new no-Pinia `src/lib/sessionStatus.ts`. A table-driven convergence test asserts the record-side and ambient-side projections produce the identical entry. No behavior change — the first, lowest-risk slice of #209 (status-delta unification deferred).
+
 ### Added (2026-06-10 palette session jump — issue #185)
 
 - **Jump to / resume sessions from the command palette (`Mod+K`).** Open sessions appear as `Jump` entries (focus/reveal via the cross-group path from #173); closed, on-disk sessions appear as `Resume` entries (reopen + reveal), capped at 20 with a "browse all" entry beyond that. Open sessions are listed before closed ones; the list refreshes when the palette opens. Replaces the old `session.switch` command.

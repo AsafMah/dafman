@@ -12,16 +12,11 @@ import { reactive, ref, computed, watch } from 'vue';
 import { invokeCommand, onPendingRequest, onSessionEvent } from '@/ipc/invoke';
 import type {
   AgentInfo,
-  AutoModeSwitchRequestData,
-  ElicitationRequestData,
-  ExitPlanModeRequestData,
   PendingRequestPayload,
-  PermissionRequestData,
   ReasoningVisibility,
   RespondToRequestParams,
   SessionEventPayload,
   SessionMode,
-  UserInputRequestData,
 } from '@/ipc/types';
 import { accentForIndex } from '@/lib/color';
 import { useLayoutStore } from '@/stores/shell/layoutStore';
@@ -29,6 +24,7 @@ import { useSettingsStore } from '@/stores/app/settingsStore';
 import { useToastStore } from '@/stores/app/toastStore';
 import { useSessionsListStore } from '@/stores/chat/sessionsListStore';
 import { toErrorMessage } from '@/lib/errorMessage';
+import type { SessionPendingRequest } from '@/lib/sessionStatus';
 import { appendEvent, applyPendingToRecord, applyToRecord } from './sessionReducer';
 import { runSessionEffects } from './sessionEffects';
 import {
@@ -103,7 +99,7 @@ export type SessionRecord = {
   /// requestId. Mirrors the reducer's `ambient.pendingRequests` at
   /// the record level so cross-pane surfaces (sidebar dot, tab dot,
   /// global modal) react without the chat panel being mounted.
-  pendingRequests: PendingRecordRequest[];
+  pendingRequests: SessionPendingRequest[];
   /// Count of completed turns the user hasn't seen because the panel
   /// wasn't the dockview active panel at the time. Drives the
   /// "new activity" dot on the tab + sidebar row. Cleared on focus
@@ -164,43 +160,6 @@ export type SessionRecord = {
   _toastedNeedsAuth: Set<string>;
   _artifactToolCallIds: Set<string>;
 };
-
-/// Per-record mirror of a single pending request. Matches the
-/// `PendingRequest` discriminated union in `chatEvents.ts`; lives
-/// here so the SessionRecord shape is self-contained (no cross-
-/// module import dance from places like SessionsManager that don't
-/// need the rest of the reducer).
-export type PendingRecordRequest =
-  | {
-      kind: 'permission';
-      requestId: string;
-      message: string;
-      request: PermissionRequestData;
-    }
-  | {
-      kind: 'userInput';
-      requestId: string;
-      message: string;
-      request: UserInputRequestData;
-    }
-  | {
-      kind: 'elicitation';
-      requestId: string;
-      message: string;
-      request: ElicitationRequestData;
-    }
-  | {
-      kind: 'exitPlanMode';
-      requestId: string;
-      message: string;
-      request: ExitPlanModeRequestData;
-    }
-  | {
-      kind: 'autoModeSwitch';
-      requestId: string;
-      message: string;
-      request: AutoModeSwitchRequestData;
-    };
 
 let unsubscribe: (() => void) | null = null;
 let unsubscribePending: (() => void) | null = null;
