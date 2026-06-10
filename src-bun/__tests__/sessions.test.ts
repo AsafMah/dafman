@@ -668,14 +668,25 @@ describe('SessionRegistry', () => {
     }
   });
 
-  test('resume is idempotent for an already-registered session', async () => {
+  test('#235: already-registered resume replays history without a second SDK resume', async () => {
     const client = new FakeClient();
+    client.nextResumeHistory = [
+      { type: 'user.message', data: { content: 'hello' }, id: 'evt-user-1' },
+      { type: 'assistant.message', data: { content: 'world' }, id: 'evt-assistant-1' },
+    ];
     _setClientForTest(client as unknown as Parameters<typeof _setClientForTest>[0]);
-    const reg = new SessionRegistry(() => {});
-    const first = await reg.resume('sess-1');
-    const second = await reg.resume('sess-1');
+    const emitted: SessionEventPayload[] = [];
+    const reg = new SessionRegistry((p) => emitted.push(p));
+
+    const first = await reg.resume('sess-235');
+    const firstReplay = emitted.splice(0);
+    const second = await reg.resume('sess-235');
+
     expect(first).toBe(second);
     expect(client.resumedSessions).toHaveLength(1);
+    expect(firstReplay.map((p) => p.eventType)).toEqual(['user.message', 'assistant.message']);
+    expect(emitted.map((p) => p.eventType)).toEqual(['user.message', 'assistant.message']);
+    expect(emitted.every((p) => p.replay === true)).toBe(true);
   });
 
   test('resume propagates SDK failures as AppError.sdk', async () => {

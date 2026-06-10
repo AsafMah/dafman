@@ -135,6 +135,24 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
     expect(record!.workingDirectory).toBe('/r');
   });
 
+  test('#235: restoreSession returns an existing record without replaying into it again', async () => {
+    const { bridge, calls, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args, fire) => {
+      const { sessionId } = args as { sessionId: string };
+      fire(event(sessionId, 'assistant.message', { messageId: 'm1' }));
+      return { sessionId, cwd: null, model: null, approveAll: false, mode: 'interactive' };
+    };
+    setRpcBridge(bridge);
+
+    const store = useSessionsStore();
+    const first = await store.restoreSession('sess-abc');
+    const second = await store.restoreSession('sess-abc');
+
+    expect(second).toBe(first);
+    expect(first!.events).toHaveLength(1);
+    expect(calls.filter((c) => c.name === 'resumeSession')).toHaveLength(1);
+  });
+
   test('events fired AFTER the RPC resolves are appended live', async () => {
     const { bridge, fire, handlers } = makeFakeBridge();
     handlers.resumeSession = async (args) => ({

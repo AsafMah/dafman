@@ -370,8 +370,10 @@ export class SessionRegistry {
   /// own, so without this the restored pane would render empty until
   /// the next turn.
   ///
-  /// Idempotent: a duplicate resume of an already-registered id is a
-  /// no-op (returns the same id).
+  /// Idempotent at the SDK-lifecycle layer: a duplicate resume of an
+  /// already-registered id reuses the live session/listener, but still
+  /// replays history so a freshly-reloaded renderer can rebuild its
+  /// transcript.
   async resume(
     sessionId: string,
     opts: {
@@ -383,10 +385,15 @@ export class SessionRegistry {
       mcpServers?: Record<string, unknown>;
     } = {},
   ): Promise<string> {
-    if (this.entries.has(sessionId)) {
-      log.debug('resume on already-registered session, returning id', {
+    const existing = this.entries.get(sessionId);
+
+    if (existing) {
+      log.debug('resume on already-registered session, replaying history', {
         sessionId,
       });
+
+      await this.hydrateHistory(existing.session, sessionId, existing.workingDirectory);
+      this.forwarder.pollTitleFromMetadata(sessionId);
 
       return sessionId;
     }
