@@ -180,19 +180,20 @@ function rafTick(): Promise<void> {
 }
 
 /// Reveal a parked navigation intent (issue #16). With a `toolCallId`,
-/// scroll the spawning tool-call card into view and flash it; without
-/// one (autopilot jobs), fall back to the bottom. The transcript node
-/// may not be rendered the instant we're asked (a freshly-opened panel
-/// is still painting its v-for), so we retry across a bounded number of
-/// frames before giving up and scrolling to the bottom.
-async function revealTarget(target: { toolCallId?: string }): Promise<void> {
-  if (!target.toolCallId) {
+/// scroll the spawning tool-call card into view and flash it. With an
+/// `eventIndex`, scroll to the timeline item at that ordinal position.
+/// Without either (autopilot jobs), fall back to the bottom. Retries
+/// across a bounded number of frames before giving up.
+async function revealTarget(target: { toolCallId?: string; eventIndex?: number }): Promise<void> {
+  if (!target.toolCallId && target.eventIndex === undefined) {
     await scrollToBottom();
 
     return;
   }
 
-  const selector = `[data-tool-call-id="${CSS.escape(target.toolCallId)}"]`;
+  const selector = target.toolCallId
+    ? `[data-tool-call-id="${CSS.escape(target.toolCallId)}"]`
+    : `[data-event-index="${target.eventIndex}"]`;
   const maxAttempts = 8;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -437,7 +438,7 @@ const commandsRun = computed(() => {
         </p>
 
         <template
-          v-for="item in timelineItems"
+          v-for="(item, itemIdx) in timelineItems"
           :key="`${item.kind}-${item.id}`"
         >
           <CommandResultCard
@@ -553,6 +554,7 @@ const commandsRun = computed(() => {
               item.kind !== 'reasoning' && !(item.kind === 'assistant' && item.text === '')
             "
             class="message-shell"
+            :data-event-index="itemIdx"
           >
             <!-- Inline editor swap. Only user messages support editing; -->
             <!-- canFork is true iff the item has a server-acknowledged   -->

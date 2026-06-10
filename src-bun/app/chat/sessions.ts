@@ -30,6 +30,7 @@ import { searchWorkspaceFiles } from '../filesystem/fileSearch';
 import { type AgentFileSpec, type AgentScope as AgentFileScope } from '../library/agentFiles';
 import { toErrorMessage } from '../shared/errorMessage';
 import { commandResultPromptBlock, stripCommandResultPromptBlocks } from './sessionHelpers';
+import { matchSessionEvents } from './transcriptSearch';
 import { isHostInlinableBlobMime, stageBlobToFile } from './attachmentStaging';
 import {
   type AgentLoadDiagnostics,
@@ -57,6 +58,7 @@ import type {
   SessionMetadataSummary,
   SessionHistoryCompactionResult,
   SessionMode,
+  TranscriptSearchResult,
   WorkspaceFileMatch,
   AgentInfo,
   JobRecord,
@@ -1012,6 +1014,73 @@ export class SessionRegistry {
     }
 
     return searchWorkspaceFiles(cwd, query, limit, options);
+  }
+
+  /// Phase 1 open-session transcript search (issue #241).
+  /// Iterates all open (in-memory) sessions, calls getEvents() on each,
+  /// extracts text from user.message / assistant.message_complete /
+  /// system.notification events, and substring-matches `query`
+  /// (case-insensitive). Returns up to `options.limit ?? 50` total
+  /// matches across sessions, with up to MAX_MATCHES_PER_SESSION per
+  /// session.
+  async searchTranscripts(
+    query: string,
+    options?: { sessionIds?: string[]; limit?: number },
+  ): Promise<TranscriptSearchResult[]> {
+    const MAX_MATCHES_PER_SESSION = 8;
+    const totalLimit = options?.limit ?? 50;
+    const filterIds = options?.sessionIds;
+    const lowerQuery = query.toLowerCase();
+
+    if (!lowerQuery) return [];
+
+    const summaryMap = await this.fetchSessionSummaries();
+    const results: TranscriptSearchResult[] = [];
+    let totalMatches = 0;
+
+    for (const [sessionId, entry] of this.entries) {
+      if (filterIds && !filterIds.includes(sessionId)) continue;
+      if (totalMatches >= totalLimit) break;
+
+      let events: SessionEvent[];
+
+      try {
+        events = await entry.session.getEvents();
+      } catch {
+        continue;
+      }
+
+      const budget = Math.min(MAX_MATCHES_PER_SESSION, totalLimit - totalMatches);
+      const matches = matchSessionEvents(events, lowerQuery, query.length, budget);
+
+      if (matches.length > 0) {
+        results.push({ sessionId, sessionSummary: summaryMap.get(sessionId), matches });
+        totalMatches += matches.length;
+      }
+    }
+
+    return results;
+  }
+
+  /// Best-effort batch fetch of session summaries from the CLI catalog
+  /// so search results can be labelled without per-session round-trips.
+  /// Summaries are optional — failure yields an empty map.
+  private async fetchSessionSummaries(): Promise<Map<string, string>> {
+    const summaryMap = new Map<string, string>();
+
+    try {
+      const items = await tryGetClient().listSessions();
+
+      for (const item of items) {
+        if (typeof item.summary === 'string' && item.summary.trim()) {
+          summaryMap.set(item.sessionId, item.summary);
+        }
+      }
+    } catch {
+      /* summaries are optional — proceed without them */
+    }
+
+    return summaryMap;
   }
 
   /// Public accessor for the session's resolved working directory.

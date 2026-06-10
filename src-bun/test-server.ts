@@ -219,6 +219,14 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
       includeIgnored: includeIgnored ?? false,
     });
   }),
+  searchSessionTranscripts: rpcGuard(async (args) => {
+    const { query, options } = args as {
+      query: string;
+      options?: { sessionIds?: string[]; limit?: number };
+    };
+
+    return sessions.searchTranscripts(query, options);
+  }),
   abortSession: rpcGuard(async (args) => {
     const { sessionId } = args as { sessionId: string };
 

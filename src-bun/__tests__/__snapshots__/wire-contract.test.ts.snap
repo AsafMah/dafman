@@ -975,3 +975,36 @@ exports[`IPC wire contracts — diagnostics pickAttachment result shape 1`] = `
   },
 }
 `;
+
+exports[`IPC wire contracts — transcript search TranscriptSearchResult + TranscriptMatch shape 1`] = `
+[
+  {
+    "matches": [
+      {
+        "eventIndex": 42,
+        "role": "user",
+        "snippet": "Tell me about …<<retry logic>>...",
+      },
+      {
+        "eventIndex": 100,
+        "role": "assistant",
+        "snippet": "...to handle failures you can <<retry>>...",
+        "timestamp": "2026-06-10T12:00:00.000Z",
+      },
+    ],
+    "sessionId": "sess-abc123",
+    "sessionSummary": "Retry logic discussion",
+  },
+  {
+    "matches": [
+      {
+        "eventIndex": 0,
+        "role": "system",
+        "snippet": "<<system>> notification",
+      },
+    ],
+    "sessionId": "sess-xyz789",
+    "sessionSummary": undefined,
+  },
+]
+`;

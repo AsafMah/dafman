@@ -44,6 +44,7 @@ import ActivityBarTab from '@/components/shell/ActivityBarTab.vue';
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
 import TerminalsPanel from '@/components/terminal/TerminalsPanel.vue';
 import Watermark from '@/components/shell/Watermark.vue';
+import SearchPanel from '@/components/search/SearchPanel.vue';
 import { setRpcBridge } from '@/ipc/invoke';
 import { createElectrobunBridge } from '@/ipc/electrobunBridge';
 import { createWebSocketBridge } from '@/ipc/wsBridge';
@@ -152,6 +153,7 @@ async function mountWith(Root: typeof App) {
   app.component('sessionsManager', SessionsManager);
   app.component('settingsPanel', SettingsPanel);
   app.component('logViewer', LogViewer);
+  app.component('searchPanel', SearchPanel);
   app.component('terminal', TerminalPanel);
   app.component('terminalsPanel', TerminalsPanel);
   app.component('watermark', Watermark);

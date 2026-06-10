@@ -107,15 +107,18 @@ export const useLayoutStore = defineStore('layout', () => {
   /// which is race-free for both the freshly-opened and already-open
   /// cases. `toolCallId` undefined ⇒ "scroll to bottom" (e.g. autopilot
   /// jobs that have no spawning tool call).
-  const pendingReveal = ref<Record<string, { toolCallId?: string }>>({});
+  const pendingReveal = ref<Record<string, { toolCallId?: string; eventIndex?: number }>>({});
 
-  function requestReveal(sessionId: string, target: { toolCallId?: string }): void {
-    // Replace (never merge) so a tool-call reveal can't leave a stale
-    // toolCallId behind a later "scroll to bottom" request.
+  function requestReveal(
+    sessionId: string,
+    target: { toolCallId?: string; eventIndex?: number },
+  ): void {
+    // Replace (never merge) so a reveal can't leave a stale id behind a
+    // later "scroll to bottom" request.
     pendingReveal.value = { ...pendingReveal.value, [sessionId]: { ...target } };
   }
 
-  function consumeReveal(sessionId: string): { toolCallId?: string } | null {
+  function consumeReveal(sessionId: string): { toolCallId?: string; eventIndex?: number } | null {
     const target = pendingReveal.value[sessionId];
 
     if (!target) return null;

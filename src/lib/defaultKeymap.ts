@@ -108,6 +108,13 @@ export const defaultKeymap: DefaultKeyBinding[] = [
     keys: '$mod+Shift+K',
     reassignable: true,
   },
+  {
+    id: 'global.search.global',
+    commandId: 'search.global',
+    scope: 'global',
+    keys: '$mod+Shift+F',
+    reassignable: true,
+  },
 
   // -------------------------------------------------------------------------
   // commandPalette — palette-owned navigation

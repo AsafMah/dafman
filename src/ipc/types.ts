@@ -59,6 +59,8 @@ export type {
   TerminalSummary,
   ThemeChoice,
   ToolsPrefs,
+  TranscriptMatch,
+  TranscriptSearchResult,
   WorkspaceFileMatch,
   Workspaces,
 } from '@/shared/wireTypes';
