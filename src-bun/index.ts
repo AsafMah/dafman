@@ -655,40 +655,65 @@ function openExternalUrl(targetUrl: string, source: string): void {
   }
 }
 
-// `will-navigate` fires for in-webview navigations (top-level frame).
-// Payload: ElectrobunEvent<{ detail: string }, {}> where detail is the target URL.
-// Event name exact match: "will-navigate" (see webviewEvents.ts).
+// `will-navigate` / `new-window-open` payloads: the native side delivers
+// `detail` as a JSON-encoded object (e.g. `{"url":"…","allowed":true}` for
+// will-navigate, `{"url":"…","isCmdClick":…}` for new-window-open) — NOT a
+// bare URL string. Extract the URL robustly from either shape.
+function extractNavTarget(detail: unknown): { url: string; allowed?: boolean } | null {
+  let value: unknown = detail;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (!s) return null;
+    if (s.startsWith('{')) {
+      try {
+        value = JSON.parse(s) as unknown;
+      } catch {
+        return { url: s }; // not JSON — the string itself is the URL
+      }
+    } else {
+      return { url: s };
+    }
+  }
+  if (value && typeof value === 'object' && 'url' in value) {
+    const obj = value as { url: unknown; allowed?: unknown };
+    if (typeof obj.url === 'string' && obj.url.trim()) {
+      return {
+        url: obj.url.trim(),
+        allowed: typeof obj.allowed === 'boolean' ? obj.allowed : undefined,
+      };
+    }
+  }
+  return null;
+}
+
+// Route any non-same-origin navigation/window-open to the OS browser.
+function handleNavAttempt(detail: unknown, source: string): void {
+  const target = extractNavTarget(detail);
+  if (!target) return;
+  if (target.url.startsWith(appOrigin)) return; // same-origin — allow it
+  // If the native side flagged it `allowed` (setNavigationRules did NOT block
+  // it in-webview), warn — the in-webview load may proceed and the rule format
+  // needs revisiting.
+  if (target.allowed === true) {
+    log.warn('webview: external navigation was NOT blocked natively', {
+      url: target.url,
+      source,
+    });
+  }
+  openExternalUrl(target.url, source);
+}
+
 mainWindow.webview.on('will-navigate', (event: unknown) => {
-  const ev = event as { data: { detail: string } };
-  const targetUrl = typeof ev?.data?.detail === 'string' ? ev.data.detail.trim() : '';
-
-  if (!targetUrl || targetUrl.startsWith(appOrigin)) return;
-
-  openExternalUrl(targetUrl, 'will-navigate');
+  handleNavAttempt((event as { data?: { detail?: unknown } })?.data?.detail, 'will-navigate');
 });
 
-// `new-window-open` fires when the page tries to open a new window/tab
-// (e.g. `<a target="_blank">`, `window.open()`, or cmd+click).
-// Payload: ElectrobunEvent<{ detail: string | { url: string, ... } }, {}>.
-// BrowserView.on() does not include "new-window-open" in its type union, but
-// the event IS dispatched through the same electrobunEventEmitter path — cast
-// to allow it at runtime.
+// `new-window-open` (target=_blank / window.open / cmd+click) — BrowserView.on()
+// doesn't type this event, but it dispatches through the same emitter; cast to
+// subscribe at runtime.
 (mainWindow.webview.on as (name: string, handler: (event: unknown) => void) => void)(
   'new-window-open',
   (event: unknown) => {
-    const ev = event as { data: { detail: string | { url: string } } };
-    const detail = ev?.data?.detail;
-    const targetUrl = (
-      typeof detail === 'string'
-        ? detail
-        : typeof detail === 'object' && detail !== null && typeof detail.url === 'string'
-          ? detail.url
-          : ''
-    ).trim();
-
-    if (!targetUrl) return;
-
-    openExternalUrl(targetUrl, 'new-window-open');
+    handleNavAttempt((event as { data?: { detail?: unknown } })?.data?.detail, 'new-window-open');
   },
 );
 

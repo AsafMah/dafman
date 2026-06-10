@@ -11,5 +11,5 @@
   "src/ipc/types.ts": 1019,
   "src/components/settings/KeyboardShortcutsSection.vue": 859,
   "src/lib/registerBuiltinCommands.ts": 819,
-  "src-bun/index.ts": 831
+  "src-bun/index.ts": 856
 }
