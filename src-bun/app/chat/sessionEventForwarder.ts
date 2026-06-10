@@ -131,6 +131,37 @@ export class SessionEventForwarder {
     }
   }
 
+  /// Like `forward`, but tags the payload with `replay: true` so the
+  /// renderer's reducer can suppress side effects (unseenTurns, OS
+  /// notifications) for historical events replayed during session resume.
+  forwardReplay(sessionId: string, event: SessionEvent): void {
+    const eventType = event.type;
+
+    logSessionEvent(sessionId, eventType, event);
+
+    const { envelope, data } = unwrapEvent(sessionId, event);
+
+    this.handleSideEffects(sessionId, eventType, data);
+
+    try {
+      this.deps.emit({
+        sessionId,
+        eventType,
+        data,
+        ...(envelope.agentId ? { agentId: envelope.agentId } : {}),
+        ...(envelope.id ? { eventId: envelope.id } : {}),
+        ...(envelope.timestamp ? { timestamp: envelope.timestamp } : {}),
+        replay: true,
+      });
+    } catch (err) {
+      log.warn('failed to forward replay session event', {
+        sessionId,
+        eventType,
+        error: toErrorMessage(err),
+      });
+    }
+  }
+
   /// Per-eventType side effects: mode mirror + autopilot pending
   /// settle on `session.mode_changed`, title poll on `session.idle`,
   /// info-log on `session.title_changed`. Kept inside the class

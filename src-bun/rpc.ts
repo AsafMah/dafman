@@ -501,6 +501,9 @@ export interface WorkspaceFileMatch {
 /// `agentId` / `eventId` / `timestamp` are lifted off the SDK envelope so
 /// the frontend can correlate sub-agent activity and order events without
 /// us mirroring every variant's metadata into `data`.
+/// `replay` is set to `true` only for events injected by `replayHistory`
+/// during session resume. Handlers that produce side effects (unseenTurns
+/// bump, OS notifications) skip their effects for replay events.
 export interface SessionEventPayload {
   sessionId: string;
   eventType: string;
@@ -512,6 +515,10 @@ export interface SessionEventPayload {
   eventId?: string;
   /// ISO 8601 timestamp from the SDK envelope.
   timestamp?: string;
+  /// Set to `true` only for events replayed from persisted history
+  /// during session resume. Side-effect handlers (unseenTurns,
+  /// OS notifications) skip their effects for replay events.
+  replay?: true;
 }
 
 /// Permission request surfaced to the renderer. Mirrors the SDK's

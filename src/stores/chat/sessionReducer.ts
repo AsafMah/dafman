@@ -336,13 +336,20 @@ function handleTurnStart(record: SessionRecord): void {
 
 // Turn end: clear thinking, fire unseen-activity dot + OS notification
 // when the session isn't the dock's active panel.
+// Skips the side effects (unseenTurns, notify) for replayed historical
+// events — isThinking still resolves so a resumed session isn't stuck.
 function handleTurnEnd(
   record: SessionRecord,
-  _payload: SessionEventPayload,
+  payload: SessionEventPayload,
   ctx: ReduceContext,
   effects: SessionEffect[],
 ): void {
   record.isThinking = false;
+
+  // Historical replay events must not inflate the unseen-turn counter
+  // or fire OS notifications — those effects were irrelevant before
+  // this app launch. Live events (no replay flag) still do both.
+  if (payload.replay) return;
 
   if (ctx.activeSessionId === record.id) return;
 
