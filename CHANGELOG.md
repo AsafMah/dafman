@@ -4,16 +4,23 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed (2026-06-10 reload transcripts — issue #235)
+
+- **Reloading the renderer (Ctrl+R / HMR) no longer blanks open transcripts.** The backend session resume short-circuited for an already-live session and skipped replaying its history, so a reload restored the tabs/sidebar but left the message panes empty (a full restart was needed to get them back). `SessionRegistry.resume()` now re-runs the same hydrate/replay path for already-registered sessions (reusing the live SDK session), and the renderer guards against double-appending into a record that already has events. Cold boot, the #172 readiness gate, and the #208 replay hydration-guard are all preserved.
+
 ### Fixed (2026-06-08 context-usage pill — issues #219, #220)
 
 - **Context-usage pill no longer corrupted by per-call usage events (#219).** `assistant.usage` carries only per-API-call `inputTokens`/`outputTokens` (verified against the SDK types), not the cumulative `currentTokens`; `mergeUsage` was misreading `inputTokens` as `currentTokens`, so any sub-agent/mcp-sampling call (which shares the session's ambient) would drop the pill to that call's small token count. The pill now sources `currentTokens`/`tokenLimit` solely from `session.usage_info`.
 - **1M-context models report usage correctly (#220).** Raised the context-limit plausibility cap from 500k to 4M so GPT-4.1 / Gemini 2.5 Pro (1M windows) are no longer rejected as implausible (which left the pill unable to compute a percentage).
+
 ### Fixed (2026-06-08 durable persistence — issue #207)
 
 - **`settings.json` can no longer be silently wiped by a torn or concurrent write (#207).** All writes now go temp-file + atomic `rename` (`src-bun/app/shared/atomicWrite.ts`), a `writeChain` serializes concurrent `update()` calls, and a `settings.json.bak` of the last-good parse is kept and used for recovery before falling back to defaults (a corrupt primary never overwrites a good `.bak`). Previously a power-loss/disk-full/concurrent write could truncate the file, and the next boot silently reset every setting **and** the whole persisted layout. The same atomic write is applied to `session-metadata.json`.
+
 ### Fixed (2026-06-08 resume hydration — issue #208)
 
 - **Resuming sessions no longer shows phantom "unseen activity" counts (#208).** On resume the backend replays a session's historical events; replayed `assistant.turn_end` events were run through the side-effectful session reducer, so every past turn bumped `unseenTurns` (and fired a turn-end OS notification when enabled) for each non-active restored session — a multi-session restart lit up bogus unread dots and reordered the sidebar. Replayed events are now wire-tagged (`replay: true`) and `handleTurnEnd` skips the unseen-count bump + notify on replay while still clearing the thinking state.
+
 ### Fixed (2026-06-08 error ownership — issue #212)
 
 - **Changing run mode / model / approve-all no longer emits an unhandled promise rejection (#212).** These fire-and-forget setters toasted the error **and** re-threw it; the `void`-called UI sites had no `.catch`, so the rejection surfaced as `unhandledrejection` (e.g. `unknown rpc: setSessionMode`). They now own the error via the toast and return `Promise<boolean>` (false on failure) instead of re-throwing; `startAutopilot` and the auto-approve toast key off that boolean so nothing double-reports or falsely confirms.

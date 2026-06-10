@@ -522,6 +522,10 @@ export const useSessionsStore = defineStore('sessions', () => {
     ensureSubscription();
     const toasts = useToastStore();
 
+    const existing = getSession(sessionId);
+
+    if (existing) return existing;
+
     try {
       // The bun RPC handler may return a different id if the SDK
       // forked on resume (rare, but the contract allows it). `cwd`
