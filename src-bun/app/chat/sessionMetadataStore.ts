@@ -18,11 +18,12 @@
 // back to an empty store on any parse failure.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { SessionMode } from '../../rpc';
 import { log } from '../observability/logging';
 import { toErrorMessage } from '../shared/errorMessage';
+import { atomicWrite } from '../shared/atomicWrite';
 
 export const SESSION_METADATA_VERSION = 1;
 
@@ -140,7 +141,7 @@ export class SessionMetadataStore implements SessionMetadataPersistence {
     this.writeChain = this.writeChain
       .then(async () => {
         await mkdir(dirname(this.path), { recursive: true });
-        await writeFile(this.path, snapshot, 'utf8');
+        await atomicWrite(this.path, snapshot);
       })
       .catch((err) => {
         log.warn('session metadata persist failed', {

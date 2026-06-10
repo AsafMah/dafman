@@ -8,6 +8,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 - **Context-usage pill no longer corrupted by per-call usage events (#219).** `assistant.usage` carries only per-API-call `inputTokens`/`outputTokens` (verified against the SDK types), not the cumulative `currentTokens`; `mergeUsage` was misreading `inputTokens` as `currentTokens`, so any sub-agent/mcp-sampling call (which shares the session's ambient) would drop the pill to that call's small token count. The pill now sources `currentTokens`/`tokenLimit` solely from `session.usage_info`.
 - **1M-context models report usage correctly (#220).** Raised the context-limit plausibility cap from 500k to 4M so GPT-4.1 / Gemini 2.5 Pro (1M windows) are no longer rejected as implausible (which left the pill unable to compute a percentage).
+### Fixed (2026-06-08 durable persistence — issue #207)
+
+- **`settings.json` can no longer be silently wiped by a torn or concurrent write (#207).** All writes now go temp-file + atomic `rename` (`src-bun/app/shared/atomicWrite.ts`), a `writeChain` serializes concurrent `update()` calls, and a `settings.json.bak` of the last-good parse is kept and used for recovery before falling back to defaults (a corrupt primary never overwrites a good `.bak`). Previously a power-loss/disk-full/concurrent write could truncate the file, and the next boot silently reset every setting **and** the whole persisted layout. The same atomic write is applied to `session-metadata.json`.
 
 ### Fixed (2026-06-08 keyboard editor chord — issue #202)
 
