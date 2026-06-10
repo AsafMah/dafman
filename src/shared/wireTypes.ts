@@ -223,6 +223,29 @@ export interface TranscriptSearchResult {
 }
 
 // ---------------------------------------------------------------------------
+// Snippets (Phase — Prompt Snippet Library)
+// ---------------------------------------------------------------------------
+
+/// User-created reusable prompt fragment. Stored as `{ version: 1, snippets: Snippet[] }`
+/// in `<userData>/snippets.json`.
+export interface Snippet {
+  /// UUID v4 — stable identifier across edits.
+  id: string;
+  /// Human label shown in the palette + Library tab.
+  title: string;
+  /// Markdown-capable text; inserted verbatim into the composer.
+  body: string;
+  /// Free-form tags for filtering in the Snippets tab.
+  tags: string[];
+  /// Optional slash trigger, e.g. "codereview" → "/codereview".
+  shortcut?: string;
+  /// ISO 8601 timestamp.
+  createdAt: string;
+  /// ISO 8601 timestamp.
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
 // Agents & tasks
 // ---------------------------------------------------------------------------
 
@@ -957,5 +980,17 @@ export type CommandMap = {
       options?: { sessionIds?: string[]; limit?: number };
     };
     result: TranscriptSearchResult[];
+  };
+  listSnippets: {
+    args: Record<string, never>;
+    result: Snippet[];
+  };
+  saveSnippet: {
+    args: { snippet: Snippet };
+    result: void;
+  };
+  deleteSnippet: {
+    args: { id: string };
+    result: void;
   };
 };

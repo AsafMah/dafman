@@ -25,6 +25,9 @@ export type AppEvents = {
   'rename-session': { sessionId: string };
   'library-activate-tab': { tab: string };
   'focus-search-panel': Record<string, never>;
+  /// Insert text at the cursor of the active session's composer.
+  /// `sessionId` scopes the event to the matching MessageComposer instance.
+  'insert-composer-text': { sessionId: string; text: string };
 };
 
 type EventKey = keyof AppEvents;

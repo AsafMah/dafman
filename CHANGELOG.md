@@ -4,6 +4,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Added (2026-06-10 prompt snippet library — issue #242)
+
+- **Reusable prompt snippets (Library → Snippets).** A new Snippets tab in the Library lets you create, edit, tag, and delete reusable prompt fragments (title + markdown body + tags + optional slash shortcut), persisted to `<userData>/snippets.json` via a new Bun `SnippetService` (atomic temp+rename writes). Insert a snippet into the active session's composer from the row's Insert action or the command palette's **Insert Snippet…** group — the body lands at the cursor (never replacing existing content) via an `insert-composer-text` bus event the composer consumes for its session. Backed by `listSnippets`/`saveSnippet`/`deleteSnippet` RPCs (wired into both the app and the test backend). Phase 1 scope: CRUD + palette + insert (slash-typeahead and a composer toolbar button are deferred to phases 2/3).
+
 ### Changed (2026-06-10 dual-reduction slice 1 — issue #209)
 
 - **Unified the duplicated pending-request shape between the two session-state reducers (internal).** `SessionRecord.pendingRequests` (sessionsStore) and `ChatAmbient.pendingRequests` (chatEvents) were byte-identical discriminated unions built by two separate hand-written switches. Both now share one `SessionPendingRequest` type + `pendingRequestEntryFromPayload`/`pendingRequestEntryFromData` builders in a new no-Pinia `src/lib/sessionStatus.ts`. A table-driven convergence test asserts the record-side and ambient-side projections produce the identical entry. No behavior change — the first, lowest-risk slice of #209 (status-delta unification deferred).

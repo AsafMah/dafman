@@ -28,6 +28,7 @@ import type {
   WorkspaceFileMatch,
   TranscriptMatch,
   TranscriptSearchResult,
+  Snippet,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -862,5 +863,59 @@ describe('IPC wire contracts — transcript search', () => {
       matches: [{ eventIndex: 0, role: 'system', snippet: '<<system>> notification' }],
     };
     expect([result, noSummary]).toMatchSnapshot();
+  });
+});
+
+describe('IPC wire contracts — snippets', () => {
+  test('Snippet shape', () => {
+    const full: Snippet = {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      title: 'Code Review Checklist',
+      body: 'Please review for:\n1. Types\n2. Tests\n3. Docs',
+      tags: ['code-review', 'checklist'],
+      shortcut: 'codereview',
+      createdAt: '2026-06-10T00:00:00.000Z',
+      updatedAt: '2026-06-10T12:00:00.000Z',
+    };
+    const minimal: Snippet = {
+      id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+      title: 'Quick note',
+      body: 'Insert text here',
+      tags: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect([full, minimal]).toMatchSnapshot();
+  });
+
+  test('listSnippets result type satisfies Snippet[]', () => {
+    type ListResult = CommandMap['listSnippets']['result'];
+    // Compile-time shape check: type must be assignable to Snippet[]
+    type _Check = ListResult extends Snippet[] ? true : never;
+    const _check: _Check = true;
+
+    expect(_check).toBe(true);
+  });
+
+  test('saveSnippet args shape', () => {
+    type SaveArgs = CommandMap['saveSnippet']['args'];
+    const sample: SaveArgs = {
+      snippet: {
+        id: 'aaa',
+        title: 'My snippet',
+        body: 'body',
+        tags: ['t1'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    };
+    expect(sample).toMatchSnapshot();
+  });
+
+  test('deleteSnippet args shape', () => {
+    type DeleteArgs = CommandMap['deleteSnippet']['args'];
+    const sample: DeleteArgs = { id: '550e8400-e29b-41d4-a716-446655440000' };
+
+    expect(sample).toMatchSnapshot();
   });
 });
