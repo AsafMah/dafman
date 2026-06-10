@@ -471,9 +471,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       const defaultApprove = settingsStore.settings.permissions?.defaultApproveAll;
 
       if (defaultApprove) {
-        void setSessionApproveAll(id, true).catch(() => {
-          /* toast already surfaced by the setter */
-        });
+        void setSessionApproveAll(id, true);
       }
 
       // Fire-and-forget: get the current run mode so the UI shows it.
@@ -754,26 +752,26 @@ export const useSessionsStore = defineStore('sessions', () => {
     sessionId: string,
     model: string,
     reasoningEffort: string | null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     assertSessionWritable(sessionId);
 
     return setSessionModelAction({ getSession }, sessionId, model, reasoningEffort);
   }
 
-  async function setSessionMode(sessionId: string, mode: SessionMode): Promise<void> {
+  async function setSessionMode(sessionId: string, mode: SessionMode): Promise<boolean> {
     assertSessionWritable(sessionId);
 
     return setSessionModeAction({ getSession }, sessionId, mode);
   }
 
-  async function setSessionApproveAll(sessionId: string, enabled: boolean): Promise<void> {
+  async function setSessionApproveAll(sessionId: string, enabled: boolean): Promise<boolean> {
     // Playground sentinel skips the writable check (no real bun session).
     if (sessionId !== PLAYGROUND_PENDING_SESSION_ID) assertSessionWritable(sessionId);
 
     return setSessionApproveAllAction({ getSession }, sessionId, enabled);
   }
 
-  async function resetSessionApprovals(sessionId: string): Promise<void> {
+  async function resetSessionApprovals(sessionId: string): Promise<boolean> {
     assertSessionWritable(sessionId);
 
     return resetSessionApprovalsAction(sessionId);

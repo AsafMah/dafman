@@ -136,11 +136,14 @@ async function permissionAllowAndStopAsking(): Promise<void> {
     requestId: props.requestId,
     response: { kind: 'permission', decision: 'approveOnce' },
   });
-  await sessionsStore.setSessionApproveAll(props.sessionId, true);
-  toasts.info(
-    'Auto-approve enabled for this session',
-    'Toggle it back from the session options gear if you want prompts again.',
-  );
+  const enabled = await sessionsStore.setSessionApproveAll(props.sessionId, true);
+
+  if (enabled) {
+    toasts.info(
+      'Auto-approve enabled for this session',
+      'Toggle it back from the session options gear if you want prompts again.',
+    );
+  }
 }
 
 const showRuleEditor = ref(false);

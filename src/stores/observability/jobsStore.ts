@@ -220,8 +220,21 @@ export const useJobsStore = defineStore('jobs', () => {
 
     try {
       const sessions = useSessionsStore();
+      const modeSet = await sessions.setSessionMode(sessionId, 'autopilot');
 
-      await sessions.setSessionMode(sessionId, 'autopilot');
+      if (!modeSet) {
+        // Toast already fired by the setter; mark job failed and bail.
+        updateLocalJob(id, {
+          status: 'failed',
+          error: 'Failed to set session mode',
+          completedAt: nowIso(),
+          canCancel: false,
+          canRemove: true,
+        });
+
+        return;
+      }
+
       updateLocalJob(id, { status: 'running' });
       await sessions.sendMessage(sessionId, trimmed, 'steer');
     } catch (err) {
