@@ -43,6 +43,7 @@ const DEFAULTS: SessionPaneViewState = {
   sortDir: 'desc',
   searchQuery: '',
   colorByGroup: false,
+  showOnlyOpen: false,
 };
 
 // ─── setup / teardown ─────────────────────────────────────────────────────────

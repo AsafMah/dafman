@@ -31,6 +31,8 @@ export interface SessionPaneViewState {
   /// component post-processing the result (Option B1).
   searchQuery: string;
   colorByGroup: boolean;
+  /// When true, only sessions currently open in a dockview panel are shown.
+  showOnlyOpen: boolean;
 }
 
 const VIEW_STATE_DEFAULTS: SessionPaneViewState = {
@@ -39,6 +41,7 @@ const VIEW_STATE_DEFAULTS: SessionPaneViewState = {
   sortDir: 'desc',
   searchQuery: '',
   colorByGroup: false,
+  showOnlyOpen: false,
 };
 
 const VALID_GROUPING: Record<string, true> = {
@@ -73,6 +76,8 @@ function validateViewState(parsed: unknown): SessionPaneViewState | null {
     searchQuery: '',
     colorByGroup:
       typeof v.colorByGroup === 'boolean' ? v.colorByGroup : VIEW_STATE_DEFAULTS.colorByGroup,
+    showOnlyOpen:
+      typeof v.showOnlyOpen === 'boolean' ? v.showOnlyOpen : VIEW_STATE_DEFAULTS.showOnlyOpen,
   };
 }
 
@@ -275,7 +280,11 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
   /// Single source of truth — the component renders this directly.
   const grouped = computed<SessionGroup[]>(() => {
     const vs = viewState.value;
-    const filtered = filterSessions(sessions.value, vs.searchQuery);
+    // Apply showOnlyOpen before text-search so the count stays accurate.
+    const openIds = vs.showOnlyOpen ? new Set(sessionsStore.sessions.map((s) => s.id)) : null;
+    const source =
+      openIds !== null ? sessions.value.filter((s) => openIds.has(s.sessionId)) : sessions.value;
+    const filtered = filterSessions(source, vs.searchQuery);
 
     // ── Build groups ──────────────────────────────────────────────────
 
