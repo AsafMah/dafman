@@ -649,7 +649,7 @@ export class SessionRegistry {
     for (let i = 0; i < events.length; i += HISTORY_REPLAY_BATCH) {
       const chunk = events.slice(i, i + HISTORY_REPLAY_BATCH);
 
-      for (const event of chunk) this.forward(sessionId, event);
+      for (const event of chunk) this.forwardAsReplay(sessionId, event);
 
       if (i + HISTORY_REPLAY_BATCH < events.length) {
         await new Promise<void>((r) => queueMicrotask(r));
@@ -811,6 +811,14 @@ export class SessionRegistry {
   private forward(sessionId: string, event: SessionEvent): void {
     this.captureAgentLoadDiagnostics(sessionId, event);
     this.forwarder.forward(sessionId, this.rewritePromptEchoForDisplay(sessionId, event));
+  }
+
+  /// Like `forward`, but marks the event as a historical replay so the
+  /// renderer can suppress side effects (unseenTurns, OS notifications)
+  /// for events that already happened before this app launch.
+  private forwardAsReplay(sessionId: string, event: SessionEvent): void {
+    this.captureAgentLoadDiagnostics(sessionId, event);
+    this.forwarder.forwardReplay(sessionId, this.rewritePromptEchoForDisplay(sessionId, event));
   }
 
   private rememberPromptEchoRewrite(

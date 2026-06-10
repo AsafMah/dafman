@@ -11,6 +11,9 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Fixed (2026-06-08 durable persistence — issue #207)
 
 - **`settings.json` can no longer be silently wiped by a torn or concurrent write (#207).** All writes now go temp-file + atomic `rename` (`src-bun/app/shared/atomicWrite.ts`), a `writeChain` serializes concurrent `update()` calls, and a `settings.json.bak` of the last-good parse is kept and used for recovery before falling back to defaults (a corrupt primary never overwrites a good `.bak`). Previously a power-loss/disk-full/concurrent write could truncate the file, and the next boot silently reset every setting **and** the whole persisted layout. The same atomic write is applied to `session-metadata.json`.
+### Fixed (2026-06-08 resume hydration — issue #208)
+
+- **Resuming sessions no longer shows phantom "unseen activity" counts (#208).** On resume the backend replays a session's historical events; replayed `assistant.turn_end` events were run through the side-effectful session reducer, so every past turn bumped `unseenTurns` (and fired a turn-end OS notification when enabled) for each non-active restored session — a multi-session restart lit up bogus unread dots and reordered the sidebar. Replayed events are now wire-tagged (`replay: true`) and `handleTurnEnd` skips the unseen-count bump + notify on replay while still clearing the thinking state.
 
 ### Fixed (2026-06-08 keyboard editor chord — issue #202)
 

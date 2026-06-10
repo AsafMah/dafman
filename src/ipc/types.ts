@@ -414,6 +414,10 @@ export interface SessionEventPayload {
   agentId?: string;
   eventId?: string;
   timestamp?: string;
+  /// Set to `true` only for events replayed from persisted history
+  /// during session resume. Side-effect handlers (unseenTurns,
+  /// OS notifications) skip their effects for replay events.
+  replay?: true;
 }
 
 /// Mirrors `PermissionRequestData` in `src-bun/rpc.ts`. Permission

@@ -557,4 +557,124 @@ describe('sessionsStore.restoreSession — buffer + drain', () => {
     expect(sendCall).toBeTruthy();
     expect('attachments' in (sendCall!.args as object)).toBe(false);
   });
+
+  // ── #208: replay hydration guard ────────────────────────────────────────
+  // Historical turn_end events replayed from persisted history on resume
+  // must NOT inflate unseenTurns or push a notify effect. Live turn_end
+  // events arriving after restore still must.
+
+  test('#208: replayed turn_end during resume drain does NOT inflate unseenTurns', async () => {
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args, fireEvent) => {
+      const { sessionId } = args as { sessionId: string };
+      // Simulate bun-side replayHistory: events tagged replay: true
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_start',
+        data: { turnId: 't1' },
+        replay: true,
+      });
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_end',
+        data: { turnId: 't1' },
+        replay: true,
+      });
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_start',
+        data: { turnId: 't2' },
+        replay: true,
+      });
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_end',
+        data: { turnId: 't2' },
+        replay: true,
+      });
+      return { sessionId, cwd: null, model: null, approveAll: false, mode: 'interactive' };
+    };
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession('s-replay');
+
+    // Two historical turn_ends — unseenTurns must NOT have moved.
+    expect(record!.unseenTurns).toBe(0);
+    // isThinking must be false — the replayed turn_end resolved it.
+    expect(record!.isThinking).toBe(false);
+
+    // A live turn_end arriving AFTER restore still bumps the counter.
+    fire(event('s-replay', 'assistant.turn_end', { turnId: 't3' }));
+    expect(record!.unseenTurns).toBe(1);
+  });
+
+  test('#208: replayed turn_end does NOT push a notify effect', async () => {
+    const { useNotificationsStore } = await import('@/stores/app/notificationsStore');
+    const { useSettingsStore } = await import('@/stores/app/settingsStore');
+    const notifications = useNotificationsStore();
+    const settings = useSettingsStore();
+    settings.settings.notifications = { turnEnd: true, waitingForInput: true };
+    const notifyCalls: Array<{ kind: string }> = [];
+    notifications.notify = (opts) => {
+      notifyCalls.push({ kind: opts.kind });
+      return true;
+    };
+
+    const { bridge, fire, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args, fireEvent) => {
+      const { sessionId } = args as { sessionId: string };
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_start',
+        data: { turnId: 'h1' },
+        replay: true,
+      });
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_end',
+        data: { turnId: 'h1' },
+        replay: true,
+      });
+      return { sessionId, cwd: null, model: null, approveAll: false, mode: 'interactive' };
+    };
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    await store.restoreSession('s-notify');
+
+    // No notify effect should have fired for the historical turn_end.
+    expect(notifyCalls.filter((c) => c.kind === 'turnEnd')).toHaveLength(0);
+
+    // A live turn_end after restore fires the notification.
+    fire(event('s-notify', 'assistant.turn_end', { turnId: 'live-1' }));
+    expect(notifyCalls.filter((c) => c.kind === 'turnEnd')).toHaveLength(1);
+  });
+
+  test('#208: isThinking resolves correctly after replay of turn_start/turn_end', async () => {
+    const { bridge, handlers } = makeFakeBridge();
+    handlers.resumeSession = async (args, fireEvent) => {
+      const { sessionId } = args as { sessionId: string };
+      // A completed turn followed by the session going idle — isThinking
+      // must be false after the drain.
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_start',
+        data: { turnId: 'r1' },
+        replay: true,
+      });
+      fireEvent({
+        sessionId,
+        eventType: 'assistant.turn_end',
+        data: { turnId: 'r1' },
+        replay: true,
+      });
+      return { sessionId, cwd: null, model: null, approveAll: false, mode: 'interactive' };
+    };
+    setRpcBridge(bridge);
+    const store = useSessionsStore();
+    const record = await store.restoreSession('s-thinking');
+
+    expect(record!.isThinking).toBe(false);
+    // sawTurnBoundary reflects the replayed turn_start.
+    expect(record!.sawTurnBoundary).toBe(true);
+  });
 });
