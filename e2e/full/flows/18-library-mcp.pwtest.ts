@@ -5,9 +5,9 @@
 /// Configured list. Adding a server via the form moves it into
 /// Configured.
 
-import { test, expect } from "@playwright/test";
-import { spawnBunHarness, type BunHarness } from "../harness/bunHarness";
-import { openActivityTab } from "../harness/pageHarness";
+import { test, expect } from '@playwright/test';
+import { spawnBunHarness, type BunHarness } from '../harness/bunHarness';
+import { openActivityTab } from '../harness/pageHarness';
 
 let harness: BunHarness;
 
@@ -19,49 +19,52 @@ test.afterEach(async () => {
   await harness.teardown();
 });
 
-test("library opens from activity bar and lists discovered MCP servers", async ({ page }) => {
+test('library opens from activity bar and lists discovered MCP servers', async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
-  await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
+  await page.locator('.lex-composer-input').first().waitFor({ state: 'visible', timeout: 15_000 });
 
   // Activity tab: aria-label "Library" (dockview edge tab, role generic).
-  await openActivityTab(page, "Library");
+  await openActivityTab(page, 'Library');
 
-  const library = page.locator(".library-panel");
+  const library = page.locator('.library-panel');
   await expect(library).toBeVisible({ timeout: 5_000 });
 
   // MCP tab is selected by default.
-  await expect(library.getByRole("tab", { name: "MCP", selected: true })).toBeVisible();
+  await expect(library.getByRole('tab', { name: 'MCP', selected: true })).toBeVisible();
 
   // Scope to the active MCP tab panel — PrimeVue Tabs render every
   // panel in the DOM (just hide non-active via CSS), so unscoped
   // `text=github` would collide with Phase 19b.2's Agents tab,
   // which mentions `.github/agents/` in its help text.
-  const mcpPanel = library.locator('[role="tabpanel"]').filter({
-    has: page.locator("text=Configured"),
-  }).first();
+  const mcpPanel = library
+    .locator('[role="tabpanel"]')
+    .filter({
+      has: page.locator('text=Configured'),
+    })
+    .first();
 
   // Configured section is empty initially; Discovered shows the two
   // fake servers.
-  await expect(mcpPanel.locator("text=No MCP servers configured.")).toBeVisible();
-  await expect(mcpPanel.locator("text=playwright")).toBeVisible();
-  await expect(mcpPanel.locator("text=github")).toBeVisible();
+  await expect(mcpPanel.locator('text=No MCP servers configured.')).toBeVisible();
+  await expect(mcpPanel.locator('text=playwright')).toBeVisible();
+  await expect(mcpPanel.locator('text=github')).toBeVisible();
 });
 
-test("add MCP server via structured form → moves to configured list", async ({ page }) => {
+test('add MCP server via structured form → moves to configured list', async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
-  await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
-  await openActivityTab(page, "Library");
+  await page.locator('.lex-composer-input').first().waitFor({ state: 'visible', timeout: 15_000 });
+  await openActivityTab(page, 'Library');
 
-  const library = page.locator(".library-panel");
+  const library = page.locator('.library-panel');
   await expect(library).toBeVisible({ timeout: 5_000 });
 
-  // Click Add to open the dialog.
-  await library.getByRole("button", { name: /^Add$/i }).click();
-  const dialog = page.locator(".p-dialog");
+  // Click "New server" to open the inline add form.
+  await library.getByRole('button', { name: /^New server$/i }).click();
+  const dialog = page.locator('.mcp-inline-form');
   await expect(dialog).toBeVisible();
 
-  await dialog.locator("#mcp-form-name").fill("my-local-server");
-  await dialog.locator("#mcp-form-cmd").fill("/usr/bin/my-server");
+  await dialog.locator('#mcp-form-name').fill('my-local-server');
+  await dialog.locator('#mcp-form-cmd').fill('/usr/bin/my-server');
 
   // Submit — type=submit button. The form has another "Add" button
   // for env rows, so target the type=submit one explicitly.
@@ -69,28 +72,31 @@ test("add MCP server via structured form → moves to configured list", async ({
 
   await expect(dialog).toBeHidden({ timeout: 3_000 });
   // Configured list now has the entry.
-  await expect(
-    library.locator(".mcp-row").filter({ hasText: "my-local-server" }),
-  ).toBeVisible({ timeout: 3_000 });
+  await expect(library.locator('.mcp-row').filter({ hasText: 'my-local-server' })).toBeVisible({
+    timeout: 3_000,
+  });
 });
 
-test("JSON mode of the form round-trips with structured", async ({ page }) => {
+test('JSON mode of the form round-trips with structured', async ({ page }) => {
   await page.goto(`/?testBridge=${encodeURIComponent(harness.wsUrl)}&autosession=1`);
-  await page.locator(".lex-composer-input").first().waitFor({ state: "visible", timeout: 15_000 });
-  await openActivityTab(page, "Library");
-  await page.locator(".library-panel").getByRole("button", { name: /^Add$/i }).click();
+  await page.locator('.lex-composer-input').first().waitFor({ state: 'visible', timeout: 15_000 });
+  await openActivityTab(page, 'Library');
+  await page
+    .locator('.library-panel')
+    .getByRole('button', { name: /^New server$/i })
+    .click();
 
-  const dialog = page.locator(".p-dialog");
+  const dialog = page.locator('.mcp-inline-form');
   await expect(dialog).toBeVisible();
 
-  await dialog.locator("#mcp-form-name").fill("rt-test");
-  await dialog.locator("#mcp-form-cmd").fill("/bin/test");
+  await dialog.locator('#mcp-form-name').fill('rt-test');
+  await dialog.locator('#mcp-form-cmd').fill('/bin/test');
 
   // Switch to JSON mode — textarea must contain the serialized payload.
-  await dialog.getByRole("button", { name: /^JSON$/i }).click();
-  const textarea = dialog.locator("#mcp-form-json");
+  await dialog.getByRole('button', { name: /^JSON$/i }).click();
+  const textarea = dialog.locator('#mcp-form-json');
   await expect(textarea).toBeVisible();
   const json = await textarea.inputValue();
-  expect(json).toContain("/bin/test");
+  expect(json).toContain('/bin/test');
   expect(json).toContain('"type"');
 });
