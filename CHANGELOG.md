@@ -10,7 +10,7 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ### Changed (2026-06-10 MCP creator inline)
 
-- **The Library → MCP "add / edit server" form is now inline instead of a modal dialog**, matching the Agents and Snippets tabs (you flagged the inconsistency: "MCP creator is a modal, but agent creator is inline"). The **New server** header action opens an inline form region; Edit opens it pre-filled; Save/Cancel collapse it. The form fields, validation, JSON mode, `addMcpConfig`/`updateMcpConfig` calls, enable/disable toggles (incl. the per-session two-column toggles), and the Discovered list + OAuth sign-in are all unchanged — only the form's container moved from a `Dialog` to an inline panel.
+- **The Library → MCP "add / edit server" form is now inline instead of a modal dialog**, matching the Agents tab (you flagged the inconsistency: "MCP creator is a modal, but agent creator is inline"). The **New server** header action opens an inline form region; Edit opens it pre-filled; Save/Cancel collapse it. The form fields, validation, JSON mode, `addMcpConfig`/`updateMcpConfig` calls, enable/disable toggles (incl. the per-session two-column toggles), and the Discovered list + OAuth sign-in are all unchanged — only the form's container moved from a `Dialog` to an inline panel.
 
 ### Added (2026-06-10 session config templates — issue #243)
 

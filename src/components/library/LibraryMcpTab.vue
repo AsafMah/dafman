@@ -3,14 +3,14 @@
 ///
 /// Configured + Discovered server lists. Add/edit via inline form
 /// (Dialog replaced with inline form region — same pattern as
-/// LibraryAgentsTab / LibrarySnippetsTab).
+/// LibraryAgentsTab).
 /// Per-row enable/disable (global allowlist), edit, remove,
 /// sign-in (for http transports; OAuth is negotiated by the SDK at
 /// sign-in time, so the button shows for every http server). Discovered servers
 /// not yet in the configured list get an "Enable" shortcut that
 /// calls `addMcpConfig` + `enableMcpServers`.
 
-import { onMounted, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
@@ -91,6 +91,9 @@ function openForm() {
   formInitialName.value = '';
   formInitialConfig.value = {};
   showForm.value = true;
+  void nextTick(() => {
+    document.querySelector<HTMLElement>('#mcp-form-name')?.focus();
+  });
 }
 
 function openEditForm(entry: ConfiguredEntry) {
@@ -98,6 +101,9 @@ function openEditForm(entry: ConfiguredEntry) {
   formInitialName.value = entry.name;
   formInitialConfig.value = JSON.parse(JSON.stringify(entry.config)) as McpConfig;
   showForm.value = true;
+  void nextTick(() => {
+    document.querySelector<HTMLElement>('#mcp-form-name')?.focus();
+  });
 }
 
 async function onFormSubmit(payload: { name: string; config: McpConfig }) {
@@ -186,6 +192,7 @@ function onHeaderAction(action: string) {
         />
       </header>
       <McpServerForm
+        :key="formMode + ':' + formInitialName"
         :initial-name="formInitialName"
         :initial-config="formInitialConfig"
         :name-locked="formMode === 'edit'"
