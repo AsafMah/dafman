@@ -93,6 +93,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "lexical-vue@0.14.1": "patches/lexical-vue@0.14.1.patch",
+  },
   "overrides": {
     "@lexical/code": "0.44.0",
     "@lexical/dragon": "0.44.0",
