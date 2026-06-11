@@ -31,6 +31,8 @@ export interface SessionPaneViewState {
   /// component post-processing the result (Option B1).
   searchQuery: string;
   colorByGroup: boolean;
+  /// When true, only sessions currently open in a dockview panel are shown.
+  showOnlyOpen: boolean;
 }
 
 const VIEW_STATE_DEFAULTS: SessionPaneViewState = {
@@ -39,6 +41,7 @@ const VIEW_STATE_DEFAULTS: SessionPaneViewState = {
   sortDir: 'desc',
   searchQuery: '',
   colorByGroup: false,
+  showOnlyOpen: false,
 };
 
 const VALID_GROUPING: Record<string, true> = {
@@ -73,6 +76,8 @@ function validateViewState(parsed: unknown): SessionPaneViewState | null {
     searchQuery: '',
     colorByGroup:
       typeof v.colorByGroup === 'boolean' ? v.colorByGroup : VIEW_STATE_DEFAULTS.colorByGroup,
+    showOnlyOpen:
+      typeof v.showOnlyOpen === 'boolean' ? v.showOnlyOpen : VIEW_STATE_DEFAULTS.showOnlyOpen,
   };
 }
 
@@ -271,11 +276,40 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
 
   // ─── Main grouped computed ─────────────────────────────────────────
 
+  /// Set of session IDs that have a live panel in any inner dockview group.
+  /// Walks `innerBodiesCache` (authoritative for unmounted groups) then
+  /// falls back to `innerApis[g.id]?.toJSON()` for live-mounted groups.
+  /// Mirrors the walking pattern in `buildSessionGroupMap`.
+  const liveOpenSessionIds = computed<Set<string>>(() => {
+    const set = new Set<string>();
+
+    for (const g of groupsStore.groups) {
+      const body = groupsStore.innerBodiesCache[g.id] ?? groupsStore.innerApis[g.id]?.toJSON();
+
+      for (const sid of extractPanelIdsFromBody(body)) {
+        set.add(sid);
+      }
+    }
+
+    return set;
+  });
+
+  /// True when any filter (showOnlyOpen or a non-empty search query) is
+  /// active. Used by the template to distinguish "filter empty" from
+  /// "catalog empty".
+  const isFilterActive = computed(
+    () => viewState.value.showOnlyOpen || viewState.value.searchQuery.trim().length > 0,
+  );
+
   /// Ordered, filtered, grouped session list derived from `viewState`.
   /// Single source of truth — the component renders this directly.
   const grouped = computed<SessionGroup[]>(() => {
     const vs = viewState.value;
-    const filtered = filterSessions(sessions.value, vs.searchQuery);
+    // Apply showOnlyOpen before text-search so the count stays accurate.
+    const openIds = vs.showOnlyOpen ? liveOpenSessionIds.value : null;
+    const source =
+      openIds !== null ? sessions.value.filter((s) => openIds.has(s.sessionId)) : sessions.value;
+    const filtered = filterSessions(source, vs.searchQuery);
 
     // ── Build groups ──────────────────────────────────────────────────
 
@@ -535,6 +569,7 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
     hasLoaded,
     viewState,
     grouped,
+    isFilterActive,
     refresh,
     upsertLiveSession,
     deleteSession,

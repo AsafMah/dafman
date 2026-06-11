@@ -7,7 +7,7 @@
 // the primary control surface for sessions; the activity-bar item just
 // toggles its visibility.
 
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete';
 import Button from 'primevue/button';
@@ -38,7 +38,8 @@ const toasts = useToastStore();
 const confirm = useConfirm();
 const { displayTitle } = useSessionSelectors();
 
-const { grouped, isLoading, hasLoaded, error, viewState } = storeToRefs(sessionsList);
+const { grouped, isLoading, hasLoaded, error, viewState, isFilterActive } =
+  storeToRefs(sessionsList);
 const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
 const { isCreating: isCreatingSession } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
@@ -301,30 +302,19 @@ function toggleSortDir() {
   viewState.value.sortDir = viewState.value.sortDir === 'desc' ? 'asc' : 'desc';
 }
 
-function toggleColorByGroup() {
-  viewState.value.colorByGroup = !viewState.value.colorByGroup;
+function toggleShowOnlyOpen() {
+  viewState.value.showOnlyOpen = !viewState.value.showOnlyOpen;
 }
 
-// ---------- Search ----------
+// ---------- Search (always-visible inline input) ----------
 
-const searchOpen = ref(false);
-const searchInputEl = ref<HTMLInputElement | null>(null);
-
-function openSearch() {
-  searchOpen.value = true;
-  void nextTick(() => {
-    searchInputEl.value?.focus();
-  });
-}
-
-function closeSearch() {
+function clearSearch() {
   viewState.value.searchQuery = '';
-  searchOpen.value = false;
 }
 
 function onSearchKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
-    closeSearch();
+    clearSearch();
   }
 }
 
@@ -479,13 +469,11 @@ function sessionLabel(session: SessionMetadataSummary): string {
   return displayTitle(session.sessionId);
 }
 
-// ---------- Color-by-group ----------
+// ---------- Color-by-group (always on) ----------
 
 /// sessionId → dockview group hex color, built from innerBodiesCache
-/// and live innerApis. Null when colorByGroup is disabled.
-const sessionGroupColor = computed((): Map<string, string> | null => {
-  if (!viewState.value.colorByGroup) return null;
-
+/// and live innerApis. Always computed — no toggle.
+const sessionGroupColor = computed((): Map<string, string> => {
   const map = new Map<string, string>();
 
   for (const g of groupsStore.groups) {
@@ -499,13 +487,17 @@ const sessionGroupColor = computed((): Map<string, string> | null => {
   return map;
 });
 
-/// Inline border-left style for a session row when colorByGroup is on.
-function rowGroupColorStyle(sessionId: string): { borderLeft: string } | undefined {
-  const color = sessionGroupColor.value?.get(sessionId);
+/// Background-tint style for a session row: sets the CSS custom property
+/// `--session-group-tint` so the base `.session-row` rule applies it as
+/// `background-color`. Hover / is-open / is-resuming rules come after in
+/// the stylesheet and override via the `background` shorthand, so state
+/// feedback is never clobbered by the tint.
+function rowGroupColorStyle(sessionId: string): Record<string, string> | undefined {
+  const color = sessionGroupColor.value.get(sessionId);
 
   if (!color) return undefined;
 
-  return { borderLeft: `3px solid ${color}` };
+  return { '--session-group-tint': `color-mix(in srgb, ${color} 12%, transparent)` };
 }
 
 void toasts; // referenced inside async handlers
@@ -570,7 +562,6 @@ void toasts; // referenced inside async handlers
           title="Grouping mode"
           class="toolbar-select toolbar-select-group"
           size="small"
-          unstyled
         />
         <Select
           v-model="viewState.sortField"
@@ -581,7 +572,6 @@ void toasts; // referenced inside async handlers
           title="Sort by"
           class="toolbar-select toolbar-select-sort"
           size="small"
-          unstyled
         />
         <Button
           :icon="
@@ -598,25 +588,40 @@ void toasts; // referenced inside async handlers
           :title="viewState.sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'"
           @click="toggleSortDir"
         />
+        <!-- Inline search input — always visible -->
+        <div class="toolbar-search">
+          <i
+            class="pi pi-search toolbar-search-icon"
+            aria-hidden="true"
+          />
+          <input
+            v-model="viewState.searchQuery"
+            class="toolbar-search-input"
+            type="search"
+            placeholder="Filter…"
+            aria-label="Filter sessions"
+            @keydown="onSearchKeydown"
+          />
+          <Button
+            v-if="viewState.searchQuery"
+            icon="pi pi-times"
+            text
+            rounded
+            size="small"
+            aria-label="Clear search"
+            title="Clear search"
+            @click="clearSearch"
+          />
+        </div>
         <Button
-          icon="pi pi-palette"
+          icon="pi pi-eye"
           text
           rounded
           size="small"
-          :class="{ 'toolbar-btn-active': viewState.colorByGroup }"
-          aria-label="Color rows by dockview group"
-          title="Color by group"
-          @click="toggleColorByGroup"
-        />
-        <Button
-          icon="pi pi-search"
-          text
-          rounded
-          size="small"
-          :class="{ 'toolbar-btn-active': searchOpen || !!viewState.searchQuery.trim() }"
-          aria-label="Toggle search"
-          title="Search sessions"
-          @click="searchOpen ? closeSearch() : openSearch()"
+          :class="{ 'toolbar-btn-active': viewState.showOnlyOpen }"
+          aria-label="Show only open sessions"
+          title="Show only open sessions"
+          @click="toggleShowOnlyOpen"
         />
         <Button
           icon="pi pi-refresh"
@@ -629,35 +634,6 @@ void toasts; // referenced inside async handlers
           @click="onRefresh"
         />
       </div>
-    </div>
-
-    <!-- Inline search bar (visible when searchOpen) -->
-    <div
-      v-if="searchOpen"
-      class="search-bar"
-    >
-      <i
-        class="pi pi-search search-bar-icon"
-        aria-hidden="true"
-      />
-      <input
-        ref="searchInputEl"
-        v-model="viewState.searchQuery"
-        class="search-bar-input"
-        type="search"
-        placeholder="Filter sessions…"
-        aria-label="Filter sessions"
-        @keydown="onSearchKeydown"
-      />
-      <Button
-        icon="pi pi-times"
-        text
-        rounded
-        size="small"
-        aria-label="Clear search"
-        title="Clear search"
-        @click="closeSearch"
-      />
     </div>
 
     <div class="manager-body">
@@ -679,16 +655,22 @@ void toasts; // referenced inside async handlers
         Loading sessions…
       </p>
       <p
-        v-else-if="hasLoaded && grouped.length === 0"
+        v-else-if="hasLoaded && grouped.length === 0 && !isFilterActive"
         class="state-message"
       >
         No sessions yet.
       </p>
       <p
+        v-else-if="hasLoaded && grouped.length === 0 && isFilterActive"
+        class="state-message"
+      >
+        No matching sessions.
+      </p>
+      <p
         v-else-if="hasLoaded && grouped.every((g) => g.sessions.length === 0)"
         class="state-message"
       >
-        No sessions match the current filter.
+        No matching sessions.
       </p>
 
       <section
@@ -954,27 +936,37 @@ void toasts; // referenced inside async handlers
   min-width: 0;
 }
 
-/* Unstyled Select rendered as a compact text button. */
+/* Themed PrimeVue Select rendered compact to fit the toolbar. */
 .toolbar-select {
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--p-text-muted-color);
-  padding: 0.25rem 0.35rem;
-  border-radius: var(--p-border-radius-sm);
-  border: none;
-  background: transparent;
+  /* Override PrimeVue's default Select background/border/shadow */
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: var(--p-border-radius-sm) !important;
   white-space: nowrap;
 }
 
 .toolbar-select:hover {
-  background: color-mix(in srgb, var(--p-text-color) 8%, transparent);
-  color: var(--p-text-color);
+  background: color-mix(in srgb, var(--p-text-color) 8%, transparent) !important;
 }
 
-/* PrimeVue Select unstyled — hide the internal chevron on narrow widths */
+.toolbar-select :deep(.p-select-label) {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  padding: 0.25rem 0.1rem 0.25rem 0.35rem;
+  white-space: nowrap;
+}
+
+.toolbar-select :deep(.p-select-dropdown) {
+  width: 1.2rem;
+}
+
+.toolbar-select :deep(.p-select-dropdown-icon) {
+  font-size: 0.6rem;
+  color: var(--p-text-muted-color);
+}
+
 .toolbar-select-group {
   max-width: 7rem;
 }
@@ -990,46 +982,47 @@ void toasts; // referenced inside async handlers
   }
 }
 
-/* Active-state tint for icon-toggle buttons (color-by-group, search) */
+/* Active-state tint for icon-toggle buttons */
 .toolbar-btn-active :deep(.p-button-icon) {
   color: var(--p-primary-color);
 }
 
-/* ---- Inline search bar ---- */
+/* ---- Inline search (toolbar-embedded) ---- */
 
-.search-bar {
-  flex: 0 0 auto;
+.toolbar-search {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.4rem;
-  border-bottom: 1px solid var(--p-content-border-color);
-  background: color-mix(in srgb, var(--p-primary-color) 5%, transparent);
+  gap: 0.15rem;
+  background: color-mix(in srgb, var(--p-text-color) 5%, transparent);
+  border-radius: var(--p-border-radius-sm);
+  padding: 0.1rem 0.2rem;
 }
 
-.search-bar-icon {
+.toolbar-search-icon {
   flex: 0 0 auto;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: var(--p-text-muted-color);
 }
 
-.search-bar-input {
+.toolbar-search-input {
   flex: 1 1 auto;
   min-width: 0;
   background: transparent;
   border: none;
   outline: none;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: var(--p-text-color);
 }
 
-.search-bar-input::placeholder {
+.toolbar-search-input::placeholder {
   color: var(--p-text-muted-color);
 }
 
-/* Hide the native clear button that some browsers add to type="search" */
-.search-bar-input::-webkit-search-cancel-button {
+/* Suppress the native clear button browsers add to type="search" */
+.toolbar-search-input::-webkit-search-cancel-button {
   display: none;
 }
 
@@ -1200,7 +1193,10 @@ void toasts; // referenced inside async handlers
   align-items: stretch;
   border-radius: var(--p-border-radius-md);
   margin: 0 0.4rem;
-  /* border-left applied inline when colorByGroup is on */
+  /* Group tint is applied via --session-group-tint so hover/open/resuming
+   * rules (which use the `background` shorthand further down) can still
+   * override it without being clobbered by an inline backgroundColor. */
+  background-color: var(--session-group-tint, transparent);
   box-sizing: border-box;
 }
 

@@ -60,6 +60,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 - **Removed the redundant send-mode pill (#233).** The steer/queue/interrupt pill next to the send button duplicated state the send button already shows (its icon/tooltip reflect the mode, and its dropdown changes it). Dropped the pill + its CSS; mode display + selection are unchanged.
 - **Silenced the Lexical composer's Vue warnings (#237).** `lexical-vue@0.14.1`'s `ContentEditable` declared `style: { type: Boolean }` (so any style object tripped "Expected Boolean, got Object") and leaked an undeclared `prefix` prop onto the underlying `<div>` (a getter-only DOM attribute → "Failed setting prop prefix"). Fixed at the root via a `bun patch` (`patches/lexical-vue@0.14.1.patch`): corrected the `style` prop type and excluded `prefix` from the attrs spread. No more per-mount console noise.
 
+### Changed (2026-06-10 session-pane UX polish — issue #232)
+
+- **Session-pane controls polished from dogfood feedback.** Color-by-group is now always on and tints the **whole session row** with a low-opacity (`color-mix` 12%) wash of its dockview group's color (was a toggle + thin green accent). The grouping/sort dropdowns now use the themed PrimeVue Select (were unstyled). Search is an always-visible inline filter input with an X-to-clear (was a button that toggled a field). Added a **"show only open sessions"** toggle to the toolbar.
+
 ### Fixed (2026-06-08 context-usage pill — issues #219, #220)
 
 - **Context-usage pill no longer corrupted by per-call usage events (#219).** `assistant.usage` carries only per-API-call `inputTokens`/`outputTokens` (verified against the SDK types), not the cumulative `currentTokens`; `mergeUsage` was misreading `inputTokens` as `currentTokens`, so any sub-agent/mcp-sampling call (which shares the session's ambient) would drop the pill to that call's small token count. The pill now sources `currentTokens`/`tokenLimit` solely from `session.usage_info`.

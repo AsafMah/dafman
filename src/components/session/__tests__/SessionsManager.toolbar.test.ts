@@ -2,9 +2,9 @@
  * Component test for the SessionsManager toolbar controls:
  * - grouping mode dropdown updates viewState
  * - sort direction toggle flips between asc/desc
- * - color-by-group toggle activates
- * - search toggle shows/hides the search bar
- * - Escape collapses the search bar and clears the query
+ * - color-by-group is always on (no toggle)
+ * - search input is always visible inline; Escape/clear reset the query
+ * - show-only-open toggle filters to open sessions
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setActivePinia, createPinia } from 'pinia';
@@ -79,57 +79,51 @@ describe('SessionsManager toolbar', () => {
     expect(store.viewState.sortDir).toBe('asc');
   });
 
-  test('color-by-group toggle flips viewState.colorByGroup', async () => {
+  test('show-only-open toggle flips viewState.showOnlyOpen', async () => {
     const { getByTitle } = mountManager();
     const store = useSessionsListStore();
 
-    expect(store.viewState.colorByGroup).toBe(false);
+    expect(store.viewState.showOnlyOpen).toBe(false);
 
-    await fireEvent.click(getByTitle('Color by group'));
+    await fireEvent.click(getByTitle('Show only open sessions'));
 
-    expect(store.viewState.colorByGroup).toBe(true);
+    expect(store.viewState.showOnlyOpen).toBe(true);
   });
 
-  test('search toggle shows the search input', async () => {
-    const { getByTitle, queryByPlaceholderText } = mountManager();
+  test('search input is always visible in the toolbar', () => {
+    const { queryByPlaceholderText } = mountManager();
 
-    // Search bar not visible initially.
-    expect(queryByPlaceholderText('Filter sessions…')).toBeNull();
-
-    await fireEvent.click(getByTitle('Search sessions'));
-
-    expect(queryByPlaceholderText('Filter sessions…')).not.toBeNull();
+    // Inline search input is always present — no toggle required.
+    expect(queryByPlaceholderText('Filter…')).not.toBeNull();
   });
 
-  test('clear-search button hides the search bar and resets query', async () => {
+  test('clear-search button resets the query without hiding the input', async () => {
     const { getByTitle, getByPlaceholderText, queryByPlaceholderText } = mountManager();
     const store = useSessionsListStore();
 
-    await fireEvent.click(getByTitle('Search sessions'));
-
-    const input = getByPlaceholderText('Filter sessions…') as HTMLInputElement;
+    const input = getByPlaceholderText('Filter…') as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: 'hello' } });
     store.viewState.searchQuery = 'hello'; // sync store directly for assertion
 
     await fireEvent.click(getByTitle('Clear search'));
 
-    expect(queryByPlaceholderText('Filter sessions…')).toBeNull();
+    // Input stays visible; only the query is cleared.
+    expect(queryByPlaceholderText('Filter…')).not.toBeNull();
     expect(store.viewState.searchQuery).toBe('');
   });
 
-  test('Escape key collapses search and clears query', async () => {
-    const { getByTitle, getByPlaceholderText, queryByPlaceholderText } = mountManager();
+  test('Escape key clears the search query without hiding the input', async () => {
+    const { getByPlaceholderText, queryByPlaceholderText } = mountManager();
     const store = useSessionsListStore();
 
-    await fireEvent.click(getByTitle('Search sessions'));
-
-    const input = getByPlaceholderText('Filter sessions…');
+    const input = getByPlaceholderText('Filter…');
 
     store.viewState.searchQuery = 'test';
     await fireEvent.keyDown(input, { key: 'Escape' });
 
-    expect(queryByPlaceholderText('Filter sessions…')).toBeNull();
+    // Input stays visible; query is cleared.
+    expect(queryByPlaceholderText('Filter…')).not.toBeNull();
     expect(store.viewState.searchQuery).toBe('');
   });
 
