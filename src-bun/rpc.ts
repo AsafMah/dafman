@@ -69,6 +69,9 @@ export type {
   WorkspaceFileMatch,
   Workspaces,
   UpdateEventPayload,
+  ApplyProjectResult,
+  Project,
+  ProjectDefaults,
 } from '../src/shared/wireTypes';
 
 // ---------------------------------------------------------------------------

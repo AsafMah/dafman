@@ -1008,3 +1008,70 @@ exports[`IPC wire contracts — transcript search TranscriptSearchResult + Trans
   },
 ]
 `;
+
+exports[`IPC wire contracts — Projects (#264) ProjectDefaults shape 1`] = `
+{
+  "full": {
+    "agentName": "backend",
+    "agentScope": "user",
+    "approveAll": true,
+    "mcpEnabled": [
+      "github",
+      "jira",
+    ],
+    "modelId": "gpt-4o",
+    "reasoningEffort": "high",
+    "runMode": "autopilot",
+    "skillsDisabled": [
+      "summarize",
+    ],
+  },
+  "minimal": {},
+}
+`;
+
+exports[`IPC wire contracts — Projects (#264) Project shape 1`] = `
+{
+  "noName": {
+    "createdAt": "2026-06-11T00:00:00.000Z",
+    "defaults": {},
+    "path": "/home/user/work/api",
+    "updatedAt": "2026-06-11T00:00:00.000Z",
+  },
+  "sample": {
+    "createdAt": "2026-06-11T00:00:00.000Z",
+    "defaults": {
+      "agentName": "backend",
+      "mcpEnabled": [
+        "github",
+      ],
+      "runMode": "autopilot",
+    },
+    "name": "API Server",
+    "path": "C:/Users/dev/work/api",
+    "updatedAt": "2026-06-11T00:00:00.000Z",
+  },
+}
+`;
+
+exports[`IPC wire contracts — Projects (#264) ApplyProjectResult shape 1`] = `
+{
+  "notApplied": {
+    "applied": false,
+    "warnings": [
+      "No project found for path: /unknown/path",
+    ],
+  },
+  "success": {
+    "applied": true,
+    "warnings": [],
+  },
+  "withWarnings": {
+    "applied": true,
+    "warnings": [
+      "Could not enable MCP server "github": server not found",
+      "Could not disable skill "summarize": skill missing",
+    ],
+  },
+}
+`;

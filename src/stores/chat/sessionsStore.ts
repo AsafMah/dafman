@@ -41,6 +41,7 @@ import {
   setSessionWorkingDirectoryAction,
 } from './sessionActions';
 import { findSessionByName as findSessionByNameHelper } from './sessionSelectors';
+import { useProjectsStore } from '@/stores/projectsStore';
 
 /// User-facing send modes. Maps to SDK message delivery via
 /// `sessionsStore.sendMessage`:
@@ -459,6 +460,43 @@ export const useSessionsStore = defineStore('sessions', () => {
         .catch(() => {
           /* agent RPC may be unavailable; ignore */
         });
+      // Projects (#264): auto-apply project defaults for new sessions.
+      // Fire-and-forget after the record is already live so the session
+      // opens immediately. Resolve the session's REAL cwd — an explicit
+      // workingDirectory if one was passed, otherwise the backend-resolved
+      // default workspace (plain `session.new` lands there) — backfill the
+      // record so cwd-keyed UI (project capture) lights up, then match the
+      // project for that cwd and apply it.
+      void (async () => {
+        let cwd = wd && wd.length > 0 ? wd : null;
+
+        if (!cwd) {
+          const meta = await invokeCommand('getSessionMetadata', { sessionId: id });
+
+          cwd = meta.cwd ?? null;
+        }
+
+        if (!cwd) return;
+
+        const current = getSession(id);
+
+        if (current && !current.workingDirectory) current.workingDirectory = cwd;
+
+        const project = await invokeCommand('getProjectForPath', { path: cwd });
+
+        if (!project) return;
+
+        const result = await useProjectsStore().apply(id, project.path);
+        const label = project.name ?? project.path.split(/[\\/]/).pop() ?? project.path;
+
+        if (result.warnings.length > 0) {
+          useToastStore().warn(`Project defaults applied: ${label}`, result.warnings.join('; '));
+        } else {
+          useToastStore().info('Project defaults applied', label);
+        }
+      })().catch(() => {
+        /* non-fatal — project lookup/apply failure must not affect the session */
+      });
 
       return record;
     } catch (err) {

@@ -587,6 +587,45 @@ export interface UpdateEventPayload {
   progress?: number;
   errorMessage?: string;
 }
+// ---------------------------------------------------------------------------
+// Projects — per-workspace config overlay (#264)
+// ---------------------------------------------------------------------------
+
+/// Delta-encoded session config defaults keyed to a workspace directory.
+/// `undefined` scalar fields mean "inherit global default" — only set
+/// fields override. mcpEnabled / skillsDisabled are explicit lists
+/// (enable-list / disable-list); unlisted servers/skills keep global defaults.
+export interface ProjectDefaults {
+  agentName?: string;
+  agentScope?: AgentFileScope;
+  mcpEnabled?: string[];
+  skillsDisabled?: string[];
+  runMode?: SessionMode;
+  modelId?: string;
+  reasoningEffort?: string | null;
+  approveAll?: boolean;
+}
+
+/// A named, per-workspace bundle of session defaults. Keyed by canonical
+/// absolute path (`path` is both the identity key and the display hint).
+export interface Project {
+  /// Canonical absolute path of the workspace. Identity key — one project per directory.
+  path: string;
+  /// Display name. Defaults to basename of `path` when omitted.
+  name?: string;
+  defaults: ProjectDefaults;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/// Result of applying a project overlay to a live session.
+export interface ApplyProjectResult {
+  applied: boolean;
+  /// Human-readable warnings for settings that couldn't be applied
+  /// (e.g. a referenced MCP server or skill no longer exists).
+  warnings: string[];
+}
+
 export type CommandMap = {
   createClient: { args: Record<string, never>; result: string };
   createSession: {
@@ -662,6 +701,13 @@ export type CommandMap = {
   listSessions: { args: Record<string, never>; result: SessionMetadataSummary[] };
   deleteSession: { args: { sessionId: string }; result: string };
   getSessionMode: { args: { sessionId: string }; result: SessionMode };
+  /// Authoritative session metadata (currently the resolved cwd via the
+  /// registry's getCwd, which consults the SDK/catalog). Used to resolve a
+  /// freshly-created session's real working directory for project auto-apply.
+  getSessionMetadata: {
+    args: { sessionId: string };
+    result: { sessionId: string; cwd: string | null };
+  };
   setSessionMode: {
     args: { sessionId: string; mode: SessionMode };
     result: SessionMode;
@@ -991,5 +1037,30 @@ export type CommandMap = {
   getUpdateStatus: {
     args: Record<string, never>;
     result: UpdateCheckResult | null;
+  };
+  // ---------- Projects (#264) ----------
+  listProjects: {
+    args: Record<string, never>;
+    result: Project[];
+  };
+  getProjectForPath: {
+    args: { path: string };
+    result: Project | null;
+  };
+  saveProject: {
+    args: { project: Project };
+    result: void;
+  };
+  deleteProject: {
+    args: { path: string };
+    result: void;
+  };
+  applyProjectToSession: {
+    args: { sessionId: string; path: string };
+    result: ApplyProjectResult;
+  };
+  captureProjectFromSession: {
+    args: { sessionId: string; path: string; name?: string };
+    result: Project;
   };
 };

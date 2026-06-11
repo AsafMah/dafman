@@ -41,6 +41,8 @@ import { SkillsRegistry } from './app/library/skillsRegistry';
 import { TerminalRegistry } from './app/terminal/terminalRegistry';
 import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { SettingsService } from './app/config/settings';
+import { ProjectService } from './app/config/projectService';
+import { applyProjectToSession, captureProjectFromSession } from './app/config/projectOps';
 import { listInstructionSources } from './app/library/instructions';
 import { toModelSummary } from './app/library/models';
 import { FakeCopilotClient } from './app/client/fakeClient';
@@ -148,6 +150,7 @@ const commandResults = new CommandResultRegistry(
   join(flags.userData, 'command-results.json'),
   emitCommandResult,
 );
+const projectService = ProjectService.loadOrDefault(join(flags.userData, 'projects.json'));
 
 subscribeLogs((record: LogRecord) => broadcast('logEvent', record));
 subscribeAudit((entry: AuditEntry) => broadcast('auditEvent', entry));
@@ -594,6 +597,43 @@ const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
     const { sessionId } = args as { sessionId: string };
 
     return commandResults.list(sessionId);
+  }),
+  // ---------- Projects (#264) ----------
+  listProjects: rpcGuard(async () => projectService.list()),
+  getProjectForPath: rpcGuard(async (args) => {
+    const { path } = args as { path: string };
+
+    return projectService.getForPath(path) ?? null;
+  }),
+  saveProject: rpcGuard(async (args) => {
+    const { project } = args as { project: Parameters<typeof projectService.save>[0] };
+
+    await projectService.save(project);
+  }),
+  deleteProject: rpcGuard(async (args) => {
+    const { path } = args as { path: string };
+
+    await projectService.delete(path);
+  }),
+  applyProjectToSession: rpcGuard(async (args) => {
+    const { sessionId, path } = args as { sessionId: string; path: string };
+    const project = projectService.getForPath(path);
+
+    if (!project) return { applied: false, warnings: [`No project found for path: ${path}`] };
+
+    return applyProjectToSession(sessions, project, sessionId);
+  }),
+  captureProjectFromSession: rpcGuard(async (args) => {
+    const { sessionId, path, name } = args as {
+      sessionId: string;
+      path: string;
+      name?: string;
+    };
+    const project = await captureProjectFromSession(sessions, sessionId, path, name);
+
+    await projectService.save(project);
+
+    return project;
   }),
 };
 

@@ -37,6 +37,7 @@ import {
   useDetailsSections,
   type ToolState,
 } from './details';
+import { useProjectsStore } from '@/stores/projectsStore';
 
 const sessionsStore = useSessionsStore();
 const layoutStore = useLayoutStore();
@@ -326,6 +327,51 @@ async function onForkSession() {
     toasts.error('Fork failed', toErrorMessage(err));
   }
 }
+
+// ---------- Project capture (#264) ----------
+
+const projectsStore = useProjectsStore();
+const capturingProject = ref(false);
+const captureNameDraft = ref('');
+
+function startCaptureProject() {
+  if (isDeleted.value) return;
+
+  const cwd = record.value?.workingDirectory;
+
+  captureNameDraft.value = cwd ? (cwd.split(/[\\/]/).pop() ?? cwd) : '';
+  capturingProject.value = true;
+}
+
+function cancelCaptureProject() {
+  capturingProject.value = false;
+  captureNameDraft.value = '';
+}
+
+async function onSaveProjectCapture() {
+  const cwd = record.value?.workingDirectory;
+
+  if (!cwd) {
+    toasts.warn('No workspace', 'Session has no working directory to save as a project default.');
+    capturingProject.value = false;
+
+    return;
+  }
+
+  const name = captureNameDraft.value.trim();
+
+  capturingProject.value = false;
+  captureNameDraft.value = '';
+
+  try {
+    const project = await projectsStore.capture(sessionId.value, cwd, name || undefined);
+    const label = project.name ?? cwd.split(/[\\/]/).pop() ?? cwd;
+
+    toasts.success('Project defaults saved', label);
+  } catch (err) {
+    toasts.error('Failed to save project defaults', toErrorMessage(err));
+  }
+}
 </script>
 
 <template>
@@ -335,6 +381,16 @@ async function onForkSession() {
   >
     <header class="section-header section-header-top">
       <span class="section-title">Session</span>
+      <Button
+        icon="pi pi-bookmark"
+        size="small"
+        severity="secondary"
+        text
+        label="Save as project"
+        title="Save current session config as project defaults for this workspace"
+        :disabled="isDeleted || !record.workingDirectory"
+        @click="startCaptureProject"
+      />
       <Button
         icon="pi pi-clone"
         size="small"
@@ -346,6 +402,34 @@ async function onForkSession() {
         @click="onForkSession"
       />
     </header>
+    <!-- Project capture inline form (#264) -->
+    <div
+      v-if="capturingProject"
+      class="capture-project-form"
+    >
+      <form @submit.prevent="onSaveProjectCapture">
+        <InputText
+          v-model="captureNameDraft"
+          size="small"
+          placeholder="Project name (optional)"
+          class="capture-project-input"
+          autofocus
+        />
+        <Button
+          type="submit"
+          label="Save"
+          size="small"
+        />
+        <Button
+          type="button"
+          label="Cancel"
+          size="small"
+          severity="secondary"
+          text
+          @click="cancelCaptureProject"
+        />
+      </form>
+    </div>
     <div
       v-if="isDeleted"
       class="deleted-details-banner"

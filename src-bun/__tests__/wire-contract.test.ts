@@ -28,6 +28,9 @@ import type {
   WorkspaceFileMatch,
   TranscriptMatch,
   TranscriptSearchResult,
+  ApplyProjectResult,
+  Project,
+  ProjectDefaults,
 } from '../rpc';
 import type { AppErrorPayload } from '../app/shared/errors';
 
@@ -862,5 +865,91 @@ describe('IPC wire contracts — transcript search', () => {
       matches: [{ eventIndex: 0, role: 'system', snippet: '<<system>> notification' }],
     };
     expect([result, noSummary]).toMatchSnapshot();
+  });
+});
+
+describe('IPC wire contracts — Projects (#264)', () => {
+  test('ProjectDefaults shape', () => {
+    const full: ProjectDefaults = {
+      agentName: 'backend',
+      agentScope: 'user',
+      mcpEnabled: ['github', 'jira'],
+      skillsDisabled: ['summarize'],
+      runMode: 'autopilot',
+      modelId: 'gpt-4o',
+      reasoningEffort: 'high',
+      approveAll: true,
+    } satisfies ProjectDefaults;
+
+    const minimal: ProjectDefaults = {} satisfies ProjectDefaults;
+
+    expect({ full, minimal }).toMatchSnapshot();
+  });
+
+  test('Project shape', () => {
+    const sample: Project = {
+      path: 'C:/Users/dev/work/api',
+      name: 'API Server',
+      defaults: {
+        agentName: 'backend',
+        mcpEnabled: ['github'],
+        runMode: 'autopilot',
+      },
+      createdAt: '2026-06-11T00:00:00.000Z',
+      updatedAt: '2026-06-11T00:00:00.000Z',
+    } satisfies Project;
+
+    const noName: Project = {
+      path: '/home/user/work/api',
+      defaults: {},
+      createdAt: '2026-06-11T00:00:00.000Z',
+      updatedAt: '2026-06-11T00:00:00.000Z',
+    } satisfies Project;
+
+    expect({ sample, noName }).toMatchSnapshot();
+  });
+
+  test('ApplyProjectResult shape', () => {
+    const success: ApplyProjectResult = {
+      applied: true,
+      warnings: [],
+    } satisfies ApplyProjectResult;
+
+    const withWarnings: ApplyProjectResult = {
+      applied: true,
+      warnings: [
+        'Could not enable MCP server "github": server not found',
+        'Could not disable skill "summarize": skill missing',
+      ],
+    } satisfies ApplyProjectResult;
+
+    const notApplied: ApplyProjectResult = {
+      applied: false,
+      warnings: ['No project found for path: /unknown/path'],
+    } satisfies ApplyProjectResult;
+
+    expect({ success, withWarnings, notApplied }).toMatchSnapshot();
+  });
+
+  test('CommandMap has project entries', () => {
+    type HasListProjects = CommandMap['listProjects'];
+    type HasGetProjectForPath = CommandMap['getProjectForPath'];
+    type HasSaveProject = CommandMap['saveProject'];
+    type HasDeleteProject = CommandMap['deleteProject'];
+    type HasApplyProjectToSession = CommandMap['applyProjectToSession'];
+    type HasCaptureProjectFromSession = CommandMap['captureProjectFromSession'];
+
+    // Type-level check: all 6 entries exist in CommandMap (compile error = failure).
+    // Cast through unknown to avoid an unused-variable error while keeping the check.
+    void (undefined as unknown as [
+      HasListProjects,
+      HasGetProjectForPath,
+      HasSaveProject,
+      HasDeleteProject,
+      HasApplyProjectToSession,
+      HasCaptureProjectFromSession,
+    ]);
+
+    expect(true).toBe(true);
   });
 });
