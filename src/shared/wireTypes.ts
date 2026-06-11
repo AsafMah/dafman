@@ -559,13 +559,34 @@ export type AuditEntry =
       argKeyCount?: number;
     };
 
-// ---------------------------------------------------------------------------
-// Command map — single source of truth for the request surface.
-// Adding a new RPC? Add it here, then implement on the bun side in
-// `src-bun/index.ts`. The bun adapter derives `DafmanRPC['bun']['requests']`
-// from this map via a local mapped type.
-// ---------------------------------------------------------------------------
+/// Simplified status type for the renderer; mirrors Electrobun's granular
+/// `UpdateStatusType` at a coarser level suitable for UI state.
+export type UpdateStatusType =
+  | 'idle'
+  | 'checking'
+  | 'no-update'
+  | 'update-available'
+  | 'downloading'
+  | 'applying'
+  | 'complete'
+  | 'error';
 
+export interface UpdateCheckResult {
+  version: string;
+  hash: string;
+  updateAvailable: boolean;
+  updateReady: boolean;
+  error: string;
+}
+
+/// Pushed from bun → renderer whenever the Updater status changes.
+export interface UpdateEventPayload {
+  status: UpdateStatusType;
+  message: string;
+  timestamp: number;
+  progress?: number;
+  errorMessage?: string;
+}
 export type CommandMap = {
   createClient: { args: Record<string, never>; result: string };
   createSession: {
@@ -957,5 +978,18 @@ export type CommandMap = {
       options?: { sessionIds?: string[]; limit?: number };
     };
     result: TranscriptSearchResult[];
+  };
+  // ---------- Auto-update ----------
+  checkForUpdate: {
+    args: Record<string, never>;
+    result: UpdateCheckResult;
+  };
+  downloadAndApplyUpdate: {
+    args: Record<string, never>;
+    result: boolean;
+  };
+  getUpdateStatus: {
+    args: Record<string, never>;
+    result: UpdateCheckResult | null;
   };
 };

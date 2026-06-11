@@ -17,6 +17,7 @@ import type {
   PendingRequestPayload,
   SessionEventPayload,
   TerminalEventPayload,
+  UpdateEventPayload,
 } from '@/ipc/types';
 
 export type InvokeResult<N extends CommandName> = CommandMap[N]['result'];
@@ -83,6 +84,7 @@ export type LogEventListener = (record: LogRecord) => void;
 export type AuditEventListener = (entry: AuditEntry) => void;
 export type TerminalEventListener = (event: TerminalEventPayload) => void;
 export type CommandResultEventListener = (event: CommandResultEvent) => void;
+export type UpdateEventListener = (payload: UpdateEventPayload) => void;
 
 /// Minimal surface that the IPC bridge has to implement. Both the real
 /// Electrobun bridge and unit-test fakes match this shape; tests inject a
@@ -95,6 +97,7 @@ export interface RpcBridge {
   onAuditEvent?(listener: AuditEventListener): () => void;
   onTerminalEvent?(listener: TerminalEventListener): () => void;
   onCommandResultEvent?(listener: CommandResultEventListener): () => void;
+  onUpdateEvent?(listener: UpdateEventListener): () => void;
 }
 
 let bridge: RpcBridge | null = null;
@@ -146,6 +149,7 @@ const terminalChannel = createDeferredChannel<TerminalEventListener>((b, l) =>
 const commandResultChannel = createDeferredChannel<CommandResultEventListener>((b, l) =>
   b.onCommandResultEvent?.(l),
 );
+const updateChannel = createDeferredChannel<UpdateEventListener>((b, l) => b.onUpdateEvent?.(l));
 
 export function setRpcBridge(next: RpcBridge | null): void {
   bridge = next;
@@ -158,6 +162,7 @@ export function setRpcBridge(next: RpcBridge | null): void {
   auditChannel.flush(next);
   terminalChannel.flush(next);
   commandResultChannel.flush(next);
+  updateChannel.flush(next);
 }
 
 export async function invokeCommand<N extends CommandName>(
@@ -191,3 +196,4 @@ export const onLogEvent = logChannel.subscribe;
 export const onAuditEvent = auditChannel.subscribe;
 export const onTerminalEvent = terminalChannel.subscribe;
 export const onCommandResultEvent = commandResultChannel.subscribe;
+export const onUpdateEvent = updateChannel.subscribe;

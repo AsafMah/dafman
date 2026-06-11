@@ -45,6 +45,13 @@ import type {
   WebviewSendChannels,
 } from './rpc';
 import { toErrorMessage } from './app/shared/errorMessage';
+import {
+  checkForUpdate as updaterCheckForUpdate,
+  downloadAndApplyUpdate as updaterDownloadAndApply,
+  getUpdateStatus,
+  onStatusChange as updaterOnStatusChange,
+  scheduleBootCheck,
+} from './updateService';
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -552,6 +559,9 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       searchSessionTranscripts: rpcGuard(async ({ query, options }) =>
         sessions.searchTranscripts(query, options),
       ),
+      checkForUpdate: rpcGuard(async () => updaterCheckForUpdate()),
+      downloadAndApplyUpdate: rpcGuard(async () => updaterDownloadAndApply()),
+      getUpdateStatus: rpcGuard(async () => getUpdateStatus()),
     },
     messages: {},
   },
@@ -791,6 +801,11 @@ function bindEmitChannels(): void {
 }
 
 bindEmitChannels();
+
+// Subscribe to Updater status changes and push to renderer. The 30-second
+// boot check runs after the webview is ready so the push channel is live.
+updaterOnStatusChange((payload) => send.updateEvent(payload));
+scheduleBootCheck((payload) => send.updateEvent(payload));
 
 // Live log fan-out to the renderer. The in-app log viewer subscribes
 // via the `logEvent` webview message and applies its own level filter

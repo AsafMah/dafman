@@ -2,7 +2,7 @@
   "src/components/session/SessionDetailsPanel.vue": 2261,
   "src/dev/Playground.vue": 1638,
   "src-bun/app/chat/sessions.ts": 1532,
-  "src/shared/wireTypes.ts": 961,
+  "src/shared/wireTypes.ts": 995,
   "src/stores/chat/sessionsStore.ts": 928,
   "src/components/chat/ChatWindow.vue": 1136,
   "src/components/session/SessionsManager.vue": 1340,
@@ -10,5 +10,5 @@
   "src/components/chat/MessageComposer.vue": 1085,
   "src/components/settings/KeyboardShortcutsSection.vue": 859,
   "src/lib/registerBuiltinCommands.ts": 912,
-  "src-bun/index.ts": 859
+  "src-bun/index.ts": 874
 }

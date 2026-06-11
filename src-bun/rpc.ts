@@ -17,6 +17,7 @@ import type {
   CommandResultRecord,
   LogRecord,
   TerminalSummary,
+  UpdateEventPayload,
 } from '../src/shared/wireTypes';
 
 // Re-export all shared payload types so existing `import … from '../../rpc'`
@@ -67,6 +68,7 @@ export type {
   TranscriptSearchResult,
   WorkspaceFileMatch,
   Workspaces,
+  UpdateEventPayload,
 } from '../src/shared/wireTypes';
 
 // ---------------------------------------------------------------------------
@@ -199,6 +201,7 @@ export type DafmanRPC = {
       auditEvent: AuditEntry;
       terminalEvent: TerminalEventPayload;
       commandResultEvent: CommandResultEvent;
+      updateEvent: UpdateEventPayload;
     };
   }>;
 };

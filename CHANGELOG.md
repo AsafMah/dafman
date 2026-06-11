@@ -4,6 +4,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 
 ## [Unreleased]
 
+### Security (2026-06-11 auto-update hardening — issue #254)
+
+- **Hardened the auto-update pipeline against insecure transport and silent failures.** Three targeted fixes: (1) `updateService.checkForUpdate()` now refuses to proceed if the baked-in `baseUrl` is not `https://` — Electrobun 1.18.1 does not sign artifacts, so plaintext HTTP is unacceptable; the guard returns an explicit error result instead of making a network request. (2) `downloadAndApplyUpdate()` no longer returns `true` after a no-op: it reads `Updater.updateInfo()` after the download and returns `false` (with a log) if the updater set an `error` or left `updateReady` false. (3) `updateStore.checkForUpdate()` now branches on `result.error` before `updateAvailable`, so a failed check surfaces as an error toast instead of silently showing "You are on the latest version." Threat model documented in `plans/specs/auto-update.md#security--threat-model`.
+
 ### Changed (2026-06-10 dual-reduction slice 2 — issue #209)
 
 - **Unified the duplicated session status-delta derivation between the two reducers (internal).** Following slice 1 (pending-requests), the per-event derivation of title, model + reasoning-effort, current sub-agent, and turn/thinking state was still duplicated between the record-side reducer (`sessionReducer.ts`) and the ambient-side chat-event handlers. Both now route through one pure, no-Pinia `reduceSessionStatusEvent` + `SessionStatusDelta` union in `src/lib/sessionStatus.ts`; the record side applies it via `applyStatusDeltaToRecord` and the ambient handlers apply the same delta. Removed 6 duplicate record-side handlers. A 32-case convergence test asserts both projections agree (and documents the intentional divergences — e.g. abort/task-complete clear the record's turn state but deliberately not the ambient's). No behavior change.
@@ -45,6 +49,10 @@ All notable changes to Dafman are documented here. Format is based on [Keep a Ch
 ### Added (2026-06-10 Library Skills two-column — issue #28)
 
 - **Library → Skills tab: per-session override toggle.** Each skill row now shows a **"Default"** (global) + **"This session"** (per-session override, via `setSessionSkillEnabled` for the focused session) toggle pair, disabled with a "No active session" hint when none is focused — mirroring the MCP two-column (#200). Continues the #28 Library-as-source-of-truth model. (Tools stay global-only for now — they have no per-session runtime/persistence; tracked in #252.)
+
+### Added (2026-06-10 in-app auto-update — issue #123)
+
+- **In-app auto-update via Electrobun delta patches.** A background check (30s after boot) and a manual "Check for updates" in Settings → Updates query the configured release `baseUrl` via Electrobun's `Updater` API; when a newer version exists, the user gets an "update available" status and can download + apply it (the app relaunches into the new version). Auto-update is automatically a no-op on the `dev` channel. New `src-bun/updateService.ts` (the Electrobun-touching boundary), `updateStore` + `UpdateSettingsSection.vue`, update RPCs + a status event channel on the wire. **Publishing releases to the `baseUrl` is a separate maintainer step** documented in `plans/specs/auto-update.md`; the update flow itself can only be exercised against a published non-dev release.
 
 ### Fixed (2026-06-10 reload transcripts — issue #235)
 
