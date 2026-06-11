@@ -36,6 +36,8 @@ import { TerminalRegistry } from './app/terminal/terminalRegistry';
 import { CommandResultRegistry } from './app/chat/commandResultRegistry';
 import { listInstructionSources } from './app/library/instructions';
 import { SettingsService, ensureDefaultWorkspace } from './app/config/settings';
+import { ProjectService } from './app/config/projectService';
+import { applyProjectToSession, captureProjectFromSession } from './app/config/projectOps';
 import { installStderrFilter } from './app/observability/stderrFilter';
 import type {
   CommandResultEvent,
@@ -175,6 +177,7 @@ const commandResults = new CommandResultRegistry(
   join(Utils.paths.userData, 'command-results.json'),
   (payload) => emitCommandResult(payload),
 );
+const projectService = ProjectService.loadOrDefault(join(Utils.paths.userData, 'projects.json'));
 
 const rpc = BrowserView.defineRPC<DafmanRPC>({
   maxRequestTime: 120000,
@@ -294,6 +297,10 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       listSessions: rpcGuard(async () => sessions.list()),
       deleteSession: rpcGuard(async ({ sessionId }) => sessions.deleteCliSession(sessionId)),
       getSessionMode: rpcGuard(async ({ sessionId }) => sessions.getMode(sessionId)),
+      getSessionMetadata: rpcGuard(async ({ sessionId }) => ({
+        sessionId,
+        cwd: (await sessions.getCwd(sessionId)) ?? null,
+      })),
       setSessionMode: rpcGuard(async ({ sessionId, mode }) => sessions.setMode(sessionId, mode)),
       getSessionName: rpcGuard(async ({ sessionId }) => sessions.getName(sessionId)),
       setSessionName: rpcGuard(async ({ sessionId, name }) => sessions.setName(sessionId, name)),
@@ -562,6 +569,29 @@ const rpc = BrowserView.defineRPC<DafmanRPC>({
       checkForUpdate: rpcGuard(async () => updaterCheckForUpdate()),
       downloadAndApplyUpdate: rpcGuard(async () => updaterDownloadAndApply()),
       getUpdateStatus: rpcGuard(async () => getUpdateStatus()),
+      // ---------- Projects (#264) ----------
+      listProjects: rpcGuard(async () => projectService.list()),
+      getProjectForPath: rpcGuard(async ({ path }) => projectService.getForPath(path) ?? null),
+      saveProject: rpcGuard(async ({ project }) => {
+        await projectService.save(project);
+      }),
+      deleteProject: rpcGuard(async ({ path }) => {
+        await projectService.delete(path);
+      }),
+      applyProjectToSession: rpcGuard(async ({ sessionId, path }) => {
+        const project = projectService.getForPath(path);
+
+        if (!project) return { applied: false, warnings: [`No project found for path: ${path}`] };
+
+        return applyProjectToSession(sessions, project, sessionId);
+      }),
+      captureProjectFromSession: rpcGuard(async ({ sessionId, path, name }) => {
+        const project = await captureProjectFromSession(sessions, sessionId, path, name);
+
+        await projectService.save(project);
+
+        return project;
+      }),
     },
     messages: {},
   },

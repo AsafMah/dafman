@@ -66,6 +66,9 @@ export type {
   UpdateStatusType,
   WorkspaceFileMatch,
   Workspaces,
+  ApplyProjectResult,
+  Project,
+  ProjectDefaults,
 } from '@/shared/wireTypes';
 
 // ---------------------------------------------------------------------------

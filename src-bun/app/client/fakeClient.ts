@@ -114,7 +114,7 @@ class FakeCopilotSession {
     // payloads. Individual flows can override via setSendScript.
     this.rpc = {
       mode: {
-        get: async () => ({ mode: 'interactive' }),
+        get: async () => 'interactive',
         set: async () => undefined,
       },
       name: {
