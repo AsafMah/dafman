@@ -30,24 +30,24 @@ restart helper — that requires only a static file host to operate.
 
 ### Before this implementation
 
-| File | State |
-|---|---|
-| `electrobun.config.ts:27` | No `release` key; `baseUrl` not set |
-| `src-bun/index.ts:12` | `Updater` imported but used only for `getLocalInfo()` + channel detection |
-| `src/shared/wireTypes.ts:543` | No update-related commands in `CommandMap` |
-| `src-bun/rpc.ts:186` | No `updateEvent` in webview messages |
-| `src/ipc/listenerRegistry.ts` | No `updateEvent` channel |
+| File                          | State                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `electrobun.config.ts:27`     | No `release` key; `baseUrl` not set                                       |
+| `src-bun/index.ts:12`         | `Updater` imported but used only for `getLocalInfo()` + channel detection |
+| `src/shared/wireTypes.ts:543` | No update-related commands in `CommandMap`                                |
+| `src-bun/rpc.ts:186`          | No `updateEvent` in webview messages                                      |
+| `src/ipc/listenerRegistry.ts` | No `updateEvent` channel                                                  |
 
-### Electrobun 1.18.x Updater surface (node\_modules/electrobun/dist-win-x64/api/bun/core/Updater.ts)
+### Electrobun 1.18.x Updater surface (node_modules/electrobun/dist-win-x64/api/bun/core/Updater.ts)
 
-| Method | Description |
-|---|---|
-| `Updater.checkForUpdate()` | Fetches `<baseUrl>/<platform>-update.json`; returns `{ version, hash, updateAvailable, updateReady, error }` |
-| `Updater.downloadUpdate()` | Walks delta-patch chain (`bspatch.exe`) from current hash to latest; falls back to full bundle download. Sets `updateInfo.updateReady = true` on success. |
-| `Updater.applyUpdate()` | Extracts tar into app data dir, writes an update `.bat` on Windows, calls `quit()` to restart. No-op if `updateReady` is false. |
-| `Updater.onStatusChange(cb)` | Replaces the single global status callback; `cb` receives `UpdateStatusEntry` on every internal status transition (30+ distinct statuses). |
-| `Updater.getLocalInfo()` | Reads `../Resources/version.json` (baked at build time); fields: `version, hash, channel, baseUrl, name, identifier`. |
-| `Updater.updateInfo()` | Returns the last result from `checkForUpdate()`, or `undefined` before first check. |
+| Method                       | Description                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Updater.checkForUpdate()`   | Fetches `<baseUrl>/<platform>-update.json`; returns `{ version, hash, updateAvailable, updateReady, error }`                                              |
+| `Updater.downloadUpdate()`   | Walks delta-patch chain (`bspatch.exe`) from current hash to latest; falls back to full bundle download. Sets `updateInfo.updateReady = true` on success. |
+| `Updater.applyUpdate()`      | Extracts tar into app data dir, writes an update `.bat` on Windows, calls `quit()` to restart. No-op if `updateReady` is false.                           |
+| `Updater.onStatusChange(cb)` | Replaces the single global status callback; `cb` receives `UpdateStatusEntry` on every internal status transition (30+ distinct statuses).                |
+| `Updater.getLocalInfo()`     | Reads `../Resources/version.json` (baked at build time); fields: `version, hash, channel, baseUrl, name, identifier`.                                     |
+| `Updater.updateInfo()`       | Returns the last result from `checkForUpdate()`, or `undefined` before first check.                                                                       |
 
 **Important constraints:**
 
@@ -105,37 +105,37 @@ restart helper — that requires only a static file host to operate.
 
 ### Key files (post-implementation)
 
-| File | Role |
-|---|---|
-| `electrobun.config.ts:57–68` | `release.baseUrl` + `generatePatch: true` placeholder |
-| `src/shared/wireTypes.ts` | `UpdateStatusType`, `UpdateCheckResult`, `UpdateEventPayload`, 3 new `CommandMap` entries |
-| `src-bun/rpc.ts` | `updateEvent: UpdateEventPayload` in `DafmanRPC.webview.messages` |
-| `src-bun/app/updater/updateService.ts` | Update service wrapping `Updater` |
-| `src-bun/index.ts` | RPC handlers + status subscription + boot check |
-| `src/ipc/listenerRegistry.ts` | `updateEvent` fan-out channel |
-| `src/ipc/invoke.ts` | `onUpdateEvent` deferred subscriber |
-| `src/ipc/electrobunBridge.ts` | `updateEvent` message handler |
-| `src/ipc/wsBridge.ts` | `updateEvent` dispatch entry |
-| `src/ipc/types.ts` | Re-exports for update types |
-| `src/stores/app/updateStore.ts` | Pinia store |
-| `src/components/settings/UpdateSettingsSection.vue` | Settings UI |
-| `src/components/settings/SettingsPanel.vue` | Updated to include `UpdateSettingsSection` |
-| `src/App.vue` | Boot subscription + update-available toast |
+| File                                                | Role                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `electrobun.config.ts:57–68`                        | `release.baseUrl` + `generatePatch: true` placeholder                                     |
+| `src/shared/wireTypes.ts`                           | `UpdateStatusType`, `UpdateCheckResult`, `UpdateEventPayload`, 3 new `CommandMap` entries |
+| `src-bun/rpc.ts`                                    | `updateEvent: UpdateEventPayload` in `DafmanRPC.webview.messages`                         |
+| `src-bun/app/updater/updateService.ts`              | Update service wrapping `Updater`                                                         |
+| `src-bun/index.ts`                                  | RPC handlers + status subscription + boot check                                           |
+| `src/ipc/listenerRegistry.ts`                       | `updateEvent` fan-out channel                                                             |
+| `src/ipc/invoke.ts`                                 | `onUpdateEvent` deferred subscriber                                                       |
+| `src/ipc/electrobunBridge.ts`                       | `updateEvent` message handler                                                             |
+| `src/ipc/wsBridge.ts`                               | `updateEvent` dispatch entry                                                              |
+| `src/ipc/types.ts`                                  | Re-exports for update types                                                               |
+| `src/stores/app/updateStore.ts`                     | Pinia store                                                                               |
+| `src/components/settings/UpdateSettingsSection.vue` | Settings UI                                                                               |
+| `src/components/settings/SettingsPanel.vue`         | Updated to include `UpdateSettingsSection`                                                |
+| `src/App.vue`                                       | Boot subscription + update-available toast                                                |
 
 ### Status coarsening
 
 Electrobun's `UpdateStatusType` has 30+ granular states. `updateService.ts`
 maps them to a 7-value coarse set used by the renderer:
 
-| Renderer status | Electrobun states |
-|---|---|
-| `checking` | `checking`, `check-complete` |
-| `no-update` | `no-update` |
-| `update-available` | `update-available`, `local-tar-*`, `patch-*` (discovery phase) |
-| `downloading` | `download-*`, `fetching-patch`, `downloading-patch`, `applying-patch`, `patch-applied`, `extracting-version`, `patch-chain-complete`, `decompressing`, `checking-local-tar` |
-| `applying` | `applying`, `extracting`, `replacing-app`, `launching-new-version` |
-| `complete` | `complete` |
-| `error` | `error`, `patch-failed` |
+| Renderer status    | Electrobun states                                                                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checking`         | `checking`, `check-complete`                                                                                                                                                |
+| `no-update`        | `no-update`                                                                                                                                                                 |
+| `update-available` | `update-available`, `local-tar-*`, `patch-*` (discovery phase)                                                                                                              |
+| `downloading`      | `download-*`, `fetching-patch`, `downloading-patch`, `applying-patch`, `patch-applied`, `extracting-version`, `patch-chain-complete`, `decompressing`, `checking-local-tar` |
+| `applying`         | `applying`, `extracting`, `replacing-app`, `launching-new-version`                                                                                                          |
+| `complete`         | `complete`                                                                                                                                                                  |
+| `error`            | `error`, `patch-failed`                                                                                                                                                     |
 
 ### Boot-time check
 
@@ -158,14 +158,14 @@ auto-update is disabled on the dev channel.
 
 ## Open Questions
 
-| Question | Recommended default |
-|---|---|
-| Should the boot check run automatically on all channels, or only canary/stable? | Auto-check on all packaged channels (dev is already excluded by Electrobun). |
+| Question                                                                                              | Recommended default                                                                                                          |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Should the boot check run automatically on all channels, or only canary/stable?                       | Auto-check on all packaged channels (dev is already excluded by Electrobun).                                                 |
 | Should `downloadAndApplyUpdate` be one atomic operation or two separate buttons (Download / Restart)? | One button for simplicity; the three-state UI (idle → "Download & Apply" → "Restart to apply") already separates the phases. |
-| Should updates auto-download without user action? | No — too disruptive. User-initiated only. |
-| Should the check interval be periodic (every N hours) rather than once at boot? | Once at boot is sufficient for now; add periodic if release cadence increases. |
-| Should there be a channel-switch UI in Settings? | Out of scope — channel is baked into the build. |
-| Should failed update downloads be retried? | Electrobun handles internal retries implicitly via the full-bundle fallback. No extra retry needed. |
+| Should updates auto-download without user action?                                                     | No — too disruptive. User-initiated only.                                                                                    |
+| Should the check interval be periodic (every N hours) rather than once at boot?                       | Once at boot is sufficient for now; add periodic if release cadence increases.                                               |
+| Should there be a channel-switch UI in Settings?                                                      | Out of scope — channel is baked into the build.                                                                              |
+| Should failed update downloads be retried?                                                            | Electrobun handles internal retries implicitly via the full-bundle fallback. No extra retry needed.                          |
 
 ---
 
@@ -197,6 +197,7 @@ bun run build:canary   # or: bun run build  (for stable)
 ```
 
 Output: `build/` directory containing:
+
 - `dafman-Setup-canary.exe` (self-extracting installer)
 - `dafman-canary-win-x64-<hash>.tar.zst` (the app bundle)
 
@@ -204,16 +205,17 @@ Output: `build/` directory containing:
 
 After each build, the following files must be uploaded to `<baseUrl>/`:
 
-| File | Content |
-|---|---|
-| `win-x64-canary-update.json` | `{ "version": "...", "hash": "<sha256 of .tar.zst>" }` |
-| `win-x64-canary-<prevHash>.patch` | bsdiff delta from the previous release's `.tar.zst` to this one |
-| `win-x64-canary-<hash>.tar.zst` | Full bundle (only required if delta chain fails / first release) |
+| File                              | Content                                                          |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `canary-win-x64-update.json`      | `{ "version": "...", "hash": "<sha256 of .tar.zst>" }`           |
+| `canary-win-x64-<prevHash>.patch` | bsdiff delta from the previous release's `.tar.zst` to this one  |
+| `canary-win-x64-<hash>.tar.zst`   | Full bundle (only required if delta chain fails / first release) |
 
-The `<platform>-<channel>-update.json` filename convention is derived by
-Electrobun's `getPlatformPrefix(channel, os, arch)` helper
-(`Updater.ts:198–202`). For `stable` channel on Windows x64, the file would be
-`win-x64-stable-update.json`.
+The `{channel}-{os}-{arch}` prefix is produced by Electrobun's
+`getPlatformPrefix(channel, os, arch)` helper (`Updater.ts:198–202`): the order
+is **channel first**, then os, then arch. For the `stable` channel on Windows
+x64, the prefix is `stable-win-x64` and the manifest is
+`stable-win-x64-update.json`.
 
 When `generatePatch: true` is set, the `electrobun build` CLI automatically
 generates the `.patch` file by diffing against the previous release (if it can
@@ -233,8 +235,9 @@ GET <baseUrl>/<platform>-<hash>.patch   (delta path)
 ### 5. Verify
 
 After uploading, run:
+
 ```bash
-curl https://releases.example.com/dafman/win-x64-canary-update.json
+curl https://releases.example.com/dafman/canary-win-x64-update.json
 # should return: {"version":"<ver>","hash":"<hash>"}
 ```
 
@@ -243,6 +246,7 @@ curl https://releases.example.com/dafman/win-x64-canary-update.json
 ## Implementation Phases
 
 ### Phase 1 — Client (this PR) ✅
+
 - `updateService.ts` wrapping Electrobun `Updater`
 - RPC commands: `checkForUpdate`, `downloadAndApplyUpdate`, `getUpdateStatus`
 - Push channel: `updateEvent` bun→renderer
@@ -252,6 +256,7 @@ curl https://releases.example.com/dafman/win-x64-canary-update.json
 - Update-available toast in `App.vue`
 
 ### Phase 2 — Release hosting (future)
+
 - CI workflow (`electrobun build` + upload artifacts to `baseUrl`)
 - GitHub Actions or equivalent: build matrix (win/mac/linux × x64/arm64),
   upload `.tar.zst` + `update.json` + `.patch` files, sign releases
@@ -259,12 +264,43 @@ curl https://releases.example.com/dafman/win-x64-canary-update.json
 - Smoke test: install canary, push a new version, verify in-app update applies
 
 ### Phase 3 — Polish (future)
+
 - Periodic check (e.g., every 6 hours) in addition to the boot check
 - Changelog/release notes in the update toast (requires structured data in `update.json`)
 - Per-channel `baseUrl` override in settings (for testing against staging)
 - Progress bar for delta download in `UpdateSettingsSection.vue`
 
 ---
+
+## Security / Threat Model
+
+**Electrobun 1.18.1 does not cryptographically sign update artifacts.**
+The `hash` field in `update.json` is a build change-detector (derived from the
+`.tar.zst` content) used to identify which delta patch to fetch. It is _not_ a
+signed digest — there is no public key, no signature file, and no verification
+step in `Updater.ts`.
+
+Integrity therefore relies on three controls:
+
+1. **HTTPS-only `baseUrl` (enforced in code)** — `updateService.checkForUpdate()`
+   now refuses to proceed if the baked-in `baseUrl` does not start with
+   `https://`. Unsigned artifacts over plaintext HTTP are unacceptable.
+   See `src-bun/updateService.ts:checkForUpdate`.
+
+2. **Locked-down, access-controlled release bucket** — the host serving
+   `{prefix}-update.json` and `{prefix}-*.patch` must allow public reads but
+   restrict writes to CI/CD service accounts only. Compromising the bucket
+   breaks the entire update chain regardless of transport security.
+
+3. **bspatch binary-exact patch application** — a delta patch applies against
+   the exact installed binary (verified by bspatch's internal diffing). A patch
+   crafted for a different binary version will fail to apply, providing a weak
+   form of version pinning (but not tamper-resistance against a bucket
+   compromise).
+
+**Follow-up:** real signature verification (Ed25519 or similar) is gated on an
+Electrobun release that supports artifact signing. Until then, the HTTPS +
+locked bucket controls are the security boundary. Track this at Phase 2.
 
 ## References
 

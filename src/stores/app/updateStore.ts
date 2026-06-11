@@ -57,7 +57,12 @@ export const useUpdateStore = defineStore('update', () => {
     updateAvailable.value = result.updateAvailable;
     updateReady.value = result.updateReady;
     latestVersion.value = result.version;
-    if (!result.updateAvailable) {
+    // Branch on error FIRST — a failed check must not look like "up to date".
+    if (result.error) {
+      status.value = 'error';
+      statusMessage.value = result.error;
+      errorMessage.value = result.error;
+    } else if (!result.updateAvailable) {
       status.value = 'no-update';
       statusMessage.value = 'You are on the latest version.';
     }

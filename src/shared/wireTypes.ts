@@ -972,13 +972,13 @@ export type CommandMap = {
     args: { recentLimit?: number };
     result: { recent: AuditEntry[] };
   };
-// hint: Logic changed on both sides. Requires understanding intent of each change.
   searchSessionTranscripts: {
     args: {
       query: string;
       options?: { sessionIds?: string[]; limit?: number };
     };
     result: TranscriptSearchResult[];
+  };
   // ---------- Auto-update ----------
   checkForUpdate: {
     args: Record<string, never>;

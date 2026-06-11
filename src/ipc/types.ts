@@ -59,7 +59,6 @@ export type {
   TerminalSummary,
   ThemeChoice,
   ToolsPrefs,
-// hint: Logic changed on both sides. Requires understanding intent of each change.
   TranscriptMatch,
   TranscriptSearchResult,
   UpdateCheckResult,
