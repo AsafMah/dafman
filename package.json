@@ -141,7 +141,6 @@
     "lexical": "0.44.0",
     "typescript-eslint": "^8.60.0"
   },
-
   "patchedDependencies": {
     "lexical-vue@0.14.1": "patches/lexical-vue@0.14.1.patch"
   }
