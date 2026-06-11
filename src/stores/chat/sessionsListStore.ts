@@ -276,12 +276,37 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
 
   // ─── Main grouped computed ─────────────────────────────────────────
 
+  /// Set of session IDs that have a live panel in any inner dockview group.
+  /// Walks `innerBodiesCache` (authoritative for unmounted groups) then
+  /// falls back to `innerApis[g.id]?.toJSON()` for live-mounted groups.
+  /// Mirrors the walking pattern in `buildSessionGroupMap`.
+  const liveOpenSessionIds = computed<Set<string>>(() => {
+    const set = new Set<string>();
+
+    for (const g of groupsStore.groups) {
+      const body = groupsStore.innerBodiesCache[g.id] ?? groupsStore.innerApis[g.id]?.toJSON();
+
+      for (const sid of extractPanelIdsFromBody(body)) {
+        set.add(sid);
+      }
+    }
+
+    return set;
+  });
+
+  /// True when any filter (showOnlyOpen or a non-empty search query) is
+  /// active. Used by the template to distinguish "filter empty" from
+  /// "catalog empty".
+  const isFilterActive = computed(
+    () => viewState.value.showOnlyOpen || viewState.value.searchQuery.trim().length > 0,
+  );
+
   /// Ordered, filtered, grouped session list derived from `viewState`.
   /// Single source of truth — the component renders this directly.
   const grouped = computed<SessionGroup[]>(() => {
     const vs = viewState.value;
     // Apply showOnlyOpen before text-search so the count stays accurate.
-    const openIds = vs.showOnlyOpen ? new Set(sessionsStore.sessions.map((s) => s.id)) : null;
+    const openIds = vs.showOnlyOpen ? liveOpenSessionIds.value : null;
     const source =
       openIds !== null ? sessions.value.filter((s) => openIds.has(s.sessionId)) : sessions.value;
     const filtered = filterSessions(source, vs.searchQuery);
@@ -544,6 +569,7 @@ export const useSessionsListStore = defineStore('sessionsList', () => {
     hasLoaded,
     viewState,
     grouped,
+    isFilterActive,
     refresh,
     upsertLiveSession,
     deleteSession,

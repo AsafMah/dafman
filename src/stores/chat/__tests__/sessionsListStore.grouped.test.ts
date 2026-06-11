@@ -9,6 +9,7 @@ import { useSessionsListStore, type SessionPaneViewState } from '@/stores/chat/s
 import { setRpcBridge, type RpcBridge } from '@/ipc/invoke';
 import type { CommandMap, CommandName, SessionMetadataSummary } from '@/ipc/types';
 import { _resetSessionsStoreForTest } from '@/stores/chat/sessionsStore';
+import { useGroupsStore } from '@/stores/shell/groupsStore';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -430,5 +431,85 @@ describe('SessionPaneViewState defaults', () => {
     expect(store.viewState.sortDir).toBe('desc');
     expect(store.viewState.colorByGroup).toBe(false);
     expect(store.viewState.searchQuery).toBe('');
+  });
+});
+
+// ─── showOnlyOpen — derived from live dockview panels ─────────────────────────
+
+describe('grouped — showOnlyOpen uses live dockview panels', () => {
+  test('showOnlyOpen=false: all catalog sessions appear', () => {
+    const store = useSessionsListStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS, grouping: 'flat', showOnlyOpen: false });
+    store.sessions = [makeSession({ sessionId: 'open-a' }), makeSession({ sessionId: 'closed-b' })];
+
+    // No groups/panels — all sessions still appear.
+    expect(store.grouped[0]!.sessions).toHaveLength(2);
+  });
+
+  test('showOnlyOpen=true: shows only sessions with a live dockview panel', () => {
+    const store = useSessionsListStore();
+    const groups = useGroupsStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS, grouping: 'flat', showOnlyOpen: true });
+    store.sessions = [makeSession({ sessionId: 'open-a' }), makeSession({ sessionId: 'closed-b' })];
+
+    // Seed a group with 'open-a' in its body cache; 'closed-b' has no panel.
+    const fakeGroupId = 'group-1';
+
+    groups.groups = [{ id: fakeGroupId, name: 'Group 1', color: '#abc' }];
+    groups.innerBodiesCache = {
+      [fakeGroupId]: { panels: { 'open-a': { id: 'open-a', component: 'chat' } }, grid: {} },
+    };
+
+    const sessions = store.grouped[0]!.sessions;
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.sessionId).toBe('open-a');
+  });
+
+  test('showOnlyOpen=true with empty groups: shows no sessions', () => {
+    const store = useSessionsListStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS, grouping: 'flat', showOnlyOpen: true });
+    store.sessions = [makeSession({ sessionId: 'a' }), makeSession({ sessionId: 'b' })];
+    // No groups registered → liveOpenSessionIds is empty.
+
+    // grouped[0] may be undefined when flat has 0 sessions (no group emitted).
+    const allSessions = store.grouped.flatMap((g) => g.sessions);
+
+    expect(allSessions).toHaveLength(0);
+  });
+});
+
+// ─── isFilterActive ────────────────────────────────────────────────────────────
+
+describe('isFilterActive', () => {
+  test('false when no filter is active', () => {
+    const store = useSessionsListStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS });
+    expect(store.isFilterActive).toBe(false);
+  });
+
+  test('true when showOnlyOpen is set', () => {
+    const store = useSessionsListStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS, showOnlyOpen: true });
+    expect(store.isFilterActive).toBe(true);
+  });
+
+  test('true when searchQuery is non-empty', () => {
+    const store = useSessionsListStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS, searchQuery: 'hello' });
+    expect(store.isFilterActive).toBe(true);
+  });
+
+  test('false when searchQuery is whitespace-only', () => {
+    const store = useSessionsListStore();
+
+    Object.assign(store.viewState, { ...DEFAULTS, searchQuery: '  ' });
+    expect(store.isFilterActive).toBe(false);
   });
 });

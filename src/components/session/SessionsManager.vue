@@ -38,7 +38,8 @@ const toasts = useToastStore();
 const confirm = useConfirm();
 const { displayTitle } = useSessionSelectors();
 
-const { grouped, isLoading, hasLoaded, error, viewState } = storeToRefs(sessionsList);
+const { grouped, isLoading, hasLoaded, error, viewState, isFilterActive } =
+  storeToRefs(sessionsList);
 const { ready: clientReady, isCreating: isCreatingClient } = storeToRefs(clientStore);
 const { isCreating: isCreatingSession } = storeToRefs(sessionsStore);
 const { settings } = storeToRefs(settingsStore);
@@ -486,14 +487,17 @@ const sessionGroupColor = computed((): Map<string, string> => {
   return map;
 });
 
-/// Background-tint style for a session row: low-opacity group color so
-/// text stays legible. Unassigned sessions (no group) get no tint.
-function rowGroupColorStyle(sessionId: string): { backgroundColor: string } | undefined {
+/// Background-tint style for a session row: sets the CSS custom property
+/// `--session-group-tint` so the base `.session-row` rule applies it as
+/// `background-color`. Hover / is-open / is-resuming rules come after in
+/// the stylesheet and override via the `background` shorthand, so state
+/// feedback is never clobbered by the tint.
+function rowGroupColorStyle(sessionId: string): Record<string, string> | undefined {
   const color = sessionGroupColor.value.get(sessionId);
 
   if (!color) return undefined;
 
-  return { backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)` };
+  return { '--session-group-tint': `color-mix(in srgb, ${color} 12%, transparent)` };
 }
 
 void toasts; // referenced inside async handlers
@@ -651,16 +655,22 @@ void toasts; // referenced inside async handlers
         Loading sessions…
       </p>
       <p
-        v-else-if="hasLoaded && grouped.length === 0"
+        v-else-if="hasLoaded && grouped.length === 0 && !isFilterActive"
         class="state-message"
       >
         No sessions yet.
       </p>
       <p
+        v-else-if="hasLoaded && grouped.length === 0 && isFilterActive"
+        class="state-message"
+      >
+        No matching sessions.
+      </p>
+      <p
         v-else-if="hasLoaded && grouped.every((g) => g.sessions.length === 0)"
         class="state-message"
       >
-        No sessions match the current filter.
+        No matching sessions.
       </p>
 
       <section
@@ -1183,7 +1193,10 @@ void toasts; // referenced inside async handlers
   align-items: stretch;
   border-radius: var(--p-border-radius-md);
   margin: 0 0.4rem;
-  /* border-left applied inline when colorByGroup is on */
+  /* Group tint is applied via --session-group-tint so hover/open/resuming
+   * rules (which use the `background` shorthand further down) can still
+   * override it without being clobbered by an inline backgroundColor. */
+  background-color: var(--session-group-tint, transparent);
   box-sizing: border-box;
 }
 
