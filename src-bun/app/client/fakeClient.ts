@@ -114,10 +114,7 @@ class FakeCopilotSession {
     // payloads. Individual flows can override via setSendScript.
     this.rpc = {
       mode: {
-        // The real SDK's mode.get() resolves a bare mode string (the
-        // metadata service validates `result === 'interactive' | 'plan' |
-        // 'autopilot'`), not a `{ mode }` envelope.
-        get: async () => 'interactive',
+        get: async () => ({ mode: 'interactive' }),
         set: async () => undefined,
       },
       name: {

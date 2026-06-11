@@ -20,7 +20,6 @@ import LibraryToolsTab from '@/components/library/LibraryToolsTab.vue';
 import LibrarySkillsTab from '@/components/library/LibrarySkillsTab.vue';
 import LibraryAgentsTab from '@/components/library/LibraryAgentsTab.vue';
 import LibraryInstructionsTab from '@/components/library/LibraryInstructionsTab.vue';
-import LibrarySnippetsTab from '@/components/library/LibrarySnippetsTab.vue';
 import { on as busOn } from '@/lib/bus';
 
 // Persist the last-active tab across panel re-mounts so toggling the
@@ -85,7 +84,6 @@ onBeforeUnmount(() => {
         <Tab value="skills">Skills</Tab>
         <Tab value="agents">Agents</Tab>
         <Tab value="instructions">Instructions</Tab>
-        <Tab value="snippets">Snippets</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="mcp">
@@ -102,9 +100,6 @@ onBeforeUnmount(() => {
         </TabPanel>
         <TabPanel value="instructions">
           <LibraryInstructionsTab />
-        </TabPanel>
-        <TabPanel value="snippets">
-          <LibrarySnippetsTab />
         </TabPanel>
       </TabPanels>
     </Tabs>
